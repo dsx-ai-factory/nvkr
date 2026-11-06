@@ -2,8 +2,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Regenerate THIRD_PARTY_NOTICES.md from the modules linked into nvkr and
-# the local nvke-demo command and private site identity helper. Tools invoked as separate processes are excluded: they
+# Regenerate THIRD_PARTY_NOTICES.md from the modules linked into nvkr, the
+# local nvke-demo command, the private site identity helper and the results
+# publisher. Tools invoked as separate processes are excluded: they
 # are not linked, so Apache-2.0 section 4(d) does not reach them.
 #
 # The linked-module set is the union over GOOS in {linux, darwin} at
@@ -43,7 +44,7 @@ trap 'rm -f "$linked" "$generated"' EXIT
 # order keeps the file identical under any locale (CI sorts in C).
 for goos in linux darwin; do
   GOOS="$goos" GOARCH=amd64 \
-    go list -deps -f '{{if .Module}}{{.Module.Path}}{{end}}' ./cmd/nvkr ./cmd/nvke-demo ./cmd/nvkr-site-identity-helper
+    go list -deps -f '{{if .Module}}{{.Module.Path}}{{end}}' ./cmd/nvkr ./cmd/nvke-demo ./cmd/nvkr-site-identity-helper ./cmd/nvkr-results-publish
 done | LC_ALL=C sort -u | grep -v '^$' | grep -v '^github.com/dsx-ai-factory/nvkr' > "$linked"
 
 python3 scripts/gen_notices.py "$linked" > "$generated"

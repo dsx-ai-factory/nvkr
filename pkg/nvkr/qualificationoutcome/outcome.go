@@ -321,6 +321,17 @@ func compareChecks(a, b Check) int {
 // FormatTime renders an outcome time: RFC 3339 in UTC without trailing zeros.
 func FormatTime(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
 
+// Times returns the outcome's start and finish, refusing a time Validate would.
+func (o Outcome) Times() (started, finished time.Time, err error) {
+	if started, err = parseTime("startedAt", o.StartedAt); err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	if finished, err = parseTime("finishedAt", o.FinishedAt); err != nil {
+		return time.Time{}, time.Time{}, err
+	}
+	return started, finished, nil
+}
+
 func parseTime(name, value string) (time.Time, error) {
 	parsed, err := time.Parse(time.RFC3339Nano, value)
 	if err != nil || parsed.IsZero() || parsed.Location() != time.UTC || parsed.Format(time.RFC3339Nano) != value {

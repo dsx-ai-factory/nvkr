@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="nvke-m2" tests="1" failures="1" skipped="0">
+  <testcase name="producer">
+    <failure message="the producer Run concluded failure, so nothing was qualified">the producer Run concluded failure, so nothing was qualified</failure>
+  </testcase>
+</testsuite>

@@ -391,6 +391,9 @@ reported as a failed issuance. The release tag rule, tag creation, publisher exc
 verification and interruption handling belong to the separate M4 publication step; a manifest attachment alone
 does not establish a release.
 
+Proposed ADR-31 indexes each production qualification attempt, failures included, as an unsigned outcome that
+points at this evidence and manifest by digest. The index grants no qualification, manifest or release authority.
+
 Full disk inspection/material reconciliation, waivers, offline pull-request qualification, a dedicated
 verify-only dispatch and cross-run qualification reuse are deferred hardening. External qualification suites such as
 NVKE's have a reserved integration boundary: results must be independently authenticated and bound to exact

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="nvke-m2" tests="4" failures="1" skipped="1">
+  <testcase name="tool/build-signature-and-provenance"></testcase>
+  <testcase name="tool/delivered-tool-version"></testcase>
+  <testcase name="tool/sbom-attestation">
+    <skipped message="not required in this lane">not required in this lane</skipped>
+  </testcase>
+  <testcase name="release-manifest/issue">
+    <failure message="NVKR-E-IMMUTABLE-VIOLATION: release manifest read-back differs">NVKR-E-IMMUTABLE-VIOLATION: release manifest read-back differs</failure>
+  </testcase>
+</testsuite>

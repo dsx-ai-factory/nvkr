@@ -504,6 +504,8 @@ verification record. Resolution and closure retrieval use the same admitted cred
 NVIDIA's hosted workflow publishes signed artifact bytes to its configured OCI registry. ADR-04 owns keyless
 signature/attestation storage and ADR-16 owns evidence tiers and full release acceptance. The compiler generates
 one release index from named outputs; normal authors do not wire payload → root → route.
+Proposed ADR-31's qualification results index is not artifact publication: it writes unsigned descriptions of
+qualification attempts, never artifact bytes, to a separate object store whose target is not part of `publication`.
 
 GitHub-hosted GHCR publication admits the exact destination packages before payload upload. The target
 package and all output/evidence sibling packages must have API-confirmed private/internal visibility and
