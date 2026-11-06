@@ -1091,14 +1091,20 @@ principals; selecting a namespace or protected environment alone cannot enforce 
 Development and production have separate generated layouts and concurrency groups (ADR-21). Unsigned
 development cancels superseded same-branch Runs and retains helpers/carriers for one day. Signed development,
 like production, is non-canceling and retains helpers/carriers for seven days to cover native disk budgets.
-Final Run records and production qualification handoffs retain seven days and disk diagnostics one day. Provider cancellation or runner loss can
+Final Run records and production qualification handoffs retain seven days and disk diagnostics one day.
+The production qualifier's unsigned qualification outcome (ADR-17 §4) also retains seven days. It is uploaded
+as `nvkr-qualification-outcome-<run>-<attempt>` for any result except a canceled job (`!cancelled()`), and
+the job output `outcome-written` reports whether the command wrote it. The upload is best effort and never
+fails the job. In a public repository anyone who can read the repository can download the artifact while it
+is kept, so redaction, not retention, protects it. Provider cancellation or runner loss can
 prevent finalization. Release finalizers have a dedicated two-hour job budget for bootstrap, bounded
 carrier acquisition/restoration, complete-release authentication and record uploads; the fifteen-minute
 utility-job budget does not apply. This bound is not evidence of successful hosted completion.
 Expired carriers require a complete new Run. Object-store copies use immutable content keys and original
 proofs under ADR-20; a new Run does not overwrite an earlier copy or imply its removal. Signed development uses
 per-attempt registry namespaces and the same authenticated earlier-attempt reuse as production.
-These retention periods govern provider locator records. Private carrier blobs have no automatic expiry
+Apart from the qualification outcome, which is the record itself, these retention periods govern provider
+locator records. Private carrier blobs have no automatic expiry
 in this implementation; registry retention must be managed separately, without removing active Run inputs.
 ADR-20 owns the separate default-branch registry cleanup protocol. Actual dispatch, credential/pool
 isolation, provider expiry and remote deletion require external evidence.

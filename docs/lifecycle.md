@@ -584,6 +584,44 @@ qualification-only output shape. Neither mode creates a release tag, moves a cha
 clearance or establishes full-release consumer acceptance. Hosted OIDC and registry acceptance remain
 subject to the evidence recorded in reconciliation.
 
+The generated production qualifier also records each attempt's qualification outcome with `--out`:
+
+```sh
+nvkr run qualify --policy qualification.yaml --issue-manifest \
+  --out ".nvkr/qualification-outcome/outcome-${GITHUB_RUN_ATTEMPT}.json"
+```
+
+The canonical `nvkr.dev/qualification-outcome/v1` record is written whatever the result: passed, failed in
+qualification or manifest issuance, or errored before qualification produced per-output checks. An errored
+outcome copies its source Run from the `workflow_run` event and marks it `unauthenticated-event`. The record
+names the source and qualifier Runs, the attempt's start and finish times, each output's checks and smoke
+verdicts, the coded error, the evidence and manifest digests, and the canonical diagnostics. The times stay
+outside the diagnostics, so they change no digest; an outcome that would exceed 4 MiB drops the diagnostics,
+which the job log keeps, and says so. An uploaded artifact is not masked like a job log, so the qualify
+step's secret values, their URL-escaped forms and any base64 value that decodes to one, GitHub tokens,
+JWTs, `gs://` URLs and email-shaped principals are redacted, and messages keep at most 140 bytes, from their
+start and their end. A base64 value cut short may keep a secret's first and last byte or two, and other
+encodings of a secret are not redacted.
+
+`--out` requires `--issue-manifest`. Before qualification starts, it admits the qualifier's GitHub Actions
+identity, the `workflow_run` event and the errored record it would yield, secrets long enough to redact, and a
+destination it can write (not a directory); a refusal stops the command before any qualification work. Stdout
+and the exit status do not otherwise change: if the record cannot be written after qualification, the command
+prints a coded error and keeps the qualification's exit status. `--out` writes the file owner-only (0600); an
+uploaded artifact keeps no file mode, so redaction is what protects it. The file is
+replaced atomically, so a reused `--out` path keeps an earlier attempt's complete record when a later attempt
+writes none. Use a fresh, attempt-specific path, as the generated job does; a caller that reuses a path must
+compare the record's qualifier Run ID and attempt before treating it as the current attempt's record. The
+generated job uploads the record as
+`nvkr-qualification-outcome-<run>-<attempt>`, kept seven days, for any result except a canceled job, and exports
+`outcome-written`. The upload is best effort: its failure never fails the job, and `outcome-written` reports only
+that the command wrote the file. No record exists for an attempt that ends before the command runs (such as a
+failed setup step or an empty source credential), that the command refuses before qualification, whose
+command times out before writing it (a caller's work deadline, or the runner stopping the step at its
+timeout), or whose record cannot be written; `outcome-written` is then `false`. A canceled job writes none
+either, and its `outcome-written` is empty because the presence step does not run. An outcome is a
+description: it grants no qualification, manifest or release authority, and no publisher consumes it yet.
+
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
 Actions workflow; the operator does not write or maintain a separate worker implementation. The maintained

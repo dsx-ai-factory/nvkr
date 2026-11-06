@@ -366,6 +366,15 @@ independently selected qualification identity, and is attested to the publicatio
 A manifest attachment alone is not a published release; tags, channels and revocation are separate.
 _Avoid_: Release clearance, ReleaseSet, qualified release, tag
 
+**Qualification outcome**:
+An unsigned description of one release qualification attempt: passed, failed in qualification or manifest
+issuance, or errored, with the source and qualifier Runs, attempt times, per-output checks and scrubbed error
+text. It points at the qualification evidence and release manifest by digest and grants no qualification,
+manifest, release or publication authority. An errored outcome's source Run comes from the unauthenticated
+triggering event and says so. `run qualify --issue-manifest --out` writes one for each attempt it qualifies;
+publishing outcomes is not implemented.
+_Avoid_: Qualification record, qualification evidence, test result
+
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.
 _Avoid_: List of successful outputs, component catalog
