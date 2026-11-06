@@ -60,6 +60,9 @@ func vmFactoryInputs(t *testing.T, platform string, policy execution.CapabilityP
 		APIVersion: authored.EnvironmentAPIVersion, Kind: authored.EnvironmentKind,
 		Metadata: authored.Metadata{Name: "test"}, UtilityContainer: fixtureUtilityContainer,
 		UtilityPlatform: "linux/amd64",
+		ToolchainAccess: &authored.ToolchainAccess{PublicRoots: []string{
+			"docker.io/library/golang", "example.test/vm-amd64", "example.test/vm-arm64",
+		}},
 		ExecutionClasses: []execution.Class{
 			{
 				Name: "amd64-kvm", RunsOn: "linux-amd64-cpu16", HostPlatform: execution.HostPlatformLinuxAMD64,

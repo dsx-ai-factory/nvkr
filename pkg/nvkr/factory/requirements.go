@@ -58,7 +58,11 @@ func admitExecuteNodeRequirements(plan *Plan, nodeID string) error {
 	if err := rejectUnsupportedLocalPlanRequirements(plan, adapter); err != nil {
 		return err
 	}
-	return validateVMDriverPlan(plan)
+	if err := validateVMDriverPlan(plan); err != nil {
+		return err
+	}
+	_, err := plan.imageUses("local")
+	return err
 }
 
 func rejectUnsupportedPlanRequirements(plan *Plan, adapter string) error {

@@ -682,7 +682,8 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 		return e.New(e.CodeEngineCapability,
 			"local execution does not support Environment.sourceAccess authentication")
 	}
-	return nil
+	_, err := plan.imageUses("local")
+	return err
 }
 
 func admitLocalRunners(ctx context.Context, plan *Plan, options LocalRunOptions, platforms []string) error {
