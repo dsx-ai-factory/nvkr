@@ -196,9 +196,10 @@ func TestNativeSmokeNonToolScopeIsExact(t *testing.T) {
 				checks.Outputs = append(checks.Outputs, ArtifactCheckOutput{Name: "non-tool", Kind: kind, BuildDigest: nativeSmokeTestDigest("5"), Overall: "pass"})
 				if kind == OutputOCI || kind == OutputAPT || kind == OutputBundle {
 					reason := "deployment-image"
-					if kind == OutputAPT {
+					switch kind {
+					case OutputAPT:
 						reason = "package-repository"
-					} else if kind == OutputBundle {
+					case OutputBundle:
 						reason = "bundle-archive"
 					}
 					if mode != "missing" {
