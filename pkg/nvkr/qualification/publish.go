@@ -234,7 +234,7 @@ func smokeVerdicts(description lifecycle.ToolSmokeDescription) ([]Verdict, error
 		case lifecycle.OutputHelm, lifecycle.OutputDiskImage:
 			verdict.Status = "not-applicable"
 			verdict.Reason = "non-tool artifact format"
-		case lifecycle.OutputOCI, lifecycle.OutputAPT:
+		case lifecycle.OutputOCI, lifecycle.OutputAPT, lifecycle.OutputBundle:
 			verdict.Status = "not-applicable"
 			verdict.Reason = reasons[output.Name]
 		default:

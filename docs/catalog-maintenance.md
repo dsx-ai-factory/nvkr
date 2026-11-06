@@ -20,10 +20,12 @@ escapes, symlinks in selected input paths, unknown sources and missing release c
 Other committed generated bundles can depend on the same pins: a development Run, a qualification pair (whose
 manifest binds the production Plan digest) and named Runs compiled from other Definitions, such as the nightly
 bundles. The optional `developmentEnvironment`, `qualificationPolicy`, `developmentQualificationPolicy` and `additionalRuns` (a list of
-`definition` and `environment` pairs) fields name them. They are generation inputs for the existing owners, not
+`definition` and `environment` selections with an optional per-run `qualificationPolicy`) fields name them. They are generation inputs for the existing owners, not
 authority and not a way to relocate a bundle: the development Environment must select the development layout,
 and `developmentQualificationPolicy` requires `developmentEnvironment` and its dedicated development policy.
-Each qualification policy is the same policy `run generate --qualification-policy` takes. Every named Run
+Each qualification policy is the same policy `run generate --qualification-policy` takes. The GPU-site
+composite names independent production and development policies in `additionalRuns`; each pair binds the
+complete composite Release and owns its producer-specific workflow namespace. Every named Run
 must select its own bundle layout; a repeated selection or a shared layout fails with `NVKR-E-USAGE`. Refresh
 checks every named member before it resolves a pin, regenerates each through its own owner (the Run generator,
 or the qualification generator for each producer plus its pair), and repeats every check. A named Run whose

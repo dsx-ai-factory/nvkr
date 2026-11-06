@@ -18,8 +18,8 @@ import (
 
 // developmentGenerationFixture loads a recorded Plan of the combined Definition
 // under the development Environment, so the test needs no source access. The
-// committed fixed development bundle belongs to the GPU site composite, whose
-// qualification ADR-26 defers. testdata/development-plan.json is main's
+// committed fixed development bundle belongs to the GPU site composite, covered
+// separately by TestGPUCompositeQualificationPairs. testdata/development-plan.json is main's
 // .github/nvkr-dev/plan.json at f2354a5a, before that bundle moved.
 func developmentGenerationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPolicy) {
 	t.Helper()

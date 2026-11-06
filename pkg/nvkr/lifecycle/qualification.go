@@ -13,6 +13,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
@@ -64,6 +65,7 @@ type ArtifactCheckOutput struct {
 }
 
 type ArtifactCheckDescription struct {
+	Composition   *definition.CompositionRecord   `json:"composition,omitempty"`
 	GateVersion   string                          `json:"gateVersion"`
 	Origin        qualificationorigin.Description `json:"origin"`
 	Inputs        ExactInputDescription           `json:"inputs"`
@@ -316,7 +318,7 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 		}
 	}
 	report := &ArtifactCheckDescription{GateVersion: ArtifactCheckGateVersion, Origin: origin,
-		Inputs: inputDescription, CatalogDigest: plan.CatalogDigest}
+		Inputs: inputDescription, CatalogDigest: plan.CatalogDigest, Composition: plan.Composition.Clone()}
 	var failures []error
 	rootErr := verifyQualificationSubject(ctx, verifier, request.Reference, predicates[request.Reference], policy, origin)
 	evidenceFailures := map[string][]error{}

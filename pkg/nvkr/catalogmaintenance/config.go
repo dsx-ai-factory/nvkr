@@ -49,8 +49,9 @@ type Config struct {
 
 // RunInput selects one generated Run bundle by its authored inputs.
 type RunInput struct {
-	Definition  string `json:"definition"`
-	Environment string `json:"environment"`
+	QualificationPolicy string `json:"qualificationPolicy,omitempty"`
+	Definition          string `json:"definition"`
+	Environment         string `json:"environment"`
 }
 
 // maxAdditionalRuns bounds the closure a single refresh regenerates.
@@ -118,18 +119,22 @@ func (config Config) Validate() error {
 	if len(config.AdditionalRuns) > maxAdditionalRuns {
 		return e.New(e.CodeUsage, "maintenance admits at most %d additional runs", maxAdditionalRuns)
 	}
-	runs := map[RunInput]bool{{config.Definition, config.Environment}: true}
+	runs := map[[2]string]bool{{config.Definition, config.Environment}: true}
 	if config.DevelopmentEnvironment != "" {
-		runs[RunInput{config.Definition, config.DevelopmentEnvironment}] = true
+		runs[[2]string{config.Definition, config.DevelopmentEnvironment}] = true
 	}
 	for _, run := range config.AdditionalRuns {
 		if !safeRelative(run.Definition) || !safeRelative(run.Environment) {
 			return e.New(e.CodeUsage, "maintenance paths must be clean repository-relative paths: %q, %q", run.Definition, run.Environment)
 		}
-		if runs[run] {
+		if run.QualificationPolicy != "" && !safeRelative(run.QualificationPolicy) {
+			return e.New(e.CodeUsage, "additional run qualification policy requires a clean relative path")
+		}
+		key := [2]string{run.Definition, run.Environment}
+		if runs[key] {
 			return e.New(e.CodeUsage, "additional run %s with %s repeats another selected run", run.Definition, run.Environment)
 		}
-		runs[run] = true
+		runs[key] = true
 	}
 	if len(config.Sources) == 0 || len(config.Sources) > 128 {
 		return e.New(e.CodeUsage, "maintenance requires 1–128 explicit source roots")
