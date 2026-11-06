@@ -13,9 +13,35 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// Every value the generated qualify step's process sees bound to a secret or the
-// job token (workflow, job and step env), and the OIDC request token its
-// id-token: write grant adds, must be redacted.
+// outcomeNonSecretBindings are the reviewed expressions the qualify step's process
+// may see without redaction. Any other expression-bound variable must be redacted
+// (outcomeSecretEnv), so a new binding, such as a minted token from a step output,
+// fails until it is reviewed.
+var outcomeNonSecretBindings = []string{"${{ vars.NVKR_CI_STORAGE_READ_USER }}", "${{ vars.NVKR_REGISTRY_WRITE_USER }}"}
+
+// outcomeBindingFindings names each expression-bound variable in scopes that the
+// outcome neither redacts nor lists as a reviewed non-secret binding, and counts
+// the redacted ones.
+func outcomeBindingFindings(scopes []map[string]string) (findings []string, redacted int) {
+	for _, env := range scopes {
+		for name, value := range env {
+			switch {
+			case !strings.Contains(value, "${{"):
+			case slices.Contains(outcomeSecretEnv, name) || strings.HasPrefix(name, outcomeSourceTokenPrefix):
+				redacted++
+			case !slices.Contains(outcomeNonSecretBindings, value):
+				findings = append(findings, name)
+			}
+		}
+	}
+	slices.Sort(findings)
+	return findings, redacted
+}
+
+// Every expression the generated qualify step's process sees (workflow, job and
+// step env) is a redacted secret or a reviewed non-secret binding, its script
+// interpolates none, and the OIDC request token its id-token: write grant adds is
+// redacted.
 func TestQualificationGenerationOutcomeSecretsCoverStep(t *testing.T) {
 	bundle, policy := generationBundle(t)
 	workflow := decodeQualificationWorkflow(t, bundle.files[policy.QualificationWorkflow])
@@ -27,22 +53,26 @@ func TestQualificationGenerationOutcomeSecretsCoverStep(t *testing.T) {
 	for _, step := range qualify.Steps {
 		if strings.Contains(step.Run, "./nvkr-exec run qualify ") {
 			scopes = append(scopes, step.Env)
-		}
-	}
-	covered := 0
-	for _, env := range scopes {
-		for name, value := range env {
-			if !strings.Contains(value, "secrets.") && !strings.Contains(value, "github.token") {
-				continue
-			}
-			covered++
-			if !slices.Contains(outcomeSecretEnv, name) && !strings.HasPrefix(name, outcomeSourceTokenPrefix) {
-				t.Errorf("qualify step secret %s is not redacted from the outcome", name)
+			if strings.Contains(step.Run, "${{") {
+				t.Error("the qualify step's script interpolates an expression; bind it through env instead")
 			}
 		}
 	}
-	if covered < 4 {
-		t.Fatalf("found %d secret-bound env vars on the qualify step; the scan no longer sees them", covered)
+	findings, redacted := outcomeBindingFindings(scopes)
+	if len(findings) != 0 {
+		t.Errorf("qualify step variables %v are neither redacted from the outcome nor reviewed non-secret bindings", findings)
+	}
+	if redacted < 4 {
+		t.Fatalf("found %d redacted secret bindings on the qualify step; the scan no longer sees them", redacted)
+	}
+	for _, binding := range []map[string]string{
+		{"NVKR_APP_TOKEN": "${{ steps.app.outputs.token }}"},
+		{"NVKR_SECRETS": "${{ toJSON(secrets) }}"},
+		{"NVKR_REGISTRY_USER": "${{ secrets.NVKR_REGISTRY_WRITE_USER }}"},
+	} {
+		if findings, _ := outcomeBindingFindings([]map[string]string{binding}); len(findings) != 1 {
+			t.Errorf("binding %v was not reported", binding)
+		}
 	}
 }
 

@@ -347,11 +347,14 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 // only a canceled job skips it. The presence output lets a later job tell an
 // attempt that wrote no outcome from an upload it cannot see. The upload names
 // the one outcome file, so nothing else in the directory, such as an
-// interrupted write's temporary file, can reach the artifact.
+// interrupted write's temporary file, can reach the artifact. The outcome grants
+// no authority, so the upload is best effort: its failure never fails a job whose
+// qualification passed. It is kept seven days, like the production qualification
+// handoffs (ADR-18 §8).
 func qualificationOutcomeUpload(out *bytes.Buffer, plan *factory.Plan, actions pipeline.GitHubActionRefs) {
 	const notCanceled = "${{ !cancelled() }}" //nolint:misspell // GitHub status function uses this exact spelling.
 	fmt.Fprintf(out, "      - name: Record whether the qualification outcome was written\n        id: outcome\n        if: %s\n        timeout-minutes: 1\n        run: |\n          set -euo pipefail\n          written=false\n          if [ -f \"%s\" ]; then written=true; fi\n          printf 'written=%%s\\n' \"$written\" >> \"$GITHUB_OUTPUT\"\n", notCanceled, qualificationOutcomeFile)
-	fmt.Fprintf(out, "      - name: Upload the qualification outcome\n        if: %s\n        uses: %s # %s\n        timeout-minutes: 5\n        with:\n          name: %s${{ github.run_id }}-${{ github.run_attempt }}\n          path: %s/%s\n          include-hidden-files: true\n          if-no-files-found: warn\n          retention-days: 30\n", notCanceled, actions.Upload, plan.Actions["upload-artifact"].Version, qualificationoutcome.ArtifactPrefix, qualificationoutcome.Directory, qualificationoutcome.FileName("${{ github.run_attempt }}"))
+	fmt.Fprintf(out, "      - name: Upload the qualification outcome\n        if: %s\n        uses: %s # %s\n        timeout-minutes: 5\n        continue-on-error: true\n        with:\n          name: %s${{ github.run_id }}-${{ github.run_attempt }}\n          path: %s/%s\n          include-hidden-files: true\n          if-no-files-found: warn\n          retention-days: 7\n", notCanceled, actions.Upload, plan.Actions["upload-artifact"].Version, qualificationoutcome.ArtifactPrefix, qualificationoutcome.Directory, qualificationoutcome.FileName("${{ github.run_attempt }}"))
 }
 
 func qualificationPermissions(out *bytes.Buffer, indent string, _ bool) {

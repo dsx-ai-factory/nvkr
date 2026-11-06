@@ -160,7 +160,8 @@ func QualifierFromEnv(lookup func(string) (string, bool)) (Run, error) {
 // FromEvent describes an attempt without per-output checks, taking the source Run
 // from the event. Stage producer is a producer Run that did not succeed; stage
 // qualify is a qualifier that ended before qualification produced per-output
-// checks. Both are errored.
+// checks. Both are errored. A qualify-stage outcome is provisional: Marshal
+// refuses it until its Error names the cause.
 func FromEvent(event Event, qualifier Run, stage Stage, startedAt, finishedAt time.Time) (Outcome, error) {
 	if event.Repository != event.HeadRepository {
 		return Outcome{}, invalid("has a source Run built from another repository's head")

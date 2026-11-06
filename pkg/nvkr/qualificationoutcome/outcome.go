@@ -151,15 +151,15 @@ func Decode(raw []byte) (Outcome, error) {
 	if err := canonical.UnmarshalExact(raw, &outcome); err != nil {
 		return Outcome{}, e.Wrap(e.CodeVerifyFailed, err, "decoding qualification outcome")
 	}
-	if err := outcome.Validate(); err != nil {
+	if err := outcome.validateRecord(); err != nil {
 		return Outcome{}, err
 	}
 	return outcome, nil
 }
 
-// Marshal validates the outcome and returns its canonical bytes.
+// Marshal validates the outcome as a record and returns its canonical bytes.
 func (o Outcome) Marshal() ([]byte, error) {
-	if err := o.Validate(); err != nil {
+	if err := o.validateRecord(); err != nil {
 		return nil, err
 	}
 	raw, err := canonical.Marshal(o)
@@ -172,8 +172,22 @@ func (o Outcome) Marshal() ([]byte, error) {
 	return raw, nil
 }
 
-// Validate admits only a complete, internally consistent outcome. It checks the
-// description's shape and authenticates none of its claims.
+// validateRecord admits an outcome that is written or decoded: it must pass
+// Validate, and an errored qualify attempt must name its cause.
+func (o Outcome) validateRecord() error {
+	if err := o.Validate(); err != nil {
+		return err
+	}
+	if o.Status == StatusErrored && o.Stage == StageQualify && o.Error == nil {
+		return invalid("an errored qualify attempt requires its error")
+	}
+	return nil
+}
+
+// Validate admits only an internally consistent outcome. It checks the
+// description's shape and authenticates none of its claims. It also admits a
+// provisional errored qualify outcome without its error, which admission checks
+// before any error exists; Marshal and Decode refuse that as a record.
 func (o Outcome) Validate() error {
 	if o.SchemaVersion != SchemaVersion || o.Lane != LanePipelineAttested {
 		return invalid("has an unsupported schema version or lane")
@@ -254,7 +268,9 @@ func (o Outcome) validateStatus() error {
 			return invalid("failed requires an authenticated qualify or manifest stage and an error; only a manifest stage carries a manifest")
 		}
 	case StatusErrored:
-		// No error is required: a failed producer has no qualifier error of its own.
+		// No error is required here: a failed producer has no qualifier error of its
+		// own, and admission validates a provisional qualify record before any error
+		// exists. A written or decoded qualify record needs one (validateRecord).
 		if (o.Stage != StageProducer && o.Stage != StageQualify) || o.SourceIdentity != SourceUnauthenticatedEvent || len(o.Checks) != 0 ||
 			o.EvidenceDigest != "" || manifest {
 			return invalid("errored requires a producer or qualify stage from the event, and no checks, evidence or manifest")

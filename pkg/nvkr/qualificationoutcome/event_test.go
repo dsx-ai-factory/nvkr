@@ -121,6 +121,12 @@ func TestQualificationOutcomeEvent(t *testing.T) {
 			if !event.RunStartedAt.Equal(time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)) || event.Action != "completed" || event.HeadBranch != "main" {
 				t.Fatal("event description lost its Run fields")
 			}
+			if tc.stage == StageQualify {
+				// A qualify record from the event is provisional until it names its cause.
+				_, err := outcome.Marshal()
+				requireCode(t, err, e.CodeVerifyFailed)
+				outcome.Error = &Failure{Code: string(e.CodeTrustPolicyMissing), Message: "qualification policy refused"}
+			}
 			raw, err := outcome.Marshal()
 			if err != nil {
 				t.Fatal(err)

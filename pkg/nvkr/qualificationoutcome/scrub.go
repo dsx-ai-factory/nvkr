@@ -5,7 +5,9 @@ package qualificationoutcome
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
+	"net/url"
 	"regexp"
 	"sort"
 	"strings"
@@ -38,12 +40,17 @@ var (
 	// Credentials that are not in the job's environment, such as an OIDC token
 	// minted while signing, are found by shape: GitHub tokens and JWTs.
 	credentialPattern = regexp.MustCompile(`\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,})|eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*`)
+	// A run of base64 text in either alphabet, padded or not, long enough to hold
+	// a secret: MinSecretBytes encode to six characters.
+	base64Run       = regexp.MustCompile(`[A-Za-z0-9+/_-]{6,}={0,2}`)
+	base64Encodings = []*base64.Encoding{base64.StdEncoding, base64.URLEncoding, base64.RawStdEncoding, base64.RawURLEncoding}
 )
 
 // Scrub prepares untrusted diagnostic text for an outcome. It redacts each secret
-// value and each line of a multi-line one, GitHub tokens and JWTs, gs:// URLs and
-// email-shaped principals, turns control characters and invalid UTF-8 into plain
-// text, and keeps at most MaxMessageBytes: the head and the tail around a marker.
+// value and each line of a multi-line one, with their URL-escaped and base64 forms
+// (secretTerms), GitHub tokens and JWTs, gs:// URLs and email-shaped principals,
+// turns control characters and invalid UTF-8 into plain text, and keeps at most
+// MaxMessageBytes: the head and the tail around a marker.
 // A job log masks secrets, but an uploaded artifact does not. Scrub is
 // idempotent, so Decode can require scrubbed text without knowing the secrets.
 func Scrub(text string, secrets []string) string {
@@ -115,6 +122,17 @@ func redactValue(value any, terms []string) any {
 }
 
 func redact(text string, terms []string) string {
+	if len(terms) > 0 {
+		// A base64 value that decodes to a secret goes whole, so neither a short
+		// secret nor the bytes base64 mixes with its neighbors survive. The terms'
+		// base64 forms still catch a value that does not decode, such as a cut one.
+		text = base64Run.ReplaceAllStringFunc(text, func(run string) string {
+			if decodesToSecret(run, terms) {
+				return redacted
+			}
+			return run
+		})
+	}
 	for _, term := range terms {
 		text = strings.ReplaceAll(text, term, redacted)
 	}
@@ -123,23 +141,59 @@ func redact(text string, terms []string) string {
 	return principalPattern.ReplaceAllString(text, redacted)
 }
 
+// decodesToSecret reports whether run is base64 for text containing a term.
+func decodesToSecret(run string, terms []string) bool {
+	for _, encoding := range base64Encodings {
+		decoded, err := encoding.DecodeString(run)
+		if err != nil {
+			continue
+		}
+		for _, term := range terms {
+			if strings.Contains(string(decoded), term) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // secretTerms lists each secret and each of its lines, trimmed (surrounding space
-// is not secret), longest first, so a secret that contains another is redacted
-// whole.
+// is not secret), with their URL-escaped and base64 forms, longest first, so a
+// secret that contains another is redacted whole. A base64 form encodes the
+// secret's whole 3-byte groups at each of the three alignments it can have inside
+// a longer encoded value. redact removes a base64 value that decodes to a secret
+// whole, so these forms matter for a value that does not decode, such as a cut
+// one, where the one or two bytes at each end of the secret stay. Other encodings
+// are not covered.
 func secretTerms(secrets []string) []string {
 	seen := map[string]bool{}
 	var terms []string
 	add := func(value string) {
-		value = strings.TrimSpace(value)
 		if len(value) >= MinSecretBytes && !seen[value] {
 			seen[value] = true
 			terms = append(terms, value)
 		}
 	}
+	addForms := func(value string) {
+		value = strings.TrimSpace(value)
+		if len(value) < MinSecretBytes {
+			return
+		}
+		add(value)
+		add(url.QueryEscape(value))
+		add(url.PathEscape(value))
+		for shift := range 3 {
+			if whole := (len(value) - shift) / 3 * 3; whole > 0 {
+				groups := []byte(value[shift : shift+whole])
+				add(base64.StdEncoding.EncodeToString(groups))
+				add(base64.URLEncoding.EncodeToString(groups))
+			}
+		}
+	}
 	for _, secret := range secrets {
-		add(secret)
+		addForms(secret)
 		for _, line := range strings.Split(secret, "\n") {
-			add(line)
+			addForms(line)
 		}
 	}
 	sort.Slice(terms, func(i, j int) bool {

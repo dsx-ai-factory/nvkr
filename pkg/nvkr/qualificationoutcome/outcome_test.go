@@ -126,6 +126,7 @@ func TestQualificationOutcomeDecode(t *testing.T) {
 		{"source identity", mutate(StatusPassed, func(o *Outcome) { o.SourceIdentity = "github" }), false},
 		{"evidence with event fields", mutate(StatusPassed, func(o *Outcome) { o.Source.Event = "push" }), false},
 		{"errored producer that succeeded", mutate(StatusErrored, func(o *Outcome) { o.Stage = StageProducer }), false},
+		{"errored qualify without error", mutate(StatusErrored, func(o *Outcome) { o.Error = nil }), false},
 		{"errored qualify after failed producer", mutate(StatusErrored, func(o *Outcome) { o.Source.Conclusion = "failure" }), false},
 		{"pull request source", mutate(StatusErrored, func(o *Outcome) { o.Source.Event = "pull_request" }), false},
 		{"non-decimal run", mutate(StatusPassed, func(o *Outcome) { o.Source.RunID = "10a" }), false},
@@ -209,6 +210,15 @@ func TestQualificationOutcomeMarshalRefusesInvalid(t *testing.T) {
 	outcome := outcomeFixture(StatusPassed)
 	outcome.Lane = "local-execution"
 	_, err := outcome.Marshal()
+	requireCode(t, err, e.CodeVerifyFailed)
+	// Admission validates a provisional errored qualify record without an error,
+	// but such a record is never written.
+	provisional := outcomeFixture(StatusErrored)
+	provisional.Error = nil
+	if err := provisional.Validate(); err != nil {
+		t.Fatalf("provisional record refused: %v", err)
+	}
+	_, err = provisional.Marshal()
 	requireCode(t, err, e.CodeVerifyFailed)
 }
 

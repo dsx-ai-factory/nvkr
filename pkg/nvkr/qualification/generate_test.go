@@ -199,8 +199,9 @@ func TestQualificationGenerationOutcomeUpload(t *testing.T) {
 				t.Fatal(err)
 			}
 			with := map[string]string{"name": "nvkr-qualification-outcome-${{ github.run_id }}-${{ github.run_attempt }}", "path": ".nvkr/qualification-outcome/outcome-${{ github.run_attempt }}.json",
-				"include-hidden-files": "true", "if-no-files-found": "warn", "retention-days": "30"}
-			if upload.If != "${{ !cancelled() }}" || upload.Uses != actions.Upload || upload.Timeout != 5 || len(upload.Env) != 0 || !reflect.DeepEqual(upload.With, with) { //nolint:misspell // GitHub status function uses this exact spelling.
+				"include-hidden-files": "true", "if-no-files-found": "warn", "retention-days": "7"}
+			// Best effort: a failed upload must not fail a job whose qualification passed.
+			if upload.If != "${{ !cancelled() }}" || upload.Uses != actions.Upload || upload.Timeout != 5 || !upload.ContinueOnError || len(upload.Env) != 0 || !reflect.DeepEqual(upload.With, with) { //nolint:misspell // GitHub status function uses this exact spelling.
 				t.Fatalf("upload step is %#v", upload)
 			}
 			if !bytes.Contains(raw, []byte("uses: "+actions.Upload+" # "+plan.Actions["upload-artifact"].Version+"\n")) {

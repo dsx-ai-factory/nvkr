@@ -365,7 +365,7 @@ future qualified publication needs an authenticated commit protocol before expos
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
   `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, `trust`,
-  `qualificationorigin`, `qualificationoutcome`, `testresults`, `validation`, `conformance`, and the separate M3-C `qualification` publisher.
+  `qualificationorigin`, `qualificationoutcome`, `releasemanifest`, `testresults`, `validation`, `conformance`, and the separate M3-C `qualification` publisher.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not
@@ -380,8 +380,9 @@ check dispatch; `conformance` owns the supported suite/harness protocol, subject
 and cleanup. Catalog, lifecycle, delivery and held-file owners retain their existing responsibilities.
 `qualificationoutcome` owns the qualification outcome schema, its strict decoding, the triggering event's
 description and text scrubbing, in lane **none (descriptive)**. It is a leaf that directly imports only the canonical
-codec, coded errors and held files. `releasemanifest` admits an outcome's inputs before qualification and
-classifies its own result into an outcome. An outcome
+codec, coded errors and held files. `releasemanifest` issues the pipeline-attested M4 release manifest
+(ADR-16 §5); it also admits an outcome's inputs before qualification and classifies its own result into an
+outcome. An outcome
 points at qualification evidence and the release manifest by digest; it adds no public lifecycle object,
 receipt or authority.
 

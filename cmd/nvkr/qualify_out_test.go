@@ -343,6 +343,12 @@ func TestQualificationCLIQualifyOut(t *testing.T) {
 	if err := os.WriteFile(blocker, nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
+	// An existing directory the command cannot write: only the temp-file probe
+	// refuses it.
+	readOnly := filepath.Join(t.TempDir(), "read-only")
+	if err := os.Mkdir(readOnly, 0o500); err != nil {
+		t.Fatal(err)
+	}
 	// Well-formed events that cannot describe an errored qualify attempt.
 	event := func(change func(run map[string]any)) string {
 		repository := map[string]any{"full_name": "example/nvkr", "id": json.Number("7")}
@@ -380,9 +386,14 @@ func TestQualificationCLIQualifyOut(t *testing.T) {
 		{"secret too short to redact", "NVKR_REGISTRY_PASSWORD", "abc", nil, e.CodeUsage},
 		{"multi-line secret with a short line", "NVKR_REGISTRY_PASSWORD", "sentinel-line\nab", nil, e.CodeUsage},
 		{"out names a directory", "", "", []string{"--issue-manifest", "--out", directory}, e.CodeUsage},
-		{"unwritable directory", "", "", []string{"--issue-manifest", "--out", filepath.Join(blocker, "outcome-1.json")}, e.CodeInternal},
+		{"out names a directory that does not exist yet", "", "", []string{"--issue-manifest", "--out", filepath.Join(directory, "absent") + string(filepath.Separator)}, e.CodeUsage},
+		{"parent is a file", "", "", []string{"--issue-manifest", "--out", filepath.Join(blocker, "outcome-1.json")}, e.CodeInternal},
+		{"read-only directory", "", "", []string{"--issue-manifest", "--out", filepath.Join(readOnly, "outcome-1.json")}, e.CodeInternal},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.name == "read-only directory" && os.Geteuid() == 0 {
+				t.Skip("root writes into a 0500 directory, so the fixture cannot refuse it")
+			}
 			qualifyOutEnvironment(t)
 			if tc.env != "" {
 				t.Setenv(tc.env, tc.value)

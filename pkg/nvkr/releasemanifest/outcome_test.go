@@ -5,6 +5,7 @@ package releasemanifest
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -156,6 +157,32 @@ func TestReleaseManifestOutcomeClassifies(t *testing.T) {
 	}
 }
 
+// A Basic authorization header carries the secret only in base64, which is still
+// redacted wherever the outcome copies text: the check message, the error and the
+// result.
+func TestReleaseManifestOutcomeRedactsEncodedSecrets(t *testing.T) {
+	basic := base64.StdEncoding.EncodeToString([]byte("nvkr-user:" + outcomeSecret))
+	publication := outcomePublication(false)
+	publication.ArtifactChecks.Outputs[0].Checks[1].Message = "Authorization: Basic " + basic
+	outcome, err := NewOutcome(&RunResult{Qualification: publication}, e.New(e.CodeGateUnmet, "refused Basic %s", basic), outcomeInputs())
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := outcome.Marshal()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Base64 mixes the secret's first and last bytes with its neighbors; its
+	// middle lies inside the redacted whole 3-byte groups.
+	middle := basic[len(basic)-len(outcomeSecret) : len(basic)-4]
+	if count := bytes.Count(raw, []byte(middle)); count != 0 {
+		t.Fatalf("the outcome exposes the base64 of a secret %d times", count)
+	}
+	if !strings.Contains(outcome.Error.Message, "[REDACTED]") || !bytes.Contains(outcome.Result, []byte("Basic ")) {
+		t.Fatalf("the error or result lost the redacted header: %q", outcome.Error.Message)
+	}
+}
+
 // Times are outside the RunResult, so two clocks give the same result bytes.
 func TestReleaseManifestOutcomeTimesStayOutsideResult(t *testing.T) {
 	result := outcomeManifest(&RunResult{Qualification: outcomePublication(true), Successful: true})
@@ -262,6 +289,13 @@ func TestReleaseManifestOutcomeRefusesUnrecordableAttempts(t *testing.T) {
 	result.Qualification.EvidenceDigest = ""
 	_, err = NewOutcome(result, nil, outcomeInputs())
 	requireOutcomeCode(t, err, e.CodeVerifyFailed)
+
+	// Without per-output checks only an error explains the attempt, so the mapper
+	// never returns a record that Marshal would refuse.
+	for _, empty := range []*RunResult{nil, {}, {Qualification: &qualification.Publication{}}} {
+		_, err = NewOutcome(empty, nil, outcomeInputs())
+		requireOutcomeCode(t, err, e.CodeInternal)
+	}
 }
 
 func TestReleaseManifestOutcomeLaneIsPipelineAttested(t *testing.T) {

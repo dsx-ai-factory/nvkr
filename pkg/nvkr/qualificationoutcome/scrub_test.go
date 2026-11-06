@@ -5,7 +5,9 @@ package qualificationoutcome
 
 import (
 	"bytes"
+	"encoding/base64"
 	"math/rand/v2"
+	"net/url"
 	"strings"
 	"testing"
 	"unicode/utf8"
@@ -54,6 +56,63 @@ func TestQualificationOutcomeScrub(t *testing.T) {
 				t.Fatal("Scrub is not idempotent, so Decode would refuse its output")
 			}
 		})
+	}
+}
+
+// An encoded secret is redacted too. Base64 mixes the secret's first and last bytes
+// with its neighbors, so only the middle of each encoding must be gone.
+func TestQualificationOutcomeScrubEncodedSecrets(t *testing.T) {
+	// Reserved characters, so URL escaping changes the secret, and bytes that encode
+	// to '+' or '/', so the URL-safe alphabet differs.
+	secret := "sentinel/pass+word?~~~value"
+	for _, tc := range []struct {
+		name, encoded string
+		middle        bool
+	}{
+		{"base64 aligned", base64.StdEncoding.EncodeToString([]byte(secret)), true},
+		{"base64 after one byte", base64.StdEncoding.EncodeToString([]byte(":" + secret)), true},
+		{"base64 after two bytes", base64.StdEncoding.EncodeToString([]byte("u:" + secret)), true},
+		{"Basic authorization", base64.StdEncoding.EncodeToString([]byte("nvkr-user:" + secret)), true},
+		{"URL-safe base64", base64.URLEncoding.EncodeToString([]byte(secret)), true},
+		{"query-escaped", url.QueryEscape(secret), false},
+		{"path-escaped", url.PathEscape(secret), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// The middle of an encoding lies inside the secret's whole 3-byte groups
+			// at every alignment.
+			survivor := tc.encoded
+			if tc.middle {
+				survivor = tc.encoded[len(tc.encoded)-len(secret) : len(tc.encoded)-4]
+			}
+			text := "request with " + tc.encoded + " refused"
+			if got := Scrub(text, []string{secret}); strings.Contains(got, survivor) || !strings.Contains(got, redacted) {
+				t.Fatalf("Scrub left %q in %q", survivor, got)
+			}
+			raw, err := RedactDocument([]byte(`{"note":"`+text+`"}`), []string{secret})
+			if err != nil || bytes.Contains(raw, []byte(survivor)) {
+				t.Fatalf("RedactDocument left %q in %s (%v)", survivor, raw, err)
+			}
+		})
+	}
+	if base64.StdEncoding.EncodeToString([]byte(secret)) == base64.URLEncoding.EncodeToString([]byte(secret)) {
+		t.Fatal("fixture does not exercise the URL-safe alphabet")
+	}
+	// A whole base64 value that decodes to a secret goes whole: the shortest
+	// admitted secret has no whole 3-byte group at one of its alignments.
+	short := "abcd"
+	for _, prefix := range []string{"", "u:", "usr:", "nvkr-user:"} {
+		for _, encoding := range []*base64.Encoding{base64.StdEncoding, base64.RawURLEncoding} {
+			encoded := encoding.EncodeToString([]byte(prefix + short))
+			if got := Scrub("Authorization: Basic "+encoded, []string{short}); got != "Authorization: Basic "+redacted {
+				t.Fatalf("%q kept part of a short secret's base64: %q", prefix, got)
+			}
+		}
+	}
+	// A cut value does not decode, so only the secret's whole 3-byte groups go.
+	cut := base64.StdEncoding.EncodeToString([]byte("u:" + secret))
+	cut = cut[:len(cut)-3]
+	if got := Scrub("request with "+cut, []string{secret}); strings.Contains(got, cut[len(cut)-len(secret)+3:len(cut)-4]) || !strings.Contains(got, redacted) {
+		t.Fatalf("a cut base64 value kept its middle: %q", got)
 	}
 }
 

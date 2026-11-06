@@ -417,7 +417,7 @@ stage/item descriptions separately from canonical result stdout and private
 diagnostics. The TUI shows role relationships, each stage's input/action/result,
 counts of outputs, tools, uploads or checks, and the last observed operation;
 navigation cannot change execution. Missing or completed telemetry cannot grant
-a pass. The adapter reports the qualification outcome only after child completion,
+a pass. The adapter reports the qualification result only after child completion,
 result retention and validation; automatic registry
 cleanup remains independently required before deployment. Portable layout,
 failure/privacy and targeted race tests, plus native Linux ARM64 pipe/Runner

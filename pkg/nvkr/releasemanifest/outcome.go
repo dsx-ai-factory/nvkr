@@ -65,8 +65,10 @@ func AdmitOutcome(ctx context.Context, environ []string, at time.Time) (*Outcome
 }
 
 // NewOutcome classifies one production qualification attempt for run qualify
-// --out. The outcome describes the result and points at its signed evidence and
-// manifest by digest. It grants no qualification, manifest or release authority.
+// --out. The outcome describes the result and names by digest the qualification
+// evidence it computed and any manifest it issued; a failed attempt may have
+// attached that evidence to no member, or to only some. It grants no
+// qualification, manifest or release authority.
 // Times stay outside the result, so they change no digest.
 func NewOutcome(result *RunResult, runErr error, in OutcomeInputs) (qualificationoutcome.Outcome, error) {
 	var publication *qualification.Publication
@@ -76,7 +78,11 @@ func NewOutcome(result *RunResult, runErr error, in OutcomeInputs) (qualificatio
 	var outcome qualificationoutcome.Outcome
 	if publication == nil || publication.ArtifactChecks == nil {
 		// Qualification returned no per-output checks (policy, source, invocation
-		// or handoff admission refused first), so only the event names the source.
+		// or handoff admission refused first), so only the event names the source
+		// and only the error explains the attempt.
+		if runErr == nil {
+			return qualificationoutcome.Outcome{}, e.New(e.CodeInternal, "qualification returned neither per-output checks nor an error")
+		}
 		var err error
 		if outcome, err = qualificationoutcome.FromEvent(in.Event, in.Qualifier, qualificationoutcome.StageQualify, in.StartedAt, in.FinishedAt); err != nil {
 			return qualificationoutcome.Outcome{}, err

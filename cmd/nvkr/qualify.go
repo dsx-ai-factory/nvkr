@@ -117,7 +117,10 @@ func admitQualificationOutcome(ctx context.Context, path string, at time.Time) (
 	if err != nil {
 		return nil, err
 	}
-	if info, err := os.Lstat(path); err == nil && info.IsDir() {
+	// A trailing separator or a final "." or ".." names a directory even before it
+	// exists; admission would otherwise create it below.
+	base := filepath.Base(path)
+	if info, err := os.Lstat(path); (err == nil && info.IsDir()) || (path != "" && os.IsPathSeparator(path[len(path)-1])) || base == "." || base == ".." {
 		return nil, e.New(e.CodeUsage, "qualify --out names a directory, not a file")
 	}
 	// 0700 matches the private qualification workspace that shares .nvkr.
@@ -134,8 +137,11 @@ func admitQualificationOutcome(ctx context.Context, path string, at time.Time) (
 	return inputs, nil
 }
 
-// writeQualificationOutcome records the attempt after its diagnostics. A canceled
-// context writes nothing: a canceled attempt has no outcome.
+// writeQualificationOutcome records the attempt after its diagnostics. It writes on
+// the command's context, so an attempt whose context ends first writes nothing: a
+// caller's work deadline, the runner stopping the step at its timeout, or a
+// canceled job. The job's outcome-written output is then false, or empty for a
+// canceled job, whose presence step does not run.
 func writeQualificationOutcome(ctx context.Context, path string, result *releasemanifest.RunResult, runErr error, inputs releasemanifest.OutcomeInputs) error {
 	outcome, err := releasemanifest.NewOutcome(result, runErr, inputs)
 	if err != nil {
