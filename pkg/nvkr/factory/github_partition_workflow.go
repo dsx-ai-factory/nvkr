@@ -313,13 +313,17 @@ func projectGitHubPartitionJob(plan *Plan, id string, source *yamlv3.Node, paren
 	job := githubInterfaceClone(source)
 	githubYAMLRemove(job, "needs")
 	condition := githubYAMLValue(job, "if")
-	preflightJobs, err := githubImagePreflightJobs(plan)
-	if err != nil {
-		return nil, err
-	}
+	var preflightJobs []string
 	ordinary := "${{ " + githubDispatchCondition(plan) + " }}"
 	expectedCondition := ordinary
 	if scheduling == executionAfterCompletion {
+		// Ordinary workers use their supplied prerequisites. Only completion
+		// workers need the separate preflight-success predicate.
+		var err error
+		preflightJobs, err = githubImagePreflightJobs(plan)
+		if err != nil {
+			return nil, err
+		}
 		expectedCondition = githubCompletionCondition(plan, preflightJobs)
 	}
 	if (scheduling != executionAfterSuccess && scheduling != executionAfterCompletion) || condition != expectedCondition {
