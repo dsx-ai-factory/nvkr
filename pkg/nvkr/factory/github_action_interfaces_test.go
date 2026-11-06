@@ -36,30 +36,30 @@ func githubActionInterfaceFixture(actions githubActionRefs, fixtures []githubInt
 		writePrepareHelperStep(&source)
 		if fixture.inputs {
 			fmt.Fprintf(&source, "      - name: Download required inputs\n        uses: %s\n        with:\n          pattern: fixture-input\n          path: .nvkr/carriers\n          merge-multiple: 'true'\n", actions.Download)
-			writeGitHubShellStep(&source, "Restore required inputs", []string{githubRunnerCommand(&Plan{}, "restore-inputs", "stage", fixture.name)})
+			writeGitHubShellStep(&source, "Restore required inputs", []string{githubRunnerCommand(imageInterfaceTestPlan(), "restore-inputs", "stage", fixture.name)})
 		}
 		if fixture.setup {
 			writeGitHubShellStep(&source, "Configure build environment", []string{"printf setup"})
 		}
 		if fixture.images {
 			fmt.Fprintln(&source, "      - name: Prepare private native toolchains\n        env:")
-			for _, key := range sortedKeys(githubImageEnvironment()) {
-				fmt.Fprintf(&source, "          %s: %s\n", key, yamlSingle(githubImageEnvironment()[key]))
+			for _, key := range sortedKeys(githubImageEnvironment(imageInterfaceTestPlan())) {
+				fmt.Fprintf(&source, "          %s: %s\n", key, yamlSingle(githubImageEnvironment(imageInterfaceTestPlan())[key]))
 			}
-			fmt.Fprintf(&source, "        run: %s\n", githubRunnerCommand(&Plan{}, "prepare-images", "stage", fixture.name))
+			fmt.Fprintf(&source, "        run: %s\n", githubRunnerCommand(imageInterfaceTestPlan(), "prepare-images", "stage", fixture.name))
 		}
 		for index := 0; index < fixture.nodes; index++ {
 			selector := fmt.Sprintf("%s/node-%d", fixture.name, index)
 			if !fixture.collectOnly {
-				fmt.Fprintf(&source, "      - name: Execute node %d\n        id: execute-%d\n        run: %s\n", index, index, githubRunnerCommand(&Plan{}, "run-node", "node", selector))
+				fmt.Fprintf(&source, "      - name: Execute node %d\n        id: execute-%d\n        run: %s\n", index, index, githubRunnerCommand(imageInterfaceTestPlan(), "run-node", "node", selector))
 			}
 			if fixture.carriers == 0 {
 				continue
 			}
-			writeGitHubShellStep(&source, fmt.Sprintf("Collect node %d", index), []string{githubRunnerCommand(&Plan{}, "pack-outputs", "node", selector)})
+			writeGitHubShellStep(&source, fmt.Sprintf("Collect node %d", index), []string{githubRunnerCommand(imageInterfaceTestPlan(), "pack-outputs", "node", selector)})
 			for carrier := 0; carrier < fixture.carriers; carrier++ {
 				label := fmt.Sprintf("%s-node-%d-carrier-%d", fixture.name, index, carrier)
-				actions.writeUploadStep(&source, &Plan{}, label, label, ".nvkr/carriers/"+label+".tar")
+				actions.writeUploadStep(&source, imageInterfaceTestPlan(), label, label, ".nvkr/carriers/"+label+".tar")
 			}
 		}
 	}
@@ -73,11 +73,11 @@ func TestGitHubSemanticCallAliasesKeepIndependentJobParameters(t *testing.T) {
 		{name: "second", nodes: 1, carriers: 1},
 		{name: "grouped", nodes: 2, carriers: 2},
 	})
-	workflow, files, err := lowerGitHubActions(&Plan{}, raw, actions)
+	workflow, files, err := lowerGitHubActions(imageInterfaceTestPlan(), raw, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
-	workflow, err = shareGitHubActions(&Plan{}, workflow, files, actions)
+	workflow, err = shareGitHubActions(imageInterfaceTestPlan(), workflow, files, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,7 +85,7 @@ func TestGitHubSemanticCallAliasesKeepIndependentJobParameters(t *testing.T) {
 		t.Fatal("identical complete operation calls must share their semantic alias")
 	}
 	for range 2 {
-		expanded, err := expandGitHubActions(&Plan{}, workflow, files)
+		expanded, err := expandGitHubActions(imageInterfaceTestPlan(), workflow, files)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -95,7 +95,7 @@ func TestGitHubSemanticCallAliasesKeepIndependentJobParameters(t *testing.T) {
 			t.Fatal("shared calls changed independent job parameters or mutated their descriptor")
 		}
 	}
-	assertGitHubCompositeReadableYAML(t, "workflow", workflow, &Plan{})
+	assertGitHubCompositeReadableYAML(t, "workflow", workflow, imageInterfaceTestPlan())
 }
 
 func TestGitHubSemanticCallAliasesRequireIdenticalUncontrolledCalls(t *testing.T) {
@@ -134,7 +134,7 @@ func TestGitHubSemanticCallAliasesRequireIdenticalUncontrolledCalls(t *testing.T
 			}
 			jobs := githubYAMLMap("first", githubYAMLMap("steps", &yamlv3.Node{Kind: yamlv3.SequenceNode, Content: []*yamlv3.Node{first}}),
 				"second", githubYAMLMap("steps", &yamlv3.Node{Kind: yamlv3.SequenceNode, Content: []*yamlv3.Node{second}}))
-			if err := anchorGitHubPreflight(&Plan{}, jobs, testActionRefs(t, githubTestPlan(t))); err != nil {
+			if err := anchorGitHubPreflight(imageInterfaceTestPlan(), jobs, testActionRefs(t, githubTestPlan(t))); err != nil {
 				t.Fatal(err)
 			}
 			step := githubYAMLField(githubYAMLField(jobs, "second"), "steps").Content[0]
@@ -202,11 +202,11 @@ func TestGitHubSemanticInterfacesReuseAcrossNodeAndCarrierCounts(t *testing.T) {
 		{name: "collect-additional-carriers", nodes: 3, carriers: 6, collectOnly: true},
 	}
 	raw := githubActionInterfaceFixture(actions, fixtures)
-	workflow, files, err := lowerGitHubActions(&Plan{}, raw, actions)
+	workflow, files, err := lowerGitHubActions(imageInterfaceTestPlan(), raw, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
-	workflow, err = shareGitHubActions(&Plan{}, workflow, files, actions)
+	workflow, err = shareGitHubActions(imageInterfaceTestPlan(), workflow, files, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -254,7 +254,7 @@ func TestGitHubSemanticInterfacesReuseAcrossNodeAndCarrierCounts(t *testing.T) {
 			t.Fatalf("fixture did not exercise %s", family)
 		}
 	}
-	expanded, err := expandGitHubActions(&Plan{}, workflow, files)
+	expanded, err := expandGitHubActions(imageInterfaceTestPlan(), workflow, files)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -288,11 +288,11 @@ func TestGitHubExecutionInterfaceHasSemanticOptionalRoles(t *testing.T) {
 		{name: "inputs-and-images", nodes: 1, carriers: 2, inputs: true, images: true},
 		{name: "authored-setup-boundary", nodes: 1, carriers: 2, inputs: true, images: true, setup: true},
 	}
-	workflow, files, err := lowerGitHubActions(&Plan{}, githubActionInterfaceFixture(actions, fixtures), actions)
+	workflow, files, err := lowerGitHubActions(imageInterfaceTestPlan(), githubActionInterfaceFixture(actions, fixtures), actions)
 	if err != nil {
 		t.Fatal(err)
 	}
-	workflow, err = shareGitHubActions(&Plan{}, workflow, files, actions)
+	workflow, err = shareGitHubActions(imageInterfaceTestPlan(), workflow, files, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -373,11 +373,11 @@ func TestGitHubExecutionInterfaceHasSemanticOptionalRoles(t *testing.T) {
 func TestGitHubExecutionInterfaceRespectsAuthoredSetupBoundary(t *testing.T) {
 	actions := testActionRefs(t, githubTestPlan(t))
 	fixture := githubInterfaceFixture{name: "with-setup", nodes: 1, carriers: 2, inputs: true, images: true, setup: true}
-	workflow, files, err := lowerGitHubActions(&Plan{}, githubActionInterfaceFixture(actions, []githubInterfaceFixture{fixture}), actions)
+	workflow, files, err := lowerGitHubActions(imageInterfaceTestPlan(), githubActionInterfaceFixture(actions, []githubInterfaceFixture{fixture}), actions)
 	if err != nil {
 		t.Fatal(err)
 	}
-	workflow, err = shareGitHubActions(&Plan{}, workflow, files, actions)
+	workflow, err = shareGitHubActions(imageInterfaceTestPlan(), workflow, files, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -403,11 +403,11 @@ func TestGitHubInputAndImagePreparationWithoutFollowingNode(t *testing.T) {
 	actions := testActionRefs(t, githubTestPlan(t))
 	fixture := githubInterfaceFixture{name: "preparation-only", inputs: true, images: true}
 	raw := githubActionInterfaceFixture(actions, []githubInterfaceFixture{fixture})
-	workflow, files, err := lowerGitHubActions(&Plan{}, raw, actions)
+	workflow, files, err := lowerGitHubActions(imageInterfaceTestPlan(), raw, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
-	workflow, err = shareGitHubActions(&Plan{}, workflow, files, actions)
+	workflow, err = shareGitHubActions(imageInterfaceTestPlan(), workflow, files, actions)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,7 +436,7 @@ func TestGitHubInputAndImagePreparationWithoutFollowingNode(t *testing.T) {
 	if want := []string{"prepare-inputs", "prepare-images"}; !reflect.DeepEqual(order, want) {
 		t.Fatalf("preparation order=%v, want %v", order, want)
 	}
-	expanded, err := expandGitHubActions(&Plan{}, workflow, files)
+	expanded, err := expandGitHubActions(imageInterfaceTestPlan(), workflow, files)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -123,6 +123,7 @@ func hostedDiskBuildFinalizerFixture(t *testing.T) *factory.Plan {
 	definition, environment := prepared.plan.Definition.Clone(), prepared.plan.Environment.Clone()
 	environment.Publication, environment.Signing = nil, nil
 	environment.GitHubARC, environment.Runtime.Runtime = "native-kvm-v1", "docker"
+	environment.ToolchainAccess = &ToolchainAccess{PublicRoots: []string{"docker.io/library/golang", "example.test/vm"}}
 	environment.ExecutionClasses[0].RunsOn = "arc-amd64-kvm"
 	component := prepared.plan.CatalogSnapshot.Components["nvke-node-non-fde"]
 	component.Disk.Encryption = "luks2"

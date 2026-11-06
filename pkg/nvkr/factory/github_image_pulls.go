@@ -23,43 +23,59 @@ import (
 const githubImageToken = "NVKR_TOOLCHAIN_READ_TOKEN"
 const githubImageUser = "NVKR_TOOLCHAIN_READ_USER"
 
+// Admission is shared by generation, bundle validation and helper execution.
+// ARC Plans include native source preparation on hosted runners, so classify
+// every projected execution image, not just the grouped disk stages.
+func admitGitHubToolchainAccess(plan *Plan) error {
+	if plan.Environment.GitHubARC == "" && plan.Environment.ToolchainAccess == nil {
+		return nil
+	}
+	for _, node := range plan.Graph.Nodes {
+		execution, err := plan.GitHubExecutionFor(node)
+		if err != nil {
+			return err
+		}
+		if execution.Container == "" {
+			continue
+		}
+		private, err := plan.Environment.ToolchainAccess.ClassifyImage(execution.Container)
+		if err != nil {
+			return e.Wrap(e.CodeEngineCapability, err, "GitHub toolchain access for node %q", node.ID)
+		}
+		if private && (plan.Environment.GitHubARC != "native-kvm-v1" || plan.Environment.ToolchainAccess.Reader == nil) {
+			return e.New(e.CodeEngineCapability, "private toolchain for node %q requires native-kvm-v1 and a declared toolchainAccess reader", node.ID)
+		}
+	}
+	// Strict disk inspection can pull an image separately from projected nodes.
+	if plan.Environment.GitHubARC == "native-kvm-v1" && githubDiskInspectionRequired(plan) {
+		for _, output := range plan.LifecycleOutputs {
+			if output.Kind != PackageDiskImage {
+				continue
+			}
+			for _, build := range plan.Builds {
+				if build.Name != output.Name {
+					continue
+				}
+				_, profile, err := diskPublicationInspectionProfile(build, plan.Environment)
+				if err != nil {
+					return err
+				}
+				private, err := plan.Environment.ToolchainAccess.ClassifyImage(profile.Image)
+				if err != nil {
+					return err
+				}
+				if private && plan.Environment.ToolchainAccess.Reader == nil {
+					return e.New(e.CodeEngineCapability, "private disk inspector requires a declared toolchainAccess reader")
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func githubPrivateToolchain(plan *Plan, image string) bool {
-	if plan.Environment.GitHubARC != "native-kvm-v1" || !strings.Contains(image, "@sha256:") {
-		return false
-	}
-	if GitHubDiskBuildOnly(plan) {
-		// Build-only iteration consumes the same published native tooling, with
-		// read access independent of any output publication configuration.
-		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
-	}
-	if plan.Environment.Publication == nil || !strings.HasPrefix(plan.Environment.Publication.RepositoryPrefix, "ghcr.io/") {
-		return false
-	}
-	prefix := plan.Environment.Publication.RepositoryPrefix
-	if strings.HasPrefix(image, prefix+"/toolchains/") {
-		return true
-	}
-	// Development publication does not move already-pinned native toolchains.
-	// Only the maintained NVKR development namespace may prepare the
-	// toolchain roots, using the separate read-only registry credential.
-	if plan.Environment.GitHubDevelopment && (prefix == "ghcr.io/dsx-ai-factory/nvkr/development" || strings.HasPrefix(prefix, "ghcr.io/dsx-ai-factory/nvkr/development-")) {
-		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
-	}
-	// Maintained disk-family, GPU site and nightly outputs reuse the published M2 tooling.
-	// Output publication does not relocate those subjects or authorize other owners.
-	// A new entry also needs rows in TestPrivateToolchainPublicationBoundary and,
-	// for a disk family, nvkeDiskFamily in the split tests.
-	switch prefix {
-	case "ghcr.io/dsx-ai-factory/nvkr/m2-candidate",
-		"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site",
-		"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks",
-		"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24",
-		"ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64",
-		"ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64":
-		return strings.HasPrefix(image, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/")
-	default:
-		return false
-	}
+	private, err := plan.Environment.ToolchainAccess.ClassifyImage(image)
+	return err == nil && private
 }
 
 func githubStagePrivateImages(plan *Plan, stage githubStage) []string {
@@ -78,8 +94,15 @@ func githubStagePrivateImages(plan *Plan, stage githubStage) []string {
 	return uniqueSorted(images)
 }
 
-func githubImageEnvironment() map[string]string {
-	return map[string]string{githubImageToken: "${{ secrets.NVKR_REGISTRY_READ }}", githubImageUser: "${{ vars.NVKR_REGISTRY_READ_USER }}"}
+func githubImageEnvironment(plan *Plan) map[string]string {
+	// Optional composite roles retain their fixed input interface even when
+	// absent; no secret reference is synthesized for an undeclared reader.
+	environment := map[string]string{githubImageToken: "", githubImageUser: ""}
+	if access := plan.Environment.ToolchainAccess; access != nil && access.Reader != nil {
+		environment[githubImageToken] = "${{ secrets." + strings.TrimPrefix(access.Reader.CredentialRef, "github:") + " }}"
+		environment[githubImageUser] = "${{ vars." + strings.TrimPrefix(access.Reader.UsernameRef, "github:") + " }}"
+	}
+	return environment
 }
 
 // PrepareGitHubImages is a separate credential-bearing step. Its temporary Docker
@@ -126,7 +149,7 @@ func PrepareGitHubImages(ctx context.Context, plan *Plan, stageID string, option
 		}
 	}
 	return pullGitHubImages(ctx, githubStagePrivateImages(plan, stage), stage.Nodes[0].Platform,
-		os.Getenv("NVKR_TOOLCHAIN_READ_USER"), os.Getenv(githubImageToken), func(ctx context.Context, config, platform, image string) error {
+		os.Getenv(githubImageUser), os.Getenv(githubImageToken), func(ctx context.Context, config, platform, image string) error {
 			command := githubImagePullCommand(ctx, config, platform, image)
 			command.Stdout, command.Stderr = options.Stdout, options.Stderr
 			return ownedcmd.Run(ctx, command)

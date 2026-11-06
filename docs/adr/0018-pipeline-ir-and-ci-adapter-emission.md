@@ -324,9 +324,8 @@ job bound covers transfer, recovery and exact-byte observation; it does not rebu
 If the catalog selects a private pin set, existing catalog-source credentials remain scoped to the
 final catalog-recompilation step; they are not passed to recovery or disk execution.
 The pool's configured scratch capacity is not a provider reservation or an observed finalizer capacity proof.
-Private native toolchain preparation may read
-the maintained `ghcr.io/dsx-ai-factory/{nvkr,nke-recipes}/m2-candidate/toolchains/` namespaces; its temporary
-read-only credential remains outside producer execution. This mode does not use publication configuration
+Private native toolchain preparation reads only the Environment-declared private roots with its
+independently declared reader; its temporary read-only credential remains outside producer execution. This mode does not use publication configuration
 as a surrogate for build credentials. Real native FDE execution is acceptance evidence recorded separately.
 
 The operator must provision ephemeral single-job runners and restrict pool access to reviewed workflows and
@@ -355,16 +354,27 @@ exact derived OCI package node is admitted only with network disabled; SBOM atte
 publication operations remain on hosted runners. Those runners restore the prepared layout rather than the
 disk producer's full material closure.
 
-Internal native toolchains beneath the candidate publication prefix's `toolchains/`
-repositories use a separate preparation step with `contents: read` and no workflow package scope.
-The maintained M2, exact `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks` and
-`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24` families, the exact
-`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site` composite and two NVKE
-nightly publication prefixes also reuse the already-published
-`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/` pins. Reusing these toolchain subjects does
-not relocate them into family, composite or nightly output namespaces. Other family prefixes, child or lookalike
-prefixes, unrelated publication owners and other toolchain repositories remain excluded from this exception.
-Only that step receives the independent `NVKR_REGISTRY_READ` credential and explicit account.
+Environment `toolchainAccess` declares transport access separately from publication. Its sorted
+`privateRoots` and `publicRoots` contain explicit registry/repository paths, with no overlap or trailing
+slash; at most 128 roots are admitted. Each root matches its repository and path-component descendants.
+Every digest-pinned execution image selected by a native ARC Plan, including source preparation on
+hosted runners and selected strict disk inspection, must match exactly one class. Unclassified images
+fail generation and helper admission with a coded capability error before output or pulls. Public roots
+select anonymous pulls; they do not prove registry visibility. Private roots currently admit only GHCR.
+
+The optional `reader` declares one `credentialRef: github:SECRET_NAME` and
+`usernameRef: github:VARIABLE_NAME` for the private roots. A selected private root requires this reader
+and the admitted `native-kvm-v1` route. Ambient `GITHUB_*` references are refused. Environment admission
+also rejects reader reuse of the publication credential or either fixed production/development writer
+reference, comparing names case-insensitively; it does not establish the grants of other secrets. Publication prefixes,
+development mode and build-only mode grant no image access. Private toolchains use a separate preparation
+step with `contents: read` and no workflow package scope. Only that step receives the declared secret and
+account variable; foreign owners and lookalike paths outside the declared roots receive no reader.
+Maintained Environments declare `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains` and the independent
+`NVKR_REGISTRY_READ` / `NVKR_REGISTRY_READ_USER` references. Adding an output namespace requires no
+code allowlist or security-test enrollment. The access declaration changes Environment/Plan identity,
+not logical Build identity; existing native Environments must declare their complete selected image roots
+before regeneration. General private registry support remains deferred.
 The entry workflow binds both values as explicit composite inputs; composite metadata does not evaluate
 caller-only `vars` or `secrets` contexts. Calls without image preparation omit both inputs, whose empty
 defaults are admitted only with the absent image role. The helper admits the complete Plan,
@@ -1072,9 +1082,8 @@ admission rejects development before qualification evidence collection.
 Development publication and signing jobs use `nvkr-dev-release`; native disk jobs use `nvkr-dev-arc`.
 They never inherit the production deployment environments. Dedicated write and read registry credentials
 are delivered only to their corresponding phases. Private carrier uploads use a separate storage writer
-without additional repository-token permissions or a product-publication route. Only signing and SBOM attestation receive OIDC. Read-only toolchain preparation can still use
-the repository token for exact retained private M2 toolchain roots; credentials are removed before producer
-execution. ARC jobs never receive source, publication-write or OIDC credentials. Source-read credentials
+without additional repository-token permissions or a product-publication route. Only signing and SBOM attestation receive OIDC. Read-only toolchain preparation requires the Environment-declared independent reader for its private
+roots; credentials are removed before producer execution. ARC jobs never receive source, publication-write or OIDC credentials. Source-read credentials
 remain confined to the existing fixed source-fetch and catalog-validation steps. Branch code must be
 reviewed before dispatch. Provider ACLs must independently exclude production write access from development
 principals; selecting a namespace or protected environment alone cannot enforce token scope.

@@ -22,6 +22,7 @@ func githubDiskBuildPlan(t *testing.T, platform, encryption string) *Plan {
 	actions := githubTestPlan(t).Actions
 	definition, environment, stack := vmFactoryInputs(t, platform, execution.CapabilityRequired)
 	environment.GitHubARC, environment.Runtime.Runtime = "native-kvm-v1", "docker"
+	environment.ToolchainAccess = testToolchainAccess()
 	environment.GitHubDispatchBranches = []string{"feature/fde"}
 	for index := range environment.ExecutionClasses {
 		class := &environment.ExecutionClasses[index]

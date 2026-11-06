@@ -38,6 +38,16 @@ func (input Definition) Clone() Definition {
 
 // Clone transfers ownership without changing the authored environment's identity.
 func (input Environment) Clone() Environment {
+	if input.ToolchainAccess != nil {
+		value := *input.ToolchainAccess
+		value.PrivateRoots = slices.Clone(value.PrivateRoots)
+		value.PublicRoots = slices.Clone(value.PublicRoots)
+		if value.Reader != nil {
+			reader := *value.Reader
+			value.Reader = &reader
+		}
+		input.ToolchainAccess = &value
+	}
 	if input.GitHubRuntimeSource != nil {
 		value := *input.GitHubRuntimeSource
 		input.GitHubRuntimeSource = &value
