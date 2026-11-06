@@ -443,6 +443,7 @@ in reconciliation; a facade alone does not discharge that debt.
 |---|---|---|
 | Canonical identity and resolution | `canonical`, `ir`, `target`, `catalog`, `buildgraph` | Authenticate and normalize inputs into deterministic logical identities; catalog owns source/artifact pin maintenance and its lock transaction |
 | Execution requirements | `execution` | Own reusable per-step runner request shape; grant no runner capability |
+| Native toolchain maintenance | `toolchainmaintenance` | Admit reviewed per-image candidate exceptions and native measurements, publish only exact internal subjects, verify through the independent reader, and propose authored pin changes; generated bundles retain their existing owners |
 | Authored input admission | `definition` | Strictly decode and validate Definition/Environment, own their canonical identity and independent copies |
 | Public lifecycle | `lifecycle` | Freeze attempts from complete plans, persist outcomes, expose Run and Release views; delegate authority |
 | Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction; observe typed payloads against exact planned producers |

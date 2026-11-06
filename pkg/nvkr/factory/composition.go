@@ -47,8 +47,8 @@ func compileComposition(ctx context.Context, composition authored.Composition, e
 	return plan, nil
 }
 
-// admitDefinitionForm keeps named development bundles composite-only: the
-// single fixed development layout belongs to plain Definitions (ADR-26 §9).
+// admitDefinitionForm keeps named development bundles composite-only. The
+// single fixed development layout admits either form (ADR-26 §9).
 func admitDefinitionForm(environment authored.Environment, record *CompositionRecord) error {
 	if record != nil {
 		return admitCompositeEnvironment(environment)
@@ -65,9 +65,6 @@ func admitDefinitionForm(environment authored.Environment, record *CompositionRe
 func admitCompositeEnvironment(environment authored.Environment) error {
 	if environment.GitHubRuntimePlan {
 		return e.New(e.CodeEngineCapability, "githubRuntimePlan does not support composite Definitions")
-	}
-	if environment.GitHubDevelopment && environment.GitHubBundle == "" {
-		return e.New(e.CodeEngineCapability, "githubDevelopment requires a named githubBundle for a composite Definition; the fixed development layout is reserved")
 	}
 	return nil
 }

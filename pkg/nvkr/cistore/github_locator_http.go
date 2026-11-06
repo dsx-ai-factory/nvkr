@@ -144,8 +144,7 @@ func githubLocatorHTTPError(ctx context.Context, cause error, message string) er
 }
 
 func githubLocatorRetryDelay(response githubLocatorResponse, attempt int, now time.Time) (time.Duration, bool, error) {
-	transient := response.status == http.StatusInternalServerError || response.status == http.StatusBadGateway ||
-		response.status == http.StatusServiceUnavailable || response.status == http.StatusGatewayTimeout
+	transient := githubLocatorTransientStatus(response.status)
 	limited := response.status == http.StatusTooManyRequests
 	if response.status == http.StatusForbidden {
 		var body struct {
@@ -156,17 +155,32 @@ func githubLocatorRetryDelay(response githubLocatorResponse, attempt int, now ti
 	if !limited && !transient {
 		return 0, false, nil
 	}
-	remaining := response.header.Values("X-RateLimit-Remaining")
-	if len(remaining) > 1 || (len(remaining) == 1 && remaining[0] == "0") {
-		return 0, true, e.New(e.CodeUnavailable, "CI locator API primary rate limit is exhausted or ambiguous")
-	}
 	delay := (60 * time.Second) << attempt
 	if transient {
 		delay = (2 * time.Second) << attempt
 	}
-	values := response.header.Values("Retry-After")
+	delay, err := githubAPIServerDelay(response.header, delay, attempt, now)
+	return delay, true, err
+}
+
+// githubAPIServerDelay refuses exhausted or ambiguous primary quota before
+// applying the shared bounded server delay. Storage downloads do not use API quota.
+func githubAPIServerDelay(header http.Header, delay time.Duration, attempt int, now time.Time) (time.Duration, error) {
+	remaining := header.Values("X-RateLimit-Remaining")
+	if len(remaining) > 1 || (len(remaining) == 1 && remaining[0] == "0") {
+		return 0, e.New(e.CodeUnavailable, "GitHub API primary rate limit is exhausted or ambiguous")
+	}
+	return githubLocatorServerDelay(header, delay, attempt, now)
+}
+
+// githubLocatorServerDelay uses the default delay only when Retry-After is
+// absent; otherwise one seconds or HTTP-date value replaces it, even if
+// shorter. It then applies the increasing minimum (1s << attempt) and refuses
+// delays over 120s instead of retrying earlier than requested.
+func githubLocatorServerDelay(header http.Header, delay time.Duration, attempt int, now time.Time) (time.Duration, error) {
+	values := header.Values("Retry-After")
 	if len(values) > 1 {
-		return 0, true, e.New(e.CodeUnavailable, "CI locator API returned ambiguous rate-limit delay")
+		return 0, e.New(e.CodeUnavailable, "CI locator server returned ambiguous retry delay")
 	}
 	if len(values) == 1 {
 		value := values[0]
@@ -174,24 +188,21 @@ func githubLocatorRetryDelay(response githubLocatorResponse, attempt int, now ti
 		if err == nil && strconv.FormatUint(seconds, 10) == value {
 			delay = time.Duration(seconds) * time.Second
 		} else if deadline, err := http.ParseTime(value); err == nil {
-			delay = deadline.Sub(now)
-			if delay < 0 {
-				delay = 0
-			}
+			delay = max(deadline.Sub(now), 0)
 		} else {
-			return 0, true, e.New(e.CodeUnavailable, "CI locator API returned invalid rate-limit delay")
+			return 0, e.New(e.CodeUnavailable, "CI locator server returned invalid retry delay")
 		}
 	}
-	// Respect the server's delay, with an increasing minimum for repeated limits.
-	// Refuse delays outside the budget instead of retrying earlier than requested.
-	minimum := time.Second << attempt
-	if delay < minimum {
-		delay = minimum
-	}
+	delay = max(delay, time.Second<<attempt)
 	if delay > 120*time.Second {
-		return 0, true, e.New(e.CodeUnavailable, "CI locator API rate-limit delay exceeds retry budget")
+		return 0, e.New(e.CodeUnavailable, "CI locator server retry delay exceeds retry budget")
 	}
-	return delay, true, nil
+	return delay, nil
+}
+
+func githubLocatorTransientStatus(status int) bool {
+	return status == http.StatusInternalServerError || status == http.StatusBadGateway ||
+		status == http.StatusServiceUnavailable || status == http.StatusGatewayTimeout
 }
 
 func githubLocatorStatusError(ctx context.Context, status int) error {

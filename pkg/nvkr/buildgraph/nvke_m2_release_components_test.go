@@ -112,7 +112,7 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 	}
 	provisioned := outputs["cluster-api-provider-provisioned"]
 	if _, exists := outputs["controller-profiles"]; exists {
-		t.Fatal("reference fixtures must not use the production/demo controller-profiles output name")
+		t.Fatal("the combined Definition keeps the reference fixture under its own name; controller-profiles is core-family only")
 	}
 	if provisioned.Catalog == nil || provisioned.Catalog.Base != "../../catalogs/nvke/release" ||
 		!slices.Equal(provisioned.Components, []string{"cluster-api-provider-provisioned"}) ||

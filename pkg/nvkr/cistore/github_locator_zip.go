@@ -12,11 +12,51 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func (g *githubLocatorClient) downloadLocator(ctx context.Context, request Request, artifact githubLocatorArtifact, allowEarlier bool) ([]byte, error) {
+	// Signed storage answers 5xx under load; retry the same bounded budget and
+	// Retry-After handling as the API, without its API rate-limit rules. Each
+	// attempt takes a fresh redirect: GitHub expires the signed URL after a
+	// minute, and a Retry-After delay may be longer.
+	var response githubLocatorResponse
+	for attempt := 0; ; attempt++ {
+		download, err := g.zipDownloadRequest(ctx, request, artifact)
+		if err != nil {
+			return nil, err
+		}
+		response, err = g.get(ctx, download, maxGitHubLocatorZIPBytes)
+		if err != nil {
+			return nil, err
+		}
+		if !githubLocatorTransientStatus(response.status) || attempt+1 == githubLocatorAPIAttempts {
+			break
+		}
+		delay, err := githubLocatorServerDelay(response.header, (2*time.Second)<<attempt, attempt, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		if err := g.wait(ctx, delay); err != nil {
+			return nil, safeIOError(ctx, e.CodeTimeout, "CI locator ZIP retry wait canceled")
+		}
+	}
+	if response.status != http.StatusOK {
+		return nil, githubLocatorStatusError(ctx, response.status)
+	}
+	hash := sha256.Sum256(response.body)
+	if strconv.Itoa(len(response.body)) != string(artifact.Size) || "sha256:"+hex.EncodeToString(hash[:]) != artifact.Digest {
+		return nil, e.New(e.CodeVerifyFailed, "CI locator ZIP differs from its provider digest or size")
+	}
+	request.Name = artifact.Name
+	return unpackGitHubLocator(ctx, response.body, request, allowEarlier)
+}
+
+// zipDownloadRequest asks the API for the artifact's signed storage URL and
+// builds a credential-free request for it.
+func (g *githubLocatorClient) zipDownloadRequest(ctx context.Context, request Request, artifact githubLocatorArtifact) (*http.Request, error) {
 	location, err := g.apiGET(ctx, "/repos/"+request.Repository+"/actions/artifacts/"+string(artifact.ID)+"/zip")
 	if err != nil {
 		return nil, err
@@ -37,19 +77,7 @@ func (g *githubLocatorClient) downloadLocator(ctx context.Context, request Reque
 	if err != nil {
 		return nil, e.New(e.CodeInternal, "creating CI locator ZIP request failed")
 	}
-	response, err := g.get(ctx, download, maxGitHubLocatorZIPBytes)
-	if err != nil {
-		return nil, err
-	}
-	if response.status != http.StatusOK {
-		return nil, githubLocatorStatusError(ctx, response.status)
-	}
-	hash := sha256.Sum256(response.body)
-	if strconv.Itoa(len(response.body)) != string(artifact.Size) || "sha256:"+hex.EncodeToString(hash[:]) != artifact.Digest {
-		return nil, e.New(e.CodeVerifyFailed, "CI locator ZIP differs from its provider digest or size")
-	}
-	request.Name = artifact.Name
-	return unpackGitHubLocator(ctx, response.body, request, allowEarlier)
+	return download, nil
 }
 
 func unpackGitHubLocator(ctx context.Context, raw []byte, request Request, allowEarlier bool) ([]byte, error) {

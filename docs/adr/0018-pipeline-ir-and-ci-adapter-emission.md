@@ -358,10 +358,11 @@ disk producer's full material closure.
 Internal native toolchains beneath the candidate publication prefix's `toolchains/`
 repositories use a separate preparation step with `contents: read` and no workflow package scope.
 The maintained M2, exact `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks` and
-`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24` families and two NVKE
+`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24` families, the exact
+`ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site` composite and two NVKE
 nightly publication prefixes also reuse the already-published
 `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/` pins. Reusing these toolchain subjects does
-not relocate them into family or nightly output namespaces. Other family prefixes, child or lookalike
+not relocate them into family, composite or nightly output namespaces. Other family prefixes, child or lookalike
 prefixes, unrelated publication owners and other toolchain repositories remain excluded from this exception.
 Only that step receives the independent `NVKR_REGISTRY_READ` credential and explicit account.
 The entry workflow binds both values as explicit composite inputs; composite metadata does not evaluate
@@ -1414,12 +1415,16 @@ mention the `needs` context retain their original direct dependency lists. Valid
 requires the exact emitted map, then restores logical dependencies in memory for the existing artifact,
 credential and execution checks. It never repairs an arbitrary omitted edge from supplied YAML.
 
-Finalizers with at most 64 required jobs retain direct result collection. Larger finalizers use 16 fixed
-buckets selected by FNV-1a over the stable provider job ID, with at most 64 members per bucket. This hash
-selects diagnostic placement only; it is not an artifact or authority identity. Bucket overflow fails with
-`engine-capability` before returning generated output. Addition or removal does not rebalance existing
-members. Only finalizer accounting depends on collectors; no producer or release job acquires a new
-cross-output execution barrier.
+Finalizers with at most 64 required jobs retain direct result collection. Larger finalizers use 16, 32 or 64
+fixed buckets selected by FNV-1a over the stable provider job ID modulo the bucket count, with at most 64
+members per bucket. Generation selects the narrowest of those widths whose fullest bucket fits, so a
+finalizer that fits 16 buckets keeps the original 16-bucket membership and collector IDs. This hash
+selects diagnostic placement only; it is not an artifact or authority identity. Overflow at 64 buckets
+fails with `engine-capability` before returning generated output, as does a layout whose all-success
+reports would exceed the finalizer's 32,768-token budget below. At a given width, addition or removal
+does not rebalance existing members; a change that crosses to another width reassigns every member once.
+Only finalizer accounting depends on collectors; no producer or release job acquires a new cross-output
+execution barrier.
 
 Each collector is a closed, five-minute hosted Ubuntu job with no token permissions, checkout, credentials,
 artifacts or helper execution. Its `always()` condition retains the entry workflow's dispatch policy.

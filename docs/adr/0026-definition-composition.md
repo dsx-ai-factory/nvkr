@@ -114,7 +114,8 @@ consumes unchanged. The derivation is a pure, deterministic function of the comp
 | Named outputs | Disjoint union. Each output declaration is copied unchanged except for catalog path rebasing below. Output names are preserved; there is no prefixing, renaming or namespacing. The union is sorted by name. | The same output name in two members is an error, even if the declarations are identical. There is no deduplication. |
 | Per-output catalog | Every output receives an explicit catalog stack. An output without an override inherits its own member's top-level `catalog`. Base and overlay locators are rebased from the member's directory to the composite's directory. Member locators must be relative; absolute locators are rejected, not rebased, matching compile-input capture. | An absolute base or overlay locator, or a rebased locator outside the admitted input root, is an error. |
 | Top-level `catalog` | Every member's top-level catalog stack, after rebasing, must be identical. It becomes the effective Definition's top-level stack. | Any difference is an error. |
-| `sbomTool`, `cosignTool` | Every member must select the same value (including omission). | Any difference is an error. |
+| `sbomTool` | Every member that selects one must select the same value; it becomes the effective `sbomTool`. A member that omits it inherits that shared value, so its outputs get SBOMs inside the composite while its standalone Runs stay unchanged. | Two different selected values are an error. |
+| `cosignTool` | Every member must select the same value (including omission). | Any difference is an error. |
 | Helm image bindings | Copied unchanged. Each member was validated standalone (§2 step 3), so every binding already resolves inside its own member; preserved names keep it resolving to the same output. | A binding cannot reach another member's output by construction. |
 | Platforms | Copied unchanged per output; aggregate `platforms` sets keep their exact membership (ADR-11 §2, ADR-12). | Unsupported platforms fail in the existing compiler and Environment admission, as for any Definition. |
 | Producer pins | Catalog locks remain the only pin owner (ADR-22). One catalog file loads once per compile. For every `(component, target platform)` that outputs of **different** members select, the effective producer snapshot (after overlays and toolchain substitutions) must be identical unless the composite declares both members as variants of that component. | Divergent effective producers for the same component and platform across members are an error unless both members are listed in that component's declared variant. A declared member that selects the component in none of its outputs is an error. Within one member, existing ADR-11 semantics are unchanged. |
@@ -264,7 +265,7 @@ Plan, workflow and publication bounds stay with their existing owners (§5).
 | `run plan`, `run graph`, `run diff`, dry-run | Supported once implemented |
 | `run local` | Static-unqualified only, as for any Definition |
 | `run generate` for a production bundle, flat or partitioned | Supported once implemented; `pipeline-attested` |
-| `githubDevelopment: true` | Supported by U5; signed development stays `pipeline-attested` with its own signer and disposable namespaces and grants no production acceptance. The single fixed development layout belongs to the combined candidate until cutover, so U5 admits a named development bundle for composites only and refuses a composite without `githubBundle` with `engine-capability` before any member read and at saved-Plan validation: `githubBundle: <name>` with publication under `ghcr.io/<owner>/<repo>/development-<name>`, workflow `.github/workflows/nvkr-dev-<name>.yml`, its own manifest and Plan under `.github/nvkr-dev-<name>/`, and a signer identity bound to that workflow. Names that collide with the fixed development qualification files (`qualify`, `smoke`, `qualification`) or the authored registry-cleanup workflow (`cleanup`) are refused. A named development bundle requires that isolated signed publication; an unsigned named development bundle is refused with `engine-capability`, because an unsigned build has no namespace to isolate. The existing refusal of `githubDevelopment` with `githubBundle` for plain Definitions is unchanged and now applies at compilation, where the Definition kind is known |
+| `githubDevelopment: true` | Supported by U5; signed development stays `pipeline-attested` with its own signer and disposable namespaces and grants no production acceptance. A composite may own the single fixed development layout (`.github/workflows/nvkr-dev.yml`, `.github/nvkr-dev/`, publication under `ghcr.io/<owner>/<repo>/development` and the `nvkr-dev.yml` signer), exactly as a plain Definition may; one Definition owns that layout at a time. The maintained repository gives it to the GPU site composite, so the combined candidate has no development bundle, and with composite qualification deferred (U8) the fixed development qualification pair is retired with it. U5 also admits a named development bundle for composites only: `githubBundle: <name>` with publication under `ghcr.io/<owner>/<repo>/development-<name>`, workflow `.github/workflows/nvkr-dev-<name>.yml`, its own manifest and Plan under `.github/nvkr-dev-<name>/`, and a signer identity bound to that workflow. Names that collide with the fixed development qualification files (`qualify`, `smoke`, `qualification`) or the authored registry-cleanup workflow (`cleanup`) are refused. A named development bundle requires that isolated signed publication; an unsigned named development bundle is refused with `engine-capability`, because an unsigned build has no namespace to isolate. The existing refusal of `githubDevelopment` with `githubBundle` for plain Definitions is unchanged and now applies at compilation, where the Definition kind is known |
 | `run check-artifacts`, `run qualify`, qualification generation, release manifest issuance | Deferred; `engine-capability` before work |
 | Member Release reuse | Deferred (§6); `engine-capability` |
 | Nested or remote members | Rejected (§8, §1) |
@@ -425,10 +426,12 @@ Negative cases on the same inputs:
 - Adding a member whose top-level catalog is `../../catalogs/nvke/release` fails with `invalid-catalog`.
 
 Decided: once the composite exists, the hand-maintained combined `definition.yaml` becomes redundant, and
-retiring it is planned as a separate cutover (U10). The combined production, development and qualification
-paths depend on it. The cutover is gated on a successful hosted composite Run with all 69 outputs and one
-Release, followed by independent consumer verification under explicit policy. Composite qualification (U8)
-must exist before the combined qualification path can retire.
+retiring it is planned as a separate cutover (U10). The combined production and qualification paths depend
+on it; the fixed development bundle now belongs to the GPU site composite. The cutover is gated on the Hosted
+acceptance criterion below, followed by U10's membership and Build Digest equality. The current composite
+selection differs from the combined Definition's 69 outputs, so that equality still needs a governed
+membership and naming alignment. Composite qualification (U8) must exist before the combined qualification
+path can retire.
 
 ## Implementation plan
 
@@ -458,8 +461,8 @@ Acceptance tests per unit:
   that selects its component in none of its outputs, → `invalid-catalog`; declared variants change the
   composite digest and an empty declaration does not.
 - **U2:** deterministic output (shuffled member order in memory yields identical bytes); duplicate output name,
-  even with identical declarations → `invalid-catalog`; differing top-level stack, `sbomTool` or `cosignTool`
-  → `invalid-catalog`; absolute member base or overlay locator → `invalid-catalog`, matching captured
+  even with identical declarations → `invalid-catalog`; differing top-level stack, selected `sbomTool` or `cosignTool`
+  → `invalid-catalog`; a member that omits `sbomTool` inherits the shared one; absolute member base or overlay locator → `invalid-catalog`, matching captured
   compile-input replay; default-catalog outputs receive explicit rebased stacks; Helm bindings resolve to the same
   outputs; effective Definition passes `Definition.Validate`.
 - **U3:** **identity invariance** — for the four NVKE families (extended, with pinned-source access like the
@@ -476,10 +479,11 @@ Acceptance tests per unit:
   concurrent writer with `write-conflict`; CLI and SDK both reach the same owner.
 - **U5:** `run generate --check` passes byte-exactly for an unchanged composite, flat and with partitions; a member
   edit without re-pin → `unverified-ref`; partition membership never follows member boundaries; maintenance
-  refuses a committed composite bundle omitted from its closure. Development: a named composite development
-  bundle regenerates byte-exactly beside the combined development bundle, with a distinct manifest, workflow,
-  signer identity and run-attempt namespace; it cannot share or overwrite the combined layout; plain
-  Definitions still refuse `githubDevelopment` with `githubBundle`; development output never satisfies a
+  refuses a committed composite bundle omitted from its closure. Development: a composite generates the fixed
+  development layout with the fixed workflow, namespace and signer, and its Plan keeps the composition record; a
+  named composite development bundle regenerates byte-exactly beside the fixed development bundle, with a distinct
+  manifest, workflow, signer identity and run-attempt namespace, and cannot share or overwrite the fixed layout;
+  plain Definitions still refuse `githubDevelopment` with `githubBundle`; development output never satisfies a
   production expectation.
 - **U6:** composition record complete and consistent; output attributed to an unlisted member, missing
   attribution, extra member or tampered effective digest → coded failure; v4 readers reject the new major;
@@ -488,7 +492,7 @@ Acceptance tests per unit:
   against a member Release both fail; required member set mismatch fails; a member-filtered view grants no
   capability and its description cannot restore authority.
 - **Hosted:** before reconciliation may claim external exercise, one hosted Run of the NVKE composite must
-  complete with 69 outputs and one root, followed by independent consumer verification under explicit policy.
+  complete with every output of its members (80 for the GPU site composite) and one root, followed by independent consumer verification under explicit policy.
   The same evidence gates U10.
 - **U9 (follow-up):** the reuse decision's matrix, extended with: family output reused only for its same-name
   composite output; an origin outside the authored allowlist refused; equal Build Digest sibling refused;
@@ -554,7 +558,8 @@ The questions left open by the first draft were decided on 2026-10-29:
    members (§1, §3); every undeclared divergence fails.
 3. Cross-workflow reuse: a follow-up after draft ADR-30 lands; composites rebuild everything until then (§6, U9).
 4. Combined `definition.yaml`: a separate cutover gated on a hosted composite Run and consumer verification (U10).
-5. Development bundles: pulled forward into U5 (§9).
+5. Development bundles: pulled forward into U5 (§9). On 2026-11-04 the fixed development layout was opened to
+   composites so the GPU site composite can use the already registered `nvkr-dev.yml` workflow (§9).
 
 ## Acceptance evidence
 

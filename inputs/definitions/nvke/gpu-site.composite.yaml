@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Member digests are machine-maintained: run `nvkr definition pin --definition` on this file after a member edit.
+apiVersion: nvkr.dev/composite-definition/v1
+kind: CompositeDefinition
+metadata:
+  name: nvke-gpu-site
+  description: Build and publish an NVKE GPU site as one Release from the five NVKE family Definitions and the GB200 AICR bundles.
+members:
+  - name: aicr-nvke-gb200
+    definition: ../aicr/nvke-gb200.yaml
+    digest: sha256:b7485bd3759591595973d17dbaa500f9bfab067811125cf8eb78c20470253862
+  - name: nvke-core
+    definition: core.yaml
+    digest: sha256:4da78715fe6b6e04945ab99bf2b4c535eacbf90346d816acecd2ceefb7cc348c
+  - name: nvke-disks
+    definition: disks.yaml
+    digest: sha256:56c39c33d1413c41f9259d2e1ad12adb93426d921e10dc1da8228c9329310d5e
+  - name: nvke-disks-ubuntu24
+    definition: disks-ubuntu24.yaml
+    digest: sha256:44a151a9f7b94342d72f83b206240a67e119dab18a8a69e94775bcde1dde8505
+  - name: nvke-services
+    definition: services.yaml
+    digest: sha256:8eeba2c9b44d42684602363d68ed10b506d822017affc391045b84c0754ef49c
+  - name: nvke-telemetry
+    definition: telemetry.yaml
+    digest: sha256:041225961418f7334df77541e1264ec691d6ab51701b1b7add9ac1160e0b1b65
+# The Ubuntu 24.04 overlay replaces these components, so the two disk families resolve different producers for them.
+variants:
+  - component: nvke-agent
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: nvke-doca-ovs
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: nvke-node-fde-amd64
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: nvke-node-fde-arm64
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: nvke-node-image
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: nvke-node-image-amd64
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: ubuntu-installer-iso
+    members: [nvke-disks, nvke-disks-ubuntu24]
+  - component: ubuntu-installer-iso-amd64
+    members: [nvke-disks, nvke-disks-ubuntu24]

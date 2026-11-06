@@ -1,29 +1,38 @@
 ## Maintained input and schema boundaries
 
-The NVKE four-family pilot adds independent core (20 outputs), services (28), telemetry (17) and disks (4)
+The NVKE four-family pilot adds independent core (21 outputs), services (34), telemetry (17) and disks (4)
 Definitions under `inputs/definitions/nvke/`, with corresponding `github-nvke-<family>` Environments and
-named production bundles. Their selected output union is the combined candidate's 69 outputs, retaining
+named production bundles. Their selected output union is the combined candidate's 69 outputs, except `nico-reference-profiles-fixture`, plus 8
+family-only outputs (two core, six services) that the combined Definition omits for workflow headroom, retaining
 aggregate native children, bound chart/image relationships and complete disk material selections. They
 reuse shared catalog/pin owners and publish into separate family prefixes beneath the existing candidate
 namespace. `make nvke-split-generate` and `make nvke-split-check` own the family subset; the repository-wide
 workflow targets include it. These are authored-input and generation changes, not a new lifecycle or
 cross-Run assembly contract. No hosted family execution, publication or independent consumer acceptance
-is recorded. The combined production/development and qualification paths remain until consumer and
-qualification cutover. Named producer qualification and named development remain unsupported; the pilot
+is recorded. The combined production and qualification paths remain until consumer and qualification
+cutover; the GPU site composite below owns the fixed development bundle. Named producer qualification remains unsupported, and so does named development for these plain family Definitions; a composite may have a named development bundle (ADR-26). The pilot
 emits no automatic association file or parent Release. Consumers independently verify exact family
 references and own any required association or compatibility decision. See the
 [pilot inputs](../../../inputs/definitions/nvke/README.md#family-pilot) and
 [partitioning strategy](../../definition-partitioning-strategy.md) for scope and historical measurements.
-Proposed [ADR-26](../0026-definition-composition.md) designs a composite of these four families as one Release;
-units U1–U7 are implemented and contract-tested only, and it adds no authored input.
+Proposed [ADR-26](../0026-definition-composition.md) designs a composite of these families as one Release;
+units U1–U7 are implemented and contract-tested only. The authored
+[GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite) pins the five families
+and the GB200 AICR Definition, which inherits their `sbomTool`, declares the eight components the Ubuntu 24.04 overlay replaces as variants of the two disk families, and has
+a generated named production bundle and the fixed development bundle, both enrolled in `make workflows-check`
+and catalog maintenance. No hosted composite Run, publication or consumer verification is recorded. The six-member finalizer fits
+ADR-18's 16 result-collector buckets.
 A fifth, `disks-ubuntu24` family selects four Ubuntu 24.04 disks that the combined candidate omits; see
 [Ubuntu 24 node-image inputs](ubuntu-24-node-image-inputs.md#ubuntu-24-node-image-inputs).
 
 The [GPU system matrix](../../../inputs/definitions/nvke/README.md#gpu-system-matrix) maps GB200, GB300, VR200
 and the site controller to family outputs in documentation only. It adds no Definition axis, input or
 generated file. NVKR records no GPU driver, fabric or runtime acceptance for any of them; that evidence
-belongs to AICR and NVKE. No maintained Definition yet selects the matrix's Ubuntu 24.04 disks,
-`controller-profiles` output, offline CAPI repository or composite site Release. The GB200 AICR bundle
+belongs to AICR and NVKE. No maintained Definition yet selects the matrix's offline CAPI repository. The core
+family selects `controller-profiles`, `disks-ubuntu24` selects the Ubuntu 24.04 disks, and the GPU site composite
+above selects the composite site Release, which no hosted Run has produced. No maintained Definition selects the
+ARM64 AICR CLI: publication accepts one bundle entry per component build subject, so its pinned attestation
+companion cannot be published beside it yet. The GB200 AICR bundle
 Definition has one local Run and no hosted Release.
 
 The maintained release node-image catalog selects the NVIDIA OVN fork `v2.4.2`
@@ -59,8 +68,9 @@ checks and formatting failure/read-only fixtures also passed. New-head hosted CI
 Native Linux signing/pipeline race and pinned-cosign interoperability were not rerun locally; raw local
 logs remain unpublished. These local contracts establish no hosted family acceptance.
 
-The maintained closure inventory checks every committed producer bundle and both qualification pairs
-offline, without skipping when private sources are unavailable. It checks exact policy selections, member
+The maintained closure inventory checks every committed producer bundle and the production qualification
+pair offline; no development qualification pair is committed, and the plain-development qualification generator
+is contract-tested separately on a compiled fixture. It runs without skipping when private sources are unavailable. It checks exact policy selections, member
 bytes/modes and complete namespace inventory; authenticated recompilation remains owned by workflow checks.
 The existing combined/development/nightly credential matrix now states each disk expectation explicitly,
 including the development exemption. The separate actual disks-family assertion retains four producers.
@@ -148,7 +158,7 @@ CAPNICo and explicitly named reference-profile fixtures, the existing provisione
 and fourteen acquired runtime-image components delivered separately for both native architectures.
 The selected NVKE/CAPI sources and NVKE telemetry pipelines dependency charts own their versions; Helm test-only images are
 excluded. `nico-reference-profiles-fixture` identifies reference test data in the release membership itself,
-not fleet configuration, the runnable demo's `controller-profiles`, or a complete legacy OSProfile set.
+not fleet configuration or a complete legacy OSProfile set; the core family also delivers that build as `controller-profiles`.
 Provider manifests, image-reference relocation and installation remain consumer work, not delivery proved here.
 Native children are locked separately from source-owned index parents, and materialization authenticates actual
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
@@ -181,15 +191,16 @@ complete hosted Run is still required to establish the corrected candidate's exe
 
 The NICo catalog additionally declares source-built `nico-flow-image` and `nico-core-image` producers
 from the infra-controller `v2.3.0` pin, on the generic rootless BuildKit route with digest-bound bases.
-Only the core family selects them: Core backs the umbrella chart's `global.image`, and Flow is the one REST
-image the packaged charts reference. Since `v2.3.0` Flow is a standalone release outside the umbrella, so the
-core family also selects a source-packaged `nico-flow` chart beside `nico` and `nico-prereqs`; it is
-contract-tested by the family membership matrix and the regenerated core bundle only. Core chains the source's native build, runtime and release Dockerfiles in
+Core backs the umbrella chart's `global.image`, and Flow is the one REST image the packaged charts
+reference. Since `v2.3.0` Flow is a standalone release outside the umbrella, so the catalog also packages a
+`nico-flow` chart beside `nico` and `nico-prereqs`. No maintained Definition selects these five outputs:
+development Run [41789718662](https://github.com/dsx-ai-factory/nvkr/actions/runs/41789718662) showed that
+source admission refuses the `v2.3.0` tree's absolute systemd symlink under `pxe/`, so the core family
+dropped them until that is resolved. Core chains the source's native build, runtime and release Dockerfiles in
 one producer per architecture, because BuildKit admits no material inputs. The generated hosted budgets
 differ by architecture: the ARM64 Core build has its own 60-minute job, while AMD64 build and preparation share
 one 120-minute job. A cold Rust workspace build may not fit either, and hosted routes admit no longer
-execution budget; a hosted Run must establish it. Both producers are designed and contract-tested by catalog validation, the
-family membership/compiled-identity matrix and the regenerated core bundle. A recording-stub contract runs the
+execution budget; a hosted Run must establish it. Both producers are designed and contract-tested by catalog validation. A recording-stub contract runs the
 Core command for both architectures: it checks the native Dockerfile selection, the handoff of each base's OCI
 layout and digest to the release stage, and that a failed base or a missing, duplicate or malformed
 intermediate digest stops before the release stage. Both bases receive the Kea package version from the
@@ -207,6 +218,17 @@ build command built both architectures locally in the pinned BuildKit image (AMD
 catalog command as it was before intermediate-digest validation built both source-owned bases, bound them by digest and compiled for about 220 seconds before
 the compiler was killed by signal 9 in an 8 GiB Docker VM; no Core image was produced. Neither has been rebuilt
 at `v2.3.0`, and no hosted Run has built, published or signed either image or the Flow chart.
+
+The core family selects `controller-profiles` from the curated `nvke-nico-reference-profiles` producer in place
+of `nico-reference-profiles-fixture`: one Release cannot publish the same image under two outputs, which the publication root rejects.
+NVKE's controller deploy item names `profilesArtifact:
+controller-profiles` (`deploy/nico/controller/release.yaml:20` at `v0.22.0`, `v0.23.0` and main `5293831c`), and a
+`--release` render fails when the Release lacks it; the stack config's `images.profiles` overrides it but cannot
+replace it. The image holds the two NICO test config profiles and their runbooks, not fleet configuration; NVKE's
+full fixture tree, with its empty and failure-injection profiles, is not selected. The combined Definition does not
+select it. It is contract-tested by the family membership matrix and the regenerated core bundle only; no hosted
+Run has built or published it, and no NVKE render has consumed it. CAPI provider manifests and a clusterctl local
+repository are not delivered.
 
 Current Definition v5/catalog v3/IR v4/Plan and artifact-graph v5 reject retired recipe, cluster, category,
 role, composition and staging fields, including empty legacy fields. Runs/Releases use v4 and validation vectors retain v3; publication roots and Inventory/ReleaseSet use v4; disk manifests use v2. Removed compiler-handoff,

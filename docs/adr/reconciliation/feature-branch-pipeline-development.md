@@ -112,11 +112,32 @@ then failed during helper locator acquisition with HTTP 503. The locator API own
 bounded transient-server retries. Recovery, exhaustion, cancellation and server-delay cases are added to
 the contract suite; [Merge Gate 39276232245](https://github.com/dsx-ai-factory/nvkr/actions/runs/39276232245) passed on `8dc975de`. Local execution remains skipped at the operator's request.
 This is not a successful complete development Run or qualification claim.
+The signed storage download that follows each locator ZIP redirect had no retry. In GPU site composite
+[Run 41884498057](https://github.com/dsx-ai-factory/nvkr/actions/runs/41884498057), the metadata assembly job, which
+reads 406 locators, failed with that storage request's HTTP 503 on three consecutive attempts. The storage download now
+uses the same bounded transient-server budget, with recovery and exhaustion cases in the contract suite.
+
+Private-carrier repository admission in [Run 42100660131](https://github.com/dsx-ai-factory/nvkr/actions/runs/42100660131),
+[ARM64 node-exporter signing job](https://github.com/dsx-ai-factory/nvkr/actions/runs/42100660131/job/127518111891),
+reported an unauthenticated source identity during restore. That path previously classified every non-200
+repository response as a trust failure, so the diagnostic does not establish the original HTTP status.
+Repository and package admission GETs now permit at most four requests for HTTP 5xx, 429 or a 403 JSON
+secondary-rate-limit response, using the existing bounded `Retry-After` parser and cancellable backoff.
+All retryable API responses refuse exhausted or ambiguous primary quota before waiting or retrying.
+The operation has an eight-minute bound; individual requests retain their thirty-second timeout. Final HTTP
+failures report their status with fetch/availability codes; invalid identities and privacy metadata in HTTP
+200 responses remain trust failures. A failed conditional request invalidates its representation before retry.
+`pkg/nvkr/cistore/privacy_http_test.go` covers recovery, exhaustion, server delays, primary-quota refusal,
+cancellation, credential scope and stale-response rejection. Simulated-clock tests through repository and
+package admission pin the eight-minute operation budget, thirty-second request deadlines, successful retry
+beyond thirty seconds and precedence of an earlier parent deadline. These are local contract tests; no hosted
+recovery with this fix is recorded.
 
 The explicit `githubDevelopment` Environment setting selects separate fixed workflow/Plan/manifest paths
-with the same compiler, complete graph and helper. The committed development bundle now uses the full
-69-output M2 Definition, including all four native plain/public-bootstrap FDE disk outputs, output-local publication, SBOM attestation,
-cosign signing, verification, metadata assembly and finalization. It retains the candidate's existing disk
+with the same compiler, complete graph and helper. The committed development bundle now uses the 83-output
+[GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite), including all eight native plain/public-bootstrap
+FDE disk outputs of both Ubuntu series, output-local publication, SBOM attestation, cosign signing, verification,
+metadata assembly and finalization; the combined 69-output candidate no longer has a development bundle. It retains the candidate's existing disk
 and source limitations; development execution cannot approve those production exceptions. Development
 finalization retains its Run record without emitting the production qualification handoff; explicit handoff
 admission returns a capability error before qualification evidence collection. Production handoffs retain seven days.
@@ -128,8 +149,10 @@ attempt URL on a reviewed nondefault branch; its source branch may differ. The f
 final qualifier use development-only credentials and distinct evidence schema/predicate. Production evidence
 admission is unchanged. The development pair has independent manifest ownership and runtime drift checks.
 Local contracts cover source/qualifier selection, metadata integrity and restoration, production rejection,
-namespace binding and generated credential/owner separation. Catalog maintenance names and regenerates the
-development pair with its producer, so pin updates cannot leave its manifest stale.
+namespace binding and generated credential/owner separation. Composite qualification is deferred (ADR-26 U8),
+so the committed development pair (`nvkr-dev-qualify.yml`, `nvkr-dev-smoke.yml`, `.github/nvkr-dev-qualification/`)
+is retired with the move to the composite; the qualification path itself remains contract-tested against a
+compiled plain development Plan.
 Development qualifier retries may retain earlier successful workers within the same qualification run,
 preserving their original branch, source/policy bindings, certificate invocation and private-carrier attempt.
 Each output publication retains its original source attempt and namespace. A later aggregate attempt

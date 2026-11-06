@@ -201,6 +201,8 @@ _Avoid_: Release, binary bundle, editable workflow scaffold
 A review-only lock and regenerated execution-bundle change under explicit source-selection constraints.
 Static checks and optional complete local diagnostic execution precede candidate handoff; neither is release
 acceptance. Scheduling and source-role alignment are operational policy, not additional lifecycle objects.
+Native toolchain maintenance additionally binds candidate-only exceptions to exact image subjects;
+independent-reader/native verification precedes the review-only pin and generated-bundle change.
 _Avoid_: Release, qualified reproduction, automatic promotion
 
 **Runnable OCI image index**:

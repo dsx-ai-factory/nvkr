@@ -170,6 +170,11 @@ version `main` pins, takes its management-plane inputs from the core family. Its
 Release lacks, including PostgreSQL, SPIRE and Temporal, from their public repositories
 ([NVKE deploy path](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/deploy/nico/README.md?plain=1#L55-L68)).
 
+The [GPU site composite](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md#gpu-site-composite)
+builds the same family outputs into one Release, so a site could take every family output from one reference;
+`qcow-imager.efi` and the GPU stack still come separately, as in the steps below. No
+hosted composite Run is recorded either, so the steps below use the family Releases.
+
 This path cannot yet run end to end. No hosted family Run is recorded; the first one for each family is tracked in [#342](https://github.com/dsx-ai-factory/nvkr/issues/342). The
 steps below name the issue that each missing Release input waits on.
 
@@ -229,12 +234,15 @@ Each stage links the NVKE `v0.23.0` page that owns it. Run them from an NVKE che
    `deploy/nvke-deploy.sh install --deploy-path deploy/nico --sitespec sitespec.yaml --stack-config stack-config.json --release nvkr-release.json`.
    NVKE refuses a release without
    `controller-profiles`
-   ([troubleshooting](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/operate/troubleshoot.md?plain=1#L249-L253)), and the core Release does not
-   carry it until [#324](https://github.com/dsx-ai-factory/nvkr/issues/324). Until then, install without
-   `--release`: set the stack config's `images.controller` to the `reference` of the `cwe` output in
-   `nvkr-release.json`, and `images.profiles` to your site's profile image. Every other image and chart then
-   comes from NVKE's pinned upstream sources. The core Release's `nico-reference-profiles-fixture` holds NVKE
-   test profiles, not fleet configuration.
+   ([troubleshooting](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/operate/troubleshoot.md?plain=1#L249-L253)). The core Release
+   carries it as the same build as `nico-reference-profiles-fixture`: NVKE's reference test profiles, not fleet
+   configuration. Set the stack config's `images.profiles` to your site's profile image; it replaces the image
+   only after NVKE finds `controller-profiles` in the Release. If you leave `images.profiles` unset, NVKE installs
+   the Release's image instead
+   ([`site.go`](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/cli/internal/deploypath/site.go#L131-L139)).
+   Its `nico-vms-cp` and `nico-vms-worker` profiles then appear among the controller's config profiles, and a node
+   set uses one only when it names it in `configProfile`
+   ([`get_node_config_profile.go`](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/controller/internal/temporal/activities/get_node_config_profile.go#L55-L87)).
 8. [Register the image for provisioning](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/operate/build-node-images.md#register-the-image-for-provisioning).
 9. [Create a workload cluster](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/docs/workload-clusters/create.md).
 10. Apply the GPU stack. The

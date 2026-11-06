@@ -20,12 +20,12 @@ This document changes no ADR contract or organizational acceptance decision.
 
 | Definition | Outputs | Native targets | Required family |
 | --- | ---: | ---: | --- |
-| [Core](../inputs/definitions/nvke/core.yaml) | 27 | 33 | CLI/operator tools, ARM64 AICR CLI, controller with its bound chart, NICo charts and Core/Flow images, providers/reference fixture, CAPI and cert-manager bootstrap images |
+| [Core](../inputs/definitions/nvke/core.yaml) | 21 | 25 | CLI/operator tools, controller with its bound chart and `controller-profiles` image, providers, CAPI and cert-manager bootstrap images |
 | [Services](../inputs/definitions/nvke/services.yaml) | 34 | 34 | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and native runtime images |
 | [Telemetry](../inputs/definitions/nvke/telemetry.yaml) | 17 | 17 | NKTP chart and native runtime images |
 | [Disks](../inputs/definitions/nvke/disks.yaml) | 4 | 4 | Ubuntu 26.04 AMD64/ARM64 plain and public-bootstrap FDE disks with complete material closures |
 | [Disks Ubuntu 24](../inputs/definitions/nvke/disks-ubuntu24.yaml) | 4 | 4 | The same disks on Ubuntu 24.04 through the Ubuntu 24 overlay |
-| Total | 86 | 92 | The combined candidate's complete named output set plus the core family's three NICo charts, two NICo images, ARM64 operator tools and ARM64 AICR CLI, the services family's six local-path-provisioner outputs, and the four Ubuntu 24.04 disks |
+| Total | 80 | 84 | 68 + 12 = 80: the combined candidate's 69 named outputs except `nico-reference-profiles-fixture`, which the core family delivers as `controller-profiles` because one Release cannot publish the same image twice, plus 12 family-only outputs, which are the core family's ARM64 operator tools and `controller-profiles` image, the services family's six local-path-provisioner outputs, and the four Ubuntu 24.04 disks |
 
 Each family selects `inputs/environments/github-nvke-<family>.yaml`, with
 `githubBundle: nvke-<family>`. Generation owns `.github/workflows/nvkr-run-nvke-<family>.yml`
@@ -39,8 +39,8 @@ using the fixed registry reader, before source or producer execution. Namespace 
 other families and foreign toolchain owners receive no exception. These are credential projection
 contracts, not evidence of provisioned package access or hosted disk execution.
 
-The combined [Definition](../inputs/definitions/nvke/definition.yaml), production and development bundles,
-and their qualification paths remain available. The families are a reversible pilot, not a recursive
+The combined [Definition](../inputs/definitions/nvke/definition.yaml), its production bundle and its
+production qualification path remain available; the fixed development bundle belongs to the GPU site composite. The families are a reversible pilot, not a recursive
 replacement for the combined Release. Existing consumer acceptance of the combined publication cannot be
 transferred to four independently produced roots.
 
@@ -290,8 +290,9 @@ bootstrap/finalization recompilation steps. Unrelated source-access entries rema
 build and publication steps do not receive the revalidation credential.
 [Source-access contract](adr/0020-artifact-publication-and-target-configuration.md#2-target-configuration-surface)
 
-Production and development qualification paths exist for the retained combined candidate. They do not
-qualify independently named family producers. Named producer qualification remains unsupported, as does
+A production qualification path exists for the retained combined candidate. The development bundle now belongs
+to the GPU site composite, whose qualification is deferred, so no development qualification pair is committed.
+Neither qualifies independently named family producers. Named producer qualification remains unsupported, as does
 `githubDevelopment: true` with a nonempty `githubBundle`. The pilot preserves those admission limits.
 A downstream coordinator may dispatch independent named workflows, but exact Run correlation, aggregate
 success decisions and deployment scheduling remain its responsibility.

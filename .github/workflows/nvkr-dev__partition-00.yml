@@ -16,8 +16,10 @@ name: p00 Prepare NVKR runner (arc-amd64-kvm) +3
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-02 }}
       nvkr-partition-03:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-03 }}
-      nvkr-partition-08:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-08 }}
+      nvkr-partition-04:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-04 }}
+      nvkr-partition-09:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-09 }}
       nvkr-results-00:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00 }}
       nvkr-results-00-statuses:
@@ -57,7 +59,7 @@ jobs:
           [ ! -L "$GITHUB_STEP_SUMMARY" ] || exit 0
           [ ! -e "$GITHUB_STEP_SUMMARY" ] || [ -f "$GITHUB_STEP_SUMMARY" ] || exit 0
           {
-            printf '%s\n' '## NVKR Run started' '' '<code>nvke-m2</code> · 69 planned outputs · <code>linux/amd64, linux/arm64</code>' '' 'Lane: <code>pipeline-attested</code>. Execution and completeness checks are pending.' ''
+            printf '%s\n' '## NVKR Run started' '' '<code>nvke-gpu-site</code> · 83 planned outputs · <code>linux/amd64, linux/arm64</code>' '' 'Lane: <code>pipeline-attested</code>. Execution and completeness checks are pending.' ''
           } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
       - name: Check out workflow source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -142,7 +144,8 @@ jobs:
       nvkr-partition-01: ${{ format('"build-runner-ubuntu-24-04":{0},"build-runner-ubuntu-24-04-arm":{1}', toJSON(needs['build-runner-ubuntu-24-04']), toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}
       nvkr-partition-02: ${{ format('"build-runner-ubuntu-24-04":{0},"build-runner-ubuntu-24-04-arm":{1}', toJSON(needs['build-runner-ubuntu-24-04']), toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}
       nvkr-partition-03: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
-      nvkr-partition-08: ${{ format('"build-runner-arc-amd64-kvm":{0},"build-runner-arc-arm64-kvm":{1}', toJSON(needs['build-runner-arc-amd64-kvm']), toJSON(needs['build-runner-arc-arm64-kvm'])) }}
+      nvkr-partition-04: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
+      nvkr-partition-09: ${{ format('"build-runner-arc-amd64-kvm":{0},"build-runner-arc-arm64-kvm":{1}', toJSON(needs['build-runner-arc-amd64-kvm']), toJSON(needs['build-runner-arc-arm64-kvm'])) }}
       nvkr-results-00: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
       nvkr-results-00-statuses: ${{ format('{0}', needs['build-runner-ubuntu-24-04'].result) }}
       nvkr-results-07: ${{ format('"build-runner-ubuntu-24-04-arm":{0}', toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}

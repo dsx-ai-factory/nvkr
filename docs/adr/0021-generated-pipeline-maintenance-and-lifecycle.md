@@ -98,12 +98,12 @@ Plan at that layout and recheck its digest. Development mode changes Environment
 transport-independent logical Build identity. Its execution and retention policy is owned by ADR-18.
 Signed development also binds the disposable namespace and signer policy in this immutable Plan. Actual
 run-attempt destinations are derived by the execution owner under ADR-20; runtime substitutions never
-rewrite generated inputs or bypass drift checks. The maintained development bundle uses the complete M2
-Definition with its separate development Environment.
+rewrite generated inputs or bypass drift checks. The maintained development bundle uses the NVKE GPU site
+composite Definition with its separate development Environment (ADR-26 §9).
 
 For a plain Definition, `githubDevelopment: true` with a nonempty `githubBundle` is unsupported and
-returns `CodeEngineCapability` before catalog resolution or generated-output work. A composite without
-`githubBundle` is refused the same way, because the fixed layout is reserved (ADR-26 §9).
+returns `CodeEngineCapability` before catalog resolution or generated-output work. A composite may use the
+fixed layout or a named development layout; only composites may use a named one (ADR-26 §9).
 Unnamed development and named production remain separate supported selections.
 
 Execution identity and transaction identity are separate. The Plan binds authored inputs and every executable
@@ -442,6 +442,16 @@ and worktrees retain Git's ordinary review and merge-conflict behavior.
 maintenance regenerates a candidate by invoking the existing owners (`run generate` and the qualification
 generator); it renders none of their files itself. Conflating two "CI" artifacts under one verb is
 disallowed; that ambiguity is what makes forgotten-regen drift possible.
+
+Native Packer/inspector maintenance is a separate authored hosted workflow. It reuses native preparation,
+retains exact source/archive/image/executable measurements, and requires a reviewed main-branch per-image
+candidate exception with approver, scope, expiry and license/security review references before publication.
+Both architectures and all subjects are admitted before the first write. Publication is limited to the
+existing internal candidate packages inside the protected publication environment. Independent-reader
+registry read-back and native pulls precede a review-only catalog/overlay/Environment pin change; the existing
+owners regenerate all dependent bundles. Exceptions grant no general approval or qualification, and ordinary
+producer Runs never rebuild toolchains implicitly. The operational owner, cadence, retention and rollback
+procedure live in the maintenance guide; external exercise is recorded in reconciliation.
 
 ## Consequences
 

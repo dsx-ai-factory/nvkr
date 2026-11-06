@@ -134,6 +134,57 @@ func TestCompositeAdmissionMatrix(t *testing.T) {
 	}
 }
 
+// TestCompositeHostedFinalizeAdmitsComposite keeps the generated finalizer open
+// to a composite: admission and the drift check pass, so an empty workspace
+// records a failed composite Run rather than an engine-capability refusal.
+func TestCompositeHostedFinalizeAdmitsComposite(t *testing.T) {
+	compositeLifecycleFixture(t, nil)
+	plan, err := CompileFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeCompositeTestDocument(t, "plan.json", plan)
+	if err := os.MkdirAll(".nvkr/factory", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run, err := FinalizeGenerated(t.Context(), compositeTestPath, compositeTestEnv, "plan.json", "composite-test", "attempt-1", ".nvkr/factory", ".nvkr/run.json")
+	assertCode(t, err, e.CodeProvenanceMissing)
+	if run == nil || run.Status != RunFailed || run.SchemaVersion != CompositeRunSchemaVersion || run.Composition == nil || run.DefinitionDigest != plan.DefinitionDigest {
+		t.Fatalf("failed composite Run = %+v (%v)", run, err)
+	}
+	if _, err := os.Stat(".nvkr/run.json"); err != nil {
+		t.Fatalf("failed composite Run was not recorded: %v", err)
+	}
+}
+
+// TestCompositeHostedFinalizeHandoffRefusesComposite keeps composite
+// qualification deferred (ADR-26 §7): with an admitted producer context the
+// handoff wrapper still refuses a composite and writes no Run or handoff.
+func TestCompositeHostedFinalizeHandoffRefusesComposite(t *testing.T) {
+	compositeLifecycleFixture(t, nil)
+	for key, value := range qualificationProducerEnvironment() {
+		t.Setenv(key, value)
+	}
+	plan, err := CompileFiles(t.Context(), compositeTestPath, compositeTestEnv, "composite-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeCompositeTestDocument(t, "plan.json", plan)
+	if err := os.MkdirAll(".nvkr/factory", 0o755); err != nil {
+		t.Fatal(err)
+	}
+	run, err := FinalizeGeneratedWithHandoff(t.Context(), compositeTestPath, compositeTestEnv, "plan.json", "composite-test", "42-2", ".nvkr/factory", ".nvkr/run.json", ".nvkr/handoff.json")
+	assertCode(t, err, e.CodeEngineCapability)
+	if run != nil {
+		t.Fatalf("refused composite handoff returned a Run: %+v", run)
+	}
+	for _, name := range []string{".nvkr/run.json", ".nvkr/handoff.json"} {
+		if _, err := os.Stat(name); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("refused composite handoff wrote %s: %v", name, err)
+		}
+	}
+}
+
 // declareLifecycleVariant gives beta a containerd output whose overlay changes
 // the producer, so alpha and beta diverge, and declares containerd a variant of
 // the two members.
