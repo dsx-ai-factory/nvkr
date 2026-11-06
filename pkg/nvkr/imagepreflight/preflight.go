@@ -74,7 +74,7 @@ func observe(ctx context.Context, planDigest string, subjects []Subject, resolve
 	credentials := make(map[string]Credential)
 	for _, subject := range subjects {
 		pin, err := name.NewDigest(subject.Image)
-		if err != nil || pin.Registry.Scheme() != "https" || !canonical.IsDigest(pin.DigestStr()) || target.ValidatePlatform(subject.Platform) != nil || subject.Route == "" || subject.Placement == "" {
+		if err != nil || pin.Scheme() != "https" || !canonical.IsDigest(pin.DigestStr()) || target.ValidatePlatform(subject.Platform) != nil || subject.Route == "" || subject.Placement == "" {
 			return nil, e.New(e.CodeEngineCapability, "image preflight requires exact subjects, platforms, routes and placements")
 		}
 		subject.Image = pin.Name()

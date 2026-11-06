@@ -130,7 +130,7 @@ func probe(ctx context.Context, subject Subject, credential Credential, base htt
 	pin, _ := name.NewDigest(subject.Image) // complete selection was admitted before workers started
 	path := "/v2/" + pin.RepositoryStr() + "/manifests/" + pin.DigestStr()
 	bounded := &metadataTransport{base: base, registry: pin.RegistryStr(), repository: pin.RepositoryStr(), private: subject.Route != Anonymous, paths: map[string]bool{"/v2/": true, path: true}}
-	var auth authn.Authenticator = authn.Anonymous
+	auth := authn.Anonymous
 	if bounded.private {
 		auth = &authn.Basic{Username: credential.Username, Password: credential.Token}
 	}

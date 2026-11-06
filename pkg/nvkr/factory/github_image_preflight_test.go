@@ -122,7 +122,8 @@ func TestGitHubImagePreflightSelectsFinalPlanAndOnlyReader(t *testing.T) {
 	t.Setenv(githubImageToken, "synthetic-reader-token")
 	t.Setenv("GITHUB_TOKEN", "synthetic-source-token")
 	t.Setenv("NVKR_REGISTRY_WRITE", "synthetic-writer-token")
-	_, err = preflightGitHubImages(t.Context(), after, "arc-amd64-kvm", func(ctx context.Context, digest string, subjects []imagepreflight.Subject, resolve imagepreflight.CredentialResolver) (*imagepreflight.Report, error) {
+	forbidGenerationSeam(t)
+	_, err = preflightGitHubImages(leakedProjectionSelection(t.Context()), after, "arc-amd64-kvm", func(ctx context.Context, digest string, subjects []imagepreflight.Subject, resolve imagepreflight.CredentialResolver) (*imagepreflight.Report, error) {
 		if digest != afterDigest {
 			t.Fatal("probe bound the committed Plan instead of final Plan")
 		}
