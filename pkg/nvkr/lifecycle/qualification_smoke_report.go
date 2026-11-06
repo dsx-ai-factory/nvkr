@@ -29,6 +29,15 @@ func (report NativeToolSmokeReport) Validate() error {
 	if checks.GateVersion != ArtifactCheckGateVersion || len(checks.Outputs) == 0 || len(checks.Outputs) > 1024 || !canonical.IsDigest(checks.CatalogDigest) {
 		return invalid()
 	}
+	if checks.Composition != nil {
+		names := make([]string, 0, len(checks.Outputs))
+		for _, output := range checks.Outputs {
+			names = append(names, output.Name)
+		}
+		if err := checks.Composition.ValidateMembership(checks.Inputs.DefinitionDigest, names); err != nil {
+			return err
+		}
+	}
 	if err := checks.Inputs.Validate(); err != nil {
 		return err
 	}
@@ -52,7 +61,7 @@ func (report NativeToolSmokeReport) Validate() error {
 			return invalid()
 		}
 		switch output.Kind {
-		case OutputExecutable, OutputOCI, OutputAPT, OutputHelm, OutputDiskImage:
+		case OutputExecutable, OutputOCI, OutputAPT, OutputHelm, OutputDiskImage, OutputBundle:
 		default:
 			return invalid()
 		}

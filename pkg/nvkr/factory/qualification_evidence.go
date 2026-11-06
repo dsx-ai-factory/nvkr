@@ -35,9 +35,6 @@ func AdmitQualificationHandoff(plan *Plan) error {
 	if plan == nil {
 		return e.New(e.CodeUsage, "qualification handoff requires an original Plan")
 	}
-	if plan.Composition != nil {
-		return e.New(e.CodeEngineCapability, "qualification of a composite Definition Run is deferred (ADR-26 §7)")
-	}
 	if plan.Environment.GitHubRuntimeSource != nil {
 		return e.New(e.CodeEngineCapability, "qualification handoff cannot replay an exact runtime source selection")
 	}

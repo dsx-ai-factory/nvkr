@@ -12,7 +12,7 @@ import (
 )
 
 func TestDevelopmentQualificationReferenceScope(t *testing.T) {
-	origin := qualificationorigin.Description{Repository: "example/nvkr", RunID: "123", Attempt: "2"}
+	origin := qualificationorigin.Description{Repository: "example/nvkr", Workflow: ".github/workflows/nvkr-dev.yml", RunID: "123", Attempt: "2"}
 	digest := "@sha256:" + strings.Repeat("a", 64)
 	for _, tc := range []struct {
 		name, ref string

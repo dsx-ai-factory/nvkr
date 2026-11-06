@@ -73,8 +73,11 @@ several digest-pinned member Definitions through one Plan, Run and Release. Its
 and [member Release reuse](adr/0026-definition-composition.md#6-reusing-already-published-member-releases-only-through-authenticated-acceptance-a-planned-follow-up)
 and [evidence lanes](adr/0026-definition-composition.md#7-evidence-lanes-no-stronger-than-the-weakest-contribution)
 own what a composite inherits. Admission, merge, composite Plans, generation including named development
-bundles, Run and publication records and consumer expectations are implemented and contract-tested only; member
-Release reuse and composite qualification are deferred and refused, and no hosted composite Run exists.
+bundles, Run and publication records, consumer expectations and hosted complete-composite qualification
+are implemented with contract tests. Qualification binds the full composition through artifact checks, smoke
+evidence and the production manifest; explicit policies select production/development pairs and bundle-archive
+applicability without deployment claims. Member Release reuse and local composite qualification rehearsal remain
+deferred and refused; no hosted composite acceptance is recorded.
 
 Proposed [ADR-27](adr/0027-pinned-tool-producers.md) designs pinned-tool producers: catalog components that run
 one released, digest-pinned executable in the `wrapped-build` lane. AICR bundles are the first use. ADR-27 owns
@@ -1264,7 +1267,7 @@ already obtained.
 | Qualified provider observation, Nix, authority/discovery adapters and operational exercises | Qualified-lane module owners | Qualified production acceptance |
 | Qualified helper-image admission | Execution/trust owners | Exact executable/runtime receipt protocol; image pin alone is insufficient |
 | Deferred release registration transport | Registry/integration owners | Optional downstream discovery |
-| Proposed ADR-26 composite Definitions, then member Release reuse and composite qualification | Release-engineering, catalog, qualification and result-reuse owners | One combined Release from independently owned Definitions without a hand-maintained combined copy |
+| Hosted acceptance of ADR-26 composite qualification; local rehearsal and member Release reuse | Release-engineering, catalog, qualification and result-reuse owners | Governed composite cutover and optional member Release reuse |
 | Proposed ADR-27 pinned-tool producers, then AICR layout output (NVIDIA/aicr#3534) and layout import | Catalog, execution, evidence and release-engineering owners | Outputs rendered by released tools, starting with AICR bundles, without rebuilding the tool from source |
 | Proposed ADR-28 multi-platform executables, then the AICR migration and the per-platform retrofits | Catalog, release-engineering, delivery and evidence owners | One tool source per release where [ADR-28 §1](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform) admits it, and one image-index output per executable, consumable by standard OCI clients |
 | Proposed ADR-29 observation owner and AICR import exception, bounded access/log/field controls, host/package provider and downstream installation/boot records | NVKR observation, AICR and downstream deployment owners; named deciders unassigned | Standalone descriptive collection and supported exact chart/disk/package comparisons |

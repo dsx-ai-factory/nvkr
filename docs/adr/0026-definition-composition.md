@@ -1,9 +1,9 @@
 # ADR-26 — Definition composition
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
-- **Implementation maturity:** U1–U7 implemented; U8 deferred, U9 waits on the result-reuse decision and U10
+- **Implementation maturity:** U1–U8 implemented; U9 waits on the result-reuse decision and U10
   on a hosted composite Run. `reconciliation/README.md` records the implemented scope.
-- **Acceptance-test maturity:** Contract suites for U1–U7, including an opt-in extended identity-invariance
+- **Acceptance-test maturity:** Contract suites for U1–U8, including an opt-in extended identity-invariance
   contract over the four NVKE families. No hosted Run, composite publication or consumer verification
   exercises a composite.
 - **Deciders:** Pending; release-engineering, publication, catalog and qualification owners must be named before
@@ -19,7 +19,8 @@
 - **Scope:** Composing complete, independently owned Definitions into one composite Definition that compiles to
   one complete Plan and produces one Run and one Release whose membership is the exact union of its members'
   named outputs, including production and development bundles. Reuse of already-published member Releases,
-  nested composites, remote members and qualification of composite Runs are deferred and fail closed. Replacing
+  nested composites and remote members are deferred and fail closed. Hosted pipeline-attested qualification
+  covers the complete composite; local qualification rehearsal and qualified-lane composites remain deferred. Replacing
   the hand-maintained combined NVKE Definition is a separately gated cutover.
 
 ## Context
@@ -241,10 +242,20 @@ whose lane cannot be authenticated forces refusal, not a lower guess. Lanes neve
 (ADR-16 §5), and the aggregate evidence floor still applies inside each output.
 
 `pipeline-attested` composites are designed here. `static-unqualified` dry-run and local diagnostic composites
-behave as for any Definition. Qualification of a composite Run (ADR-16 §5, M3 artifact checks, the M4 release
-manifest) is deferred: those records bind one Definition digest and do not yet bind a composition record. Until
-they do, qualification of a composite Run fails with `engine-capability` before work. `qualified` composites are
-not designed.
+behave as for any Definition. Hosted qualification of a composite Run (ADR-16 §5) covers the complete composite, never separate member
+Runs. Its original handoff replays the captured composite and member inputs. Exact-input verification compares
+the composition record and every output against authenticated publication metadata. Artifact checks, native
+worker reports, qualification evidence and the production release manifest retain that complete record and
+composite Definition digest. Missing, substituted or extra output attribution fails closed. Independent policies
+select exact producer, qualifier and smoke workflows; family evidence is not inherited. Development qualification
+uses its own source namespace and cannot issue a production manifest. Local qualification rehearsal remains
+deferred for composites; `qualified` composites are not designed.
+
+The GPU-site policy reuses fixed executable version profiles and explicitly classifies each AICR `bundle-oci`
+output as `bundle-archive`. Delivery checks its exact OCI wrapper, digest, size and complete bounded gzip/tar
+archive before issuing artifact checks. This rule excludes loose-tool execution for that exact output; it does
+not skip signatures, provenance, evidence or membership, and makes no deployment or application-compatibility claim.
+Unsupported output kinds and missing independent applicability rules refuse qualification.
 
 ### 8. Nesting, cycles and bounds
 
@@ -265,8 +276,9 @@ Plan, workflow and publication bounds stay with their existing owners (§5).
 | `run plan`, `run graph`, `run diff`, dry-run | Supported once implemented |
 | `run local` | Static-unqualified only, as for any Definition |
 | `run generate` for a production bundle, flat or partitioned | Supported once implemented; `pipeline-attested` |
-| `githubDevelopment: true` | Supported by U5; signed development stays `pipeline-attested` with its own signer and disposable namespaces and grants no production acceptance. A composite may own the single fixed development layout (`.github/workflows/nvkr-dev.yml`, `.github/nvkr-dev/`, publication under `ghcr.io/<owner>/<repo>/development` and the `nvkr-dev.yml` signer), exactly as a plain Definition may; one Definition owns that layout at a time. The maintained repository gives it to the GPU site composite, so the combined candidate has no development bundle, and with composite qualification deferred (U8) the fixed development qualification pair is retired with it. U5 also admits a named development bundle for composites only: `githubBundle: <name>` with publication under `ghcr.io/<owner>/<repo>/development-<name>`, workflow `.github/workflows/nvkr-dev-<name>.yml`, its own manifest and Plan under `.github/nvkr-dev-<name>/`, and a signer identity bound to that workflow. Names that collide with the fixed development qualification files (`qualify`, `smoke`, `qualification`) or the authored registry-cleanup workflow (`cleanup`) are refused. A named development bundle requires that isolated signed publication; an unsigned named development bundle is refused with `engine-capability`, because an unsigned build has no namespace to isolate. The existing refusal of `githubDevelopment` with `githubBundle` for plain Definitions is unchanged and now applies at compilation, where the Definition kind is known |
-| `run check-artifacts`, `run qualify`, qualification generation, release manifest issuance | Deferred; `engine-capability` before work |
+| `githubDevelopment: true` | Supported by U5; signed development stays `pipeline-attested` with its own signer and disposable namespaces and grants no production acceptance. A composite may own the single fixed development layout (`.github/workflows/nvkr-dev.yml`, `.github/nvkr-dev/`, publication under `ghcr.io/<owner>/<repo>/development` and the `nvkr-dev.yml` signer), exactly as a plain Definition may; one Definition owns that layout at a time. The maintained repository gives it to the GPU site composite, so the combined candidate has no development bundle, and U8 generates its independent fixed development qualification pair. U5 also admits a named development bundle for composites only: `githubBundle: <name>` with publication under `ghcr.io/<owner>/<repo>/development-<name>`, workflow `.github/workflows/nvkr-dev-<name>.yml`, its own manifest and Plan under `.github/nvkr-dev-<name>/`, and a signer identity bound to that workflow. Names that collide with the fixed development qualification files (`qualify`, `smoke`, `qualification`, and names starting with those words followed by a hyphen) or the authored registry-cleanup workflow (`cleanup`) are refused. A named development bundle requires that isolated signed publication; an unsigned named development bundle is refused with `engine-capability`, because an unsigned build has no namespace to isolate. The existing refusal of `githubDevelopment` with `githubBundle` for plain Definitions is unchanged and now applies at compilation, where the Definition kind is known |
+| Hosted `run check-artifacts`, `run qualify`, qualification generation, release manifest issuance | Complete-composite pipeline-attested qualification with independently selected policy; development cannot issue a production manifest |
+| Local qualification rehearsal | Deferred; `engine-capability` before work |
 | Member Release reuse | Deferred (§6); `engine-capability` |
 | Nested or remote members | Rejected (§8, §1) |
 
@@ -308,7 +320,7 @@ and owning operation carry that detail.
 | Malformed composite, unknown field, empty or unsorted members, too many members, duplicate member name, locator or digest, member name mismatch, locator outside the input root, absolute member catalog or overlay locator, nested member, malformed variant (non-canonical, unsorted or repeated component; fewer than two, unsorted, repeated or unlisted members) | `invalid-catalog` |
 | Duplicate output name across members, differing top-level catalog stacks or tool selectors, divergent cross-member effective producer without a declared variant covering both members, declared variant member that does not select its component | `invalid-catalog` |
 | Member digest differs from the loaded member, at load, generation or `--check` | `unverified-ref` |
-| Deferred use (qualification, member Release reuse) | `engine-capability` |
+| Deferred use (local qualification rehearsal, member Release reuse) | `engine-capability` |
 | Cancellation or deadline during admission | `timeout` |
 
 ## Worked example: the four NVKE families
@@ -447,7 +459,7 @@ not only failure, and are table-driven.
 | U5 Generation, development and maintenance | `pkg/nvkr/factory`, `catalogmaintenance` | Named composite production bundles, flat and partitioned; named composite development bundles with independent manifest, signer and disposable namespaces; drift on member edit; maintenance-closure enrollment | U3, U4 |
 | U6 Run and publication records | `pkg/nvkr/lifecycle`, `pkg/nvkr/delivery` | Run-record and publication-root schema majors with composition binding and per-output attribution; release description export | U3 |
 | U7 Consumer view | `pkg/nvkr/lifecycle`, `client/v1` | Composite exact-input expectation, member-set requirement, cross-form refusal | U6 |
-| U8 Deferred: qualification | ADR-16/21 owners | Bind the composition record into handoff, artifact checks, qualification evidence and release manifest | U6; separate decision update |
+| U8 Hosted qualification | ADR-16/21 owners | Bind complete composition into handoff, artifact checks, native smoke, qualification evidence and release manifest; explicit per-run policies and isolated workflow pairs | U6 |
 | U9 Follow-up: member Release reuse | result-reuse owner | Cross-workflow origin admission in the reuse decision, §6 and §7 | draft ADR-30 (backlog item 4) landing |
 | U10 Cutover: retire combined `definition.yaml` | NVKE release owner | Move the combined production, development and qualification paths to the composite; retire the combined bundles and input | U5–U8; hosted composite Run and consumer verification |
 

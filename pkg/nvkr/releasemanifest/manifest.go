@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -77,6 +78,7 @@ type Member struct {
 // Manifest is the strict wire document. Decoding one describes a claim; only
 // its qualification-identity attestation on Release authenticates it.
 type Manifest struct {
+	Composition   *definition.CompositionRecord   `json:"composition,omitempty"`
 	Inputs        Inputs                          `json:"inputs"`
 	Lane          string                          `json:"lane"`
 	Members       []Member                        `json:"members"`
@@ -89,7 +91,7 @@ type Manifest struct {
 var (
 	memberNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 	memberKinds       = map[string]bool{lifecycle.OutputExecutable: true, lifecycle.OutputOCI: true,
-		lifecycle.OutputAPT: true, lifecycle.OutputHelm: true, lifecycle.OutputDiskImage: true}
+		lifecycle.OutputAPT: true, lifecycle.OutputHelm: true, lifecycle.OutputDiskImage: true, lifecycle.OutputBundle: true}
 	sourceLanes = map[string]bool{lifecycle.SourceLaneHermeticBuild: true,
 		lifecycle.SourceLaneWrappedBuild: true, lifecycle.SourceLaneAcquired: true}
 )
@@ -106,6 +108,15 @@ func (manifest Manifest) validate() error {
 		inputs.EnvironmentDigest, inputs.PlanDigest, inputs.VerificationPolicyDigest} {
 		if !canonical.IsDigest(digest) {
 			return e.New(e.CodeVerifyFailed, "release manifest omits exact input identities")
+		}
+	}
+	if manifest.Composition != nil {
+		names := make([]string, 0, len(manifest.Members))
+		for _, member := range manifest.Members {
+			names = append(names, member.Name)
+		}
+		if err := manifest.Composition.ValidateMembership(inputs.DefinitionDigest, names); err != nil {
+			return err
 		}
 	}
 	source, qualifier := manifest.Source, manifest.Qualification.Invocation
@@ -250,7 +261,7 @@ func fromEvidence(evidence qualification.Evidence, members []lifecycle.Qualifica
 		return Manifest{}, e.New(e.CodeReleaseIncomplete, "release provenance does not cover the exact qualified output set")
 	}
 	release := checks.Inputs.ReleaseSubject
-	manifest := Manifest{SchemaVersion: SchemaVersion, Lane: Lane,
+	manifest := Manifest{SchemaVersion: SchemaVersion, Lane: Lane, Composition: checks.Composition.Clone(),
 		Release: Release{Reference: release, Digest: release[strings.LastIndex(release, "@")+1:]},
 		Source:  checks.Origin,
 		Inputs: Inputs{CatalogDigest: checks.CatalogDigest, ContentSubject: checks.Inputs.ContentSubject,

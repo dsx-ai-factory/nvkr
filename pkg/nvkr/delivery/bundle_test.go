@@ -189,6 +189,25 @@ func TestBundlePublicationAndSelectedRegistryPull(t *testing.T) {
 				t.Fatal(err)
 			}
 			active.Store(true)
+			checked, checkErr := PullCheckedPublication(t.Context(), ref, t.TempDir(), options)
+			if scenario == "corrupt payload" {
+				// The registry reader rejects the streamed checksum before archive inspection.
+				assertRegistryCode(t, checkErr, e.CodeFetchFailed)
+				if checked != nil {
+					t.Fatal("corrupt bundle issued checked publication")
+				}
+			} else {
+				if checkErr != nil {
+					t.Fatal(checkErr)
+				}
+				view, err := checked.Description(ref)
+				if err != nil || len(view.Outputs) != 1 || view.Outputs[0].Kind != outputFormatBundle {
+					t.Fatalf("checked bundle description: %v", err)
+				}
+				if err := checked.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}
 			parent, workspace := t.TempDir(), t.TempDir()
 			out := filepath.Join(parent, "output")
 			if scenario == "existing destination" {

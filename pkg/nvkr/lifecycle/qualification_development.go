@@ -42,7 +42,15 @@ func CheckDevelopmentQualificationSource(ctx context.Context, provider *qualific
 	if !policy.Source.Development || origin.Branch == "" || origin.Repository != policy.Source.Repository || origin.Workflow != policy.Source.Workflow || origin.DefaultBranch != policy.Source.DefaultBranch {
 		return nil, nil, e.New(e.CodeUntrustedSigner, "development source differs from independent policy")
 	}
-	plan, err := factory.LoadPlanContext(ctx, filepath.Join(DevelopmentQualificationSourceRoot, ".github/nvkr-dev/plan.json"))
+	bundle, err := development.BundleForProducer(policy.Source.Workflow)
+	if err != nil {
+		return nil, nil, err
+	}
+	directory := ".github/nvkr-dev"
+	if bundle != "" {
+		directory += "-" + bundle
+	}
+	plan, err := factory.LoadPlanContext(ctx, filepath.Join(DevelopmentQualificationSourceRoot, directory, "plan.json"))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -125,7 +133,7 @@ func developmentQualificationCandidate(ctx context.Context, plan *factory.Plan, 
 		return QualificationCandidate{}, err
 	}
 	metadata := inspection.Root.Release
-	if metadata == nil || metadata.PlanDigest != digest || metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest {
+	if metadata == nil || metadata.PlanDigest != digest || metadata.DefinitionDigest != plan.DefinitionDigest || metadata.EnvironmentDigest != plan.EnvironmentDigest || !metadata.Composition.Equal(plan.Composition) {
 		return QualificationCandidate{}, e.New(e.CodeVerifyFailed, "development metadata differs from exact source Plan and invocation")
 	}
 	if err := factory.ValidatePublicationInvocation(metadata.InvocationID, origin.InvocationID); err != nil {
@@ -171,7 +179,7 @@ func admitDevelopmentQualificationReference(reference string, origin qualificati
 	if err := delivery.ValidatePublicationReference(reference); err != nil {
 		return err
 	}
-	namespace, err := development.ParseNamespace("ghcr.io/" + strings.ToLower(origin.Repository) + "/development")
+	namespace, err := development.NamespaceForProducer(origin.Repository, origin.Workflow)
 	if err != nil {
 		return err
 	}
