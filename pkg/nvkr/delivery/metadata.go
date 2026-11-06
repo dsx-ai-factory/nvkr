@@ -27,12 +27,20 @@ func InspectMetadata(ctx context.Context, root string) (Inspection, error) {
 // allowPayloads is used only for browsing an existing full layout. It permits
 // declared output blobs to be present, without opening or verifying their bytes.
 func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Inspection, error) {
+	return inspectMetadataProgress(ctx, root, allowPayloads, "", nil)
+}
+
+func inspectMetadataProgress(ctx context.Context, root string, allowPayloads bool, expectedRoot string, progress func(MetadataProgress)) (Inspection, error) {
+	ctx = withMetadataReads(ctx)
 	if err := deliveryContext(ctx); err != nil {
 		return Inspection{}, err
 	}
 	index, raw, err := readIndex(ctx, root)
 	if err != nil {
 		return Inspection{}, err
+	}
+	if expectedRoot != "" && digestBytes(raw) != expectedRoot {
+		return Inspection{}, e.New(e.CodeVerifyFailed, "cached metadata root identity differs")
 	}
 	if index.ArtifactType != MediaPublicationRoot || len(index.Manifests) != 1 || index.Manifests[0].ArtifactType != MediaPublicationRoot || index.Manifests[0].MediaType != MediaOCIManifest {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata release requires one root manifest")
@@ -65,6 +73,16 @@ func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Insp
 	visited := map[string]bool{index.Manifests[0].Digest: true, manifest.Config.Digest: true}
 	optionalPayloads := map[string]bool{}
 	total := index.Manifests[0].Size + manifest.Config.Size
+	done := 0
+	report := func(object *PublishedObject) {
+		if object != nil {
+			done++
+		}
+		if progress != nil {
+			progress(metadataProgressUpdate(digestBytes(raw), done, len(publication.Objects), object))
+		}
+	}
+	report(nil)
 	for _, object := range publication.Objects {
 		if object.Output != nil && object.Output.ImageIndex != nil {
 			controls, payloads, err := imageIndexMetadata(ctx, root, object)
@@ -85,6 +103,7 @@ func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Insp
 					optionalPayloads[d.Digest] = true
 				}
 			}
+			report(&object)
 			continue
 		}
 		m, err := metadataManifest(ctx, root, object)
@@ -129,6 +148,7 @@ func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Insp
 				return Inspection{}, err
 			}
 		}
+		report(&object)
 	}
 	if allowPayloads {
 		if err := verifyMetadataInventory(ctx, root, visited, optionalPayloads); err != nil {

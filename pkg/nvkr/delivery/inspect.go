@@ -418,15 +418,6 @@ func verifyBlobInventory(root string, reachable map[string]bool) error {
 	return nil
 }
 
-func readBlob(ctx context.Context, root string, descriptor Descriptor, max int64) ([]byte, error) {
-	held, err := holdBlob(ctx, root, descriptor, max)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = held.Close() }()
-	return held.ReadAllContext(ctx, max)
-}
-
 func holdBlob(ctx context.Context, root string, descriptor Descriptor, max int64) (*heldfile.File, error) {
 	if !isDigest(descriptor.Digest) || descriptor.Size < 0 || descriptor.Size > max {
 		return nil, e.New(e.CodeVerifyFailed, "OCI descriptor is malformed or exceeds its byte bound")

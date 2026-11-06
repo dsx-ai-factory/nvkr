@@ -62,6 +62,8 @@ to its exact evidence subject rather than one release-wide revision; a normalize
 not a Git tag. Consumers own deployment-role mapping, source compatibility and installation completeness.
 Export needs no separate Plan, mapping or producer workspace. Publisher-declared qualification is distinct
 from the description's metadata inspection scope, and the description adds no canonical identity.
+Acquisition progress is provisional: loading entries and cached bytes cannot assert complete membership
+or restore verification authority; the completed description still requires full metadata inspection.
 _Avoid_: Bundle, mutable tag, clearance
 
 **Verification Policy**:

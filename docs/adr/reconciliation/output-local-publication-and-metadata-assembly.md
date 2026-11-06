@@ -69,6 +69,14 @@ The root reader rejects extra blobs and bounds control/evidence to 512 MiB per r
 readers share exact schema/media-type checks. `release browse` projects checked metadata and evidence,
 config-declared platforms and derived sibling locators, without reading payload layers or verifying policy.
 Filtering follows complete metadata validation; detached views establish no registry-availability claim.
+Metadata acquisition now uses at most 16 concurrent member workers with synchronized byte accounting and
+cancel/join on failure. Browse, export and authenticity inspection reuse an expendable root-digest cache;
+every hit checks blob hashes, sizes and the closure before inspection under the per-root cache lock. A per-root
+kernel lock and a checked staged rename prevent partial cache entries. Corruption triggers a fresh pull.
+Plain stderr progress and the live registry browser report acquisition separately from completed inspection;
+partial entries stay loading until complete closure and composition checks pass. The default inspection and
+authenticity deadlines are one hour. These implementation changes require the local contract and external
+timing evidence recorded with their change; they establish no signing-service or production acceptance.
 Artifact views also expose config-derived OS/architecture and Helm chart version (not appVersion), with
 native indexes retaining child platforms. Full Helm verification compares the config with Chart.yaml.
 Generic release export and JSON browsing share the explicit `nvkr.dev/release-description/v1` schema.

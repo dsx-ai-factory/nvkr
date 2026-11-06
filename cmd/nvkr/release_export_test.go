@@ -192,14 +192,18 @@ func TestReleaseExportPresentationKeepsOwningFailure(t *testing.T) {
 			ownerErr := e.New(e.CodeTimeout, "private-owner-error-sentinel")
 			shows := 0
 			operation := func(context.Context, string, lifecycle.InspectionOptions) ([]byte, error) { return nil, ownerErr }
-			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(_ context.Context, _ runpresenter.Options, source runSnapshotSource, _ func(context.Context) error) runpresenter.Result {
+			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(ctx context.Context, _ runpresenter.Options, source runSnapshotSource, work func(context.Context) error) runpresenter.Result {
 				shows++
+				var workErr error
+				if work != nil {
+					workErr = work(ctx)
+				}
 				snapshot := source.Snapshot()
 				assertReleasePresentationSafe(t, snapshot)
 				if snapshot.FailureCode != string(e.CodeTimeout) || len(snapshot.Items) != 0 {
 					t.Fatal("failed export invented membership or changed code")
 				}
-				return runpresenter.Result{}
+				return runpresenter.Result{WorkErr: workErr}
 			}}
 			var out bytes.Buffer
 			app := &cli.App{Writer: &out, Commands: []*cli.Command{{Name: "release", Subcommands: []*cli.Command{releaseExportCmdWithOperation(operation)}}}, Metadata: map[string]interface{}{commandPresentationServicesKey: services}}
@@ -274,12 +278,16 @@ func TestReleaseExportTUIRejectsDescriptionSchemaDrift(t *testing.T) {
 				calls++
 				return []byte(raw), nil
 			}
-			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(_ context.Context, _ runpresenter.Options, source runSnapshotSource, _ func(context.Context) error) runpresenter.Result {
+			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(ctx context.Context, _ runpresenter.Options, source runSnapshotSource, work func(context.Context) error) runpresenter.Result {
 				shows++
+				var workErr error
+				if work != nil {
+					workErr = work(ctx)
+				}
 				if source.Snapshot().FailureCode != string(e.CodeInternal) || len(source.Snapshot().Items) != 0 {
 					t.Error("invalid description invented result membership")
 				}
-				return runpresenter.Result{}
+				return runpresenter.Result{WorkErr: workErr}
 			}}
 			var out bytes.Buffer
 			app := &cli.App{Writer: &out, Commands: []*cli.Command{{Name: "release", Subcommands: []*cli.Command{releaseExportCmdWithOperation(operation)}}}, Metadata: map[string]interface{}{commandPresentationServicesKey: services}}

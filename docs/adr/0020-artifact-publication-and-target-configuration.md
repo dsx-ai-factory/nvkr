@@ -675,7 +675,17 @@ schemas and memberships across the complete release metadata and evidence closur
 reading artifact payload layers. Its detached description joins exact sibling output and evidence references,
 all output memberships, Build/component subjects and evidence stage/subject bindings. Locators are explicitly
 labeled as derived from the supplied root reference; the detached view does not establish registry availability.
-Registry acquisition fetches each sibling manifest, config and bounded evidence document. For aggregate
+Registry acquisition fetches sibling manifests, configs and bounded evidence documents with at most 16
+concurrent member workers. First failure cancels and joins all workers before staging cleanup; synchronized
+byte accounting retains the per-object and 512 MiB total acquisition bounds. Index/layout bytes remain
+deterministic. Bounded control-document reads hash an owned memory snapshot; payload capabilities
+still use sealed descriptors. Repeated metadata checks within one visit may reuse these verified bytes
+in a private, capped 32 MiB memo, discarded between visits and before refetching a rejected cache entry.
+A root-digest-keyed, expendable metadata cache rechecks each blob and the complete closure
+before reuse, never caching signature or consumer-policy acceptance. A checked stage and per-root kernel
+lock prevent partial cache publication; corrupt entries are refetched. Cache loss after a crash is a miss,
+not a durable authority transition. Optional acquisition progress is descriptive and provisional: loading
+entries and counts cannot assert completeness, even when all downloads have finished. For aggregate
 images it also fetches the exact finite native child manifests/configs bound by the index and release metadata,
 never their layers. Child platform, digest and size substitutions fail before a metadata view is returned. Local inspection
 accepts complete or metadata-only layouts and does not probe the supplied registry namespace. Executable,

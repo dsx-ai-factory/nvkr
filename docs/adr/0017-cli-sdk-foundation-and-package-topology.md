@@ -284,8 +284,19 @@ navigation. Delivery validates the bounded metadata and evidence closure before 
 and evidence membership, without downloading or reading artifact payload layers. Local inspection accepts a
 complete publication layout or a metadata-only layout. Presentation may then focus on an exact output or
 render text, JSON, or Mermaid; platform labels describe checked config metadata. Reference and transport
-admission precede filesystem/network work. Registry inspection owns and removes a system temporary directory
-by default; an explicit caller-owned workspace is retained while its private staging child is removed.
+admission precede filesystem/network work. Uncached registry inspection owns and removes a private temporary workspace. A content-addressed disk cache
+reuses only a fully rechecked metadata closure; every hit re-verifies hashes and sizes. The owning inspection
+holds the per-root cache lock through description and evidence visits, without a redundant layout copy. Invalid entries are refetched, and publication uses a checked stage and a per-root kernel lock.
+The cache is expendable transport data, never durable authority. `NVKR_METADATA_CACHE=off` or `--no-cache`
+disables reuse; an explicit caller-owned workspace is retained while its private staging child is removed.
+The default inspection and authenticity deadlines are one hour, subject to earlier caller cancellation.
+`release verify --timeout` bounds the whole verification operation. Authenticity verifies output subjects
+with at most 16 concurrent checks, consuming results in canonical output order so error selection is
+deterministic, canceling and joining the remaining active checks on failure. Its live TUI retains loading
+state until the owning signature, evidence and policy checks all pass.
+Optional progress reports root arrival and member acquisition independently of final closure checks.
+A live registry browser may display these provisional entries labeled loading; only successful complete
+inspection and composition checks authorize a completed description.
 Each format labels metadata inspection explicitly. These detached descriptions establish no payload,
 signature or policy verification, and cannot restore an authenticated or verified Release capability. Explicit
 `artifact-publication` verification retains its full payload and policy checks; `authenticity` adds policy-bound

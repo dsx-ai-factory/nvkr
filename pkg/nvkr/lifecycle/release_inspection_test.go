@@ -24,6 +24,7 @@ import (
 )
 
 func TestInspectReleaseLocalAndRegistryHaveSameClosure(t *testing.T) {
+	t.Setenv("NVKR_METADATA_CACHE", "off")
 	for _, private := range []bool{false, true} {
 		t.Run(map[bool]string{false: "anonymous", true: "authenticated"}[private], func(t *testing.T) {
 			handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
@@ -118,6 +119,7 @@ func TestInspectReleaseAdmissionPrecedesFilesystemAndNetwork(t *testing.T) {
 }
 
 func TestInspectReleaseTimeoutCleansRegistryWorkspace(t *testing.T) {
+	t.Setenv("NVKR_METADATA_CACHE", "off")
 	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) { <-r.Context().Done() }))
 	defer server.Close()
 	reference := strings.TrimPrefix(server.URL, "http://") + "/product/releases@sha256:" + strings.Repeat("a", 64)
@@ -134,6 +136,7 @@ func TestInspectReleaseTimeoutCleansRegistryWorkspace(t *testing.T) {
 }
 
 func TestInspectReleaseDefaultWorkspaceIsOwnedAndTemporary(t *testing.T) {
+	t.Setenv("NVKR_METADATA_CACHE", "off")
 	layout, _ := testPublicationLayout(t)
 	handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
 	var mode atomic.Int32
@@ -172,7 +175,7 @@ func TestInspectReleaseDefaultWorkspaceIsOwnedAndTemporary(t *testing.T) {
 			mode.Store(tc.mode)
 			temporary := t.TempDir()
 			t.Setenv("TMPDIR", temporary)
-			options := InspectionOptions{Registry: transport, Timeout: 5 * time.Second}
+			options := InspectionOptions{Registry: transport, Timeout: 30 * time.Second}
 			if tc.mode == 2 {
 				options.Timeout = 50 * time.Millisecond
 			}

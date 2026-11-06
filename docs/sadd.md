@@ -365,7 +365,8 @@ and describes attempt markers without opening payloads or restoring authority.
 Public command result browsers also consume typed projections after their owning
 operations return and release receipts. Maintenance transactions and verifier
 scope remain with their existing owners; closing a view neither repeats nor
-reverses an operation. These presentation records are outside artifact/Plan/Run identity.
+reverses an operation. The registry release browser also displays provisional loading entries during metadata acquisition; final
+closure and composition checks gate its completed view. These presentation records are outside artifact/Plan/Run identity.
 
 A named Artifact keeps its payload digest across Run and Release views. The enclosing publication root has a
 separate identity. Release content binds the exact named payload membership, and the outer publication carries
@@ -379,7 +380,9 @@ payload bytes. Locators derive from the supplied root namespace; the detached de
 registry-availability claim. Selecting an output changes the presentation only after all metadata is checked.
 These views explicitly label metadata inspection, leave payloads, signatures and consumer policy unverified,
 and cannot restore a live verification capability. Artifact-publication verification retains its full payload
-and policy checks; authenticity applies signature/evidence policy to the metadata closure.
+and policy checks; authenticity applies signature/evidence policy to the metadata closure. Acquisition uses
+at most 16 member workers and an expendable root-digest-keyed cache that re-verifies blob hashes, sizes and
+closure before reuse. Cache contents never restore policy or signature acceptance.
 [Release navigation](release-navigation.md) documents the registry and local entry points and
 their validation scope.
 

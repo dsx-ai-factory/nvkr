@@ -15,6 +15,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -33,6 +34,7 @@ import (
 // Crypto is deliberately substituted. These tests exercise real registry
 // transport and metadata/evidence binding; they do not establish Sigstore trust.
 type authenticityRegistryVerifier struct {
+	mu                sync.Mutex
 	t                 *testing.T
 	expectedSubjects  map[string]bool
 	expectedBundles   map[string][]byte
@@ -59,7 +61,9 @@ func (verifier *authenticityRegistryVerifier) Verify(ctx context.Context, subjec
 	if !verifier.expectedSubjects[subject.Ref] || subject.Digest != referenceDigest(subject.Ref) || !policy.RequireAttestation || policy.IdentityRegexp != "^builder$" || policy.Issuer != "issuer" {
 		verifier.t.Fatalf("unexpected signature subject or policy: %+v, %+v", subject, policy)
 	}
+	verifier.mu.Lock()
 	verifier.subjects = append(verifier.subjects, subject.Ref)
+	verifier.mu.Unlock()
 	if subject.Ref == verifier.failSubject {
 		return sign.VerificationRecord{}, e.New(e.CodeSignatureInvalid, "fixture signature rejected")
 	}
@@ -171,7 +175,7 @@ func newAuthenticityRegistryFixture(t *testing.T, root string) *authenticityRegi
 func (fixture *authenticityRegistryFixture) consumer(t *testing.T) (*Consumer, *authenticityRegistryVerifier, string) {
 	t.Helper()
 	workspace := filepath.Join(t.TempDir(), "authentication")
-	consumer, err := NewConsumer(ConsumerOptions{Registry: fixture.options, WorkspaceRoot: workspace})
+	consumer, err := NewConsumer(ConsumerOptions{Registry: fixture.options, WorkspaceRoot: workspace, DisableMetadataCache: true})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -504,4 +508,34 @@ func authenticityRegistryIndexLayout(t *testing.T) (string, string) {
 	}
 	attested, result := attestFixtureLayout(t, prepared)
 	return attested, result.RootDigest
+}
+
+func TestAuthenticateRegistryCacheStillAuthenticatesEverySubject(t *testing.T) {
+	layout, _ := testPublicationLayout(t)
+	fixture := newAuthenticityRegistryFixture(t, layout)
+	_, verifier, _ := fixture.consumer(t)
+	consumer, err := NewConsumer(ConsumerOptions{Registry: fixture.options, MetadataCacheRoot: t.TempDir()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	consumer.verifier = verifier
+	for i := range 2 {
+		fixture.requests.Store(0)
+		authenticated, err := consumer.Authenticate(t.Context(), fixture.reference, authenticityRegistryPolicy())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := authenticated.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if (fixture.requests.Load() > 0) != (i == 0) {
+			t.Fatalf("visit %d registry requests=%d", i, fixture.requests.Load())
+		}
+		if len(verifier.subjects) != (i+1)*len(verifier.expectedSubjects) {
+			t.Fatal("cache reused signature acceptance")
+		}
+	}
+	if fixture.payloadGets.Load() != 0 {
+		t.Fatal("authenticity cache fetched payloads")
+	}
 }
