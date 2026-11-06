@@ -35,7 +35,8 @@ both `resolve` and `catalog bump`.
   command, output form, CGO/flags, version stamps). **No commit SHAs live here.**
 - **`pins.lock.yaml`** — machine-generated, changes often. One entry per source: the resolved
   `{tag, commit, treeHash, sourceDateEpoch}`, plus an **`artifacts:`** section of per-arch content digests for
-  prebuilt (no-compile) components. This is the **only file a version bump touches**.
+  prebuilt (no-compile) components. A source-version bump changes the lock, then regenerates explicitly
+  maintained producer copies and Run bundles; the registry's source-derived bindings stay unchanged.
 
 Both files carry explicit `apiVersion` and `kind`. Readers dispatch to an exact versioned schema, reject unknown
 versions/kinds/fields, and never interpret a future lock as the current version. A missing lock is an input error,
@@ -90,6 +91,30 @@ and transport do not enter this logical identity.
 Templated version stamps such as `KUBE_GIT_VERSION` and `KUBE_GIT_COMMIT` are rendered from source pins at
 load time (`{{.Tag}}`, `{{.Commit}}`, …). Unknown template tokens fail closed. There is no cluster context,
 criteria axis or `versionFrom` projection into build identity.
+
+Source command producers may opt into `sourceMetadata`, a map of `NVKR_SOURCE_*` environment names to
+source-pin templates. The catalog owner renders those declarations from the component's own pin;
+resolved overlays retain the declarations so later source replacement cannot retain a stale rendered value.
+The existing stamp tokens remain available. `ReleaseVersion` additionally requires an exact semantic tag
+and refuses commit-only pins. A commit-only chart producer must instead declare an explicit stream and
+validate it against its pinned chart during packaging. This is metadata consistency, not source approval
+or runtime compatibility. Commands continue to support only the existing architecture template; bindings
+reach them as quoted environment values, not shell-template expansion.
+
+The namespace is reserved: `versionStamp` cannot supply it, and metadata cannot override compiler-owned
+variables or arbitrary ambient environment names. Names contain an uppercase initial suffix followed by
+uppercase letters, digits or underscores, with a maximum 64-character suffix. At most 32 bindings and
+4 KiB per template/rendered value are admitted. Unknown tokens, conflicting names, NUL values and builders
+without this environment interface fail with `CodeInvalidCatalog`. The interface is admitted for
+`oci-hermetic`, `buildkit-rootless` and `native-go` source commands. Existing catalogs that omit it retain
+their prior logical bytes. Opting in adds environment inputs to Build identity; migrating the OVN command
+declarations and bindings intentionally changes affected Build Digests even at the same source pin.
+
+Producer-copy maintenance is explicit under ADR-21: it names source catalogs, producer IDs, existing
+named destinations, base catalogs and ordered predecessors. Each copy replaces a whole producer through
+the existing overlay validator; there is no field merge or source inference from repository URLs.
+Authored `frozen` replacements retain their complete producer contract. Regenerating a predecessor
+changes dependent bindings while a downstream copy still selects its own source pin.
 
 ### 3. Fail closed on any unpinned or under-resolved input
 

@@ -49,6 +49,11 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	metadata, err := cat.Components["ovn-kubernetes-chart"].SourceMetadataEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream := metadata["NVKR_SOURCE_STREAM"]
 	mapping := cat.Components["ovn-kubernetes-chart"].Helm
 	if mapping == nil || len(mapping.Images) != 6 {
 		t.Fatal("missing six-slot source chart mapping")
@@ -172,7 +177,7 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 	server := httptest.NewServer(registry.New(registry.Logger(log.New(io.Discard, "", 0))))
 	defer server.Close()
 	repository := strings.TrimPrefix(server.URL, "http://") + "/ovn-chart-arm64"
-	ref, err := name.NewTag(repository+":2.4.2", name.StrictValidation, name.Insecure)
+	ref, err := name.NewTag(repository+":"+stream, name.StrictValidation, name.Insecure)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,13 +185,13 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 		t.Fatal(err)
 	}
 	pulled := t.TempDir()
-	cmd := exec.CommandContext(ctx, helm, "pull", "oci://"+repository, "--version", "2.4.2", "--plain-http", "--destination", pulled, "--registry-config", filepath.Join(pulled, "registry.json"))
+	cmd := exec.CommandContext(ctx, helm, "pull", "oci://"+repository, "--version", stream, "--plain-http", "--destination", pulled, "--registry-config", filepath.Join(pulled, "registry.json"))
 	cmd.WaitDelay = 5 * time.Second
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("real Helm OCI pull: %v\n%s", err, out)
 	}
-	raw, err := os.ReadFile(filepath.Join(pulled, "ovn-chart-arm64-2.4.2.tgz"))
+	raw, err := os.ReadFile(filepath.Join(pulled, "ovn-chart-arm64-"+stream+".tgz"))
 	if err != nil {
 		t.Fatal(err)
 	}

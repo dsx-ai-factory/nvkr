@@ -302,6 +302,9 @@ type Component struct {
 	VendorCommand []string          `json:"vendorCommand,omitempty"`   // from the source: vendor step for non-vendored repos
 	SourceDate    int64             `json:"sourceDateEpoch,omitempty"` // committer %ct of Commit
 	VersionStamp  map[string]string `json:"versionStamp,omitempty"`    // rendered -X-style stamps
+	// SourceMetadata holds opt-in NVKR_SOURCE_* templates, rendered against this
+	// component's owning pin at every compilation, including resolved overlays.
+	SourceMetadata map[string]string `json:"sourceMetadata,omitempty"`
 
 	// prebuilt (the no-compile lane): set when this component is acquired, not built.
 	// The URL/Image templates are already version-rendered (only {{.Arch}} may remain);

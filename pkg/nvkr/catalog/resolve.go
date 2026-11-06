@@ -40,6 +40,7 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		ArtifactPath:           raw.ArtifactPath,
 		WriteDir:               raw.WriteDir,
 		ExclusionReason:        raw.ExclusionReason,
+		SourceMetadata:         cloneStringMap(raw.SourceMetadata),
 
 		BuildRequirements: execution.Clone(raw.BuildRequirements),
 	}
@@ -288,13 +289,7 @@ func renderStamps(tmpls map[string]string, pin Pin) (map[string]string, error) {
 	if len(tmpls) == 0 {
 		return nil, nil
 	}
-	maj, min, pat := splitVersion(pin.Tag)
-	data := stampData{
-		Tag: pin.Tag, ModuleTag: StripTagPrefix(pin.Tag),
-		Version: NormalizeVersion(pin.Tag), Commit: pin.Commit,
-		TreeHash: pin.TreeHash, Epoch: pin.SourceDateEpoch, Date: EpochDate(pin.SourceDateEpoch),
-		Major: maj, Minor: min, Patch: pat,
-	}
+	data := stampContext(pin)
 	out := make(map[string]string, len(tmpls))
 	for k, v := range tmpls {
 		t, err := template.New(k).Option("missingkey=error").Parse(v)
@@ -308,6 +303,16 @@ func renderStamps(tmpls map[string]string, pin Pin) (map[string]string, error) {
 		out[k] = b.String()
 	}
 	return out, nil
+}
+
+func stampContext(pin Pin) stampData {
+	maj, min, pat := splitVersion(pin.Tag)
+	return stampData{
+		Tag: pin.Tag, ModuleTag: StripTagPrefix(pin.Tag),
+		Version: NormalizeVersion(pin.Tag), Commit: pin.Commit,
+		TreeHash: pin.TreeHash, Epoch: pin.SourceDateEpoch, Date: EpochDate(pin.SourceDateEpoch),
+		Major: maj, Minor: min, Patch: pat,
+	}
 }
 
 // StripTagPrefix removes a module-scoped tag prefix from an upstream tag

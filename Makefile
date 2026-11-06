@@ -277,7 +277,7 @@ PROJECTION_PILOT ?=
 PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION_PILOT))
 
 .PHONY: workflows-check
-workflows-check: workflow-generator pipeline-dev-check nvke-split-check nvke-gpu-site-check catalog-refresh-check ## Check committed producer, qualification, development, family and GPU site composite bundles and the catalog refresh workflow for drift.
+workflows-check: workflow-generator producer-overlays-check pipeline-dev-check nvke-split-check nvke-gpu-site-check catalog-refresh-check ## Check committed producer, qualification, development, family and GPU site composite bundles and the catalog refresh workflow for drift.
 	@# Repeat the committed Plan's authored selection, including focused feature-branch
 	@# Definitions. The generator still authenticates the complete bundle and inputs.
 	@definition="$$(jq -er '.definitionPath | select(type == "string" and length > 0)' .github/nvkr-run/plan.json)" && \
@@ -293,6 +293,13 @@ workflows-check: workflow-generator pipeline-dev-check nvke-split-check nvke-gpu
 		--definition inputs/definitions/demo/arm64-upstream-kvm.json \
 		--environment inputs/environments/github-nightly-upstream.json \
 		--root . --runtime --check
+
+.PHONY: producer-overlays-check producer-overlays-generate
+producer-overlays-check: workflow-generator ## Check configured producer copies and predecessor bindings.
+	bin/nvkr-exec catalog regenerate-overlays --config inputs/policies/ovn-producer-overlays.json --check
+
+producer-overlays-generate: workflow-generator ## Regenerate configured producer copies and predecessor bindings.
+	bin/nvkr-exec catalog regenerate-overlays --config inputs/policies/ovn-producer-overlays.json
 
 # The private NVKE source the installed catalog refresh workflow was rendered with.
 CATALOG_REFRESH_SOURCE ?= dsx-ai-factory/nvke:NKE_SOURCE_TOKEN

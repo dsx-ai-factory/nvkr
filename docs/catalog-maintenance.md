@@ -56,6 +56,55 @@ automatic refresh of an exact pin. A newer umbrella may retain a member version 
 member's `derivedFrom` provenance when its bytes are unchanged. This stricter maintenance policy is
 invocation-scoped; explicitly invoked interactive pin/bump commands retain their existing repinning behavior.
 
+## Maintain producer copies
+
+`producerOverlays` optionally names a `nvkr.dev/producer-overlay-maintenance/v1` JSON or YAML input.
+Each ordered entry names an existing overlay destination and its name, a base catalog, ordered predecessor
+paths, and source catalogs with exact component IDs. `frozen` holds any complete replacements that must
+retain their current producer contract. The owner copies complete producers and derives predecessor
+digests through the normal catalog validator; it performs no field merge. Destination names/types must
+already match, and repeated or missing producers, incorrect dependency order and unsafe paths fail closed.
+
+The maintained [OVN inputs](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/ovn-producer-overlays.json) select NVIDIA and upstream TCG
+producer copies. The NVKE refresh policy checks these overlays before pin work and regenerates them before
+Run generation. This does not enroll OVN sources in scheduled bumping or change their release constraints.
+To apply an explicitly reviewed OVN pin, follow the commands beside its
+[source catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/ovn-nvidia/README.md), then regenerate these copies:
+
+```sh
+# Before changing pins, require the existing generated baseline to be current.
+make producer-overlays-check
+# After the explicitly selected catalog pin/bump:
+make producer-overlays-generate
+make producer-overlays-check
+```
+
+The CLI equivalent is `catalog regenerate-overlays --config inputs/policies/ovn-producer-overlays.json`,
+with `--check` for a read-only byte comparison. Unchanged inputs preserve file bytes and modification times.
+Check mode creates neither output nor a writer guard. Applying stages the set and checks destination bytes
+under a persistent writer guard, then replaces each changed file and syncs its directory. Regenerate all
+affected Run bundles with their recorded inputs and generator identity before `make workflows-check`.
+Locks, producer-overlay sets and Run bundles are separate transactions. After interrupted regeneration,
+retain the checkout, rerun both generation owners and their checks, or discard the disposable checkout.
+The refresh command returns the original coded failure after a committed pin; a dirty partial set is not a
+successful candidate. Review concurrent-edit conflicts rather than overwriting them.
+
+The migration retains existing output membership. Its remaining copies have explicit dispositions:
+
+| Copy or consumer | Disposition |
+|---|---|
+| `node-images/variants/nvidia-tcg.json` | Generated from `ovn-nvidia`; its distinct node-image producer remains explicitly frozen in the maintenance input. |
+| `node-images/variants/upstream-tcg.json` | Generated from `ovn-upstream`, after NVIDIA TCG. A NVIDIA bump updates its predecessor binding while preserving its upstream pin. |
+| `node-images/variants/nvidia-local-kvm.json`, `upstream-local-kvm.json` | Their existing complete node-image replacements stay frozen; only dependent predecessor bindings are regenerated. |
+| `node-images/variants/native-nvidia.json` and `node-images/release/registry.yaml` | Retain the separate maintained `nvke-*` package contract and source pins. Migration to generated copies is a follow-up. |
+| `node-images/variants/upstream-kvm.json` | Retains its explicit upstream 1.4.0 snapshot; not enrolled. |
+| `node-images/variants/nvidia-kvm.json` | Retains the known mismatch: commit `26cc199de8e814a7fe6d899a770fc04df0bbc2f9`, stream 1.5.18, versus the candidate NVIDIA 2.4.2 stream. It is not silently upgraded. |
+| `node-images/diagnostic` | Retains its separate source-owned package producers and upstream pin. |
+| Controller profile package streams and deployment requests | Remain downstream-owned selections. Integration checks require the selected profile stream to match its producer; coordinate a stream change explicitly. |
+
+These paths are under `inputs/catalogs/`. No build, deployment compatibility or qualification is established
+by regeneration. Source metadata and command migration change affected Build Digests at the existing pins.
+
 ## Preview and apply locally
 
 Build the CLI and supply existing Git access to the canonical sources, then run:
@@ -66,7 +115,7 @@ bin/nvkr catalog refresh --config inputs/policies/nvke-catalog-maintenance.yaml 
 bin/nvkr catalog refresh --config inputs/policies/nvke-catalog-maintenance.yaml --json
 ```
 
-The owner first compiles and validates the full current Plan, then checks the existing generated bundle.
+The owner first checks configured producer overlays, compiles and validates the full current Plan, then checks the existing generated bundle.
 This detects unrelated generation drift before any pin update. The CLI version must match the
 `generatorVersion` recorded in the committed Plan; the commands above use the maintained bundle's
 `dev (unknown)` generator identity. A Git-stamped `make build` has a different identity and correctly
@@ -76,7 +125,7 @@ reports drift until its own bundle is deliberately regenerated. The command uses
 `--check` resolves the complete candidate pin transaction and emits descriptive changes. It writes no
 lock or generated files and returns status 3 (`NVKR-E-DIFF`) when pins would change. It does not claim that
 the candidate has compiled or executed. Applying commits the atomic pin transaction, invokes the normal
-Run generator, then repeats compilation and the byte-exact generated-file check. An unchanged transaction
+producer-overlay generator when configured, then the Run generator, and repeats the byte-exact checks. An unchanged transaction
 preserves lock and generated bytes and returns `changed: false`; registry outages remain errors, not no-ops.
 
 Use a disposable branch/checkout for applying updates. Lock replacement and generated-bundle replacement
