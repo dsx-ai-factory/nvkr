@@ -128,10 +128,11 @@ type Environment struct {
 	// GitHubRunners selects explicit native hosted routes by execution platform.
 	GitHubRunners map[string]string `json:"githubRunners,omitempty"`
 
-	SourceAccess map[string]SourceAccess `json:"sourceAccess,omitempty"`
-	Publication  *Publication            `json:"publication,omitempty"`
-	Runtime      Runtime                 `json:"runtime,omitempty"`
-	Signing      *Signing                `json:"signing,omitempty"`
+	SourceAccess    map[string]SourceAccess `json:"sourceAccess,omitempty"`
+	ToolchainAccess *ToolchainAccess        `json:"toolchainAccess,omitempty"`
+	Publication     *Publication            `json:"publication,omitempty"`
+	Runtime         Runtime                 `json:"runtime,omitempty"`
+	Signing         *Signing                `json:"signing,omitempty"`
 }
 
 // SourceAccess configures transport-only authentication and mirroring for one
@@ -290,6 +291,17 @@ func (environment Environment) Validate() error {
 	}
 	if err := environment.validateObjectStores(); err != nil {
 		return err
+	}
+	if err := environment.ToolchainAccess.Validate(); err != nil {
+		return err
+	}
+	if access := environment.ToolchainAccess; access != nil && access.Reader != nil {
+		ref := access.Reader.CredentialRef
+		if strings.EqualFold(ref, development.WriteCredentialRef) ||
+			strings.EqualFold(ref, ProductionRegistryWriteCredential) ||
+			(environment.Publication != nil && strings.EqualFold(ref, environment.Publication.CredentialRef)) {
+			return e.New(e.CodeInvalidCatalog, "toolchainAccess reader must not use a publication writer credential")
+		}
 	}
 	if environment.GitHubDevelopment && environment.GitHubBundle != "" {
 		if err := environment.admitNamedDevelopment(); err != nil {

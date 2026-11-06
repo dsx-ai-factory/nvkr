@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
@@ -18,6 +19,7 @@ import (
 func privateImageTestPlan(t *testing.T, credential string) *Plan {
 	t.Helper()
 	return recompileGitHubStabilityPlan(t, arcTestPlan(t, "linux/amd64"), func(inputs *githubStabilityInputs) {
+		inputs.environment.ToolchainAccess.PrivateRoots = []string{"ghcr.io/example/nvkr/toolchains"}
 		inputs.environment.Publication.RepositoryPrefix = "ghcr.io/example/nvkr"
 		inputs.environment.Publication.CredentialRef = credential
 		inputs.environment.Publication.Anonymous = false
@@ -103,7 +105,7 @@ func TestPrivateImageProjectionRejectsCallerCredentialSubstitution(t *testing.T)
 	for _, input := range []string{"nvkr-toolchain-read-token", "nvkr-toolchain-read-user"} {
 		for _, change := range []string{"valid", "missing", "empty", "substituted"} {
 			t.Run(input+"/"+change, func(t *testing.T) {
-				plan := &Plan{}
+				plan := imageInterfaceTestPlan()
 				env := githubYAMLMap(githubImageToken, githubYAMLString("${{ inputs.nvkr-toolchain-read-token }}"), githubImageUser, githubYAMLString("${{ inputs.nvkr-toolchain-read-user }}"))
 				step := githubYAMLMap("name", githubYAMLString("Prepare images"), "run", githubYAMLString(githubRunnerCommand(plan, "prepare-images", "stage", "private-stage")), "env", env)
 				arguments := githubYAMLMap("nvkr-toolchain-read-token", githubYAMLString("${{ secrets.NVKR_REGISTRY_READ }}"), "nvkr-toolchain-read-user", githubYAMLString("${{ vars.NVKR_REGISTRY_READ_USER }}"))
@@ -131,4 +133,16 @@ func TestPrivateImageProjectionRejectsCallerCredentialSubstitution(t *testing.T)
 			})
 		}
 	}
+}
+
+func testToolchainAccess() *authored.ToolchainAccess {
+	return &authored.ToolchainAccess{
+		PrivateRoots: []string{"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains"},
+		PublicRoots:  []string{"docker.io/library/golang", "example.test/inspection", "example.test/vm-amd64", "example.test/vm-arm64"},
+		Reader:       &authored.ToolchainReader{CredentialRef: "github:NVKR_REGISTRY_READ", UsernameRef: "github:NVKR_REGISTRY_READ_USER"},
+	}
+}
+
+func imageInterfaceTestPlan() *Plan {
+	return &Plan{Environment: authored.Environment{ToolchainAccess: testToolchainAccess()}}
 }
