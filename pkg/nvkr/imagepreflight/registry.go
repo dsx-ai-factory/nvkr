@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"mime"
 	"net"
 	"net/http"
 	"strings"
@@ -147,7 +148,8 @@ func probe(ctx context.Context, subject Subject, credential Credential, base htt
 	wanted, _ := v1.ParsePlatform(subject.Platform)
 	if media.IsIndex() {
 		var index v1.IndexManifest
-		if json.Unmarshal(raw, &index) != nil || index.SchemaVersion != 2 || index.MediaType != media {
+		if json.Unmarshal(raw, &index) != nil || index.SchemaVersion != 2 ||
+			(index.MediaType != media && (media != types.OCIImageIndex || index.MediaType != "")) {
 			return "", probeError(ctx, refusal("malformed image index"))
 		}
 		var matches []v1.Descriptor
@@ -260,8 +262,9 @@ func readManifest(ctx context.Context, client *http.Client, bounded *metadataTra
 	if blobDigest(raw) != digest || (response.Header.Get("Docker-Content-Digest") != "" && response.Header.Get("Docker-Content-Digest") != digest) {
 		return nil, "", refusal("manifest digest mismatch")
 	}
-	media := types.MediaType(response.Header.Get("Content-Type"))
-	if !media.IsImage() && !media.IsIndex() {
+	mediaType, _, err := mime.ParseMediaType(response.Header.Get("Content-Type"))
+	media := types.MediaType(mediaType)
+	if err != nil || (!media.IsImage() && !media.IsIndex()) {
 		return nil, "", refusal("unsupported manifest media type")
 	}
 	return raw, media, nil

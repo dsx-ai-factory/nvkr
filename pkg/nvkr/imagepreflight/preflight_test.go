@@ -69,7 +69,16 @@ func fixture(t *testing.T, mode string, private bool) (*registryFixture, http.Ro
 		if mode == "index-ambiguous" {
 			children = append(children, children[0])
 		}
-		f.manifest, _ = json.Marshal(v1.IndexManifest{SchemaVersion: 2, MediaType: types.OCIImageIndex, Manifests: children})
+		index := v1.IndexManifest{SchemaVersion: 2, MediaType: types.OCIImageIndex, Manifests: children}
+		switch mode {
+		case "index-omitted-media":
+			index.MediaType = ""
+		case "index-mismatched-media":
+			index.MediaType = types.OCIManifestSchema1
+		case "index-invalid-schema":
+			index.SchemaVersion = 1
+		}
+		f.manifest, _ = json.Marshal(index)
 		f.media = types.OCIImageIndex
 	}
 	if mode == "malformed" {
@@ -177,6 +186,14 @@ func (f *registryFixture) serve(w http.ResponseWriter, r *http.Request) {
 			raw, media = f.child, types.OCIManifestSchema1
 		}
 		w.Header().Set("Content-Type", string(media))
+		switch f.mode {
+		case "parameterized-media", "index-parameterized-media":
+			w.Header().Set("Content-Type", string(media)+"; charset=utf-8")
+		case "malformed-media":
+			w.Header().Set("Content-Type", string(media)+"; charset")
+		case "unsupported-media":
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		}
 		w.Header().Set("Docker-Content-Digest", blobDigest(raw))
 		if f.mode == "head-digest" && r.Method == http.MethodHead {
 			w.Header().Set("Docker-Content-Digest", testPlan)
@@ -208,6 +225,9 @@ func TestExactManifestReaderPreflight(t *testing.T) {
 		code e.Code
 	}{
 		{"image", ""}, {"index", ""}, {"head-fallback", ""}, {"transient", ""}, {"config-redirect", ""},
+		{"index-omitted-media", ""}, {"parameterized-media", ""}, {"index-parameterized-media", ""},
+		{"index-mismatched-media", e.CodeFetchFailed}, {"index-invalid-schema", e.CodeFetchFailed},
+		{"malformed-media", e.CodeFetchFailed}, {"unsupported-media", e.CodeFetchFailed},
 		{"foreign-reader-realm", e.CodeFetchFailed},
 		{"malformed-token", e.CodeFetchFailed},
 		{"unauthorized", e.CodeFetchFailed}, {"forbidden", e.CodeFetchFailed}, {"token-forbidden", e.CodeFetchFailed}, {"missing", e.CodeFetchFailed},
