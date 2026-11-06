@@ -29,8 +29,10 @@ additionalRuns:
     environment: inputs/environments/github-nvke-disks-ubuntu24.yaml
   - definition: inputs/definitions/nvke/gpu-site.composite.yaml
     environment: inputs/environments/github-nvke-gpu-site.yaml
+    qualificationPolicy: inputs/policies/nvke-gpu-site-qualification.yaml
   - definition: inputs/definitions/nvke/gpu-site.composite.yaml
     environment: inputs/environments/github-development.yaml
+    qualificationPolicy: inputs/policies/nvke-gpu-site-development-qualification.yaml
   - definition: inputs/definitions/demo/arm64-nvidia-kvm.json
     environment: inputs/environments/github-nightly-nvidia.json
   - definition: inputs/definitions/demo/arm64-upstream-kvm.json

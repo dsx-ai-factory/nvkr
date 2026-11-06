@@ -3,7 +3,8 @@
     "bundle": "nvkr-dev",
     "group": "development",
     "definition": "inputs/definitions/nvke/gpu-site.composite.yaml",
-    "environment": "inputs/environments/github-development.yaml"
+    "environment": "inputs/environments/github-development.yaml",
+    "qualificationPolicy": "inputs/policies/nvke-gpu-site-development-qualification.yaml"
   },
   {
     "bundle": "nvkr-run",
@@ -34,7 +35,8 @@
     "bundle": "nvkr-run-nvke-gpu-site",
     "group": "gpu-site",
     "definition": "inputs/definitions/nvke/gpu-site.composite.yaml",
-    "environment": "inputs/environments/github-nvke-gpu-site.yaml"
+    "environment": "inputs/environments/github-nvke-gpu-site.yaml",
+    "qualificationPolicy": "inputs/policies/nvke-gpu-site-qualification.yaml"
   },
   {
     "bundle": "nvkr-run-nvke-nightly-arm64",

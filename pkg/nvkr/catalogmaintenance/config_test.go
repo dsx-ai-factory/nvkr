@@ -52,22 +52,35 @@ func TestMaintenanceConfigAdmission(t *testing.T) {
 		{"qualification absolute", func(c *Config) { c.QualificationPolicy = "/qualification.yaml" }, e.CodeUsage},
 		{"additional runs", func(c *Config) {
 			c.DevelopmentEnvironment = "environment-dev.yaml"
-			c.AdditionalRuns = []RunInput{{"nightly.json", "environment-nightly.json"}, {c.Definition, "environment-other.yaml"}}
+			c.AdditionalRuns = []RunInput{{Definition: "nightly.json", Environment: "environment-nightly.json"}, {Definition: c.Definition, Environment: "environment-other.yaml"}}
 		}, ""},
-		{"additional run escape", func(c *Config) { c.AdditionalRuns = []RunInput{{"../nightly.json", "environment-nightly.json"}} }, e.CodeUsage},
-		{"additional run shell path", func(c *Config) { c.AdditionalRuns = []RunInput{{"nightly.json", "$(touch pwn)"}} }, e.CodeUsage},
+		{"additional run escape", func(c *Config) {
+			c.AdditionalRuns = []RunInput{{Definition: "../nightly.json", Environment: "environment-nightly.json"}}
+		}, e.CodeUsage},
+		{"additional run shell path", func(c *Config) {
+			c.AdditionalRuns = []RunInput{{Definition: "nightly.json", Environment: "$(touch pwn)"}}
+		}, e.CodeUsage},
+		{"additional policy", func(c *Config) {
+			c.AdditionalRuns = []RunInput{{Definition: "other.yaml", Environment: "other-env.yaml", QualificationPolicy: "policy.yaml"}}
+		}, ""},
+		{"additional policy escape", func(c *Config) {
+			c.AdditionalRuns = []RunInput{{Definition: "other.yaml", Environment: "other-env.yaml", QualificationPolicy: "../policy.yaml"}}
+		}, e.CodeUsage},
+		{"same run different policy", func(c *Config) {
+			c.AdditionalRuns = []RunInput{{Definition: c.Definition, Environment: c.Environment, QualificationPolicy: "policy.yaml"}}
+		}, e.CodeUsage},
 		{"additional run empty", func(c *Config) { c.AdditionalRuns = []RunInput{{}} }, e.CodeUsage},
-		{"additional run repeats production", func(c *Config) { c.AdditionalRuns = []RunInput{{c.Definition, c.Environment}} }, e.CodeUsage},
+		{"additional run repeats production", func(c *Config) { c.AdditionalRuns = []RunInput{{Definition: c.Definition, Environment: c.Environment}} }, e.CodeUsage},
 		{"additional run repeats development", func(c *Config) {
 			c.DevelopmentEnvironment = "environment-dev.yaml"
-			c.AdditionalRuns = []RunInput{{c.Definition, c.DevelopmentEnvironment}}
+			c.AdditionalRuns = []RunInput{{Definition: c.Definition, Environment: c.DevelopmentEnvironment}}
 		}, e.CodeUsage},
 		{"additional run repeated", func(c *Config) {
-			c.AdditionalRuns = []RunInput{{"nightly.json", "environment-nightly.json"}, {"nightly.json", "environment-nightly.json"}}
+			c.AdditionalRuns = []RunInput{{Definition: "nightly.json", Environment: "environment-nightly.json"}, {Definition: "nightly.json", Environment: "environment-nightly.json"}}
 		}, e.CodeUsage},
 		{"too many additional runs", func(c *Config) {
 			for i := 0; i <= maxAdditionalRuns; i++ {
-				c.AdditionalRuns = append(c.AdditionalRuns, RunInput{"nightly.json", fmt.Sprintf("environment-%d.json", i)})
+				c.AdditionalRuns = append(c.AdditionalRuns, RunInput{Definition: "nightly.json", Environment: fmt.Sprintf("environment-%d.json", i)})
 			}
 		}, e.CodeUsage},
 	} {

@@ -149,10 +149,11 @@ attempt URL on a reviewed nondefault branch; its source branch may differ. The f
 final qualifier use development-only credentials and distinct evidence schema/predicate. Production evidence
 admission is unchanged. The development pair has independent manifest ownership and runtime drift checks.
 Local contracts cover source/qualifier selection, metadata integrity and restoration, production rejection,
-namespace binding and generated credential/owner separation. Composite qualification is deferred (ADR-26 U8),
-so the committed development pair (`nvkr-dev-qualify.yml`, `nvkr-dev-smoke.yml`, `.github/nvkr-dev-qualification/`)
-is retired with the move to the composite; the qualification path itself remains contract-tested against a
-compiled plain development Plan.
+namespace binding and generated credential/owner separation. ADR-26 U8 adds complete-composite hosted
+qualification: the committed development pair (`nvkr-dev-qualify.yml`, `nvkr-dev-smoke.yml`,
+`.github/nvkr-dev-qualification/`) now selects the explicit GPU-site development policy and binds every output
+and the composition record. Contract tests cover both plain and composite Plans; hosted composite qualification
+has not been exercised.
 Development qualifier retries may retain earlier successful workers within the same qualification run,
 preserving their original branch, source/policy bindings, certificate invocation and private-carrier attempt.
 Each output publication retains its original source attempt and namespace. A later aggregate attempt

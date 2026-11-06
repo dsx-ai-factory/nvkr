@@ -255,3 +255,38 @@ func TestDevelopmentInvocationRejectsChangedSelectionBeforeProviderIO(t *testing
 		})
 	}
 }
+
+func TestNamedDevelopmentSourceKeepsProducerIsolation(t *testing.T) {
+	for _, other := range []bool{false, true} {
+		t.Run(map[bool]string{false: "matching pair", true: "other qualifier"}[other], func(t *testing.T) {
+			policy, repo, run := developmentOriginFixture(t)
+			policy.Workflow = ".github/workflows/nvkr-dev-site.yml"
+			run.Path = policy.Workflow
+			qualifier := ".github/workflows/nvkr-dev-qualify-site.yml"
+			if other {
+				qualifier = development.QualificationWorkflow
+			}
+			t.Setenv("GITHUB_WORKFLOW_REF", policy.Repository+"/"+qualifier+"@refs/heads/"+run.HeadBranch)
+			provider := fakeGitHub(t, repo, run)
+			if other {
+				provider = noTriggeredProviderIO(t)
+			}
+			source, err := provider.AuthenticateTriggeredSource(t.Context(), policy)
+			if other {
+				assertCode(t, err, e.CodeTrustPolicyMissing)
+				if source != nil {
+					t.Fatal("cross-producer source receipt")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = source.Close() }()
+			description, err := source.Description()
+			if err != nil || description.Workflow != policy.Workflow {
+				t.Fatalf("wrong source identity: %v", err)
+			}
+		})
+	}
+}

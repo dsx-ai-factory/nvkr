@@ -40,7 +40,7 @@ type Namespace struct{ prefix, repository, bundle string }
 
 func ParseNamespace(prefix string) (Namespace, error) {
 	parts := namespacePattern.FindStringSubmatch(prefix)
-	if parts == nil || reservedBundles[parts[3]] {
+	if parts == nil || ValidateBundle(parts[3]) != nil {
 		return Namespace{}, e.New(e.CodeEngineCapability, "development publication requires ghcr.io/<owner>/<repo>/development or an unreserved development-<bundle>")
 	}
 	return Namespace{prefix: prefix, repository: parts[1] + "/" + parts[2], bundle: parts[3]}, nil
@@ -57,7 +57,7 @@ func ProducerWorkflowFor(bundle string) string {
 
 // ValidateBundle refuses development bundle names reserved by fixed workflows.
 func ValidateBundle(bundle string) error {
-	if reservedBundles[bundle] {
+	if reservedBundles[bundle] || strings.HasPrefix(bundle, "qualify-") || strings.HasPrefix(bundle, "smoke-") || strings.HasPrefix(bundle, "qualification-") {
 		return e.New(e.CodeEngineCapability, "development bundle name %q is reserved", bundle)
 	}
 	return nil

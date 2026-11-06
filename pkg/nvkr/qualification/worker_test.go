@@ -152,6 +152,7 @@ func TestTriggeredSmokeWorkerAdmitsBeforePolicyAndProviderIO(t *testing.T) {
 		return
 	}
 	policy := workerPolicyFixture()
+	policy.Source.Workflow = ".github/workflows/nvkr-run.yml"
 	policy.Smoke.Images = map[string]string{"linux/" + runtime.GOARCH: policy.Smoke.Images["linux/amd64"]}
 	root := t.TempDir()
 	t.Chdir(root)

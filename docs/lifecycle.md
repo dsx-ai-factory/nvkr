@@ -67,8 +67,9 @@ bin/nvkr definition pin --definition <composite.yaml> --check   # report drift, 
 bin/nvkr definition pin --definition <composite.yaml>           # rewrite only the stale digests
 ```
 
-Composite qualification, release manifests and runtime Plans are not implemented and fail with
-`engine-capability`.
+Hosted composite qualification binds the complete Release and its member attribution through artifact checks,
+native smoke evidence and production release manifests. Generation requires an explicit independent policy.
+Local composite qualification rehearsal and runtime Plans remain unsupported and fail with `engine-capability`.
 
 For saved generated Plans, `run plan --plan <path>` prints the required outputs and instructions;
 `--pretty` provides an indented display view. `run graph` exports complete linked producer/artifact graphs,

@@ -204,7 +204,15 @@ func TestMaintainedPrivateToolchainPreparation(t *testing.T) {
 		expected = append(expected, "../../../.github/"+entry.Bundle+"/plan.json")
 		expectedManifests = append(expectedManifests, "../../../.github/"+entry.Bundle+"/manifest.json")
 		if entry.QualificationPolicy != "" {
-			expectedManifests = append(expectedManifests, "../../../.github/nvkr-qualification/manifest.json")
+			var qualificationBundle string
+			if suffix, ok := strings.CutPrefix(entry.Bundle, "nvkr-dev"); ok {
+				qualificationBundle = "nvkr-dev-qualification" + suffix
+			} else if suffix, ok := strings.CutPrefix(entry.Bundle, "nvkr-run"); ok {
+				qualificationBundle = "nvkr-qualification" + suffix
+			} else {
+				t.Fatalf("unknown qualification owner for %s", entry.Bundle)
+			}
+			expectedManifests = append(expectedManifests, "../../../.github/"+qualificationBundle+"/manifest.json")
 		}
 	}
 	plans, err := filepath.Glob("../../../.github/*/plan.json")

@@ -159,9 +159,8 @@ func TestCompositeHostedFinalizeAdmitsComposite(t *testing.T) {
 	}
 }
 
-// TestCompositeHostedFinalizeHandoffRefusesComposite keeps composite
-// qualification deferred (ADR-26 §7): with an admitted producer context the
-// handoff wrapper still refuses a composite and writes no Run or handoff.
+// TestCompositeHostedFinalizeHandoffRefusesComposite preserves admission for
+// an unsigned composite: source context alone cannot authorize a handoff.
 func TestCompositeHostedFinalizeHandoffRefusesComposite(t *testing.T) {
 	compositeLifecycleFixture(t, nil)
 	for key, value := range qualificationProducerEnvironment() {
