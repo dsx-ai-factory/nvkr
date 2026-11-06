@@ -24,7 +24,14 @@ func admitExecuteNodeRequirements(plan *Plan, nodeID string) error {
 	const adapter = "factory execute-node"
 	if plan.Qualification != TierStaticUnqualified || plan.Environment.GitHubARC != "" ||
 		plan.Environment.Publication != nil || plan.Environment.Signing != nil || !hasLocalVMBuild(plan) {
-		return admitGitHubRequirements(plan, adapter)
+		if plan.Environment.GitHubARC != "" || len(plan.Environment.GitHubRunners) > 0 {
+			return admitGitHubRequirements(plan, adapter)
+		}
+		if err := admitSharedExecutionRequirements(plan, adapter); err != nil {
+			return err
+		}
+		_, err := plan.imageUses("local")
+		return err
 	}
 	nodes, artifacts := planIndex(plan)
 	node, ok := nodes[nodeID]

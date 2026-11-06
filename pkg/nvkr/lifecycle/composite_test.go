@@ -75,6 +75,8 @@ func compositeLifecycleFixture(t *testing.T, mutate func(*definition.Environment
 	}
 	writeCompositeTestDocument(t, compositeTestPath, composite)
 	environment := Environment{APIVersion: EnvironmentAPIVersion, Kind: EnvironmentKind, Metadata: Metadata{Name: "fixture"},
+		ToolchainAccess:  &ToolchainAccess{PublicRoots: []string{"docker.io/library/golang", "example.test/toolchains"}},
+		Runtime:          Runtime{ImageLocations: map[string]string{"nvkr-toolchain-go": "example.test/toolchains/go", "nvkr-toolchain-cgo": "example.test/toolchains/cgo"}},
 		UtilityContainer: compositeTestUtil, UtilityPlatform: "linux/amd64"}
 	if mutate != nil {
 		mutate(&environment)

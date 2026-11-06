@@ -6,7 +6,13 @@ metadata:
 publication:
   credentialRef: github:NVKR_REGISTRY_AUTH
   repositoryPrefix: ghcr.io/example-ai-factory/nvke
+toolchainAccess:
+  publicRoots:
+    - docker.io/library/golang
+    - ghcr.io/example-ai-factory
 runtime:
-  toolchainRegistry: ghcr.io/example-ai-factory
+  imageLocations:
+    nvkr-toolchain-go: ghcr.io/example-ai-factory/nvkr-toolchain-go
+    nvkr-toolchain-cgo: ghcr.io/example-ai-factory/nvkr-toolchain-cgo
 utilityContainer: golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161
 utilityPlatform: linux/amd64

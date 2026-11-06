@@ -274,6 +274,8 @@ func testDefinition(t *testing.T) Definition {
 
 func testEnvironment() Environment {
 	return Environment{APIVersion: EnvironmentAPIVersion, Kind: EnvironmentKind, Metadata: Metadata{Name: "test"},
+		ToolchainAccess:  &ToolchainAccess{PublicRoots: []string{"docker.io/library/golang", "example.test/toolchains"}},
+		Runtime:          Runtime{ImageLocations: map[string]string{"nvkr-toolchain-go": "example.test/toolchains/go", "nvkr-toolchain-cgo": "example.test/toolchains/cgo"}},
 		UtilityContainer: "golang@sha256:" + repeat("1", 64), UtilityPlatform: "linux/amd64",
 		Publication: &Publication{RepositoryPrefix: "registry.example.test/product", Anonymous: true}}
 }

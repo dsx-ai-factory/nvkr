@@ -254,7 +254,9 @@ func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
 			} else {
 				want.GitHubARC, want.DiskEvidence = "", ""
 				want.ExecutionClasses, want.DiskInspectionProfiles = nil, nil
-				want.ToolchainAccess = nil
+				want.ToolchainAccess = &definition.ToolchainAccess{PublicRoots: []string{
+					"docker.io/alpine/helm", "docker.io/library/busybox", "docker.io/library/golang", "docker.io/moby/buildkit",
+				}}
 			}
 			for selected := range want.SourceAccess {
 				if !sources[selected] {

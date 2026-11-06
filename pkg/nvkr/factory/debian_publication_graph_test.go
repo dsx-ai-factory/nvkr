@@ -28,6 +28,8 @@ func debianObjectPublicationInputs(t *testing.T, scan bool) (definition.Definiti
 	cat.Tools = maps.Clone(reference.CatalogSnapshot.Tools)
 	cat.Actions = reference.CatalogSnapshot.Actions
 	if scan {
+		environment.ToolchainAccess.PublicRoots = append(environment.ToolchainAccess.PublicRoots, "example.test/inspection")
+		slices.Sort(environment.ToolchainAccess.PublicRoots)
 		d.SBOMTool = "scanner"
 		disk := diskPublicationPlanFixture(t, "linux/amd64")
 		environment.DiskInspectionProfiles = disk.Environment.DiskInspectionProfiles

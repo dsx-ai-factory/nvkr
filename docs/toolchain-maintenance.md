@@ -151,7 +151,7 @@ without building or publishing. It cannot be combined with `approval_run`.
 
 ## Declare consumer access
 
-Each native ARC Environment declares toolchain access independently of its output publication prefix:
+Each GitHub Environment declares image access independently of its output publication prefix:
 
 ```yaml
 toolchainAccess:
@@ -169,8 +169,8 @@ toolchainAccess:
 
 Roots are sorted, unique registry/repository paths. Each covers that repository and descendants at a
 slash boundary. Roots must not overlap, including across classes; at most 128 are supported. Public roots
-select anonymous pulls. Every selected execution image in a native ARC Plan, including hosted source
-preparation and strict disk inspection when enabled, must be digest-pinned and classified. Generation
+select anonymous pulls. Every selected execution image in a GitHub Plan, including producer, vendor, utility, inspector, startup
+container and service images, must be digest-pinned and classified. Generation
 fails before writing a bundle if a root is missing or a selected private root lacks a reader. Declare
 only roots trusted for that reader; an authored declaration does not verify the account's actual grants.
 Private pulls currently support GHCR only and require `native-kvm-v1`. The reader secret and username
@@ -180,8 +180,28 @@ references; those comparisons are case-insensitive. Operators still own the gran
 
 When adding a toolchain root, update the Environment, regenerate with `make workflows-generate`, and
 run `make workflows-check`. Changing only the output publication namespace needs no access-code change.
-Existing native ARC Environments without `toolchainAccess` must migrate before generating workflows.
+Existing ordinary hosted and native ARC Environments without `toolchainAccess` must migrate before
+generating workflows. Declare public roots for anonymous pulls. Private ordinary-hosted and startup
+container/service routes remain unsupported, even when a reader is declared. Standalone CLI diagnostics
+also require a declared anonymous route for a selected registry image; measured local image IDs stay local.
 Access declarations change Environment and Plan digests, while logical Build identity is unchanged.
+
+### Migrate source/location bindings
+
+Replace `runtime.toolchainRegistry` with explicit `runtime.imageLocations` bindings:
+
+```yaml
+runtime:
+  imageLocations:
+    mirror.invalid/compiler: ghcr.io/example/tools/compiler
+```
+
+The catalog pins `mirror.invalid/compiler@sha256:<exact-digest>`; compilation requires that exact source
+key and retains the digest at the declared destination. Both build and vendor consumers use the same
+binding. Existing bare `nvkr-toolchain-*` names can be explicit keys during migration; their names no longer
+select a registry. Missing mirror keys fail before bundle output. Direct public references need no relocation.
+Declare access for the resolved destination separately. Native bundle digests and measured local image IDs
+are never relocated. Transport changes preserve logical Build identity but change the complete Plan.
 
 ## Retention and rollback
 

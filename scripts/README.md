@@ -56,6 +56,11 @@ results from committed regressions.
 
 ## Definition → Run
 
+`generate-maintained.py` drives `make workflows-generate` and `make workflows-check` from
+`inputs/policies/maintained-generation.json`. That authored list selects every maintained Plan bundle and
+the default qualifier policy. Contract tests compare the list with committed Plans and manifests, so a
+new bundle must enter the same image-access contract. Group-specific Make targets use this list too.
+
 For repository pipeline changes, `make pipeline-dev-run PIPELINE_DEV_REPO=owner/repo` checks the generated
 development bundle and calls `pipeline-dev.py`. The helper requires a clean named branch matching the
 remote commit and an active registered `nvkr-dev.yml`, then dispatches that branch explicitly. It performs

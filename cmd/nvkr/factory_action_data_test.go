@@ -35,6 +35,7 @@ func githubActionDataCommandFixture(t *testing.T) (planBytes []byte, selector, o
 	environment := authored.Environment{
 		APIVersion: authored.EnvironmentAPIVersion, Kind: authored.EnvironmentKind,
 		Metadata: authored.Metadata{Name: "action-data"}, RunsOn: "ubuntu-24.04",
+		ToolchainAccess:  &authored.ToolchainAccess{PublicRoots: []string{"docker.io/library/golang"}},
 		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161",
 		UtilityPlatform:  "linux/amd64",
 	}

@@ -70,6 +70,15 @@ func githubBootstrapRunner(runner string) string {
 }
 
 func admitGitHubRequirements(plan *Plan, adapter string) error {
+	if err := admitSharedExecutionRequirements(plan, adapter); err != nil {
+		return err
+	}
+	return admitGitHubToolchainAccess(plan)
+}
+
+// Capability checks are shared with in-process helpers. Image routes are
+// admitted separately so a local image ID never becomes a hosted pull target.
+func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 	if PerOutputPublication(plan) {
 		for _, name := range sortedKeys(plan.Targets) {
 			target := plan.Targets[name]
@@ -86,7 +95,7 @@ func admitGitHubRequirements(plan *Plan, adapter string) error {
 		if err := rejectUnsupportedPlanRequirements(plan, adapter); err != nil {
 			return err
 		}
-		return admitGitHubToolchainAccess(plan)
+		return nil
 	}
 	deny := func() error {
 		return e.New(e.CodeEngineCapability, "%s requires the native-kvm-v1 ARC disk route", adapter)
@@ -171,7 +180,7 @@ func admitGitHubRequirements(plan *Plan, adapter string) error {
 			return deny()
 		}
 	}
-	return admitGitHubToolchainAccess(plan)
+	return nil
 }
 
 func githubDiskOutput(plan *Plan, node Node) string {

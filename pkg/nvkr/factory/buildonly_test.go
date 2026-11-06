@@ -134,6 +134,7 @@ func TestToolAcquireNodeIsNotIRProjected(t *testing.T) {
 // services, variables and setup on the supported hosted engine.
 func TestDeliveryRuntimeConfigRendersOnGitHub(t *testing.T) {
 	plan := buildOnlyPlan(t, "ubuntu-24.04")
+	plan.Environment.ToolchainAccess.PublicRoots = append([]string{"docker.io/library/docker"}, plan.Environment.ToolchainAccess.PublicRoots...)
 	plan.Environment.Runtime.RuntimeImage = "docker:27@sha256:" + strings.Repeat("a", 64)
 	plan.Environment.Runtime.Services = []string{"docker:dind@sha256:" + strings.Repeat("b", 64)}
 	plan.Environment.Runtime.Variables = map[string]string{"DOCKER_HOST": "tcp://docker:2375"}

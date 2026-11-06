@@ -37,6 +37,10 @@ intended work; it does not establish that the step succeeded.
 
 ## Generate and check the bundle
 
+Before generation, [declare consumer image access](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/toolchain-maintenance.md#declare-consumer-access)
+for every selected producer, vendor, utility, inspector and startup image. Ordinary hosted Environments
+require explicit public roots too. Private ordinary-hosted and startup routes are refused.
+
 For one Definition whose generated workflow is too large, the Environment can select
 `githubExecutionPartitions: true`. Generation then emits an entry workflow and bounded sibling workers;
 all belong to one generated manifest, use one complete Plan and feed one Run finalizer and Release.
