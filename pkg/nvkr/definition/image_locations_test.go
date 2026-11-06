@@ -19,6 +19,11 @@ func TestImageLocationBinding(t *testing.T) {
 	}{
 		{"explicit key", "mirror.invalid/compiler@" + digest, "ghcr.io/example/compiler@" + digest, map[string]string{"mirror.invalid/compiler": "ghcr.io/example/compiler"}, ""},
 		{"ordinary source", "docker.io/library/golang@" + digest, "ghcr.io/example/compiler@" + digest, map[string]string{"docker.io/library/golang": "ghcr.io/example/compiler"}, ""},
+		{"tagged source", "source.example/compiler:1.0@" + digest, "ghcr.io/example/compiler@" + digest, map[string]string{"source.example/compiler": "ghcr.io/example/compiler"}, ""},
+		{"tagged port source", "source.example:5000/compiler:1.0@" + digest, "ghcr.io/example/compiler@" + digest, map[string]string{"source.example:5000/compiler": "ghcr.io/example/compiler"}, ""},
+		{"port source", "source.example:5000/compiler@" + digest, "ghcr.io/example/compiler@" + digest, map[string]string{"source.example:5000/compiler": "ghcr.io/example/compiler"}, ""},
+		{"tagged short source", "golang:1.27@" + digest, "ghcr.io/example/compiler@" + digest, map[string]string{"golang": "ghcr.io/example/compiler"}, ""},
+		{"unbound tagged source", "golang:1.27@" + digest, "golang:1.27@" + digest, nil, ""},
 		{"unresolved key", "mirror.invalid/compiler@" + digest, "", nil, e.CodeEngineCapability},
 		{"legacy unresolved", "nvkr-toolchain-renamed@" + digest, "", nil, e.CodeEngineCapability},
 		{"legacy explicit", "nvkr-toolchain-renamed@" + digest, "ghcr.io/example/compiler@" + digest, map[string]string{"nvkr-toolchain-renamed": "ghcr.io/example/compiler"}, ""},

@@ -6,6 +6,12 @@ kind: Environment
 metadata:
   name: nvke-ovn-source-github
   description: Candidate OVN publication through the existing GitHub OCI delivery path. Requires default-branch admission and fork-readable NKE_SOURCE_TOKEN.
+toolchainAccess:
+  publicRoots:
+    - docker.io/alpine/helm
+    - docker.io/library/busybox
+    - docker.io/library/golang
+    - docker.io/moby/buildkit
 publication:
   mode: per-output-v1
   repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate

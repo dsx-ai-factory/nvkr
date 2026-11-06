@@ -132,7 +132,7 @@ func maintenanceFixture(t *testing.T) (Config, func(string)) {
 		t.Fatal(err)
 	}
 	writeFixture(t, "definition.yaml", []byte("apiVersion: nvkr.dev/definition/v5\nkind: Definition\nmetadata: {name: fixture}\ncatalog: {base: catalog}\noutputs:\n- {name: tools, format: executable, platform: linux/amd64, components: [tool]}\n"))
-	writeFixture(t, "environment.yaml", []byte("apiVersion: nvkr.dev/environment/v1\nkind: Environment\nmetadata: {name: fixture}\nutilityContainer: "+image+"\nutilityPlatform: linux/amd64\n"))
+	writeFixture(t, "environment.yaml", []byte("apiVersion: nvkr.dev/environment/v1\nkind: Environment\nmetadata: {name: fixture}\ntoolchainAccess:\n  publicRoots: [docker.io/library/busybox]\nutilityContainer: "+image+"\nutilityPlatform: linux/amd64\n"))
 	writeJSON(t, "maintenance.yaml", cfg)
 	if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, cfg.Environment, "test (deadbeef)", "github", ".", false); err != nil {
 		t.Fatal(err)

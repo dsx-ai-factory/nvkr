@@ -60,6 +60,11 @@ func (profile Runtime) ResolveImageLocation(reference string) (string, error) {
 	if !pinned || !canonical.IsDigest(digest) {
 		return "", e.New(e.CodeUnpinnedInput, "image location requires an exact image digest")
 	}
+	// A digest-pinned reference may retain a tag; bindings name repositories.
+	// Strip only the tag, preserving registry ports and authored spelling.
+	if colon := strings.LastIndex(source, ":"); colon > strings.LastIndex(source, "/") {
+		source = source[:colon]
+	}
 	if location, ok := profile.ImageLocations[source]; ok {
 		return location + "@" + digest, nil
 	}
