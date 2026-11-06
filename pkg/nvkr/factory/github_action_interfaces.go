@@ -299,7 +299,10 @@ func githubProjectInterfaceRole(plan *Plan, original, call *yamlv3.Node, actions
 		return nil, e.New(e.CodeEngineCapability, "semantic GitHub recovery omits its provider-result input")
 	}
 	if role.kind == "prepare-images" {
-		expected := githubImageEnvironment()
+		if present && (plan.Environment.ToolchainAccess == nil || plan.Environment.ToolchainAccess.Reader == nil) {
+			return nil, e.New(e.CodeEngineCapability, "semantic image preparation requires a declared toolchainAccess reader")
+		}
+		expected := githubImageEnvironment(plan)
 		for key := range expected {
 			input := strings.ToLower(strings.ReplaceAll(key, "_", "-"))
 			expected[key] = "${{ inputs." + input + " }}"
@@ -312,7 +315,7 @@ func githubProjectInterfaceRole(plan *Plan, original, call *yamlv3.Node, actions
 			githubYAMLSet(inputs, input, githubYAMLMap("description", githubYAMLString("Independent private toolchain reader when image preparation is present"), "required", &yamlv3.Node{Kind: yamlv3.ScalarNode, Tag: "!!bool", Value: "false"}, "default", githubYAMLString("")))
 			if present {
 				value := githubYAMLValue(githubYAMLField(call, "with"), input)
-				if value != githubImageEnvironment()[key] {
+				if value != githubImageEnvironment(plan)[key] {
 					return nil, e.New(e.CodeEngineCapability, "semantic image preparation changes its caller credential")
 				}
 				githubYAMLSet(invocation.Arguments, input, githubYAMLString(value))

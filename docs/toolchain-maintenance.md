@@ -149,6 +149,40 @@ Required repository configuration:
 The manual `verify_published=true` mode still checks the currently committed pins
 without building or publishing. It cannot be combined with `approval_run`.
 
+## Declare consumer access
+
+Each native ARC Environment declares toolchain access independently of its output publication prefix:
+
+```yaml
+toolchainAccess:
+  privateRoots:
+    - ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains
+  publicRoots:
+    - docker.io/alpine/helm
+    - docker.io/library/busybox
+    - docker.io/library/golang
+    - docker.io/moby/buildkit
+  reader:
+    credentialRef: github:NVKR_REGISTRY_READ
+    usernameRef: github:NVKR_REGISTRY_READ_USER
+```
+
+Roots are sorted, unique registry/repository paths. Each covers that repository and descendants at a
+slash boundary. Roots must not overlap, including across classes; at most 128 are supported. Public roots
+select anonymous pulls. Every selected execution image in a native ARC Plan, including hosted source
+preparation and strict disk inspection when enabled, must be digest-pinned and classified. Generation
+fails before writing a bundle if a root is missing or a selected private root lacks a reader. Declare
+only roots trusted for that reader; an authored declaration does not verify the account's actual grants.
+Private pulls currently support GHCR only and require `native-kvm-v1`. The reader secret and username
+variable stay confined to image preparation; no repository-token fallback is admitted.
+The reader must not reuse the publication credential or the fixed production/development writer
+references; those comparisons are case-insensitive. Operators still own the grants of other secrets.
+
+When adding a toolchain root, update the Environment, regenerate with `make workflows-generate`, and
+run `make workflows-check`. Changing only the output publication namespace needs no access-code change.
+Existing native ARC Environments without `toolchainAccess` must migrate before generating workflows.
+Access declarations change Environment and Plan digests, while logical Build identity is unchanged.
+
 ## Retention and rollback
 
 Preparation locators request **14 days** of Actions retention. The private CI

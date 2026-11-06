@@ -7,6 +7,17 @@ metadata:
   name: nvke-fde-github
   description: Native build-only FDE iteration; raw QCOW2 and static-unqualified Run, without registry publication, signing or disk inspection.
 githubARC: native-kvm-v1
+toolchainAccess:
+  privateRoots:
+    - ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains
+  publicRoots:
+    - docker.io/alpine/helm
+    - docker.io/library/busybox
+    - docker.io/library/golang
+    - docker.io/moby/buildkit
+  reader:
+    credentialRef: github:NVKR_REGISTRY_READ
+    usernameRef: github:NVKR_REGISTRY_READ_USER
 githubDispatchBranches:
   - codex/fde-image-pipeline
 githubRunners:

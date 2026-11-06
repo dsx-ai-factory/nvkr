@@ -29,6 +29,9 @@ matching names or source URLs do not imply interchangeability. Output-specific c
 overlays bind exact predecessors. Do not silently refresh a stale overlay or independently bump a derived
 pin-set member.
 
+For native ARC inputs, follow [consumer toolchain access](../../../../docs/toolchain-maintenance.md#declare-consumer-access)
+to classify selected images in the Environment and bind the private reader before generation.
+
 ## Review changes with the CLI
 
 Capture a baseline Plan if valid inputs already exist. Use a fresh scratch directory for Plans and alternative

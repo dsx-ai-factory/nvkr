@@ -26,6 +26,7 @@ func arcTestPlan(t *testing.T, platform string) *Plan {
 	base := diskPublicationPlanFixture(t, platform)
 	environment := base.Environment.Clone()
 	environment.GitHubARC = "native-kvm-v1"
+	environment.ToolchainAccess = testToolchainAccess()
 	environment.Runtime.Runtime = "docker"
 	for i := range environment.ExecutionClasses {
 		environment.ExecutionClasses[i].RunsOn = githubARCRunner(string(environment.ExecutionClasses[i].HostPlatform))
