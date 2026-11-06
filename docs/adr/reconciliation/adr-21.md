@@ -8,6 +8,12 @@ native pulls before proposing catalog/overlay/Environment changes and owner rege
 cover invalid/expired exceptions, incomplete sets, source-attempt mismatches, archive/configuration and
 measurement substitution, overlay rebinding and profile updates, and review-branch retry/refusal behavior.
 The current authored-input inventory has a read-only repin preview; that is not a live refresh.
+Refresh notification contracts cover reuse of one labeled or legacy-title issue,
+create-once retry routing, lookup failures, and silence for unchanged successful
+measurements and successful publication. Native image push paths are checked against
+the module-local inspector dependency graph for both Linux architectures. Manifest
+comparison and routing are diagnostic only; these offline tests do not exercise
+GitHub issue writes, hosted matrix outputs or a live refresh.
 
 No new preparation, publication, native pull, App exchange or complete refresh was dispatched for this
 change. The first complete exercise remains a maintainer action after merge, with exact Run and artifact

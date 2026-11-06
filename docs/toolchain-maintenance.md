@@ -28,11 +28,23 @@ package inventories and build/validation logs use the existing private CI
 transport; GitHub Actions artifacts hold its locators. The preparation Run,
 attempt and exact source commit must be retained with the proposals.
 
-Every refresh report assigns an issue to `njhensley` and links the Run. A failed
-architecture, missing measurements, stale preparation, expired exception,
+Refresh reports use one open tracking issue labeled `native-toolchain-refresh`,
+with `Native toolchain refresh` as the stable title. The workflow reuses the oldest
+matching open issue (including the former Run-number titles) when no labeled issue
+exists, and creates an issue assigned to `njhensley` only when neither lookup finds
+one. Existing duplicates are left for the owner to resolve. Each report links the Run.
+Only failures, cancellations, or successful measurements whose image manifests
+differ from the committed pins post a report. Both native architectures must
+compare successfully; unchanged successful preparation and successful publication
+post nothing. Source-change triggers cover the image sources and locks, the static
+Linux inspector helper's module-local dependencies, the Go pins, preparation and
+verification scripts, and this workflow. The dependency path contract checks both
+architectures during the ordinary Go test suite.
+
+A failed architecture, missing measurements, stale preparation, expired exception,
 publication error, reader failure or regeneration failure leaves the selected
-consumer pins unchanged. Successful preparation also needs owner action: its
-report is not publication approval. Resolve pending refresh reports only after
+consumer pins unchanged. Changed successful preparation needs owner action: its
+report is not publication approval. Resolve the tracking issue only after
 reviewing the resulting pin change or recording why the candidate is rejected.
 
 The weekly refresh is also the dependency/security review checkpoint. Review the

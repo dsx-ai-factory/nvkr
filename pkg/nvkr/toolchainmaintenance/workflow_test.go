@@ -4,9 +4,15 @@
 package toolchainmaintenance
 
 import (
+	"context"
+	"maps"
 	"os"
+	"os/exec"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"sigs.k8s.io/yaml"
 )
@@ -20,7 +26,8 @@ func TestWorkflowKeepsPreparationPublicationAndReviewSeparate(t *testing.T) {
 		On          map[string]any    `json:"on"`
 		Permissions map[string]string `json:"permissions"`
 		Concurrency struct {
-			Cancel bool `json:"cancel-in-progress"`
+			Group  string `json:"group"`
+			Cancel bool   `json:"cancel-in-progress"`
 		} `json:"concurrency"`
 		Jobs map[string]struct {
 			If          string            `json:"if"`
@@ -28,7 +35,9 @@ func TestWorkflowKeepsPreparationPublicationAndReviewSeparate(t *testing.T) {
 			Environment string            `json:"environment"`
 			Timeout     int               `json:"timeout-minutes"`
 			Permissions map[string]string `json:"permissions"`
+			Outputs     map[string]string `json:"outputs"`
 			Steps       []struct {
+				ID   string            `json:"id"`
 				Name string            `json:"name"`
 				Uses string            `json:"uses"`
 				Run  string            `json:"run"`
@@ -40,7 +49,7 @@ func TestWorkflowKeepsPreparationPublicationAndReviewSeparate(t *testing.T) {
 	if err := yaml.Unmarshal(raw, &workflow); err != nil {
 		t.Fatal(err)
 	}
-	if workflow.Permissions["contents"] != "read" || workflow.Permissions["actions"] != "read" || workflow.Concurrency.Cancel {
+	if workflow.Permissions["contents"] != "read" || workflow.Permissions["actions"] != "read" || workflow.Concurrency.Cancel || workflow.Concurrency.Group != "native-toolchains-${{ github.ref }}" {
 		t.Fatal("unsafe workflow token or publication cancellation")
 	}
 	for _, trigger := range []string{"pull_request", "pull_request_target", "workflow_run"} {
@@ -87,7 +96,85 @@ func TestWorkflowKeepsPreparationPublicationAndReviewSeparate(t *testing.T) {
 			}
 		}
 	}
-	if !strings.Contains(string(raw), "--assignee njhensley") {
-		t.Fatal("refresh failures lack the named owner")
+	report := workflow.Jobs["report"]
+	if !strings.Contains(report.If, "always()") || !strings.Contains(report.If, "github.ref == 'refs/heads/main'") ||
+		!maps.Equal(report.Permissions, map[string]string{"contents": "read", "issues": "write"}) {
+		t.Fatal("refresh reporter lost failure scheduling, serialized main admission or minimal permissions")
+	}
+	notify := report.Steps[len(report.Steps)-1]
+	if notify.Run != "python3 scripts/report-native-toolchains.py report" || notify.Env["RESULTS"] != "${{ toJSON(needs) }}" {
+		t.Fatal("refresh reporter bypasses tested actionable-issue routing")
+	}
+	measure := workflow.Jobs["measure"]
+	for _, arch := range []string{"amd64", "arm64"} {
+		key := "changed_" + arch
+		if measure.Outputs[key] != "${{ steps.compare.outputs."+key+" }}" {
+			t.Fatal("matrix comparisons must have distinct outputs for both architectures")
+		}
+	}
+	compares := false
+	for _, step := range measure.Steps {
+		if step.ID == "compare" && strings.Contains(step.Run, "report-native-toolchains.py compare") &&
+			step.Env["NATIVE_ARCH"] == "${{ matrix.arch }}" {
+			compares = true
+		}
+	}
+	if !compares {
+		t.Fatal("measurement must compare actual proposal manifests with committed pins")
+	}
+}
+
+func TestNativeToolchainPushPaths(t *testing.T) {
+	root, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(root, Workflow))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		On struct {
+			Push struct {
+				Paths []string `json:"paths"`
+			} `json:"push"`
+		} `json:"on"`
+	}
+	if err := yaml.Unmarshal(raw, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{}
+	for _, path := range []string{
+		".go-version", "go.mod", "go.sum", "toolchains/nvkr-packer/**", "toolchains/nvkr-disk-inspect/**",
+		"scripts/prepare-native-toolchains.sh", "scripts/verify-native-toolchains.sh", Workflow,
+	} {
+		want[path] = true
+	}
+	// Match the static Linux helper build in prepare-native-toolchains.sh, not
+	// the test binary's host platform or the much larger maintenance CLI closure.
+	for _, arch := range []string{"amd64", "arm64"} {
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+		cmd := exec.CommandContext(ctx, "go", "list", "-mod=readonly", "-deps", "-f",
+			"{{if and .Module .Module.Main}}{{.Dir}}{{end}}", "./cmd/nvkr-disk-inspect")
+		cmd.Dir = root
+		cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH="+arch, "CGO_ENABLED=0", "GOTOOLCHAIN=local")
+		out, err := cmd.Output()
+		cancel()
+		if err != nil {
+			t.Fatalf("list native %s dependencies: %v", arch, err)
+		}
+		for _, dir := range strings.Split(strings.TrimSpace(string(out)), "\n") {
+			rel, err := filepath.Rel(root, dir)
+			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+				t.Fatalf("module-local dependency outside repository: %q (%v)", dir, err)
+			}
+			want[filepath.ToSlash(rel)+"/**"] = true
+		}
+	}
+	paths := workflow.On.Push.Paths
+	slices.Sort(paths)
+	expected := slices.Sorted(maps.Keys(want))
+	if !slices.Equal(paths, expected) {
+		t.Fatalf("native image push paths drifted from Linux helper dependencies; update %s\ngot: %v\nwant: %v", Workflow, paths, expected)
 	}
 }
