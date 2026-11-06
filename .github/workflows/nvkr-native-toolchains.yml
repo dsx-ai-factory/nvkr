@@ -13,9 +13,37 @@ name: Prepare native NVKR toolchains
       - 'go.sum'
       - 'toolchains/nvkr-packer/**'
       - 'toolchains/nvkr-disk-inspect/**'
+      # TestNativeToolchainPushPaths checks both Linux architectures.
       - 'cmd/nvkr-disk-inspect/**'
-      - 'pkg/nvkr/**'
-      - 'internal/**'
+      - 'internal/buildactivity/**'
+      - 'internal/bundlearchive/**'
+      - 'internal/diskdiagnostic/**'
+      - 'internal/documentpath/**'
+      - 'internal/helmarchive/**'
+      - 'internal/ownedcmd/**'
+      - 'internal/releaseasset/**'
+      - 'internal/securepath/**'
+      - 'internal/sourcegit/**'
+      - 'internal/transportarchive/**'
+      - 'internal/versionpolicy/**'
+      - 'pkg/nvkr/assemble/**'
+      - 'pkg/nvkr/buildgraph/**'
+      - 'pkg/nvkr/canonical/**'
+      - 'pkg/nvkr/catalog/**'
+      - 'pkg/nvkr/definition/**'
+      - 'pkg/nvkr/development/**'
+      - 'pkg/nvkr/errors/**'
+      - 'pkg/nvkr/execution/**'
+      - 'pkg/nvkr/internal/discoverytags/**'
+      - 'pkg/nvkr/internal/heldfile/**'
+      - 'pkg/nvkr/internal/packertransport/**'
+      - 'pkg/nvkr/internal/safetext/**'
+      - 'pkg/nvkr/ir/**'
+      - 'pkg/nvkr/material/**'
+      - 'pkg/nvkr/pipeline/**'
+      - 'pkg/nvkr/profile/**'
+      - 'pkg/nvkr/sbom/**'
+      - 'pkg/nvkr/target/**'
       - 'scripts/prepare-native-toolchains.sh'
       - 'scripts/verify-native-toolchains.sh'
       - '.github/workflows/nvkr-native-toolchains.yml'
@@ -42,6 +70,10 @@ jobs:
     if: github.repository == 'dsx-ai-factory/nvkr' && github.ref == 'refs/heads/main' && !inputs.verify_published && !inputs.approval_run
     permissions:
       contents: read
+    # Distinct matrix keys prevent completion order from overwriting results.
+    outputs:
+      changed_amd64: ${{ steps.compare.outputs.changed_amd64 }}
+      changed_arm64: ${{ steps.compare.outputs.changed_arm64 }}
     strategy:
       fail-fast: false
       matrix:
@@ -85,6 +117,13 @@ jobs:
             --directory ".nvkr/native-toolchains/$NATIVE_ARCH" \
             --arch "$NATIVE_ARCH" --source "$SOURCE_COMMIT" \
             > ".nvkr/native-toolchains/$NATIVE_ARCH/proposal.json"
+      - name: Compare measured manifests with committed pins
+        id: compare
+        env:
+          NATIVE_ARCH: ${{ matrix.arch }}
+        run: >-
+          python3 scripts/report-native-toolchains.py compare --arch "$NATIVE_ARCH"
+          --proposal ".nvkr/native-toolchains/$NATIVE_ARCH/proposal.json"
       - name: Retain native measurements
         if: always() && steps.ci-helper.outcome == 'success'
         uses: ./.github/nvkr-run/actions/ci-upload
@@ -355,6 +394,9 @@ jobs:
       contents: read
       issues: write
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # 7.0.1
+        with:
+          persist-credentials: false
       - name: Notify maintenance owner of pending or failed refresh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -362,17 +404,4 @@ jobs:
           RESULTS: ${{ toJSON(needs) }}
           APPROVAL_RUN: ${{ inputs.approval_run }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          RUN_ID: ${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          {
-            printf '@njhensley: weekly/source-change native toolchain maintenance.\n\nRun: %s\n\n' "$RUN_URL"
-            printf 'Preparation approval run: %s\n\n' "${APPROVAL_RUN:-not yet approved}"
-            printf 'Job results:\n'
-            jq -r 'to_entries[] | "- " + .key + ": " + .value.result' <<< "$RESULTS"
-            printf '\nOld pins remain selected until a complete refresh passes and its pin change is reviewed and merged.\n'
-            printf 'For a successful preparation, review the retained per-image proposals, license/security findings and source-lock freshness. Record exceptions with approver, candidate scope and expiry before publishing.\n'
-            printf 'Follow docs/toolchain-maintenance.md; refresh acceptance and rollback are recorded separately from build success.\n'
-          } > "$RUNNER_TEMP/refresh-report.md"
-          cat "$RUNNER_TEMP/refresh-report.md" >> "$GITHUB_STEP_SUMMARY"
-          gh issue create --title "Native toolchain refresh $RUN_ID" --assignee njhensley --body-file "$RUNNER_TEMP/refresh-report.md"
+        run: python3 scripts/report-native-toolchains.py report

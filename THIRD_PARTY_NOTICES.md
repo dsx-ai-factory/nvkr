@@ -44,7 +44,7 @@ Regenerate with `make notices`.
 | `github.com/gdamore/tcell/v2` | v2.13.10 | Apache-2.0 |
 | `github.com/go-jose/go-jose/v4` | v4.1.6 | Apache-2.0 |
 | `github.com/google/go-containerregistry` | v0.22.1 | Apache-2.0 |
-| `github.com/klauspost/compress` | v1.19.2 | BSD-3-Clause |
+| `github.com/klauspost/compress` | v1.20.2 | BSD-3-Clause |
 | `github.com/lucasb-eyer/go-colorful` | v1.3.0 | MIT |
 | `github.com/moby/sys/mountinfo` | v0.7.3 | Apache-2.0 |
 | `github.com/opencontainers/go-digest` | v1.0.0 | Apache-2.0 |
@@ -4154,7 +4154,7 @@ Apache License
 
 ## github.com/klauspost/compress
 
-Version: v1.19.2
+Version: v1.20.2
 
 ```
 Copyright (c) 2012 The Go Authors. All rights reserved.

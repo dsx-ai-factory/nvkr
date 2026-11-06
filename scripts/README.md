@@ -193,7 +193,9 @@ Signer-policy rejection is covered by the owning consumer contract tests.
 The [toolchain maintenance workflow](../docs/toolchain-maintenance.md) delegates subject admission,
 publication, read-back and authored pin changes to `pkg/nvkr/toolchainmaintenance`, then regenerates
 through the existing owners. `propose-toolchain-refresh.py` publishes only the checked review diff with
-the repository App; its offline behavior tests run with `make test-ci-tools`.
+the repository App. `report-native-toolchains.py` compares measured manifests with
+committed pins and routes actionable reports to one labeled tracking issue; both
+scripts' offline behavior tests run with `make test-ci-tools`.
 
 The ARM64 build/publish/consume nightly cycle is retired. `nightly-build.sh` and
 `TestNightlyPublishedCandidate` remain as uninvoked legacy code pending removal;
