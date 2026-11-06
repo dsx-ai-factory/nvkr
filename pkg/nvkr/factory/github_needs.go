@@ -69,6 +69,17 @@ func githubNeedsForPlan(ctx context.Context, plan *Plan) (*githubNeedsProjection
 			}
 		}
 	}
+	preflightJobs, err := githubImagePreflightJobs(plan)
+	if err != nil {
+		return nil, err
+	}
+	var preflightNeeds []string
+	for _, id := range bootstrap {
+		preflightNeeds = append(preflightNeeds, id)
+	}
+	for _, id := range preflightJobs {
+		full[id] = uniqueSorted(preflightNeeds)
+	}
 	_, artifacts := planIndex(plan)
 	for _, stage := range stages {
 		if err := githubNeedsContext(ctx); err != nil {
@@ -77,7 +88,7 @@ func githubNeedsForPlan(ctx context.Context, plan *Plan) (*githubNeedsProjection
 		if _, exists := full[stage.ID]; exists {
 			return nil, e.New(e.CodeEngineCapability, "GitHub stage %q collides with a bootstrap job", stage.ID)
 		}
-		full[stage.ID] = stage.needs(artifacts, nodeJobs, bootstrap[stage.Nodes[0].RunsOn])
+		full[stage.ID] = uniqueSorted(append(stage.needs(artifacts, nodeJobs, bootstrap[stage.Nodes[0].RunsOn]), preflightJobs...))
 	}
 	if plan.DefinitionDigest != "" && plan.EnvironmentDigest != "" {
 		full[githubFinalizerJobID], err = githubFinalizerJobs(plan, nodeJobs)
@@ -97,7 +108,18 @@ func githubNeedsForPlan(ctx context.Context, plan *Plan) (*githubNeedsProjection
 	for _, value := range plan.Environment.Runtime.Services {
 		retain = retain || githubNeedsWord.MatchString(value)
 	}
-	return projectGitHubNeeds(ctx, full, retain)
+	projection, err := projectGitHubNeeds(ctx, full, retain)
+	if err != nil {
+		return nil, err
+	}
+	// Completion-scheduled verification must still observe each live reader
+	// result directly. Reachability alone does not preserve that success gate.
+	for _, stage := range stages {
+		if stage.executionCondition() == executionAfterCompletion {
+			projection.Reduced[stage.ID] = uniqueSorted(append(projection.Reduced[stage.ID], preflightJobs...))
+		}
+	}
+	return projection, nil
 }
 
 func projectGitHubNeeds(ctx context.Context, full map[string][]string, retainOrdinary bool) (*githubNeedsProjection, error) {

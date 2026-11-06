@@ -226,6 +226,11 @@ func githubCarrierContext(ctx context.Context) error {
 // finalizer's stage and runner-bootstrap dependencies, including grouped stages.
 func githubFinalizerJobs(plan *Plan, nodeJobs map[string]string) ([]string, error) {
 	jobs := make([]string, 0, len(nodeJobs)+len(plan.Graph.Nodes))
+	preflight, err := githubImagePreflightJobs(plan)
+	if err != nil {
+		return nil, err
+	}
+	jobs = append(jobs, preflight...)
 	for _, node := range plan.Graph.Nodes {
 		job := nodeJobs[node.ID]
 		if job == "" {

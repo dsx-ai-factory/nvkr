@@ -1,4 +1,4 @@
-name: 'p19 Bind image digest and package Helm: controller-chart +4'
+name: p19 Package aicr-nvke-gb200-ubuntu-tra...flow-argocd-helm +4
 'on':
   workflow_call:
     inputs:
@@ -10,28 +10,22 @@ name: 'p19 Bind image digest and package Helm: controller-chart +4'
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
-      nvkr-partition-21:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-21 }}
-      nvkr-results-01:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01 }}
-      nvkr-results-01-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01-statuses }}
-      nvkr-results-06:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-06 }}
-      nvkr-results-06-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-06-statuses }}
-      nvkr-results-09:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
-      nvkr-results-09-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09-statuses }}
-      nvkr-results-0e:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e }}
-      nvkr-results-0e-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0e-statuses }}
-      nvkr-results-0f:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f }}
-      nvkr-results-0f-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f-statuses }}
+      nvkr-results-00:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00 }}
+      nvkr-results-00-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00-statuses }}
+      nvkr-results-02:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02 }}
+      nvkr-results-02-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02-statuses }}
+      nvkr-results-04:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-04 }}
+      nvkr-results-04-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-04-statuses }}
+      nvkr-results-0d:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d }}
+      nvkr-results-0d-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0d-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -40,11 +34,10 @@ name: 'p19 Bind image digest and package Helm: controller-chart +4'
 permissions:
   contents: read
 jobs:
-  nvkr-package-controller-chart:
-    name: 'Bind image digest and package Helm: controller-chart'
+  nvkr-package-publication-aicr-nvke-gb200-001849522d36:
+    name: 'Package publication bundle: publication-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-package-cwe'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-process-controller-chart-build-nvke-9024d4709c1b'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -69,11 +62,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-package-publication-capnico-controller:
-    name: 'Package publication bundle: publication-capnico-controller'
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-package-aicr-nvke-gb200-ubuntu-train-44abbd520ae5'].result == 'success' }}
+  nvkr-package-publication-aicr-nvke-gb200-454ce0ffffab:
+    name: 'Package publication bundle: publication-aicr-nvke-gb200-ubuntu-training-kubeflow-flux'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-package-capnico-controller'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -98,11 +91,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-package-publication-cluster-api-prov-6fe85337de7c:
-    name: 'Package publication bundle: publication-cluster-api-provider-provisioned'
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-package-aicr-nvke-gb200-ubuntu-train-eb40c8bb577c'].result == 'success' }}
+  nvkr-package-publication-aicr-nvke-gb200-8525d994e10a:
+    name: 'Package publication bundle: publication-aicr-nvke-gb200-ubuntu-training-kubeflow-helm'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-package-cluster-api-provider-provisioned'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -127,11 +120,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-package-publication-controller-profiles:
-    name: 'Package publication bundle: publication-controller-profiles'
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-package-aicr-nvke-gb200-ubuntu-train-6c66c71e9be3'].result == 'success' }}
+  nvkr-package-publication-local-path-provisioner-arm64:
+    name: 'Package publication bundle: publication-local-path-provisioner-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-package-controller-profiles'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -156,11 +149,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-package-publication-cwe:
-    name: 'Package publication bundle: publication-cwe'
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-package-local-path-provisioner-arm64'].result == 'success' }}
+  nvkr-package-publication-nvkectl-linux-arm64:
+    name: 'Package publication bundle: publication-nvkectl-linux-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-package-cwe'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -185,27 +178,25 @@ jobs:
     permissions:
       actions: read
       contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-package-nvkectl-linux-arm64'].result == 'success' }}
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-package-controller-chart, nvkr-package-publication-capnico-controller, nvkr-package-publication-cluster-api-prov-6fe85337de7c, nvkr-package-publication-controller-profiles, nvkr-package-publication-cwe]
+    needs: [nvkr-package-publication-aicr-nvke-gb200-001849522d36, nvkr-package-publication-aicr-nvke-gb200-454ce0ffffab, nvkr-package-publication-aicr-nvke-gb200-8525d994e10a, nvkr-package-publication-local-path-provisioner-arm64, nvkr-package-publication-nvkectl-linux-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-partition-21: ${{ format('"nvkr-package-controller-chart":{0}', toJSON(needs['nvkr-package-controller-chart'])) }}
-      nvkr-results-01: ${{ format('"nvkr-package-controller-chart":{0}', toJSON(needs['nvkr-package-controller-chart'])) }}
-      nvkr-results-01-statuses: ${{ format('{0}', needs['nvkr-package-controller-chart'].result) }}
-      nvkr-results-06: ${{ format('"nvkr-package-publication-cwe":{0}', toJSON(needs['nvkr-package-publication-cwe'])) }}
-      nvkr-results-06-statuses: ${{ format('{0}', needs['nvkr-package-publication-cwe'].result) }}
-      nvkr-results-09: ${{ format('"nvkr-package-publication-cluster-api-prov-6fe85337de7c":{0}', toJSON(needs['nvkr-package-publication-cluster-api-prov-6fe85337de7c'])) }}
-      nvkr-results-09-statuses: ${{ format('{0}', needs['nvkr-package-publication-cluster-api-prov-6fe85337de7c'].result) }}
-      nvkr-results-0e: ${{ format('"nvkr-package-publication-controller-profiles":{0}', toJSON(needs['nvkr-package-publication-controller-profiles'])) }}
-      nvkr-results-0e-statuses: ${{ format('{0}', needs['nvkr-package-publication-controller-profiles'].result) }}
-      nvkr-results-0f: ${{ format('"nvkr-package-publication-capnico-controller":{0}', toJSON(needs['nvkr-package-publication-capnico-controller'])) }}
-      nvkr-results-0f-statuses: ${{ format('{0}', needs['nvkr-package-publication-capnico-controller'].result) }}
+      nvkr-results-00: ${{ format('"nvkr-package-publication-aicr-nvke-gb200-454ce0ffffab":{0},"nvkr-package-publication-nvkectl-linux-arm64":{1}', toJSON(needs['nvkr-package-publication-aicr-nvke-gb200-454ce0ffffab']), toJSON(needs['nvkr-package-publication-nvkectl-linux-arm64'])) }}
+      nvkr-results-00-statuses: ${{ format('{0} {1}', needs['nvkr-package-publication-aicr-nvke-gb200-454ce0ffffab'].result, needs['nvkr-package-publication-nvkectl-linux-arm64'].result) }}
+      nvkr-results-02: ${{ format('"nvkr-package-publication-aicr-nvke-gb200-001849522d36":{0}', toJSON(needs['nvkr-package-publication-aicr-nvke-gb200-001849522d36'])) }}
+      nvkr-results-02-statuses: ${{ format('{0}', needs['nvkr-package-publication-aicr-nvke-gb200-001849522d36'].result) }}
+      nvkr-results-04: ${{ format('"nvkr-package-publication-local-path-provisioner-arm64":{0}', toJSON(needs['nvkr-package-publication-local-path-provisioner-arm64'])) }}
+      nvkr-results-04-statuses: ${{ format('{0}', needs['nvkr-package-publication-local-path-provisioner-arm64'].result) }}
+      nvkr-results-0d: ${{ format('"nvkr-package-publication-aicr-nvke-gb200-8525d994e10a":{0}', toJSON(needs['nvkr-package-publication-aicr-nvke-gb200-8525d994e10a'])) }}
+      nvkr-results-0d-statuses: ${{ format('{0}', needs['nvkr-package-publication-aicr-nvke-gb200-8525d994e10a'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

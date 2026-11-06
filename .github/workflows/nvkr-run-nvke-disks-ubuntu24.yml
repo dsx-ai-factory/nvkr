@@ -86,11 +86,101 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  preflight-images-arc-amd64-kvm:
+    name: 'Observe image reader availability (arc-amd64-kvm)'
+    runs-on: 'arc-amd64-kvm'
+    timeout-minutes: 15
+    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-arc'
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - name: Observe image reader availability (arc-amd64-kvm)
+        uses: ./.github/nvkr-run-nvke-disks-ubuntu24/actions/jobs/preflight-images-arc-amd64-kvm/part-1
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Observe exact image manifests
+        timeout-minutes: 3
+        env:
+          NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NVKR_REGISTRY_READ }}'
+          NVKR_TOOLCHAIN_READ_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+        run: ./nvkr-exec factory github preflight-images --plan .github/nvkr-run-nvke-disks-ubuntu24/plan.json --runner arc-amd64-kvm
+    permissions:
+      actions: read
+      contents: read
+  preflight-images-arc-arm64-kvm:
+    name: 'Observe image reader availability (arc-arm64-kvm)'
+    runs-on: 'arc-arm64-kvm'
+    timeout-minutes: 15
+    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-arc'
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - name: Observe image reader availability (arc-arm64-kvm)
+        uses: ./.github/nvkr-run-nvke-disks-ubuntu24/actions/jobs/preflight-images-arc-arm64-kvm/part-1
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Observe exact image manifests
+        timeout-minutes: 3
+        env:
+          NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NVKR_REGISTRY_READ }}'
+          NVKR_TOOLCHAIN_READ_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+        run: ./nvkr-exec factory github preflight-images --plan .github/nvkr-run-nvke-disks-ubuntu24/plan.json --runner arc-arm64-kvm
+    permissions:
+      actions: read
+      contents: read
+  preflight-images-ubuntu-24-04:
+    name: 'Observe image reader availability (ubuntu-24.04)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 15
+    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - name: Observe image reader availability (ubuntu-24.04)
+        uses: ./.github/nvkr-run-nvke-disks-ubuntu24/actions/jobs/preflight-images-ubuntu-24-04/part-1
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Observe exact image manifests
+        timeout-minutes: 3
+        env:
+          NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NVKR_REGISTRY_READ }}'
+          NVKR_TOOLCHAIN_READ_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+        run: ./nvkr-exec factory github preflight-images --plan .github/nvkr-run-nvke-disks-ubuntu24/plan.json --runner ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+  preflight-images-ubuntu-24-04-arm:
+    name: 'Observe image reader availability (ubuntu-24.04-arm)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 15
+    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - name: Observe image reader availability (ubuntu-24.04-arm)
+        uses: ./.github/nvkr-run-nvke-disks-ubuntu24/actions/jobs/preflight-images-ubuntu-24-04-arm/part-1
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Observe exact image manifests
+        timeout-minutes: 3
+        env:
+          NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NVKR_REGISTRY_READ }}'
+          NVKR_TOOLCHAIN_READ_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+        run: ./nvkr-exec factory github preflight-images --plan .github/nvkr-run-nvke-disks-ubuntu24/plan.json --runner ubuntu-24.04-arm
+    permissions:
+      actions: read
+      contents: read
   nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-agent:
     name: 'Fetch pinned source for nvke-agent (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -117,7 +207,7 @@ jobs:
     name: 'Build and package producer evidence for nvke-node-fde-ubuntu24-amd64'
     runs-on: 'arc-amd64-kvm'
     timeout-minutes: 1105
-    needs: [build-runner-arc-amd64-kvm, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-0c5f02c3d655, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-10109689b3ae, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-9d0a3a2d2ff9, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-f906d751721a, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-agent, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-doca-ovs, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-285c4e706ab1, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-608c2630ffc7]
+    needs: [nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-0c5f02c3d655, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-10109689b3ae, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-9d0a3a2d2ff9, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-f906d751721a, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-agent, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-doca-ovs, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-285c4e706ab1, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-608c2630ffc7]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
     permissions:
@@ -273,7 +363,7 @@ jobs:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -295,7 +385,7 @@ jobs:
     name: 'Fetch pinned source for nvke-cni-ovn (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -309,7 +399,7 @@ jobs:
     name: 'Fetch pinned source for nvke-doca-ovs (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -331,7 +421,7 @@ jobs:
     name: 'Fetch pinned source for nvke-image-inputs, nvke-node-fde-amd64, nvke-patched-installer-iso-amd64 (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -353,7 +443,7 @@ jobs:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -375,7 +465,7 @@ jobs:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -397,7 +487,7 @@ jobs:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -411,7 +501,7 @@ jobs:
     name: 'Fetch pinned source for ovn-kubernetes-chart (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -425,7 +515,7 @@ jobs:
     name: 'Fetch pinned source for nvke-agent (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -445,7 +535,7 @@ jobs:
     name: 'Build and package producer evidence for nvke-node-fde-ubuntu24-arm64'
     runs-on: 'arc-arm64-kvm'
     timeout-minutes: 1105
-    needs: [build-runner-arc-arm64-kvm, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3]
+    needs: [nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-1de305b80d30, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-cni-ovn, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-doca-ovs, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-1fd69ba6cdeb, nvkr-nvke-node-fde-ubuntu24-arm64-fetch-o-e6fdc891acb3]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
     permissions:
@@ -515,7 +605,7 @@ jobs:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -537,7 +627,7 @@ jobs:
     name: 'Fetch pinned source for nvke-cni-ovn (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -551,7 +641,7 @@ jobs:
     name: 'Fetch pinned source for nvke-doca-ovs (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -573,7 +663,7 @@ jobs:
     name: 'Fetch pinned source for nvke-image-inputs, nvke-node-fde-arm64, nvke-patched-installer-iso (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -595,7 +685,7 @@ jobs:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -617,7 +707,7 @@ jobs:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -639,7 +729,7 @@ jobs:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -653,7 +743,7 @@ jobs:
     name: 'Fetch pinned source for ovn-kubernetes-chart (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -667,7 +757,7 @@ jobs:
     name: 'Fetch pinned source for nvke-agent (nvke-node-image-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -681,7 +771,7 @@ jobs:
     name: 'Build and package producer evidence for nvke-node-image-ubuntu24-amd64'
     runs-on: 'arc-amd64-kvm'
     timeout-minutes: 1105
-    needs: [build-runner-arc-amd64-kvm, nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78, nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e, nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1, nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677, nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224, nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40, nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7, nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa, nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent]
+    needs: [nvkr-nvke-node-image-ubuntu24-amd64-fetch-12e232109f78, nvkr-nvke-node-image-ubuntu24-amd64-fetch-16e1e414375e, nvkr-nvke-node-image-ubuntu24-amd64-fetch-29ac160699a1, nvkr-nvke-node-image-ubuntu24-amd64-fetch-3d59a97da677, nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f05a918d224, nvkr-nvke-node-image-ubuntu24-amd64-fetch-6409eb5fab40, nvkr-nvke-node-image-ubuntu24-amd64-fetch-7cffe3abeab7, nvkr-nvke-node-image-ubuntu24-amd64-fetch-c424f98526aa, nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
     permissions:
@@ -745,7 +835,7 @@ jobs:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-image-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -767,7 +857,7 @@ jobs:
     name: 'Fetch pinned source for nvke-cni-ovn (nvke-node-image-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -781,7 +871,7 @@ jobs:
     name: 'Fetch pinned source for nvke-doca-ovs (nvke-node-image-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -803,7 +893,7 @@ jobs:
     name: 'Fetch pinned source for nvke-image-inputs, nvke-node-image-amd64, nvke-patched-installer-iso-amd64 (nvke-node-image-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -825,7 +915,7 @@ jobs:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -847,7 +937,7 @@ jobs:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-image-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -869,7 +959,7 @@ jobs:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-image-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -883,7 +973,7 @@ jobs:
     name: 'Fetch pinned source for ovn-kubernetes-chart (nvke-node-image-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -897,7 +987,7 @@ jobs:
     name: 'Fetch pinned source for nvke-agent (nvke-node-image-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -911,7 +1001,7 @@ jobs:
     name: 'Build and package producer evidence for nvke-node-image-ubuntu24-arm64'
     runs-on: 'arc-arm64-kvm'
     timeout-minutes: 1105
-    needs: [build-runner-arc-arm64-kvm, nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616, nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475, nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd, nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e, nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a, nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2, nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671, nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5, nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent]
+    needs: [nvkr-nvke-node-image-ubuntu24-arm64-fetch-41dbcd4a6616, nvkr-nvke-node-image-ubuntu24-arm64-fetch-706926c35475, nvkr-nvke-node-image-ubuntu24-arm64-fetch-8fb7112d8acd, nvkr-nvke-node-image-ubuntu24-arm64-fetch-996f23f8f46e, nvkr-nvke-node-image-ubuntu24-arm64-fetch-a56a7f64e80a, nvkr-nvke-node-image-ubuntu24-arm64-fetch-d730773a23b2, nvkr-nvke-node-image-ubuntu24-arm64-fetch-f3f2d4cda671, nvkr-nvke-node-image-ubuntu24-arm64-fetch-f76f6d2be7f5, nvkr-nvke-node-image-ubuntu24-arm64-fetch-nvke-agent]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
     permissions:
@@ -975,7 +1065,7 @@ jobs:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-image-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -997,7 +1087,7 @@ jobs:
     name: 'Fetch pinned source for nvke-cni-ovn (nvke-node-image-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -1011,7 +1101,7 @@ jobs:
     name: 'Fetch pinned source for nvke-doca-ovs (nvke-node-image-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -1033,7 +1123,7 @@ jobs:
     name: 'Fetch pinned source for nvke-image-inputs, nvke-node-image, nvke-patched-installer-iso (nvke-node-image-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -1055,7 +1145,7 @@ jobs:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -1077,7 +1167,7 @@ jobs:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-image-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -1099,7 +1189,7 @@ jobs:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-image-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -1113,7 +1203,7 @@ jobs:
     name: 'Fetch pinned source for ovn-kubernetes-chart (nvke-node-image-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -1127,7 +1217,7 @@ jobs:
     name: 'Acquire pinned cosign'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: &steps-ubuntu-24-04-node
       - *check-native-linux-amd64
@@ -1314,7 +1404,7 @@ jobs:
     name: 'Acquire pinned syft'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
     permissions:
@@ -1438,7 +1528,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-00'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [build-runner-ubuntu-24-04, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-0c5f02c3d655]
+    needs: [build-runner-ubuntu-24-04, nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-0c5f02c3d655, preflight-images-arc-amd64-kvm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -1477,7 +1567,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-03'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-disk-nvke-node-image-ubuntu24-amd64, nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent, nvkr-tool-cosign]
+    needs: [nvkr-disk-nvke-node-image-ubuntu24-amd64, nvkr-nvke-node-image-ubuntu24-amd64-fetch-nvke-agent, nvkr-tool-cosign, preflight-images-ubuntu-24-04]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -1590,6 +1680,19 @@ jobs:
     steps:
       - name: Forward provider results
         run: ':'
+  nvkr-results-0c:
+    name: 'Collect provider results: nvkr-results-0c'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions: {}
+    outputs:
+      results: ${{ toJSON(needs) }}
+      statuses: ${{ join(needs.*.result, ' ') }}
+    steps:
+      - name: Forward provider results
+        run: ':'
   nvkr-results-0d:
     name: 'Collect provider results: nvkr-results-0d'
     runs-on: ubuntu-24.04
@@ -1633,7 +1736,7 @@ jobs:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [nvkr-results-00, nvkr-results-01, nvkr-results-02, nvkr-results-03, nvkr-results-04, nvkr-results-05, nvkr-results-06, nvkr-results-07, nvkr-results-08, nvkr-results-09, nvkr-results-0a, nvkr-results-0b, nvkr-results-0d, nvkr-results-0e, nvkr-results-0f]
+    needs: [nvkr-results-00, nvkr-results-01, nvkr-results-02, nvkr-results-03, nvkr-results-04, nvkr-results-05, nvkr-results-06, nvkr-results-07, nvkr-results-08, nvkr-results-09, nvkr-results-0a, nvkr-results-0b, nvkr-results-0c, nvkr-results-0d, nvkr-results-0e, nvkr-results-0f]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     env:
@@ -1721,7 +1824,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 66 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 70 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {

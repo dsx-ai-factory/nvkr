@@ -110,3 +110,15 @@ The declaration migration is generation/admission behavior only. Public declarat
 pulls; they are not registry visibility evidence. Private reader grants, successful pulls and current-head
 native execution still require external evidence. Existing native Environments must declare all selected
 execution image roots before regeneration; undeclared roots fail closed.
+
+Declared-access Plans now emit bounded exact-manifest/config reader preflight after final runtime
+Plan delivery, on each selected hosted or ARC placement, before producer fan-out. Completion-scheduled
+verification retains a separate reader-success gate. Local registry fixtures cover authentication,
+exact digest/platform binding, malformed/oversized metadata, bounded retries and joined cancellation;
+generation contracts cover reader scope, refreshed selection and worker dependencies. Observations
+are sorted point-in-time diagnostics bound to the final Plan and route; no layer download or release
+authority is claimed. Existing per-job pulls and runtime checks remain. Selection uses the current
+projected execution images and strict inspectors; complete cross-owner inventory is tracked separately
+in [issue 426](https://github.com/dsx-ai-factory/nvkr/issues/426). No fresh-runner reader exercise for this
+preflight implementation is recorded for hosted AMD64, hosted ARM64, ARC AMD64 or ARC ARM64; production
+grants and connectivity on each class remain unverified.
