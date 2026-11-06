@@ -101,65 +101,33 @@ func TestPrivateImagePullRejectsCredentialAndCancellationBeforeWork(t *testing.T
 
 func TestPrivateToolchainPublicationBoundary(t *testing.T) {
 	plan := arcTestPlan(t, "linux/amd64")
-	for _, test := range []struct {
-		name, publication, image string
-		development              bool
-		want                     bool
-	}{
-		{"current", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
-		{"gpu site current subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
-		{"gpu site prefix lookalike", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site-mirror", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"gpu site child prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site/other", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"gpu site foreign toolchain owner", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site", "ghcr.io/other/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"gpu site non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/other/packer", false, false},
-		{"disk family current subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
-		{"disk family prefix lookalike", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-mirror", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"disk family child prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks/other", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"ubuntu24 disk family current subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
-		{"ubuntu24 disk family prefix lookalike", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24-mirror", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"ubuntu24 disk family child prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24/other", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"ubuntu24 disk family non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks-ubuntu24", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/other/packer", false, false},
-		{"core family prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/core", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"services family prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/services", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"telemetry family prefix", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/telemetry", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"foreign disk family owner", "ghcr.io/other/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"disk family foreign toolchain owner", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/other/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"disk family unsupported repository", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
-		{"disk family non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/other/packer", false, false},
-		{"unsupported repository", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
-		{"nightly current subject", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
-		{"nightly unsupported repository", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
-		{"upstream nightly current subject", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, true},
-		{"upstream nightly unsupported repository", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", false, false},
-		{"nightly prefix lookalike", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64-mirror", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"nightly child prefix", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64/other", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"foreign nightly owner", "ghcr.io/other/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"foreign toolchain owner", "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-arm64", "ghcr.io/other/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"different publication owner", "ghcr.io/example/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-		{"sibling repository", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nvkr-mirror/m2-candidate/toolchains/packer", false, false},
-		{"non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/other/packer", false, false},
-		{"development current toolchain", "ghcr.io/dsx-ai-factory/nvkr/development", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", true, true},
-		{"development unsupported repository", "ghcr.io/dsx-ai-factory/nvkr/development", "ghcr.io/dsx-ai-factory/nke-recipes/m2-candidate/toolchains/packer", true, false},
-		{"development different owner", "ghcr.io/example/nvkr/development", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", true, false},
-		{"development sibling repository", "ghcr.io/dsx-ai-factory/nvkr/development", "ghcr.io/dsx-ai-factory/nvkr-mirror/m2-candidate/toolchains/packer", true, false},
-		{"development non-toolchain subject", "ghcr.io/dsx-ai-factory/nvkr/development", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/other/packer", true, false},
-		{"development prefix without policy", "ghcr.io/dsx-ai-factory/nvkr/development", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", false, false},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			plan.Environment.Publication.RepositoryPrefix = test.publication
-			plan.Environment.GitHubDevelopment = test.development
-			image := test.image + "@sha256:" + strings.Repeat("a", 64)
-			if got := githubPrivateToolchain(plan, image); got != test.want {
-				t.Fatalf("private preparation = %t, want %t", got, test.want)
-			}
-			if githubPrivateToolchain(plan, test.image+":latest") {
-				t.Fatal("unpinned image admitted")
-			}
-		})
+	for _, publication := range []string{"ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/other/arbitrary-output"} {
+		plan.Environment.Publication.RepositoryPrefix = publication
+		for _, test := range []struct {
+			name, repository string
+			want             bool
+		}{
+			{"declared root", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer", true},
+			{"foreign owner", "ghcr.io/other/nvkr/m2-candidate/toolchains/packer", false},
+			{"owner lookalike", "ghcr.io/dsx-ai-factory-mirror/nvkr/m2-candidate/toolchains/packer", false},
+			{"repository lookalike", "ghcr.io/dsx-ai-factory/nvkr-mirror/m2-candidate/toolchains/packer", false},
+			{"root lookalike", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains-mirror/packer", false},
+			{"undeclared sibling", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/other/packer", false},
+		} {
+			t.Run(publication+"/"+test.name, func(t *testing.T) {
+				image := test.repository + "@sha256:" + strings.Repeat("a", 64)
+				if got := githubPrivateToolchain(plan, image); got != test.want {
+					t.Fatalf("private preparation = %t, want %t", got, test.want)
+				}
+				if githubPrivateToolchain(plan, test.repository+":latest") {
+					t.Fatal("unpinned image received a reader")
+				}
+			})
+		}
 	}
-	plan.Environment.GitHubARC = "unsupported"
-	if githubPrivateToolchain(plan, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:"+strings.Repeat("a", 64)) {
-		t.Fatal("unsupported ARC policy received private image preparation")
+	plan.Environment.ToolchainAccess.Reader = nil
+	if !githubPrivateToolchain(plan, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer@sha256:"+strings.Repeat("a", 64)) || githubImageEnvironment(plan)[githubImageToken] != "" {
+		t.Fatal("missing reader changed image classification or synthesized a credential")
 	}
 }
 
@@ -219,7 +187,7 @@ func TestMaintainedNamedPrivateImageCredentialBoundary(t *testing.T) {
 
 // Discover maintained bundles so a new publication namespace cannot silently
 // omit preparation. Select required stages from the pinned subjects themselves,
-// independently of the publication allowlist used by the renderer and validator.
+// independently of the access declaration used by the renderer and validator.
 func TestMaintainedPrivateToolchainPreparation(t *testing.T) {
 	plans, err := filepath.Glob("../../../.github/*/plan.json")
 	if err != nil || len(plans) == 0 {
@@ -429,7 +397,7 @@ func TestGitHubStageExecutionRejectsPrivateImageOrdering(t *testing.T) {
 	plan.Environment.DiskEvidence = "build-provenance-v1"
 	stage := githubStage{ID: "disk-stage", DiskOutput: "image", Nodes: []Node{{Container: plan.Environment.Publication.RepositoryPrefix + "/toolchains/packer@sha256:" + strings.Repeat("a", 64)}}}
 	stage.diskExecutionBudget = time.Minute
-	prepare := githubStep{Run: githubRunnerCommand(plan, "prepare-images", "stage", stage.ID), Env: githubImageEnvironment()}
+	prepare := githubStep{Run: githubRunnerCommand(plan, "prepare-images", "stage", stage.ID), Env: githubImageEnvironment(plan)}
 	run := githubStep{ID: "run-disk", Run: githubRunnerCommand(plan, "run-disk", "output", stage.DiskOutput), TimeoutMinutes: 1 + githubDiskCleanupHeadroomMinutes}
 	actions, err := resolveGitHubActions(plan.Actions)
 	if err != nil {

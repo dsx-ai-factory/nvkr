@@ -95,9 +95,16 @@ The GPU site production [Run 42116623552](https://github.com/dsx-ai-factory/nvkr
 at `ab3fe8a7` failed before native toolchain materialization; the
 [source-fetch job](https://github.com/dsx-ai-factory/nvkr/actions/runs/42116623552/job/127558874072)
 omitted private-image preparation because the generator did not admit the GPU site publication prefix
-for the existing M2 toolchain pins. The exact `m2-candidate/gpu-site` prefix now receives the same
-separate reader step as the maintained disk families. A contract discovers maintained Plans and checks
-every stage selecting those private subjects for preparation and explicit reader wiring before execution,
-including partition workers. Repository secret-name and variable-name read-back confirmed
+for the existing M2 toolchain pins. The Environment now declares private/public toolchain roots and one independent reader, instead of using
+publication prefixes for image access. Contract tests cover missing classifications/readers, publication
+independence, native preparation, reader projection, and foreign/lookalike roots. A contract discovers
+maintained Plans and checks every stage selecting the retained private subjects for preparation and
+explicit reader wiring before execution, including partition workers.
+Repository secret-name and variable-name read-back confirmed
 `NVKR_REGISTRY_READ` and `NVKR_REGISTRY_READ_USER`; `nvkr-arc` has no overriding entries.
 This is generation and configuration evidence only; a successful production rerun remains pending.
+
+The declaration migration is generation/admission behavior only. Public declarations request anonymous
+pulls; they are not registry visibility evidence. Private reader grants, successful pulls and current-head
+native execution still require external evidence. Existing native Environments must declare all selected
+execution image roots before regeneration; undeclared roots fail closed.

@@ -83,7 +83,10 @@ func admitGitHubRequirements(plan *Plan, adapter string) error {
 		}
 	}
 	if plan.Environment.GitHubARC == "" {
-		return rejectUnsupportedPlanRequirements(plan, adapter)
+		if err := rejectUnsupportedPlanRequirements(plan, adapter); err != nil {
+			return err
+		}
+		return admitGitHubToolchainAccess(plan)
 	}
 	deny := func() error {
 		return e.New(e.CodeEngineCapability, "%s requires the native-kvm-v1 ARC disk route", adapter)
@@ -168,7 +171,7 @@ func admitGitHubRequirements(plan *Plan, adapter string) error {
 			return deny()
 		}
 	}
-	return nil
+	return admitGitHubToolchainAccess(plan)
 }
 
 func githubDiskOutput(plan *Plan, node Node) string {

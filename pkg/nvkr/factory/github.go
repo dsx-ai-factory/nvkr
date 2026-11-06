@@ -347,8 +347,8 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 		}
 		if privateImages {
 			fmt.Fprintln(&body, "      - name: Prepare private native toolchains\n        env:")
-			for _, key := range sortedKeys(githubImageEnvironment()) {
-				fmt.Fprintf(&body, "          %s: %s\n", key, yamlSingle(githubImageEnvironment()[key]))
+			for _, key := range sortedKeys(githubImageEnvironment(plan)) {
+				fmt.Fprintf(&body, "          %s: %s\n", key, yamlSingle(githubImageEnvironment(plan)[key]))
 			}
 			fmt.Fprintf(&body, "        run: %s\n", githubRunnerCommand(plan, "prepare-images", "stage", stage.ID))
 		}

@@ -6,6 +6,21 @@
     "description": "Native ARM64 GitHub nightly candidate with operator-trusted ARC KVM disk production and pipeline-attested build-provenance-v1 publication. Runner availability, protected-environment admission and runtime qualification are independently gated."
   },
   "githubARC": "native-kvm-v1",
+  "toolchainAccess": {
+    "privateRoots": [
+      "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains"
+    ],
+    "publicRoots": [
+      "docker.io/alpine/helm",
+      "docker.io/library/busybox",
+      "docker.io/library/golang",
+      "docker.io/moby/buildkit"
+    ],
+    "reader": {
+      "credentialRef": "github:NVKR_REGISTRY_READ",
+      "usernameRef": "github:NVKR_REGISTRY_READ_USER"
+    }
+  },
   "githubRunners": {
     "linux/amd64": "ubuntu-24.04",
     "linux/arm64": "ubuntu-24.04-arm"

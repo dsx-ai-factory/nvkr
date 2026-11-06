@@ -266,7 +266,7 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 			}
 			if stage, ok := byNodeForJob(stages, jobID); ok && len(githubStagePrivateImages(plan, stage)) > 0 &&
 				strings.TrimSpace(step.Run) == githubRunnerCommand(plan, "prepare-images", "stage", stage.ID) {
-				if !reflect.DeepEqual(step.Env, githubImageEnvironment()) || step.If != "" || step.ContinueOnError || step.Uses != "" {
+				if !reflect.DeepEqual(step.Env, githubImageEnvironment(plan)) || step.If != "" || step.ContinueOnError || step.Uses != "" {
 					return e.New(e.CodeEngineCapability, "private image preparation requires only its exact read credential")
 				}
 				continue
@@ -759,7 +759,7 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 		prepared := false
 		for _, step := range steps {
 			if strings.TrimSpace(step.Run) == githubRunnerCommand(plan, "prepare-images", "stage", stage.ID) {
-				if prepared || !reflect.DeepEqual(step.Env, githubImageEnvironment()) {
+				if prepared || !reflect.DeepEqual(step.Env, githubImageEnvironment(plan)) {
 					return e.New(e.CodeEngineCapability, "private toolchain preparation must occur exactly once with scoped credentials")
 				}
 				prepared = true
