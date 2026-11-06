@@ -78,7 +78,7 @@ func toolSmokePlanScope(plan *factory.Plan, smoke QualificationSmokePolicy) ([]p
 		switch output.Kind {
 		case OutputDiskImage, OutputHelm:
 			// These exact output kinds carry no loose executable bundle in the MVP.
-		case OutputOCI, OutputAPT:
+		case OutputOCI, OutputAPT, OutputBundle:
 			rule, exists := exemptions[output.Name]
 			if !exists || rule.Kind != output.Kind || !sameSmokeComponents(rule.Components, output.Components) {
 				return nil, e.New(e.CodeGateUnmet, "output %q has no exact non-tool smoke rule", output.Name)

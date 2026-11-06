@@ -16,8 +16,11 @@ import (
 	yaml "go.yaml.in/yaml/v3"
 )
 
-func TestQualificationRejectsLegacyProducerNamespaceBeforeInputIO(t *testing.T) {
+func TestQualificationRejectsOtherProducerNamespacesBeforeInputIO(t *testing.T) {
 	for _, workflow := range []string{
+		".github/workflows/nvkr-qualify-site.yml",
+		".github/workflows/nvkr-smoke-site.yml",
+		".github/workflows/nvkr-dev-qualify-site.yml",
 		".github/workflows/nvkr-run__host-amd64-node.yml",
 		".github/workflows/nvkr-dev__host-amd64-node.yml",
 		".github/workflows/nvkr-run-nightly__host-amd64-node.yml",

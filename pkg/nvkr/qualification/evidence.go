@@ -92,7 +92,7 @@ func (evidence Evidence) validate() error {
 		return e.New(e.CodeReleaseIncomplete, "qualification evidence requires the complete output and smoke set")
 	}
 	if dev {
-		namespace, err := development.ParseNamespace("ghcr.io/" + strings.ToLower(checks.Origin.Repository) + "/development")
+		namespace, err := development.NamespaceForProducer(checks.Origin.Repository, checks.Origin.Workflow)
 		if err != nil {
 			return err
 		}
@@ -113,6 +113,15 @@ func (evidence Evidence) validate() error {
 			if err := factory.ValidatePublicationInvocation(invocation, checks.Origin.InvocationID); err != nil {
 				return err
 			}
+		}
+	}
+	if checks.Composition != nil {
+		names := make([]string, 0, len(checks.Outputs))
+		for _, output := range checks.Outputs {
+			names = append(names, output.Name)
+		}
+		if err := checks.Composition.ValidateMembership(checks.Inputs.DefinitionDigest, names); err != nil {
+			return err
 		}
 	}
 	previous := ""

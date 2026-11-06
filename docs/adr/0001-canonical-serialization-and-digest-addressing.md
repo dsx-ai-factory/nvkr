@@ -177,6 +177,9 @@ pipeline-attested build/evidence qualification; it does not reuse a reserved qua
 The document binds the authenticated originating repository, Run, attempt, commit, workflow/ref and build
 invocation; the separately authenticated qualification invocation; gate version; Definition, Environment,
 Plan and relevant input identities; and complete exact output/subject membership with per-check results.
+Composite artifact checks carry optional `composition`, the complete ADR-26 record. It recomputes the
+composite Definition digest and attributes exactly the checked outputs; native reports and qualification
+evidence bind those exact check bytes. Plain-Definition records omit the field and retain their bytes.
 Object-owned output, subject and check collections have deterministic ordering. Overall output verdicts are
 pass/fail only. Applicable checks must pass before publication; non-applicable checks carry the explicit
 applicability result. External suites outside this MVP use `not-evaluated` with reason `outside MVP scope`;
@@ -216,6 +219,9 @@ lane (`hermetic-build`, `wrapped-build` or `acquired`, read from its verified pr
 and the SHA-256 of that verified production predicate's canonical JSON, excluding the optional trailing
 transport newline that signature verification also ignores. An aggregate image member names its index;
 the bound qualification evidence enumerates its native children. Disk members state producer-only scope.
+Composite manifests carry the same optional `composition` record, validated against their Definition digest
+and complete member list. The exact qualification evidence and live artifact receipt must agree with it.
+Plain-Definition manifest bytes are unchanged; older strict readers reject the composite extension.
 Members are sorted by name and unique. Unknown fields, versions, lanes or kinds, noncanonical bytes, missing
 identities and inexact bindings fail closed. The canonical document is bounded by the qualification signing
 transport limit. Pretty-printed JSON hashes are insufficient for either document. Reconciliation records

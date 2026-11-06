@@ -38,13 +38,7 @@ func finalizeGenerated(ctx context.Context, definitionPath, environmentPath, pla
 	}
 	// Preserve authored-input admission before reading a generated Plan. These
 	// bounded document reads do not compile catalogs or acquire source trees.
-	// A composite finalizes like a plain Definition; its qualification handoff
-	// stays deferred (ADR-26 §9).
-	if handoffPath != "" {
-		if _, err := LoadDefinition(ctx, definitionPath); err != nil {
-			return nil, err
-		}
-	} else if _, err := LoadDefinitionInput(ctx, definitionPath); err != nil {
+	if _, err := LoadDefinitionInput(ctx, definitionPath); err != nil {
 		return nil, err
 	}
 	if _, err := LoadEnvironment(ctx, environmentPath); err != nil {

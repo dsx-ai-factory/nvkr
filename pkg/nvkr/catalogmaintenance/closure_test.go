@@ -231,8 +231,8 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		{Definition: "inputs/definitions/nvke/telemetry.yaml", Environment: "inputs/environments/github-nvke-telemetry.yaml"},
 		{Definition: "inputs/definitions/nvke/disks.yaml", Environment: "inputs/environments/github-nvke-disks.yaml"},
 		{Definition: "inputs/definitions/nvke/disks-ubuntu24.yaml", Environment: "inputs/environments/github-nvke-disks-ubuntu24.yaml"},
-		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-nvke-gpu-site.yaml"},
-		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-development.yaml"},
+		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-nvke-gpu-site.yaml", QualificationPolicy: "inputs/policies/nvke-gpu-site-qualification.yaml"},
+		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-development.yaml", QualificationPolicy: "inputs/policies/nvke-gpu-site-development-qualification.yaml"},
 		{Definition: "inputs/definitions/demo/arm64-nvidia-kvm.json", Environment: "inputs/environments/github-nightly-nvidia.json"},
 		{Definition: "inputs/definitions/demo/arm64-upstream-kvm.json", Environment: "inputs/environments/github-nightly-upstream.json"},
 	}
@@ -257,6 +257,11 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 	for _, planPath := range planPaths {
 		plan, bundle := committedClosureRun(t, filepath.ToSlash(planPath))
 		input := RunInput{Definition: plan.DefinitionPath, Environment: plan.EnvironmentPath}
+		for _, selected := range wantRuns {
+			if selected.Definition == input.Definition && selected.Environment == input.Environment {
+				input.QualificationPolicy = selected.QualificationPolicy
+			}
+		}
 		if !slices.Contains(wantRuns, input) || plans[input] != nil {
 			t.Fatalf("committed Plan %s has an unexpected or duplicate policy selection %+v", planPath, input)
 		}
@@ -292,10 +297,29 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		}
 		*selected.target = pair
 	}
+	for _, input := range wantRuns {
+		if input.QualificationPolicy == "" {
+			continue
+		}
+		policy, err := lifecycle.LoadQualificationPolicy(t.Context(), input.QualificationPolicy)
+		if err != nil {
+			t.Fatal(err)
+		}
+		pair, err := qualification.RenderWorkflows(t.Context(), plans[input], policy, input.QualificationPolicy)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := qualification.CheckWorkflows(t.Context(), ".", pair); err != nil {
+			t.Fatal(err)
+		}
+		members.additionalQualifications = append(members.additionalQualifications, pair)
+	}
 	directories, files := members.paths()
 	wantDirectories := []string{
 		".github/nvkr-dev",
+		".github/nvkr-dev-qualification",
 		".github/nvkr-qualification",
+		".github/nvkr-qualification-nvke-gpu-site",
 		".github/nvkr-run",
 		".github/nvkr-run-nvke-core",
 		".github/nvkr-run-nvke-disks",
@@ -310,7 +334,10 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		t.Fatalf("closure directories = %v, want %v", directories, wantDirectories)
 	}
 	wantFiles := []string{
+		".github/workflows/nvkr-dev-qualify.yml",
+		".github/workflows/nvkr-dev-smoke.yml",
 		".github/workflows/nvkr-dev.yml",
+		".github/workflows/nvkr-qualify-nvke-gpu-site.yml",
 		".github/workflows/nvkr-qualify.yml",
 		".github/workflows/nvkr-run-nvke-core.yml",
 		".github/workflows/nvkr-run-nvke-disks-ubuntu24.yml",
@@ -321,6 +348,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		".github/workflows/nvkr-run-nvke-services.yml",
 		".github/workflows/nvkr-run-nvke-telemetry.yml",
 		".github/workflows/nvkr-run.yml",
+		".github/workflows/nvkr-smoke-nvke-gpu-site.yml",
 		".github/workflows/nvkr-smoke.yml",
 	}
 	if !slices.Equal(files, wantFiles) {

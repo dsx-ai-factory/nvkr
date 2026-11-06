@@ -355,6 +355,12 @@ the hosted certificate identity or complete this external acceptance requirement
 
 Qualification evidence binds its schema and gate version, exact subject membership, producing Run/attempt/commit,
 Definition and relevant input identities, source build identity, qualification invocation and per-check results.
+For composite Runs, the handoff replays all pinned member inputs and the exact-input verifier authenticates
+the complete composition record against the publication. Artifact checks, worker evidence, qualification
+evidence and the release manifest carry that same record and bind its composite digest and complete output
+attribution (ADR-26 U8). A member Run's evidence cannot qualify the composite. Explicit `bundle-archive`
+applicability permits bundle outputs only after delivery validates their exact wrapper and complete bounded
+archive; no deployment, cluster execution or application compatibility is claimed.
 Version 2 additionally requires the full independent policy and authenticated per-member native worker
 observations; the v1 placeholder shape cannot satisfy this gate. Its canonical schema and family are registered
 in ADR-01 before use. Signing and attachment use the admitted
