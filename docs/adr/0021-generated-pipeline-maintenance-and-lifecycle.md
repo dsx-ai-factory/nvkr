@@ -79,8 +79,9 @@ records one successful earlier-head full development execution of this opt-in to
 execution-model extraction and per-worker fragment forwarding, and proves neither current-head worker execution,
 full-product failure/cancellation recovery nor production qualification. Optional qualification
 generation separately emits the admitted `workflow_run` qualifier and fixed `workflow_call` smoke pair (§4).
-That pair currently admits the default producer workflow only; named producer
-qualification is not part of this namespace contract.
+Each named production producer may select an independent policy and owns
+`nvkr-qualify-<name>.yml`, `nvkr-smoke-<name>.yml` and `.github/nvkr-qualification-<name>/manifest.json`.
+The event trigger uses the producer renderer's exact display name. Default ownership remains unchanged.
 A separately authored downstream CI coordinator may schedule
 dispatches of those bundles; its scheduling, exact-run correlation and runtime
 ownership are outside generation (ADR-16/18).
@@ -364,7 +365,12 @@ The explicit development policy generates a separate fixed manual-dispatch/call 
 `.github/nvkr-dev-qualification/`. Production and development owners have independent locks, stages and
 manifests. A prior manifest naming the other producer cannot authorize replacement or retirement. The same
 exact-byte runtime policy check applies to both pairs. The development source checkout is untrusted input
-data and does not replace the qualifier's generated policy or executable owner.
+data and does not replace the qualifier's generated policy or executable owner. Named composite development producers use `nvkr-dev-qualify-<name>.yml`,
+`nvkr-dev-smoke-<name>.yml` and `.github/nvkr-dev-qualification-<name>/manifest.json`.
+Development producer names beginning `qualify-`, `smoke-` or `qualification-` are reserved to prevent
+ownership collisions. Each source workflow selects its own original Plan path and disposable namespace.
+Catalog maintenance additional runs may select `qualificationPolicy`; the same owner regenerates and
+checks both producer and qualification files, and includes every manifest and workflow in the refresh closure.
 
 The reviewed policy and generated pair may merge before real hosted acceptance. The fresh producer run and
 positive/negative hosted and independent-consumer exercises follow merge; their evidence remains required

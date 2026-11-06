@@ -72,7 +72,7 @@ func CheckQualificationFiles(ctx context.Context, options QualificationFilesOpti
 	if err != nil {
 		return nil, nil, err
 	}
-	definition, err := LoadDefinition(ctx, options.DefinitionPath)
+	input, err := LoadDefinitionInput(ctx, options.DefinitionPath)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -90,7 +90,7 @@ func CheckQualificationFiles(ctx context.Context, options QualificationFilesOpti
 	if err := factory.AdmitQualificationHandoff(plan); err != nil {
 		return nil, nil, err
 	}
-	expected, err := Compile(ctx, options.DefinitionPath, definition, options.EnvironmentPath, environment, plan.GeneratorVersion)
+	expected, err := CompileFiles(ctx, options.DefinitionPath, options.EnvironmentPath, plan.GeneratorVersion)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -110,7 +110,7 @@ func CheckQualificationFiles(ctx context.Context, options QualificationFilesOpti
 		return nil, nil, err
 	}
 	receipt, report, err := consumer.CheckQualification(ctx, QualificationRequest{Reference: candidate.Reference,
-		Definition: definition, Environment: environment, Plan: plan, Origin: origin, Predicates: candidate.Predicates})
+		Definition: input.Definition, Environment: environment, Plan: plan, Origin: origin, Predicates: candidate.Predicates})
 	if err != nil {
 		_ = origin.Close()
 	} else {

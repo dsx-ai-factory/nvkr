@@ -188,16 +188,19 @@ func TestNativeSmokeCompleteScope(t *testing.T) {
 }
 
 func TestNativeSmokeNonToolScopeIsExact(t *testing.T) {
-	for _, kind := range []string{OutputOCI, OutputAPT, OutputHelm, OutputDiskImage} {
+	for _, kind := range []string{OutputOCI, OutputAPT, OutputHelm, OutputDiskImage, OutputBundle} {
 		for _, mode := range []string{"exact", "missing", "wrong components"} {
 			t.Run(kind+"/"+mode, func(t *testing.T) {
 				plan, checks, bundles, policy := nativeSmokeScopeFixture()
 				plan.LifecycleOutputs = append(plan.LifecycleOutputs, factory.LifecycleOutputPlan{Name: "non-tool", Kind: kind, Components: []string{"image"}, BuildDigest: nativeSmokeTestDigest("5")})
 				checks.Outputs = append(checks.Outputs, ArtifactCheckOutput{Name: "non-tool", Kind: kind, BuildDigest: nativeSmokeTestDigest("5"), Overall: "pass"})
-				if kind == OutputOCI || kind == OutputAPT {
+				if kind == OutputOCI || kind == OutputAPT || kind == OutputBundle {
 					reason := "deployment-image"
-					if kind == OutputAPT {
+					switch kind {
+					case OutputAPT:
 						reason = "package-repository"
+					case OutputBundle:
+						reason = "bundle-archive"
 					}
 					if mode != "missing" {
 						policy.Smoke.NonToolOutputs = []QualificationNonToolOutput{{Output: "non-tool", Kind: kind, Components: []string{"image"}, Reason: reason}}
@@ -207,7 +210,7 @@ func TestNativeSmokeNonToolScopeIsExact(t *testing.T) {
 					}
 				}
 				_, err := deriveQualificationSmokeMembers(&plan, checks, bundles, policy)
-				if (kind == OutputOCI || kind == OutputAPT) && mode != "exact" {
+				if (kind == OutputOCI || kind == OutputAPT || kind == OutputBundle) && mode != "exact" {
 					assertCode(t, err, e.CodeGateUnmet)
 				} else if err != nil {
 					t.Fatal(err)

@@ -18,11 +18,15 @@ import (
 )
 
 func developmentBranch(policy SourcePolicy) (string, error) {
+	qualifier, _, err := development.QualificationWorkflows(policy.Workflow)
+	if err != nil {
+		return "", e.Wrap(e.CodeTrustPolicyMissing, err, "development qualification requires an admitted generated producer")
+	}
 	branch, ok := strings.CutPrefix(os.Getenv("GITHUB_REF"), "refs/heads/")
-	if !policy.Development || policy.Workflow != development.ProducerWorkflow || !ok || branch == policy.DefaultBranch ||
+	if !policy.Development || !ok || branch == policy.DefaultBranch ||
 		os.Getenv("GITHUB_ACTIONS") != "true" || os.Getenv("GITHUB_SERVER_URL") != "https://github.com" ||
 		os.Getenv("GITHUB_EVENT_NAME") != "workflow_dispatch" || os.Getenv("GITHUB_REPOSITORY") != policy.Repository ||
-		os.Getenv("GITHUB_WORKFLOW_REF") != policy.Repository+"/"+development.QualificationWorkflow+"@refs/heads/"+branch {
+		os.Getenv("GITHUB_WORKFLOW_REF") != policy.Repository+"/"+qualifier+"@refs/heads/"+branch {
 		return "", e.New(e.CodeTrustPolicyMissing, "development qualification requires its separate manually dispatched nondefault-branch workflow")
 	}
 	if err := (SourcePolicy{Repository: policy.Repository, Workflow: policy.Workflow, DefaultBranch: branch}).Validate(); err != nil {
@@ -81,7 +85,11 @@ func (g *GitHub) authenticateDevelopmentInvocation(ctx context.Context, source *
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
-	if workflow != development.QualificationWorkflow || request.RunID == origin.RunID {
+	qualifier, _, err := development.QualificationWorkflows(origin.Workflow)
+	if err != nil {
+		return nil, err
+	}
+	if workflow != qualifier || request.RunID == origin.RunID {
 		return nil, e.New(e.CodeTrustPolicyMissing, "development qualification requires a separate invocation of the admitted development workflow")
 	}
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)

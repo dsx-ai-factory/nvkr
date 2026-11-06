@@ -690,9 +690,9 @@ func writeQualificationTestFile(t *testing.T, root, name string, raw []byte) {
 	}
 }
 
-// Producer namespaces are valid ordinary generation inputs, while qualification
-// currently owns only the default producer pair. Reject before either owner writes.
-func TestQualificationGenerationNamedProducerRefusesWithoutOutput(t *testing.T) {
+// A named producer requires a matching independent policy, never the default
+// producer policy. Reject a mismatch before either owner writes.
+func TestQualificationGenerationMismatchedProducerRefusesWithoutOutput(t *testing.T) {
 	plan, policy := generationFixture(t)
 	plan.Environment = plan.Environment.Clone()
 	plan.Environment.GitHubBundle = "nightly"
@@ -707,7 +707,7 @@ func TestQualificationGenerationNamedProducerRefusesWithoutOutput(t *testing.T) 
 	bundle, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
 	requireCode(t, err, e.CodeEngineCapability)
 	if bundle != nil {
-		t.Fatal("unsupported named qualification emitted a bundle")
+		t.Fatal("mismatched qualification policy emitted a bundle")
 	}
 	inputs := t.TempDir()
 	environment := plan.Environment.Clone()

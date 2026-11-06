@@ -12,6 +12,7 @@
 /.github/nvkr-run/*.lease
 /.github/nvkr-run-*/*.lease
 /.github/nvkr-qualification/*.lease
+/.github/nvkr-qualification-*/*.lease
 /.github/nvkr-dev/*.lease
 /.github/nvkr-dev-*/*.lease
 /.github/nvkr-dev-qualification/*.lease
