@@ -295,6 +295,14 @@ func (environment Environment) Validate() error {
 	if err := environment.ToolchainAccess.Validate(); err != nil {
 		return err
 	}
+	if access := environment.ToolchainAccess; access != nil && access.Reader != nil {
+		ref := access.Reader.CredentialRef
+		if strings.EqualFold(ref, development.WriteCredentialRef) ||
+			strings.EqualFold(ref, ProductionRegistryWriteCredential) ||
+			(environment.Publication != nil && strings.EqualFold(ref, environment.Publication.CredentialRef)) {
+			return e.New(e.CodeInvalidCatalog, "toolchainAccess reader must not use a publication writer credential")
+		}
+	}
 	if environment.GitHubDevelopment && environment.GitHubBundle != "" {
 		if err := environment.admitNamedDevelopment(); err != nil {
 			return err

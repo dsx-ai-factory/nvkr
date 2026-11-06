@@ -163,6 +163,8 @@ fails before writing a bundle if a root is missing or a selected private root la
 only roots trusted for that reader; an authored declaration does not verify the account's actual grants.
 Private pulls currently support GHCR only and require `native-kvm-v1`. The reader secret and username
 variable stay confined to image preparation; no repository-token fallback is admitted.
+The reader must not reuse the publication credential or the fixed production/development writer
+references; those comparisons are case-insensitive. Operators still own the grants of other secrets.
 
 When adding a toolchain root, update the Environment, regenerate with `make workflows-generate`, and
 run `make workflows-check`. Changing only the output publication namespace needs no access-code change.

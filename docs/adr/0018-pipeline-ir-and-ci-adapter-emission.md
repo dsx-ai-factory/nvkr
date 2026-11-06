@@ -364,7 +364,9 @@ select anonymous pulls; they do not prove registry visibility. Private roots cur
 
 The optional `reader` declares one `credentialRef: github:SECRET_NAME` and
 `usernameRef: github:VARIABLE_NAME` for the private roots. A selected private root requires this reader
-and the admitted `native-kvm-v1` route. Ambient `GITHUB_*` references are refused. Publication prefixes,
+and the admitted `native-kvm-v1` route. Ambient `GITHUB_*` references are refused. Environment admission
+also rejects reader reuse of the publication credential or either fixed production/development writer
+reference, comparing names case-insensitively; it does not establish the grants of other secrets. Publication prefixes,
 development mode and build-only mode grant no image access. Private toolchains use a separate preparation
 step with `contents: read` and no workflow package scope. Only that step receives the declared secret and
 account variable; foreign owners and lookalike paths outside the declared roots receive no reader.

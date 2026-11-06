@@ -97,7 +97,9 @@ at `ab3fe8a7` failed before native toolchain materialization; the
 omitted private-image preparation because the generator did not admit the GPU site publication prefix
 for the existing M2 toolchain pins. The Environment now declares private/public toolchain roots and one independent reader, instead of using
 publication prefixes for image access. Contract tests cover missing classifications/readers, publication
-independence, native preparation, reader projection, and foreign/lookalike roots. A contract discovers
+independence, native preparation, reader projection, and foreign/lookalike roots. Environment admission
+also rejects the configured publication credential and fixed writer references as readers, including
+case variants; tests cover that separation without claiming to authenticate other secrets' grants. A contract discovers
 maintained Plans and checks every stage selecting the retained private subjects for preparation and
 explicit reader wiring before execution, including partition workers.
 Repository secret-name and variable-name read-back confirmed

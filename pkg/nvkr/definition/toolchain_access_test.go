@@ -94,6 +94,42 @@ func TestToolchainAccessClone(t *testing.T) {
 	}
 }
 
+func TestEnvironmentToolchainReaderExcludesWriters(t *testing.T) {
+	for _, test := range []struct {
+		name, reader, publication string
+		valid                     bool
+	}{
+		{"independent reader", "github:READER", "github:PUBLISHER", true},
+		{"reader without publication", "github:READER", "", true},
+		{"publication credential", "github:PUBLISHER", "github:PUBLISHER", false},
+		{"publication credential case", "github:publisher", "github:PUBLISHER", false},
+		{"production writer", "github:NVKR_REGISTRY_WRITE", "", false},
+		{"production writer case", "github:nvkr_registry_write", "", false},
+		{"development writer", "github:NVKR_DEV_REGISTRY_WRITE", "", false},
+		{"development writer case", "github:nvkr_dev_registry_write", "", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			environment := Environment{
+				APIVersion: EnvironmentAPIVersion, Kind: EnvironmentKind, Metadata: Metadata{Name: "fixture"},
+				UtilityContainer: "golang@sha256:" + strings.Repeat("a", 64), UtilityPlatform: "linux/amd64",
+				ToolchainAccess: &ToolchainAccess{PrivateRoots: []string{"ghcr.io/example/tools"},
+					Reader: &ToolchainReader{CredentialRef: test.reader, UsernameRef: "github:ACCOUNT"}},
+			}
+			if test.publication != "" {
+				environment.Publication = &Publication{RepositoryPrefix: "ghcr.io/example/output", CredentialRef: test.publication}
+			}
+			err := environment.Validate()
+			if test.valid {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if !toolchainErrorCode(err, e.CodeInvalidCatalog) || !strings.Contains(err.Error(), "publication writer") {
+				t.Fatalf("expected writer isolation refusal, got %v", err)
+			}
+		})
+	}
+}
+
 func toolchainErrorCode(err error, code e.Code) bool {
 	var coded *e.Error
 	return errors.As(err, &coded) && coded.Code == code

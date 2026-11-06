@@ -539,7 +539,7 @@ func githubSigningPermissionsFor(plan *Plan, kind string) map[string]string {
 }
 
 // ProductionRegistryWriteCredential selects independently scoped production accounts.
-const ProductionRegistryWriteCredential = "github:NVKR_REGISTRY_WRITE"
+const ProductionRegistryWriteCredential = authored.ProductionRegistryWriteCredential
 
 func githubScopedPublication(plan *Plan) bool {
 	return plan.Environment.GitHubDevelopment ||

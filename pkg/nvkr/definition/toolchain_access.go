@@ -12,6 +12,10 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 )
 
+// ProductionRegistryWriteCredential identifies the fixed production publisher
+// credential so access declarations cannot reuse it as a toolchain reader.
+const ProductionRegistryWriteCredential = "github:NVKR_REGISTRY_WRITE"
+
 // ToolchainAccess classifies native execution images independently of output
 // publication. Roots include a registry and repository path, without a trailing
 // slash. Each root covers that repository and its path-component descendants.
@@ -29,6 +33,8 @@ type ToolchainReader struct {
 	UsernameRef   string `json:"usernameRef"`
 }
 
+// Validate checks root partitioning and reader reference syntax.
+// Environment admission additionally excludes publication writer references.
 func (access *ToolchainAccess) Validate() error {
 	if access == nil {
 		return nil
