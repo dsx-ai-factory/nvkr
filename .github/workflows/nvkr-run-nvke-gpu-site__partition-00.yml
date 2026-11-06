@@ -12,14 +12,6 @@ name: p00 Prepare NVKR runner (arc-amd64-kvm) +3
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
       nvkr-partition-01:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-01 }}
-      nvkr-partition-02:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-02 }}
-      nvkr-partition-03:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-03 }}
-      nvkr-partition-04:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-04 }}
-      nvkr-partition-09:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-09 }}
       nvkr-results-00:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00 }}
       nvkr-results-00-statuses:
@@ -44,7 +36,6 @@ jobs:
     name: 'Prepare NVKR runner (arc-amd64-kvm)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 15
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - name: Check native runner platform
         run: |
@@ -71,11 +62,11 @@ jobs:
           nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-arc-amd64-kvm'
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
   build-runner-arc-arm64-kvm:
     name: 'Prepare NVKR runner (arc-arm64-kvm)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 15
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - name: Check native runner platform
         run: |
@@ -91,11 +82,11 @@ jobs:
           nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-arc-arm64-kvm'
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
   build-runner-ubuntu-24-04:
     name: 'Prepare NVKR runner (ubuntu-24.04)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 15
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - name: Check native runner platform
         run: |
@@ -111,11 +102,11 @@ jobs:
           nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
   build-runner-ubuntu-24-04-arm:
     name: 'Prepare NVKR runner (ubuntu-24.04-arm)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 15
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - name: Check native runner platform
         run: |
@@ -131,6 +122,7 @@ jobs:
           nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
@@ -141,11 +133,7 @@ jobs:
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-partition-01: ${{ format('"build-runner-ubuntu-24-04":{0},"build-runner-ubuntu-24-04-arm":{1}', toJSON(needs['build-runner-ubuntu-24-04']), toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}
-      nvkr-partition-02: ${{ format('"build-runner-ubuntu-24-04":{0},"build-runner-ubuntu-24-04-arm":{1}', toJSON(needs['build-runner-ubuntu-24-04']), toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}
-      nvkr-partition-03: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
-      nvkr-partition-04: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
-      nvkr-partition-09: ${{ format('"build-runner-arc-amd64-kvm":{0},"build-runner-arc-arm64-kvm":{1}', toJSON(needs['build-runner-arc-amd64-kvm']), toJSON(needs['build-runner-arc-arm64-kvm'])) }}
+      nvkr-partition-01: ${{ format('"build-runner-arc-amd64-kvm":{0},"build-runner-arc-arm64-kvm":{1},"build-runner-ubuntu-24-04":{2},"build-runner-ubuntu-24-04-arm":{3}', toJSON(needs['build-runner-arc-amd64-kvm']), toJSON(needs['build-runner-arc-arm64-kvm']), toJSON(needs['build-runner-ubuntu-24-04']), toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}
       nvkr-results-00: ${{ format('"build-runner-ubuntu-24-04":{0}', toJSON(needs['build-runner-ubuntu-24-04'])) }}
       nvkr-results-00-statuses: ${{ format('{0}', needs['build-runner-ubuntu-24-04'].result) }}
       nvkr-results-07: ${{ format('"build-runner-ubuntu-24-04-arm":{0}', toJSON(needs['build-runner-ubuntu-24-04-arm'])) }}

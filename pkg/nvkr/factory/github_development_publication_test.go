@@ -298,7 +298,7 @@ func TestDevelopmentPreservesProducerGraphAndPrivateToolchainReads(t *testing.T)
 		t.Fatal(err)
 	}
 	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
-	disks, fetches := 0, 0
+	disks, fetches, preflights := 0, 0, 0
 	for _, job := range document.Jobs {
 		if job.Permissions["packages"] == "write" {
 			t.Fatal("development gained workflow-token package writes")
@@ -311,6 +311,13 @@ func TestDevelopmentPreservesProducerGraphAndPrivateToolchainReads(t *testing.T)
 				step.Env[githubImageToken] != "${{ secrets.NVKR_REGISTRY_READ }}" || job.Env["NVKR_CREDENTIAL"] != "" {
 				t.Fatal("native toolchain preparation lost its independent read-only scope")
 			}
+			if strings.Contains(step.Run, "factory github preflight-images ") {
+				preflights++
+				continue
+			}
+			if !strings.Contains(step.Run, "factory github prepare-images ") {
+				t.Fatal("development reader escaped preflight and per-job preparation")
+			}
 			if job.Environment == githubDevelopmentARCEnvironment {
 				disks++
 			} else {
@@ -318,7 +325,7 @@ func TestDevelopmentPreservesProducerGraphAndPrivateToolchainReads(t *testing.T)
 			}
 		}
 	}
-	if disks != 1 || fetches == 0 {
-		t.Fatalf("development omitted private native preparation: %d disks / %d fetches", disks, fetches)
+	if disks != 1 || fetches == 0 || preflights != 2 {
+		t.Fatalf("development omitted private native preparation or placement preflight: %d disks / %d fetches / %d preflights", disks, fetches, preflights)
 	}
 }

@@ -116,6 +116,10 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 	if err := admitGitHubNeeds(ctx, plan, &document); err != nil {
 		return err
 	}
+	preflightJobs, err := validateGitHubImagePreflights(plan, &document, actions)
+	if err != nil {
+		return err
+	}
 	if err := validateGitHubScriptLimits(document); err != nil {
 		return err
 	}
@@ -197,7 +201,7 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 	document.Jobs[startID] = start
 	if len(plan.LifecycleOutputs) > 0 {
 		finalizer := document.Jobs["nvkr-lifecycle-run"]
-		if len(finalizer.Steps) == 0 || !reflect.DeepEqual(finalizer.Steps[len(finalizer.Steps)-1], githubRunEndSummary(len(stages)+len(bootstrap))) {
+		if len(finalizer.Steps) == 0 || !reflect.DeepEqual(finalizer.Steps[len(finalizer.Steps)-1], githubRunEndSummary(len(stages)+len(bootstrap)+len(preflightJobs))) {
 			return e.New(e.CodeEngineCapability, "GitHub Run closing summary must follow finalization and upload even after failure")
 		}
 		finalizer.Steps = finalizer.Steps[:len(finalizer.Steps)-1]
@@ -417,7 +421,7 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 		if !ok || job.Name != stage.Name || job.RunsOn != node.RunsOn {
 			return e.New(e.CodeInvalidCatalog, "GitHub workflow job for artifact node %q is missing or misbound", node.ID)
 		}
-		expectedNeeds := stage.needs(artifacts, nodeJobs, bootstrap[node.RunsOn])
+		expectedNeeds := uniqueSorted(append(stage.needs(artifacts, nodeJobs, bootstrap[node.RunsOn]), preflightJobs...))
 		actualNeeds := append([]string(nil), job.Needs...)
 		sort.Strings(actualNeeds)
 		if strings.Join(actualNeeds, "\x00") != strings.Join(expectedNeeds, "\x00") {
@@ -440,7 +444,7 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 		if len(githubStagePrivateImages(plan, stage)) > 0 && !reflect.DeepEqual(job.Permissions, map[string]string{"contents": "read"}) {
 			return e.New(e.CodeEngineCapability, "private toolchain jobs require exactly contents:read")
 		}
-		wantCondition := stage.condition(plan)
+		wantCondition := stage.condition(plan, preflightJobs...)
 		if job.If != wantCondition {
 			return e.New(e.CodeEngineCapability, "GitHub execution job %q must require dispatch on an admitted branch", jobID)
 		}
@@ -546,7 +550,7 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 		if err := actions.validateHelperPreparedFirst("nvkr-lifecycle-run", job.Steps, plan); err != nil {
 			return err
 		}
-		var needs []string
+		needs := append([]string(nil), preflightJobs...)
 		for _, id := range nodeJobs {
 			needs = append(needs, id)
 		}

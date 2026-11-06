@@ -236,7 +236,8 @@ var (
 		"factory github ci-fetch-locators": true, "factory github ci-upload": true,
 		"factory github describe-action": true, "factory github install-runtime-inputs": true,
 		"factory github pack-outputs": true, "factory github prepare-images": true,
-		"factory github recover": true, "factory github run-disk": true, "factory github run-node": true,
+		"factory github preflight-images": true,
+		"factory github recover":          true, "factory github run-disk": true, "factory github run-node": true,
 		"run finalize": true, "run generate": true,
 		"run qualification-source": true, "run qualify": true, "run smoke-worker": true,
 	}

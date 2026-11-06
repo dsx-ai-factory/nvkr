@@ -263,7 +263,21 @@ func assertGitHubPrivateImageCredentialBoundary(t *testing.T, plan *Plan, bundle
 func assertGitHubPrivateImageJobs(t *testing.T, jobs map[string]githubJob, wantDisks int) {
 	t.Helper()
 	disks, fetches := 0, 0
-	for _, job := range jobs {
+	for id, job := range jobs {
+		if strings.HasPrefix(id, "preflight-images-") {
+			for _, step := range job.Steps {
+				if step.Env[githubImageToken] != "" && (step.Env[githubImageToken] != "${{ secrets.NVKR_REGISTRY_READ }}" || !strings.Contains(step.Run, "factory github preflight-images ") || len(step.Env) != 2 || step.If != "" || step.ContinueOnError) {
+					t.Fatal("toolchain credential escaped the manifest preflight step")
+				}
+				if strings.Contains(step.Run, "factory github run-") {
+					t.Fatal("preflight job executes a producer")
+				}
+			}
+			if job.Env[githubImageToken] != "" || job.Permissions["packages"] != "" || job.Permissions["id-token"] != "" {
+				t.Fatal("preflight has ambient or writer credentials")
+			}
+			continue
+		}
 		prepared := false
 		prepareIndex, executionIndex := -1, -1
 		for index, step := range job.Steps {
