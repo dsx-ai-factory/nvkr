@@ -278,7 +278,15 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		for _, binding := range materials {
 			needs = append(needs, binding.Producer)
 		}
+		metadata, err := nc.SourceMetadataEnv()
+		if err != nil {
+			return nil, err
+		}
 		env := buildEnv(nc, r.Platform)
+		for name, value := range metadata {
+			env = append(env, ir.EnvVar{Name: name, Value: value})
+		}
+		sort.Slice(env, func(i, j int) bool { return env[i].Name < env[j].Name })
 		command := renderArchAll(nc.BuildCommand, arch)
 		if selected, ok := nc.BuildCommandByPlatform[r.Platform]; ok {
 			command = renderArchAll(selected, arch)

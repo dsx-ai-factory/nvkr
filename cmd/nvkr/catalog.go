@@ -178,11 +178,12 @@ func cmdCatalog() *cli.Command {
 				Action: pinArtifacts,
 			},
 			cmdCatalogRefresh(),
+			cmdCatalogRegenerateOverlays(),
 			cmdCatalogUpdateCI(),
 		},
 	}
 	for _, leaf := range command.Subcommands {
-		if leaf.Name != "refresh" && leaf.Name != "update-ci" {
+		if leaf.Name != "refresh" && leaf.Name != "update-ci" && leaf.Name != "regenerate-overlays" {
 			leaf.Flags = append(leaf.Flags, commandPresentationFlags()...)
 		}
 	}

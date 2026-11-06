@@ -220,6 +220,7 @@ func cloneComponent(component catalog.Component) catalog.Component {
 	component.Materials = maps.Clone(component.Materials)
 	component.VendorCommand = slices.Clone(component.VendorCommand)
 	component.VersionStamp = maps.Clone(component.VersionStamp)
+	component.SourceMetadata = maps.Clone(component.SourceMetadata)
 	component.Patches = slices.Clone(component.Patches)
 	component.BuildRequirements = execution.Clone(component.BuildRequirements)
 	component.ToolArgs = slices.Clone(component.ToolArgs)

@@ -200,11 +200,20 @@ func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
 			commands = append(commands, strings.TrimPrefix(line, "  - "))
 		}
 	}
+	ovn, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/ovn-nvidia"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := ovn.Components["nvke-cni-ovn"].SourceMetadataEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	stream := metadata["NVKR_SOURCE_STREAM"]
 	packages := []string{
 		"teleport-ent=18.6.4",
 		"nvke-agent nvke-kubeadm-distro-{{ trimPrefix .KubernetesVersion \"v\" }} spire-agent",
 		"nvke-cni-calico-images-3.30.1 nvke-cni-calico-manifests-3.30.1",
-		"nke-cni-ovn-images-2.4.2 nke-cni-ovn-charts-2.4.2",
+		"nke-cni-ovn-images-" + stream + " nke-cni-ovn-charts-" + stream,
 	}
 	if len(commands) != len(packages) {
 		t.Fatal("source-owned package selection changed")

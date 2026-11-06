@@ -212,6 +212,28 @@ versionStamp:
 These are build inputs, not labels added after the build. For the pinned tag `v0.23.0`,
 `.ModuleTag` is `v0.23.0`; `.Version` is `0.23.0`.
 
+For new source-derived environment names, use the opt-in `sourceMetadata` namespace instead of adding
+component-specific names to NVKR's environment allowlist:
+
+```yaml
+sourceMetadata:
+  NVKR_SOURCE_COMMIT: '{{.Commit}}'
+  NVKR_SOURCE_STREAM: '{{.ReleaseVersion}}'
+  NVKR_SOURCE_REVISION: '1+git.{{printf "%.12s" .Commit}}'
+```
+
+The command reads these as quoted shell variables, for example `"${NVKR_SOURCE_COMMIT:?}"`.
+`ReleaseVersion` strips the module prefix and leading `v`, and rejects commit-only or non-semantic tags.
+For a commit-only pin, explicitly declare the expected stream and check the pinned chart's version during
+packaging. Keep installer-time expressions in quoted heredocs; write generated constants separately with
+safe shell quoting. The supplied OVN catalogs demonstrate this split.
+
+Bindings must use `NVKR_SOURCE_` followed by 1–64 uppercase letters, digits or underscores, starting with
+a letter. The namespace is reserved from `versionStamp`; arbitrary environment and reproducibility overrides
+are rejected. Source metadata is supported by `oci-hermetic`, `buildkit-rootless` and `native-go` command
+producers. Adding bindings changes their Build Digests. Resolved producer overlays retain these declarations;
+use [producer-copy maintenance](catalog-maintenance.md#maintain-producer-copies) to refresh their source pins.
+
 ## Debian packages
 
 A `host-package` component can produce a raw DEB using its existing command, pinned toolchain,

@@ -443,6 +443,8 @@ _Avoid_: Run-wide pipeline tool, release executable output, build script
 An ordered, predecessor-bound catalog change replacing a complete component producer or performing an exact
 toolchain-pin substitution for an explicit sorted component set and host architecture. Substitution fails if
 any selected producer does not carry the expected old pin; it is not a partial producer merge.
+Explicit maintenance inputs may regenerate complete producer copies and ordered predecessor bindings.
+Source metadata bindings derive build environment values from each copied producer's own pin.
 _Avoid_: Output selection group, mixin, deployment topology
 
 **Derived pin set**:

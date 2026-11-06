@@ -32,10 +32,14 @@ Packer/Go/GCC toolchain across its selected output scopes; that image also inclu
 digest-checked Helm 4.2.4 and ORAS 1.3.3. There is no separate Helm-wrapper image.
 The combined selection creates one immutable Run. Catalog
 overlays remain bound to each exact predecessor digest. `../../catalogs/node-images/variants/nvidia-tcg.json` depends on the M2
-OS catalog's digest: repinning that catalog requires reviewing this binding.
+OS catalog's digest: repinning that catalog requires regenerating and reviewing this binding.
 The upstream selection stacks `../../catalogs/node-images/variants/upstream-tcg.json` after `../../catalogs/node-images/variants/nvidia-tcg.json`;
 its `requiresCatalogDigest` binds that exact predecessor, not the base catalog
-alone. Regenerate and review both bindings after changing either predecessor.
+alone. `make producer-overlays-generate` derives both bindings from
+[`ovn-producer-overlays.json`](../../policies/ovn-producer-overlays.json); run its check before a pin change,
+then regenerate and review the copies and dependent bindings afterward. The
+[maintenance guide](../../../docs/catalog-maintenance.md#maintain-producer-copies) lists the frozen variants
+and recovery procedure.
 
 `arm64-upstream-tcg.json` substitutes these four outputs as one matched
 diagnostic selection; the other 28 output names remain unchanged:

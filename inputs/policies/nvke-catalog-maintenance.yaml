@@ -7,6 +7,7 @@ name: nvke-m2
 # Registry constraints stay authored; this policy never widens them.
 catalog: inputs/catalogs/nvke/release
 sources: [nvke, nvke-helm]
+producerOverlays: inputs/policies/ovn-producer-overlays.json
 sameRelease:
   - [nvke, nvke-helm]
 definition: inputs/definitions/nvke/definition.yaml

@@ -20,6 +20,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/packertransport"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/safetext"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/sourceenv"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/material"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
@@ -808,7 +809,16 @@ func validateVerifyNode(n Node) error {
 }
 
 func validateBuildEnv(nodeID, arch, platform, builder string, env []EnvVar) error {
-	values, err := validateEnv(nodeID, env, allowedBuildEnv)
+	allowed := make(map[string]bool, len(allowedBuildEnv)+len(env))
+	for name, admitted := range allowedBuildEnv {
+		allowed[name] = admitted
+	}
+	for _, variable := range env {
+		if sourceenv.ValidName(variable.Name) {
+			allowed[variable.Name] = true
+		}
+	}
+	values, err := validateEnv(nodeID, env, allowed)
 	if err != nil {
 		return err
 	}
