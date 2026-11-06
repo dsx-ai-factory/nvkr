@@ -771,6 +771,7 @@ func diskLifecycleFixtureWithProducer(t *testing.T, attempt string, packer bool)
 	definition.Outputs[0].Components = []string{"nvke-node-non-fde"}
 	environment := testEnvironment()
 	environment.Publication = nil
+	environment.ToolchainAccess.PublicRoots = append(environment.ToolchainAccess.PublicRoots, "example.test/vm")
 	environment.ExecutionClasses = []execution.Class{{
 		Name: "amd64-kvm", RunsOn: "linux-amd64-cpu16", HostPlatform: execution.HostPlatformLinuxAMD64,
 		Resources:    execution.ResourceCapacity{CPUMillis: 8000, MemoryMiB: 16384, EphemeralStorageMiB: 65536},
