@@ -13,6 +13,10 @@ import (
 
 func TestToolchainAccessClassification(t *testing.T) {
 	access := &ToolchainAccess{PrivateRoots: []string{"ghcr.io/example/tools"}, PublicRoots: []string{"docker.io/library/golang"}}
+	classifier, err := access.ImageClassifier()
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, test := range []struct {
 		name, image string
 		private     bool
@@ -29,20 +33,63 @@ func TestToolchainAccessClassification(t *testing.T) {
 		{"parent", "ghcr.io/example", false, e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			private, err := access.ClassifyImage(test.image + "@sha256:" + strings.Repeat("a", 64))
-			if test.code != "" {
-				if !toolchainErrorCode(err, test.code) || private {
+			for _, classify := range []func(string) (bool, error){access.ClassifyImage, classifier.ClassifyImage} {
+				private, err := classify(test.image + "@sha256:" + strings.Repeat("a", 64))
+				if test.code != "" {
+					if !toolchainErrorCode(err, test.code) || private {
+						t.Fatalf("got private=%t, %v", private, err)
+					}
+				} else if err != nil || private != test.private {
 					t.Fatalf("got private=%t, %v", private, err)
 				}
-			} else if err != nil || private != test.private {
-				t.Fatalf("got private=%t, %v", private, err)
 			}
 		})
 	}
 	for _, image := range []string{"ghcr.io/example/tools:latest", "ghcr.io/example/tools@sha256:abc", "sha256:" + strings.Repeat("a", 64)} {
-		if _, err := access.ClassifyImage(image); !toolchainErrorCode(err, e.CodeUnpinnedInput) {
-			t.Fatalf("unpinned image: %v", err)
+		for _, classify := range []func(string) (bool, error){access.ClassifyImage, classifier.ClassifyImage} {
+			if _, err := classify(image); !toolchainErrorCode(err, e.CodeUnpinnedInput) {
+				t.Fatalf("unpinned image: %v", err)
+			}
 		}
+	}
+}
+
+func TestToolchainImageClassifierOwnsValidatedRoots(t *testing.T) {
+	access := &ToolchainAccess{PrivateRoots: []string{"ghcr.io/example/tools"}, PublicRoots: []string{"docker.io/library/golang"}}
+	classifier, err := access.ImageClassifier()
+	if err != nil {
+		t.Fatal(err)
+	}
+	access.PrivateRoots[0] = "ghcr.io/foreign/tools"
+	access.PublicRoots[0] = "ghcr.io/foreign/tools"
+	for _, test := range []struct {
+		image   string
+		private bool
+		code    e.Code
+	}{
+		{"ghcr.io/example/tools/packer", true, ""},
+		{"golang", false, ""},
+		{"ghcr.io/foreign/tools/packer", false, e.CodeEngineCapability},
+	} {
+		private, err := classifier.ClassifyImage(test.image + "@sha256:" + strings.Repeat("a", 64))
+		if test.code == "" {
+			if err != nil || private != test.private {
+				t.Fatalf("snapshot changed for %s: %t, %v", test.image, private, err)
+			}
+		} else if !toolchainErrorCode(err, test.code) || private {
+			t.Fatalf("snapshot admitted undeclared image: %t, %v", private, err)
+		}
+	}
+	image := "ghcr.io/example/tools/packer@sha256:" + strings.Repeat("a", 64)
+	if _, err := access.ClassifyImage(image); !toolchainErrorCode(err, e.CodeInvalidCatalog) {
+		t.Fatalf("exported classifier reused stale validation: %v", err)
+	}
+	invalid, err := access.ImageClassifier()
+	if !toolchainErrorCode(err, e.CodeInvalidCatalog) {
+		t.Fatalf("invalid declaration returned a classifier: %v", err)
+	}
+	if private, err := invalid.ClassifyImage(image); !toolchainErrorCode(err, e.CodeEngineCapability) || private {
+		t.Fatalf("zero classifier did not fail closed: %t, %v", private, err)
 	}
 }
 
