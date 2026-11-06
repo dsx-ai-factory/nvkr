@@ -87,6 +87,8 @@ name: p01 Fetch aicr-nvke-gb200-ubuntu-training-kubeflow-flux +63
         required: true
       NVKR_CI_STORAGE_WRITE_TOKEN:
         required: true
+      NVKR_REGISTRY_READ:
+        required: true
 permissions:
   contents: read
 jobs:
@@ -1031,6 +1033,9 @@ jobs:
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1049,18 +1054,20 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-amd64-fetch-nvke-cni-calico:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1079,13 +1086,12 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-amd64-fetch-nvke-cni-ovn:
     name: 'Fetch pinned source for nvke-cni-ovn (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1121,6 +1127,9 @@ jobs:
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1139,18 +1148,20 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-amd64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1169,18 +1180,20 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-amd64-fetch-nvke-spire-agent:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1199,13 +1212,12 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-amd64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-fde-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1271,6 +1283,9 @@ jobs:
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1289,18 +1304,20 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-arm64-fetch-nvke-cni-calico:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1319,13 +1336,12 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-arm64-fetch-nvke-cni-ovn:
     name: 'Fetch pinned source for nvke-cni-ovn (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1361,6 +1377,9 @@ jobs:
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1379,18 +1398,20 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-arm64-fetch-nvke-kubeadm-distro:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1409,18 +1430,20 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-arm64-fetch-nvke-spire-agent:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1439,13 +1462,12 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-arm64-fetch-ovn-kube-ubuntu:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-fde-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1511,6 +1533,9 @@ jobs:
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1529,18 +1554,20 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-10109689b3ae:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1559,18 +1586,20 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-9d0a3a2d2ff9:
     name: 'Fetch pinned source for nvke-image-inputs, nvke-node-fde-amd64, nvke-patched-installer-iso-amd64 (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1589,18 +1618,20 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-ubuntu24-amd64-fetch-n-f906d751721a:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1619,13 +1650,12 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-ubuntu24-amd64-fetch-nvke-agent:
     name: 'Fetch pinned source for nvke-agent (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1691,6 +1721,9 @@ jobs:
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1709,13 +1742,12 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-ubuntu24-amd64-fetch-o-285c4e706ab1:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-fde-ubuntu24-amd64)'
     runs-on: 'ubuntu-24.04'
@@ -1781,6 +1813,9 @@ jobs:
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1799,18 +1834,20 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-4c94422bd941:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1829,18 +1866,20 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-832956f72ff8:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1859,18 +1898,20 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-ubuntu24-arm64-fetch-n-be8398cf9bcc:
     name: 'Fetch pinned source for nvke-image-inputs, nvke-node-fde-arm64, nvke-patched-installer-iso (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1889,13 +1930,12 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-nvke-node-fde-ubuntu24-arm64-fetch-nvke-agent:
     name: 'Fetch pinned source for nvke-agent (nvke-node-fde-ubuntu24-arm64)'
     runs-on: 'ubuntu-24.04-arm'
@@ -1961,6 +2001,9 @@ jobs:
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
     steps:
       - name: Check native runner platform
         run: |
@@ -1979,13 +2022,12 @@ jobs:
       - name: execute source part-1
         uses: ./.github/nvkr-run-nvke-gpu-site/actions/shared/execute-source
         with:
+          nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
+          nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
           nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04

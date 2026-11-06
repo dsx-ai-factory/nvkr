@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -47,8 +48,8 @@ func TestAdmissionRevalidatesPrivacyAndNeverUsesStaleSuccess(t *testing.T) {
 		{name: "invalid weak prefix", status: 304, etag: `w/"private-v1"`, code: e.CodeTrustPolicyMissing},
 		{name: "304 omits optional validator", status: 304},
 		{name: "changed public package", status: 200, etag: `"public-v2"`, body: strings.Replace(admissionPrivatePackage, `"private"`, `"public"`, 1), code: e.CodeTrustPolicyMissing},
-		{name: "access revoked", status: 403, code: e.CodeTrustPolicyMissing},
-		{name: "rate limited", status: 429, code: e.CodeTrustPolicyMissing},
+		{name: "access revoked", status: 403, code: e.CodeFetchFailed},
+		{name: "rate limited", status: 429, code: e.CodeUnavailable},
 		{name: "malformed replacement", status: 200, etag: `"bad-v2"`, body: `{`, code: e.CodeTrustPolicyMissing},
 		{name: "contradictory validator", status: 304, etag: `"different"`, code: e.CodeTrustPolicyMissing},
 		{name: "transport failure", fail: true, code: e.CodeFetchFailed},
@@ -63,6 +64,7 @@ func TestAdmissionRevalidatesPrivacyAndNeverUsesStaleSuccess(t *testing.T) {
 				held = `"private-v1"`
 			}
 			b := newBackend()
+			b.wait = func(context.Context, time.Duration) error { return nil }
 			b.client.Transport = admissionTransportFunc(func(r *http.Request) (*http.Response, error) {
 				calls++
 				if r.Header.Get("Authorization") != "Bearer "+testOptions.Token || r.Header.Get("Accept") != "application/vnd.github+json" || r.Header.Get("X-GitHub-Api-Version") != "2022-11-28" {
@@ -74,7 +76,11 @@ func TestAdmissionRevalidatesPrivacyAndNeverUsesStaleSuccess(t *testing.T) {
 					}
 					return admissionResponseFor(r, 200, held, admissionPrivatePackage), nil
 				}
-				if r.Header.Get("If-None-Match") != held {
+				wantETag := held
+				if calls > 2 {
+					wantETag = ""
+				}
+				if r.Header.Get("If-None-Match") != wantETag {
 					t.Fatal("second boundary did not revalidate the held representation")
 				}
 				if tc.cancel {
@@ -100,7 +106,13 @@ func TestAdmissionRevalidatesPrivacyAndNeverUsesStaleSuccess(t *testing.T) {
 					t.Fatal("failure reused stale private admission")
 				}
 			}
-			if calls != 2 {
+			wantCalls := 2
+			if tc.status == 429 {
+				// The third response would require a 240-second default wait,
+				// exceeding the shared 120-second server-delay bound.
+				wantCalls = 4
+			}
+			if calls != wantCalls {
 				t.Fatalf("every boundary must contact GitHub, got %d requests", calls)
 			}
 			if tc.code != "" && tc.status != 200 && len(b.responses.entries) != 0 {
