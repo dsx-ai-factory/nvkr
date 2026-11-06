@@ -177,12 +177,23 @@ func TestImageUsesOrdinaryHostedAdmission(t *testing.T) {
 			in.environment.Runtime.RuntimeImage = fixtureUtilityContainer
 			in.environment.Runtime.Services = []string{fixtureUtilityContainer}
 		}, false},
+		{"public service only", func(in *githubStabilityInputs) {
+			in.environment.Runtime.Services = []string{fixtureUtilityContainer}
+		}, false},
 		{"unknown startup", func(in *githubStabilityInputs) {
 			in.environment.Runtime.RuntimeImage = "ghcr.io/example/start@sha256:" + strings.Repeat("a", 64)
 		}, true},
 		{"private startup", func(in *githubStabilityInputs) {
 			in.environment.Runtime.RuntimeImage = "ghcr.io/example/start@sha256:" + strings.Repeat("a", 64)
 			in.environment.ToolchainAccess.PrivateRoots = []string{"ghcr.io/example/start"}
+			in.environment.ToolchainAccess.Reader = &authored.ToolchainReader{CredentialRef: "github:READER", UsernameRef: "github:ACCOUNT"}
+		}, true},
+		{"unknown service only", func(in *githubStabilityInputs) {
+			in.environment.Runtime.Services = []string{"ghcr.io/example/service@sha256:" + strings.Repeat("a", 64)}
+		}, true},
+		{"private service only", func(in *githubStabilityInputs) {
+			in.environment.Runtime.Services = []string{"ghcr.io/example/service@sha256:" + strings.Repeat("a", 64)}
+			in.environment.ToolchainAccess.PrivateRoots = []string{"ghcr.io/example/service"}
 			in.environment.ToolchainAccess.Reader = &authored.ToolchainReader{CredentialRef: "github:READER", UsernameRef: "github:ACCOUNT"}
 		}, true},
 		{"private ordinary producer", func(in *githubStabilityInputs) {
@@ -213,6 +224,11 @@ func TestImageUsesOrdinaryHostedAdmission(t *testing.T) {
 			}
 			if len(uses) == 0 {
 				t.Fatal("empty inventory")
+			}
+			if (tc.name == "public startup" || tc.name == "public service only") && !slices.ContainsFunc(uses, func(use ImageUse) bool {
+				return use.Role == "service" && use.Reference == fixtureUtilityContainer
+			}) {
+				t.Fatal("missing public service use")
 			}
 			for _, use := range uses {
 				if use.Route != ImageAnonymous || use.Reader != (authored.ToolchainReader{}) {

@@ -184,6 +184,8 @@ Existing ordinary hosted and native ARC Environments without `toolchainAccess` m
 generating workflows. Declare public roots for anonymous pulls. Private ordinary-hosted and startup
 container/service routes remain unsupported, even when a reader is declared. Standalone CLI diagnostics
 also require a declared anonymous route for a selected registry image; measured local image IDs stay local.
+Ordinary local operation helpers also require declared public roots for registry-pinned images;
+measured local image IDs and native bundles retain their local routes.
 Access declarations change Environment and Plan digests, while logical Build identity is unchanged.
 
 ### Migrate source/location bindings
