@@ -254,6 +254,7 @@ func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
 			} else {
 				want.GitHubARC, want.DiskEvidence = "", ""
 				want.ExecutionClasses, want.DiskInspectionProfiles = nil, nil
+				want.ToolchainAccess = nil
 			}
 			for selected := range want.SourceAccess {
 				if !sources[selected] {

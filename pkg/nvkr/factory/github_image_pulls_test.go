@@ -392,10 +392,9 @@ func TestPrivateImageActiveInterruption(t *testing.T) {
 
 func TestGitHubStageExecutionRejectsPrivateImageOrdering(t *testing.T) {
 	plan := arcTestPlan(t, "linux/amd64")
-	plan.Environment.Publication.RepositoryPrefix = "ghcr.io/example/nvkr"
 	plan.Environment.DiskInspectionProfiles = nil
 	plan.Environment.DiskEvidence = "build-provenance-v1"
-	stage := githubStage{ID: "disk-stage", DiskOutput: "image", Nodes: []Node{{Container: plan.Environment.Publication.RepositoryPrefix + "/toolchains/packer@sha256:" + strings.Repeat("a", 64)}}}
+	stage := githubStage{ID: "disk-stage", DiskOutput: "image", Nodes: []Node{{Container: plan.Environment.ToolchainAccess.PrivateRoots[0] + "/packer@sha256:" + strings.Repeat("a", 64)}}}
 	stage.diskExecutionBudget = time.Minute
 	prepare := githubStep{Run: githubRunnerCommand(plan, "prepare-images", "stage", stage.ID), Env: githubImageEnvironment(plan)}
 	run := githubStep{ID: "run-disk", Run: githubRunnerCommand(plan, "run-disk", "output", stage.DiskOutput), TimeoutMinutes: 1 + githubDiskCleanupHeadroomMinutes}
