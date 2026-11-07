@@ -182,6 +182,10 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 		}
 		limit := int64(sbom.MaxDocumentBytes)
 		if object.ArtifactType == sbom.BundleMediaType {
+			if manifest.ArtifactType != sbom.BundleMediaType || manifest.Config.MediaType != MediaEmptyConfig ||
+				manifest.Config.Digest != digestBytes([]byte("{}")) || manifest.Config.Size != 2 {
+				return e.New(e.CodeVerifyFailed, "signed SBOM requires the standard Sigstore OCI envelope")
+			}
 			limit = sbom.MaxBundleBytes
 		}
 		raw, err := readBlob(ctx, root, manifest.Layers[0], limit)

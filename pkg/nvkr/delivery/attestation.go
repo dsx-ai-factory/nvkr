@@ -146,7 +146,7 @@ func preparedEvidenceDocument(ctx context.Context, source string, object Publish
 	if err != nil {
 		return nil, err
 	}
-	if len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest || manifest.ArtifactType != object.ArtifactType {
+	if len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest || manifest.artifactType() != object.ArtifactType {
 		return nil, e.New(e.CodeVerifyFailed, "prepared SBOM differs from its exact evidence binding")
 	}
 	return readBlob(ctx, source, manifest.Layers[0], sbom.MaxDocumentBytes)

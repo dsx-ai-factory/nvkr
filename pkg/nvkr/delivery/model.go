@@ -121,6 +121,8 @@ type PublishedObject struct {
 // PublicationRoot is the canonical config behind the immutable OCI index that an
 // operator pins. A tag may discover the index; it is never part of this identity.
 type PublicationRoot struct {
+	// The transport index binds this selection; canonical root JSON stays unchanged.
+	ociRepresentation   OCIRepresentation
 	Release             *ReleaseMetadata  `json:"release,omitempty"`
 	SchemaVersion       string            `json:"schemaVersion"`
 	Qualification       string            `json:"qualification"`

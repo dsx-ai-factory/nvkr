@@ -100,6 +100,7 @@ Runs and the limits of what each establishes.
 | Build AICR deployment bundles | [AICR inputs and hardware limits](inputs/definitions/aicr/README.md) |
 | Build NVKE node images | [Node images](docs/node-images.md) |
 | Browse, pull or verify a published Release | [Release quickstart](docs/release-quickstart.md) |
+| Diagnose Helm or registry publication errors | [Registry diagnostics and compatibility](docs/publication-architecture.md#troubleshoot-helm-and-registry-rejections) |
 | Work with an AI agent | [Use NVKR with your AI agent](docs/use-with-agents.md) and the [operator skill](.agents/skills/nvkr-operator/SKILL.md) |
 | Look up terminology | [Concept reference](docs/user-concepts.md) |
 

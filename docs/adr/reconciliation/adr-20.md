@@ -3,3 +3,44 @@
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
 | 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects with consistent named-output aliases and independent evidence, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation, selected output payload-closure retrieval and per-output assembly/finalization; consumer held-closure export bound to exact-input receipts; candidate M2 hosted signing/publication completed; public-bootstrap FDE build-provenance publication supported; development attempt namespaces and scoped GHCR cleanup; hosted GHCR package privacy admission using metadata-derived destination references and an exact-root-bound push; required Environment transport selection with preserved omitted-OCI behavior, explicit OCI identity and early APT/both rejection; required S3 copies of original signed publications through a generic byte-provider interface | Package admission has local contracts, not a hosted private-publication or public-source access proof; independent grants, historical provider payloads and future visibility changes remain operational obligations. Hosted GHCR legacy layouts without the metadata contract fail closed. `release pull` shares the bounded HTTP/2 peer-reset reacquisition used by `delivery.Pull`, with local `httptest` contracts only, as recorded in [output-local publication](output-local-publication-and-metadata-assembly.md#output-local-publication-and-metadata-assembly); no external large-disk `release pull` has been re-run since the recorded peer-reset failures. Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and live S3/CDN operational acceptance remain unproved; registration is deferred. Direct APT service adapter, repository signing and authenticated read-back remain unimplemented. |
+
+For [issue #425](https://github.com/dsx-ai-factory/nvkr/issues/425), `publication.ociRepresentation` explicitly
+selects construction before identity freezing. Omission preserves the existing `artifact-v1` format;
+`nvkr-compatible-v1` selects documented NVKR wrapper changes with logical types retained in checked
+annotations and publication membership. A digest-bound root-index annotation records explicit intent
+without adding default-valued canonical root fields. The local Distribution fixture models the
+reported unknown-type rejection: it rejects a retained
+Helm wrapper, then accepts a complete diagnostic image-index, Helm, CLI and raw-SBOM publication with all
+seven declared members. Full and metadata-only readback preserve root and membership bindings. Opt-in
+Helm v4.3.0 `show chart` and `pull` against that loopback fixture preserve the exact chart archive bytes.
+Public-reader contracts accept legacy, annotated and matching dual claims for Helm, binary bundles,
+Debian carriers and root metadata, and reject missing/conflicting claims and untyped OCI empty configs.
+These are local contracts and client interoperability evidence, not acceptance by the affected GitLab
+deployment, hosted signing, qualification or a completed producer Run. Native image/index subjects,
+disk wrappers and imported producer manifests retain their exact bytes; disk and producer-specific custom
+artifact types can still encounter registry restrictions. No registry-side rewrite or universal artifact
+compatibility is claimed.
+
+Retained-root regressions cover exact metadata export, including an index with retained whitespace,
+and attested completion with legacy preparation and final bootstraps. Explicit compatible generic configs use NVKR's
+artifact-config media type rather than claiming to be CycloneDX or Sigstore payload documents.
+The explicit choice changes Environment/Plan identity without changing producer Build identities.
+Unknown choices fail at Environment, constructor and executable boundaries. Standard Sigstore envelopes
+remain with the attestation owner; the compatible generic constructor rejects substitute signed envelopes.
+Compatible raw-SBOM referrer descriptors report config type, with separately checked logical annotations;
+local fallback-index roundtrips check these descriptors and exact evidence membership. A synthetic signed
+bundle remains discoverable under the standard Sigstore artifact-type filter; this checks transport, not
+cryptographic validity. Universal CycloneDX-filter discovery is not claimed. Native/default construction is not silently stripped,
+and compatible-profile consumer support is separate from the old-layout reader contract.
+Publication failures are classified from the pinned registry library's structured status and diagnostics:
+authentication/authorization, permanent rejection, unambiguous unsupported operations and integrity
+failures remain distinct from timeouts and transient failures. The public-boundary contracts preserve
+typed causes while omitting untrusted response bodies, messages, details and request URLs from diagnostic
+presentation. No error triggers repackaging or a weaker evidence policy. Delivery supplies a read-only
+base API/authentication report and observes ordinary publication traffic for per-operation diagnostics.
+The internal `factory registry-check` adapter prints the same report. Local response fixtures cover
+optional/missing version headers, authentication, missing endpoints, proxy HTML, distinct blob/manifest/
+evidence/referrer failures and safe network causes. The exact OCI specification version and untested
+features remain unknown. These protocol-response contracts do not require a vendor certification matrix.
+Write probes remain absent; the library's mutating, asynchronously cleaned-up push-permission helper is not
+used. Live registry/version coverage and hosted validation of these changes remain unverified.

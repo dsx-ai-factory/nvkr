@@ -366,6 +366,53 @@ digest, semantic digest, size, and optional platform. The registry tag is only a
 returns, and the consumer requires, `repository@sha256:<root-index-digest>`. Full-layout pull materializes and verifies the
 complete recursive closure before the destination becomes visible.
 
+`publication.ociRepresentation` is an explicit Environment-owned construction choice, admitted before
+artifact work and bound into Environment and Plan identity. Omission preserves existing construction
+and authored bytes. Explicit `artifact-v1` uses the same wrapper format while recording the additional
+authored choice. `nvkr-compatible-v1` opts into the following representation for newly constructed
+NVKR wrappers; unknown selections fail with `engine-capability` before staging or generation.
+
+| Content | Explicit compatible representation |
+|---|---|
+| Helm | Real Helm config and unchanged TGZ layer; omit the optional NVKR `artifactType` and retain logical type in a digest-bound annotation and publication membership |
+| Binary bundles | Existing binary config and files; change only the NVKR manifest/index representation |
+| Generic, Debian/APT and raw SBOM carriers | Exact payload bytes; truthful `application/vnd.nvkr.artifact.config.v1+json` for the exact `{}` config; logical type in checked annotations and membership |
+| Publication metadata | Existing canonical root JSON and schema; explicit selection in the digest-bound `dev.nvkr.oci.representation` root-index annotation; compatible root wrapper/index |
+| Signed SBOMs and cosign artifacts | Preserve the standard Sigstore bundle `artifactType`, empty config, subject and layer; the attestation owner constructs signed envelopes |
+| Native images/indexes, disks and imported/pinned manifests | Preserve exact bytes and their own format; no conversion or promise that the registry accepts every member |
+
+The standard referrer type for a compatible raw SBOM wrapper follows its truthful config media type.
+Its NVKR logical-type annotation is not the standard `artifactType` filter: a client filtering exclusively
+for CycloneDX may not discover it. NVKR still checks exact manifest/document digests, subject and complete
+root membership. Compatible roots require an updated reader; old-layout support in that reader does not
+promise that older clients accept the compatible format. Signed-profile requirements remain mandatory.
+
+Construction derives affected descriptors, evidence subjects and root identities before signing or
+transport. Metadata export and attested completion preserve exact inspected bootstrap bytes and selected
+intent; reading an old representation does not migrate it. Full declared membership remains mandatory.
+Structured refusals follow [ADR-03](0003-coded-error-and-exit-code-contract.md#2-retryable-vs-input-classification).
+Neither a vendor name, a successful `/v2/` response nor an ambiguous manifest rejection selects a format.
+No error, capability observation or unknown result authorizes field removal, a weaker policy or retry with
+different identified bytes. A different representation requires a deliberate construction transaction.
+
+Generic registry diagnostics are owned by delivery, independent of vendor names and format construction.
+A read-only base check reuses the existing pinned ORAS authentication client and registry credential owner.
+Publication passively observes its existing pinned registry client's normal requests without adding probes,
+reading/replacing bodies, changing retry policy or retaining secrets and raw URLs. Operation-local reports
+distinguish the observed Distribution V2 API family and recognized optional `registry/2.0` advertisement
+from an unknown exact OCI Distribution specification version. Authentication challenges, denials, proxy
+responses and absent endpoints are observations, never evidence that a particular older protocol is supported.
+Upload and referrer responses are reported separately; base reachability never establishes push permission
+or custom artifact acceptance. No vendor-version inference or global capability cache is used.
+
+Failures carry the exact typed response's request stage where available, sanitized status/codes and a next
+action for credentials/permissions, endpoint/proxy routing, unsupported operations, manifest policy/media,
+integrity or transient connection failures. Evidence attachment failure cannot authorize unsigned fallback.
+The internal diagnostic CLI is a presentation adapter over delivery and issues no test upload or deletion.
+Read-only network checks have a 15-second deadline; ambient helper behavior remains with its existing owner.
+Publication retains caller deadlines or supplies a bounded default. Observations neither mint authority nor
+alter a frozen Plan, selected representation, exact signed bytes, imported manifests or required membership.
+
 The config uses `nvkr.dev/publication-root/v4` and `application/vnd.nvkr.publication-root.config.v4+json`.
 Its release metadata binds the exact Definition, Environment, compiled Plan and release-content identities.
 Its output bindings carry Build Digest and exact named output membership; deployment cluster metadata is
@@ -737,7 +784,8 @@ its policy. Full release verification retains its existing payload and policy ch
 remain Run artifacts and are not converted into a publication by this export interface.
 
 Each required SBOM is embedded once as a CycloneDX predicate in a signed in-toto statement inside a standard
-Sigstore v0.3 bundle. An empty-config OCI referrer manifest carries that bundle in the owning output repository;
+Sigstore v0.3 bundle. Its standard OCI referrer manifest retains the bundle `artifactType`, exact `{}`
+config under OCI's empty-config media type, subject and bundle layer in the owning output repository;
 no raw SBOM copy is published. Its OCI subject is the associated deliverable manifest, while the statement
 subject remains the exact inventoried binary, native image manifest, or source/final archive. Shared evidence
 belongs to the first sorted output membership's repository. Membership binds the exact subject, stage,

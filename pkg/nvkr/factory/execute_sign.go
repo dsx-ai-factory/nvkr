@@ -371,7 +371,7 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 			for _, object := range inspection.Root.Objects {
 				sources[object.Name] = filepath.Join(workspace, "closure")
 			}
-			_, err = delivery.BuildMetadataRoot(ctx, output.Path, inspection.Root, sources)
+			_, err = delivery.BuildMetadataRootWithRepresentation(ctx, output.Path, inspection.Root, sources, publicationOCIRepresentation(plan))
 		} else {
 			_, err = delivery.ExportMetadata(ctx, filepath.Join(workspace, "closure"), output.Path)
 		}

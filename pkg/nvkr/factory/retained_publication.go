@@ -120,7 +120,7 @@ func captureRetainedOrdinaryPublication(ctx context.Context, plan *Plan, artifac
 	}
 	metadata := &delivery.ReleaseMetadata{DefinitionDigest: plan.DefinitionDigest, EnvironmentDigest: plan.EnvironmentDigest,
 		PlanDigest: identity, ContentSubject: content, Composition: plan.Composition.Clone()}
-	result, err := delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{Release: metadata, Objects: objects})
+	result, err := delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{OCIRepresentation: publicationOCIRepresentation(plan), Release: metadata, Objects: objects})
 	if err != nil {
 		return nil, "", err
 	}
