@@ -2,7 +2,7 @@
 
 `nvkr release browse` reads the bounded metadata and evidence of an exact release publication root and
 shows its declared artifacts and memberships. `release export` writes that complete description as versioned
-JSON for other tools. Both validate the complete metadata closure before writing a result, without downloading
+JSON for other tools. Both validate the complete metadata closure before writing a completed result, without downloading
 or reading artifact payload layers. They can read a registry or an existing local OCI layout, and run on
 macOS as well as Linux. Metadata inspection does not verify payload bytes, signatures or consumer policy;
 use `release verify` for authenticated consumption.
@@ -28,14 +28,38 @@ inspection and states that payloads, signatures and policy are unverified. Succe
 establish an accepted Release, independent reproduction, or operational qualification.
 
 Registry access uses the existing local credential keychain by default. Add `--anonymous` for a public
-registry. `--plain-http` explicitly enables HTTP for a local test registry. Inspection has a ten-minute default
-deadline; `--timeout 20m` changes it. A caller's earlier cancellation still wins. Registry downloads use a
+registry. `--plain-http` explicitly enables HTTP for a local test registry. Browse and export have a one-hour default
+deadline; `--timeout 2h` changes it. Authenticity verification also permits one hour. A caller's earlier cancellation still wins. With caching disabled, registry downloads use a
 private system temporary directory that is removed on success, failure, or cancellation. By default, browsing
-does not write to the current working directory. With `--workspace`, only the private inspection child is removed; the
-caller-owned workspace remains. Registry browsing fetches the release index, metadata manifests and configs,
+does not write to the current working directory. With `--workspace` and caching disabled, only the private inspection child is removed; the
+caller-owned workspace remains. With caching enabled, staging stays in the cache directory so publication can
+use an atomic rename on the same filesystem; select that directory with `NVKR_METADATA_CACHE`. Registry browsing fetches the release index, then up to 16 member objects concurrently: metadata manifests and configs,
 and bounded evidence documents from their derived sibling repositories. It checks exact metadata digests,
 sizes, schemas and memberships. Artifact payload layers, including container layers, executable archives and
 disk images, are not downloaded.
+
+## Metadata cache and progress
+
+Browse, export and authenticity verification reuse metadata in the OS user cache directory under
+`nvkr/release-metadata/v1/<release-root-sha256>`. On macOS this is normally
+`~/Library/Caches/nvkr/release-metadata/v1`; on Linux it is
+`${XDG_CACHE_HOME:-$HOME/.cache}/nvkr/release-metadata/v1`. Set `NVKR_METADATA_CACHE` to an explicit
+cache directory, or `NVKR_METADATA_CACHE=off` to disable it. `--no-cache` disables reads and writes for
+one browse, export or verify operation. `--layout` continues to inspect only the supplied layout.
+
+Each hit rechecks blob hashes, sizes, schemas and complete metadata membership before use. Inspection
+holds the per-root cache lock while it reads those bytes, avoiding another copy of the metadata closure. Corrupt entries are rejected and refetched. Per-root kernel locks
+serialize readers and replacement; only a completely checked staged layout is renamed into the cache.
+The empty per-root `.lock` files persist as cache bookkeeping to preserve a stable lock inode.
+Closing an inspection releases the kernel lock; the persistent file is not an active or leaked lock.
+The cache is expendable and carries no signature, policy, payload-integrity or registry-availability result.
+Authenticity verification still performs its signature and policy checks on every invocation. The cache has
+no automatic eviction: to clear it, close active inspections and remove the `release-metadata/v1` directory
+(or the explicit directory you selected), including its `.lock` files. The next invocation downloads fresh metadata.
+
+Plain mode reports metadata objects done/total on stderr, leaving JSON stdout unchanged. On a cache hit,
+these updates follow the per-member integrity checks. One object is a release member, including its config, evidence layer or native-image children. Downloaded counts do not
+establish closure completeness; final integrity and composition checks still run after acquisition.
 
 ## Browse interactively
 
@@ -45,7 +69,10 @@ Opt into the read-only terminal browser from an interactive terminal:
 bin/nvkr release browse --reference "$RELEASE_REF" --ui=tui
 ```
 
-The browser opens after the complete metadata inspection and starts with named outputs. Rows show the
+The registry browser opens immediately in a loading state. Once the root arrives, it reports the total
+member count and adds outputs and evidence as their metadata downloads finish. Partial rows stay labeled
+loading, including at 100% downloaded while closure and composition checks are pending. A failed check
+leaves a failed, incomplete view. After successful inspection it becomes a read-only result browser. Rows show the
 artifact kind, recorded platforms or chart version when space permits. Details retain the complete values,
 including component build subjects, aggregate image children and declared disk metadata. The metadata-only
 scope stays visible; publisher declarations are not verification results.
@@ -57,10 +84,11 @@ scope stays visible; publisher declarations are not verification results.
 - In Details, use Up/Down to select an evidence link and Enter to follow it. Esc returns to the previous
   selection. Shared evidence lists every bound output; links target only outputs included in the view.
 - Press `?` for help, `q` then `y` to close, or Ctrl+C to close immediately. Closing preserves the command's
-  result and performs no download, verification or publication action.
+  result. During loading, closing cancels the acquisition and joins its workers before restoring the terminal.
 
 `--output` can restrict the supplied view to one exact output and its evidence. Interactive search and
-navigation cannot widen that selection. `--layout` works with the same browser for a local OCI layout.
+navigation cannot widen that selection. While loading a selected output, evidence links appear only after
+the complete closure has passed inspection. `--layout` works with the same browser for a local OCI layout.
 At least 40 columns and 12 rows are needed; smaller terminals pause browsing until resized. Add `--no-color`
 or set `NO_COLOR` to disable colors.
 
@@ -119,8 +147,8 @@ directories must be readable and searchable by their owner. Every file, includin
 to the downloaded archive by its digest.
 
 `release pull` accepts only a registry reference. Use `publish extract` for an executable bundle already in a
-local layout. Registry credentials, `--anonymous`, `--plain-http`, `--workspace`, and the ten-minute default
-`--timeout` follow the browsing rules above. `--workspace` selects the parent for private temporary registry
+local layout. Registry credentials, `--anonymous`, `--plain-http`, `--workspace`, follow the browsing transport rules above. Pull retains its ten-minute default
+`--timeout` and does not use the metadata cache. `--workspace` selects the parent for private temporary registry
 data; `--out` selects the new directory containing the downloaded output. Temporary data is removed on success,
 failure, or cancellation; a caller-owned workspace remains.
 
@@ -259,7 +287,11 @@ continues to return its compact artifact array.
 For authenticated consumption, follow [the lifecycle verification guide](lifecycle.md#run-and-verify) and pass
 the same pinned reference to `release verify` with the consumer's accepted identity, issuer and evidence scope.
 Browsing invokes neither cosign nor a signer, and does not treat a raw preparation SBOM as a signed attestation.
-The existing Linux and capability requirements for policy verification still apply.
+The existing Linux and capability requirements for policy verification still apply. `release verify --timeout` bounds the
+whole verification operation (default `1h`). Authenticity reuses the verified metadata cache,
+then authenticates up to 16 output subjects concurrently. Results and failure selection retain
+canonical output order; a failed subject cancels and joins the remaining active checks. Its TUI
+shows provisional metadata while loading and marks the result complete only after policy checks pass.
 Select `--scope authenticity` to authenticate signatures, provenance and required signed evidence without
 artifact payload downloads, or `--scope artifact-publication` to include payload integrity checks.
 

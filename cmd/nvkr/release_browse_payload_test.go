@@ -31,6 +31,7 @@ import (
 )
 
 func TestReleaseBrowseNeverDownloadsOutputLayers(t *testing.T) {
+	t.Setenv("NVKR_METADATA_CACHE", "off")
 	// Metadata-only transport and presentation do not branch on architecture;
 	// delivery owns both native disk profile round trips.
 	fixture := releaseBrowsePayloadFixture(t, "amd64")
@@ -108,21 +109,27 @@ func TestReleaseBrowseNeverDownloadsOutputLayers(t *testing.T) {
 			payloadGets.Store(0)
 			shows := 0
 			var snapshot progress.Snapshot
-			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(_ context.Context, _ runpresenter.Options, source runSnapshotSource, work func(context.Context) error) runpresenter.Result {
+			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(ctx context.Context, options runpresenter.Options, source runSnapshotSource, work func(context.Context) error) runpresenter.Result {
 				shows++
-				snapshot = source.Snapshot()
-				if work != nil {
-					t.Fatal("read-only browser retained inspection work")
+				if !options.Live || work == nil || source.Snapshot().Status != "loading" {
+					t.Fatal("registry browser did not open in a loading state")
 				}
-				return runpresenter.Result{}
+				err := work(ctx)
+				snapshot = source.Snapshot()
+				return runpresenter.Result{WorkErr: err}
 			}}
 			var out bytes.Buffer
 			app := releasePresentationTestApp(executeReleaseVerification, &out, services)
 			err := app.RunContext(t.Context(), []string{"nvkr", "release", "browse", "--reference", reference, "--output", "tools", "--ui=tui", "--anonymous", "--plain-http"})
 			if corrupt {
 				assertLifecycleCommandCode(t, err, e.CodeFetchFailed)
-				if len(snapshot.Items) != 0 || snapshot.Status != "failed" {
+				if snapshot.Status != "failed" {
 					t.Fatal("TUI hid invalid sibling metadata behind output selection")
+				}
+				for _, item := range snapshot.Items {
+					if item.State != "loading" {
+						t.Fatal("failed closure promoted partial metadata")
+					}
 				}
 			} else if err != nil || len(snapshot.Items) != 2 || snapshot.Status != "complete" {
 				t.Fatalf("metadata-only browser failed: %+v, %v", snapshot, err)

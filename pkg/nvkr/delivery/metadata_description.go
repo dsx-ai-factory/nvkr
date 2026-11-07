@@ -17,6 +17,7 @@ import (
 // or complete local layout. Output layers are never opened. Returned platforms
 // describe the exact configs, not an observation of payloads or a trust receipt.
 func InspectMetadataDescription(ctx context.Context, root, reference string) (PublicationDescription, error) {
+	ctx = withMetadataReads(ctx)
 	if err := ValidatePublicationReference(reference); err != nil {
 		return PublicationDescription{}, err
 	}

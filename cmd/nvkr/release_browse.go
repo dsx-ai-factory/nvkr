@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -25,7 +26,8 @@ func releaseBrowseCmd() *cli.Command {
 			&cli.StringFlag{Name: "format", Value: "text", Usage: "text, json or mermaid"},
 			&cli.StringFlag{Name: "output", Usage: "focus on one exact named output and its evidence"},
 			&cli.StringFlag{Name: "workspace", Usage: "temporary registry inspection workspace"},
-			&cli.DurationFlag{Name: "timeout", Value: 10 * time.Minute, Usage: "bound the complete inspection"},
+			&cli.DurationFlag{Name: "timeout", Value: time.Hour, Usage: "bound the complete inspection"},
+			&cli.BoolFlag{Name: "no-cache", Usage: "fetch metadata without reading or writing the disk cache"},
 			&cli.BoolFlag{Name: "anonymous", Usage: "disable ambient registry credentials"},
 			&cli.BoolFlag{Name: "plain-http", Usage: "use HTTP for a local registry"},
 		}, commandPresentationFlags()...),
@@ -41,6 +43,18 @@ func releaseBrowseCmd() *cli.Command {
 			if err := presentation.Validate(); err != nil {
 				return err
 			}
+			if view.tui && c.String("layout") == "" {
+				return showReleaseMetadataLoad(c, view, "Release metadata browse", presentation.Output, func(ctx context.Context, report func(delivery.MetadataProgress)) (commandDisplay, error) {
+					description, err := lifecycle.InspectRelease(ctx, c.String("reference"), lifecycle.InspectionOptions{
+						WorkspaceRoot: c.String("workspace"), Timeout: c.Duration("timeout"), DisableCache: c.Bool("no-cache"), Progress: report,
+						Registry: delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")},
+					})
+					if err != nil {
+						return commandDisplay{}, err
+					}
+					return releasePublicationDisplay(description, presentation.Output)
+				})
+			}
 			shown := false
 			defer func() {
 				if returnedErr != nil && view.tui && !shown {
@@ -48,7 +62,7 @@ func releaseBrowseCmd() *cli.Command {
 				}
 			}()
 			description, err := lifecycle.InspectRelease(c.Context, c.String("reference"), lifecycle.InspectionOptions{
-				LayoutPath: c.String("layout"), WorkspaceRoot: c.String("workspace"), Timeout: c.Duration("timeout"),
+				LayoutPath: c.String("layout"), WorkspaceRoot: c.String("workspace"), Timeout: c.Duration("timeout"), DisableCache: c.Bool("no-cache"), Progress: releaseMetadataReporter(c, view),
 				Registry: delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")},
 			})
 			if err != nil {

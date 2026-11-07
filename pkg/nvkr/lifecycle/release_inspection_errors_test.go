@@ -19,6 +19,7 @@ import (
 )
 
 func TestInspectReleaseRegistryFailureClassification(t *testing.T) {
+	t.Setenv("NVKR_METADATA_CACHE", "off")
 	// Delivery's metadataFetchError table owns the HTTP status matrix. One
 	// transport refusal proves public error propagation and staging cleanup;
 	// repeating retry backoff for each transient status adds no lifecycle signal.

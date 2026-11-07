@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
@@ -21,6 +22,7 @@ import (
 // Crypto is substituted here; real metadata and exact subject bindings remain
 // enforced. These tests do not establish Sigstore or hosted acceptance.
 type authenticityVerifier struct {
+	mu          sync.Mutex
 	calls       int
 	bundles     int
 	mutate      func(int, *sign.VerificationRecord)
@@ -33,6 +35,8 @@ func (*authenticityVerifier) SignAndAttest(context.Context, sign.Subject, []byte
 }
 
 func (v *authenticityVerifier) Verify(ctx context.Context, subject sign.Subject, policy sign.VerifyPolicy) (sign.VerificationRecord, error) {
+	v.mu.Lock()
+	defer v.mu.Unlock()
 	v.calls++
 	if _, bounded := ctx.Deadline(); !bounded || !policy.RequireAttestation {
 		return sign.VerificationRecord{}, e.New(e.CodeInternal, "authentication omitted deadline or provenance")

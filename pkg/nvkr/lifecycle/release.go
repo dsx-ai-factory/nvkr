@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
@@ -30,6 +31,12 @@ type ConsumerOptions struct {
 	Credential    sign.Credential
 	Registry      delivery.RegistryOptions
 	WorkspaceRoot string
+	// MetadataCacheRoot and DisableMetadataCache affect authenticity inspection only.
+	MetadataCacheRoot    string
+	DisableMetadataCache bool
+	MetadataProgress     func(delivery.MetadataProgress)
+	// Timeout bounds authenticity verification; zero selects one hour.
+	Timeout time.Duration
 }
 
 type Consumer struct {
@@ -79,6 +86,9 @@ type ExactInputReceipt struct {
 }
 
 func NewConsumer(options ConsumerOptions) (*Consumer, error) {
+	if options.Timeout < 0 {
+		return nil, e.New(e.CodeUsage, "release verification timeout must be positive")
+	}
 	root := options.WorkspaceRoot
 	if root == "" {
 		root = filepath.ToSlash(filepath.Join(".nvkr", "verified-releases"))
@@ -89,7 +99,7 @@ func NewConsumer(options ConsumerOptions) (*Consumer, error) {
 	if options.Credential == (sign.Credential{}) {
 		keychain = options.Registry.AmbientKeychain()
 	}
-	return &Consumer{inspection: InspectionOptions{WorkspaceRoot: options.WorkspaceRoot, Registry: options.Registry}, verifierFor: func(policy VerificationPolicy) (sign.OCISigner, error) {
+	return &Consumer{inspection: InspectionOptions{Timeout: options.Timeout, WorkspaceRoot: options.WorkspaceRoot, Registry: options.Registry, CacheRoot: options.MetadataCacheRoot, DisableCache: options.DisableMetadataCache, Progress: options.MetadataProgress}, verifierFor: func(policy VerificationPolicy) (sign.OCISigner, error) {
 		return sign.NewCosignOCISigner(sign.CosignOCIOptions{Binary: options.CosignBinary,
 			BinaryDigest: options.CosignDigest, Identity: policy.IdentityRegexp, Issuer: policy.Issuer, Credential: options.Credential, Keychain: keychain})
 	}, materialize: func(ctx context.Context, reference string) (*delivery.Publication, error) {

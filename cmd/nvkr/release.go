@@ -9,6 +9,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
@@ -185,6 +186,8 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 				Flags: append([]cli.Flag{
 					&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "lane", Required: true},
 					&cli.StringFlag{Name: "scope", Required: true, Usage: "authenticity (signatures and evidence; payload integrity not checked), artifact-publication (includes payload integrity), or release (capability-gated)"},
+					&cli.DurationFlag{Name: "timeout", Value: time.Hour, Usage: "overall release verification timeout"},
+					&cli.BoolFlag{Name: "no-cache", Usage: "disable the authenticity metadata cache"},
 					&cli.StringFlag{Name: "minimum-disk-evidence", Usage: "minimum accepted disk evidence: strict or build-provenance-v1 (default: build-provenance-v1 for pipeline-attested; strict for qualified)"},
 					&cli.StringFlag{Name: "identity"}, &cli.StringFlag{Name: "issuer"}, &cli.StringFlag{Name: "cosign"}, &cli.StringFlag{Name: "cosign-digest"},
 					&cli.StringFlag{Name: "definition", Usage: "exact authored Definition to require with --environment and --plan"},
@@ -236,19 +239,36 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 					if err := policy.Validate(); err != nil {
 						return err
 					}
+					timeout := c.Duration("timeout")
+					if timeout <= 0 {
+						return e.New(e.CodeUsage, "release verification timeout must be positive")
+					}
+					ctx, cancel := context.WithTimeout(c.Context, timeout)
+					defer cancel()
 					options := lifecycle.ConsumerOptions{
-						CosignBinary: c.String("cosign"), CosignDigest: c.String("cosign-digest"),
-						Registry:      delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")},
-						WorkspaceRoot: c.String("workspace"),
+						Timeout: timeout, CosignBinary: c.String("cosign"), CosignDigest: c.String("cosign-digest"),
+						Registry:             delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")},
+						WorkspaceRoot:        c.String("workspace"),
+						DisableMetadataCache: c.Bool("no-cache"), MetadataProgress: releaseMetadataReporter(c, view),
 					}
 					if policy.Scope == lifecycle.ScopeAuthenticity {
-						description, err := authenticate(c.Context, c.String("reference"), policy, options)
-						if err != nil {
-							return err
-						}
 						if view.tui {
 							shown = true
-							return showCommandResult(c, view, authenticatedReleaseDisplay(description), nil)
+							deadline, _ := ctx.Deadline()
+							return showReleaseMetadataLoad(c, view, "Release authenticity verification", "", func(workCtx context.Context, report func(delivery.MetadataProgress)) (commandDisplay, error) {
+								workCtx, cancel := context.WithDeadline(workCtx, deadline)
+								defer cancel()
+								options.MetadataProgress = report
+								description, err := authenticate(workCtx, c.String("reference"), policy, options)
+								if err != nil {
+									return commandDisplay{}, err
+								}
+								return authenticatedReleaseDisplay(description), nil
+							})
+						}
+						description, err := authenticate(ctx, c.String("reference"), policy, options)
+						if err != nil {
+							return err
 						}
 						raw, err := canonical.Marshal(description)
 						if err != nil {
@@ -265,20 +285,20 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 							return e.New(e.CodeEngineCapability,
 								"exact-input verification requires pipeline-attested/artifact-publication policy")
 						}
-						_, err := (&lifecycle.Consumer{}).Verify(c.Context, c.String("reference"), policy)
+						_, err := (&lifecycle.Consumer{}).Verify(ctx, c.String("reference"), policy)
 						return err
 					}
 					var expectation *lifecycle.ExactInputExpectation
 					if exactInputCount == 3 {
-						input, err := lifecycle.LoadDefinitionInput(c.Context, c.String("definition"))
+						input, err := lifecycle.LoadDefinitionInput(ctx, c.String("definition"))
 						if err != nil {
 							return err
 						}
-						environment, err := lifecycle.LoadEnvironment(c.Context, c.String("environment"))
+						environment, err := lifecycle.LoadEnvironment(ctx, c.String("environment"))
 						if err != nil {
 							return err
 						}
-						plan, err := factory.LoadPlanContext(c.Context, c.String("plan"))
+						plan, err := factory.LoadPlanContext(ctx, c.String("plan"))
 						if err != nil {
 							return err
 						}
@@ -287,7 +307,7 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 							return err
 						}
 					}
-					result, err := verify(c.Context, c.String("reference"), policy, options, expectation, export)
+					result, err := verify(ctx, c.String("reference"), policy, options, expectation, export)
 					if err != nil {
 						return err
 					}

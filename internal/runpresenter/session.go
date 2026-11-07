@@ -29,6 +29,8 @@ type Options struct {
 	Screen  tcell.Screen
 	Live    bool
 	NoColor bool
+	// StayOpen changes a joined live operation into a read-only result browser.
+	StayOpen bool
 	// Diagnostics is an optional bounded private capture, never a terminal writer
 	// or safe progress stream. Its caller may replay bytes after Run returns.
 	Diagnostics *rundiagnostics.Buffer
@@ -198,6 +200,11 @@ func Run(ctx context.Context, options Options, source interface{ Snapshot() prog
 			joined = true
 			view.dismissConfirmation()
 			result.WorkErr = err
+			if options.StayOpen && drawing && !canceling {
+				done = nil
+				view.live = false
+				continue
+			}
 			if drawing {
 				// The owner has joined. Cancellation is no longer a wait state;
 				// show its final snapshot without replacing its returned error.
@@ -211,7 +218,9 @@ func Run(ctx context.Context, options Options, source interface{ Snapshot() prog
 			canceling = true
 			ctxDone = nil
 			if done == nil {
-				result.WorkErr = canceled(ctx.Err())
+				if !joined {
+					result.WorkErr = canceled(ctx.Err())
+				}
 				return result
 			}
 		case event, open := <-events:
