@@ -23,6 +23,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	"golang.org/x/sync/semaphore"
 )
 
 // PullMetadata fetches bounded manifests, configs and evidence, never output
@@ -77,7 +78,7 @@ func PullMetadataWithOptions(ctx context.Context, reference, out string, request
 	}
 	defer cleanup()
 	writer := layoutWriter{root: stage, plain: true}
-	boundedWriter := metadataBlobWriter{writer: writer, limit: maxMetadataBytes}
+	boundedWriter := metadataBlobWriter{writer: writer, limit: maxMetadataBytes, inflight: semaphore.NewWeighted(maxMetadataReadBytes)}
 	put := boundedWriter.put
 	manifest := func(ctx context.Context, repo name.Repository, d Descriptor) (ociManifest, error) {
 		got, err := puller.Get(ctx, repo.Digest(d.Digest))
@@ -94,23 +95,17 @@ func PullMetadataWithOptions(ctx context.Context, reference, out string, request
 		return m, nil
 	}
 	blob := func(ctx context.Context, repo name.Repository, d Descriptor, max int64) error {
-		if d.Size < 0 || d.Size > max {
-			return e.New(e.CodeVerifyFailed, "oversized metadata blob")
-		}
-		layer, err := puller.Layer(ctx, repo.Digest(d.Digest))
-		if err != nil {
-			return metadataFetchError(ctx, err, "fetch metadata blob")
-		}
-		reader, err := layer.Compressed()
-		if err != nil {
-			return metadataFetchError(ctx, err, "open metadata blob")
-		}
-		defer reader.Close()
-		raw, err := io.ReadAll(io.LimitReader(reader, max+1))
-		if err != nil {
-			return metadataFetchError(ctx, err, "read metadata blob")
-		}
-		return put(raw, d, max)
+		return boundedWriter.copyBlob(ctx, d, max, func() (io.ReadCloser, error) {
+			layer, err := puller.Layer(ctx, repo.Digest(d.Digest))
+			if err != nil {
+				return nil, metadataFetchError(ctx, err, "fetch metadata blob")
+			}
+			reader, err := layer.Compressed()
+			if err != nil {
+				return nil, metadataFetchError(ctx, err, "open metadata blob")
+			}
+			return reader, nil
+		})
 	}
 	m, err := manifest(ctx, ref.Context(), index.Manifests[0])
 	if err != nil {

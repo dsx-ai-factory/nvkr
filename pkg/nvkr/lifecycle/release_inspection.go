@@ -56,16 +56,7 @@ func inspectReleaseMetadata(ctx context.Context, reference string, options Inspe
 			return delivery.PublicationDescription{}, err
 		}
 		if cacheRoot != "" {
-			var description delivery.PublicationDescription
-			err := delivery.VisitCachedMetadata(ctx, reference, cacheRoot, delivery.MetadataPullOptions{Registry: options.Registry, Progress: options.Progress}, func(ctx context.Context, layout string, _ delivery.Inspection) error {
-				var err error
-				description, err = inspectReleaseLayout(ctx, reference, layout, verifyEvidence)
-				return err
-			})
-			if err != nil {
-				return delivery.PublicationDescription{}, err
-			}
-			return description, nil
+			return inspectCachedRelease(ctx, reference, cacheRoot, options, verifyEvidence)
 		}
 		if options.WorkspaceRoot != "" {
 			if err := os.MkdirAll(options.WorkspaceRoot, 0o700); err != nil {
@@ -147,4 +138,40 @@ func metadataCacheRoot(options InspectionOptions) (string, error) {
 		return "", e.Wrap(e.CodeUsage, err, "locating release metadata cache; set NVKR_METADATA_CACHE or disable caching")
 	}
 	return filepath.Join(base, "nvkr", "release-metadata", "v1"), nil
+}
+
+// Capture owned, already bounded evidence bytes under the cache lock. External
+// cryptographic work runs after the lock is released and never rereads the cache.
+func inspectCachedRelease(ctx context.Context, reference, cacheRoot string, options InspectionOptions, verifyEvidence func(context.Context, string, []byte) error) (delivery.PublicationDescription, error) {
+	type evidenceSnapshot struct {
+		subject string
+		raw     []byte
+	}
+	var evidence []evidenceSnapshot
+	var capture func(context.Context, string, []byte) error
+	if verifyEvidence != nil {
+		capture = func(_ context.Context, subject string, raw []byte) error {
+			evidence = append(evidence, evidenceSnapshot{subject: subject, raw: raw})
+			return nil
+		}
+	}
+	var description delivery.PublicationDescription
+	err := delivery.VisitCachedMetadata(ctx, reference, cacheRoot, delivery.MetadataPullOptions{Registry: options.Registry, Progress: options.Progress}, func(ctx context.Context, layout string, _ delivery.Inspection) error {
+		var err error
+		description, err = inspectReleaseLayout(ctx, reference, layout, capture)
+		return err
+	})
+	if err != nil {
+		return delivery.PublicationDescription{}, err
+	}
+	for i, item := range evidence {
+		if err := authenticityContext(ctx); err != nil {
+			return delivery.PublicationDescription{}, err
+		}
+		if err := verifyEvidence(ctx, item.subject, item.raw); err != nil {
+			return delivery.PublicationDescription{}, err
+		}
+		evidence[i].raw = nil
+	}
+	return description, nil
 }

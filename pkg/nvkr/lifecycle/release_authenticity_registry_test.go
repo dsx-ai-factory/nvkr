@@ -56,10 +56,14 @@ func (*authenticityRegistryVerifier) AttestSBOM(context.Context, string, []byte)
 func (verifier *authenticityRegistryVerifier) Verify(ctx context.Context, subject sign.Subject, policy sign.VerifyPolicy) (sign.VerificationRecord, error) {
 	verifier.t.Helper()
 	if _, ok := ctx.Deadline(); !ok {
-		verifier.t.Fatal("authentication did not bound signature work")
+		err := e.New(e.CodeSignatureInvalid, "authentication did not bound signature work")
+		verifier.t.Error(err)
+		return sign.VerificationRecord{}, err
 	}
 	if !verifier.expectedSubjects[subject.Ref] || subject.Digest != referenceDigest(subject.Ref) || !policy.RequireAttestation || policy.IdentityRegexp != "^builder$" || policy.Issuer != "issuer" {
-		verifier.t.Fatalf("unexpected signature subject or policy: %+v, %+v", subject, policy)
+		err := e.New(e.CodeSignatureInvalid, "unexpected signature subject or policy: %+v, %+v", subject, policy)
+		verifier.t.Error(err)
+		return sign.VerificationRecord{}, err
 	}
 	verifier.mu.Lock()
 	verifier.subjects = append(verifier.subjects, subject.Ref)
@@ -537,5 +541,46 @@ func TestAuthenticateRegistryCacheStillAuthenticatesEverySubject(t *testing.T) {
 	}
 	if fixture.payloadGets.Load() != 0 {
 		t.Fatal("authenticity cache fetched payloads")
+	}
+}
+
+func TestCachedEvidenceVerificationReleasesLockAndOwnsBytes(t *testing.T) {
+	for _, reject := range []bool{false, true} {
+		t.Run(map[bool]string{false: "accepted", true: "rejected"}[reject], func(t *testing.T) {
+			layout, _ := testPublicationLayout(t)
+			fixture := newAuthenticityRegistryFixture(t, layout)
+			options := InspectionOptions{Registry: fixture.options, CacheRoot: t.TempDir(), Timeout: time.Minute}
+			visited := 0
+			description, err := inspectReleaseMetadata(t.Context(), fixture.reference, options, func(ctx context.Context, subject string, raw []byte) error {
+				if visited == 0 {
+					browseCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+					defer cancel()
+					if _, err := InspectRelease(browseCtx, fixture.reference, options); err != nil {
+						return err
+					}
+					// Subsequent evidence verification must not reopen the shared cache.
+					entry := filepath.Join(options.CacheRoot, strings.TrimPrefix(referenceDigest(fixture.reference), "sha256:"))
+					if err := os.Rename(entry, filepath.Join(options.CacheRoot, "retired")); err != nil {
+						return err
+					}
+				}
+				visited++
+				if !bytes.Equal(raw, fixture.bundles[subject]) {
+					return e.New(e.CodeVerifyFailed, "captured evidence changed")
+				}
+				if reject {
+					return e.New(e.CodeSignatureInvalid, "fixture rejection")
+				}
+				return nil
+			})
+			if reject {
+				assertCode(t, err, e.CodeSignatureInvalid)
+				if description.RootDigest != "" {
+					t.Fatal("rejected evidence returned a complete description")
+				}
+			} else if err != nil || visited != len(fixture.bundles) {
+				t.Fatalf("evidence verification visited %d/%d bundles: %v", visited, len(fixture.bundles), err)
+			}
+		})
 	}
 }
