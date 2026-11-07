@@ -186,6 +186,9 @@ type Runtime struct {
 	Variables         map[string]string `json:"variables,omitempty"`
 	Setup             []string          `json:"setup,omitempty"`
 	ToolchainRegistry string            `json:"toolchainRegistry,omitempty"`
+	// ImageLocations binds exact source repositories (including mirror.invalid
+	// keys) to transport repositories. Image content digests are preserved.
+	ImageLocations map[string]string `json:"imageLocations,omitempty"`
 	// BuildNetworkPolicy independently controls whether a producer declaration
 	// may request network access during its build. Omission is offline-only.
 	BuildNetworkPolicy string `json:"buildNetworkPolicy,omitempty"`
@@ -566,8 +569,11 @@ func (profile Runtime) validate() error {
 			return e.New(e.CodeInvalidCatalog, "delivery setup line must not contain control characters")
 		}
 	}
-	if strings.ContainsAny(profile.ToolchainRegistry, "\r\n\x00 ") {
-		return e.New(e.CodeInvalidCatalog, "delivery toolchainRegistry %q is unsafe", profile.ToolchainRegistry)
+	if profile.ToolchainRegistry != "" {
+		return e.New(e.CodeEngineCapability, "runtime.toolchainRegistry is retired; declare exact runtime.imageLocations source/repository bindings")
+	}
+	if err := validateImageLocations(profile.ImageLocations); err != nil {
+		return err
 	}
 	if profile.BuildNetworkPolicy != "" && profile.BuildNetworkPolicy != BuildNetworkOfflineOnly &&
 		profile.BuildNetworkPolicy != BuildNetworkProducerDeclared {

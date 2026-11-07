@@ -6,6 +6,12 @@ kind: Environment
 metadata:
   description: GitHub hosted-runner publication settings with a pinned identity policy.
   name: nvke-github
+toolchainAccess:
+  publicRoots:
+    - docker.io/alpine/helm
+    - docker.io/library/busybox
+    - docker.io/library/golang
+    - docker.io/moby/buildkit
 publication:
   credentialRef: github:GITHUB_TOKEN
   repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr

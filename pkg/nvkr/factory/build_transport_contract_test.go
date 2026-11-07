@@ -103,7 +103,7 @@ func TestPlanAcceptsEnvironmentToolchainRelocation(t *testing.T) {
 			toolchain = node.Toolchain
 		}
 	}
-	if !strings.HasPrefix(toolchain, "mirror.example/nvkr/nvkr-toolchain-test@sha256:") {
+	if !strings.HasPrefix(toolchain, "mirror.example/nvkr/transport-test@sha256:") {
 		t.Fatalf("fixture did not relocate its toolchain: %q", toolchain)
 	}
 	unrouted := buildTransportPlan(t, "unrouted")
@@ -175,9 +175,9 @@ func buildTransportPlan(t *testing.T, lane string) *Plan {
 	switch lane {
 	case "source":
 	case "relocated", "unrouted":
-		component.ToolchainImage = "nvkr-toolchain-test@" + strings.SplitN(component.ToolchainImage, "@", 2)[1]
+		component.ToolchainImage = "source.example/transport-test@" + strings.SplitN(component.ToolchainImage, "@", 2)[1]
 		if lane == "relocated" {
-			environment.Runtime.ToolchainRegistry = "mirror.example/nvkr"
+			environment.Runtime.ImageLocations = map[string]string{"source.example/transport-test": "mirror.example/nvkr/transport-test"}
 		}
 	case "nix":
 		component.BuilderType = ir.BuilderNix
@@ -197,6 +197,7 @@ func buildTransportPlan(t *testing.T, lane string) *Plan {
 	if err != nil {
 		t.Fatal(err)
 	}
+	environment.ToolchainAccess.PublicRoots = append(environment.ToolchainAccess.PublicRoots, "mirror.example/nvkr", "source.example/transport-test")
 	plan, err := Compile(t.Context(), definition, environment, stack, "v0.0.0 (test)")
 	if err != nil {
 		t.Fatal(err)

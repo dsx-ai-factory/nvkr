@@ -130,6 +130,12 @@ func TestValidateGitHubBundleRejectsIsolationAndTransportTampering(t *testing.T)
 			githubTestYAMLField(t, step(t, root, "name", "Upload NVKR runner"), "with", "if-no-files-found").Value = "ignore"
 		}, e.CodeEngineCapability, "missing declared output"},
 		{"checkout-credential", bundle.WorkflowPath, func(t *testing.T, root *yamlv3.Node) {
+			// Isolate the bootstrap mutation from the shared preflight checkout.
+			resolved, err := githubResolveAliases(root, map[*yamlv3.Node]bool{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			*root = *resolved
 			checkout := githubTestYAMLStep(t, githubTestYAMLField(t, root, "jobs", bootstrapJob, "steps"), "uses", plan.Actions["checkout"].Uses())
 			githubTestYAMLField(t, checkout, "with", "persist-credentials").Value = "true"
 		}, e.CodeEngineCapability, "ambient credentials"},
@@ -205,6 +211,9 @@ func TestValidateGitHubBundleRejectsLateHelperPreparation(t *testing.T) {
 	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 	changed := 0
 	for id, job := range document.Jobs {
+		if strings.HasPrefix(id, "preflight-images-") {
+			continue // Keep preflight intact to exercise the producer helper-order guard.
+		}
 		var steps []githubStep
 		for _, step := range job.Steps {
 			if step.Name == prepareHelperStepName {

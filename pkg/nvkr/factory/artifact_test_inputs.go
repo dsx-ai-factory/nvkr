@@ -102,6 +102,16 @@ func selectCLIArtifactTestInputs(plan *Plan, output string) (*CLIArtifactTestInp
 	if producer == nil || producer.BuilderType != ir.BuilderOCIHermetic || producer.Toolchain == "" || !component.FromSource || producer.OutputType != "host-package" {
 		return nil, e.New(e.CodeEngineCapability, "CLI artifact tests require a source-built container toolchain")
 	}
+	classifier, err := plan.Environment.ToolchainAccess.ImageClassifier()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := plan.resolveImageUse(classifier, "local", ImageUse{
+		ConsumerID: selected.Name + "/diagnostic", Role: "diagnostic", Reference: producer.Toolchain,
+		Platform: producer.ToolchainPlatform, Placement: "local",
+	}, false); err != nil {
+		return nil, err
+	}
 	return &CLIArtifactTestInputs{
 		Output: selected.Name, BuildDigest: selected.BuildDigest, Platform: selected.Platform,
 		Repo: component.Repo, Commit: component.Commit, TreeHash: component.TreeHash,

@@ -119,6 +119,7 @@ func TestNativePackerBundleBindsExactIdentityPlatformAndPurpose(t *testing.T) {
 
 func TestCompileNativeHVFToolchainAndRejectHostedRendering(t *testing.T) {
 	definition, environment, stack := vmFactoryInputs(t, "linux/arm64", execution.CapabilityRequired)
+	environment.ToolchainAccess = &authored.ToolchainAccess{PublicRoots: []string{"docker.io/library/golang", "example.test/vendor"}}
 	base := *stack.Catalog
 	base.Components = make(map[string]catalog.Component)
 	for name, component := range stack.Catalog.Components {
@@ -163,5 +164,21 @@ func TestCompileNativeHVFToolchainAndRejectHostedRendering(t *testing.T) {
 	}
 	if _, err := RenderGitHub(t.Context(), plan); factoryErrorCode(err) != e.CodeEngineCapability {
 		t.Fatalf("native bundle admitted to hosted execution: %v", err)
+	}
+	uses, err := plan.ImageUses("local")
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, use := range uses {
+		if use.Role == "producer" {
+			found = true
+			if use.Route != ImageNativeBundle || use.Platform != "darwin/arm64" || use.Reference != "sha256:"+strings.Repeat("d", 64) {
+				t.Fatalf("native bundle lost its host platform or source kind: %+v", use)
+			}
+		}
+	}
+	if !found {
+		t.Fatal("native producer is absent from image inventory")
 	}
 }

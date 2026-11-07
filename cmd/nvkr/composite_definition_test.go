@@ -126,6 +126,7 @@ func TestReleaseVerifyExactInputsAdmitComposites(t *testing.T) {
 	write("defs/composite.yaml", composite)
 	write("defs/environment.yaml", definition.Environment{APIVersion: definition.EnvironmentAPIVersion, Kind: definition.EnvironmentKind,
 		Metadata: definition.Metadata{Name: "fixture"}, UtilityPlatform: "linux/amd64",
+		Runtime:          definition.Runtime{ImageLocations: map[string]string{"nvkr-toolchain-go": "example.test/toolchains/go", "nvkr-toolchain-cgo": "example.test/toolchains/cgo"}},
 		UtilityContainer: "golang@sha256:fe5d57d3b718e7a4986bae156c2d73f44973bfd313073aed08a4de6692bb6161"})
 	plan, err := lifecycle.CompileFiles(t.Context(), "defs/composite.yaml", "defs/environment.yaml", "composite-test")
 	if err != nil {

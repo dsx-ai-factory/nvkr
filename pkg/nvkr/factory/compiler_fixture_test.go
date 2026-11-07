@@ -13,5 +13,5 @@ func fixtureInputs(name, output, runsOn string) (authored.Definition, authored.E
 	return authored.Definition{APIVersion: authored.DefinitionAPIVersion, Kind: authored.DefinitionKind,
 			Metadata: authored.Metadata{Name: name}, Catalog: authored.Catalog{Base: "testdata/catalogs/kubernetes-layered"},
 			Outputs: []authored.DefinitionOutput{{Name: output, Platform: "linux/amd64", Format: authored.OutputExecutable, Components: []string{"containerd", "kubelet"}}}},
-		authored.Environment{APIVersion: authored.EnvironmentAPIVersion, Kind: authored.EnvironmentKind, Metadata: authored.Metadata{Name: "fixture"}, RunsOn: runsOn, UtilityContainer: fixtureUtilityContainer, UtilityPlatform: "linux/amd64"}
+		authored.Environment{APIVersion: authored.EnvironmentAPIVersion, Kind: authored.EnvironmentKind, Metadata: authored.Metadata{Name: "fixture"}, ToolchainAccess: &authored.ToolchainAccess{PublicRoots: []string{"docker.io/library/golang", "example.test/toolchains"}}, Runtime: authored.Runtime{ImageLocations: map[string]string{"nvkr-toolchain-go": "example.test/toolchains/go", "nvkr-toolchain-cgo": "example.test/toolchains/cgo"}}, RunsOn: runsOn, UtilityContainer: fixtureUtilityContainer, UtilityPlatform: "linux/amd64"}
 }

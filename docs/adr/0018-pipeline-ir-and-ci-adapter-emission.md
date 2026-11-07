@@ -357,10 +357,17 @@ disk producer's full material closure.
 Environment `toolchainAccess` declares transport access separately from publication. Its sorted
 `privateRoots` and `publicRoots` contain explicit registry/repository paths, with no overlap or trailing
 slash; at most 128 roots are admitted. Each root matches its repository and path-component descendants.
-Every digest-pinned execution image selected by a native ARC Plan, including source preparation on
-hosted runners and selected strict disk inspection, must match exactly one class. Unclassified images
+Every digest-pinned execution image selected by a GitHub Plan, including producer and vendor images,
+utility operations, strict disk inspection, startup containers and services, must match exactly one class.
+The owning inventory derives consumers from producer IR and utility instructions before renderer job
+grouping. Local image IDs and native bundle digests are separate sources, never registry references.
+Standalone CLI diagnostics classify their selected registry image through the same classifier and require
+an anonymous route, or retain a measured local image ID; private diagnostic materialization is deferred. Unclassified images
 fail generation and helper admission with a coded capability error before output or pulls. Public roots
 select anonymous pulls; they do not prove registry visibility. Private roots currently admit only GHCR.
+Ordinary in-process operation helpers keep shared capability checks but select local image semantics unless the
+Environment declares an explicit hosted route. Local IDs remain local; registry consumers still require
+classification. This admission does not supply local image preparation or runtime-observation receipts.
 
 The optional `reader` declares one `credentialRef: github:SECRET_NAME` and
 `usernameRef: github:VARIABLE_NAME` for the private roots. A selected private root requires this reader
@@ -373,8 +380,17 @@ account variable; foreign owners and lookalike paths outside the declared roots 
 Maintained Environments declare `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains` and the independent
 `NVKR_REGISTRY_READ` / `NVKR_REGISTRY_READ_USER` references. Adding an output namespace requires no
 code allowlist or security-test enrollment. The access declaration changes Environment/Plan identity,
-not logical Build identity; existing native Environments must declare their complete selected image roots
-before regeneration. General private registry support remains deferred.
+not logical Build identity; existing GitHub Environments, including ordinary hosted configurations, must
+declare their complete selected image roots before regeneration. Private startup containers/services and
+private ordinary hosted execution remain refused before output. General private registry support remains deferred.
+
+Environment `runtime.imageLocations` maps exact source repositories to explicit registry repositories for
+build and vendor consumers, retaining each immutable content digest. The reserved `mirror.invalid/<key>`
+source requires a binding; missing keys fail compilation. Legacy bare `nvkr-toolchain-*` sources also require
+an explicit binding, and `runtime.toolchainRegistry` is refused with migration guidance. Neither a basename
+nor publication namespace selects relocation. Measured local IDs and native bundle digests bypass registry
+relocation. The authored maintained generation inventory is checked against discovered committed Plans and
+manifests; new maintained bundles must join that same access and per-job preparation contract.
 The entry workflow binds both values as explicit composite inputs; composite metadata does not evaluate
 caller-only `vars` or `secrets` contexts. Calls without image preparation omit both inputs, whose empty
 defaults are admitted only with the absent image role. The helper admits the complete Plan,

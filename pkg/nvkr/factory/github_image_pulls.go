@@ -24,57 +24,9 @@ const githubImageToken = "NVKR_TOOLCHAIN_READ_TOKEN"
 const githubImageUser = "NVKR_TOOLCHAIN_READ_USER"
 
 // Admission is shared by generation, bundle validation and helper execution.
-// ARC Plans include native source preparation on hosted runners, so classify
-// every projected execution image, not just the grouped disk stages.
 func admitGitHubToolchainAccess(plan *Plan) error {
-	if plan.Environment.GitHubARC == "" && plan.Environment.ToolchainAccess == nil {
-		return nil
-	}
-	classifier, err := plan.Environment.ToolchainAccess.ImageClassifier()
-	if err != nil {
-		return err
-	}
-	for _, node := range plan.Graph.Nodes {
-		execution, err := plan.GitHubExecutionFor(node)
-		if err != nil {
-			return err
-		}
-		if execution.Container == "" {
-			continue
-		}
-		private, err := classifier.ClassifyImage(execution.Container)
-		if err != nil {
-			return e.Wrap(e.CodeEngineCapability, err, "GitHub toolchain access for node %q", node.ID)
-		}
-		if private && (plan.Environment.GitHubARC != "native-kvm-v1" || plan.Environment.ToolchainAccess.Reader == nil) {
-			return e.New(e.CodeEngineCapability, "private toolchain for node %q requires native-kvm-v1 and a declared toolchainAccess reader", node.ID)
-		}
-	}
-	// Strict disk inspection can pull an image separately from projected nodes.
-	if plan.Environment.GitHubARC == "native-kvm-v1" && githubDiskInspectionRequired(plan) {
-		for _, output := range plan.LifecycleOutputs {
-			if output.Kind != PackageDiskImage {
-				continue
-			}
-			for _, build := range plan.Builds {
-				if build.Name != output.Name {
-					continue
-				}
-				_, profile, err := diskPublicationInspectionProfile(build, plan.Environment)
-				if err != nil {
-					return err
-				}
-				private, err := classifier.ClassifyImage(profile.Image)
-				if err != nil {
-					return err
-				}
-				if private && plan.Environment.ToolchainAccess.Reader == nil {
-					return e.New(e.CodeEngineCapability, "private disk inspector requires a declared toolchainAccess reader")
-				}
-			}
-		}
-	}
-	return nil
+	_, err := plan.imageUses("github")
+	return err
 }
 
 func githubPrivateToolchain(plan *Plan, image string) bool {

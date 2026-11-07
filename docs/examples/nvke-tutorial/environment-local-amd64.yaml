@@ -6,6 +6,11 @@ kind: Environment
 metadata:
   description: Native Linux amd64 utility execution for local builds; publication remains opt-in.
   name: nvke-local-amd64
+toolchainAccess:
+  publicRoots:
+    - docker.io/alpine/helm
+    - docker.io/library/golang
+    - docker.io/moby/buildkit
 publication:
   anonymous: true
   plainHTTP: true

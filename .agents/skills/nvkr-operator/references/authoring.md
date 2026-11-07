@@ -29,8 +29,10 @@ matching names or source URLs do not imply interchangeability. Output-specific c
 overlays bind exact predecessors. Do not silently refresh a stale overlay or independently bump a derived
 pin-set member.
 
-For native ARC inputs, follow [consumer toolchain access](../../../../docs/toolchain-maintenance.md#declare-consumer-access)
-to classify selected images in the Environment and bind the private reader before generation.
+For GitHub generation or standalone CLI diagnostics, follow [consumer toolchain access](../../../../docs/toolchain-maintenance.md#declare-consumer-access)
+to classify every selected image in the Environment before work. Follow its migration guidance for
+ordinary hosted access and explicit source/location bindings; private startup and ordinary hosted routes
+remain unsupported.
 
 ## Review changes with the CLI
 

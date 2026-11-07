@@ -20,33 +20,37 @@ func TestPreparedFilesDryRunPreservesFrozenRequirements(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	prepared, err := PrepareFiles(t.Context(), "docs/examples/nvke-tutorial/definition.yaml", "docs/examples/nvke-tutorial/environment-local.yaml", "test", "attempt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	before := prepared.Description()
-	if before.Attempt != "attempt" || before.Status != RunPending || len(before.Expected) == 0 {
-		t.Fatalf("invalid prepared run: %+v", before)
-	}
-	root := filepath.Join(".nvkr", "runs", filepath.Base(t.TempDir()))
-	got, err := ExecuteLocal(t.Context(), prepared, LocalOptions{AttemptsRoot: root, DryRun: true, Stdout: io.Discard, Stderr: io.Discard})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(*got, before) {
-		t.Fatalf("dry run changed frozen state: %+v", got)
-	}
-	if _, err := os.Lstat(root); !os.IsNotExist(err) {
-		t.Fatalf("dry run reserved attempt storage: %v", err)
-	}
-	got.Expected[0].Name = "changed"
-	got.Expected[0].Components[0] = "changed"
-	got.Expected[0].ComponentResults[0] = "changed"
-	if !reflect.DeepEqual(prepared.Description(), before) {
-		t.Fatal("description exposed mutable prepared requirements")
-	}
-	if !reflect.DeepEqual((*PreparedRun)(nil).Description(), Run{}) {
-		t.Fatal("nil description must be empty")
+	for _, suffix := range []string{"", "-amd64", "-arm64"} {
+		t.Run("tutorial"+suffix, func(t *testing.T) {
+			prepared, err := PrepareFiles(t.Context(), "docs/examples/nvke-tutorial/definition"+suffix+".yaml", "docs/examples/nvke-tutorial/environment-local"+suffix+".yaml", "test", "attempt")
+			if err != nil {
+				t.Fatal(err)
+			}
+			before := prepared.Description()
+			if before.Attempt != "attempt" || before.Status != RunPending || len(before.Expected) == 0 {
+				t.Fatalf("invalid prepared run: %+v", before)
+			}
+			root := filepath.Join(".nvkr", "runs", filepath.Base(t.TempDir()))
+			got, err := ExecuteLocal(t.Context(), prepared, LocalOptions{AttemptsRoot: root, DryRun: true, Stdout: io.Discard, Stderr: io.Discard})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reflect.DeepEqual(*got, before) {
+				t.Fatalf("dry run changed frozen state: %+v", got)
+			}
+			if _, err := os.Lstat(root); !os.IsNotExist(err) {
+				t.Fatalf("dry run reserved attempt storage: %v", err)
+			}
+			got.Expected[0].Name = "changed"
+			got.Expected[0].Components[0] = "changed"
+			got.Expected[0].ComponentResults[0] = "changed"
+			if !reflect.DeepEqual(prepared.Description(), before) {
+				t.Fatal("description exposed mutable prepared requirements")
+			}
+			if !reflect.DeepEqual((*PreparedRun)(nil).Description(), Run{}) {
+				t.Fatal("nil description must be empty")
+			}
+		})
 	}
 }
 

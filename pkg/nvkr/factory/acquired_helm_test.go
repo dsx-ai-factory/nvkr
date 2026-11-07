@@ -91,7 +91,7 @@ func acquiredHelmPlan(t *testing.T, body []byte, oci bool, inspect ...bool) *Pla
 		t.Fatal(err)
 	}
 	definition := authored.Definition{APIVersion: authored.DefinitionAPIVersion, Kind: authored.DefinitionKind, Metadata: authored.Metadata{Name: "acquired-helm"}, Catalog: authored.Catalog{Base: "catalog"}, Outputs: []authored.DefinitionOutput{{Name: "charts", Platform: "linux/amd64", Format: authored.OutputHelm, Components: []string{"chart"}}}}
-	environment := authored.Environment{APIVersion: authored.EnvironmentAPIVersion, Kind: authored.EnvironmentKind, Metadata: authored.Metadata{Name: "local"}, UtilityContainer: fixtureUtilityContainer, UtilityPlatform: "linux/amd64"}
+	environment := authored.Environment{APIVersion: authored.EnvironmentAPIVersion, Kind: authored.EnvironmentKind, Metadata: authored.Metadata{Name: "local"}, ToolchainAccess: &authored.ToolchainAccess{PublicRoots: []string{"docker.io/library/golang"}}, UtilityContainer: fixtureUtilityContainer, UtilityPlatform: "linux/amd64"}
 	if len(inspect) > 0 && inspect[0] {
 		// The chart reader never executes Syft. The exact tool selection remains a
 		// graph dependency; this fixture tests the metadata inspection path offline.

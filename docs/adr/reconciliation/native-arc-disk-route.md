@@ -1,7 +1,8 @@
 ## Native ARC disk route
 The single checked-in `nvkr-run.yml` selects the 69-output M2 Definition and its main-only publication
 Environment, including plain and public-bootstrap FDE disks on both native architectures. The Makefile drift
-gate repeats the exact Definition and Environment paths recorded in the committed Plan. Dispatch does not
+gate uses the authored maintained generation inventory, whose Definition and Environment paths are
+contract-checked against the committed Plans. Dispatch does not
 choose among Definitions. Alternate selections can be generated into a scratch root with their matching
 byte-exact check. The standalone `codex/fde-image-pipeline` branch used the separate one-output FDE Definition
 and build-only Environment for the recorded diagnostic below. Neither candidate selection is a ratified
@@ -110,6 +111,16 @@ The declaration migration is generation/admission behavior only. Public declarat
 pulls; they are not registry visibility evidence. Private reader grants, successful pulls and current-head
 native execution still require external evidence. Existing native Environments must declare all selected
 execution image roots before regeneration; undeclared roots fail closed.
+
+The image-use admission inventory now covers all GitHub producer bundles, including ordinary hosted
+Plans, vendor-only and utility-only consumers, inspector images, startup containers and services.
+Private startup and ordinary hosted routes remain refused. The maintained generation selection is authored
+once and checked against discovered Plans/manifests; the access contract derives expected subjects from
+producer IR and utility fields and checks expanded workers and composites. Exact source/location bindings
+replace basename-based relocation, preserving content digests and Build identity. Local/native routes are
+descriptive inventory entries, not runtime receipts; their preparation and runtime observation follow-ups
+remain separate. Standalone CLI diagnostic selection shares anonymous access admission. These are
+implementation/contract changes only; this change records no live registry, runner or production acceptance.
 
 Declared-access Plans now emit bounded exact-manifest/config reader preflight after final runtime
 Plan delivery, on each selected hosted or ARC placement, before producer fan-out. Completion-scheduled

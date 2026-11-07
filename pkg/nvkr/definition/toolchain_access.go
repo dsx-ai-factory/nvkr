@@ -16,7 +16,7 @@ import (
 // credential so access declarations cannot reuse it as a toolchain reader.
 const ProductionRegistryWriteCredential = "github:NVKR_REGISTRY_WRITE"
 
-// ToolchainAccess classifies native execution images independently of output
+// ToolchainAccess classifies execution images independently of output
 // publication. Roots include a registry and repository path, without a trailing
 // slash. Each root covers that repository and its path-component descendants.
 // PublicRoots explicitly select anonymous pulls, not observed registry visibility.
@@ -125,11 +125,11 @@ func (access *ToolchainAccess) ClassifyImage(image string) (bool, error) {
 func (classifier ToolchainImageClassifier) ClassifyImage(image string) (bool, error) {
 	pin, err := name.NewDigest(image)
 	if err != nil || !canonical.IsDigest(pin.DigestStr()) {
-		return false, e.New(e.CodeUnpinnedInput, "native toolchain image must be digest-pinned: %q", image)
+		return false, e.New(e.CodeUnpinnedInput, "execution image must be digest-pinned: %q", image)
 	}
 	for _, part := range strings.Split(pin.RepositoryStr(), "/") {
 		if part == "" || part == "." || part == ".." {
-			return false, e.New(e.CodeInvalidCatalog, "native toolchain image has a noncanonical repository path: %q", image)
+			return false, e.New(e.CodeInvalidCatalog, "execution image has a noncanonical repository path: %q", image)
 		}
 	}
 	for _, root := range classifier.roots {
@@ -137,7 +137,7 @@ func (classifier ToolchainImageClassifier) ClassifyImage(image string) (bool, er
 			return root.private, nil
 		}
 	}
-	return false, e.New(e.CodeEngineCapability, "native toolchain image %q has no declared toolchainAccess root", image)
+	return false, e.New(e.CodeEngineCapability, "execution image %q has no declared toolchainAccess root", image)
 }
 
 func repositoryWithin(repository, root string) bool {

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -786,6 +787,8 @@ func TestLocalProducerRecordsOnlyDiskOutputInvocations(t *testing.T) {
 					component.ToolchainImage = "example.test/runtime@sha256:" + strings.Repeat("c", 64)
 					component.BuildCommand, component.ArtifactPath, component.WriteDir = []string{"build-runtime"}, "out/runtime.deb", "out"
 					base.Components["runtime"] = component
+					plan.Environment.ToolchainAccess.PublicRoots = append(plan.Environment.ToolchainAccess.PublicRoots, "example.test/runtime")
+					slices.Sort(plan.Environment.ToolchainAccess.PublicRoots)
 					stack, err := catalog.ApplyStack(base)
 					if err != nil {
 						t.Fatal(err)

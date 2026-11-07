@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"reflect"
 	"sort"
-	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -65,7 +64,9 @@ func compileBuildGraph(resolved *buildgraph.Resolved, environment authored.Envir
 	if err != nil {
 		return nil, err
 	}
-	relocateToolchainRegistry(graph, environment.Runtime.ToolchainRegistry)
+	if err := relocateImageLocations(graph, environment.Runtime); err != nil {
+		return nil, err
+	}
 	if err := admitBuildNetwork(graph, environment.Runtime.BuildNetworkPolicy); err != nil {
 		return nil, err
 	}
@@ -95,40 +96,27 @@ func admitBuildNetwork(graph *ir.Graph, policy string) error {
 	return nil
 }
 
-// toolchainMaterializedPrefix names operator-materialized toolchain images. The catalog pins
-// them registry-agnostically (bare `nvkr-toolchain-*@sha256:…`) so the default catalog carries no
-// operator's registry; the delivery's toolchainRegistry supplies WHERE the operator published
-// them. A public toolchain (e.g. golang@sha256:…) never carries this prefix and is left as-is.
-const toolchainMaterializedPrefix = "nvkr-toolchain-"
-
-// relocateToolchainRegistry rewrites build and vendoring operator-materialized image refs into
-// the delivery-supplied registry, preserving the @sha256 digest (mirroring airgap.Relocate, so
-// buildDigest — which strips the prefix — is unchanged). When no registry is configured the
-// operator toolchains are left registry-agnostic (they will not pull at runtime until an
-// operator names their registry); public toolchains are always left untouched.
-func relocateToolchainRegistry(graph *ir.Graph, registry string) {
-	registry = strings.TrimSuffix(strings.TrimSpace(registry), "/")
-	if registry == "" {
-		return
-	}
+// Build and vendor consumers share exact source/location bindings. Relocation
+// preserves the immutable digest and therefore logical Build identity.
+func relocateImageLocations(graph *ir.Graph, runtime authored.Runtime) error {
 	for i := range graph.Nodes {
 		node := &graph.Nodes[i]
+		var reference *string
 		switch node.Kind {
 		case ir.KindBuild:
-			node.Toolchain = relocatedToolchainReference(node.Toolchain, registry)
+			reference = &node.Toolchain
 		case ir.KindFetch:
-			node.VendorImage = relocatedToolchainReference(node.VendorImage, registry)
+			reference = &node.VendorImage
+		default:
+			continue
 		}
+		resolved, err := runtime.ResolveImageLocation(*reference)
+		if err != nil {
+			return e.Wrap(e.CodeEngineCapability, err, "image location for producer %q", node.ID)
+		}
+		*reference = resolved
 	}
-}
-
-func relocatedToolchainReference(reference, registry string) string {
-	name, _, _ := strings.Cut(reference, "@")
-	// Only bare operator toolchains await relocation; public and qualified refs stay intact.
-	if strings.Contains(name, "/") || !strings.HasPrefix(name, toolchainMaterializedPrefix) {
-		return reference
-	}
-	return registry + "/" + reference
+	return nil
 }
 
 func (plan Plan) validatePlanBuilds() error {

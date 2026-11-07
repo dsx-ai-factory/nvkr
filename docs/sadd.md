@@ -574,9 +574,11 @@ platforms. Artifact kinds and producer metadata govern format admission directly
 
 A Definition selects producers and output-affecting settings directly on named outputs. An Environment supplies
 runtime settings, runner routes and execution classes, required publication transports and namespace,
-credential references, and signing identity/issuer policy. Native toolchain access declares private and
-anonymous roots independently of publication, with one reader for private roots. Unclassified native
-images or selected private roots without a reader fail generation before output. The compiler derives
+credential references, and signing identity/issuer policy. Image access declares private and
+anonymous roots independently of publication, with one reader for private roots. Every GitHub image consumer
+is inventoried before renderer grouping; unclassified images or unsupported private routes fail generation
+before output. Exact source/location bindings preserve logical Build identity. Measured local images and
+native bundle digests are separate sources, never registry references. The compiler derives
 routine packaging and routes.
 Declared-access GitHub Plans schedule bounded manifest/config reader probes after final runtime Plan
 delivery, separately per selected runner placement, and gate producer fan-out on success. The probe

@@ -6,6 +6,11 @@ kind: Environment
 metadata:
   description: Local development registry and dry-run signing policy.
   name: nvke-local
+toolchainAccess:
+  publicRoots:
+    - docker.io/alpine/helm
+    - docker.io/library/golang
+    - docker.io/moby/buildkit
 publication:
   anonymous: true
   plainHTTP: true

@@ -43,6 +43,8 @@ func diskPublicationPlanFixtureForHost(t *testing.T, platform, host string) *Pla
 	environment.Runtime.Runtime = "podman"
 	environment.Publication = &authored.Publication{RepositoryPrefix: "example.test/nvkr", Anonymous: true}
 	environment.Signing = cosignSigningProfile()
+	environment.ToolchainAccess.PublicRoots = append(environment.ToolchainAccess.PublicRoots, "example.test/inspection")
+	sort.Strings(environment.ToolchainAccess.PublicRoots)
 	definition.CosignTool = "cosign"
 	environment.DiskInspectionProfiles = map[string]authored.DiskInspectionProfile{host: {
 		Image:           "example.test/inspection@sha256:" + strings.Repeat("1", 64),
