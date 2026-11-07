@@ -440,29 +440,12 @@ func localToolchainPlatform(node ir.Node) string {
 	return node.Platform
 }
 
-func executionOutput(ctx context.Context, name string, args ...string) ([]byte, error) {
-	cmd := execCmd(RunOptions{Ctx: ctx}, name, args...)
-	return commandOutput(ctx, cmd)
-}
-
 func heldExecutionOutput(ctx context.Context, runtime *heldRuntimeExecutable, args ...string) ([]byte, error) {
 	if runtime == nil || runtime.capability == nil {
 		return nil, e.New(e.CodeEngineCapability, "container runtime capability is incomplete")
 	}
 	var stdout, stderr bytes.Buffer
 	if err := runtime.run(ctx, &stdout, &stderr, args...); err != nil {
-		if ctx.Err() != nil {
-			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "execution observation canceled")
-		}
-		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
-	}
-	return stdout.Bytes(), nil
-}
-
-func commandOutput(ctx context.Context, cmd *exec.Cmd) ([]byte, error) {
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := runOwnedCommand(ctx, cmd); err != nil {
 		if ctx.Err() != nil {
 			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "execution observation canceled")
 		}

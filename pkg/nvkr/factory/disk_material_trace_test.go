@@ -74,7 +74,9 @@ func diskMaterialTraceFixtureWithPublicationMode(t *testing.T, sibling, networke
 	agent.WriteDir = "out"
 	agent.Materials = map[string]string{"runtime": "runtime"}
 	base.Components["agent"] = agent
-	environment := fixture.plan.Environment
+	environment := fixture.plan.Environment.Clone()
+	environment.ToolchainAccess.PublicRoots = append(environment.ToolchainAccess.PublicRoots, "example.test/agent")
+	slices.Sort(environment.ToolchainAccess.PublicRoots)
 	if networked {
 		image := base.Components["image"]
 		image.BuildNetwork = ir.NetworkDefault

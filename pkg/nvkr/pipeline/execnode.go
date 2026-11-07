@@ -82,6 +82,9 @@ func (l Local) execNodeLaunch(n ir.Node, opts RunOptions) (*ArtifactResult, erro
 		image, platform := n.Toolchain, localToolchainPlatform(n)
 		if n.Kind == ir.KindFetch {
 			image, platform = n.VendorImage, "linux/"+runtime.GOARCH
+			if len(n.VendorCmd) == 0 {
+				image = ""
+			}
 		}
 		if image != "" && (n.Kind == ir.KindBuild || n.Kind == ir.KindFetch) {
 			var err error

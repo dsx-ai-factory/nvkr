@@ -138,7 +138,7 @@ func sourceVendorImage(ctx context.Context, runtime packerContainerRuntime, refe
 		return "", e.New(e.CodeEngineCapability, "source vendor image has a mismatched native platform, invalid identity or implicit volumes")
 	}
 	if canonical.IsDigest(reference) && image.ID != reference {
-		return "", e.New(e.CodePreflightFailed, "source vendor local config ID changed after admission")
+		return "", e.New(e.CodeEngineCapability, "source vendor image identity changed after admission")
 	}
 	return image.ID, nil
 }

@@ -10,11 +10,13 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
-)
 
-import e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+)
 
 func TestImageAdmissionRoutes(t *testing.T) {
 	subject := "ghcr.io/example/private@sha256:" + strings.Repeat("a", 64)
@@ -174,6 +176,46 @@ func TestPreparedImageRepositorySpelling(t *testing.T) {
 		t.Run(tc.subject+"/"+tc.observed, func(t *testing.T) {
 			if got := sameImageSubject(tc.subject+digest, tc.observed+digest); got != tc.match {
 				t.Fatalf("subject match=%t", got)
+			}
+		})
+	}
+}
+
+func TestFetchImageAdmissionRequiresVendorCommand(t *testing.T) {
+	for _, vendoring := range []bool{false, true} {
+		t.Run(fmt.Sprint("vendoring=", vendoring), func(t *testing.T) {
+			base, _, opts := pristineClosureFixture(t)
+			runtimePath, subject, root := imageAdmissionRuntimeFixture(t)
+			daemon := fmt.Sprintf(`{"ID":"daemon-a","OSType":"linux","Architecture":%q}`, runtime.GOARCH)
+			if err := os.WriteFile(filepath.Join(root, "daemon"), []byte(daemon), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Remove(filepath.Join(root, "image")); err != nil {
+				t.Fatal(err)
+			}
+			node := testFetchNode(base.ID, "https://example.test/source", base.Commit, base.TreeHash, base.Dest, subject, "")
+			if vendoring {
+				node.VendorCmd = []string{"vendor"}
+				var err error
+				node.VendorSpecDigest, err = ir.VendorSpecIdentity(node.VendorCmd, node.VendorImage)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			opts.Launch, opts.Runtime, opts.ImageAccess = true, runtimePath, ImageScopedReader
+			opts.Stdout, opts.Stderr = io.Discard, io.Discard
+			_, err := (Local{}).ExecNode(node, opts)
+			if vendoring {
+				if code(err) != e.CodeEngineCapability {
+					t.Fatalf("missing vendor image accepted: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(root, "calls")); !os.IsNotExist(err) {
+				t.Fatal("fetch without vendoring invoked image runtime")
 			}
 		})
 	}
