@@ -279,7 +279,7 @@ func (transport developmentRegistryTransport) RoundTrip(request *http.Request) (
 
 func TestDevelopmentUtilityCarriesDispatchContextWithoutCredentials(t *testing.T) {
 	plan, node, calls := githubRunnerRuntimeFixture(t, "exit 0\n")
-	location := utilityRunnerLocation{runtime: plan.Environment.RuntimeBinary(), mountSource: "/fixture", mountTarget: "/workspace",
+	location := utilityRunnerLocation{imageAccess: "prepared-only", runtime: plan.Environment.RuntimeBinary(), mountSource: "/fixture", mountTarget: "/workspace",
 		helper: "/workspace/nvkr-exec", plan: GitHubDevelopmentPlanPath, publicationRunContext: true, developmentRunContext: true}
 	setDevelopmentRun(t)
 	t.Setenv("NVKR_CREDENTIAL", "must-not-cross")

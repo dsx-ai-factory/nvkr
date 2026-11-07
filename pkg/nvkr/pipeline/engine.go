@@ -52,14 +52,20 @@ type RunOptions struct {
 	// the helper ORCHESTRATES the pinned toolchain container itself — the same code path as
 	// Local.Run — so a generic CI runner needs only a container runtime plus this helper.
 	Launch     bool
-	KeepGoing  bool         // continue after a failed build node instead of failing closed
-	Package    bool         // assemble each artifact into its outputType (oci-image/.deb) and record that digest
-	PackageDir string       // where packaged artifacts are written (default .nvkr/work/packages)
-	Runtime    string       // container runtime binary (default "docker"; e.g. docker | podman)
-	OCI        OCITransport // daemonless OCI registry/layout adapter (default: anonymous registry client)
-	Stdout     io.Writer    // build log sink
-	Stderr     io.Writer
-	progress   *progressSink // concurrency-safe live lifecycle output; node logs remain buffered
+	KeepGoing  bool   // continue after a failed build node instead of failing closed
+	Package    bool   // assemble each artifact into its outputType (oci-image/.deb) and record that digest
+	PackageDir string // where packaged artifacts are written (default .nvkr/work/packages)
+	Runtime    string // container runtime binary (default "docker"; e.g. docker | podman)
+	// ImageAccess is the factory-admitted route description, when supplied. It
+	// never proves availability: launched consumers authenticate bytes before
+	// source/output work. Omission retains the standalone unqualified runner API;
+	// factory consumers always supply their selected image route.
+	ImageAccess   ImageAccess
+	preparedImage *PreparedImage
+	OCI           OCITransport // daemonless OCI registry/layout adapter (default: anonymous registry client)
+	Stdout        io.Writer    // build log sink
+	Stderr        io.Writer
+	progress      *progressSink // concurrency-safe live lifecycle output; node logs remain buffered
 	// sources is a run-owned single-flight cache for exact prepared source inputs.
 	// It is intentionally private: authority and lifetime cannot cross a Run call.
 	sources *preparedSourceCache

@@ -23,7 +23,13 @@ import (
 // already-checked-out matching source closure is reused only through a re-hashed
 // source receipt; HEAD alone is never sufficient.
 func (l Local) fetch(n ir.Node, opts RunOptions) (returnErr error) {
-	return l.fetchWithSourceVendorAdmission(n, opts, admitSourceVendor)
+	return l.fetchWithSourceVendorAdmission(n, opts, func(ctx context.Context, node ir.Node, runtime string) (*sourceVendor, error) {
+		access := opts.ImageAccess
+		if access == "" {
+			access = ImagePreparedOnly
+		}
+		return admitSourceVendorWithAccess(ctx, node, runtime, access)
+	})
 }
 
 // The private core keeps the complete Git/closure lifecycle testable with a

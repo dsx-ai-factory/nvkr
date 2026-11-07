@@ -367,7 +367,8 @@ fail generation and helper admission with a coded capability error before output
 select anonymous pulls; they do not prove registry visibility. Private roots currently admit only GHCR.
 Ordinary in-process operation helpers keep shared capability checks but select local image semantics unless the
 Environment declares an explicit hosted route. Local IDs remain local; registry consumers still require
-classification. This admission does not supply local image preparation or runtime-observation receipts.
+classification. The inventory supplies route descriptions, never proof of local image availability.
+Runtime admission below owns the process-local prepared-image receipt.
 
 The optional `reader` declares one `credentialRef: github:SECRET_NAME` and
 `usernameRef: github:VARIABLE_NAME` for the private roots. A selected private root requires this reader
@@ -396,9 +397,16 @@ caller-only `vars` or `secrets` contexts. Calls without image preparation omit b
 defaults are admitted only with the absent image role. The helper admits the complete Plan,
 native platform and disk host requirements before pulling; it uses a private temporary Docker
 configuration and deletes it on success or failure before source or producer execution.
-Held runtime observation accepts an already-local exact repository digest, rejects a present
-but mismatched record, and pulls only after a failed local lookup. Image/platform/tool-byte
-admission remains required. No registry credential is forwarded into producer containers.
+One pipeline-owned image admission path accepts an already-local exact repository subject and checks
+its platform and local config ID. The config ID and registry manifest digest remain distinct. Only an
+explicit anonymous route can pull after a failed local lookup, within a ten-minute admission bound.
+Private and measured-local consumers never pull: an unavailable private image requires a new invocation
+of the separately credential-bearing preparation step. Present mismatched or ambiguous metadata fails
+without retry. A process-local prepared-image receipt binds subject, platform, config ID and observed
+runtime identity; it grants neither qualification nor provider authority. Factory utility and ordinary
+producer launches reauthenticate locally through this owner and use `--pull=never`. Held source and
+qualified observers retain their held executable/daemon authentication while using the same image
+admission logic. No registry credential is forwarded into producer containers.
 The package owner grants the reader account access without granting the source repository Actions access.
 
 For Plans with declared toolchain access, generated support jobs observe exact image manifests after
@@ -512,8 +520,9 @@ platform route. Each configured native job checks its realized kernel OS/archite
 helper use. Bootstrap builds a separate static Linux helper with explicit `GOOS`/`GOARCH` for each route;
 transport pairs each job with that route's helper. The execution entrypoint checks its own native helper
 platform against the exact Plan before work. Before build execution, the pipeline owner checks the
-actual Docker/Podman daemon platform, pulls the pinned toolchain for the selected platform, and verifies its
-reported image platform and manifest identity. Failed platform-admission pulls capture at most 1 MiB of
+actual Docker/Podman daemon platform and admits the selected image through the shared local-first
+owner and its explicit materialization route. It verifies image platform, manifest subject and local
+config identity. Failed platform-admission pulls capture at most 1 MiB of
 stderr and report only a fixed diagnostic category; raw registry messages, URLs and credentials are not
 included. Overflow and unrecognized responses remain distinct diagnostic categories. Cancellation takes
 precedence, and classification does not retry a pull or relax admission. Held source vendoring separately checks its daemon against

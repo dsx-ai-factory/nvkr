@@ -21,6 +21,14 @@ import (
 // capability; development and prequalification acquisition retain the configured
 // runtime pathname behavior.
 func runContainerRuntime(opts RunOptions, args ...string) error {
+	if opts.preparedImage != nil && len(args) > 0 && (args[0] == "run" || args[0] == "create") {
+		image := opts.preparedImage
+		if err := image.RequireFor(opts.ctx(), opts.Runtime, image.subject, image.platform); err != nil {
+			return err
+		}
+		args = append([]string{args[0], "--pull=never"}, args[1:]...)
+	}
+
 	if opts.execution != nil && opts.execution.runtime != nil {
 		return opts.execution.runtime.run(opts.ctx(), opts.Stdout, opts.Stderr, args...)
 	}

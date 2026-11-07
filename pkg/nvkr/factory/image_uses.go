@@ -11,6 +11,7 @@ import (
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 // ImageRoute describes required materialization, never observed availability or
@@ -161,4 +162,44 @@ func (plan *Plan) resolveImageUse(classifier authored.ToolchainImageClassifier, 
 		}
 	}
 	return use, nil
+}
+
+// runtimeImageAccess projects the admitted inventory without reimplementing its
+// classification policy. A missing consumer is allowed only when it has no image.
+func (plan *Plan) runtimeImageAccess(node Node, engine string) (pipeline.ImageAccess, error) {
+	if plan == nil {
+		return "", e.New(e.CodeUsage, "runtime image admission requires a Plan")
+	}
+	uses, err := plan.imageUses(engine)
+	if err != nil {
+		return "", err
+	}
+	for _, use := range uses {
+		if use.ConsumerID != node.ID {
+			continue
+		}
+		switch use.Route {
+		case ImageAnonymous:
+			return pipeline.ImageAnonymous, nil
+		case ImageScopedReader:
+			return pipeline.ImageScopedReader, nil
+		case ImageMeasuredLocal:
+			return pipeline.ImageMeasuredLocal, nil
+		case ImageNativeBundle:
+			return "", nil
+		default:
+			return "", e.New(e.CodeEngineCapability, "unsupported runtime image route")
+		}
+	}
+	if node.Container != "" {
+		return "", e.New(e.CodeEngineCapability, "image consumer is absent from admitted inventory")
+	}
+	return "", nil
+}
+
+func (plan *Plan) operationImageEngine() string {
+	if plan.Environment.GitHubARC != "" || len(plan.Environment.GitHubRunners) > 0 {
+		return "github"
+	}
+	return "local"
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 // utilityRunnerLocation describes only the two maintained helper transports.
@@ -21,6 +22,7 @@ import (
 // these private paths are not another authored execution contract.
 type utilityRunnerLocation struct {
 	runtime                  string
+	imageAccess              pipeline.ImageAccess
 	mountSource, mountTarget string
 	helper, plan, planDigest string
 	user                     string
@@ -37,6 +39,10 @@ func executeUtilityNode(ctx context.Context, node Node, location utilityRunnerLo
 	}
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "utility execution canceled")
+	}
+	prepared, err := pipeline.PrepareContainerImage(ctx, location.runtime, node.Container, node.Platform, location.imageAccess)
+	if err != nil {
+		return err
 	}
 	network := "bridge"
 	if node.Network == ir.NetworkNone {
@@ -66,6 +72,10 @@ func executeUtilityNode(ctx context.Context, node Node, location utilityRunnerLo
 	if location.planDigest != "" {
 		args = append(args, "--plan-digest", location.planDigest)
 	}
+	if err := prepared.RequireFor(ctx, location.runtime, node.Container, node.Platform); err != nil {
+		return err
+	}
+	args = append([]string{args[0], "--pull=never"}, args[1:]...)
 	cmd := exec.CommandContext(ctx, location.runtime, args...)
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	runErr := ownedcmd.Run(ctx, cmd)

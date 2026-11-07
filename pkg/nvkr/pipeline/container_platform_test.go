@@ -21,13 +21,13 @@ func TestContainerPlatformAdmission(t *testing.T) {
 		name, raw, platform string
 		code                e.Code
 	}{
-		{"amd64", `{"Os":"linux","Architecture":"amd64","RepoDigests":["` + image + `"]}`, "linux/amd64", ""},
-		{"arm64", `{"Os":"linux","Architecture":"arm64","RepoDigests":["` + image + `"]}`, "linux/arm64", ""},
-		{"wrong architecture", `{"Os":"linux","Architecture":"amd64","RepoDigests":["` + image + `"]}`, "linux/arm64", e.CodeEngineCapability},
-		{"wrong OS", `{"Os":"darwin","Architecture":"arm64","RepoDigests":["` + image + `"]}`, "linux/arm64", e.CodeEngineCapability},
-		{"wrong identity", `{"Os":"linux","Architecture":"arm64","RepoDigests":["example.test/tool@sha256:` + strings.Repeat("b", 64) + `"]}`, "linux/arm64", e.CodePreflightFailed},
-		{"missing identity", `{"Os":"linux","Architecture":"arm64"}`, "linux/arm64", e.CodePreflightFailed},
-		{"duplicate architecture", `{"Os":"linux","Architecture":"amd64","Architecture":"arm64","RepoDigests":["` + image + `"]}`, "linux/arm64", e.CodeEngineCapability},
+		{"amd64", `{"Id":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","Os":"linux","Architecture":"amd64","RepoDigests":["` + image + `"]}`, "linux/amd64", ""},
+		{"arm64", `{"Id":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","Os":"linux","Architecture":"arm64","RepoDigests":["` + image + `"]}`, "linux/arm64", ""},
+		{"wrong architecture", `{"Id":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","Os":"linux","Architecture":"amd64","RepoDigests":["` + image + `"]}`, "linux/arm64", e.CodePreflightFailed},
+		{"wrong OS", `{"Id":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","Os":"darwin","Architecture":"arm64","RepoDigests":["` + image + `"]}`, "linux/arm64", e.CodePreflightFailed},
+		{"wrong identity", `{"Id":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","Os":"linux","Architecture":"arm64","RepoDigests":["example.test/tool@sha256:` + strings.Repeat("b", 64) + `"]}`, "linux/arm64", e.CodePreflightFailed},
+		{"missing identity", `{"Id":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","Os":"linux","Architecture":"arm64"}`, "linux/arm64", e.CodePreflightFailed},
+		{"duplicate architecture", `{"Id":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","Os":"linux","Architecture":"amd64","Architecture":"arm64","RepoDigests":["` + image + `"]}`, "linux/arm64", e.CodeEngineCapability},
 		{"malformed", `{`, "linux/arm64", e.CodeEngineCapability},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -105,8 +105,8 @@ func TestContainerAdmissionChecksDaemonBeforePull(t *testing.T) {
 		name, platform, daemon, wantCalls string
 		code                              e.Code
 	}{
-		{"native amd64", "linux/amd64", "amd64", "info\npull\nimage\n", ""},
-		{"native arm64", "linux/arm64", "arm64", "info\npull\nimage\n", ""},
+		{"native amd64", "linux/amd64", "amd64", "info\nversion\nimage\n", ""},
+		{"native arm64", "linux/arm64", "arm64", "info\nversion\nimage\n", ""},
 		{"foreign", "linux/arm64", "amd64", "info\n", e.CodeEngineCapability},
 		{"unsupported", "linux/riscv64", "arm64", "", e.CodeEngineCapability},
 	} {
@@ -115,7 +115,7 @@ func TestContainerAdmissionChecksDaemonBeforePull(t *testing.T) {
 			log := filepath.Join(dir, "calls")
 			runtimePath := filepath.Join(dir, "docker")
 			t.Setenv("NVKR_TEST_CALLS", log)
-			script := "#!/bin/sh\nprintf '%s\n' \"$1\" >> \"$NVKR_TEST_CALLS\"\ncase \"$1\" in\ninfo) printf '%s\n' '{\"OSType\":\"linux\",\"Architecture\":\"" + tc.daemon + "\"}';;\npull) exit 0;;\nimage) printf '%s\n' '{\"Os\":\"linux\",\"Architecture\":\"" + tc.daemon + "\",\"RepoDigests\":[\"" + image + "\"]}';;\nesac\n"
+			script := "#!/bin/sh\nprintf '%s\n' \"$1\" >> \"$NVKR_TEST_CALLS\"\ncase \"$1\" in\ninfo) printf '%s\n' '{\"ID\":\"test-daemon\",\"OSType\":\"linux\",\"Architecture\":\"" + tc.daemon + "\"}';;\nversion) printf '%s\\n' '{}';;\npull) exit 0;;\nimage) printf '%s\n' '{\"Id\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"Os\":\"linux\",\"Architecture\":\"" + tc.daemon + "\",\"RepoDigests\":[\"" + image + "\"]}';;\nesac\n"
 			if err := os.WriteFile(runtimePath, []byte(script), 0o755); err != nil {
 				t.Fatal(err)
 			}
@@ -235,21 +235,22 @@ func TestContainerPlatformPullCapturesDiagnosticsBeforeInspection(t *testing.T) 
 	script := `#!/bin/sh
 printf '%s\n' "$1" >> "$NVKR_TEST_CALLS"
 case "$1" in
-info) printf '%s\n' '{"OSType":"linux","Architecture":"amd64"}';;
+info) printf '%s\n' '{"ID":"test-daemon","OSType":"linux","Architecture":"amd64"}';;
+version) printf '%s\n' '{}';;
 pull) printf '%s\n' 'toomanyrequests: secret-value https://registry.invalid/private' >&2; exit 1;;
-image) exit 0;;
+image) exit 1;;
 esac
 `
 	if err := os.WriteFile(runtimePath, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	image := "example.test/tool@sha256:" + strings.Repeat("a", 64)
-	err := CheckContainerPlatform(t.Context(), runtimePath, image, "linux/amd64")
+	err := CheckContainerPlatform(t.Context(), runtimePath, image, "linux/amd64", ImageAnonymous)
 	if code(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "diagnostic: registry-rate-limit)") || strings.Contains(err.Error(), "secret-value") || strings.Contains(err.Error(), "registry.invalid") {
 		t.Fatalf("pull diagnostic was not safely classified: %v", err)
 	}
 	calls, readErr := os.ReadFile(log)
-	if readErr != nil || string(calls) != "info\npull\n" {
+	if readErr != nil || string(calls) != "info\nversion\nimage\npull\n" {
 		t.Fatalf("failed pull was retried or inspected: %q, %v", calls, readErr)
 	}
 }

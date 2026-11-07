@@ -579,7 +579,11 @@ anonymous roots independently of publication, with one reader for private roots.
 is inventoried before renderer grouping; unclassified images or unsupported private routes fail generation
 before output. Exact source/location bindings preserve logical Build identity. Measured local images and
 native bundle digests are separate sources, never registry references. The compiler derives
-routine packaging and routes.
+routine packaging and routes. Runtime image admission shares a local-first owner across utility,
+ordinary producer and held image checks. Its process-local receipt binds the exact subject, platform,
+local config ID and observed runtime identity. Only an explicit anonymous route can materialize a
+missing image; private consumers require separately scoped preparation and never retry anonymously.
+Factory consumers recheck local bytes before launch and prohibit implicit pulls.
 Declared-access GitHub Plans schedule bounded manifest/config reader probes after final runtime Plan
 delivery, separately per selected runner placement, and gate producer fan-out on success. The probe
 owner records sorted Plan/subject/route/time observations without downloading layers. These describe

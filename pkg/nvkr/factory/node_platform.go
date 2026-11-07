@@ -22,7 +22,7 @@ func CheckNodePlatform(ctx context.Context, plan *Plan, nodeID string) error {
 	return checkNodePlatform(ctx, plan, nodeID, runtime.GOOS+"/"+runtime.GOARCH, pipeline.CheckContainerPlatform)
 }
 
-type containerPlatformCheck func(context.Context, string, string, string) error
+type containerPlatformCheck func(context.Context, string, string, string, ...pipeline.ImageAccess) error
 
 func checkNodePlatform(ctx context.Context, plan *Plan, nodeID, observed string, check containerPlatformCheck) error {
 	node, err := admitExecutionNode(ctx, plan, nodeID)
@@ -46,7 +46,11 @@ func checkNodeContainerPlatform(ctx context.Context, plan *Plan, node Node, chec
 	if execution.Container == "" {
 		return nil
 	}
-	return check(ctx, plan.Environment.RuntimeBinary(), execution.Container, execution.Platform)
+	access, err := plan.runtimeImageAccess(node, "github")
+	if err != nil {
+		return err
+	}
+	return check(ctx, plan.Environment.RuntimeBinary(), execution.Container, execution.Platform, access)
 }
 
 func admitExecutionNode(ctx context.Context, plan *Plan, nodeID string) (Node, error) {
