@@ -285,7 +285,7 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 							return e.New(e.CodeEngineCapability,
 								"exact-input verification requires pipeline-attested/artifact-publication policy")
 						}
-						_, err := (&lifecycle.Consumer{}).Verify(c.Context, c.String("reference"), policy)
+						_, err := (&lifecycle.Consumer{}).Verify(ctx, c.String("reference"), policy)
 						return err
 					}
 					var expectation *lifecycle.ExactInputExpectation

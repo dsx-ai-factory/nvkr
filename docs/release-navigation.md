@@ -31,8 +31,9 @@ Registry access uses the existing local credential keychain by default. Add `--a
 registry. `--plain-http` explicitly enables HTTP for a local test registry. Browse and export have a one-hour default
 deadline; `--timeout 2h` changes it. Authenticity verification also permits one hour. A caller's earlier cancellation still wins. With caching disabled, registry downloads use a
 private system temporary directory that is removed on success, failure, or cancellation. By default, browsing
-does not write to the current working directory. With `--workspace`, only the private inspection child is removed; the
-caller-owned workspace remains. Registry browsing fetches the release index, then up to 16 member objects concurrently: metadata manifests and configs,
+does not write to the current working directory. With `--workspace` and caching disabled, only the private inspection child is removed; the
+caller-owned workspace remains. With caching enabled, staging stays in the cache directory so publication can
+use an atomic rename on the same filesystem; select that directory with `NVKR_METADATA_CACHE`. Registry browsing fetches the release index, then up to 16 member objects concurrently: metadata manifests and configs,
 and bounded evidence documents from their derived sibling repositories. It checks exact metadata digests,
 sizes, schemas and memberships. Artifact payload layers, including container layers, executable archives and
 disk images, are not downloaded.
@@ -49,10 +50,12 @@ one browse, export or verify operation. `--layout` continues to inspect only the
 Each hit rechecks blob hashes, sizes, schemas and complete metadata membership before use. Inspection
 holds the per-root cache lock while it reads those bytes, avoiding another copy of the metadata closure. Corrupt entries are rejected and refetched. Per-root kernel locks
 serialize readers and replacement; only a completely checked staged layout is renamed into the cache.
+The empty per-root `.lock` files persist as cache bookkeeping to preserve a stable lock inode.
+Closing an inspection releases the kernel lock; the persistent file is not an active or leaked lock.
 The cache is expendable and carries no signature, policy, payload-integrity or registry-availability result.
 Authenticity verification still performs its signature and policy checks on every invocation. The cache has
 no automatic eviction: to clear it, close active inspections and remove the `release-metadata/v1` directory
-(or the explicit directory you selected), then the next invocation downloads fresh metadata.
+(or the explicit directory you selected), including its `.lock` files. The next invocation downloads fresh metadata.
 
 Plain mode reports metadata objects done/total on stderr, leaving JSON stdout unchanged. On a cache hit,
 these updates follow the per-member integrity checks. One object is a release member, including its config, evidence layer or native-image children. Downloaded counts do not

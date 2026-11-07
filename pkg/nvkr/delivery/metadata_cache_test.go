@@ -4,6 +4,7 @@
 package delivery
 
 import (
+	"context"
 	"io"
 	"log"
 	"net/http"
@@ -14,6 +15,9 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
+
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 
 	"github.com/google/go-containerregistry/pkg/registry"
 )
@@ -126,5 +130,78 @@ func TestMetadataCacheDoesNotPublishFailedPull(t *testing.T) {
 		if !strings.HasSuffix(entry.Name(), ".lock") {
 			t.Fatal("failed pull published a cache entry")
 		}
+	}
+}
+
+func TestMetadataCacheRetirementFailureCleansStageAndUnlocks(t *testing.T) {
+	full, digest := releasePublicationFixture(t)
+	handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	options := RegistryOptions{PlainHTTP: true, Anonymous: true}
+	ref, err := Push(t.Context(), full, strings.TrimPrefix(server.URL, "http://")+"/product/releases", options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cache := t.TempDir()
+	entry := filepath.Join(cache, strings.TrimPrefix(digest, "sha256:"))
+	if _, err := ExportMetadata(t.Context(), full, entry); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(entry, "index.json"), []byte("corrupt cache index"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	injected, visited := false, false
+	request := MetadataPullOptions{Registry: options, Progress: func(MetadataProgress) {
+		if injected {
+			return
+		}
+		entries, err := os.ReadDir(cache)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		for _, candidate := range entries {
+			if !strings.HasPrefix(candidate.Name(), ".metadata-cache-") {
+				continue
+			}
+			// A nonempty destination forces Rename to fail without relying on uid,
+			// filesystem permissions, or removing the already checked replacement.
+			rejected := filepath.Join(cache, candidate.Name(), "rejected")
+			if err := os.Mkdir(rejected, 0o700); err != nil {
+				t.Error(err)
+				return
+			}
+			if err := os.WriteFile(filepath.Join(rejected, "blocker"), []byte("fixture"), 0o600); err != nil {
+				t.Error(err)
+				return
+			}
+			injected = true
+		}
+	}}
+	visit := func(context.Context, string, Inspection) error { visited = true; return nil }
+	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+	defer cancel()
+	err = VisitCachedMetadata(ctx, ref, cache, request, visit)
+	assertRegistryCode(t, err, e.CodeImmutableViolation)
+	if !strings.Contains(err.Error(), "retiring invalid metadata cache") || !injected || visited {
+		t.Fatalf("did not fail during retirement: injected=%t visited=%t err=%v", injected, visited, err)
+	}
+	entries, err := os.ReadDir(cache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range entries {
+		if strings.HasPrefix(candidate.Name(), ".metadata-cache-") {
+			t.Fatal("failed retirement leaked staging")
+		}
+	}
+	// A subsequent visit must acquire the released lock, refetch the still-invalid
+	// entry and reach the visitor only after successful atomic replacement.
+	if err := VisitCachedMetadata(ctx, ref, cache, MetadataPullOptions{Registry: options}, visit); err != nil {
+		t.Fatal(err)
+	}
+	if !visited {
+		t.Fatal("repaired cache was not visited")
 	}
 }
