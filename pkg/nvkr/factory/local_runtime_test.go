@@ -15,7 +15,6 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
 // Scripted process boundaries exercise orchestration and argument/environment
@@ -72,28 +71,29 @@ printf '%s/%s/%s\n' "$GOOS" "$GOARCH" "$CGO_ENABLED" > "$6"
 }
 
 func TestLocalFactoryContainerArgumentsAndCleanup(t *testing.T) {
+	plan := githubTestPlan(t)
+	node := planNode(plan, "package/worker")
 	root := t.TempDir()
-	runtime := filepath.Join(root, "runtime")
+	runtime := filepath.Join(root, "docker")
 	log := filepath.Join(root, "calls")
 	t.Setenv("NVKR_TEST_RUNTIME_LOG", log)
-	if err := os.WriteFile(runtime, []byte("#!/bin/sh\nprintf '%s\\n' \"CALL\" \"$@\" >> \"$NVKR_TEST_RUNTIME_LOG\"\n"), 0o755); err != nil {
+	if err := os.WriteFile(runtime, []byte("#!/bin/sh\nprintf '%s\\n' \"CALL\" \"$@\" >> \"$NVKR_TEST_RUNTIME_LOG\"\n"+preparedUtilityRuntimeProtocol(node, "docker")), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	options := withLocalDefaults(LocalRunOptions{Workspace: filepath.Join(root, "workspace"), Runtime: runtime})
-	node := Node{ID: "package/tools", Kind: NodePackage, Platform: "linux/amd64", Network: ir.NetworkNone, Container: "example.invalid/tool@sha256:" + strings.Repeat("a", 64)}
-	err := executeLocalFactoryNode(t.Context(), nil, node, options, nil)
+	err := executeLocalFactoryNode(t.Context(), plan, node, options, nil)
 	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 	if _, err := os.Stat(log); !os.IsNotExist(err) {
 		t.Fatal("missing runner launched runtime")
 	}
-	if err := executeLocalFactoryNode(t.Context(), nil, node, options, map[string]string{"linux/amd64": "runner"}); err != nil {
+	if err := executeLocalFactoryNode(t.Context(), plan, node, options, map[string]string{"linux/amd64": "runner"}); err != nil {
 		t.Fatal(err)
 	}
 	raw, err := os.ReadFile(log)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, expected := range []string{"CALL\nrun\n--rm\n--name\n", "--network\nnone\n--platform\nlinux/amd64\n", "-v\n" + options.Workspace + ":/workspace/.nvkr/factory\n", "-w\n/workspace\n", node.Container + "\n", "/workspace/.nvkr/factory/.runner/nvkr-exec-amd64\nfactory\nexecute-node\n", "--plan\n/workspace/.nvkr/factory/.runner/plan.json\n--node\npackage/tools\n", "CALL\nrm\n-f\nnvkr-factory-"} {
+	for _, expected := range []string{"CALL\nrun\n--pull=never\n--rm\n--name\n", "--network\nnone\n--platform\nlinux/amd64\n", "-v\n" + options.Workspace + ":/workspace/.nvkr/factory\n", "-w\n/workspace\n", node.Container + "\n", "/workspace/.nvkr/factory/.runner/nvkr-exec-amd64\nfactory\nexecute-node\n", "--plan\n/workspace/.nvkr/factory/.runner/plan.json\n--node\n" + node.ID + "\n", "CALL\nrm\n-f\nnvkr-factory-"} {
 		if !strings.Contains(string(raw), expected) {
 			t.Fatalf("missing runtime contract %q in %s", expected, raw)
 		}

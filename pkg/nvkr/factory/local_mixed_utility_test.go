@@ -217,15 +217,15 @@ func TestMixedLocalUtilityLaunchBindsExactPlan(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	runtime := filepath.Join(root, "runtime")
+	node := planNode(plan, "worker/sbom")
+	runtime := filepath.Join(root, "docker")
 	log := filepath.Join(root, "calls")
 	t.Setenv("NVKR_TEST_RUNTIME_LOG", log)
-	if err := os.WriteFile(runtime, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" >> \"$NVKR_TEST_RUNTIME_LOG\"\n"), 0o755); err != nil {
+	if err := os.WriteFile(runtime, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" >> \"$NVKR_TEST_RUNTIME_LOG\"\n"+preparedUtilityRuntimeProtocol(node, "docker")), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	// Ordinary terminal observation runs on the host; SBOM production still
 	// enters the offline child and must bind the complete original Plan.
-	node := planNode(plan, "worker/sbom")
 	options := withLocalDefaults(LocalRunOptions{Workspace: ".nvkr/test", Runtime: runtime})
 	compiler := filepath.Join(root, "compiler")
 	if err := os.WriteFile(compiler, []byte("#!/bin/sh\n[ \"$5\" = -o ] || exit 91\nprintf 'fixture runner' > \"$6\"\n"), 0o755); err != nil {

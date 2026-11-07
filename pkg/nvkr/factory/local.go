@@ -925,8 +925,12 @@ func launchLocalUtility(ctx context.Context, plan *Plan, node Node, options Loca
 			return err
 		}
 	}
+	access, err := plan.runtimeImageAccess(node, "local")
+	if err != nil {
+		return err
+	}
 	return executeUtilityNode(ctx, node, utilityRunnerLocation{
-		runtime: options.Runtime, mountSource: workspace, mountTarget: "/workspace/.nvkr/factory",
+		runtime: options.Runtime, imageAccess: access, mountSource: workspace, mountTarget: "/workspace/.nvkr/factory",
 		helper: containerRunner, plan: "/workspace/.nvkr/factory/" + localPlanPath, planDigest: planDigest,
 		user: localContainerUser(), home: true,
 	}, options.Stdout, options.Stderr)

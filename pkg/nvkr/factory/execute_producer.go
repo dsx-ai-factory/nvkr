@@ -23,6 +23,10 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 	if err != nil {
 		return err
 	}
+	access, err := plan.runtimeImageAccess(node, plan.operationImageEngine())
+	if err != nil {
+		return err
+	}
 	_, artifacts := planIndex(plan)
 	var sourceRoot string
 	if instruction.Kind == ir.KindFetch {
@@ -64,7 +68,7 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 		}
 	}
 	result, err := run(instruction, pipeline.RunOptions{
-		Ctx: ctx, SourceRoot: sourceRoot, Runtime: runtime, Jobs: jobs, Launch: true,
+		Ctx: ctx, SourceRoot: sourceRoot, Runtime: runtime, Jobs: jobs, Launch: true, ImageAccess: access,
 		BuildMaterials: buildMaterials, ToolExecutable: toolExecutable, Stdout: stdout, Stderr: stderr,
 	})
 	if err != nil {

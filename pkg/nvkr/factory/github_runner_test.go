@@ -157,6 +157,8 @@ func githubRunnerRuntimeFixtureFor(t *testing.T, runtimeOverride, script string)
 	calls := filepath.Join(root, "runtime-calls")
 	t.Setenv("NVKR_TEST_RUNTIME_LOG", calls)
 	runtime := filepath.Join(root, plan.Environment.RuntimeBinary())
+	script = preparedUtilityRuntimeProtocol(node, plan.Environment.RuntimeBinary()) + script
+
 	if err := os.WriteFile(runtime, []byte("#!/bin/sh\nprintf '%s\\n' CALL \"$@\" >> \"$NVKR_TEST_RUNTIME_LOG\"\n"+script), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -200,7 +202,7 @@ func TestRunGitHubNodeUtilityStatusAndExactLaunch(t *testing.T) {
 			if digestErr != nil {
 				t.Fatal(digestErr)
 			}
-			for _, want := range []string{"CALL\nrun\n--rm\n--name\n", "--network\nnone\n--platform\n" + node.Platform, "/workspace/nvkr-exec\nfactory\nexecute-node\n", "--plan\n" + FactoryPlanPath, "--node\n" + node.ID, "--plan-digest\n" + digest, "CALL\nrm\n-f\n"} {
+			for _, want := range []string{"CALL\nrun\n--pull=never\n--rm\n--name\n", "--network\nnone\n--platform\n" + node.Platform, "/workspace/nvkr-exec\nfactory\nexecute-node\n", "--plan\n" + FactoryPlanPath, "--node\n" + node.ID, "--plan-digest\n" + digest, "CALL\nrm\n-f\n"} {
 				if !strings.Contains(string(raw), want) {
 					t.Fatalf("missing%q: %s", want, raw)
 				}
@@ -354,7 +356,7 @@ func TestGitHubUtilityContextUsesStageBoundAndEarlierDeadline(t *testing.T) {
 
 func TestPublicationUtilityCarriesOnlyPublicRunIdentity(t *testing.T) {
 	plan, node, calls := githubRunnerRuntimeFixture(t, "exit 0\n")
-	location := utilityRunnerLocation{runtime: plan.Environment.RuntimeBinary(), mountSource: "/fixture", mountTarget: "/workspace", helper: "/workspace/nvkr-exec", plan: FactoryPlanPath, publicationRunContext: true}
+	location := utilityRunnerLocation{imageAccess: "prepared-only", runtime: plan.Environment.RuntimeBinary(), mountSource: "/fixture", mountTarget: "/workspace", helper: "/workspace/nvkr-exec", plan: FactoryPlanPath, publicationRunContext: true}
 	t.Setenv("GITHUB_ACTIONS", "true")
 	t.Setenv("GITHUB_TOKEN", "must-not-cross")
 	t.Setenv(githubRepositoryTokenEnv, "repository-token-must-not-cross")
@@ -375,4 +377,19 @@ func TestPublicationUtilityCarriesOnlyPublicRunIdentity(t *testing.T) {
 			t.Fatalf("credential crossed utility boundary: %s", forbidden)
 		}
 	}
+}
+
+func preparedUtilityRuntimeProtocol(node Node, runtimeName string) string {
+	arch := strings.TrimPrefix(node.Platform, "linux/")
+	info := fmt.Sprintf(`{"ID":"test-daemon","OSType":"linux","Architecture":%q}`, arch)
+	if runtimeName == "podman" {
+		info = fmt.Sprintf(`{"host":{"os":"linux","arch":%q,"hostname":"test-host"},"store":{"graphDriverName":"overlay","graphRoot":"/test/store","runRoot":"/test/run"},"version":{"Version":"test","OsArch":%q}}`, arch, node.Platform)
+	}
+	id := "sha256:" + strings.Repeat("b", 64)
+	if canonical.IsDigest(node.Container) {
+		id = node.Container
+	}
+	image := fmt.Sprintf(`{"Id":%q,"Os":"linux","Architecture":%q,"RepoDigests":[%q]}`, id, arch, node.Container)
+	return "case \"$1\" in\ninfo) printf '%s\\n' '" + info + "'; exit 0;;\nversion) printf '%s\\n' '{}'; exit 0;;\nimage) printf '%s\\n' '" + image + "'; exit 0;;\npull) exit 94;;\nesac\n"
+
 }

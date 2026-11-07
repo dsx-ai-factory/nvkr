@@ -123,6 +123,10 @@ func launchGitHubUtility(ctx context.Context, plan *Plan, node Node, options Git
 	if location.runtime == "docker" {
 		location.user, location.home = localContainerUser(), true
 	}
+	location.imageAccess, err = plan.runtimeImageAccess(node, "github")
+	if err != nil {
+		return err
+	}
 	err = executeUtilityNode(ctx, node, location, options.Stdout, options.Stderr)
 	return githubUtilityError(ctx, err)
 }

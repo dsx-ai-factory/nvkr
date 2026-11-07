@@ -60,6 +60,7 @@ func ordinaryMaterialPlan(t *testing.T) (*Plan, Node) {
 		APIVersion: authored.EnvironmentAPIVersion, Kind: authored.EnvironmentKind,
 		Metadata: authored.Metadata{Name: "test"}, RunsOn: "ubuntu-24.04",
 		UtilityContainer: fixtureUtilityContainer, UtilityPlatform: "linux/amd64",
+		ToolchainAccess: &authored.ToolchainAccess{PublicRoots: []string{"docker.io/library/golang", "example.test/composer"}},
 	}
 	plan, err := Compile(t.Context(), definition, environment, stack, "test")
 	if err != nil {
