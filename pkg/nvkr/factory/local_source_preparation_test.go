@@ -5,7 +5,6 @@ package factory
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"io"
 	"os"
@@ -15,9 +14,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -122,28 +119,29 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 	if len(before.Builds) != len(after.Builds) {
 		t.Fatal("source selection changed outputs")
 	}
-	// Exercise the exact projection used by prepareDefaultNativeBuild, rather than
-	// duplicating its catalog grouping logic in a test-only approximation.
-	rawPlan, err := canonical.Marshal(after)
+	bindings, err := LoadLocalToolchainBindings(t.Context(), filepath.Join(scripts, "..", "toolchains/nvkr-packer/local-bindings.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	projectionCtx, cancelProjection := context.WithTimeout(t.Context(), 15*time.Second)
-	defer cancelProjection()
-	projection := exec.CommandContext(projectionCtx, "jq", "-L", scripts, "-e", `include "nvke-os-plan"; local_toolchain_scopes("all"; "amd64")`)
-	projection.WaitDelay = time.Second
-	projection.Stdin = bytes.NewReader(rawPlan)
-	projected, err := projection.CombinedOutput()
+	preparation, err := CompileLocalToolchainPreparation(t.Context(), after, bindings, "amd64")
 	if err != nil {
-		t.Fatalf("native-build-toolchain-scopes: %v: %s", err, projected)
+		t.Fatal(err)
+	}
+	compiledScopes, err := preparation.Scopes(t.Context(), "sha256:"+strings.Repeat("a", 64))
+	if err != nil {
+		t.Fatal(err)
 	}
 	var scopes []struct {
-		Outputs    []string `json:"outputs"`
-		Components []string `json:"components"`
-		Pin        string   `json:"pin"`
+		Outputs, Components []string
+		Pin                 string
 	}
-	if err := json.Unmarshal(projected, &scopes); err != nil {
-		t.Fatal(err)
+	for _, scope := range compiledScopes {
+		for _, substitution := range scope.Overlay.ToolchainSubstitutions {
+			scopes = append(scopes, struct {
+				Outputs, Components []string
+				Pin                 string
+			}{scope.Outputs, substitution.Components, substitution.From})
+		}
 	}
 	sharedCharts := false
 	for _, scope := range scopes {

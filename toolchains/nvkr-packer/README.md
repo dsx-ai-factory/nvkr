@@ -172,6 +172,20 @@ Preparation neither pushes nor signs an image, writes a source lock, or supplies
 The native preparation script/workflow can retain exact image archives and measurements for a separately
 authorized publication owner.
 
+The local Go launcher and ARM64 shell adapter use `local-bindings.json` to declare compatible
+catalog names, exact predecessor pins, architectures and explicit component sets. The factory binds
+those selectors to each compiled catalog digest and selected output. Output names, disk counts,
+equal image strings and shared catalogs do not extend component membership. Add an explicit binding
+when another compatible producer group needs this image; unknown local IDs and unclassified image
+routes fail before assembly. The ordinary Environment image-access classifier owns public routes.
+
+Before assembly, the factory recompiles the proposed substitutions in memory and inventories every
+image consumer. After native validation, each launcher checks the returned image ID and Linux
+architecture in the selected daemon, emits predecessor-bound overlays, recompiles, and compares
+all named outputs, catalog digests, Build Digests and image consumers against the expected selection.
+These are local diagnostic checks. They do not supply hosted release evidence or demonstrate a
+successful NVKE image bake.
+
 Consume a reviewed published native image through the catalog's existing `toolchainSubstitutions` contract:
 bind the exact predecessor catalog digest, native `arch`, existing `from` pin, measured `to` pin and sorted
 explicit component set. For each M2 disk, the nine source-map consumers are `nvke-agent`, `nvke-cni-calico`,

@@ -11,69 +11,7 @@ def toolchain_overlay($arch; $from; $to; $digest; $components):
    name:("nvke-os-local-toolchain-" + $arch), requiresCatalogDigest:$digest,
    toolchainSubstitutions:[{arch:$arch, from:$from, to:$to, components:$components}]};
 
-def component_toolchain($arch): .toolchainImages[$arch] // .toolchainImage;
-
-def disk_toolchain_scope($arch):
-  [.builds[] | select(any(.executionGraph.nodes[]; .builderType == "vm-image"))] |
-  if length != 1 then error("expected one disk build") else .[0] end |
-  . as $disk |
-  [.executionGraph.nodes[] | select(.kind == "build" and .builderType == "vm-image") | .component] |
-  if length != 1 then error("expected one disk root") else .[0] end |
-  ($disk.catalogSnapshot.Components[.] | component_toolchain($arch)) as $pin |
-  {pin:$pin, catalogDigest:$disk.catalogDigest, components:
-    ([$disk.components[] as $name | $disk.catalogSnapshot.Components[$name] |
-      select(.fromSource == true and component_toolchain($arch) == $pin) | $name] | sort)};
-
-# This launcher projection follows an already admitted Plan. Catalog loading
-# authenticates the exact predecessor and substitution; this is not a validator
-# or permission to rewrite unrelated producer toolchains.
-def simulator_toolchain_scope($arch):
-  [.builds[] | select(.name == ("nicosim-tools-" + $arch))] |
-  if length != 1 then error("expected one simulator tools build") else .[0] end |
-  . as $build |
-  [.components[] as $name | .catalogSnapshot.Components[$name] |
-    if .fromSource != true or (component_toolchain($arch) | type) != "string" then
-      error("simulator component lacks a source toolchain")
-    else {name:$name, pin:component_toolchain($arch)} end] as $selected |
-  [$selected[].pin] | unique |
-  if length != 1 then error("expected one simulator source toolchain") else .[0] end |
-  {pin:., catalogDigest:$build.catalogDigest, components:([$selected[].name] | sort)};
-
-# Only the two source-built site charts select the shared local toolchain. The
-# ordinary catalog overlay authenticates every selected predecessor digest.
-def site_helm_toolchain_scope($arch):
-  [.builds[] | select(.name == "controller-chart" or .name == "nktp")] as $builds |
-  if ($builds | length) != 2 then error("expected two site chart builds") else . end |
-  ([$builds[].catalogDigest] | unique |
-    if length != 1 then error("site charts must share one catalog") else .[0] end) as $digest |
-  [$builds[] | . as $build | .components[] as $name |
-    $build.catalogSnapshot.Components[$name] |
-    if .fromSource != true or (component_toolchain($arch) | type) != "string" then
-      error("site chart lacks a source toolchain")
-    else {name:$name, pin:component_toolchain($arch)} end] as $selected |
-  [$selected[].pin] | unique |
-  if length != 1 then error("expected one site Helm toolchain") else .[0] end |
-  {pin:., catalogDigest:$digest, components:([$selected[].name] | sort)};
-
-# The full Definition uses one measured image for three catalog-scoped producer
-# groups. Keep each authenticated predecessor separate rather than applying the
-# disk catalog's substitution to unrelated catalogs.
-def local_toolchain_scopes($lane; $arch):
-  . as $plan |
-  (if $lane == "all" then [disk_toolchain_scope($arch), simulator_toolchain_scope($arch), site_helm_toolchain_scope($arch)]
-   elif $lane == "os" then [disk_toolchain_scope($arch)]
-   elif $lane == "simulator" then [simulator_toolchain_scope($arch)]
-   elif $lane == "site" then [site_helm_toolchain_scope($arch)]
-   else error("unsupported local toolchain selection") end) |
-  if ([.[].catalogDigest] | unique | length) != length then
-    error("local toolchain groups must have distinct catalogs")
-  else map(. as $scope | . + {outputs:
-    ([$plan.builds[] | select(.catalogDigest == $scope.catalogDigest) | .name] | sort)}) end;
-
-# Relocate only descriptive authored references and append the existing scoped
-# overlays. Linux and Mac call this same projection; catalog/capture own admission.
-def local_toolchain_substitutions($image): map(select(.pin != $image));
-
+# Relocate authored references and attach factory-compiled, predecessor-bound overlays.
 def local_toolchain_definition($definition_dir; $repository_prefix; $scopes):
   def relocate: if startswith("/") then error("local demo catalog references must be repository-relative")
     else $repository_prefix + $definition_dir + "/" + . end;
