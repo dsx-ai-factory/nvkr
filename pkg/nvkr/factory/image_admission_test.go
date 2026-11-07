@@ -37,15 +37,18 @@ func TestPrivateUtilityUsesPreparedImageWithoutRepull(t *testing.T) {
 		t.Fatalf("private route: %q %v", access, err)
 	}
 	for _, tc := range []struct {
-		name         string
-		missing      bool
-		arch, digest string
-		want         e.Code
+		name               string
+		missing            bool
+		arch, digest       string
+		want               e.Code
+		changeAfterInspect string
 	}{
-		{"prepared", false, "amd64", strings.Repeat("a", 64), ""},
-		{"missing", true, "amd64", strings.Repeat("a", 64), e.CodeEngineCapability},
-		{"wrong digest", false, "amd64", strings.Repeat("c", 64), e.CodePreflightFailed},
-		{"wrong platform", false, "arm64", strings.Repeat("a", 64), e.CodePreflightFailed},
+		{"prepared", false, "amd64", strings.Repeat("a", 64), "", ""},
+		{"missing", true, "amd64", strings.Repeat("a", 64), e.CodeEngineCapability, ""},
+		{"wrong digest", false, "amd64", strings.Repeat("c", 64), e.CodePreflightFailed, ""},
+		{"wrong platform", false, "arm64", strings.Repeat("a", 64), e.CodePreflightFailed, ""},
+		{"evicted after admission", false, "amd64", strings.Repeat("a", 64), e.CodeEngineCapability, "evict"},
+		{"substituted after admission", false, "amd64", strings.Repeat("a", 64), e.CodePreflightFailed, "substitute"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -73,17 +76,34 @@ func TestPrivateUtilityUsesPreparedImageWithoutRepull(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			change := ":"
+			switch tc.changeAfterInspect {
+			case "evict":
+				change = fmt.Sprintf("mv %q %q", metadata, filepath.Join(root, "evicted"))
+			case "substitute":
+				raw, err := os.ReadFile(metadata)
+				if err != nil {
+					t.Fatal(err)
+				}
+				next := filepath.Join(root, "replacement")
+				raw = []byte(strings.Replace(string(raw), strings.Repeat("b", 64), strings.Repeat("d", 64), 1))
+				if err := os.WriteFile(next, raw, 0o600); err != nil {
+					t.Fatal(err)
+				}
+				change = fmt.Sprintf("if [ -f %q ]; then mv %q %q; fi", next, next, metadata)
+			}
 			script := fmt.Sprintf(`#!/bin/sh
 printf '%%s\n' "$*" >> %q
 case "$1" in
 info) printf '%%s\n' '{"ID":"daemon-a","OSType":"linux","Architecture":"amd64"}';;
 version) printf '%%s\n' '{}';;
-image) cat %q;;
+image) cat %q || exit 95
+%s;;
 run) case " $* " in *' --pull=never '*) exit 0;; *) exit 93;; esac;;
 rm) exit 0;;
 *) exit 94;;
 esac
-`, calls, metadata)
+`, calls, metadata, change)
 			runtime := filepath.Join(root, "docker")
 			if err := os.WriteFile(runtime, []byte(script), 0o755); err != nil {
 				t.Fatal(err)
@@ -98,7 +118,11 @@ esac
 			if err != nil {
 				t.Fatal(err)
 			}
-			if strings.Contains(string(raw), "pull --platform") || strings.Contains(string(raw), "run --pull=never") != (tc.want == "") {
+			if tc.changeAfterInspect != "" && strings.Count(string(raw), "image inspect ") != 2 {
+				t.Fatalf("utility did not recheck the admitted image: %s", raw)
+			}
+			if strings.Contains("\n"+string(raw), "\npull ") || strings.Contains("\n"+string(raw), "\nrun ") != (tc.want == "") ||
+				strings.Contains(string(raw), "run --pull=never") != (tc.want == "") {
 				t.Fatalf("unadmitted runtime calls: %s", raw)
 			}
 		})
