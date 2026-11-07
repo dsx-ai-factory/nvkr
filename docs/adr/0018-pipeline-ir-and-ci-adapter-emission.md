@@ -375,7 +375,7 @@ and the admitted `native-kvm-v1` route. Ambient `GITHUB_*` references are refuse
 also rejects reader reuse of the publication credential or either fixed production/development writer
 reference, comparing names case-insensitively; it does not establish the grants of other secrets. Publication prefixes,
 development mode and build-only mode grant no image access. Private toolchains use a separate preparation
-step with `contents: read` and no workflow package scope. Only that step receives the declared secret and
+step with `contents: read` and no workflow package scope. Only preparation and the manifest preflight below receive the declared secret and
 account variable; foreign owners and lookalike paths outside the declared roots receive no reader.
 Maintained Environments declare `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains` and the independent
 `NVKR_REGISTRY_READ` / `NVKR_REGISTRY_READ_USER` references. Adding an output namespace requires no
@@ -400,6 +400,34 @@ Held runtime observation accepts an already-local exact repository digest, rejec
 but mismatched record, and pulls only after a failed local lookup. Image/platform/tool-byte
 admission remains required. No registry credential is forwarded into producer containers.
 The package owner grants the reader account access without granting the source repository Actions access.
+
+For Plans with declared toolchain access, generated support jobs observe exact image manifests after
+all runner bootstraps have validated or refreshed the runtime Plan. Each selected runner placement
+gets its own probe job, including native ARC placements under their protected Environment. Producer
+jobs require successful preflight; completion-scheduled verification also retains explicit preflight
+success predicates through dependency reduction and reusable worker projection. Probe jobs load the
+delivered final Plan, never a separately authored image list. The current selection covers projected
+execution images and strict disk inspectors; the complete cross-owner image-use inventory remains a
+separate capability. Explicitly public job/service startup images may be probed; private startup
+images have no admitted provider startup credential route and fail before bundle output.
+
+Probes deduplicate registry/repository/digest, platform, credential route and placement. Anonymous
+access requires a public route; private requests use only the declared reader. The operation bounds
+itself to two minutes, ten seconds per HTTP request, four joined workers, 4 MiB per manifest/config
+and 64 KiB per token response. At most one retry follows a transient transport, rate-limit or service
+failure; authorization and missing-object failures are not retried. HEAD admits an exact bounded GET
+fallback for unsupported HEAD, and GET additionally checks exact bytes and platform membership.
+An index must select exactly one matching image child. The exact image config establishes platform;
+no layers are downloaded. Config CDN redirects remain bounded, HTTPS-only and free of reader
+credentials. Challenge exchanges request only repository pull scope; foreign reader realms and
+scope escalation fail closed. Errors omit credentials, token URLs and response bodies.
+
+Sorted observations bind the final Plan digest, image and selected manifest, platform, route,
+placement and observation time. They describe point-in-time metadata availability, not continuing
+grants, layer availability, runtime acceptance, qualification or release authority. Per-job pulls,
+byte/platform checks and credential destruction remain mandatory. Local registry fixtures establish
+protocol and scheduling contracts only; fresh-runner reader exercises for each admitted placement
+class remain separate external acceptance evidence.
 
 Each generated native disk producer first prepares access to the fixed `/dev/kvm` path, before checkout,
 helper downloads or input restoration. The credential-free, one-minute step rejects a missing device,

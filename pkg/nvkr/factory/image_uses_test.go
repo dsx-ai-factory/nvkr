@@ -374,18 +374,33 @@ func assertImageUsePreparation(t *testing.T, plan *Plan, bundle *GeneratedBundle
 				t.Fatal("reader at job scope")
 			}
 			prepared, execution := -1, -1
+			preflight, observed := strings.HasPrefix(id, "preflight-images-"), false
 			for index, step := range job.Steps {
 				if strings.Contains(step.Run, "factory github prepare-images ") {
 					if !required[id] || prepared >= 0 || step.If != "" || step.ContinueOnError || !reflect.DeepEqual(step.Env, githubImageEnvironment(plan)) {
 						t.Fatalf("%s: preparation must run once with exact declared reader", id)
 					}
 					prepared = index
+				} else if strings.Contains(step.Run, "factory github preflight-images ") {
+					var wantEnv map[string]string
+					for _, use := range uses {
+						if use.Placement == job.RunsOn && use.Route == ImageScopedReader {
+							wantEnv = githubImageEnvironment(plan)
+						}
+					}
+					if !preflight || observed || step.If != "" || step.ContinueOnError || step.TimeoutMinutes != 3 || !reflect.DeepEqual(step.Env, wantEnv) {
+						t.Fatalf("%s: preflight must run once with only its placement's declared reader", id)
+					}
+					observed = true
 				} else if step.Env[githubImageToken] != "" || step.Env[githubImageUser] != "" {
 					t.Fatalf("%s: reader escaped preparation", id)
 				}
 				if execution < 0 && (strings.Contains(step.Run, "factory github run-node ") || strings.Contains(step.Run, "factory github run-disk ")) {
 					execution = index
 				}
+			}
+			if preflight && (!observed || execution >= 0 || job.Permissions["packages"] != "" || job.Permissions["id-token"] != "") {
+				t.Fatalf("%s: preflight missing or mixed with producer/writer authority", id)
 			}
 			if required[id] && (prepared < 0 || execution <= prepared) {
 				t.Errorf("%s: preparation missing or after execution", id)

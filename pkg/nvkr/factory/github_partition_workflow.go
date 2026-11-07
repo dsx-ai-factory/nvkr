@@ -313,6 +313,25 @@ func projectGitHubPartitionJob(plan *Plan, id string, source *yamlv3.Node, paren
 	job := githubInterfaceClone(source)
 	githubYAMLRemove(job, "needs")
 	condition := githubYAMLValue(job, "if")
+	var preflightJobs []string
+	ordinary := "${{ " + githubDispatchCondition(plan) + " }}"
+	expectedCondition := ordinary
+	if scheduling == executionAfterCompletion {
+		// Ordinary workers use their supplied prerequisites. Only completion
+		// workers need the separate preflight-success predicate.
+		var err error
+		preflightJobs, err = githubImagePreflightJobs(plan)
+		if err != nil {
+			return nil, err
+		}
+		expectedCondition = githubCompletionCondition(plan, preflightJobs)
+	}
+	if (scheduling != executionAfterSuccess && scheduling != executionAfterCompletion) || condition != expectedCondition {
+		return nil, e.New(e.CodeEngineCapability, "GitHub partition job %q has an unsupported scheduling condition", id)
+	}
+	// The exact generated scheduling expression is projected below; all other
+	// needs-observing expressions still require rejection.
+	githubYAMLRemove(job, "if")
 	// Needs-observing authored expressions need an exact context projection;
 	// never silently evaluate them against the worker's empty local needs.
 	encoded, err := encodeGitHubYAML(job)
@@ -322,25 +341,18 @@ func projectGitHubPartitionJob(plan *Plan, id string, source *yamlv3.Node, paren
 	if githubNeedsWord.Match(encoded) {
 		return nil, e.New(e.CodeEngineCapability, "GitHub partition job %q observes an unprojected needs context", id)
 	}
-	ordinary := "${{ " + githubDispatchCondition(plan) + " }}"
-	unconditional := "${{ always() && " + githubDispatchCondition(plan) + " }}"
-	expectedCondition := ordinary
-	if scheduling == executionAfterCompletion {
-		expectedCondition = unconditional
-	}
-	if (scheduling != executionAfterSuccess && scheduling != executionAfterCompletion) || condition != expectedCondition {
-		return nil, e.New(e.CodeEngineCapability, "GitHub partition job %q has an unsupported scheduling condition", id)
-	}
 	guard := "always() && " + githubDispatchCondition(plan)
+	required := preflightJobs
 	if scheduling == executionAfterSuccess {
 		guard = "!cancelled() && " + githubDispatchCondition(plan) //nolint:misspell // GitHub expression function spelling.
-		for _, parent := range parents {
-			result := "fromJSON(inputs.dependencies)['" + parent + "']"
-			if owners != nil {
-				result = githubPartitionResultExpression(parent, owners)
-			}
-			guard += " && " + result + ".result == 'success'"
+		required = parents
+	}
+	for _, parent := range required {
+		result := "fromJSON(inputs.dependencies)['" + parent + "']"
+		if owners != nil {
+			result = githubPartitionResultExpression(parent, owners)
 		}
+		guard += " && " + result + ".result == 'success'"
 	}
 	githubYAMLSet(job, "if", githubYAMLString("${{ "+guard+" }}"))
 	return job, nil

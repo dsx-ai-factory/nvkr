@@ -22,6 +22,9 @@ substitute for it. Image access separately declares private and anonymous image 
 an independent reader; publication namespaces grant no pull access. Unclassified GitHub execution images
 fail admission. Exact source/location bindings preserve logical Build identity; measured local images and
 native bundles retain separate source semantics.
+Declared-access GitHub Runs observe exact manifest/config availability with that reader after final
+Plan validation and before producer fan-out, separately per runner placement. This point-in-time
+observation grants no runtime or release authority and does not replace per-job pulls or byte checks.
 Native hosted platform routes are explicit execution settings; they do not change logical Build identity
 or prove provider allocation. Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
 are also catalog dependencies ([ADR-22](docs/adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies)).

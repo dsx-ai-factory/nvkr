@@ -174,7 +174,11 @@ container and service images, must be digest-pinned and classified. Generation
 fails before writing a bundle if a root is missing or a selected private root lacks a reader. Declare
 only roots trusted for that reader; an authored declaration does not verify the account's actual grants.
 Private pulls currently support GHCR only and require `native-kvm-v1`. The reader secret and username
-variable stay confined to image preparation; no repository-token fallback is admitted.
+variable stay confined to manifest preflight and per-job image preparation; no repository-token
+fallback is admitted. After final runtime Plan validation, each selected runner placement checks
+exact manifests and image configs before producer fan-out. Observations describe availability at that
+time, download no layers, and do not replace fresh per-job pulls or runtime verification. Private
+job/service startup images are rejected because they have no admitted provider startup credential route.
 The reader must not reuse the publication credential or the fixed production/development writer
 references; those comparisons are case-insensitive. Operators still own the grants of other secrets.
 

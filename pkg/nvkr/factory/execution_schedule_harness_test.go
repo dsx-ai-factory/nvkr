@@ -35,6 +35,7 @@ const (
 	harnessJobOverheadMinutes  = 1.5  // estimated runner pickup, checkout and helper restore
 	harnessDiskMinutes         = 43   // recorded native FDE disk job, Run 38443178035
 	harnessBootstrapMinutes    = 3    // estimated helper build
+	harnessPreflightMinutes    = 1    // estimated metadata probe, before job overhead
 	harnessCallOverheadMinutes = 0.5  // estimated reusable-workflow call start
 	harnessJitterSeeds         = 8    // deterministic duration perturbations per layout
 	harnessClearImprovement    = 0.05 // required worst-case gain on a partitioned Plan
@@ -157,6 +158,14 @@ func harnessGraphFor(t *testing.T, name string, plan *Plan) harnessGraph {
 		}
 		// Bootstraps for ARC targets run on the hosted runner the workflow renders.
 		ops["build-runner-"+shortStableName(resolved.RunsOn)] = harnessOp{pool: harnessPool(githubBootstrapRunner(resolved.RunsOn)), minutes: harnessBootstrapMinutes}
+	}
+	placements, err := githubPreflightSubjects(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for runner := range placements {
+		id := githubImagePreflightID(runner)
+		ops[id] = harnessOp{pool: harnessPool(runner), inline: layout.Pinned[id], minutes: harnessJobOverheadMinutes + harnessPreflightMinutes}
 	}
 	for id := range deps {
 		if _, ok := ops[id]; !ok {

@@ -415,9 +415,17 @@ func (stage githubStage) needs(artifacts map[string]Artifact, nodeJobs map[strin
 	return uniqueSorted(needs)
 }
 
-func (stage githubStage) condition(plan *Plan) string {
+func (stage githubStage) condition(plan *Plan, preflightJobs ...string) string {
 	if stage.executionCondition() == executionAfterCompletion {
-		return "${{ always() && " + githubDispatchCondition(plan) + " }}"
+		return githubCompletionCondition(plan, preflightJobs)
 	}
 	return "${{ " + githubDispatchCondition(plan) + " }}"
+}
+
+func githubCompletionCondition(plan *Plan, preflightJobs []string) string {
+	guard := "always() && " + githubDispatchCondition(plan)
+	for _, id := range preflightJobs {
+		guard += " && needs['" + id + "'].result == 'success'"
+	}
+	return "${{ " + guard + " }}"
 }
