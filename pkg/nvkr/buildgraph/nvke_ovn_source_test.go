@@ -34,10 +34,19 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
-const ovnForkCommit = "8af51273d52dfa07454435d18d37230e582d797a"
+func ovnForkPin(t *testing.T) catalog.Pin {
+	t.Helper()
+	lock, err := catalog.LoadLockContext(t.Context(), "../../../inputs/catalogs/ovn-nvidia")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return lock.Pins["ovn-kubernetes"]
+}
 
-// ovnForkStream matches Chart.yaml at ovnForkCommit; it is not the Debian revision.
-const ovnForkStream = "2.4.2"
+func ovnForkStream(t *testing.T) string {
+	t.Helper()
+	return catalog.NormalizeVersion(ovnForkPin(t).Tag)
+}
 
 // Dockerfile.ubuntu consumes this override; the .nv fork owns its compiler FROM.
 // This literal-binding contract does not check live registry availability.
@@ -131,11 +140,11 @@ func TestNVKEOVNForkLocalDiskSelection(t *testing.T) {
 		t.Fatal("local profile does not bind the exact fork package installation input")
 	}
 	for _, kind := range []string{"charts", "images"} {
-		if !strings.Contains(string(raw), "nke-cni-ovn-"+kind+"-"+ovnForkStream) {
+		if !strings.Contains(string(raw), "nke-cni-ovn-"+kind+"-"+ovnForkStream(t)) {
 			t.Fatalf("profile does not install fork %s package", kind)
 		}
 	}
-	if strings.Contains(string(raw), "nke-cni-ovn-charts-1.4.0") {
+	if strings.Contains(string(raw), "nke-cni-ovn-charts-"+catalog.NormalizeVersion(upstreamOVNPin(t).Tag)) {
 		t.Fatal("local profile retains the upstream OVN stream")
 	}
 }
@@ -150,7 +159,7 @@ func TestNVKEOVNForkGraphs(t *testing.T) {
 				t.Fatal("OVN selection must contain the image, chart and Debian bundle")
 			}
 			for _, component := range cat.Components {
-				if !component.FromSource || component.Prebuilt != nil || component.Repo != "https://github.com/dsx-ai-factory/ovn-kubernetes" || component.Commit != ovnForkCommit {
+				if !component.FromSource || component.Prebuilt != nil || component.Repo != "https://github.com/dsx-ai-factory/ovn-kubernetes" || component.Commit != ovnForkPin(t).Commit {
 					t.Fatal("OVN producer must use the locked fork source, without binary fallback")
 				}
 				if strings.Contains(strings.Join(component.BuildCommand, "\n"), "os-image/packages") {
@@ -208,17 +217,14 @@ func TestNVKEOVNForkGraphs(t *testing.T) {
 	}
 }
 
-// TestNVKEOVNForkPinBindings guards the supplied catalog's repeated literals.
-// Re-pinning this candidate requires reviewing its stream and packaging together.
+// TestNVKEOVNForkPinBindings retains the reviewed producer behavior while source
+// metadata is supplied through opt-in lock-derived bindings.
 func TestNVKEOVNForkPinBindings(t *testing.T) {
 	lock, err := catalog.LoadLockContext(t.Context(), "../../../inputs/catalogs/ovn-nvidia")
 	if err != nil {
 		t.Fatal(err)
 	}
 	pin := lock.Pins["ovn-kubernetes"]
-	if pin.Commit != ovnForkCommit {
-		t.Fatal("fork lock changed without reviewing the catalog's stream and packaging bindings")
-	}
 	cat := loadOVNForkCatalog(t)
 	// The exact source-owned Dockerfile hardcodes Go 1.26.9 and ignores this argument.
 	if strings.Contains(strings.Join(cat.Components["ovn-kube-ubuntu"].BuildCommand, "\n"), "build-arg:BUILDER_IMAGE=") {
@@ -229,7 +235,7 @@ func TestNVKEOVNForkPinBindings(t *testing.T) {
 		fragments []string
 	}{
 		{component: "ovn-kube-ubuntu", fragments: []string{
-			"name=localhost/nvke/ovn-kubernetes:git-" + pin.Commit,
+			`name=localhost/nvke/ovn-kubernetes:git-"${NVKR_SOURCE_COMMIT:?}"`,
 			"filename=Dockerfile.ubuntu.nv",
 			"build-arg:OVN_K8S_SRC_ROOT=.",
 			`--opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"`,
@@ -246,14 +252,14 @@ func TestNVKEOVNForkPinBindings(t *testing.T) {
 			"build-arg:K8S_VER=v1.36",
 		}},
 		{component: "ovn-kubernetes-chart", fragments: []string{
-			"grep -qx 'version: " + ovnForkStream + `' "$chart/Chart.yaml"`,
+			`grep -Fqx "version: $stream" "$chart/Chart.yaml"`,
 		}},
 		{component: "nvke-cni-ovn", fragments: []string{
-			"readonly stream=" + ovnForkStream,
-			"readonly revision=1+git." + pin.Commit[:12],
-			"tag: git-" + pin.Commit,
-			"readonly image_dir=/usr/lib/nke/cni-ovn/" + ovnForkStream,
-			"readonly image_name=ovn-images_" + ovnForkStream + "_linux_{{.Arch}}.tgz",
+			`readonly stream="${NVKR_SOURCE_STREAM:?}"`,
+			`readonly revision="${NVKR_SOURCE_REVISION:?}"`,
+			"tag: git-${NVKR_SOURCE_COMMIT:?}",
+			`"/usr/lib/nke/cni-ovn/$stream" "$image_name"`,
+			`readonly image_name="ovn-images_${stream}_linux_{{.Arch}}.tgz"`,
 			"Maintainer: NKE <nke-dev@exchange.nvidia.com>",
 		}},
 	} {
@@ -324,7 +330,7 @@ func TestNVKEOVNForkImageInvocation(t *testing.T) {
 				for _, want := range []string{
 					"platform=linux/" + arch,
 					fmt.Sprintf("build-arg:SOURCE_DATE_EPOCH=%d", cat.Components["ovn-kube-ubuntu"].SourceDate),
-					"type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nvke/ovn-kubernetes:git-" + ovnForkCommit,
+					"type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nvke/ovn-kubernetes:git-" + ovnForkPin(t).Commit,
 				} {
 					if !slices.Contains(strings.Split(string(args), "\n"), want) {
 						t.Fatalf("missing BuildKit argument %q in %s", want, args)
@@ -473,7 +479,7 @@ test "$(gzip -dc ovn-images_%[1]s_linux_$GOARCH.tgz | sha256sum | cut -d' ' -f1)
 /tools/helm template ovn /tmp/root/etc/dgx/ovn-kubernetes \
   -f /tmp/root/etc/dgx/ovn-kubernetes/values-nke.yaml \
   --set k8sAPIServer=https://127.0.0.1:6443 --set podNetwork=10.244.0.0/16
-`, ovnForkStream, "1+git."+ovnForkCommit[:12])
+`, ovnForkStream(t), "1+git."+ovnForkPin(t).Commit[:12])
 		name := fmt.Sprintf("nvkr-ovn-check-%d-%s", os.Getpid(), filepath.Base(t.TempDir()))
 		t.Cleanup(func() {
 			cleanup, stop := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
@@ -499,7 +505,7 @@ test "$(gzip -dc ovn-images_%[1]s_linux_$GOARCH.tgz | sha256sum | cut -d' ' -f1)
 		if err != nil {
 			t.Fatalf("independent Debian inspection: %v: %s", err, output)
 		}
-		if err := checkOVNRenderedImages(output); err != nil {
+		if err := checkOVNRenderedImages(output, ovnForkPin(t).Commit); err != nil {
 			t.Fatal(err)
 		}
 		t.Log("independent Debian inspection, exact image correspondence and Helm image selection passed")
@@ -548,7 +554,7 @@ func buildOVNTestHelm(t *testing.T, containerRuntime string) string {
 
 // YAML decoding is delegated to the existing library. This is a regression
 // assertion over Helm's rendered fixture, not a deployment admission validator.
-func checkOVNRenderedImages(rendered []byte) error {
+func checkOVNRenderedImages(rendered []byte, commit string) error {
 	decoder := yaml.NewDecoder(strings.NewReader(string(rendered)))
 	images := 0
 	var visit func(*yaml.Node) error
@@ -557,7 +563,7 @@ func checkOVNRenderedImages(rendered []byte) error {
 			for i := 0; i < len(node.Content); i += 2 {
 				if node.Content[i].Value == "image" && node.Content[i+1].Kind == yaml.ScalarNode {
 					value := node.Content[i+1].Value
-					if value != "localhost/nvke/ovn-kubernetes:git-"+ovnForkCommit {
+					if value != "localhost/nvke/ovn-kubernetes:git-"+commit {
 						return fmt.Errorf("rendered OVN image %q does not match the built export", value)
 					}
 					images++
@@ -593,13 +599,13 @@ func TestNVKEOVNForkRenderedImages(t *testing.T) {
 		name, document string
 		wantError      bool
 	}{
-		{name: "built image", document: "spec:\n  containers:\n    - image: localhost/nvke/ovn-kubernetes:git-" + ovnForkCommit},
+		{name: "built image", document: "spec:\n  containers:\n    - image: localhost/nvke/ovn-kubernetes:git-" + ovnForkPin(t).Commit},
 		{name: "old NVCR default", document: "spec:\n  containers:\n    - image: nvcr.io/nv-ngn/sdn/ovnkube:old", wantError: true},
 		{name: "no images", document: "kind: ConfigMap", wantError: true},
 		{name: "invalid YAML", document: "[", wantError: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			if err := checkOVNRenderedImages([]byte(test.document)); (err != nil) != test.wantError {
+			if err := checkOVNRenderedImages([]byte(test.document), ovnForkPin(t).Commit); (err != nil) != test.wantError {
 				t.Fatalf("rendered image check = %v, wantError=%t", err, test.wantError)
 			}
 		})
@@ -613,37 +619,15 @@ func TestNVKEOVNPostinstImportDiagnostics(t *testing.T) {
 	}
 	for _, arch := range []string{"amd64", "arm64"} {
 		t.Run(arch, func(t *testing.T) {
-			resolved, err := buildgraph.Resolve(loadOVNForkCatalog(t), buildgraph.Selection{
-				Components: []string{"nvke-cni-ovn", "ovn-kube-ubuntu", "ovn-kubernetes-chart"}, Platform: "linux/" + arch,
-			})
+			root, err := runOVNPackageFixture(t, loadOVNForkCatalog(t), arch, ovnForkStream(t))
 			if err != nil {
 				t.Fatal(err)
 			}
-			graph, err := buildgraph.Compile(resolved)
+			raw, err := os.ReadFile(filepath.Join(root, "nvkr-output/images/DEBIAN/postinst"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			var hook string
-			for _, node := range graph.Nodes {
-				if node.Kind != ir.KindBuild || node.Component != "nvke-cni-ovn" {
-					continue
-				}
-				if len(node.Command) != 3 {
-					t.Fatal("unexpected OVN packaging command")
-				}
-				// Exercise the compiled catalog's fixed hook heredoc; Bash owns its syntax.
-				_, rest, found := strings.Cut(node.Command[2], "cat >\"$images/DEBIAN/postinst\" <<'EOF'\n")
-				if !found {
-					t.Fatal("missing OVN postinst heredoc")
-				}
-				hook, _, found = strings.Cut(rest, "\nEOF\n")
-				if !found || !strings.Contains(hook, "ovn-images_"+ovnForkStream+"_linux_"+arch+".tgz") {
-					t.Fatal("missing native OVN postinst hook")
-				}
-			}
-			if hook == "" {
-				t.Fatal("missing OVN package producer")
-			}
+			hook := string(raw)
 			for _, tc := range []struct {
 				name, argument, importStatus, gzipStatus string
 				override, wantCtr, wantDiagnostic        string
@@ -693,7 +677,7 @@ func TestNVKEOVNPostinstImportDiagnostics(t *testing.T) {
 					}
 					// Relocate only host paths into test-owned scratch. External commands
 					// are controlled fixtures; the actual pipeline and failure handler run.
-					script := strings.ReplaceAll(hook, "/usr/lib/nke/cni-ovn/"+ovnForkStream, root)
+					script := strings.ReplaceAll(hook, "/usr/lib/nke/cni-ovn/"+ovnForkStream(t), root)
 					script = strings.ReplaceAll(script, "/var/log/nke-cni-ovn-postinst.log", logPath)
 					script = strings.ReplaceAll(script, "/usr/local/bin/ctr", filepath.Join(root, "local-ctr"))
 					// Allow subprocess scheduling under the concurrent full-package gate;

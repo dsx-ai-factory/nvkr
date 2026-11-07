@@ -1,0 +1,304 @@
+{
+  "apiVersion": "nvkr.dev/producer-overlay-maintenance/v1",
+  "overlays": [
+    {
+      "name": "nvke-os-arm64-tcg-local",
+      "destination": "inputs/catalogs/node-images/variants/nvidia-tcg.json",
+      "base": "inputs/catalogs/node-images/release",
+      "producers": [
+        {
+          "catalog": "inputs/catalogs/ovn-nvidia",
+          "components": [
+            "nvke-cni-ovn",
+            "ovn-kube-ubuntu",
+            "ovn-kubernetes-chart"
+          ]
+        }
+      ],
+      "frozen": {
+        "nvke-node-image": {
+          "component": {
+            "artifactPath": "non-fde/nvke-node.qcow2",
+            "buildNetwork": "default",
+            "buildRequirements": {
+              "allowedHostPlatforms": [
+                "linux/arm64"
+              ],
+              "capabilities": [
+                {
+                  "name": "kvm",
+                  "policy": "forbidden"
+                }
+              ],
+              "resources": {
+                "cpuMillis": 8000,
+                "ephemeralStorageMiB": 65536,
+                "memoryMiB": 10240
+              },
+              "timeoutSeconds": 21600
+            },
+            "builderType": "vm-image",
+            "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+            "disk": {
+              "encryption": "none",
+              "format": "qcow2"
+            },
+            "fromSource": true,
+            "materials": {
+              "image-inputs": "nvke-image-inputs",
+              "installer-iso": "nvke-patched-installer-iso"
+            },
+            "outputType": "disk-image",
+            "packer": {
+              "acceleratorVariable": "accelerator",
+              "acquisitionArchive": "non-fde/apt-acquisitions.tar",
+              "architectureVariable": "architecture",
+              "buildLogDirectoryVariable": "build_log_directory",
+              "buildName": "nvke-node-non-fde.qemu.nvke-non-fde",
+              "materialManifest": {
+                "kinds": {
+                  "image-inputs": "archive",
+                  "installer-iso": "disk-image"
+                },
+                "schemaVersion": "nvke.nvidia.com/os-image-materials/v1"
+              },
+              "materialManifestVariable": "material_manifest",
+              "outputDirectoryVariable": "output_directory",
+              "packerVersion": "1.15.4",
+              "projectPath": "os-image/packer",
+              "sshPrivateKeyVariable": "ssh_private_key_file",
+              "sshPublicKeyVariable": "ssh_public_key_file",
+              "variables": {
+                "capture_apt_acquisitions": "true",
+                "efi_firmware_code": "/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd",
+                "efi_firmware_vars": "/usr/share/AAVMF/AAVMF_VARS.fd",
+                "guest_memory_mib": "4096",
+                "ssh_timeout": "180m",
+                "cpu_model": "cortex-a57",
+                "boot_wait": "30s",
+                "ubuntu_series": "26.04"
+              }
+            },
+            "platforms": [
+              "linux/arm64"
+            ],
+            "repo": "https://github.com/dsx-ai-factory/nvke.git",
+            "sourceDateEpoch": 1793236039,
+            "tag": "v0.23.0",
+            "toolchainImages": {
+              "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
+              "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
+            },
+            "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+            "vendorCommand": [
+              "bash",
+              "-ec",
+              "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "nvke-local-upstream-ovn",
+      "destination": "inputs/catalogs/node-images/variants/upstream-tcg.json",
+      "base": "inputs/catalogs/node-images/release",
+      "predecessors": [
+        "inputs/catalogs/node-images/variants/nvidia-tcg.json"
+      ],
+      "producers": [
+        {
+          "catalog": "inputs/catalogs/ovn-upstream",
+          "components": [
+            "nvke-cni-ovn",
+            "ovn-kube-ubuntu",
+            "ovn-kubernetes-chart"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "nvke-os-arm64-nvidia-local-kvm",
+      "destination": "inputs/catalogs/node-images/variants/nvidia-local-kvm.json",
+      "base": "inputs/catalogs/node-images/release",
+      "predecessors": [
+        "inputs/catalogs/node-images/variants/nvidia-tcg.json"
+      ],
+      "frozen": {
+        "nvke-node-image": {
+          "component": {
+            "platforms": [
+              "linux/arm64"
+            ],
+            "fromSource": true,
+            "builderType": "vm-image",
+            "buildNetwork": "default",
+            "buildRequirements": {
+              "resources": {
+                "cpuMillis": 8000,
+                "memoryMiB": 10240,
+                "ephemeralStorageMiB": 65536
+              },
+              "allowedHostPlatforms": [
+                "linux/arm64"
+              ],
+              "capabilities": [
+                {
+                  "name": "kvm",
+                  "policy": "required"
+                }
+              ],
+              "timeoutSeconds": 21600
+            },
+            "repo": "https://github.com/dsx-ai-factory/nvke.git",
+            "tag": "v0.23.0",
+            "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+            "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+            "toolchainImages": {
+              "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
+              "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
+            },
+            "outputType": "disk-image",
+            "disk": {
+              "format": "qcow2",
+              "encryption": "none"
+            },
+            "packer": {
+              "projectPath": "os-image/packer",
+              "packerVersion": "1.15.4",
+              "buildName": "nvke-node-non-fde.qemu.nvke-non-fde",
+              "architectureVariable": "architecture",
+              "acceleratorVariable": "accelerator",
+              "materialManifestVariable": "material_manifest",
+              "materialManifest": {
+                "schemaVersion": "nvke.nvidia.com/os-image-materials/v1",
+                "kinds": {
+                  "image-inputs": "archive",
+                  "installer-iso": "disk-image"
+                }
+              },
+              "outputDirectoryVariable": "output_directory",
+              "sshPrivateKeyVariable": "ssh_private_key_file",
+              "sshPublicKeyVariable": "ssh_public_key_file",
+              "buildLogDirectoryVariable": "build_log_directory",
+              "acquisitionArchive": "non-fde/apt-acquisitions.tar",
+              "variables": {
+                "boot_wait": "30s",
+                "capture_apt_acquisitions": "true",
+                "cpu_model": "host",
+                "efi_firmware_code": "/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd",
+                "efi_firmware_vars": "/usr/share/AAVMF/AAVMF_VARS.fd",
+                "guest_memory_mib": "4096",
+                "ssh_timeout": "60m",
+                "ubuntu_series": "26.04"
+              }
+            },
+            "materials": {
+              "image-inputs": "nvke-image-inputs",
+              "installer-iso": "nvke-patched-installer-iso"
+            },
+            "artifactPath": "non-fde/nvke-node.qcow2",
+            "vendorCommand": [
+              "bash",
+              "-ec",
+              "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n"
+            ],
+            "sourceDateEpoch": 1793236039
+          }
+        }
+      }
+    },
+    {
+      "name": "nvke-os-arm64-upstream-local-kvm",
+      "destination": "inputs/catalogs/node-images/variants/upstream-local-kvm.json",
+      "base": "inputs/catalogs/node-images/release",
+      "predecessors": [
+        "inputs/catalogs/node-images/variants/nvidia-tcg.json",
+        "inputs/catalogs/node-images/variants/upstream-tcg.json"
+      ],
+      "frozen": {
+        "nvke-node-image": {
+          "component": {
+            "platforms": [
+              "linux/arm64"
+            ],
+            "fromSource": true,
+            "builderType": "vm-image",
+            "buildNetwork": "default",
+            "buildRequirements": {
+              "resources": {
+                "cpuMillis": 8000,
+                "memoryMiB": 10240,
+                "ephemeralStorageMiB": 65536
+              },
+              "allowedHostPlatforms": [
+                "linux/arm64"
+              ],
+              "capabilities": [
+                {
+                  "name": "kvm",
+                  "policy": "required"
+                }
+              ],
+              "timeoutSeconds": 21600
+            },
+            "repo": "https://github.com/dsx-ai-factory/nvke.git",
+            "tag": "v0.23.0",
+            "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+            "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+            "toolchainImages": {
+              "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
+              "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
+            },
+            "outputType": "disk-image",
+            "disk": {
+              "format": "qcow2",
+              "encryption": "none"
+            },
+            "packer": {
+              "projectPath": "os-image/packer",
+              "packerVersion": "1.15.4",
+              "buildName": "nvke-node-non-fde.qemu.nvke-non-fde",
+              "architectureVariable": "architecture",
+              "acceleratorVariable": "accelerator",
+              "materialManifestVariable": "material_manifest",
+              "materialManifest": {
+                "schemaVersion": "nvke.nvidia.com/os-image-materials/v1",
+                "kinds": {
+                  "image-inputs": "archive",
+                  "installer-iso": "disk-image"
+                }
+              },
+              "outputDirectoryVariable": "output_directory",
+              "sshPrivateKeyVariable": "ssh_private_key_file",
+              "sshPublicKeyVariable": "ssh_public_key_file",
+              "buildLogDirectoryVariable": "build_log_directory",
+              "acquisitionArchive": "non-fde/apt-acquisitions.tar",
+              "variables": {
+                "boot_wait": "30s",
+                "capture_apt_acquisitions": "true",
+                "cpu_model": "host",
+                "efi_firmware_code": "/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd",
+                "efi_firmware_vars": "/usr/share/AAVMF/AAVMF_VARS.fd",
+                "guest_memory_mib": "4096",
+                "ssh_timeout": "60m",
+                "ubuntu_series": "26.04"
+              }
+            },
+            "materials": {
+              "image-inputs": "nvke-image-inputs",
+              "installer-iso": "nvke-patched-installer-iso"
+            },
+            "artifactPath": "non-fde/nvke-node.qcow2",
+            "vendorCommand": [
+              "bash",
+              "-ec",
+              "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n"
+            ],
+            "sourceDateEpoch": 1793236039
+          }
+        }
+      }
+    }
+  ]
+}

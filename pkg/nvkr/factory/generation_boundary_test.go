@@ -211,6 +211,7 @@ func TestGeneratedScriptCheckRejectsProjectionAdapterRoutes(t *testing.T) {
 		admit  bool
 	}{
 		{"./nvkr-exec run generate --engine github --definition d --environment e --root . --check", true},
+		{"./nvkr-exec run qualification-source --policy policy.yaml", true},
 		{"./nvkr-exec run generate --engine github --definition d --environment e --root . --check --projection-pilot", false},
 		{"./nvkr-exec run generate --engine github --definition d --environment e --root . --check --projection-pilot=in-process", false},
 		{"./nvkr-exec run generate --engine github --definition d --environment e --root .", false},
@@ -235,9 +236,10 @@ var (
 		"factory github ci-fetch-locators": true, "factory github ci-upload": true,
 		"factory github describe-action": true, "factory github install-runtime-inputs": true,
 		"factory github pack-outputs": true, "factory github prepare-images": true,
-		"factory github recover": true, "factory github run-disk": true, "factory github run-node": true,
+		"factory github preflight-images": true,
+		"factory github recover":          true, "factory github run-disk": true, "factory github run-node": true,
 		"run finalize": true, "run generate": true,
-		"run qualify": true, "run smoke-worker": true,
+		"run qualification-source": true, "run qualify": true, "run smoke-worker": true,
 	}
 	generatedGenerationFlags = map[string]bool{"--engine": true, "--definition": true, "--environment": true,
 		"--root": true, "--check": true, "--runtime": true, "--source-commit": true}

@@ -30,6 +30,10 @@ func admitGitHubToolchainAccess(plan *Plan) error {
 	if plan.Environment.GitHubARC == "" && plan.Environment.ToolchainAccess == nil {
 		return nil
 	}
+	classifier, err := plan.Environment.ToolchainAccess.ImageClassifier()
+	if err != nil {
+		return err
+	}
 	for _, node := range plan.Graph.Nodes {
 		execution, err := plan.GitHubExecutionFor(node)
 		if err != nil {
@@ -38,7 +42,7 @@ func admitGitHubToolchainAccess(plan *Plan) error {
 		if execution.Container == "" {
 			continue
 		}
-		private, err := plan.Environment.ToolchainAccess.ClassifyImage(execution.Container)
+		private, err := classifier.ClassifyImage(execution.Container)
 		if err != nil {
 			return e.Wrap(e.CodeEngineCapability, err, "GitHub toolchain access for node %q", node.ID)
 		}
@@ -60,7 +64,7 @@ func admitGitHubToolchainAccess(plan *Plan) error {
 				if err != nil {
 					return err
 				}
-				private, err := plan.Environment.ToolchainAccess.ClassifyImage(profile.Image)
+				private, err := classifier.ClassifyImage(profile.Image)
 				if err != nil {
 					return err
 				}

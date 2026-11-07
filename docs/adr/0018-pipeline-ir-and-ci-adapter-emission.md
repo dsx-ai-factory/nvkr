@@ -368,7 +368,7 @@ and the admitted `native-kvm-v1` route. Ambient `GITHUB_*` references are refuse
 also rejects reader reuse of the publication credential or either fixed production/development writer
 reference, comparing names case-insensitively; it does not establish the grants of other secrets. Publication prefixes,
 development mode and build-only mode grant no image access. Private toolchains use a separate preparation
-step with `contents: read` and no workflow package scope. Only that step receives the declared secret and
+step with `contents: read` and no workflow package scope. Only preparation and the manifest preflight below receive the declared secret and
 account variable; foreign owners and lookalike paths outside the declared roots receive no reader.
 Maintained Environments declare `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains` and the independent
 `NVKR_REGISTRY_READ` / `NVKR_REGISTRY_READ_USER` references. Adding an output namespace requires no
@@ -384,6 +384,34 @@ Held runtime observation accepts an already-local exact repository digest, rejec
 but mismatched record, and pulls only after a failed local lookup. Image/platform/tool-byte
 admission remains required. No registry credential is forwarded into producer containers.
 The package owner grants the reader account access without granting the source repository Actions access.
+
+For Plans with declared toolchain access, generated support jobs observe exact image manifests after
+all runner bootstraps have validated or refreshed the runtime Plan. Each selected runner placement
+gets its own probe job, including native ARC placements under their protected Environment. Producer
+jobs require successful preflight; completion-scheduled verification also retains explicit preflight
+success predicates through dependency reduction and reusable worker projection. Probe jobs load the
+delivered final Plan, never a separately authored image list. The current selection covers projected
+execution images and strict disk inspectors; the complete cross-owner image-use inventory remains a
+separate capability. Explicitly public job/service startup images may be probed; private startup
+images have no admitted provider startup credential route and fail before bundle output.
+
+Probes deduplicate registry/repository/digest, platform, credential route and placement. Anonymous
+access requires a public route; private requests use only the declared reader. The operation bounds
+itself to two minutes, ten seconds per HTTP request, four joined workers, 4 MiB per manifest/config
+and 64 KiB per token response. At most one retry follows a transient transport, rate-limit or service
+failure; authorization and missing-object failures are not retried. HEAD admits an exact bounded GET
+fallback for unsupported HEAD, and GET additionally checks exact bytes and platform membership.
+An index must select exactly one matching image child. The exact image config establishes platform;
+no layers are downloaded. Config CDN redirects remain bounded, HTTPS-only and free of reader
+credentials. Challenge exchanges request only repository pull scope; foreign reader realms and
+scope escalation fail closed. Errors omit credentials, token URLs and response bodies.
+
+Sorted observations bind the final Plan digest, image and selected manifest, platform, route,
+placement and observation time. They describe point-in-time metadata availability, not continuing
+grants, layer availability, runtime acceptance, qualification or release authority. Per-job pulls,
+byte/platform checks and credential destruction remain mandatory. Local registry fixtures establish
+protocol and scheduling contracts only; fresh-runner reader exercises for each admitted placement
+class remain separate external acceptance evidence.
 
 Each generated native disk producer first prepares access to the fixed `/dev/kvm` path, before checkout,
 helper downloads or input restoration. The credential-free, one-minute step rejects a missing device,
@@ -1091,14 +1119,20 @@ principals; selecting a namespace or protected environment alone cannot enforce 
 Development and production have separate generated layouts and concurrency groups (ADR-21). Unsigned
 development cancels superseded same-branch Runs and retains helpers/carriers for one day. Signed development,
 like production, is non-canceling and retains helpers/carriers for seven days to cover native disk budgets.
-Final Run records and production qualification handoffs retain seven days and disk diagnostics one day. Provider cancellation or runner loss can
+Final Run records and production qualification handoffs retain seven days and disk diagnostics one day.
+The production qualifier's unsigned qualification outcome (ADR-17 §4) also retains seven days. It is uploaded
+as `nvkr-qualification-outcome-<run>-<attempt>` for any result except a canceled job (`!cancelled()`), and
+the job output `outcome-written` reports whether the command wrote it. The upload is best effort and never
+fails the job. In a public repository anyone who can read the repository can download the artifact while it
+is kept, so redaction, not retention, protects it. Provider cancellation or runner loss can
 prevent finalization. Release finalizers have a dedicated two-hour job budget for bootstrap, bounded
 carrier acquisition/restoration, complete-release authentication and record uploads; the fifteen-minute
 utility-job budget does not apply. This bound is not evidence of successful hosted completion.
 Expired carriers require a complete new Run. Object-store copies use immutable content keys and original
 proofs under ADR-20; a new Run does not overwrite an earlier copy or imply its removal. Signed development uses
 per-attempt registry namespaces and the same authenticated earlier-attempt reuse as production.
-These retention periods govern provider locator records. Private carrier blobs have no automatic expiry
+Apart from the qualification outcome, which is the record itself, these retention periods govern provider
+locator records. Private carrier blobs have no automatic expiry
 in this implementation; registry retention must be managed separately, without removing active Run inputs.
 ADR-20 owns the separate default-branch registry cleanup protocol. Actual dispatch, credential/pool
 isolation, provider expiry and remote deletion require external evidence.

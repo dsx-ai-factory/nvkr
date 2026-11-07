@@ -12,6 +12,7 @@
 /.github/nvkr-run/*.lease
 /.github/nvkr-run-*/*.lease
 /.github/nvkr-qualification/*.lease
+/.github/nvkr-qualification-*/*.lease
 /.github/nvkr-dev/*.lease
 /.github/nvkr-dev-*/*.lease
 /.github/nvkr-dev-qualification/*.lease
@@ -20,6 +21,8 @@
 .pins.lock.yaml.lock
 # persistent advisory-lock guard `definition pin` leaves beside a composite Definition
 .*.pin.lock
+# persistent producer-overlay maintenance writer guard
+/.nvkr-producer-overlays.lease
 
 # test / coverage
 coverage.out

@@ -46,7 +46,6 @@ jobs:
     name: 'Verify release and deliverable signatures: output-nvkectl-linux-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-nvkectl-linux-arm64'].result == 'success' }}
     environment: 'nvkr-release'
     permissions:
       actions: read
@@ -75,11 +74,11 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-nvkectl-linux-arm64'].result == 'success' }}
   nvkr-verify-publication-output-capnico-controller:
     name: 'Verify release and deliverable signatures: output-capnico-controller'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-capnico-controller'].result == 'success' }}
     environment: 'nvkr-release'
     permissions:
       actions: read
@@ -108,11 +107,11 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-capnico-controller'].result == 'success' }}
   nvkr-verify-publication-output-cluster-ap-5fb4884131f8:
     name: 'Verify release and deliverable signatures: output-cluster-api-provider-provisioned'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-cluster-api-provider-provisioned'].result == 'success' }}
     environment: 'nvkr-release'
     permissions:
       actions: read
@@ -141,11 +140,11 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-cluster-api-provider-provisioned'].result == 'success' }}
   nvkr-verify-publication-output-cwe:
     name: 'Verify release and deliverable signatures: output-cwe'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-cwe'].result == 'success' }}
     environment: 'nvkr-release'
     permissions:
       actions: read
@@ -174,11 +173,11 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-cwe'].result == 'success' }}
   nvkr-verify-publication-output-nico-refer-768f0a1fbfbe:
     name: 'Verify release and deliverable signatures: output-nico-reference-profiles-fixture'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-nico-reference-profiles-fixture'].result == 'success' }}
     environment: 'nvkr-release'
     permissions:
       actions: read
@@ -207,6 +206,7 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-nico-reference-profiles-fixture'].result == 'success' }}
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04

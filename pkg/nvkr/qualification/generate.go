@@ -18,7 +18,19 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationoutcome"
 )
+
+// The production qualify job writes one outcome per Run attempt and exports
+// whether it did as this job output.
+const qualificationOutcomeWrittenOutput = "outcome-written"
+
+// qualificationOutcomeFile is the outcome path as the run steps see it: the
+// shell expands ${GITHUB_RUN_ATTEMPT}. The upload's `with:` path is not a shell,
+// so qualificationOutcomeUpload names the same attempt with
+// ${{ github.run_attempt }}. Both come from qualificationoutcome.Directory and
+// FileName, so change them together.
+var qualificationOutcomeFile = qualificationoutcome.Directory + "/" + qualificationoutcome.FileName("${GITHUB_RUN_ATTEMPT}")
 
 const DevelopmentQualificationManifestPath = ".github/nvkr-dev-qualification/manifest.json"
 const QualificationManifestPath = ".github/nvkr-qualification/manifest.json"
@@ -66,9 +78,6 @@ func GenerateFiles(ctx context.Context, definitionPath, environmentPath, policyP
 	if err := factory.ValidateGenerationEngine(engine); err != nil {
 		return "", err
 	}
-	if err := lifecycle.RefuseComposite(ctx, definitionPath, "qualification generation"); err != nil {
-		return "", err
-	}
 	if !qualificationInputPath(policyPath) {
 		return "", e.New(e.CodeUsage, "qualification policy must have a clean repository-relative path")
 	}
@@ -83,8 +92,15 @@ func GenerateFiles(ctx context.Context, definitionPath, environmentPath, policyP
 	if err != nil {
 		return "", err
 	}
-	if err := admitQualificationBundle(environment.GitHubBundle); err != nil {
-		return "", err
+	expectedProducer := factory.GitHubWorkflowPath
+	if environment.GitHubBundle != "" {
+		expectedProducer = ".github/workflows/nvkr-run-" + environment.GitHubBundle + ".yml"
+	}
+	if environment.GitHubDevelopment {
+		expectedProducer = development.ProducerWorkflowFor(environment.GitHubBundle)
+	}
+	if expectedProducer != policy.Source.Workflow || environment.GitHubDevelopment != policy.Source.Development {
+		return "", e.New(e.CodeEngineCapability, "qualification policy selects a different producer")
 	}
 	plan, err := lifecycle.CompileFiles(ctx, definitionPath, environmentPath, generatorVersion)
 	if err != nil {
@@ -147,8 +163,18 @@ func admitQualificationGeneration(policy lifecycle.QualificationPolicy, policyPa
 	if !qualificationInputPath(policyPath) || policyPath == policy.Source.Workflow || policyPath == policy.QualificationWorkflow || (policy.Smoke != nil && policyPath == policy.Smoke.Workflow) {
 		return e.New(e.CodeUsage, "qualification policy path overlaps generated files or is unsafe")
 	}
-	if (!policy.Source.Development && policy.Source.Workflow != factory.GitHubWorkflowPath) || (policy.Source.Development && policy.Source.Workflow != development.ProducerWorkflow) {
-		return e.New(e.CodeEngineCapability, "qualification generation requires the selected generated producer workflow")
+	directory, qualifier, worker, err := qualificationNamespace(policy.Source.Workflow)
+	if err != nil {
+		return err
+	}
+	if policy.Source.Development != strings.HasPrefix(directory, ".github/nvkr-dev-") {
+		return e.New(e.CodeEngineCapability, "qualification producer differs from selected lane")
+	}
+	if qualifier == "" && (!defaultQualificationPath(policy.QualificationWorkflow) || !defaultQualificationPath(policy.Smoke.Workflow)) {
+		return e.New(e.CodeEngineCapability, "default qualification cannot own another producer namespace")
+	}
+	if qualifier != "" && (qualifier != policy.QualificationWorkflow || worker != policy.Smoke.Workflow) {
+		return e.New(e.CodeEngineCapability, "qualification requires its isolated generated workflow pair")
 	}
 	if !policy.Source.Development && (policy.QualificationWorkflow == development.QualificationWorkflow || policy.QualificationWorkflow == development.SmokeWorkflow || policy.Smoke.Workflow == development.QualificationWorkflow || policy.Smoke.Workflow == development.SmokeWorkflow) {
 		return e.New(e.CodeEngineCapability, "production qualification cannot own development workflows")
@@ -159,13 +185,6 @@ func admitQualificationGeneration(policy lifecycle.QualificationPolicy, policyPa
 	}
 	if policy.Cosign.Version == "" || policy.Cosign.PlatformDigests["linux/amd64"] == "" || policy.Cosign.Digest != "" || (policy.Cosign.Path != "" && policy.Cosign.Path != "cosign") {
 		return e.New(e.CodeUnpinnedInput, "qualification generation requires an exact cosign version locator, the AMD64 final signer pin and every native worker pin, and the fixed cosign executable name")
-	}
-	return nil
-}
-
-func admitQualificationBundle(bundle string) error {
-	if bundle != "" {
-		return e.New(e.CodeEngineCapability, "qualification generation admits only the default producer bundle; named producer qualification is unsupported")
 	}
 	return nil
 }
@@ -186,8 +205,12 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
-	if err := admitQualificationBundle(plan.Environment.GitHubBundle); err != nil {
+	producerPath, producerName, err := factory.GitHubProducerIdentity(plan)
+	if err != nil {
 		return nil, err
+	}
+	if policy.Source.Workflow != producerPath {
+		return nil, e.New(e.CodeEngineCapability, "qualification policy selects a different producer workflow")
 	}
 	if policy.Source.Development != plan.Environment.GitHubDevelopment {
 		return nil, e.New(e.CodeEngineCapability, "qualification policy and producer select different lanes")
@@ -243,7 +266,7 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 		fmt.Fprint(&top, "permissions:\n  contents: read\nconcurrency:\n  group: nvkr-development-qualification-${{ github.run_id }}\n  cancel-in-progress: false\njobs:\n  native-smoke:\n    name: native-smoke\n")
 		condition = "github.event_name == 'workflow_dispatch' && github.repository == " + qualificationExpression(policy.Source.Repository) + " && startsWith(github.ref, 'refs/heads/') && github.ref != " + qualificationExpression("refs/heads/"+policy.Source.DefaultBranch)
 	} else {
-		fmt.Fprintf(&top, "name: %s\n'on':\n  workflow_run:\n    workflows: [%s]\n    types: [completed]\n    branches: [%s]\n", qualificationYAML("nvkr-qualify-"+plan.Name), qualificationYAML("nvkr-run-"+plan.Name), qualificationYAML(policy.Source.DefaultBranch))
+		fmt.Fprintf(&top, "name: %s\n'on':\n  workflow_run:\n    workflows: [%s]\n    types: [completed]\n    branches: [%s]\n", qualificationYAML("nvkr-qualify-"+plan.Name), qualificationYAML(producerName), qualificationYAML(policy.Source.DefaultBranch))
 		fmt.Fprint(&top, "permissions:\n  contents: read\nconcurrency:\n  group: nvkr-qualification-${{ github.workflow }}-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}\n  cancel-in-progress: false\njobs:\n  native-smoke:\n    name: native-smoke\n")
 		condition = "github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.repository == " + qualificationExpression(policy.Source.Repository) + " && github.event.workflow_run.head_branch == " + qualificationExpression(policy.Source.DefaultBranch) + " && github.event.workflow_run.repository.full_name == github.repository && github.event.workflow_run.head_repository.full_name == github.repository"
 
@@ -260,6 +283,7 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 		fmt.Fprint(&top, "    environment: nvkr-dev-release\n")
 	} else {
 		fmt.Fprint(&top, "    environment: nvkr-release\n")
+		fmt.Fprintf(&top, "    outputs:\n      %s: ${{ steps.outcome.outputs.written }}\n", qualificationOutcomeWrittenOutput)
 	}
 	fmt.Fprint(&top, "    steps:\n")
 	qualificationBootstrap(&top, plan, actions, linker, policy, "amd64")
@@ -276,9 +300,12 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	sourceAuth.writeEnvironment(&top)
 	manifestFlag := ""
 	if !policy.Source.Development {
-		manifestFlag = " --issue-manifest"
+		manifestFlag = " --issue-manifest --out \"" + qualificationOutcomeFile + "\""
 	}
 	fmt.Fprintf(&top, "        run: |\n          set -euo pipefail\n%s          exec ./nvkr-exec run qualify --policy %s%s\n", sourceAuth.requireTokens(), qualificationShell(policyPath), manifestFlag)
+	if !policy.Source.Development {
+		qualificationOutcomeUpload(&top, plan, actions)
+	}
 	fmt.Fprintf(&worker, "name: %s\n'on':\n  workflow_call:\n", qualificationYAML("nvkr-smoke-"+plan.Name))
 	sourceAuth.writeCallContract(&worker)
 	fmt.Fprintf(&worker, "permissions:\n  contents: read\nconcurrency:\n  group: nvkr-native-smoke-${{ github.run_id }}-${{ github.run_attempt }}\n  cancel-in-progress: false\njobs:\n  native:\n    name: native-${{ matrix.arch }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: %d\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n", hostedJobTimeoutMinutes)
@@ -327,6 +354,20 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	return &GeneratedWorkflows{files: files, manifest: qualificationManifest{SchemaVersion: qualificationGeneratedSchema, PlanDigest: planDigest, PolicyDigest: policyDigest, ProducerWorkflow: policy.Source.Workflow, QualificationWorkflow: policy.QualificationWorkflow, SmokeWorkflow: policy.Smoke.Workflow, Members: members}}, nil
 }
 
+// qualificationOutcomeUpload keeps the qualify step's outcome whatever its result;
+// only a canceled job skips it. The presence output lets a later job tell an
+// attempt that wrote no outcome from an upload it cannot see. The upload names
+// the one outcome file, so nothing else in the directory, such as an
+// interrupted write's temporary file, can reach the artifact. The outcome grants
+// no authority, so the upload is best effort: its failure never fails a job whose
+// qualification passed. It is kept seven days, like the production qualification
+// handoffs (ADR-18 §8).
+func qualificationOutcomeUpload(out *bytes.Buffer, plan *factory.Plan, actions pipeline.GitHubActionRefs) {
+	const notCanceled = "${{ !cancelled() }}" //nolint:misspell // GitHub status function uses this exact spelling.
+	fmt.Fprintf(out, "      - name: Record whether the qualification outcome was written\n        id: outcome\n        if: %s\n        timeout-minutes: 1\n        run: |\n          set -euo pipefail\n          written=false\n          if [ -f \"%s\" ]; then written=true; fi\n          printf 'written=%%s\\n' \"$written\" >> \"$GITHUB_OUTPUT\"\n", notCanceled, qualificationOutcomeFile)
+	fmt.Fprintf(out, "      - name: Upload the qualification outcome\n        if: %s\n        uses: %s # %s\n        timeout-minutes: 5\n        continue-on-error: true\n        with:\n          name: %s${{ github.run_id }}-${{ github.run_attempt }}\n          path: %s/%s\n          include-hidden-files: true\n          if-no-files-found: warn\n          retention-days: 7\n", notCanceled, actions.Upload, plan.Actions["upload-artifact"].Version, qualificationoutcome.ArtifactPrefix, qualificationoutcome.Directory, qualificationoutcome.FileName("${{ github.run_attempt }}"))
+}
+
 func qualificationPermissions(out *bytes.Buffer, indent string, _ bool) {
 	fmt.Fprintf(out, "%spermissions:\n%s  contents: read\n%s  actions: read\n%s  id-token: write\n", indent, indent, indent, indent)
 }
@@ -338,7 +379,11 @@ func qualificationShell(value string) string {
 
 func admitQualificationRegistry(plan *factory.Plan, policy lifecycle.QualificationPolicy) error {
 	if policy.Source.Development {
-		prefix := "ghcr.io/" + strings.ToLower(policy.Source.Repository) + "/development"
+		namespace, err := development.NamespaceForProducer(policy.Source.Repository, policy.Source.Workflow)
+		if err != nil {
+			return err
+		}
+		prefix := namespace.Prefix()
 		publication := plan.Environment.Publication
 		if publication == nil || publication.RepositoryPrefix != prefix || publication.CredentialRef != development.WriteCredentialRef || publication.Anonymous {
 			return e.New(e.CodeEngineCapability, "development qualification requires the source repository development namespace and dedicated credential")

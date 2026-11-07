@@ -542,7 +542,7 @@ and consumer verification. Completed stage reports do not authorize deployment:
 the qualification result becomes successful only after the child exits successfully
 and the adapter retains and validates its result. Failures keep the last reported
 item and refuse deployment handoff. Plain output prints the same stage and item
-observations. The final qualification outcome remains in scrollback after the TUI
+observations. The final qualification result remains in scrollback after the TUI
 closes. These are local keys and the lane remains `unqualified-local-execution`.
 
 | Key | Action |

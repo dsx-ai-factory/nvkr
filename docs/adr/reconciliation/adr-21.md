@@ -1,5 +1,15 @@
 ## Support by owner
 
+Explicit producer-overlay maintenance now checks the existing generated baseline before pin mutation,
+copies complete producers from named catalogs, and derives ordered predecessor bindings before Run
+generation. The NVIDIA/upstream TCG copies and their two dependent local KVM bindings are enrolled;
+the KVM replacement producers remain frozen. The maintenance workflow admits only the configured
+destination paths in its patch. Deterministic/no-write checks, stale-writer refusal, selection/order errors
+and lock-only propagation have local contract coverage in `producer_overlays_test.go`. Lock, overlay-set
+and Run-bundle commits remain separate transactions; interrupted regeneration requires rerunning the
+owners and all checks. No hosted refresh or producer execution validates this migration. The
+[maintenance guide](../../catalog-maintenance.md#maintain-producer-copies) owns recovery and the excluded-copy inventory.
+
 Native image maintenance (#243) adds an authored main-branch workflow owned by `njhensley`, with Monday
 06:00 UTC preparation and relevant-source change triggers. It reuses native preparation and verification,
 retains separate image archives, admits a complete four-image set against reviewed per-image exceptions,

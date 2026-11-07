@@ -58,7 +58,10 @@ make nvke-gpu-site-generate
 make nvke-gpu-site-check
 ```
 
-`make workflows-generate`, `make workflows-check` and NVKE catalog maintenance include both bundles.
+`make workflows-generate`, `make workflows-check` and NVKE catalog maintenance include both build bundles
+and their separate qualify/smoke workflow pairs. The production pair uses
+[`nvke-gpu-site-qualification.yaml`](../../policies/nvke-gpu-site-qualification.yaml); the development pair uses
+[`nvke-gpu-site-development-qualification.yaml`](../../policies/nvke-gpu-site-development-qualification.yaml).
 
 | Environment | Workflow | Publication | Signer |
 |---|---|---|---|
@@ -68,8 +71,8 @@ make nvke-gpu-site-check
 The production Environment starts from the combined candidate's `github-release.yaml`. The composite owns the
 repository's fixed development bundle, `nvkr-dev.yml`, generated from the unchanged `github-development.yaml`.
 In both, disks run on the native ARC KVM pools and every other job on hosted runners. The combined candidate no
-longer has a development bundle, and the development qualifier pair is retired because composite qualification
-is deferred. Development jobs use the `nvkr-dev-release` and `nvkr-dev-arc` GitHub environments, which admit
+longer has a development bundle. The fixed `nvkr-dev-qualify.yml` and `nvkr-dev-smoke.yml` pair now
+qualifies the complete GPU-site development Release. Development jobs use the `nvkr-dev-release` and `nvkr-dev-arc` GitHub environments, which admit
 only allowlisted branches. Dispatch a clean pushed branch of this repository that those environments admit:
 
 ```sh
@@ -77,8 +80,9 @@ make pipeline-dev-run PIPELINE_DEV_REPO=dsx-ai-factory/nvkr
 ```
 
 Every composite Run rebuilds every output, including eight native disk bakes; it does not reuse a family
-Release. Composite qualification, member Release reuse and composite runtime Plans are refused with
-`engine-capability`. Verifying a composite Release establishes nothing about the family Releases, and the
+Release. Hosted qualification binds the complete composite and all its outputs; AICR bundles receive strict
+artifact validation, with no deployment or application-compatibility claim. Local qualification rehearsal,
+member Release reuse and composite runtime Plans remain refused with `engine-capability`. Verifying a composite Release establishes nothing about the family Releases, and the
 reverse also holds.
 
 The GB200 AICR Definition selects no `sbomTool`, so its standalone ARM64 local build needs no ARM64 scanner.

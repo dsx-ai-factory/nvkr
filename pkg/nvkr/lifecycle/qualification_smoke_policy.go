@@ -35,7 +35,7 @@ type QualificationNonToolMember struct {
 
 func (rule QualificationNonToolMember) key() string { return rule.Output + "\x00" + rule.Member }
 
-// QualificationNonToolOutput explicitly scopes one exact OCI/APT output outside
+// QualificationNonToolOutput explicitly scopes one exact OCI, APT or bundle output outside
 // delivered loose-tool smoke. Deployment images may contain tools; this rule
 // makes no assertion about their internal content or operational acceptance.
 type QualificationNonToolOutput struct {
@@ -156,8 +156,8 @@ func (smoke QualificationSmokePolicy) validateExecution() error {
 			return e.New(e.CodeTrustPolicyMissing, "non-tool smoke scope requires unique exact outputs and nonempty bounded component membership")
 		}
 		seen[output.Output] = true
-		if (output.Kind != OutputOCI || output.Reason != "deployment-image") && (output.Kind != OutputAPT || output.Reason != "package-repository") {
-			return e.New(e.CodeTrustPolicyMissing, "non-tool smoke scope requires an explicit deployment-image or package-repository role")
+		if (output.Kind != OutputOCI || output.Reason != "deployment-image") && (output.Kind != OutputAPT || output.Reason != "package-repository") && (output.Kind != OutputBundle || output.Reason != "bundle-archive") {
+			return e.New(e.CodeTrustPolicyMissing, "non-tool smoke scope requires an explicit deployment-image, package-repository or bundle-archive role")
 		}
 		components := make(map[string]bool, len(output.Components))
 		for _, component := range output.Components {

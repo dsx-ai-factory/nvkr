@@ -52,8 +52,11 @@ func (policy QualificationPolicy) Validate() error {
 	if err := policy.Source.Validate(); err != nil {
 		return err
 	}
-	if policy.Source.Development && (policy.Source.Workflow != development.ProducerWorkflow || policy.QualificationWorkflow != development.QualificationWorkflow || policy.Smoke == nil || policy.Smoke.Workflow != development.SmokeWorkflow) {
-		return e.New(e.CodeTrustPolicyMissing, "development qualification requires its dedicated producer, qualifier and smoke workflows")
+	if policy.Source.Development {
+		qualifier, worker, err := development.QualificationWorkflows(policy.Source.Workflow)
+		if err != nil || policy.QualificationWorkflow != qualifier || policy.Smoke == nil || policy.Smoke.Workflow != worker {
+			return e.New(e.CodeTrustPolicyMissing, "development qualification requires its dedicated producer, qualifier and smoke workflows")
+		}
 	}
 	if policy.QualificationWorkflow != "" {
 		qualifier := policy.Source

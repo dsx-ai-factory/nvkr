@@ -245,6 +245,13 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 		}
 		actions.writeUploadStep(&body, plan, "NVKR runner", "nvkr-exec-"+shortStableName(runner), "nvkr-exec")
 	}
+	preflightJobs, err := githubImagePreflightJobs(plan)
+	if err != nil {
+		return nil, err
+	}
+	if err := writeGitHubImagePreflights(&body, plan, bootstrapJobs, actions); err != nil {
+		return nil, err
+	}
 	for _, stage := range stages {
 		node := stage.Nodes[0]
 		timeoutMinutes, err := githubStageTimeoutMinutes(stage)
@@ -255,7 +262,7 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 			return nil, e.Wrap(e.CodeTimeout, err, "GitHub factory rendering canceled")
 		}
 		jobID := stage.ID
-		needs := stage.needs(artifacts, nodeJobs, bootstrapJobs[node.RunsOn])
+		needs := uniqueSorted(append(stage.needs(artifacts, nodeJobs, bootstrapJobs[node.RunsOn]), preflightJobs...))
 		fmt.Fprintf(&body, "  %s:\n", jobID)
 		fmt.Fprintf(&body, "    name: %s\n", yamlSingle(stage.Name))
 		fmt.Fprintf(&body, "    runs-on: %s\n", yamlSingle(node.RunsOn))
@@ -273,7 +280,7 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 			}
 		}
 		fmt.Fprintf(&body, "    needs: [%s]\n", strings.Join(needs, ", "))
-		fmt.Fprintf(&body, "    if: %s\n", stage.condition(plan))
+		fmt.Fprintf(&body, "    if: %s\n", stage.condition(plan, preflightJobs...))
 		if stage.DiskOutput != "" {
 			fmt.Fprintf(&body, "    environment: %s\n", yamlSingle(githubARCEnvironmentFor(plan)))
 		}

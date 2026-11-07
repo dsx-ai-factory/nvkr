@@ -27,6 +27,7 @@ type closure struct {
 	runs                     []closureRun
 	qualification            *qualification.GeneratedWorkflows
 	developmentQualification *qualification.GeneratedWorkflows
+	additionalQualifications []*qualification.GeneratedWorkflows
 }
 
 // closureRun is one non-production Run member with the fresh Plan it renders.
@@ -50,8 +51,6 @@ func otherRuns(config Config) []RunInput {
 
 // generatedBundleGlob finds every committed generated bundle manifest.
 const generatedBundleGlob = ".github/nvkr-*/manifest.json"
-
-var qualificationDirectory = path.Dir(qualification.QualificationManifestPath)
 
 // buildClosure renders the policy's dependent members through their real owners
 // and refuses a committed generated bundle the policy does not name. It writes
@@ -88,6 +87,32 @@ func buildClosure(ctx context.Context, config Config, generatorVersion string, p
 		}
 		allowed[directory], workflows[bundle.WorkflowPath] = true, true
 		members.runs = append(members.runs, closureRun{bundle: bundle, plan: runPlan})
+		if run.QualificationPolicy != "" {
+			if err := admitPath(run.QualificationPolicy); err != nil {
+				return nil, err
+			}
+			policy, err := lifecycle.LoadQualificationPolicy(ctx, run.QualificationPolicy)
+			if err != nil {
+				return nil, err
+			}
+			pair, err := qualification.RenderWorkflows(ctx, runPlan, policy, run.QualificationPolicy)
+			if err != nil {
+				return nil, err
+			}
+			directory := path.Dir(pair.ManifestPath())
+			if allowed[directory] {
+				return nil, e.New(e.CodeUsage, "qualification owner is selected more than once")
+			}
+			for workflow := range pair.Files() {
+				if workflows[workflow] {
+					return nil, e.New(e.CodeUsage, "qualification workflow overlaps another selected owner")
+				}
+				workflows[workflow] = true
+			}
+			allowed[directory] = true
+			members.additionalQualifications = append(members.additionalQualifications, pair)
+		}
+
 		if run.Environment == config.DevelopmentEnvironment && config.DevelopmentQualificationPolicy != "" {
 			if err := admitPath(config.DevelopmentQualificationPolicy); err != nil {
 				return nil, err
@@ -117,7 +142,7 @@ func buildClosure(ctx context.Context, config Config, generatorVersion string, p
 		if members.qualification, err = qualification.RenderWorkflows(ctx, plan, policy, config.QualificationPolicy); err != nil {
 			return nil, err
 		}
-		allowed[qualificationDirectory] = true
+		allowed[path.Dir(members.qualification.ManifestPath())] = true
 	}
 	if err := refuseUnnamedBundles(allowed); err != nil {
 		return nil, err
@@ -158,7 +183,7 @@ func (members *closure) check(ctx context.Context) error {
 			return err
 		}
 	}
-	for _, pair := range []*qualification.GeneratedWorkflows{members.qualification, members.developmentQualification} {
+	for _, pair := range append([]*qualification.GeneratedWorkflows{members.qualification, members.developmentQualification}, members.additionalQualifications...) {
 		if pair != nil {
 			if err := qualification.CheckWorkflows(ctx, ".", pair); err != nil {
 				return err
@@ -188,7 +213,7 @@ func (members *closure) paths() (directories, files []string) {
 		add(run.bundle)
 	}
 	if members.qualification != nil {
-		directories = append(directories, qualificationDirectory)
+		directories = append(directories, path.Dir(members.qualification.ManifestPath()))
 		for name := range members.qualification.Files() {
 			files = append(files, name)
 		}
@@ -196,6 +221,12 @@ func (members *closure) paths() (directories, files []string) {
 	if members.developmentQualification != nil {
 		directories = append(directories, path.Dir(qualification.DevelopmentQualificationManifestPath))
 		for name := range members.developmentQualification.Files() {
+			files = append(files, name)
+		}
+	}
+	for _, pair := range members.additionalQualifications {
+		directories = append(directories, path.Dir(pair.ManifestPath()))
+		for name := range pair.Files() {
 			files = append(files, name)
 		}
 	}
@@ -282,6 +313,12 @@ func generateClosure(ctx context.Context, config Config, generatorVersion string
 		return "", err
 	}
 	for _, run := range otherRuns(config) {
+		if run.QualificationPolicy != "" {
+			if _, err := qualification.GenerateFiles(ctx, run.Definition, run.Environment, run.QualificationPolicy, generatorVersion, factory.EngineGitHub, ".", check); err != nil {
+				return "", err
+			}
+			continue
+		}
 		if run.Environment == config.DevelopmentEnvironment && config.DevelopmentQualificationPolicy != "" {
 			if _, err := qualification.GenerateFiles(ctx, run.Definition, run.Environment, config.DevelopmentQualificationPolicy, generatorVersion, factory.EngineGitHub, ".", check); err != nil {
 				return "", err

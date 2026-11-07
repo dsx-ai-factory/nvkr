@@ -38,7 +38,7 @@ func TestQualificationSmokePlanAdmitsCompleteStaticScope(t *testing.T) {
 			p.LifecycleOutputs[0].Components = []string{"tool", "tool"}
 		}, e.CodeReleaseIncomplete},
 		{"unknown kind", func(p *factory.Plan, _ *QualificationPolicy) { p.LifecycleOutputs[0].Kind = "unknown" }, e.CodeEngineCapability},
-		{"bundle has no deployment smoke exemption", func(p *factory.Plan, _ *QualificationPolicy) { p.LifecycleOutputs[0].Kind = OutputBundle }, e.CodeEngineCapability},
+		{"bundle requires exact archive rule", func(p *factory.Plan, _ *QualificationPolicy) { p.LifecycleOutputs[0].Kind = OutputBundle }, e.CodeGateUnmet},
 		{"no build", func(p *factory.Plan, _ *QualificationPolicy) { p.Builds = nil }, e.CodeReleaseIncomplete},
 		{"ambiguous build", func(p *factory.Plan, _ *QualificationPolicy) { p.Builds = append(p.Builds, p.Builds[0]) }, e.CodeReleaseIncomplete},
 		{"no graph", func(p *factory.Plan, _ *QualificationPolicy) { p.Builds[0].Graph = nil }, e.CodeReleaseIncomplete},
@@ -66,7 +66,7 @@ func TestQualificationSmokePlanAdmitsCompleteStaticScope(t *testing.T) {
 }
 
 func TestQualificationSmokePlanExactNonToolExemptions(t *testing.T) {
-	for _, kind := range []string{OutputOCI, OutputAPT} {
+	for _, kind := range []string{OutputOCI, OutputAPT, OutputBundle} {
 		for _, mode := range []string{"exact", "missing", "wrong components", "wrong kind", "extra output"} {
 			t.Run(kind+"/"+mode, func(t *testing.T) {
 				plan, _, _, policy := nativeSmokeScopeFixture()
@@ -74,6 +74,9 @@ func TestQualificationSmokePlanExactNonToolExemptions(t *testing.T) {
 				reason := "deployment-image"
 				if kind == OutputAPT {
 					reason = "package-repository"
+				}
+				if kind == OutputBundle {
+					reason = "bundle-archive"
 				}
 				policy.Smoke.NonToolOutputs = []QualificationNonToolOutput{{Output: "non-tool", Kind: kind, Components: []string{"first", "second"}, Reason: reason}}
 				switch mode {

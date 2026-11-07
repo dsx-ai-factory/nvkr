@@ -20,6 +20,9 @@ Separately selected execution settings, required publication transports and name
 and signing identity policy. Selecting an unavailable transport fails before work; a supported sibling cannot
 substitute for it. Native toolchain access separately declares private and anonymous image roots and
 an independent reader; publication namespaces grant no pull access. Unclassified native images fail admission.
+Declared-access GitHub Runs observe exact manifest/config availability with that reader after final
+Plan validation and before producer fan-out, separately per runner placement. This point-in-time
+observation grants no runtime or release authority and does not replace per-job pulls or byte checks.
 Native hosted platform routes are explicit execution settings; they do not change logical Build identity
 or prove provider allocation. Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
 are also catalog dependencies ([ADR-22](docs/adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies)).
@@ -78,7 +81,8 @@ releases their named outputs through one Plan, Run and Release. Proposed
 [ADR-26](docs/adr/0026-definition-composition.md) designs it and owns its
 [merge rules](docs/adr/0026-definition-composition.md#3-merge-rules-exact-union-never-precedence) and
 [member Release reuse](docs/adr/0026-definition-composition.md#6-reusing-already-published-member-releases-only-through-authenticated-acceptance-a-planned-follow-up);
-units U1–U7 are implemented and contract-tested only, with no hosted composite Run, publication or consumer
+units U1–U8, including complete-composite hosted qualification with independent policies, are implemented
+and contract-tested only, with no hosted composite Run, publication or consumer
 verification yet.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
@@ -368,6 +372,15 @@ independently selected qualification identity, and is attested to the publicatio
 A manifest attachment alone is not a published release; tags, channels and revocation are separate.
 _Avoid_: Release clearance, ReleaseSet, qualified release, tag
 
+**Qualification outcome**:
+An unsigned description of one release qualification attempt: passed, failed in qualification or manifest
+issuance, or errored, with the source and qualifier Runs, attempt times, per-output checks and scrubbed error
+text. It points at the qualification evidence and release manifest by digest and grants no qualification,
+manifest, release or publication authority. An errored outcome's source Run comes from the unauthenticated
+triggering event and says so. `run qualify --issue-manifest --out` writes one for each attempt it qualifies;
+publishing outcomes is not implemented.
+_Avoid_: Qualification record, qualification evidence, test result
+
 **Inventory**:
 The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.
 _Avoid_: List of successful outputs, component catalog
@@ -436,6 +449,8 @@ _Avoid_: Run-wide pipeline tool, release executable output, build script
 An ordered, predecessor-bound catalog change replacing a complete component producer or performing an exact
 toolchain-pin substitution for an explicit sorted component set and host architecture. Substitution fails if
 any selected producer does not carry the expected old pin; it is not a partial producer merge.
+Explicit maintenance inputs may regenerate complete producer copies and ordered predecessor bindings.
+Source metadata bindings derive build environment values from each copied producer's own pin.
 _Avoid_: Output selection group, mixin, deployment topology
 
 **Derived pin set**:

@@ -34,7 +34,6 @@ jobs:
     name: 'Verify release and deliverable signatures: output-nvke-node-fde-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-nvke-node-fde-amd64'].result == 'success' }}
     environment: 'nvkr-release'
     permissions:
       actions: read
@@ -63,11 +62,11 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-nvke-node-fde-amd64'].result == 'success' }}
   nvkr-verify-publication-output-nvke-node-fde-arm64:
     name: 'Verify release and deliverable signatures: output-nvke-node-fde-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-nvke-node-fde-arm64'].result == 'success' }}
     environment: 'nvkr-release'
     permissions:
       actions: read
@@ -96,11 +95,11 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-nvke-node-fde-arm64'].result == 'success' }}
   nvkr-verify-publication-output-nvke-node-image-amd64:
     name: 'Verify release and deliverable signatures: output-nvke-node-image-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-nvke-node-image-amd64'].result == 'success' }}
     environment: 'nvkr-release'
     permissions:
       actions: read
@@ -129,11 +128,11 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-nvke-node-image-amd64'].result == 'success' }}
   nvkr-verify-publication-output-nvke-node-image-arm64:
     name: 'Verify release and deliverable signatures: output-nvke-node-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-nvke-node-image-arm64'].result == 'success' }}
     environment: 'nvkr-release'
     permissions:
       actions: read
@@ -162,6 +161,7 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-sign-output-nvke-node-image-arm64'].result == 'success' }}
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04

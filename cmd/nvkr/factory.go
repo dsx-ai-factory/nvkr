@@ -200,6 +200,16 @@ func cmdFactoryGitHub() *cli.Command {
 			return factory.WriteGitHubActionData(c.Context, plan, c.String("action"), os.Getenv("GITHUB_OUTPUT"))
 		}),
 		cmdFactoryCleanupDevelopment(),
+		githubFactoryCommand("preflight-images", "runner", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
+			report, err := factory.PreflightGitHubImages(c.Context, plan, c.String("runner"))
+			if err != nil {
+				return err
+			}
+			if err := json.NewEncoder(c.App.Writer).Encode(report); err != nil {
+				return e.Wrap(e.CodeInternal, err, "write image preflight observations")
+			}
+			return nil
+		}),
 		githubFactoryCommand("prepare-images", "stage", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
 			return factory.PrepareGitHubImages(c.Context, plan, c.String("stage"), options)
 		}),

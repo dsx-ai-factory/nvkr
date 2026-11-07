@@ -101,7 +101,7 @@ func (description ToolSmokeDescription) Validate() error {
 				return e.New(e.CodeReleaseIncomplete, "smoke contains unselected executable members")
 			}
 			delete(members, output.Name)
-		case OutputOCI, OutputAPT:
+		case OutputOCI, OutputAPT, OutputBundle:
 			rule, ok := exemptions[output.Name]
 			components := make([]string, 0, len(output.BuildSubjects))
 			if output.ImageIndex != nil {

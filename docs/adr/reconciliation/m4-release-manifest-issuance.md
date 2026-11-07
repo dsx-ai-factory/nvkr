@@ -31,3 +31,15 @@ require issuance only in the production final signer. These are local contract t
 No hosted Run, OIDC manifest attestation, registry read-back or independent consumer verification is
 recorded. The tag rule, tag creation, publisher exclusion, consumer verification instructions and
 interruption demonstrations remain M4-D.
+
+`run qualify --issue-manifest --out` also writes an unsigned qualification outcome for each attempt it
+qualifies, and the generated production qualifier uploads it, best effort and kept seven days (ADR-18 §8), for
+any result except a canceled job. An attempt that ends earlier (a failed setup step), that the command's
+admission refuses, or whose command times out before writing (a caller's work deadline, or the runner
+stopping the step at its timeout) writes none, and the job's `outcome-written` output is `false`; a canceled
+job writes none and leaves it empty.
+A record that cannot be written after qualification never changes the exit status. Contract tests
+cover the status mapping, the event fallback for errored attempts, admission before any work, redaction
+(including URL-escaped and base64 forms of the step's secrets), times kept outside the diagnostics, the size
+bound, an unchanged stdout and exit status, and the generated steps. No hosted Run has produced an outcome,
+and no publisher consumes one.

@@ -22,8 +22,12 @@ and hardware acceptance, as recorded below.
 `nvkr.definition` digest, joined into one effective Definition, one Plan, one Run and one Release whose
 membership is the exact union of member outputs. Implemented, contract-tested units are listed in its row
 below, including named composite development bundles (U5); no hosted composite Run, composite publication or
-consumer verification has been exercised or recorded. Qualification and member Release reuse remain
-deferred and must fail closed when implemented; reuse follows the separately drafted result-reuse decision.
+consumer verification has been exercised or recorded. Hosted complete-composite qualification binds composition and every output through handoff, checks, smoke,
+qualification evidence and the production manifest. GPU-site production/development pairs select explicit
+policies, including artifact-only bundle archive validation. Local composite qualification rehearsal and member
+Release reuse remain deferred and fail closed; reuse follows the separately drafted result-reuse decision.
+Contract coverage includes `TestQualificationAuthenticatesCompleteComposition` and
+`TestGPUCompositeQualificationPairs`; these do not establish external service or hosted acceptance.
 Retiring the combined NVKE Definition is a separate cutover gated on a hosted composite Run and consumer
 verification.
 

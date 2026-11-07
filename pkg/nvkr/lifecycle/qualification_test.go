@@ -147,6 +147,7 @@ func newQualificationFixture(t *testing.T) (QualificationRequest, *Consumer, *qu
 }
 
 type qualificationFixtureOptions struct {
+	plan        func(*factory.Plan)
 	publication func(*delivery.PublicationRequest)
 	predicate   func(string, *provenance.Predicate)
 }
@@ -173,7 +174,13 @@ func newQualificationFixtureWithSigningIdentity(t *testing.T, identity string, o
 	if err != nil {
 		t.Fatal(err)
 	}
+	for _, option := range options {
+		if option.plan != nil {
+			option.plan(plan)
+		}
+	}
 	fixture := exactInputFixtureForPlanAndInvocation(t, definition, environment, plan, description.InvocationID, func(request *delivery.PublicationRequest) {
+		request.Release.DefinitionDigest, request.Release.Composition = plan.DefinitionDigest, plan.Composition.Clone()
 		for i := range request.Objects {
 			object := &request.Objects[i]
 			if object.Output != nil {

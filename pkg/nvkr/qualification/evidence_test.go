@@ -156,7 +156,7 @@ func TestQualificationEvidenceStrictContract(t *testing.T) {
 }
 
 func TestSmokeAdmissionCollectsCompleteSetAndRejectsFabrication(t *testing.T) {
-	for _, kind := range []string{lifecycle.OutputHelm, lifecycle.OutputDiskImage, lifecycle.OutputExecutable, lifecycle.OutputOCI, lifecycle.OutputAPT} {
+	for _, kind := range []string{lifecycle.OutputHelm, lifecycle.OutputDiskImage, lifecycle.OutputExecutable, lifecycle.OutputOCI, lifecycle.OutputAPT, lifecycle.OutputBundle} {
 		t.Run(kind, func(t *testing.T) {
 			fixture := evidenceFixture()
 			for i := range fixture.ArtifactChecks.Outputs {

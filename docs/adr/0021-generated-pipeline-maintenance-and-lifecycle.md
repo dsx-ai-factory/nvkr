@@ -79,8 +79,9 @@ records one successful earlier-head full development execution of this opt-in to
 execution-model extraction and per-worker fragment forwarding, and proves neither current-head worker execution,
 full-product failure/cancellation recovery nor production qualification. Optional qualification
 generation separately emits the admitted `workflow_run` qualifier and fixed `workflow_call` smoke pair (§4).
-That pair currently admits the default producer workflow only; named producer
-qualification is not part of this namespace contract.
+Each named production producer may select an independent policy and owns
+`nvkr-qualify-<name>.yml`, `nvkr-smoke-<name>.yml` and `.github/nvkr-qualification-<name>/manifest.json`.
+The event trigger uses the producer renderer's exact display name. Default ownership remains unchanged.
 A separately authored downstream CI coordinator may schedule
 dispatches of those bundles; its scheduling, exact-run correlation and runtime
 ownership are outside generation (ADR-16/18).
@@ -244,13 +245,25 @@ A pin or catalog change moves the IR, which moves the emitted pipeline. The two 
 - `run generate` after `catalog bump` regenerates the pipeline in the **same
   change** as the lock edit. The drift gate (§2) makes a lock change **unmergeable without the matching pipeline
   regen**, so "forgot to regenerate" is structurally impossible to merge.
-- `catalogmaintenance` owns an explicitly configured review-candidate refresh: check the existing bundle,
-  atomically bump selected independent roots and their declared pin sets, regenerate, and repeat the drift
+- `catalogmaintenance` owns an explicitly configured review-candidate refresh: check the existing bundle
+  and any configured producer overlays, atomically bump selected independent roots and their declared pin sets,
+  regenerate producer overlays before dependent Run bundles, and repeat the drift
   check. No-op preserves bytes. `--check` previews only the complete pin transaction, without writes or a
   claim that candidate production was exercised. Locks and generated files retain separate transactions;
   failure after pin commit leaves a disposable checkout for diagnosis, never a publishable candidate.
   Recovery context preserves the generating owner's coded cause, including retryable cancellation and
   non-retryable generated-file drift during either generation pass.
+- Optional `producerOverlays` names a strict `nvkr.dev/producer-overlay-maintenance/v1` input. Its ordered
+  entries declare source catalogs and exact producer IDs, existing named overlay destinations, base catalogs,
+  ordered predecessors and any explicitly frozen complete replacements. The maintenance owner derives
+  predecessor digests and uses the catalog's whole-producer validator. Missing or ambiguous producers,
+  invalid ordering, path escapes and destination ownership conflicts fail before any write. Check mode
+  compares exact bytes without opening a writer guard. A persistent kernel-released guard serializes writers;
+  all destination bytes undergo CAS and all changes are staged before per-file rename and directory fsync.
+  The set is not a cross-file atomic transaction. Interrupted regeneration is repaired by rerunning this
+  owner and all dependent bundle generators, then checking the complete candidate. A failed pass retains
+  its coded cause and never reports candidate success. The maintenance workflow transports only the exact
+  configured overlay destinations alongside its existing lock and bundle allowlist.
 - `catalog update-ci` takes no policy path and renders a separate GitHub workflow that discovers the one
   `inputs/policies/*-catalog-maintenance.yaml` when it runs (several share the repository-root generated bundle
   and are refused), with a reviewed schedule (nightly unless one is given, so pins stay current without an
@@ -352,7 +365,12 @@ The explicit development policy generates a separate fixed manual-dispatch/call 
 `.github/nvkr-dev-qualification/`. Production and development owners have independent locks, stages and
 manifests. A prior manifest naming the other producer cannot authorize replacement or retirement. The same
 exact-byte runtime policy check applies to both pairs. The development source checkout is untrusted input
-data and does not replace the qualifier's generated policy or executable owner.
+data and does not replace the qualifier's generated policy or executable owner. Named composite development producers use `nvkr-dev-qualify-<name>.yml`,
+`nvkr-dev-smoke-<name>.yml` and `.github/nvkr-dev-qualification-<name>/manifest.json`.
+Development producer names beginning `qualify-`, `smoke-` or `qualification-` are reserved to prevent
+ownership collisions. Each source workflow selects its own original Plan path and disposable namespace.
+Catalog maintenance additional runs may select `qualificationPolicy`; the same owner regenerates and
+checks both producer and qualification files, and includes every manifest and workflow in the refresh closure.
 
 The reviewed policy and generated pair may merge before real hosted acceptance. The fresh producer run and
 positive/negative hosted and independent-consumer exercises follow merge; their evidence remains required

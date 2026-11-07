@@ -28,7 +28,7 @@ const qualificationOwnerDirectory = ".github/nvkr-qualification"
 var qualificationWorkflowPath = regexp.MustCompile(`^\.github/workflows/[A-Za-z0-9][A-Za-z0-9_.-]*\.ya?ml$`)
 
 func (manifest qualificationManifest) validate() error {
-	if manifest.SchemaVersion != qualificationGeneratedSchema || !canonical.IsDigest(manifest.PlanDigest) || !canonical.IsDigest(manifest.PolicyDigest) || (manifest.ProducerWorkflow != factory.GitHubWorkflowPath && manifest.ProducerWorkflow != development.ProducerWorkflow) || len(manifest.Members) != 2 {
+	if manifest.SchemaVersion != qualificationGeneratedSchema || !canonical.IsDigest(manifest.PlanDigest) || !canonical.IsDigest(manifest.PolicyDigest) || len(manifest.Members) != 2 {
 		return e.New(e.CodePipelineDrift, "invalid qualification ownership manifest")
 	}
 	if !qualificationWorkflowPath.MatchString(manifest.QualificationWorkflow) || !qualificationWorkflowPath.MatchString(manifest.SmokeWorkflow) || manifest.QualificationWorkflow == manifest.SmokeWorkflow || manifest.QualificationWorkflow == manifest.ProducerWorkflow || manifest.SmokeWorkflow == manifest.ProducerWorkflow {
@@ -37,9 +37,16 @@ func (manifest qualificationManifest) validate() error {
 	if factory.IsLegacyGeneratedGitHubChildWorkflowPath(manifest.QualificationWorkflow) || factory.IsLegacyGeneratedGitHubChildWorkflowPath(manifest.SmokeWorkflow) {
 		return e.New(e.CodePipelineDrift, "qualification ownership overlaps a retired producer workflow namespace")
 	}
-	if manifest.ProducerWorkflow == development.ProducerWorkflow {
-		if manifest.QualificationWorkflow != development.QualificationWorkflow || manifest.SmokeWorkflow != development.SmokeWorkflow {
-			return e.New(e.CodePipelineDrift, "development qualification ownership requires its fixed workflow pair")
+	_, qualifier, worker, err := qualificationNamespace(manifest.ProducerWorkflow)
+	if err != nil {
+		return e.Wrap(e.CodePipelineDrift, err, "invalid qualification producer namespace")
+	}
+	if qualifier == "" && (!defaultQualificationPath(manifest.QualificationWorkflow) || !defaultQualificationPath(manifest.SmokeWorkflow)) {
+		return e.New(e.CodePipelineDrift, "default qualification ownership overlaps another producer namespace")
+	}
+	if qualifier != "" {
+		if manifest.QualificationWorkflow != qualifier || manifest.SmokeWorkflow != worker {
+			return e.New(e.CodePipelineDrift, "qualification ownership requires its isolated workflow pair")
 		}
 	} else if manifest.QualificationWorkflow == development.QualificationWorkflow || manifest.SmokeWorkflow == development.SmokeWorkflow || manifest.QualificationWorkflow == development.SmokeWorkflow || manifest.SmokeWorkflow == development.QualificationWorkflow {
 		return e.New(e.CodePipelineDrift, "production ownership overlaps development qualification")
@@ -91,6 +98,9 @@ func CheckWorkflows(ctx context.Context, root string, bundle *GeneratedWorkflows
 // policy before candidate I/O. It never recompiles candidate inputs or repairs
 // files. The caller supplies its trusted qualifier checkout, not a source Run.
 func CheckGeneratedPolicy(ctx context.Context, root string, policy lifecycle.QualificationPolicy) error {
+	if _, _, _, err := qualificationNamespace(policy.Source.Workflow); err != nil {
+		return err
+	}
 	if err := generationContext(ctx); err != nil {
 		return err
 	}
@@ -495,10 +505,8 @@ func syncQualificationDirectory(fs *os.Root, name string) error {
 }
 
 func (manifest qualificationManifest) ownerDirectory() string {
-	if manifest.ProducerWorkflow == development.ProducerWorkflow {
-		return path.Dir(DevelopmentQualificationManifestPath)
-	}
-	return qualificationOwnerDirectory
+	directory, _, _, _ := qualificationNamespace(manifest.ProducerWorkflow)
+	return directory
 }
 func (manifest qualificationManifest) manifestPath() string {
 	return manifest.ownerDirectory() + "/manifest.json"
