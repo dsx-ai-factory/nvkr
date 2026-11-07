@@ -100,9 +100,7 @@ printf '%s\n' "$UTILITY"
 	write(filepath.Join(bin, "jq"), `#!/bin/sh
 printf '%s\n' "projection:$*" >>"$CALLS"
 case "$*" in
- *local_toolchain_scopes*) printf '%s\n' '[{},{},{}]';;
- *local_toolchain_substitutions*) printf '%s\n' '[{},{},{}]';;
- *toolchain_overlay*) printf '%s\n' '{}';;
+ *.overlay*) printf '%s\n' '{}';;
  *local_toolchain_definition*) printf '%s\n' '{"catalog":{},"outputs":[]}';;
  *) exit 23;;
 esac
@@ -118,6 +116,7 @@ esac
 	write(nvkr, `#!/bin/sh
 printf '%s\n' "nvkr:$*" >>"$CALLS"
 case "$1:$2" in
+ factory:local-toolchain-scopes) printf '%s\n' '[{},{},{},{}]';;
  factory:prepare-native-packer) printf '%s\n' "{\"layout\":\".nvkr/mac-build/first/toolchain\",\"bundle\":\"packer-tools\",\"toolchain\":\"$UTILITY\",\"platform\":\"darwin/arm64\"}";;
  factory:prepare-native-packer-inputs) printf '%s\n' '{"definition":".nvkr/mac-build/first/packer-inputs/definition.json","environment":".nvkr/mac-build/first/packer-inputs/environment.json"}';;
  run:plan) /bin/cat "$PLAN";;
@@ -151,7 +150,7 @@ esac
 			t.Fatal("normal Mac preparation must use source-compatible TCG without replacing its kernel")
 		}
 	}
-	sequence := []string{"probe:go:env GOVERSION", "probe:docker:buildx version", "probe:docker:version --format {{.Server.Os}}/{{.Server.Arch}}", "probe:clang:--version", "nvkr:factory prepare-native-packer ", "nvkr:factory prepare-native-packer-inputs --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json --environment inputs/environments/local-native-mac.json", "nvkr:run plan ", "local_toolchain_scopes", "utility:toolchains/nvkr-packer/build.sh --arch arm64 --diagnostic-local --print-validated-image-id", "toolchain_overlay", "local_toolchain_definition", "nvkr:run local --definition .nvkr/mac-build/first/definition.json --environment .nvkr/mac-build/first/packer-inputs/environment.json"}
+	sequence := []string{"probe:go:env GOVERSION", "probe:docker:buildx version", "probe:docker:version --format {{.Server.Os}}/{{.Server.Arch}}", "probe:clang:--version", "nvkr:factory prepare-native-packer ", "nvkr:factory prepare-native-packer-inputs --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json --environment inputs/environments/local-native-mac.json", "nvkr:run plan ", "factory local-toolchain-scopes", "utility:toolchains/nvkr-packer/build.sh --arch arm64 --diagnostic-local --print-validated-image-id", ".overlay", "local_toolchain_definition", "nvkr:run plan ", "--selected-plan", "nvkr:run local --definition .nvkr/mac-build/first/definition.json --environment .nvkr/mac-build/first/packer-inputs/environment.json"}
 	rest := string(observed)
 	for _, expected := range sequence {
 		_, remaining, found := strings.Cut(rest, expected)
@@ -171,9 +170,11 @@ esac
 }
 
 func TestDefaultLinuxPreparationBuildsAndBindsLocalToolchain(t *testing.T) {
+	// The fake runner owns its Git inputs; terminal-injected core.* settings are not local source redirects.
+	t.Setenv("GIT_CONFIG_COUNT", "0")
 	for _, arch := range []string{"amd64", "arm64"} {
-		for _, valid := range []bool{true, false} {
-			t.Run(arch+"/"+map[bool]string{true: "validated image", false: "invalid image ID"}[valid], func(t *testing.T) {
+		for _, mode := range []string{"validated image", "invalid image ID", "uncovered selection", "coverage mismatch", "wrong observed image"} {
+			t.Run(arch+"/"+mode, func(t *testing.T) {
 				repo, bin := t.TempDir(), t.TempDir()
 				plan, err := canonical.Marshal(nativeCapturedBuildPlanFixture(t))
 				if err != nil {
@@ -184,15 +185,14 @@ func TestDefaultLinuxPreparationBuildsAndBindsLocalToolchain(t *testing.T) {
 					t.Fatal(err)
 				}
 				for name, body := range map[string]string{
-					"docker": "#!/bin/sh\ncase \"$1\" in buildx) echo buildx;; version) echo linux/" + arch + ";; *) exit 99;; esac\n",
-					"nvkr":   "#!/bin/sh\nset -eu\ntest \"$1:$2\" = run:plan\nprintf '%s\\n' \"nvkr:$*\" >>\"$CALLS\"\ncat \"$FIXTURE_PLAN\"\n",
+					"docker": "#!/bin/sh\ncase \"$1\" in image) printf '%s linux/" + arch + "\n' \"${OBSERVED_ID:-$IMAGE_ID}\";; buildx) echo buildx;; version) echo linux/" + arch + ";; *) exit 99;; esac\n",
+					"nvkr":   "#!/bin/sh\nset -eu\nprintf '%s\\n' \"nvkr:$*\" >>\"$CALLS\"\ncase \"$1:$2\" in run:plan) cat \"$FIXTURE_PLAN\";; factory:local-toolchain-scopes) test \"$TEST_MODE\" != 'uncovered selection' || exit 42; case \" $* \" in *' --selected-plan '*) test \"$TEST_MODE\" != 'coverage mismatch' || exit 42;; esac; printf '%s\\n' '[{},{},{},{}]';; *) exit 99;; esac\n",
 					"bash":   "#!/bin/sh\nset -eu\ntest \"$1\" = toolchains/nvkr-packer/build.sh\ntest \"$2:$3\" = --arch:" + arch + "\nprintf '%s\\n' \"bootstrap:$*\" >>\"$CALLS\"\nprintf '%s\\n' \"$IMAGE_ID\"\n",
 					"jq": `#!/bin/sh
 set -eu
 printf '%s\n' "projection:$*" >>"$CALLS"
 case "$*" in
- *local_toolchain_scopes*|*local_toolchain_substitutions*) printf '%s\n' '[{}]';;
- *toolchain_overlay*) printf '%s\n' '{}';;
+ *.overlay*) printf '%s\n' '{}';;
  *local_toolchain_definition*) printf '%s\n' '{"catalog":{},"outputs":[]}';;
  *) exit 23;;
 esac
@@ -206,16 +206,23 @@ esac
 					writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
 				}
 				image := "sha256:" + strings.Repeat("a", 64)
-				if !valid {
+				if mode == "invalid image ID" {
 					image = "mutable:tag"
 				}
 				calls := filepath.Join(repo, "calls")
 				cfg := BuildConfig{Repository: repo, AttemptPrefix: "first", NVKR: filepath.Join(bin, "nvkr"), Definition: "inputs/definitions/demo/" + arch + "-nvidia-local-kvm.json", Environment: "inputs/environments/local-" + arch + "-kvm.json"}
-				runner := Runner{Env: SetEnv(os.Environ(), map[string]string{"PATH": bin + string(os.PathListSeparator) + os.Getenv("PATH"), "CALLS": calls, "IMAGE_ID": image, "FIXTURE_PLAN": planPath})}
+				runner := Runner{Env: SetEnv(os.Environ(), map[string]string{"PATH": bin + string(os.PathListSeparator) + os.Getenv("PATH"), "CALLS": calls, "IMAGE_ID": image, "FIXTURE_PLAN": planPath, "TEST_MODE": mode, "OBSERVED_ID": map[bool]string{true: "sha256:" + strings.Repeat("b", 64)}[mode == "wrong observed image"]})}
 				err = prepareDefaultNativeBuild(t.Context(), runner, &cfg, "linux/"+arch)
-				if !valid {
+				if mode != "validated image" {
+					want := e.CodeVerifyFailed
+					if mode == "uncovered selection" {
+						want = e.CodeEngineCapability
+					}
+					if raw, readErr := os.ReadFile(calls); readErr == nil && mode == "uncovered selection" && strings.Contains(string(raw), "bootstrap:") {
+						t.Fatal("uncovered consumer built the utility image")
+					}
 					var coded *e.Error
-					if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed || cfg.Definition != "inputs/definitions/demo/"+arch+"-nvidia-local-kvm.json" {
+					if !errors.As(err, &coded) || coded.Code != want || cfg.Definition != "inputs/definitions/demo/"+arch+"-nvidia-local-kvm.json" {
 						t.Fatalf("invalid toolchain image was accepted: %v", err)
 					}
 					return
@@ -223,8 +230,13 @@ esac
 				if err != nil || cfg.Definition != ".nvkr/native-build/first/definition.json" || cfg.Environment != "inputs/environments/local-"+arch+"-kvm.json" {
 					t.Fatalf("Linux toolchain preparation: %+v %v", cfg, err)
 				}
+				for _, name := range []string{"toolchain-attempt.json", "toolchain-attempt-1.json", "toolchain-attempt-2.json", "toolchain-attempt-3.json"} {
+					if _, err := os.Stat(filepath.Join(repo, ".nvkr/native-build/first", name)); err != nil {
+						t.Fatal("fourth substitution omitted", err)
+					}
+				}
 				raw, err := os.ReadFile(calls)
-				if err != nil || !strings.Contains(string(raw), "--arg arch "+arch) || strings.Contains(string(raw), "factory prepare-native-packer") {
+				if err != nil || !strings.Contains(string(raw), "--arch "+arch) || strings.Contains(string(raw), "factory prepare-native-packer") {
 					t.Fatalf("architecture-specific preparation: %s %v", raw, err)
 				}
 			})
@@ -350,6 +362,7 @@ test "$GOTOOLCHAIN:$GOENV:$GOWORK" = local:off:off
 test "${PROBE_FAIL:-}" != go
 printf '%s\n' "$TEST_GO_VERSION"`,
 		"docker": `case "$*" in
+ 'image inspect --format {{.Id}} {{.Os}}/{{.Architecture}} '*) printf '%s linux/arm64\n' "$UTILITY";;
  'buildx version') test "${PROBE_FAIL:-}" != buildx; printf '%s\n' buildx;;
  'version --format {{.Server.Os}}/{{.Server.Arch}}') test "${PROBE_FAIL:-}" != daemon; printf '%s\n' linux/arm64;;
  *) exit 29;;
