@@ -23,7 +23,7 @@ func TestAuthenticateOutputsBoundOrderAndJoin(t *testing.T) {
 				outputs := make([]delivery.PublicationOutput, 40)
 				for i := range outputs {
 					outputs[i].Reference = strconv.Itoa(i)
-					outputs[i].Output.Name = fmt.Sprint(i)
+					outputs[i].Name = fmt.Sprint(i)
 				}
 				var active, peak atomic.Int32
 				ctx, cancel := context.WithCancel(t.Context())

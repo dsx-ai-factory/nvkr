@@ -41,8 +41,11 @@ func readBlob(ctx context.Context, root string, descriptor Descriptor, max int64
 	if err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "checking OCI blob")
 	}
-	if !info.Mode().IsRegular() || info.Size() != descriptor.Size {
-		return nil, e.New(e.CodeVerifyFailed, "OCI blob %s is not a regular file of the declared size", descriptor.Digest)
+	if !info.Mode().IsRegular() {
+		return nil, e.New(e.CodeVerifyFailed, "OCI blob %s is not a regular file", descriptor.Digest)
+	}
+	if info.Size() != descriptor.Size {
+		return nil, e.New(e.CodeVerifyFailed, "OCI blob %s bytes do not match descriptor", descriptor.Digest)
 	}
 	// The extra byte detects growth after Stat without trusting the mutable path.
 	raw, err := io.ReadAll(io.LimitReader(contextReader{ctx: ctx, reader: source}, descriptor.Size+1))
