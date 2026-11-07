@@ -49,10 +49,13 @@ func LoadLocalToolchainBindings(ctx context.Context, path string) ([]LocalToolch
 	if err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "open local toolchain bindings")
 	}
-	defer held.Close()
 	raw, err := held.ReadAllContext(ctx, 1<<20)
+	closeErr := held.Close()
 	if err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "read local toolchain bindings")
+	}
+	if closeErr != nil {
+		return nil, e.Wrap(e.CodeInvalidCatalog, closeErr, "close local toolchain bindings")
 	}
 	if err := canonical.ValidateFoldedJSONDocument(raw); err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "invalid local toolchain binding document")
