@@ -30,7 +30,7 @@ codes slot in without renumbering, and they **never change meaning**. Shell comm
 | `10–19` | Resolve / input / preflight / crypto | `no-match`, `ambiguous`, `reserved-axis`, `unsupported`, `invalid-catalog`, `unpinned-source`, `tag-toolchain`, **`builder-not-provided`**, `preflight-failed` (including builder-version mismatch), `signature-invalid` |
 | `20–29` | Build / verify / trust-policy / disk | `fetch-failed`, `build-failed`, `verify-failed` (digest divergence), `untrusted-signer`, `trust-policy-missing`, `untrusted-profile`, `encrypted-artifact`, `envelope-decode`, `engine-capability` |
 | `30–31` | Retryable / transient | `unavailable`, `timeout` (`32–39` reserved) |
-| `40–54` | Release / lifecycle | `vector-unpinned`, `release-incomplete`, `gate-unmet`, `unverified-ref`, `compat-mismatch`, `provenance-missing`, `inventory-unpinned`, `immutable-violation`, `withdrawn`, `unpinned-input`, `mirror-mismatch`, `pipeline-drift`, `status-checkpoint`, `write-conflict`, `pin-set-mismatch` |
+| `40–56` | Release / lifecycle | `vector-unpinned`, `release-incomplete`, `gate-unmet`, `unverified-ref`, `compat-mismatch`, `provenance-missing`, `inventory-unpinned`, `immutable-violation`, `withdrawn`, `unpinned-input`, `mirror-mismatch`, `pipeline-drift`, `status-checkpoint`, `write-conflict`, `pin-set-mismatch`, `registry-auth-failed`, `registry-rejected` |
 
 Builder-preflight failures live in the resolve/preflight band. A profile that does not provide a required
 builder maps to `builder-not-provided`; a builder version, executable-identity, sandbox, or privilege mismatch
@@ -41,6 +41,24 @@ maps to `preflight-failed`. "Builder-version-mismatch" is a failure scenario, no
 A **retryable band** (`unavailable`, `timeout`) plus a `Retryable()` predicate lets a gate distinguish a
 transient failure from an input error. Network 5xx, dial, and EOF classify as `unavailable`; a deadline or
 cancellation classifies as `timeout`. A gate retries the retryable class and fails closed on the rest.
+
+Publication classifies structured registry responses without inferring a vendor or protocol version.
+Registry authentication or authorization refusal uses `registry-auth-failed` (55); other permanent
+publication request refusals use `registry-rejected` (56). An unambiguous unsupported operation uses
+`engine-capability` (29), and an unambiguous digest or size mismatch uses `verify-failed` (22).
+An authentication diagnostic takes precedence over any unsupported diagnostic. HTTP 408, 429 and 5xx
+responses remain transient unless authentication was explicitly refused. Ambiguous or unknown permanent
+diagnostics do not authorize automatic representation changes. `MANIFEST_INVALID` alone identifies a
+rejection, not the specific unsupported field. Diagnostic presentation includes only the status and known
+structured codes; untrusted server bodies, messages, details and request URLs are not copied into that
+presentation. The original structured cause remains available through error unwrapping.
+An absent manifest/blob during post-upload readback remains unavailable rather than proving a permanent
+format rejection; publication acceptance is not issued while that readback is incomplete.
+Diagnostic reports additionally describe the observed API family and request stage, while preserving an
+unknown exact OCI specification version and unknown untested features. Typed DNS and certificate failures
+receive safe connection diagnostics instead of printing credential-bearing client URLs. Next-action guidance
+is derived from the established failure class and request, never from a presumed vendor/version or untrusted
+error-message text. The coded cause and retryability remain authoritative; observations do not change them.
 
 ### 3. Trust-failure granularity and the typed-error discipline
 

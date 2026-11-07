@@ -36,6 +36,7 @@ name: Prepare native NVKR toolchains
       - 'pkg/nvkr/execution/**'
       - 'pkg/nvkr/internal/discoverytags/**'
       - 'pkg/nvkr/internal/heldfile/**'
+      - 'pkg/nvkr/internal/ociformat/**'
       - 'pkg/nvkr/internal/packertransport/**'
       - 'pkg/nvkr/internal/safetext/**'
       - 'pkg/nvkr/internal/sourceenv/**'

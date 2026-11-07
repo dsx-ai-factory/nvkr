@@ -21,7 +21,7 @@ func executeBundlePackage(ctx context.Context, plan *Plan, node Node, output Art
 	if err != nil {
 		return err
 	}
-	_, err = delivery.BuildBundleArtifact(ctx, output.Path, output.Name, inputs[0].Path, result.SHA256)
+	_, err = delivery.BuildBundleArtifactWithRepresentation(ctx, output.Path, output.Name, inputs[0].Path, result.SHA256, publicationOCIRepresentation(plan))
 	return err
 }
 

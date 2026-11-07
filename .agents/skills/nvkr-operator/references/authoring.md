@@ -32,6 +32,15 @@ pin-set member.
 For native ARC inputs, follow [consumer toolchain access](../../../../docs/toolchain-maintenance.md#declare-consumer-access)
 to classify selected images in the Environment and bind the private reader before generation.
 
+Publication format selection belongs to the Environment. Read the [OCI representation
+contract](../../../../docs/publication-architecture.md#oci-representation) before selecting
+`publication.ociRepresentation`. Omission preserves the existing format. An explicit compatible selection
+changes newly constructed NVKR wrappers before identity freezing; registry errors never authorize rewriting
+identified artifacts, imported producer manifests or signed evidence. Registry and consumer acceptance still
+require their own evidence.
+Use the same guide's registry diagnostics to inspect API observations and structured failure guidance;
+do not infer an OCI feature version from the V2 base endpoint or request a hidden write probe.
+
 ## Review changes with the CLI
 
 Capture a baseline Plan if valid inputs already exist. Use a fresh scratch directory for Plans and alternative

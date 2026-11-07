@@ -61,7 +61,7 @@ func pullHelmOutput(ctx context.Context, reference, out, metadataRoot, workspace
 		return PulledFile{}, err
 	}
 	if object.Output == nil || object.Output.Format != outputFormatHelm || object.Output.TransportPath != "" ||
-		manifest.ArtifactType != object.ArtifactType || manifest.Config.MediaType != MediaHelmConfig || len(manifest.Layers) != 1 ||
+		manifest.artifactType() != object.ArtifactType || manifest.Config.MediaType != MediaHelmConfig || len(manifest.Layers) != 1 ||
 		manifest.Layers[0].MediaType != MediaHelmChartLayer || manifest.Layers[0].Digest != object.BlobDigest ||
 		manifest.Layers[0].Size < 0 || manifest.Layers[0].Size > helmarchive.MaxPackageBytes {
 		return PulledFile{}, e.New(e.CodeVerifyFailed, "selected Helm output has invalid media, payload or transport binding")
@@ -110,7 +110,7 @@ func pullAPTOutput(ctx context.Context, reference, out, metadataRoot, workspace 
 	if err != nil {
 		return err
 	}
-	if manifest.ArtifactType != object.ArtifactType || len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest {
+	if manifest.artifactType() != object.ArtifactType || len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest {
 		return e.New(e.CodeVerifyFailed, "selected APT output has no exact single payload")
 	}
 	file, err := fetchPullLayer(ctx, reference, manifest.Layers[0], workspace, options)

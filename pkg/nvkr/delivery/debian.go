@@ -17,7 +17,16 @@ const outputFormatDebian = "debian-package"
 // OCI object. It does not rebuild, install, infer dependencies or change the raw
 // producer subject. Factory authenticates that original producer/result pair.
 func BuildDebianArtifact(ctx context.Context, out, name, source, expectedDigest string) (result Result, returnErr error) {
+	return BuildDebianArtifactWithRepresentation(ctx, out, name, source, expectedDigest, "")
+}
+
+// BuildDebianArtifactWithRepresentation preserves raw bytes under an explicitly
+// admitted wrapper choice. Empty retains the existing artifact representation.
+func BuildDebianArtifactWithRepresentation(ctx context.Context, out, name, source, expectedDigest string, representation OCIRepresentation) (result Result, returnErr error) {
 	if err := deliveryContext(ctx); err != nil {
+		return result, err
+	}
+	if err := admitOCIRepresentation(representation); err != nil {
 		return result, err
 	}
 	if !outputNamePattern.MatchString(name) || !isDigest(expectedDigest) {
@@ -41,7 +50,7 @@ func BuildDebianArtifact(ctx context.Context, out, name, source, expectedDigest 
 		return result, err
 	}
 	defer cleanup()
-	writer := layoutWriter{root: stage, plain: true}
+	writer := layoutWriter{root: stage, plain: true, compatible: representation == OCINVKRCompatibleV1}
 	descriptor, _, err := writer.addHeldObject(ctx, ObjectInput{Name: name, Kind: outputFormatDebian, ArtifactType: MediaDeliveryObject, LayerMediaType: MediaOctetStream, SemanticDigest: held.Digest(), BlobDigest: held.Digest()}, held)
 	if err != nil {
 		return result, err
@@ -89,7 +98,11 @@ func InspectDebianArtifact(ctx context.Context, root, expectedDigest string) (De
 // emitted by BuildDebianArtifact. Raw package identity remains independent of
 // the manifest's serialization and descriptor identity.
 func validateDebianCarrier(ctx context.Context, root string, manifest ociManifest, expectedDigest string) error {
-	if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.Subject != nil || len(manifest.Annotations) != 0 || manifest.ArtifactType != MediaDeliveryObject || manifest.Config.MediaType != MediaEmptyConfig || len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaOctetStream || manifest.Layers[0].Digest != expectedDigest || manifest.Layers[0].Size <= 0 {
+	annotations := len(manifest.Annotations)
+	if manifest.Annotations[artifactTypeAnnotation] != "" {
+		annotations--
+	}
+	if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.Subject != nil || annotations != 0 || manifest.artifactType() != MediaDeliveryObject || !manifest.plainConfig() || len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaOctetStream || manifest.Layers[0].Digest != expectedDigest || manifest.Layers[0].Size <= 0 {
 		return e.New(e.CodeVerifyFailed, "Debian carrier changes standard metadata or original raw package binding")
 	}
 	config, err := readBlob(ctx, root, manifest.Config, 8<<20)

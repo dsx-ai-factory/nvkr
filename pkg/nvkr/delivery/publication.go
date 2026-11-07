@@ -504,7 +504,7 @@ func materializePayload(ctx context.Context, root string, object PublishedObject
 	if err != nil {
 		return err
 	}
-	if manifest.ArtifactType != object.ArtifactType || len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest {
+	if manifest.artifactType() != object.ArtifactType || len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest {
 		return e.New(e.CodeVerifyFailed, "publication object has no exact single payload")
 	}
 	held, err := holdBlob(ctx, root, manifest.Layers[0], maxDeliveryFileBytes)

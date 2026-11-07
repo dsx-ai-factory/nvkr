@@ -58,6 +58,10 @@ func releasePublicationPlatformFixture(t *testing.T, osName, arch string) (strin
 }
 
 func releasePublicationRequestFixture(t *testing.T, osName, arch string) PublicationRequest {
+	return releasePublicationRequestWithRepresentation(t, osName, arch, "")
+}
+
+func releasePublicationRequestWithRepresentation(t *testing.T, osName, arch string, representation OCIRepresentation) PublicationRequest {
 	t.Helper()
 	source := filepath.Join(t.TempDir(), "cli")
 	payload := []byte("exact executable")
@@ -65,7 +69,7 @@ func releasePublicationRequestFixture(t *testing.T, osName, arch string) Publica
 		t.Fatal(err)
 	}
 	bundlePath := filepath.Join(t.TempDir(), "bundle")
-	bundle, err := BuildBinaryBundle(t.Context(), bundlePath, BinaryBundleRequest{OS: "linux", Arch: "amd64", Purpose: "tools", Files: []BinaryFileInput{{Name: "cli", Path: source, InstallPath: "/usr/local/bin/cli", Mode: 0o755}}})
+	bundle, err := BuildBinaryBundle(t.Context(), bundlePath, BinaryBundleRequest{OCIRepresentation: representation, OS: "linux", Arch: "amd64", Purpose: "tools", Files: []BinaryFileInput{{Name: "cli", Path: source, InstallPath: "/usr/local/bin/cli", Mode: 0o755}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +99,7 @@ func releasePublicationRequestFixture(t *testing.T, osName, arch string) Publica
 	if err != nil {
 		t.Fatal(err)
 	}
-	return PublicationRequest{Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build,
+	return PublicationRequest{OCIRepresentation: representation, Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build,
 		PlanDigest: digestBytes([]byte("plan")), ContentSubject: content}, Objects: []ObjectInput{
 		{Name: "tools", Kind: "binary-bundle", Path: bundlePath, Layout: true, ArtifactType: MediaBinaryBundle, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest, OS: osName, Arch: arch, Output: &OutputBinding{Repository: "tools", Format: "executable", BuildDigest: build, Components: []string{"cli"}, BuildSubjects: []BuildSubject{{Component: "cli", Digest: digestBytes(payload)}}}},
 		{Name: "sbom-" + strings.TrimPrefix(semantic, "sha256:"), Kind: "sbom", ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: semantic, Bytes: raw, Evidence: &EvidenceBinding{Outputs: []string{"tools"}, Component: "cli", Stage: "build-output", SubjectKind: "file", SubjectDigest: digestBytes(payload)}},
