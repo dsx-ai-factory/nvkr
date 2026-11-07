@@ -94,11 +94,75 @@ jobs:
     permissions:
       actions: read
       contents: read
+  preflight-images-arc-arm64-kvm:
+    name: 'Observe image reader availability (arc-arm64-kvm)'
+    runs-on: 'arc-arm64-kvm'
+    timeout-minutes: 15
+    needs: [build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-arc'
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - name: Observe image reader availability (arc-arm64-kvm)
+        uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/jobs/preflight-images-arc-arm64-kvm/part-1
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Observe exact image manifests
+        timeout-minutes: 3
+        env:
+          NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NVKR_REGISTRY_READ }}'
+          NVKR_TOOLCHAIN_READ_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+        run: ./nvkr-exec factory github preflight-images --plan .github/nvkr-run-nvke-nightly-arm64/plan.json --runner arc-arm64-kvm
+    permissions:
+      actions: read
+      contents: read
+  preflight-images-ubuntu-24-04:
+    name: 'Observe image reader availability (ubuntu-24.04)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 15
+    needs: [build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - name: Observe image reader availability (ubuntu-24.04)
+        uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/jobs/preflight-images-ubuntu-24-04/part-1
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Observe exact image manifests
+        timeout-minutes: 3
+        run: ./nvkr-exec factory github preflight-images --plan .github/nvkr-run-nvke-nightly-arm64/plan.json --runner ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+  preflight-images-ubuntu-24-04-arm:
+    name: 'Observe image reader availability (ubuntu-24.04-arm)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 15
+    needs: [build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - name: Observe image reader availability (ubuntu-24.04-arm)
+        uses: ./.github/nvkr-run-nvke-nightly-arm64/actions/jobs/preflight-images-ubuntu-24-04-arm/part-1
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Observe exact image manifests
+        timeout-minutes: 3
+        env:
+          NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NVKR_REGISTRY_READ }}'
+          NVKR_TOOLCHAIN_READ_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+        run: ./nvkr-exec factory github preflight-images --plan .github/nvkr-run-nvke-nightly-arm64/plan.json --runner ubuntu-24.04-arm
+    permissions:
+      actions: read
+      contents: read
   nvkr-capi-exec-init-image-arm64-pull-nati-ef3a1341839f:
     name: 'Acquire pinned capi-exec-init-image-arm64/pull-native-capi-exec-init-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: &steps-ubuntu-24-04-arm-node
       - *check-native-linux-arm64
@@ -124,8 +188,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: capi-exec-init-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-capi-exec-init-image-arm64-pull-nati-ef3a1341839f, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-capi-exec-init-image-arm64-pull-nati-ef3a1341839f, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: &steps-ubuntu-24-04-two-nodes
       - *check-native-linux-amd64
       - *checkout-workflow-source
@@ -150,7 +214,7 @@ jobs:
     name: 'Acquire pinned capi-exec-plugin-image-arm64/pull-native-capi-exec-plugin-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -160,8 +224,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: capi-exec-plugin-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-capi-exec-plugin-image-arm64-pull-na-872c582cdabe, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-capi-exec-plugin-image-arm64-pull-na-872c582cdabe, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -170,7 +234,7 @@ jobs:
     name: 'Fetch pinned source for capnico-controller (capnico-controller-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -190,8 +254,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-capnico-controller-arm64-build-capni-b3f328de28b1, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-capnico-controller-arm64-build-capni-b3f328de28b1, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -200,7 +264,7 @@ jobs:
     name: 'Fetch pinned source for cluster-api-provider-provisioned (cluster-api-provider-provisioned-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -231,8 +295,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-cluster-api-provider-provisioned-arm-97d0ad58bf4c, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-cluster-api-provider-provisioned-arm-97d0ad58bf4c, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -241,7 +305,7 @@ jobs:
     name: 'Fetch pinned source for nvke-controller-chart (controller-chart)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -265,8 +329,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: controller-chart'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-controller-chart-build-nvke-controller-chart, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-controller-chart-build-nvke-controller-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -275,7 +339,7 @@ jobs:
     name: 'Fetch pinned source for nvke-local-profiles (controller-profiles)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -299,8 +363,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: controller-profiles'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-controller-profiles-build-nvke-local-profiles, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-controller-profiles-build-nvke-local-profiles, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -309,7 +373,7 @@ jobs:
     name: 'Acquire pinned csi-node-driver-registrar-image-arm64/pull-csi-node-driver-registrar-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -319,8 +383,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -329,7 +393,7 @@ jobs:
     name: 'Fetch pinned source for nvke-controller (cwe)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -353,8 +417,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: cwe'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-cwe-build-nvke-controller, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-cwe-build-nvke-controller, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -363,7 +427,7 @@ jobs:
     name: 'Fetch pinned source for clusterctl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -383,7 +447,7 @@ jobs:
     name: 'Fetch pinned source for kind (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -403,7 +467,7 @@ jobs:
     name: 'Fetch pinned source for kubectl (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -423,7 +487,7 @@ jobs:
     name: 'Fetch pinned source for oras (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -443,7 +507,7 @@ jobs:
     name: 'Acquire pinned installer-tools-arm64/pull-helm'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -453,8 +517,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-installer-tools-arm64-build-clusterctl, nvkr-installer-tools-arm64-build-kind, nvkr-installer-tools-arm64-build-kubectl, nvkr-installer-tools-arm64-build-oras, nvkr-installer-tools-arm64-pull-helm, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-installer-tools-arm64-build-clusterctl, nvkr-installer-tools-arm64-build-kind, nvkr-installer-tools-arm64-build-kubectl, nvkr-installer-tools-arm64-build-oras, nvkr-installer-tools-arm64-pull-helm, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -463,7 +527,7 @@ jobs:
     name: 'Fetch pinned source for nerdctl (native-tools-linux-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -483,7 +547,7 @@ jobs:
     name: 'Fetch pinned source for nico-sim, nico-simctl (native-tools-linux-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -517,7 +581,7 @@ jobs:
     name: 'Fetch pinned source for nvke-installer-sources (native-tools-linux-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -541,7 +605,7 @@ jobs:
     name: 'Fetch pinned source for nvkectl (native-tools-linux-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -565,7 +629,7 @@ jobs:
     name: 'Acquire pinned native-tools-linux-arm64/pull-clusterctl-linux'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -575,7 +639,7 @@ jobs:
     name: 'Acquire pinned native-tools-linux-arm64/pull-helm-linux'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -585,7 +649,7 @@ jobs:
     name: 'Acquire pinned native-tools-linux-arm64/pull-kind-linux'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -595,7 +659,7 @@ jobs:
     name: 'Acquire pinned native-tools-linux-arm64/pull-kubectl-linux'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -605,7 +669,7 @@ jobs:
     name: 'Acquire pinned native-tools-linux-arm64/pull-oras-linux'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -615,8 +679,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: native-tools-linux-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-native-tools-linux-arm64-build-nerdctl, nvkr-native-tools-linux-arm64-build-nico-sim, nvkr-native-tools-linux-arm64-build-nico-simctl, nvkr-native-tools-linux-arm64-build-nvke-2a2da25020b0, nvkr-native-tools-linux-arm64-build-nvkectl, nvkr-native-tools-linux-arm64-pull-clusterctl-linux, nvkr-native-tools-linux-arm64-pull-helm-linux, nvkr-native-tools-linux-arm64-pull-kind-linux, nvkr-native-tools-linux-arm64-pull-kubectl-linux, nvkr-native-tools-linux-arm64-pull-oras-linux, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-native-tools-linux-arm64-build-nerdctl, nvkr-native-tools-linux-arm64-build-nico-sim, nvkr-native-tools-linux-arm64-build-nico-simctl, nvkr-native-tools-linux-arm64-build-nvke-2a2da25020b0, nvkr-native-tools-linux-arm64-build-nvkectl, nvkr-native-tools-linux-arm64-pull-clusterctl-linux, nvkr-native-tools-linux-arm64-pull-helm-linux, nvkr-native-tools-linux-arm64-pull-kind-linux, nvkr-native-tools-linux-arm64-pull-kubectl-linux, nvkr-native-tools-linux-arm64-pull-oras-linux, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -625,7 +689,7 @@ jobs:
     name: 'Fetch pinned source for nico-sim, nico-sim-runtime-assets, nico-simctl (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -669,8 +733,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-nicosim-tools-arm64-build-nico-sim, nvkr-nicosim-tools-arm64-build-nico-sim-r-52401c164e52, nvkr-nicosim-tools-arm64-build-nico-simctl, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-nicosim-tools-arm64-build-nico-sim, nvkr-nicosim-tools-arm64-build-nico-sim-r-52401c164e52, nvkr-nicosim-tools-arm64-build-nico-simctl, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -679,7 +743,7 @@ jobs:
     name: 'Fetch pinned source for nktp-chart (nktp)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -703,8 +767,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: nktp'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-nktp-build-nktp-chart, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-nktp-build-nktp-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -713,7 +777,7 @@ jobs:
     name: 'Fetch pinned source for nvke-agent, nvke-node-image, nvke-patched-installer-iso (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -868,7 +932,7 @@ jobs:
     name: 'Fetch pinned source for nvke-cni-calico (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -890,7 +954,7 @@ jobs:
     name: 'Fetch pinned source for nvke-cni-ovn (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -904,7 +968,7 @@ jobs:
     name: 'Fetch pinned source for nvke-image-inputs (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -926,7 +990,7 @@ jobs:
     name: 'Fetch pinned source for nvke-kubeadm-distro (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -948,7 +1012,7 @@ jobs:
     name: 'Fetch pinned source for nvke-spire-agent (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -970,7 +1034,7 @@ jobs:
     name: 'Fetch pinned source for ovn-kube-ubuntu (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -984,7 +1048,7 @@ jobs:
     name: 'Fetch pinned source for ovn-kubernetes-chart (nvke-node-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -998,7 +1062,7 @@ jobs:
     name: 'Fetch pinned source for nvkectl (nvkectl)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -1022,8 +1086,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: nvkectl'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-nvkectl-build-nvkectl, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-nvkectl-build-nvkectl, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1032,7 +1096,7 @@ jobs:
     name: 'Acquire pinned operator-tools/pull-helm'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1042,7 +1106,7 @@ jobs:
     name: 'Acquire pinned operator-tools/pull-kubectl'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1052,8 +1116,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: operator-tools'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-operator-tools-pull-helm, nvkr-operator-tools-pull-kubectl, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-operator-tools-pull-helm, nvkr-operator-tools-pull-kubectl, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1062,7 +1126,7 @@ jobs:
     name: 'Fetch pinned source for ovn-kubernetes-chart (ovn-chart-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -1086,8 +1150,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-ovn-chart-arm64-build-ovn-kubernetes-chart, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-ovn-chart-arm64-build-ovn-kubernetes-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1096,7 +1160,7 @@ jobs:
     name: 'Fetch pinned source for ovn-kube-ubuntu (ovn-image-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -1120,8 +1184,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-ovn-image-arm64-build-ovn-kube-ubuntu, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-ovn-image-arm64-build-ovn-kube-ubuntu, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1294,7 +1358,7 @@ jobs:
     name: 'Acquire pinned postgresql-image-arm64/pull-postgresql-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1304,8 +1368,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1324,7 +1388,7 @@ jobs:
     name: 'Acquire pinned postgresql/pull-postgresql-chart'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1334,8 +1398,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: postgresql'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-postgresql-pull-postgresql-chart, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-postgresql-pull-postgresql-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1354,7 +1418,7 @@ jobs:
     name: 'Fetch pinned source for nerdctl (site-startup-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1374,7 +1438,7 @@ jobs:
     name: 'Fetch pinned source for nvkr-site-identity-helper (site-startup-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1394,8 +1458,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: site-startup-tools-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-site-startup-tools-arm64-build-nerdctl, nvkr-site-startup-tools-arm64-build-nvkr-730dca8c1ce8, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-site-startup-tools-arm64-build-nerdctl, nvkr-site-startup-tools-arm64-build-nvkr-730dca8c1ce8, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1414,7 +1478,7 @@ jobs:
     name: 'Acquire pinned spiffe-csi-image-arm64/pull-spiffe-csi-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1424,8 +1488,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1444,7 +1508,7 @@ jobs:
     name: 'Acquire pinned spire-agent-image-arm64/pull-spire-agent-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1454,8 +1518,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1474,7 +1538,7 @@ jobs:
     name: 'Acquire pinned spire-bash-image-arm64/pull-spire-bash-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1484,8 +1548,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1504,7 +1568,7 @@ jobs:
     name: 'Acquire pinned spire-controller-manager-image-arm64/pull-spire-controller-manager-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1514,8 +1578,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1534,7 +1598,7 @@ jobs:
     name: 'Acquire pinned spire-crds/pull-spire-crds-chart'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1544,8 +1608,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-crds'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-crds-pull-spire-crds-chart, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-spire-crds-pull-spire-crds-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1564,7 +1628,7 @@ jobs:
     name: 'Acquire pinned spire-oidc-image-arm64/pull-spire-oidc-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1574,8 +1638,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1594,7 +1658,7 @@ jobs:
     name: 'Acquire pinned spire-server-image-arm64/pull-spire-server-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1604,8 +1668,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1624,7 +1688,7 @@ jobs:
     name: 'Acquire pinned spire-tpm-server-image-arm64/pull-spire-tpm-server-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1634,8 +1698,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1654,7 +1718,7 @@ jobs:
     name: 'Acquire pinned spire/pull-spire-chart'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1664,8 +1728,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-pull-spire-chart, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-spire-pull-spire-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1684,7 +1748,7 @@ jobs:
     name: 'Acquire pinned temporal-admin-tools-image-arm64/pull-temporal-admin-tools-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1694,8 +1758,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1714,7 +1778,7 @@ jobs:
     name: 'Acquire pinned temporal-server-image-arm64/pull-temporal-server-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1724,8 +1788,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1744,7 +1808,7 @@ jobs:
     name: 'Acquire pinned temporal-ui-image-arm64/pull-temporal-ui-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1754,8 +1818,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1774,7 +1838,7 @@ jobs:
     name: 'Acquire pinned temporal/pull-temporal-chart'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -1784,8 +1848,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: temporal'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-temporal-pull-temporal-chart, nvkr-tool-syft]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-temporal-pull-temporal-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -1804,7 +1868,7 @@ jobs:
     name: 'Acquire pinned cosign'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
     permissions:
@@ -1856,7 +1920,7 @@ jobs:
     name: 'Acquire pinned syft'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
     permissions:
@@ -3992,7 +4056,7 @@ jobs:
     name: 'Acquire pinned workload-image-arm64/pull-native-workload-image'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [build-runner-ubuntu-24-04-arm]
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -4002,8 +4066,8 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: workload-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-tool-syft, nvkr-workload-image-arm64-pull-native-workload-image]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    needs: [nvkr-tool-syft, nvkr-workload-image-arm64-pull-native-workload-image, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
@@ -4185,7 +4249,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-03'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-nktp, nvkr-attest-sboms-output-postgresql-image-arm64, nvkr-attest-sboms-output-temporal-admin-t-9e993584a415, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-package-publication-operator-tools, nvkr-package-spire, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-process-workload-image-arm64-termina-b50c8407e3d1, nvkr-publish-output-capi-exec-plugin-image-arm64, nvkr-publish-output-spire-server-image-arm64, nvkr-sign-output-workload-image-arm64, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-cosign, nvkr-verify-publication-output-cluster-ap-f52c14e947ce, nvkr-verify-publication-output-spire, nvkr-workload-image-arm64-pull-native-workload-image]
+    needs: [nvkr-attest-sboms-output-nktp, nvkr-attest-sboms-output-postgresql-image-arm64, nvkr-attest-sboms-output-temporal-admin-t-9e993584a415, nvkr-nvke-node-image-arm64-fetch-nvke-spire-agent, nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-package-publication-operator-tools, nvkr-package-spire, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-process-workload-image-arm64-termina-b50c8407e3d1, nvkr-publish-output-capi-exec-plugin-image-arm64, nvkr-publish-output-spire-server-image-arm64, nvkr-sign-output-workload-image-arm64, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-cosign, nvkr-verify-publication-output-cluster-ap-f52c14e947ce, nvkr-verify-publication-output-spire, nvkr-workload-image-arm64-pull-native-workload-image, preflight-images-ubuntu-24-04]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -4302,7 +4366,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0c'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-capi-exec-init-image-arm64-pull-nati-ef3a1341839f, nvkr-capnico-controller-arm64-fetch-capni-9ea020956c3a, nvkr-controller-chart-build-nvke-controller-chart, nvkr-controller-chart-fetch-nvke-controller-chart, nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-installer-tools-arm64-build-kubectl, nvkr-installer-tools-arm64-fetch-kubectl, nvkr-native-tools-linux-arm64-fetch-nerdctl, nvkr-nvke-node-image-arm64-fetch-nvke-age-9e963c3a699c, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart, nvkr-package-publication-installer-tools-arm64, nvkr-package-publication-spire-bash-image-arm64, nvkr-package-site-startup-tools-arm64, nvkr-package-workload-image-arm64, nvkr-process-spire-terminal-observe-spire-sbom, nvkr-publish-output-capnico-controller-arm64, nvkr-publish-output-controller-profiles, nvkr-publish-output-nicosim-tools-arm64, nvkr-publish-output-nktp, nvkr-publish-output-postgresql-image-arm64, nvkr-verify-publication-output-native-too-e33d8241d20e, nvkr-verify-publication-output-temporal-s-030929bd4981, nvkr-verify-publication-output-workload-image-arm64]
+    needs: [nvkr-capi-exec-init-image-arm64-pull-nati-ef3a1341839f, nvkr-capnico-controller-arm64-fetch-capni-9ea020956c3a, nvkr-controller-chart-build-nvke-controller-chart, nvkr-controller-chart-fetch-nvke-controller-chart, nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-installer-tools-arm64-build-kubectl, nvkr-installer-tools-arm64-fetch-kubectl, nvkr-native-tools-linux-arm64-fetch-nerdctl, nvkr-nvke-node-image-arm64-fetch-nvke-age-9e963c3a699c, nvkr-nvke-node-image-arm64-fetch-ovn-kubernetes-chart, nvkr-package-publication-installer-tools-arm64, nvkr-package-publication-spire-bash-image-arm64, nvkr-package-site-startup-tools-arm64, nvkr-package-workload-image-arm64, nvkr-process-spire-terminal-observe-spire-sbom, nvkr-publish-output-capnico-controller-arm64, nvkr-publish-output-controller-profiles, nvkr-publish-output-nicosim-tools-arm64, nvkr-publish-output-nktp, nvkr-publish-output-postgresql-image-arm64, nvkr-verify-publication-output-native-too-e33d8241d20e, nvkr-verify-publication-output-temporal-s-030929bd4981, nvkr-verify-publication-output-workload-image-arm64, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -4457,7 +4521,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 323 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 326 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {

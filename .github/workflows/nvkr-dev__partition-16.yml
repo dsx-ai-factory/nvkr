@@ -1,4 +1,4 @@
-name: p16 Package nktp +1
+name: 'p16 Package container image: capnico-controller +4'
 'on':
   workflow_call:
     inputs:
@@ -10,14 +10,24 @@ name: p16 Package nktp +1
         value: ${{ jobs.nvkr-partition-results.outputs.results }}
       statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      nvkr-partition-20:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-20 }}
+      nvkr-results-01:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01 }}
+      nvkr-results-01-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01-statuses }}
       nvkr-results-02:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02 }}
       nvkr-results-02-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-02-statuses }}
-      nvkr-results-0a:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0a }}
-      nvkr-results-0a-statuses:
-        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0a-statuses }}
+      nvkr-results-05:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05 }}
+      nvkr-results-05-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-05-statuses }}
+      nvkr-results-0c:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0c }}
+      nvkr-results-0c-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0c-statuses }}
     secrets:
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
@@ -26,11 +36,10 @@ name: p16 Package nktp +1
 permissions:
   contents: read
 jobs:
-  nvkr-package-publication-nktp:
-    name: 'Package publication bundle: publication-nktp'
+  nvkr-package-capnico-controller:
+    name: 'Package container image: capnico-controller'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-nktp-sbom'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -55,11 +64,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-package-publication-nvkectl:
-    name: 'Package publication bundle: publication-nvkectl'
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-capnico-controller-linux-amd64-sbom'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-capnico-controller-linux-arm64-build-f87f1492b304'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-process-capnico-controller-linux-arm-7ed4de380f4f'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-arc-amd64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-ubuntu-24-04'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
+  nvkr-package-cluster-api-provider-provisioned:
+    name: 'Package container image: cluster-api-provider-provisioned'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-nvkectl-sbom'].result == 'success' }}
     steps:
       - name: Check native runner platform
         run: |
@@ -84,20 +93,113 @@ jobs:
     permissions:
       actions: read
       contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-cluster-api-provider-provisioned-lin-768a4d08b436'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-cluster-api-provider-provisioned-lin-eba583757c10'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-process-cluster-api-provider-provisi-0fe9554d2806'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-arc-amd64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-ubuntu-24-04'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
+  nvkr-package-controller-profiles:
+    name: 'Package container image: controller-profiles'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-controller-profiles-linux-amd64-sbom'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-controller-profiles-linux-arm64-buil-f8987efaba30'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-process-controller-profiles-linux-ar-fea918438281'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-arc-amd64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-ubuntu-24-04'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
+  nvkr-package-cwe:
+    name: 'Package container image: cwe'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-cwe-linux-amd64-sbom'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-cwe-linux-arm64-build-nvke-controller'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-process-cwe-linux-arm64-terminal-obs-9bd89bc60f40'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-arc-amd64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-ubuntu-24-04'].result == 'success' && fromJSON(inputs.dependencies)['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
+  nvkr-package-publication-local-path-provisioner:
+    name: 'Package publication bundle: publication-local-path-provisioner'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-local-path-helper-image-sbom'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-local-path-provisioner-image-sbom'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-local-path-provisioner-sbom'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-package-local-path-provisioner'].result == 'success' }}
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-package-publication-nktp, nvkr-package-publication-nvkectl]
+    needs: [nvkr-package-capnico-controller, nvkr-package-cluster-api-provider-provisioned, nvkr-package-controller-profiles, nvkr-package-cwe, nvkr-package-publication-local-path-provisioner]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     permissions: {}
     outputs:
       results: ${{ toJSON(needs) }}
       statuses: ${{ join(needs.*.result, ' ') }}
-      nvkr-results-02: ${{ format('"nvkr-package-publication-nktp":{0}', toJSON(needs['nvkr-package-publication-nktp'])) }}
-      nvkr-results-02-statuses: ${{ format('{0}', needs['nvkr-package-publication-nktp'].result) }}
-      nvkr-results-0a: ${{ format('"nvkr-package-publication-nvkectl":{0}', toJSON(needs['nvkr-package-publication-nvkectl'])) }}
-      nvkr-results-0a-statuses: ${{ format('{0}', needs['nvkr-package-publication-nvkectl'].result) }}
+      nvkr-partition-20: ${{ format('"nvkr-package-capnico-controller":{0},"nvkr-package-cluster-api-provider-provisioned":{1},"nvkr-package-controller-profiles":{2},"nvkr-package-cwe":{3}', toJSON(needs['nvkr-package-capnico-controller']), toJSON(needs['nvkr-package-cluster-api-provider-provisioned']), toJSON(needs['nvkr-package-controller-profiles']), toJSON(needs['nvkr-package-cwe'])) }}
+      nvkr-results-01: ${{ format('"nvkr-package-controller-profiles":{0},"nvkr-package-publication-local-path-provisioner":{1}', toJSON(needs['nvkr-package-controller-profiles']), toJSON(needs['nvkr-package-publication-local-path-provisioner'])) }}
+      nvkr-results-01-statuses: ${{ format('{0} {1}', needs['nvkr-package-controller-profiles'].result, needs['nvkr-package-publication-local-path-provisioner'].result) }}
+      nvkr-results-02: ${{ format('"nvkr-package-capnico-controller":{0}', toJSON(needs['nvkr-package-capnico-controller'])) }}
+      nvkr-results-02-statuses: ${{ format('{0}', needs['nvkr-package-capnico-controller'].result) }}
+      nvkr-results-05: ${{ format('"nvkr-package-cwe":{0}', toJSON(needs['nvkr-package-cwe'])) }}
+      nvkr-results-05-statuses: ${{ format('{0}', needs['nvkr-package-cwe'].result) }}
+      nvkr-results-0c: ${{ format('"nvkr-package-cluster-api-provider-provisioned":{0}', toJSON(needs['nvkr-package-cluster-api-provider-provisioned'])) }}
+      nvkr-results-0c-statuses: ${{ format('{0}', needs['nvkr-package-cluster-api-provider-provisioned'].result) }}
     steps:
       - name: Forward provider results
         run: ':'

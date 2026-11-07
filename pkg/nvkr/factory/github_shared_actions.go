@@ -59,6 +59,12 @@ func shareGitHubActions(plan *Plan, raw []byte, files map[string][]byte, actions
 		prepared := false
 		part, transfer := 0, 0
 		for _, call := range steps.Content {
+			// Placement probes are bounded support jobs with their own exact
+			// composites, not producer action-data interfaces.
+			if strings.HasPrefix(jobID, "preflight-images-") {
+				rewritten = append(rewritten, call)
+				continue
+			}
 			if githubYAMLValue(call, "id") == githubContextStepID {
 				return nil, e.New(e.CodeEngineCapability, "job %q uses reserved action context ID", jobID)
 			}
