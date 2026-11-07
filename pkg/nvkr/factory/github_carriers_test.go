@@ -474,6 +474,13 @@ func carrierTestResults(t *testing.T, plan *Plan) map[string]any {
 		}
 		results["build-runner-"+shortStableName(node.RunsOn)] = map[string]any{"result": "success"}
 	}
+	preflight, err := githubImagePreflightJobs(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, job := range preflight {
+		results[job] = map[string]any{"result": "success"}
+	}
 	return results
 }
 

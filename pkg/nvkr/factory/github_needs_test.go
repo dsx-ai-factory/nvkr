@@ -317,8 +317,9 @@ func TestGitHubNeedsRetainsAuthoredDependencyContext(t *testing.T) {
 		t.Fatal("fixture does not exercise redundant dependencies")
 	}
 	for _, test := range []struct {
-		name string
-		edit func(*Plan)
+		name     string
+		edit     func(*Plan)
+		wantCode e.Code
 	}{
 		{name: "whole context", edit: func(plan *Plan) { plan.Environment.Runtime.Setup = []string{"echo '${{ toJSON(needs) }}'"} }},
 		{name: "bracket access", edit: func(plan *Plan) { plan.Environment.Runtime.Setup = []string{"echo '${{ needs[\"job\"].result }}'"} }},
@@ -326,10 +327,10 @@ func TestGitHubNeedsRetainsAuthoredDependencyContext(t *testing.T) {
 		{name: "environment context", edit: func(plan *Plan) {
 			plan.Environment.Runtime.Variables = map[string]string{"RESULT": "${{ needs.job.result }}"}
 		}},
-		{name: "container context", edit: func(plan *Plan) {
+		{name: "container context", wantCode: e.CodeUnpinnedInput, edit: func(plan *Plan) {
 			plan.Environment.Runtime.RuntimeImage = "${{ needs.job.outputs.image }}@sha256:pin"
 		}},
-		{name: "service context", edit: func(plan *Plan) {
+		{name: "service context", wantCode: e.CodeUnpinnedInput, edit: func(plan *Plan) {
 			plan.Environment.Runtime.Services = []string{"${{ needs.job.outputs.image }}@sha256:pin"}
 		}},
 	} {
@@ -337,6 +338,14 @@ func TestGitHubNeedsRetainsAuthoredDependencyContext(t *testing.T) {
 			copy := *plan
 			test.edit(&copy)
 			projection, err := githubNeedsForPlan(t.Context(), &copy)
+			if test.wantCode != "" {
+				// Dynamic images cannot provide exact subjects for reader preflight.
+				assertFactoryErrorCode(t, err, test.wantCode)
+				if projection != nil {
+					t.Fatal("unresolved execution image returned a partial projection")
+				}
+				return
+			}
 			if err != nil {
 				t.Fatal(err)
 			}
