@@ -58,9 +58,21 @@ func (w *metadataBlobWriter) copyBlob(ctx context.Context, d Descriptor, max int
 	}
 	defer reader.Close()
 	raw := make([]byte, size)
-	n, err := io.ReadFull(reader, raw)
-	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
-		return metadataFetchError(ctx, err, "read metadata blob")
+	n := 0
+	for n < len(raw) {
+		if err := deliveryContext(ctx); err != nil {
+			return err
+		}
+		read, err := reader.Read(raw[n:])
+		n += read
+		if err == io.EOF {
+			break
+		}
+		// Preserve a transport's unexpected EOF. io.ReadFull would also
+		// synthesize that error for an otherwise complete shorter body.
+		if err != nil {
+			return metadataFetchError(ctx, err, "read metadata blob")
+		}
 	}
 	return w.put(raw[:n], d, max)
 }
