@@ -1,5 +1,22 @@
 ## Ubuntu 24 node-image inputs
 
+The shared Calico vendor recipe now sets `CNI_DOCKERHUB_MIRROR=mirror.gcr.io`
+inside its declared command, including the diagnostic and NVSentinel experiment
+copies. `TestNVKECalicoVendorMirror` covers the compiled vendor argv for both
+architectures and its changed vendor identity. On 2026-11-05, anonymous read-only
+`crane digest` and `crane manifest` checks matched all 11 Docker Hub Calico image
+digests in each architecture's v3.30.1 lock (22 exact references) at NVKE
+`2cfd00081b468d85a4894ec17e9deac13c9d8169`; the experiment's older Calico source
+has identical image locks. These checks establish manifest availability at that
+time, not blob completeness or a successful bundle, disk bake or hosted Run.
+This is best-effort: NVKE falls back to Docker Hub on a mirror miss, retries the
+canonical set on mirrored-transfer failure, and leaves Quay untouched. The public
+mirror has no retention guarantee. Registry credentials remain outside source
+vendoring; [issue 412](https://github.com/dsx-ai-factory/nvkr/issues/412) tracks the
+durable authenticated acquisition and offline bundle mode. This mitigation
+references [issue 403](https://github.com/dsx-ai-factory/nvkr/issues/403) without
+establishing rate-limit recovery.
+
 The opt-in `inputs/definitions/diagnostics/ubuntu24` selections reuse M2's NVKE source, now
 `v0.23.0` at `2cfd00081b468d85a4894ec17e9deac13c9d8169`, including upstream Ubuntu 24 support from
 `96ccc50cb7f8ed8bb08f7cf8655906982774f809`. A predecessor-bound whole-producer overlay

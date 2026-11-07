@@ -62,6 +62,19 @@ Former paths below were relative to `definitions/` at upstream commit
 | `nvke-nightly-arm64/installer-tools-catalog` | [`tools/installer-hosted-arm64`](tools/installer-hosted-arm64/registry.yaml) | Hosted installer-tool packaging and acquired Helm |
 | `nvke-local-dev-arm64/simulator-catalog` | [`tools/native`](tools/native/registry.yaml) | Shared simulator tools and runtime assets |
 
+## Calico image acquisition
+
+Calico's source-vendoring commands select `CNI_DOCKERHUB_MIRROR=mirror.gcr.io`
+inside the vendor container in the release, diagnostic and NVSentinel experiment
+catalogs. Outer job environment variables are not forwarded into that container.
+This is a best-effort mitigation for [Docker Hub rate limiting](https://github.com/dsx-ai-factory/nvkr/issues/403):
+NVKE falls back to Docker Hub when an exact digest is missing, and retries the
+canonical image set if the mirrored transfer fails. Quay references are untouched;
+locked image digests and installed names stay unchanged. The public mirror has
+[no retention guarantee](https://docs.cloud.google.com/artifact-registry/docs/pull-cached-dockerhub-images).
+[Issue 412](https://github.com/dsx-ai-factory/nvkr/issues/412)
+tracks the durable NVKR-owned authenticated acquisition and NVKE offline bundle mode.
+
 ## Remaining consolidation
 
 The target is one owner for each producer and pin, with explicitly named variants where contracts

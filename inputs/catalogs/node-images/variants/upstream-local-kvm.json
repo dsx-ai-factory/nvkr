@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-upstream-local-kvm",
-  "requiresCatalogDigest": "sha256:5cab22b189f6988ccbc400c5cd30e3361b4acfa403fc6727c28d2604c8f12170",
+  "requiresCatalogDigest": "sha256:dc78eb0cf647d32c4d44fe5048910d0104d58d99ac8227536447d3ab682f6c70",
   "components": {
     "nvke-node-image": {
       "component": {
