@@ -106,6 +106,6 @@ func copyMetadataCache(ctx context.Context, source, out string, inspected Inspec
 	for _, object := range inspected.Root.Objects {
 		sources[object.Name] = source
 	}
-	_, err := buildMetadataRoot(ctx, out, inspected.Root, sources, inspected.RootDigest)
+	_, err := buildMetadataRoot(ctx, out, inspected.Root, sources, inspected.RootDigest, source)
 	return err
 }

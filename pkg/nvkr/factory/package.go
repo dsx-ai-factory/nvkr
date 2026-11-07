@@ -94,9 +94,17 @@ func executeBinaryPackage(ctx context.Context, plan *Plan, output Artifact, inpu
 			InstallPath: "/usr/local/bin/" + input.Name, Mode: mode})
 	}
 	_, err = delivery.BuildBinaryBundle(ctx, output.Path, delivery.BinaryBundleRequest{
-		OS: osName, Arch: arch, Purpose: output.Name, Files: files,
+		OCIRepresentation: publicationOCIRepresentation(plan),
+		OS:                osName, Arch: arch, Purpose: output.Name, Files: files,
 	})
 	return err
+}
+
+func publicationOCIRepresentation(plan *Plan) delivery.OCIRepresentation {
+	if plan == nil || plan.Environment.Publication == nil {
+		return ""
+	}
+	return plan.Environment.Publication.OCIRepresentation
 }
 
 func binaryPackagePlatform(plan *Plan, inputs []Artifact) (string, error) {

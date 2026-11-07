@@ -25,6 +25,8 @@ import (
 // It creates no discovery tag and confers no release or qualification authority.
 // The caller must admit space for one payload copy in scratch before calling.
 func PushDiskArtifact(ctx context.Context, artifact *DiskArtifact, repository, scratch string, options RegistryOptions) (reference string, err error) {
+	ctx, observer := observeRegistry(ctx)
+	defer func(observedCtx context.Context) { err = observer.explain(observedCtx, err) }(ctx)
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
 	}
@@ -74,7 +76,7 @@ func PushDiskArtifact(ctx context.Context, artifact *DiskArtifact, repository, s
 	}
 	ref := repo.Digest(view.ManifestDigest)
 	if err := remote.Write(ref, image, registryOptions(ctx, options)...); err != nil {
-		return ref.Name(), classifyContext(ctx, e.Wrap(e.CodeUnavailable, err, "publishing disk transport; destination may contain partial uploads"))
+		return ref.Name(), registryPublishError(ctx, err, "publishing disk transport")
 	}
 	return ref.Name(), nil
 }

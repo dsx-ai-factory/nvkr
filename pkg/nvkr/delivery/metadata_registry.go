@@ -69,7 +69,7 @@ func PullMetadataWithOptions(ctx context.Context, reference, out string, request
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata index identity/size differs")
 	}
 	var index ociIndex
-	if err := json.Unmarshal(fetched.Manifest, &index); err != nil || index.ArtifactType != MediaPublicationRoot || len(index.Manifests) != 1 {
+	if err := json.Unmarshal(fetched.Manifest, &index); err != nil || index.artifactType() != MediaPublicationRoot || len(index.Manifests) != 1 {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata index must contain one root")
 	}
 	stage, commit, cleanup, err := stageLayout(out)
@@ -111,7 +111,7 @@ func PullMetadataWithOptions(ctx context.Context, reference, out string, request
 	if err != nil {
 		return Inspection{}, err
 	}
-	if m.ArtifactType != MediaPublicationRoot || len(m.Layers) != 0 || m.Config.MediaType != MediaPublicationRootConfig {
+	if m.artifactType() != MediaPublicationRoot || len(m.Layers) != 0 || m.Config.MediaType != MediaPublicationRootConfig {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "invalid metadata root")
 	}
 	if err := blob(ctx, ref.Context(), m.Config, 8<<20); err != nil {
