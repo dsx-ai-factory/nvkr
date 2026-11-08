@@ -9,9 +9,19 @@ import (
 	"sort"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/urfave/cli/v2"
 )
+
+// validateResolveOutput admits only the documented --output formats.
+func validateResolveOutput(format string) error {
+	switch format {
+	case "ir", "canonical", "nodes", "digest", "components":
+		return nil
+	}
+	return e.New(e.CodeUsage, "unknown resolve output %q (use ir, canonical, nodes, digest, or components)", format)
+}
 
 func cmdResolve() *cli.Command {
 	return &cli.Command{
@@ -22,6 +32,11 @@ func cmdResolve() *cli.Command {
 				Usage: "ir | canonical | nodes | digest | components"},
 		),
 		Action: func(c *cli.Context) error {
+			// Admit the output format before resolution and before the TUI branch, so a
+			// misspelling fails closed instead of silently rendering the default view.
+			if err := validateResolveOutput(c.String("output")); err != nil {
+				return err
+			}
 			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
