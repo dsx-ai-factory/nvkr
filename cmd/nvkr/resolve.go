@@ -14,7 +14,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
-// validateResolveOutput admits only the documented --output formats.
+// validateResolveOutput admits only the formats listed in the --output flag's usage
+// text. Any other value is a usage error, so an unknown value can never fall through
+// to the default renderer in the output switch below.
 func validateResolveOutput(format string) error {
 	switch format {
 	case "ir", "canonical", "nodes", "digest", "components":
@@ -90,6 +92,7 @@ func cmdResolve() *cli.Command {
 					fmt.Println(l)
 				}
 			default:
+				// Only "ir" reaches this branch: validateResolveOutput rejects every other value.
 				b, err := g.MarshalDeterministic()
 				if err != nil {
 					return err
