@@ -202,6 +202,17 @@ func TestCompositeAdmissionContract(t *testing.T) {
 			DeclaredVariant{Component: "shared-cli", Members: []string{"alpha", "beta"}}, DeclaredVariant{Component: "shared-cli", Members: []string{"alpha", "beta"}})},
 		{name: "unsorted variants", code: e.CodeInvalidCatalog, mutate: declareVariants(
 			DeclaredVariant{Component: "shared-cli", Members: []string{"alpha", "beta"}}, DeclaredVariant{Component: "agent", Members: []string{"alpha", "beta"}})},
+		{name: "trailing comment", mutate: appendToComposite("\n# ---\n")},
+		{name: "second document", code: e.CodeInvalidCatalog, mutate: appendToComposite("\n---\napiVersion: broken\nkind: DefinitelyNotADefinition\n")},
+		{name: "empty second document", code: e.CodeInvalidCatalog, mutate: appendToComposite("\n---\n")},
+		{name: "member with a second document", code: e.CodeInvalidCatalog, mutate: func(t *testing.T, root string, _ *CompositeDefinition) []byte {
+			raw, err := canonical.Marshal(compositeMemberFixture("beta", "beta-cli"))
+			if err != nil {
+				t.Fatal(err)
+			}
+			writeCompositeRaw(t, filepath.Join(root, "defs", "beta.yaml"), append(raw, "\n---\n"...))
+			return nil
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root, composite := compositeFixture(t)
@@ -238,6 +249,17 @@ func TestCompositeAdmissionContract(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// appendToComposite returns the canonical composite followed by suffix.
+func appendToComposite(suffix string) func(*testing.T, string, *CompositeDefinition) []byte {
+	return func(t *testing.T, _ string, composite *CompositeDefinition) []byte {
+		raw, err := canonical.Marshal(composite)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return append(raw, suffix...)
 	}
 }
 
@@ -439,7 +461,35 @@ func TestCompositeAdmissionCancellationReadsNoMember(t *testing.T) {
 	}
 }
 
+func TestCompositeTrailingDocumentReadsNoMember(t *testing.T) {
+	_, composite := compositeFixture(t)
+	raw, err := canonical.Marshal(composite)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw = append(raw, "\n---\n"...)
+	reads := 0
+	reader := func(context.Context, string) ([]byte, error) { reads++; return nil, errors.New("unexpected read") }
+	_, err = AdmitComposite(t.Context(), "defs/composite.yaml", raw, reader)
+	requireCode(t, err, e.CodeInvalidCatalog)
+	if reads != 0 {
+		t.Fatalf("trailing document admission read %d members", reads)
+	}
+	_, err = DecodeComposite(raw)
+	requireCode(t, err, e.CodeInvalidCatalog)
+
+	// The extra document is invalid input, not a composite this use cannot admit.
+	path := filepath.Join(t.TempDir(), "composite.yaml")
+	writeCompositeRaw(t, path, raw)
+	_, err = LoadDefinition(t.Context(), path)
+	requireCode(t, err, e.CodeInvalidCatalog)
+}
+
 func TestDocumentKindDispatch(t *testing.T) {
+	const (
+		plain     = "apiVersion: nvkr.dev/definition/v5\nkind: Definition\n"
+		composite = "apiVersion: nvkr.dev/composite-definition/v1\nkind: CompositeDefinition\n"
+	)
 	for _, tc := range []struct {
 		name, raw, kind string
 	}{
@@ -448,6 +498,12 @@ func TestDocumentKindDispatch(t *testing.T) {
 		{"future composite", "apiVersion: nvkr.dev/composite-definition/v2\nkind: CompositeDefinition\n", ""},
 		{"old definition", "apiVersion: nvkr.dev/definition/v4\nkind: Definition\n", ""},
 		{"environment", "apiVersion: nvkr.dev/environment/v1\nkind: Environment\n", ""},
+		{"leading document marker", "---\n" + plain, DefinitionKind},
+		{"second valid document", plain + "---\n" + plain, ""},
+		{"second invalid document", plain + "---\n[unclosed\n", ""},
+		{"empty second document", plain + "---\n", ""},
+		{"composite with a second document", composite + "---\n" + plain, ""},
+		{"composite with an empty second document", composite + "---\n", ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			kind, err := DocumentKind([]byte(tc.raw))

@@ -233,12 +233,21 @@ func TestLocalRunDryRunDoesNotCreateAttempt(t *testing.T) {
 
 func TestLifecycleCommandsRejectInvalidInputs(t *testing.T) {
 	lifecycleCommandRepo(t)
+	definition, err := os.ReadFile("docs/examples/nvke-tutorial/definition.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	twoDocuments := filepath.Join(t.TempDir(), "two-definitions.yaml")
+	if err := os.WriteFile(twoDocuments, append(definition, "---\napiVersion: broken\nkind: DefinitelyNotADefinition\n"...), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct {
 		name string
 		args []string
 		code e.Code
 	}{
 		{"missing definition", []string{"definition", "validate", "--definition", "missing.yaml"}, e.CodeInvalidCatalog},
+		{"second YAML document", []string{"definition", "validate", "--definition", twoDocuments}, e.CodeInvalidCatalog},
 		{"missing inspection", []string{"definition", "inspect", "--definition", "missing.yaml"}, e.CodeInvalidCatalog},
 		{"missing plan", []string{"run", "plan", "--definition", "missing.yaml", "--environment", "missing.yaml"}, e.CodeInvalidCatalog},
 		{"missing environment", []string{"run", "plan", "--definition", "docs/examples/nvke-tutorial/definition.yaml", "--environment", "missing.yaml"}, e.CodeInvalidCatalog},
@@ -248,8 +257,11 @@ func TestLifecycleCommandsRejectInvalidInputs(t *testing.T) {
 		{"wrong factory workspace", []string{"factory", "execute-node", "--plan", "missing.json", "--node", "missing", "--workspace", "wrong"}, e.CodeUsage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := invokeLifecycleCLI(t, tc.args...)
+			output, err := invokeLifecycleCLI(t, tc.args...)
 			assertLifecycleCommandCode(t, err, tc.code)
+			if output != "" {
+				t.Fatalf("stdout = %q, want empty", output)
+			}
 		})
 	}
 }
