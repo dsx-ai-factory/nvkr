@@ -120,7 +120,7 @@ func requireSingleDocument(raw []byte, label string) error {
 	var document yamlv3.Node
 	if err := decoder.Decode(&document); err != nil {
 		if err == io.EOF {
-			return nil // Empty input still reaches schema validation.
+			return nil
 		}
 		return e.Wrap(e.CodeInvalidCatalog, err, "parsing %s", label)
 	}
