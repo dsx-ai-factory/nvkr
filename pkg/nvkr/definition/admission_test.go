@@ -29,6 +29,7 @@ func TestAdmissionPreservesAuthoredIdentityAndRejectsUnknownInputs(t *testing.T)
 		{"unsupported namespace", []byte(strings.Replace(string(raw), DefinitionAPIVersion, "unsupported.dev/definition/v5", 1)), e.CodeInvalidCatalog},
 		{"old version", []byte(strings.Replace(string(raw), DefinitionAPIVersion, "nvkr.dev/definition/v3", 1)), e.CodeInvalidCatalog},
 		{"unknown field", []byte(strings.Replace(string(raw), `"outputs":`, `"clusters":[],"outputs":`, 1)), e.CodeInvalidCatalog},
+		{"duplicate key", []byte(strings.Replace(string(raw), `"kind":`, `"kind":"`+DefinitionKind+`","kind":`, 1)), e.CodeInvalidCatalog},
 		{"leading document marker", []byte("---\n" + string(raw)), ""},
 		{"trailing comment", []byte(string(raw) + "\n# ---\n"), ""},
 		{"second valid document", []byte(string(raw) + "\n---\n" + string(raw)), e.CodeInvalidCatalog},
@@ -67,6 +68,20 @@ func TestAdmissionPreservesAuthoredIdentityAndRejectsUnknownInputs(t *testing.T)
 	}
 }
 
+func TestSyntaxErrorKeepsDecoderLine(t *testing.T) {
+	raw := []byte("apiVersion: nvkr.dev/definition/v5\nkind: Definition\nmetadata:\n  name: \"x\n  other: 1\noutputs: []\n")
+	_, err := DecodeDefinition(raw)
+	requireCode(t, err, e.CodeInvalidCatalog)
+	if !strings.Contains(err.Error(), "yaml: line 7:") {
+		t.Fatalf("DecodeDefinition error = %v, want the decoder's line 7", err)
+	}
+	_, err = DocumentKind(raw)
+	requireCode(t, err, e.CodeInvalidCatalog)
+	if !strings.Contains(err.Error(), "yaml: line 7:") {
+		t.Fatalf("DocumentKind error = %v, want the decoder's line 7", err)
+	}
+}
+
 func TestRequireSingleDocument(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -86,6 +101,7 @@ func TestRequireSingleDocument(t *testing.T) {
 		{"second invalid document", "a: 1\n---\n[unclosed\n", e.CodeInvalidCatalog},
 		{"empty second document", "a: 1\n---\n", e.CodeInvalidCatalog},
 		{"document after end marker", "a: 1\n...\n---\nb: 2\n", e.CodeInvalidCatalog},
+		{"content after document end marker", "a: 1\n...\nb: 2\n", e.CodeInvalidCatalog},
 		{"second JSON document", "{\"a\": 1}\n---\n{\"b\": 2}\n", e.CodeInvalidCatalog},
 		{"invalid first document", "[unclosed\n", e.CodeInvalidCatalog},
 	} {
@@ -123,6 +139,7 @@ func TestEnvironmentAdmitsExactlyOneDocument(t *testing.T) {
 		{"second valid document", string(raw) + "\n---\n" + string(raw), e.CodeInvalidCatalog},
 		{"second invalid document", string(raw) + "\n---\napiVersion: broken\nkind: DefinitelyNotADefinition\n", e.CodeInvalidCatalog},
 		{"empty second document", string(raw) + "\n---\n", e.CodeInvalidCatalog},
+		{"duplicate key", strings.Replace(string(raw), `"kind":`, `"kind":"`+EnvironmentKind+`","kind":`, 1), e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "environment.yaml")

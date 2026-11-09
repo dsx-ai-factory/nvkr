@@ -84,11 +84,11 @@ func decodeStrict(raw []byte, label string, output any) error {
 	if int64(len(raw)) > maxDocumentBytes {
 		return e.New(e.CodeInvalidCatalog, "%s document exceeds its byte bound", label)
 	}
-	if err := requireSingleDocument(raw, label); err != nil {
-		return err
-	}
 	if err := yaml.UnmarshalStrict(raw, output); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "parsing %s", label)
+	}
+	if err := requireSingleDocument(raw, label); err != nil {
+		return err
 	}
 	// Explicit null/empty values must not extend the old version's vocabulary.
 	if environment, ok := output.(*Environment); ok && environment.APIVersion == EnvironmentAPIVersion {
