@@ -266,6 +266,36 @@ func TestLifecycleCommandsRejectInvalidInputs(t *testing.T) {
 	}
 }
 
+func TestFlagOnlyInspectionCommandsRejectUnusedArguments(t *testing.T) {
+	lifecycleCommandRepo(t)
+	const definition = "docs/examples/nvke-tutorial/definition.yaml"
+	const catalog = "inputs/catalogs/nvke/module-tags"
+	for _, tc := range []struct {
+		name string
+		args []string
+		flag string
+	}{
+		{"definition validate", []string{"definition", "validate", "--definition", definition, "--ui", "plain", "typo.yaml"}, "--definition"},
+		{"definition inspect", []string{"definition", "inspect", "--definition", definition, "--ui", "plain", "typo.yaml"}, "--definition"},
+		{"definition pin", []string{"definition", "pin", "--definition", "missing.yaml", "--check", "typo.yaml"}, "--definition"},
+		{"catalog validate", []string{"catalog", "validate", "--data", catalog, "--ui", "plain", "nvkectl"}, "--data"},
+		{"catalog list", []string{"catalog", "list", "--data", catalog, "--ui", "plain", "nvkectl"}, "--data"},
+		{"catalog digest", []string{"catalog", "digest", "--data", catalog, "--ui", "plain", "nvkectl"}, "--data"},
+		{"flag-looking tokens after the argument", []string{"definition", "validate", "--definition", definition, "typo.yaml", "--ui", "plain"}, "--definition"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := invokeLifecycleCLI(t, tc.args...)
+			assertLifecycleCommandCode(t, err, e.CodeUsage)
+			if !strings.Contains(err.Error(), tc.flag) {
+				t.Fatalf("error %q does not point to %s", err, tc.flag)
+			}
+			if output != "" {
+				t.Fatalf("stdout = %q, want empty", output)
+			}
+		})
+	}
+}
+
 func assertLifecycleCommandCode(t *testing.T, err error, want e.Code) {
 	t.Helper()
 	var coded *e.Error

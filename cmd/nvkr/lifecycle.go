@@ -24,9 +24,21 @@ func lifecycleInputFlags() []cli.Flag {
 	}
 }
 
+// rejectUnusedArguments refuses positional arguments on a flag-only command,
+// so a filename that is never read cannot look as if it was checked.
+func rejectUnusedArguments(c *cli.Context, flag string) error {
+	if c.Args().Present() {
+		return e.New(e.CodeUsage, "%s accepts flags only; unexpected argument %q (pass it with --%s)", c.Command.HelpName, c.Args().First(), flag)
+	}
+	return nil
+}
+
 func cmdDefinition() *cli.Command {
 	return &cli.Command{Name: "definition", Usage: "validate and inspect authored product definitions", Subcommands: []*cli.Command{
 		{Name: "validate", Usage: "validate a Definition or composite Definition and print its exact identity", Flags: append(commandPresentationFlags(), &cli.StringFlag{Name: "definition", Required: true}), Action: func(c *cli.Context) error {
+			if err := rejectUnusedArguments(c, "definition"); err != nil {
+				return err
+			}
 			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
@@ -46,6 +58,9 @@ func cmdDefinition() *cli.Command {
 			return nil
 		}},
 		{Name: "inspect", Usage: "emit the validated Definition, or a composite's description, as canonical JSON", Flags: append(commandPresentationFlags(), &cli.StringFlag{Name: "definition", Required: true}), Action: func(c *cli.Context) error {
+			if err := rejectUnusedArguments(c, "definition"); err != nil {
+				return err
+			}
 			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
@@ -73,6 +88,9 @@ func cmdDefinition() *cli.Command {
 		{Name: "pin", Usage: "recompute a composite Definition's member digests", Flags: append(commandPresentationFlags(),
 			&cli.StringFlag{Name: "definition", Required: true, Usage: "composite Definition YAML"},
 			&cli.BoolFlag{Name: "check", Usage: "write nothing; fail on member pin drift"}), Action: func(c *cli.Context) error {
+			if err := rejectUnusedArguments(c, "definition"); err != nil {
+				return err
+			}
 			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
