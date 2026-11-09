@@ -265,22 +265,16 @@ func TestStageTwoObservationRunsAfterTrustedFetchMaterialization(t *testing.T) {
 }
 
 func TestObserveContainerImageMeasuresBareLocalImageID(t *testing.T) {
-	want := "sha256:" + repeatHex("c")
-	runtimePath := filepath.Join(t.TempDir(), "runtime")
-	script := "#!/bin/sh\n" +
-		"if [ \"$1\" = image ] && [ \"$2\" = inspect ]; then printf '{\"Id\":\"" + want + "\"}'; exit 0; fi\n" +
-		"exit 41\n"
-	if err := os.WriteFile(runtimePath, []byte(script), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	node := ir.Node{ID: "build-local", Kind: ir.KindBuild, Toolchain: want}
-	got, err := observeContainerImage(context.Background(), runtimePath, node)
+	runtimePath, _, _ := imageAdmissionRuntimeFixture(t)
+	want := "sha256:" + repeatHex("b")
+	node := ir.Node{ID: "build-local", Kind: ir.KindBuild, Toolchain: want, Platform: "linux/amd64"}
+	got, err := observeContainerImage(t.Context(), runtimePath, node)
 	if err != nil || got != want {
-		t.Fatalf("local image ID was not independently inspected: got=%q err=%v", got, err)
+		t.Fatalf("local ID: %q %v", got, err)
 	}
 	node.Toolchain = "sha256:" + repeatHex("d")
-	if _, err := observeContainerImage(context.Background(), runtimePath, node); executionErrorCode(err) != nvkrerr.CodePreflightFailed {
-		t.Fatalf("runtime-selected image ID mismatch did not fail closed: %v", err)
+	if _, err := observeContainerImage(t.Context(), runtimePath, node); executionErrorCode(err) != nvkrerr.CodePreflightFailed {
+		t.Fatal(err)
 	}
 }
 

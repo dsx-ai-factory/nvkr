@@ -61,7 +61,7 @@ func newOperationHarness(t *testing.T, script string) (*Plan, string) {
 	// Shadow both maintained runtimes: hosted steps use the Environment's, local
 	// scheduling defaults to docker. No case may reach a real daemon.
 	for _, name := range []string{plan.Environment.RuntimeBinary(), "docker"} {
-		if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\nprintf '%s\\n' CALL \"$@\" >> \"$NVKR_TEST_RUNTIME_LOG\"\n"+script), 0o755); err != nil {
+		if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\nprintf '%s\\n' CALL \"$@\" >> \"$NVKR_TEST_RUNTIME_LOG\"\n"+preparedUtilityRuntimeProtocol(planNode(plan, "package/worker"), name)+script), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}

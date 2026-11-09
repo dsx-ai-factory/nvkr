@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -77,6 +78,23 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 // Isolation is enforced by the flag the verified helper passes, portable to any generic
 // runner — no engine-native container block, no bespoke network-none runner tag.
 func (l Local) execNodeLaunch(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
+	if opts.ImageAccess != "" && !opts.DryRun && opts.SourceWorkspace == nil {
+		image, platform := n.Toolchain, localToolchainPlatform(n)
+		if n.Kind == ir.KindFetch {
+			image, platform = n.VendorImage, "linux/"+runtime.GOARCH
+			if len(n.VendorCmd) == 0 {
+				image = ""
+			}
+		}
+		if image != "" && (n.Kind == ir.KindBuild || n.Kind == ir.KindFetch) {
+			var err error
+			opts.preparedImage, err = PrepareContainerImage(opts.ctx(), opts.Runtime, image, platform, opts.ImageAccess)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	if opts.progress == nil {
 		opts.progress = &progressSink{w: opts.Stdout}
 	}

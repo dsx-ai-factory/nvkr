@@ -4,6 +4,7 @@
 package pipeline
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -14,10 +15,10 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
-func TestPreparedPrivateImageRequiresExactLocalDigest(t *testing.T) {
+func TestAnonymousImageRequiresExactLocalDigest(t *testing.T) {
 	digest := "sha256:" + strings.Repeat("a", 64)
 	ref := "ghcr.io/example/tool@" + digest
-	document := fmt.Sprintf(`{"RepoDigests":[%q],"Os":"linux","Architecture":"amd64"}`, ref)
+	document := fmt.Sprintf(`{"Id":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","RepoDigests":[%q],"Os":"linux","Architecture":"amd64"}`, ref)
 	for _, test := range []struct {
 		name, document string
 		missing        bool
@@ -81,14 +82,14 @@ func TestPreparedImageRequiresSelectedToolchainPlatform(t *testing.T) {
 		{"VM wrong OS", ir.BuilderVMImage, "linux/arm64", "linux/amd64", "linux/amd64", "windows", "amd64", e.CodePreflightFailed},
 		{"missing observed OS", ir.BuilderOCIHermetic, "linux/amd64", "", "linux/amd64", "", "amd64", e.CodePreflightFailed},
 		{"missing observed arch", ir.BuilderOCIHermetic, "linux/amd64", "", "linux/amd64", "linux", "", e.CodePreflightFailed},
-		{"missing VM host", ir.BuilderVMImage, "linux/amd64", "", "", "linux", "amd64", e.CodeInvalidCatalog},
-		{"invalid selected platform", ir.BuilderOCIHermetic, "linux/any", "", "linux/any", "linux", "amd64", e.CodeInvalidCatalog},
+		{"missing VM host", ir.BuilderVMImage, "linux/amd64", "", "", "linux", "amd64", e.CodeEngineCapability},
+		{"invalid selected platform", ir.BuilderOCIHermetic, "linux/any", "", "linux/any", "linux", "amd64", e.CodeEngineCapability},
 	} {
 		for _, missing := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/pull=%t", test.name, missing), func(t *testing.T) {
 				calls, pulls := 0, 0
 				node := ir.Node{ID: "toolchain", Toolchain: ref, BuilderType: test.builder, Platform: test.platform, ToolchainPlatform: test.host}
-				document := fmt.Sprintf(`{"RepoDigests":[%q],"Os":%q,"Architecture":%q}`, ref, test.observedOS, test.observedArch)
+				document := fmt.Sprintf(`{"Id":"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","RepoDigests":[%q],"Os":%q,"Architecture":%q}`, ref, test.observedOS, test.observedArch)
 				got, err := observeContainerImageWith(t.Context(), node, func(args ...string) ([]byte, error) {
 					calls++
 					if args[0] == "pull" {
@@ -110,7 +111,7 @@ func TestPreparedImageRequiresSelectedToolchainPlatform(t *testing.T) {
 				if missing {
 					wantCalls, wantPulls = 3, 1
 				}
-				if test.want == e.CodeInvalidCatalog {
+				if test.want == e.CodeEngineCapability && (test.selected == "" || test.selected == "linux/any") {
 					wantCalls, wantPulls = 0, 0
 				}
 				if calls != wantCalls || pulls != wantPulls {
@@ -159,17 +160,17 @@ func TestLocalImageIdentityUsesPortableExactIDProjection(t *testing.T) {
 		name, document string
 		code           e.Code
 	}{
-		{"Docker prefixed", `{"Id":"` + want + `"}`, ""},
-		{"Podman raw", `{"Id":"` + strings.TrimPrefix(want, "sha256:") + `"}`, ""},
-		{"wrong prefixed", `{"Id":"sha256:` + strings.Repeat("c", 64) + `"}`, e.CodePreflightFailed},
-		{"wrong raw", `{"Id":"` + strings.Repeat("c", 64) + `"}`, e.CodePreflightFailed},
+		{"Docker prefixed", `{"Os":"linux","Architecture":"amd64","Id":"` + want + `"}`, ""},
+		{"Podman raw", `{"Os":"linux","Architecture":"amd64","Id":"` + strings.TrimPrefix(want, "sha256:") + `"}`, ""},
+		{"wrong prefixed", `{"Os":"linux","Architecture":"amd64","Id":"sha256:` + strings.Repeat("c", 64) + `"}`, e.CodePreflightFailed},
+		{"wrong raw", `{"Os":"linux","Architecture":"amd64","Id":"` + strings.Repeat("c", 64) + `"}`, e.CodePreflightFailed},
 		{"missing ID", `{}`, e.CodePreflightFailed},
 		{"malformed object", `{`, e.CodeEngineCapability},
-		{"duplicate ID", `{"Id":"` + want + `","Id":"` + want + `"}`, e.CodeEngineCapability},
+		{"duplicate ID", `{"Os":"linux","Architecture":"amd64","Id":"` + want + `","Id":"` + want + `"}`, e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			calls := 0
-			got, err := observeContainerImageWith(t.Context(), ir.Node{ID: "node", Toolchain: want}, func(args ...string) ([]byte, error) {
+			got, err := observeContainerImageWith(t.Context(), ir.Node{ID: "node", Toolchain: want, Platform: "linux/amd64"}, func(args ...string) ([]byte, error) {
 				calls++
 				if !slices.Equal(args, []string{"image", "inspect", "--format", "{{json .}}", want}) {
 					t.Fatalf("local exact identity must use the portable object, without pulling: %v", args)
@@ -214,4 +215,16 @@ func TestSourceVendorImageNormalizesOnlyCanonicalLocalIDs(t *testing.T) {
 			}
 		})
 	}
+}
+
+func observeContainerImageWith(ctx context.Context, node ir.Node, output func(...string) ([]byte, error)) (string, error) {
+	access := ImageAnonymous
+	if strings.HasPrefix(node.Toolchain, "sha256:") {
+		access = ImageMeasuredLocal
+	}
+	receipt, err := admitContainerImage(ctx, node.Toolchain, localToolchainPlatform(node), access, "test-runtime", func(_ context.Context, args ...string) ([]byte, error) { return output(args...) })
+	if err != nil {
+		return "", err
+	}
+	return receipt.digest, nil
 }

@@ -21,7 +21,9 @@ and signing identity policy. Selecting an unavailable transport fails before wor
 substitute for it. Image access separately declares private and anonymous image roots and
 an independent reader; publication namespaces grant no pull access. Unclassified GitHub execution images
 fail admission. Exact source/location bindings preserve logical Build identity; measured local images and
-native bundles retain separate source semantics.
+native bundles retain separate source semantics. Prepared-image receipts are process-local runtime
+observations binding an exact image subject, platform and runtime. Private consumers reauthenticate
+prepared local bytes without another pull; a missing image requires scoped preparation again.
 Declared-access GitHub Runs observe exact manifest/config availability with that reader after final
 Plan validation and before producer fan-out, separately per runner placement. This point-in-time
 observation grants no runtime or release authority and does not replace per-job pulls or byte checks.

@@ -33,9 +33,9 @@ func TestUtilityPlatformAdmissionBeforeNodeEffects(t *testing.T) {
 		name, daemon, image, calls string
 		code                       e.Code
 	}{
-		{"native", "amd64", "amd64", "info\npull\nimage\n", ""},
+		{"native", "amd64", "amd64", "info\nversion\nimage\n", ""},
 		{"foreign daemon", "arm64", "amd64", "info\n", e.CodeEngineCapability},
-		{"foreign image", "amd64", "arm64", "info\npull\nimage\n", e.CodeEngineCapability},
+		{"foreign image", "amd64", "arm64", "info\nversion\nimage\n", e.CodePreflightFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			work := t.TempDir()
@@ -43,15 +43,15 @@ func TestUtilityPlatformAdmissionBeforeNodeEffects(t *testing.T) {
 			tools := t.TempDir()
 			log := filepath.Join(tools, "calls")
 			runtimePath := filepath.Join(tools, "docker")
-			script := "#!/bin/sh\nprintf '%s\\n' \"$1\" >> " + shellQuote(log) + "\ncase \"$1\" in\ninfo) printf '%s\\n' '{\"OSType\":\"linux\",\"Architecture\":\"" + tc.daemon + "\"}';;\npull) exit 0;;\nimage) printf '%s\\n' '{\"Os\":\"linux\",\"Architecture\":\"" + tc.image + "\",\"RepoDigests\":[\"" + node.Container + "\"]}';;\n*) exit 99;;\nesac\n"
+			script := "#!/bin/sh\nprintf '%s\\n' \"$1\" >> " + shellQuote(log) + "\ncase \"$1\" in\ninfo) printf '%s\\n' '{\"ID\":\"test-daemon\",\"OSType\":\"linux\",\"Architecture\":\"" + tc.daemon + "\"}';;\nversion) printf '%s\\n' '{}';;\npull) exit 0;;\nimage) printf '%s\\n' '{\"Id\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"Os\":\"linux\",\"Architecture\":\"" + tc.image + "\",\"RepoDigests\":[\"" + node.Container + "\"]}';;\n*) exit 99;;\nesac\n"
 			if err := os.WriteFile(runtimePath, []byte(script), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			err := checkNodePlatform(t.Context(), plan, node.ID, "linux/amd64", func(ctx context.Context, runtime, image, platform string) error {
+			err := checkNodePlatform(t.Context(), plan, node.ID, "linux/amd64", func(ctx context.Context, runtime, image, platform string, access ...pipeline.ImageAccess) error {
 				if runtime != plan.Environment.RuntimeBinary() || image != node.Container || platform != node.Platform {
 					t.Fatal("admission changed the selected utility")
 				}
-				return pipeline.CheckContainerPlatform(ctx, runtimePath, image, platform)
+				return pipeline.CheckContainerPlatform(ctx, runtimePath, image, platform, access...)
 			})
 			if tc.code == "" {
 				if err != nil {
@@ -88,7 +88,10 @@ func TestNodePlatformRevalidatesPlanAndExactNode(t *testing.T) {
 			selected := nativeUtilityNode(t, plan).ID
 			tc.mutate(plan, &selected)
 			called := false
-			err := checkNodePlatform(t.Context(), plan, selected, tc.observed, func(context.Context, string, string, string) error { called = true; return nil })
+			err := checkNodePlatform(t.Context(), plan, selected, tc.observed, func(context.Context, string, string, string, ...pipeline.ImageAccess) error {
+				called = true
+				return nil
+			})
 			assertFactoryErrorCode(t, err, tc.code)
 			if called {
 				t.Fatal("invalid selection reached runtime work")
@@ -128,7 +131,7 @@ func TestNodePlatformDiagnosticRequiresNativeRoutes(t *testing.T) {
 	plan := githubTestPlan(t)
 	node := nativeUtilityNode(t, plan)
 	called := false
-	err := checkNodePlatform(t.Context(), plan, node.ID, "linux/amd64", func(context.Context, string, string, string) error {
+	err := checkNodePlatform(t.Context(), plan, node.ID, "linux/amd64", func(context.Context, string, string, string, ...pipeline.ImageAccess) error {
 		called = true
 		return nil
 	})

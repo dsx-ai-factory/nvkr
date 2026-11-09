@@ -253,7 +253,7 @@ func TestGitHubDevelopmentUtilityBindsItsOwnPlanBeforeLaunch(t *testing.T) {
 			t.Chdir(root)
 			t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
 			runtimePath := filepath.Join(root, plan.Environment.RuntimeBinary())
-			if err := os.WriteFile(runtimePath, []byte("#!/bin/sh\nprintf '%s\\n' \"$@\" >> runtime-calls\nexit 0\n"), 0o755); err != nil {
+			if err := os.WriteFile(runtimePath, []byte("#!/bin/sh\n"+preparedUtilityRuntimeProtocol(selected, plan.Environment.RuntimeBinary())+"printf '%s\\n' \"$@\" >> runtime-calls\nexit 0\n"), 0o755); err != nil {
 				t.Fatal(err)
 			}
 			writePlan := func(path string, value *Plan) {

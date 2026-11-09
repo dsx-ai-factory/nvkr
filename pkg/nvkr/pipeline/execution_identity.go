@@ -24,7 +24,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/profile"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
 // LocalContainerSandboxMode is the exact isolation contract exercised by Local's
@@ -206,6 +205,7 @@ func (LocalExecutionObserver) ObserveExecution(ctx context.Context, request Exec
 	if err != nil {
 		return profile.ExecutionObservation{}, err
 	}
+	request.runtimeExecutable.identity = runtimeDigest
 	observation := profile.ExecutionObservation{
 		RunnerDigest: runnerDigest, RunnerOrigin: profile.RunnerPreexisting,
 		RuntimeIdentity: runtimeDigest,
@@ -255,13 +255,13 @@ func observeHeldRuntimeIdentity(ctx context.Context, runtime *heldRuntimeExecuta
 	if runtime == nil || runtime.capability == nil || runtime.capability.Digest() == "" {
 		return "", e.New(e.CodeEngineCapability, "container runtime capability is incomplete")
 	}
-	raw, err := heldExecutionOutput(ctx, runtime, "version", "--format", "{{json .}}")
+	raw, err := heldImageOutput(ctx, runtime, "", "version", "--format", "{{json .}}")
 	if err != nil {
 		return "", e.Wrap(e.CodeEngineCapability, err, "observing held container runtime identity")
 	}
 	var serverID string
 	if runtime.name == "podman" {
-		serverRaw, err := heldExecutionOutput(ctx, runtime, "info", "--format", "{{json .}}")
+		serverRaw, err := heldImageOutput(ctx, runtime, "", "info", "--format", "{{json .}}")
 		if err != nil {
 			return "", e.Wrap(e.CodeEngineCapability, err, "observing Podman runtime identity")
 		}
@@ -270,7 +270,7 @@ func observeHeldRuntimeIdentity(ctx context.Context, runtime *heldRuntimeExecuta
 			return "", err
 		}
 	} else {
-		serverRaw, err := heldExecutionOutput(ctx, runtime, "info", "--format", "{{json .ID}}")
+		serverRaw, err := heldImageOutput(ctx, runtime, "", "info", "--format", "{{json .ID}}")
 		if err != nil {
 			return "", e.Wrap(e.CodeEngineCapability, err, "observing container runtime server identity")
 		}
@@ -374,68 +374,62 @@ func runtimeIdentityFromOutput(executableDigest, endpoint, serverID string, raw 
 }
 
 func observeContainerImage(ctx context.Context, runtimePath string, node ir.Node) (string, error) {
-	return observeContainerImageWith(ctx, node, func(args ...string) ([]byte, error) {
-		return executionOutput(ctx, runtimePath, args...)
-	})
-}
-
-func observeHeldContainerImage(ctx context.Context, runtime *heldRuntimeExecutable, node ir.Node) (string, error) {
-	if runtime == nil || runtime.capability == nil {
-		return "", e.New(e.CodeEngineCapability, "container runtime capability is incomplete")
-	}
-	return observeContainerImageWith(ctx, node, func(args ...string) ([]byte, error) {
-		return heldExecutionOutput(ctx, runtime, args...)
-	})
-}
-
-func observeContainerImageWith(ctx context.Context, node ir.Node, output func(...string) ([]byte, error)) (string, error) {
-	if strings.HasPrefix(node.Toolchain, "sha256:") {
-		if validateSHA256(node.Toolchain) != nil {
-			return "", e.New(e.CodeInvalidCatalog,
-				"node %q toolchain image ID is not a canonical digest", node.ID)
-		}
-		raw, err := output("image", "inspect", "--format", "{{json .}}", node.Toolchain)
-		if err != nil {
-			return "", e.Wrap(e.CodeEngineCapability, err,
-				"inspecting local toolchain image ID for node %q", node.ID)
-		}
-		if err := canonical.ValidateJSONDocument(raw); err != nil {
-			return "", e.Wrap(e.CodeEngineCapability, err,
-				"decoding local toolchain image ID for node %q", node.ID)
-		}
-		var inspection packerImageInspection
-		if err := json.Unmarshal(bytes.TrimSpace(raw), &inspection); err != nil {
-			return "", e.Wrap(e.CodeEngineCapability, err,
-				"decoding local toolchain image ID for node %q", node.ID)
-		}
-		observedID := normalizeLocalImageID(inspection.ID)
-		if observedID != node.Toolchain {
-			return "", e.New(e.CodePreflightFailed,
-				"runtime selected local toolchain image ID %q for node %q, want %q",
-				observedID, node.ID, node.Toolchain)
-		}
-		return observedID, nil
-	}
-	platform := localToolchainPlatform(node)
-	if err := target.ValidatePlatform(platform); err != nil {
-		return "", e.Wrap(e.CodeInvalidCatalog, err, "node %q toolchain platform", node.ID)
-	}
-	// An authenticated preparation step may have materialized a private image
-	// and destroyed its registry credential. Resolve the exact repository digest
-	// locally before attempting a network pull. A present but mismatched record
-	// fails closed; only a failed lookup may fall back to materialization.
-	if raw, err := output("image", "inspect", "--format", "{{json .}}", node.Toolchain); err == nil {
-		return inspectPreparedContainerImage(node, raw)
-	}
-	pullArgs := []string{"pull", "--platform", platform, node.Toolchain}
-	if _, err := output(pullArgs...); err != nil {
-		return "", e.Wrap(e.CodeEngineCapability, err, "materializing pinned toolchain for node %q", node.ID)
-	}
-	raw, err := output("image", "inspect", "--format", "{{json .}}", node.Toolchain)
+	receipt, err := PrepareContainerImage(ctx, runtimePath, node.Toolchain, localToolchainPlatform(node), ImagePreparedOnly)
 	if err != nil {
-		return "", e.Wrap(e.CodeEngineCapability, err, "inspecting toolchain identity for node %q", node.ID)
+		return "", err
 	}
-	return inspectPreparedContainerImage(node, raw)
+	return receipt.digest, nil
+}
+
+func observeHeldContainerImage(ctx context.Context, runtime *heldRuntimeExecutable, node ir.Node, routes ...ImageAccess) (string, error) {
+	access := ImagePreparedOnly
+	if len(routes) > 1 {
+		return "", e.New(e.CodeEngineCapability, "image admission requires one access route")
+	}
+	if len(routes) == 1 {
+		access = routes[0]
+	}
+	receipt, err := prepareHeldContainerImage(ctx, runtime, node, access)
+	if err != nil {
+		return "", err
+	}
+	return receipt.digest, nil
+}
+
+func prepareHeldContainerImage(ctx context.Context, runtime *heldRuntimeExecutable, node ir.Node, access ImageAccess) (receipt *PreparedImage, returnErr error) {
+	if err := requireRunContext(ctx, "held image admission"); err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	defer func() {
+		returnErr = mapCancellation(ctx, returnErr, "held image admission")
+		if returnErr != nil {
+			receipt = nil
+		}
+	}()
+
+	if err := validateImageAccess(node.Toolchain, localToolchainPlatform(node), access); err != nil {
+		return nil, err
+	}
+
+	if runtime == nil || runtime.capability == nil {
+		return nil, e.New(e.CodeEngineCapability, "container runtime capability is incomplete")
+	}
+	identity, err := observeHeldRuntimeIdentity(ctx, runtime)
+	if err != nil {
+		return nil, err
+	}
+	if runtime.identity != "" && runtime.identity != identity {
+		return nil, e.New(e.CodePreflightFailed, "prepared image runtime changed after admission")
+	}
+	receipt, err = admitContainerImage(ctx, node.Toolchain, localToolchainPlatform(node), access, identity, func(ctx context.Context, args ...string) ([]byte, error) {
+		return heldImageOutput(ctx, runtime, localToolchainPlatform(node), args...)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return receipt, nil
 }
 
 // A VM toolchain runs on its selected host, not the guest/output platform.
@@ -446,57 +440,12 @@ func localToolchainPlatform(node ir.Node) string {
 	return node.Platform
 }
 
-func inspectPreparedContainerImage(node ir.Node, raw []byte) (string, error) {
-	if err := canonical.ValidateJSONDocument(raw); err != nil {
-		return "", e.Wrap(e.CodeEngineCapability, err, "decoding toolchain identity for node %q", node.ID)
-	}
-	var inspection packerImageInspection
-	if err := json.Unmarshal(bytes.TrimSpace(raw), &inspection); err != nil {
-		return "", e.Wrap(e.CodeEngineCapability, err, "decoding toolchain identity for node %q", node.ID)
-	}
-	platform := localToolchainPlatform(node)
-	wantOS, wantArch, ok := strings.Cut(platform, "/")
-	if !ok || inspection.OS != wantOS || inspection.Architecture != wantArch {
-		return "", e.New(e.CodePreflightFailed,
-			"runtime selected toolchain platform %s/%s for node %q, want %q",
-			inspection.OS, inspection.Architecture, node.ID, platform)
-	}
-	want, err := imageManifestDigest(node.Toolchain)
-	if err != nil {
-		return "", e.Wrap(e.CodeInvalidCatalog, err, "node %q toolchain", node.ID)
-	}
-	for _, ref := range inspection.RepoDigests {
-		if _, digest, ok := strings.Cut(ref, "@"); ok && digest == want {
-			return digest, nil
-		}
-	}
-	return "", e.New(e.CodePreflightFailed,
-		"runtime did not report selected toolchain manifest %s for node %q", want, node.ID)
-}
-
-func executionOutput(ctx context.Context, name string, args ...string) ([]byte, error) {
-	cmd := execCmd(RunOptions{Ctx: ctx}, name, args...)
-	return commandOutput(ctx, cmd)
-}
-
 func heldExecutionOutput(ctx context.Context, runtime *heldRuntimeExecutable, args ...string) ([]byte, error) {
 	if runtime == nil || runtime.capability == nil {
 		return nil, e.New(e.CodeEngineCapability, "container runtime capability is incomplete")
 	}
 	var stdout, stderr bytes.Buffer
 	if err := runtime.run(ctx, &stdout, &stderr, args...); err != nil {
-		if ctx.Err() != nil {
-			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "execution observation canceled")
-		}
-		return nil, fmt.Errorf("%w: %s", err, strings.TrimSpace(stderr.String()))
-	}
-	return stdout.Bytes(), nil
-}
-
-func commandOutput(ctx context.Context, cmd *exec.Cmd) ([]byte, error) {
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout, cmd.Stderr = &stdout, &stderr
-	if err := runOwnedCommand(ctx, cmd); err != nil {
 		if ctx.Err() != nil {
 			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "execution observation canceled")
 		}
