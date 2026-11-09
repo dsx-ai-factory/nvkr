@@ -4,6 +4,7 @@
 package main
 
 import (
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
@@ -65,6 +66,52 @@ func TestCatalogListShowsDirectProducers(t *testing.T) {
 	for _, old := range []string{"recipes:", "overlays (layered", "mixins:"} {
 		if strings.Contains(output, old) {
 			t.Fatalf("catalog list exposes removed %q", old)
+		}
+	}
+}
+
+func TestCatalogListFiltersAndEmitsJSON(t *testing.T) {
+	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools", "operator-arm64")
+	output, err := runCatalogCommand(t, "catalog", "list", "--data", arm, "--platform", "linux/arm64", "--output-type", "host-package", "--format", "json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []struct {
+		Name         string   `json:"name"`
+		Platforms    []string `json:"platforms"`
+		OutputType   string   `json:"outputType"`
+		ProducerMode string   `json:"producerMode"`
+	}
+	if err := json.Unmarshal([]byte(output), &got); err != nil {
+		t.Fatalf("not JSON: %v: %s", err, output)
+	}
+	if len(got) != 2 || got[0].Name != "helm" || got[1].Name != "kubectl" || got[0].Platforms[0] != "linux/arm64" || got[0].ProducerMode != "prebuilt" {
+		t.Fatalf("unexpected projection: %+v", got)
+	}
+
+	plain, err := runCatalogCommand(t, "catalog", "list", "--data", layeredCatalogPath(t), "--output-type", "host-package")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(plain, "kubectl") || !strings.Contains(plain, "kubelet") || strings.Contains(plain, "pause") {
+		t.Fatalf("filtered plain list has wrong membership: %s", plain)
+	}
+}
+
+func TestCatalogListRejectsBadSelectorsWithoutOutput(t *testing.T) {
+	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools", "operator-arm64")
+	for _, args := range [][]string{
+		{"--platform", "linux/amd64"},
+		{"--output-type", "tarball"},
+		{"--platform", "arm64"},
+		{"--output-type", "package"},
+		{"--platform", ""},
+		{"--format", "yaml"},
+	} {
+		output, err := runCatalogCommand(t, append([]string{"catalog", "list", "--data", arm}, args...)...)
+		assertLifecycleCommandCode(t, err, e.CodeUsage)
+		if output != "" {
+			t.Fatalf("%v emitted %q", args, output)
 		}
 	}
 }

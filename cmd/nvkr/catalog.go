@@ -114,11 +114,20 @@ func cmdCatalog() *cli.Command {
 			},
 			{
 				Name:  "list",
-				Usage: "list components",
-				Flags: []cli.Flag{&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"}},
+				Usage: "list components, optionally filtered by declared platform and output type",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"},
+					&cli.StringFlag{Name: "platform", Usage: "only components declaring this exact platform (linux/amd64 or linux/arm64)"},
+					&cli.StringFlag{Name: "output-type", Usage: "only components with this exact output type (for example host-package)"},
+					&cli.StringFlag{Name: "format", Value: "text", Usage: "text or json"},
+				},
 				Action: func(c *cli.Context) error {
 					if err := rejectUnusedArguments(c, "data"); err != nil {
 						return err
+					}
+					format := c.String("format")
+					if format != "text" && format != "json" {
+						return e.New(e.CodeUsage, "--format must be text or json, got %q", format)
 					}
 					view, err := selectCommandPresentation(c)
 					if err != nil {
@@ -128,16 +137,42 @@ func cmdCatalog() *cli.Command {
 					if err != nil {
 						return showCommandResult(c, view, catalogCommandDisplay("Catalog components"), err)
 					}
+					var selectors []string
+					for _, name := range []string{"platform", "output-type"} {
+						if !c.IsSet(name) {
+							continue
+						}
+						if c.String(name) == "" {
+							return e.New(e.CodeUsage, "--%s requires a value", name)
+						}
+						selectors = append(selectors, fmt.Sprintf("--%s %s", name, c.String(name)))
+					}
+					found, err := cat.Discover(c.String("platform"), c.String("output-type"))
+					if err != nil {
+						return err
+					}
+					if len(selectors) > 0 && len(found) == 0 {
+						return e.New(e.CodeUsage, "no component in catalog %q matches %s", cat.Metadata.Name, strings.Join(selectors, " "))
+					}
+					if format == "json" {
+						encoder := json.NewEncoder(os.Stdout)
+						encoder.SetIndent("", "  ")
+						return encoder.Encode(found)
+					}
+					listed := *cat
+					listed.Components = make(map[string]catalog.Component, len(found))
+					for _, d := range found {
+						listed.Components[d.Name] = cat.Components[d.Name]
+					}
 					if view.tui {
-						return showCommandResult(c, view, catalogComponentsDisplay(cat, "Catalog components"), nil)
+						return showCommandResult(c, view, catalogComponentsDisplay(&listed, "Catalog components"), nil)
 					}
 					fmt.Printf("catalog: %s\n\n", cat.Metadata.Name)
 					fmt.Printf("components:\n")
-					names := make([]string, 0, len(cat.Components))
-					for n := range cat.Components {
-						names = append(names, n)
+					names := make([]string, 0, len(found))
+					for _, d := range found {
+						names = append(names, d.Name)
 					}
-					sort.Strings(names)
 					tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 					for _, n := range names {
 						fmt.Fprintf(tw, "  %s\t%s\n", n, cat.Components[n].String())
