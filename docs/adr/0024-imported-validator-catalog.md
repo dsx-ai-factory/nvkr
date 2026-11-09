@@ -139,8 +139,10 @@ complete replacement with no inheritance, overlay or fallback to shipped registr
 existing producer-catalog meaning.) How the default catalog ships is open; any choice must preserve these
 semantics. Existing `inputs/testing/nightly-profiles.json` retains its separate coordinator ownership.
 
-Loading is a bounded, cancellation-aware walk. Any entry that is not a `{project}/{artifact}/{suite}.yaml`
-regular file, any symlink or escaping path, a duplicate ID or an unknown field fails loading. The current
+Loading is a bounded, cancellation-aware walk. It descends only through real `{project}` and `{project}/{artifact}`
+directories to reach registrations. Any other entry fails loading: a non-directory at those levels, anything
+at the third level that is not a `{suite}.yaml` regular file, anything deeper, any symlink or escaping path, a
+duplicate ID or an unknown field. The current
 slice's read bounds carry over: 1 MiB per document, 16 MiB per catalog and 1,024 registration files. Every
 registration is fully validated even when unselected, so one invalid registration fails the invocation rather
 than being skipped.
@@ -180,6 +182,9 @@ image:
 workingDirectory: cli
 acquisition:
   command: [go, mod, download]
+  network:                        # Go defaults; a toolchain with another GOPROXY/GOSUMDB declares those instead
+    - {host: proxy.golang.org, port: 443}
+    - {host: sum.golang.org, port: 443}
 command: [make, --no-print-directory, test-artifact, GO=go, "GO_TEST_FLAGS=-count=1 -timeout=15m -json"]
 environment:
   NVKECTL: "${inputs.executable.path}"
@@ -211,7 +216,10 @@ Run path with the same Definition and Environment inputs, then continues exactly
 continues only from a successfully completed Run; incomplete, failed or uncommitted Runs fail.
 
 Lifecycle opens the Run through `CaptureLocalDiagnosticArtifacts`, which replays its compiler reads and checks
-every named payload's bytes. Each input role binds to exactly one named Run output matching the registration's
+every named payload's bytes. That capture admits only complete Runs in the local execution lane with content
+identity and a non-composite Plan (enforced by `replayLocalQualificationInputs`); hosted and composite Runs
+fail binding until lifecycle capture is explicitly extended, which is a prerequisite for validating them.
+Each input role binds to exactly one named Run output matching the registration's
 output, component and format; a missing, ambiguous or format-incompatible output fails. Factory derives the
 test-origin source, toolchain image and expected version from the Run's Plan. Every suite retains its own
 named-output bindings even when outputs share a Build Digest. Callers supply no artifact paths or digests.
@@ -271,7 +279,10 @@ network-capable environment does not widen a suite's declared access. Until the 
 destinations and a credential-delivery owner exists, any suite requiring test-phase network access or
 credentials fails admission; this ADR does not choose the enforcement or delivery mechanism.
 
-The `local` environment (docker capability, no credentials, no test-phase network):
+The `local` environment (docker capability, no credentials, no test-phase network). It permits acquisition-phase
+access only to destinations the selected suite declares for acquisition; nothing else is admitted. Until
+pipeline enforces destinations, acquisition keeps the parity baseline (networked, without the artifact or
+credentials):
 
 ```yaml
 apiVersion: nvkr.dev/test-environment/v1
@@ -281,6 +292,8 @@ metadata:
 provider: local
 provides:
   capabilities: [docker]
+network:
+  acquisition: declared-by-suite   # only the selected suite's declared acquisition destinations
 # No credentials. Tests run without network access.
 ```
 
