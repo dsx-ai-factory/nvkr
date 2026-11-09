@@ -213,6 +213,31 @@ func TestGraphAndComparisonProjectionExcludeTransportAndRawValues(t *testing.T) 
 	}
 }
 
+func TestGraphDisplayShowsFocusedOutputAndItsItems(t *testing.T) {
+	lifecycleCommandRepo(t)
+	document, err := planview.Load(context.Background(), ".github/nvkr-run/plan.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	graph, err := document.GraphSnapshotFor(planview.GraphOptions{View: "complete", Format: "json", Output: "controller-chart"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	display := graphDisplay(graph)
+	var focused bool
+	for _, field := range display.Fields {
+		focused = focused || (field.Label == "Output" && field.Value == "controller-chart")
+	}
+	if !focused || len(display.Items) != len(graph.Vertices) {
+		t.Fatalf("focused output not presented: fields %v, %d items for %d vertices", display.Fields, len(display.Items), len(graph.Vertices))
+	}
+	for _, item := range display.Items {
+		if item.ID == "output/nvkectl" {
+			t.Fatal("unrelated output presented")
+		}
+	}
+}
+
 func TestRootCommandTypedResultsAndDefaultBytes(t *testing.T) {
 	lifecycleCommandRepo(t)
 	for _, args := range [][]string{

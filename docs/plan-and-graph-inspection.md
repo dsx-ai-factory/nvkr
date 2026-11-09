@@ -66,7 +66,12 @@ and live Run presentation, see [Lifecycle](lifecycle.md#choose-local-run-present
 nvkr run graph --plan .github/nvkr-run/plan.json --format mermaid
 nvkr run graph --plan .github/nvkr-run/plan.json --format dot
 nvkr run graph --plan .github/nvkr-run/plan.json --format json
+nvkr run graph --plan .github/nvkr-run/plan.json --output controller-chart --format mermaid
 ```
+
+`--output NAME` focuses any view on one exact required output and its upstream dependencies, such as the
+images a chart packages, plus that output's own publication route. The whole Plan is admitted first, an unknown name is a usage error, and the result
+is marked as filtered. The Plan and its digest are unchanged, and without `--output` the output is unchanged.
 
 The default `--view complete` includes every embedded producer IR node, factory operation, intermediate
 artifact, required output slot and publication route. Exact producer references join the instruction graph
