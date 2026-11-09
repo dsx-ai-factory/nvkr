@@ -21,3 +21,7 @@ executionClasses:
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared
+toolchainAccess:
+  publicRoots:
+    - docker.io/library/golang
+    - docker.io/moby/buildkit
