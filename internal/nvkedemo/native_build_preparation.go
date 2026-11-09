@@ -294,7 +294,7 @@ func prepareDefaultNativeBuild(ctx context.Context, runner Runner, cfg *BuildCon
 	}
 	// Linux builds the native toolchain; Darwin additionally binds its execution
 	// bundle. Both paths derive substitutions from the admitted Plan.
-	// Follow the same admitted Plan scopes as the Linux launcher's shared jq owner.
+	// The factory owns admission and final coverage for both local launchers.
 	baseline, err := runner.Capture(ctx, []string{cfg.NVKR, "run", "plan", "--definition", prepared.Definition, "--environment", prepared.Environment, "--json"}, "native-build-baseline", 2*time.Minute)
 	if err != nil {
 		return err
@@ -306,9 +306,9 @@ func prepareDefaultNativeBuild(ctx context.Context, runner Runner, cfg *BuildCon
 	if _, err := factory.LoadPlanContext(ctx, filepath.Join(cfg.Repository, plan)); err != nil {
 		return err
 	}
-	scopes, err := runner.Capture(ctx, []string{"jq", "-L", "scripts", "-e", "--arg", "arch", arch, `include "nvke-os-plan"; local_toolchain_scopes("all"; $arch)`, plan}, "native-build-toolchain-scopes", time.Minute)
-	if err != nil {
-		return err
+	scopeCommand := []string{cfg.NVKR, "factory", "local-toolchain-scopes", "--plan", plan, "--bindings", "toolchains/nvkr-packer/local-bindings.json", "--arch", arch}
+	if _, err := runner.Capture(ctx, scopeCommand, "native-build-toolchain-admission", 2*time.Minute); err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "local toolchain preparation admission")
 	}
 	image, err := runner.Capture(ctx, []string{"bash", "toolchains/nvkr-packer/build.sh", "--arch", arch, "--diagnostic-local", "--print-validated-image-id", "--tag", "localhost/nvkr-packer-toolchain:laptop-" + cfg.AttemptPrefix}, "native-build-utility-bootstrap", 6*time.Hour)
 	if err != nil {
@@ -318,34 +318,32 @@ func prepareDefaultNativeBuild(ctx context.Context, runner Runner, cfg *BuildCon
 	if !canonical.IsDigest(pin) {
 		return e.New(e.CodeVerifyFailed, "native utility bootstrap returned no exact validated image ID")
 	}
-	scopePath := filepath.Join(root, "toolchain-scopes.json")
-	if err := privateWrite(filepath.Join(cfg.Repository, scopePath), scopes); err != nil {
-		return err
-	}
-	substitutions, err := runner.Capture(ctx, []string{"jq", "-L", "scripts", "-e", "--arg", "image", pin,
-		`include "nvke-os-plan"; local_toolchain_substitutions($image)`, scopePath}, "native-build-toolchain-substitutions", time.Minute)
+	observed, err := runner.Capture(ctx, []string{"docker", "image", "inspect", "--format", "{{.Id}} {{.Os}}/{{.Architecture}}", pin}, "native-build-toolchain-image", 30*time.Second)
 	if err != nil {
 		return err
 	}
-	scopePath = filepath.Join(root, "substitutions.json")
+	if strings.TrimSpace(string(observed)) != pin+" linux/"+arch {
+		return e.New(e.CodeVerifyFailed, "native utility image ID or platform differs from the measured selection")
+	}
+	substitutions, err := runner.Capture(ctx, append(scopeCommand, "--image", pin), "native-build-toolchain-substitutions", 2*time.Minute)
+	if err != nil {
+		return err
+	}
+	scopePath := filepath.Join(root, "substitutions.json")
 	if err := privateWrite(filepath.Join(cfg.Repository, scopePath), substitutions); err != nil {
 		return err
 	}
 	var selected []json.RawMessage
-	if err := json.Unmarshal(substitutions, &selected); err != nil || len(selected) > 3 {
+	if err := json.Unmarshal(substitutions, &selected); err != nil {
 		return e.New(e.CodeVerifyFailed, "native utility preparation returned invalid catalog substitutions")
-	}
-	if len(selected) == 0 {
-		cfg.Definition, cfg.Environment = prepared.Definition, prepared.Environment
-		return nil
 	}
 	for index := range selected {
 		name := "toolchain-attempt.json"
 		if index != 0 {
 			name = fmt.Sprintf("toolchain-attempt-%d.json", index)
 		}
-		raw, err := runner.Capture(ctx, []string{"jq", "-L", "scripts", "-e", "--argjson", "index", fmt.Sprint(index), "--arg", "to", pin, "--arg", "arch", arch,
-			`include "nvke-os-plan"; .[$index] | toolchain_overlay($arch; .pin; $to; .catalogDigest; .components)`, scopePath}, fmt.Sprintf("native-build-toolchain-overlay-%d", index), time.Minute)
+		raw, err := runner.Capture(ctx, []string{"jq", "-e", "--argjson", "index", fmt.Sprint(index),
+			`.[$index].overlay`, scopePath}, fmt.Sprintf("native-build-toolchain-overlay-%d", index), time.Minute)
 		if err != nil {
 			return err
 		}
@@ -361,6 +359,17 @@ func prepareDefaultNativeBuild(ctx context.Context, runner Runner, cfg *BuildCon
 	final := filepath.Join(root, "definition.json")
 	if err := privateWrite(filepath.Join(cfg.Repository, final), definition); err != nil {
 		return err
+	}
+	selectedPlan, err := runner.Capture(ctx, []string{cfg.NVKR, "run", "plan", "--definition", final, "--environment", prepared.Environment, "--json"}, "native-build-selected-plan", 2*time.Minute)
+	if err != nil {
+		return err
+	}
+	selectedPath := filepath.Join(root, "selected-plan.json")
+	if err := privateWrite(filepath.Join(cfg.Repository, selectedPath), selectedPlan); err != nil {
+		return err
+	}
+	if _, err := runner.Capture(ctx, append(scopeCommand, "--image", pin, "--selected-plan", selectedPath), "native-build-toolchain-coverage", 2*time.Minute); err != nil {
+		return e.Wrap(e.CodeVerifyFailed, err, "local toolchain substitution coverage")
 	}
 	cfg.Definition, cfg.Environment = final, prepared.Environment
 	return nil

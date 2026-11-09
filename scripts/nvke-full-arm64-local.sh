@@ -278,16 +278,15 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
     "Build graph: planned outputs: \(.lifecycleOutputs | length); producer steps: \([.builds[].executionGraph.nodes[]?] | length); producer dependency edges: \([.builds[].executionGraph.nodes[]?.needs[]?] | length)",
     (.lifecycleOutputs[]? | "  output: \(.name) [\(.kind)]: \(.components | join(", "))")
   ' "${bootstrap}/baseline-plan.json" >&2
-  jq -L scripts -e --arg lane "${lane}" 'include "nvke-os-plan"; local_toolchain_scopes($lane; "arm64")' \
-    "${bootstrap}/baseline-plan.json" >"${bootstrap}/toolchain-scopes.json"
+  scopes_command=("${runner}" factory local-toolchain-scopes --plan "${bootstrap}/baseline-plan.json"
+    --bindings toolchains/nvkr-packer/local-bindings.json --arch arm64)
+  "${scopes_command[@]}" >"${bootstrap}/toolchain-scopes.json"
   if [[ -n "${shared_bootstrap}" ]]; then
     # This is an explicit invocation-local tool selection, not a serialized
     # receipt. The next Plan still admits the exact image and substitution.
     [[ -f "${tools}/toolchain-image" && ! -L "${tools}/toolchain-image" ]] || { echo 'Shared bootstrap lacks its measured toolchain image.' >&2; exit 1; }
     image="$(<"${tools}/toolchain-image")"
     [[ "${image}" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo 'Shared bootstrap image must be an immutable native image ID.' >&2; exit 1; }
-    actual="$(timeout --kill-after=5s 30s "${runtime}" image inspect --format '{{.Id}}' "${image}")"
-    [[ "sha256:${actual#sha256:}" == "${image}" ]] || { echo 'Shared toolchain bytes are unavailable in this runtime.' >&2; exit 1; }
   else
     toolchain_tag="localhost/nvkr-packer-toolchain:laptop-${attempt}"
     image="$(CONTAINER_RUNTIME="${runtime}" bash toolchains/nvkr-packer/build.sh \
@@ -297,13 +296,14 @@ if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}"
   fi
   # Freeze fresh local bytes through the existing overlay contract, not a tag
   # or a hand-edited maintained lock. Each output retains its own catalog scope.
-  jq -L scripts --arg image "${image}" 'include "nvke-os-plan"; local_toolchain_substitutions($image)' "${bootstrap}/toolchain-scopes.json" >"${bootstrap}/substitutions.json"
+  actual="$(timeout --kill-after=5s 30s "${runtime}" image inspect --format '{{.Id}} {{.Os}}/{{.Architecture}}' "${image}")"
+  [[ "${actual}" == "${image} linux/arm64" ]] || { echo 'Toolchain image ID or native platform differs from the measured selection.' >&2; exit 1; }
+  "${scopes_command[@]}" --image "${image}" >"${bootstrap}/substitutions.json"
   if [[ "$(jq length "${bootstrap}/substitutions.json")" != 0 ]]; then
   while IFS= read -r index; do
     file=toolchain-attempt.json
     if [[ "${index}" != 0 ]]; then file="toolchain-attempt-${index}.json"; fi
-    jq -L scripts -e --argjson index "${index}" --arg to "${image}" 'include "nvke-os-plan"; .[$index] |
-      toolchain_overlay("arm64"; .pin; $to; .catalogDigest; .components)' \
+    jq -e --argjson index "${index}" '.[$index].overlay' \
       "${bootstrap}/substitutions.json" >"${bootstrap}/${file}"
   done < <(jq -r 'keys[]' "${bootstrap}/substitutions.json")
   # The generated Definition lives three directories below the repository.
@@ -320,6 +320,9 @@ fi
 selected_plan_command=("${runner}" run plan --definition "${definition}" --environment "${environment}" --json)
 print_nvkr_command "${selected_plan_command[@]}"
 "${selected_plan_command[@]}" >"${bootstrap}/selected-plan.json"
+if [[ "${lane}" == all || "${lane}" == os || "${lane}" == simulator || "${lane}" == site ]]; then
+  "${scopes_command[@]}" --image "${image}" --selected-plan "${bootstrap}/selected-plan.json" >/dev/null
+fi
 preview_command=("${runner}" run local --definition "${definition}" --environment "${environment}" --attempt "${attempt}-preview" --capture-inputs-root=. --dry-run)
 print_nvkr_command "${preview_command[@]}"
 "${preview_command[@]}"
