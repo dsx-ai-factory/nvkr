@@ -29,6 +29,7 @@ func TestAdmissionPreservesAuthoredIdentityAndRejectsUnknownInputs(t *testing.T)
 		{"unsupported namespace", []byte(strings.Replace(string(raw), DefinitionAPIVersion, "unsupported.dev/definition/v5", 1)), e.CodeInvalidCatalog},
 		{"old version", []byte(strings.Replace(string(raw), DefinitionAPIVersion, "nvkr.dev/definition/v3", 1)), e.CodeInvalidCatalog},
 		{"unknown field", []byte(strings.Replace(string(raw), `"outputs":`, `"clusters":[],"outputs":`, 1)), e.CodeInvalidCatalog},
+		{"duplicate key", []byte(strings.Replace(string(raw), `"kind":`, `"kind":"`+DefinitionKind+`","kind":`, 1)), e.CodeInvalidCatalog},
 		{"leading document marker", []byte("---\n" + string(raw)), ""},
 		{"trailing comment", []byte(string(raw) + "\n# ---\n"), ""},
 		{"second valid document", []byte(string(raw) + "\n---\n" + string(raw)), e.CodeInvalidCatalog},
@@ -138,6 +139,7 @@ func TestEnvironmentAdmitsExactlyOneDocument(t *testing.T) {
 		{"second valid document", string(raw) + "\n---\n" + string(raw), e.CodeInvalidCatalog},
 		{"second invalid document", string(raw) + "\n---\napiVersion: broken\nkind: DefinitelyNotADefinition\n", e.CodeInvalidCatalog},
 		{"empty second document", string(raw) + "\n---\n", e.CodeInvalidCatalog},
+		{"duplicate key", strings.Replace(string(raw), `"kind":`, `"kind":"`+EnvironmentKind+`","kind":`, 1), e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "environment.yaml")
