@@ -117,8 +117,8 @@ func cmdCatalog() *cli.Command {
 				Usage: "list components, optionally filtered by declared platform and output type",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"},
-					&cli.StringFlag{Name: "platform", Usage: "only components declaring this exact platform (linux/amd64 or linux/arm64)"},
-					&cli.StringFlag{Name: "output-type", Usage: "only components with this exact output type (for example host-package)"},
+					&cli.StringSliceFlag{Name: "platform", Usage: "only components declaring this exact platform (for example linux/arm64); give at most once"},
+					&cli.StringSliceFlag{Name: "output-type", Usage: "only components with this exact output type (for example host-package); give at most once"},
 					&cli.StringFlag{Name: "format", Value: "text", Usage: "text or json"},
 				},
 				Action: func(c *cli.Context) error {
@@ -129,6 +129,17 @@ func cmdCatalog() *cli.Command {
 					if format != "text" && format != "json" {
 						return e.New(e.CodeUsage, "--format must be text or json, got %q", format)
 					}
+					platform, err := catalogListSelector(c, "platform")
+					if err != nil {
+						return err
+					}
+					outputType, err := catalogListSelector(c, "output-type")
+					if err != nil {
+						return err
+					}
+					if err := catalog.ValidateSelectors(platform, outputType); err != nil {
+						return err
+					}
 					view, err := selectCommandPresentation(c)
 					if err != nil {
 						return err
@@ -137,22 +148,13 @@ func cmdCatalog() *cli.Command {
 					if err != nil {
 						return showCommandResult(c, view, catalogCommandDisplay("Catalog components"), err)
 					}
-					var selectors []string
-					for _, name := range []string{"platform", "output-type"} {
-						if !c.IsSet(name) {
-							continue
-						}
-						if c.String(name) == "" {
-							return e.New(e.CodeUsage, "--%s requires a value", name)
-						}
-						selectors = append(selectors, fmt.Sprintf("--%s %s", name, c.String(name)))
-					}
-					found, err := cat.Discover(c.String("platform"), c.String("output-type"))
+					found, err := cat.Discover(platform, outputType)
 					if err != nil {
 						return err
 					}
-					if len(selectors) > 0 && len(found) == 0 {
-						return e.New(e.CodeUsage, "no component in catalog %q matches %s", cat.Metadata.Name, strings.Join(selectors, " "))
+					if (platform != "" || outputType != "") && len(found) == 0 {
+						noMatch := e.New(e.CodeNoMatch, "no component in catalog %q matches %s", cat.Metadata.Name, catalogListCriteria(platform, outputType))
+						return showCommandResult(c, view, catalogCommandDisplay("Catalog components"), noMatch)
 					}
 					if format == "json" {
 						encoder := json.NewEncoder(os.Stdout)
@@ -167,7 +169,12 @@ func cmdCatalog() *cli.Command {
 						modes[d.Name] = d.ProducerMode
 					}
 					if view.tui {
-						return showCommandResult(c, view, catalogComponentsDisplay(&listed, "Catalog components", modes), nil)
+						display := catalogComponentsDisplay(&listed, "Catalog components", modes)
+						if platform != "" || outputType != "" {
+							display.Fields = append(display.Fields, progress.Field{Label: "Filter", Value: catalogListCriteria(platform, outputType)},
+								progress.Field{Label: "Catalog total", Value: strconv.Itoa(len(cat.Components))})
+						}
+						return showCommandResult(c, view, display, nil)
 					}
 					fmt.Printf("catalog: %s\n\n", cat.Metadata.Name)
 					fmt.Printf("components:\n")
@@ -331,6 +338,32 @@ func catalogCommandDisplay(title string) commandDisplay {
 
 func sourcePinFields(pin catalog.Pin) []progress.Field {
 	return []progress.Field{{Label: "Commit", Value: pin.Commit}, {Label: "Tree hash", Value: pin.TreeHash}, {Label: "Source epoch", Value: strconv.FormatInt(pin.SourceDateEpoch, 10)}}
+}
+
+// catalogListSelector returns the single value of a list selector flag.
+// Repeating a selector is refused rather than silently keeping the last value.
+func catalogListSelector(c *cli.Context, name string) (string, error) {
+	values := c.StringSlice(name)
+	switch {
+	case len(values) > 1:
+		return "", e.New(e.CodeUsage, "--%s may be given only once", name)
+	case len(values) == 1 && values[0] == "":
+		return "", e.New(e.CodeUsage, "--%s requires a value", name)
+	case len(values) == 1:
+		return values[0], nil
+	}
+	return "", nil
+}
+
+func catalogListCriteria(platform, outputType string) string {
+	var criteria []string
+	if platform != "" {
+		criteria = append(criteria, "--platform "+platform)
+	}
+	if outputType != "" {
+		criteria = append(criteria, "--output-type "+outputType)
+	}
+	return strings.Join(criteria, " ")
 }
 
 // catalogComponentsDisplay shows each component; modes, when given, names the

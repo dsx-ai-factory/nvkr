@@ -85,7 +85,7 @@ func TestCatalogListFiltersAndEmitsJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &got); err != nil {
 		t.Fatalf("not JSON: %v: %s", err, output)
 	}
-	if len(got) != 2 || got[0].Name != "helm" || got[1].Name != "kubectl" || got[0].Platforms[0] != "linux/arm64" || got[0].ProducerMode != "prebuilt" {
+	if len(got) != 2 || got[0].Name != "helm" || got[1].Name != "kubectl" || got[0].Platforms[0] != "linux/arm64" || got[0].ProducerMode != "acquired" {
 		t.Fatalf("unexpected projection: %+v", got)
 	}
 
@@ -101,11 +101,11 @@ func TestCatalogListFiltersAndEmitsJSON(t *testing.T) {
 func TestCatalogListRejectsBadSelectorsWithoutOutput(t *testing.T) {
 	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools", "operator-arm64")
 	for _, args := range [][]string{
-		{"--platform", "linux/amd64"},
-		{"--output-type", "tarball"},
 		{"--platform", "arm64"},
 		{"--output-type", "package"},
 		{"--platform", ""},
+		{"--platform", "linux/amd64", "--platform", "linux/arm64"},
+		{"--output-type", "host-package", "--output-type", "raw"},
 		{"--format", "yaml"},
 	} {
 		output, err := runCatalogCommand(t, append([]string{"catalog", "list", "--data", arm}, args...)...)
@@ -143,14 +143,71 @@ func TestCatalogListFormatsAgreeOnFilteredMembership(t *testing.T) {
 	}
 }
 
-func TestCatalogListNoMatchIsUsageErrorInEveryFormat(t *testing.T) {
+func TestCatalogListNoMatchIsNoMatchErrorInEveryFormat(t *testing.T) {
 	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools", "operator-arm64")
 	for _, format := range []string{"text", "json"} {
-		output, err := runCatalogCommand(t, "catalog", "list", "--data", arm, "--platform", "linux/amd64", "--format", format)
-		assertLifecycleCommandCode(t, err, e.CodeUsage)
+		output, err := runCatalogCommand(t, "catalog", "list", "--data", arm, "--output-type", "tarball", "--format", format)
+		assertLifecycleCommandCode(t, err, e.CodeNoMatch)
 		if output != "" {
 			t.Fatalf("%s no-match emitted %q", format, output)
 		}
+	}
+}
+
+func TestCatalogListChecksSelectorsBeforeLoadingTheCatalog(t *testing.T) {
+	missing := filepath.Join(t.TempDir(), "absent")
+	for _, args := range [][]string{{"--platform", "bogus"}, {"--output-type", "bogus"}, {"--platform", ""}} {
+		output, err := runCatalogCommand(t, append([]string{"catalog", "list", "--data", missing}, args...)...)
+		assertLifecycleCommandCode(t, err, e.CodeUsage)
+		if output != "" {
+			t.Fatalf("%v emitted %q", args, output)
+		}
+	}
+}
+
+func TestCatalogListAdmitsDarwinSelectorAndNoMatchesAbsentPlatform(t *testing.T) {
+	native := filepath.Join("..", "..", "inputs", "catalogs", "tools", "native")
+	output, err := runCatalogCommand(t, "catalog", "list", "--data", native, "--platform", "darwin/arm64", "--format", "json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []struct {
+		Platforms []string `json:"platforms"`
+	}
+	if err := json.Unmarshal([]byte(output), &got); err != nil || len(got) == 0 {
+		t.Fatalf("no darwin/arm64 components listed: %v: %s", err, output)
+	}
+	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools", "operator-arm64")
+	_, err = runCatalogCommand(t, "catalog", "list", "--data", arm, "--platform", "darwin/arm64")
+	assertLifecycleCommandCode(t, err, e.CodeNoMatch)
+}
+
+func TestCatalogListValidatesWholeCatalogBeforeFiltering(t *testing.T) {
+	dir := t.TempDir()
+	registry, err := os.ReadFile(filepath.Join(layeredCatalogPath(t), "registry.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	broken := strings.Replace(string(registry), "components:\n", "components:\n  broken:\n    outputType: not-a-type\n    platforms:\n    - linux/amd64\n", 1)
+	if broken == string(registry) {
+		t.Fatal("fixture registry has no components key")
+	}
+	for name, content := range map[string]string{"registry.yaml": broken} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	lock, err := os.ReadFile(filepath.Join(layeredCatalogPath(t), "pins.lock.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "pins.lock.yaml"), lock, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output, err := runCatalogCommand(t, "catalog", "list", "--data", dir, "--output-type", "host-package")
+	assertLifecycleCommandCode(t, err, e.CodeInvalidCatalog)
+	if output != "" {
+		t.Fatalf("invalid catalog emitted %q", output)
 	}
 }
 
