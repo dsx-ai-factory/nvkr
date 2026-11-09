@@ -105,17 +105,17 @@ jq -e '
   .validatedNVKE.goVersion == "1.27.1" and
   .validatedNVKE.packerProject == "os-image/packer" and
   .validatedNVKE.requiredBuild == "nke-node-non-fde.qemu.nke-non-fde" and
-  .packer.version == "1.15.4" and
+  .packer.version == "1.16.2" and
   .packer.license == "BUSL-1.1" and
   .qemuPlugin.source == "github.com/hashicorp/qemu" and
-  .qemuPlugin.version == "1.1.6" and
+  .qemuPlugin.version == "1.1.8" and
   .qemuPlugin.license == "MPL-2.0" and
   .go.license == "BSD-3-Clause" and
-  .helm.version == "4.2.4" and .helm.license == "Apache-2.0" and
-  .oras.version == "1.3.3" and .oras.license == "Apache-2.0" and
-  .crane.version == "0.21.9" and
+  .helm.version == "4.3.1" and .helm.license == "Apache-2.0" and
+  .oras.version == "1.3.6" and .oras.license == "Apache-2.0" and
+  .crane.version == "0.22.1" and
   .crane.license == "Apache-2.0" and
-  .nfpm.version == "2.47.0" and
+  .nfpm.version == "2.48.0" and
   .nfpm.license == "MIT" and
   .publicationGates.packerBUSLRedistributionApproval == "not-recorded" and
   .publicationGates.vulnerabilityReviewApproval == "not-recorded" and
@@ -374,8 +374,8 @@ fi
   --entrypoint sh \
   "${image_id}" -ec '
   mkdir -p "${HOME}" "${TMPDIR}"
-  test "$(CHECKPOINT_DISABLE=1 packer version)" = "Packer v1.15.4"
-  plugin=/nvkr/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v1.1.6_x5.0_linux_'"${arch}"'
+  test "$(CHECKPOINT_DISABLE=1 packer version)" = "Packer v1.16.2"
+  plugin=/nvkr/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v1.1.8_x5.0_linux_'"${arch}"'
   test -x "${plugin}"
   test "$(cat "${plugin}_SHA256SUM")" = "$(sha256sum "${plugin}" | cut -d" " -f1)"
   test "$(packer plugins installed)" = "${plugin}"
@@ -411,10 +411,10 @@ fi
   command -v unzip >/dev/null
   command -v xorriso >/dev/null
   test "$(GOTOOLCHAIN=local go version)" = "go version go${EXPECTED_GO_VERSION} linux/'"${arch}"'"
-  test "$(crane version)" = "0.21.9"
-  test "$(helm version --template "{{.Version}}")" = "v4.2.4"
-  oras version | grep -Eq "^Version:[[:space:]]+1.3.3$"
-  nfpm --version | grep -Eq "^GitVersion:[[:space:]]+2.47.0$"
+  test "$(crane version)" = "0.22.1"
+  test "$(helm version --template "{{.Version}}")" = "v4.3.1"
+  oras version | grep -Eq "^Version:[[:space:]]+1.3.6$"
+  nfpm --version | grep -Eq "^GitVersion:[[:space:]]+2.48.0$"
   dpkg-scanpackages --version >/dev/null
   7z i >/dev/null
   xorriso -version >/dev/null 2>&1
@@ -433,11 +433,11 @@ fi
   mkdir -p "${TMPDIR}/packer-probe"
   cat >"${TMPDIR}/packer-probe/probe.pkr.hcl" <<"EOF"
 packer {
-  required_version = "= 1.15.4"
+  required_version = "= 1.16.2"
   required_plugins {
     qemu = {
       source  = "github.com/hashicorp/qemu"
-      version = "= 1.1.6"
+      version = "= 1.1.8"
     }
   }
 }
