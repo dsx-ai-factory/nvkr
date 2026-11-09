@@ -124,3 +124,39 @@ func TestGraphOutputFocusIsUpstreamClosedAndExcludesSiblingOutput(t *testing.T) 
 		}
 	}
 }
+
+func TestGraphOutputFocusExcludesSiblingOutputSharingBuildDigest(t *testing.T) {
+	// Inspect refuses a Plan whose digests disagree with its Definitions, so the
+	// shared digest is set on the Document's own snapshot.
+	doc := inspectPlan(t, maintainedPlan(t))
+	chart, sibling := -1, -1
+	for i, output := range doc.plan.LifecycleOutputs {
+		switch output.Name {
+		case "controller-chart":
+			chart = i
+		case "nvkectl":
+			sibling = i
+		}
+	}
+	if chart < 0 || sibling < 0 {
+		t.Fatal("maintained plan lost controller-chart or nvkectl")
+	}
+	doc.plan.LifecycleOutputs[sibling].BuildDigest = doc.plan.LifecycleOutputs[chart].BuildDigest
+	focused, err := doc.GraphSnapshotFor(GraphOptions{View: "complete", Format: "json", Output: "controller-chart"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	siblingArtifact := "artifact/" + doc.plan.LifecycleOutputs[sibling].ArtifactID
+	kept := false
+	for _, vertex := range focused.Vertices {
+		if vertex.Key == "output/controller-chart" {
+			kept = true
+		}
+		if vertex.Key == "output/nvkectl" || vertex.Key == siblingArtifact {
+			t.Fatalf("%s kept although it only shares a Build Digest", vertex.Key)
+		}
+	}
+	if !kept {
+		t.Fatal("focused output missing")
+	}
+}
