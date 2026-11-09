@@ -67,6 +67,20 @@ func TestAdmissionPreservesAuthoredIdentityAndRejectsUnknownInputs(t *testing.T)
 	}
 }
 
+func TestSyntaxErrorKeepsDecoderLine(t *testing.T) {
+	raw := []byte("apiVersion: nvkr.dev/definition/v5\nkind: Definition\nmetadata:\n  name: \"x\n  other: 1\noutputs: []\n")
+	_, err := DecodeDefinition(raw)
+	requireCode(t, err, e.CodeInvalidCatalog)
+	if !strings.Contains(err.Error(), "yaml: line 7:") {
+		t.Fatalf("DecodeDefinition error = %v, want the decoder's line 7", err)
+	}
+	_, err = DocumentKind(raw)
+	requireCode(t, err, e.CodeInvalidCatalog)
+	if !strings.Contains(err.Error(), "yaml: line 7:") {
+		t.Fatalf("DocumentKind error = %v, want the decoder's line 7", err)
+	}
+}
+
 func TestRequireSingleDocument(t *testing.T) {
 	for _, tc := range []struct {
 		name string
@@ -86,6 +100,7 @@ func TestRequireSingleDocument(t *testing.T) {
 		{"second invalid document", "a: 1\n---\n[unclosed\n", e.CodeInvalidCatalog},
 		{"empty second document", "a: 1\n---\n", e.CodeInvalidCatalog},
 		{"document after end marker", "a: 1\n...\n---\nb: 2\n", e.CodeInvalidCatalog},
+		{"content after document end marker", "a: 1\n...\nb: 2\n", e.CodeInvalidCatalog},
 		{"second JSON document", "{\"a\": 1}\n---\n{\"b\": 2}\n", e.CodeInvalidCatalog},
 		{"invalid first document", "[unclosed\n", e.CodeInvalidCatalog},
 	} {

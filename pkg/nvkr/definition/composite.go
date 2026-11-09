@@ -236,15 +236,15 @@ func DocumentKind(raw []byte) (string, error) {
 	if int64(len(raw)) > maxDocumentBytes {
 		return "", e.New(e.CodeInvalidCatalog, "definition document exceeds its byte bound")
 	}
-	if err := requireSingleDocument(raw, "definition"); err != nil {
-		return "", err
-	}
 	var header struct {
 		APIVersion string `json:"apiVersion"`
 		Kind       string `json:"kind"`
 	}
 	if err := yaml.Unmarshal(raw, &header); err != nil {
 		return "", e.Wrap(e.CodeInvalidCatalog, err, "parsing definition kind")
+	}
+	if err := requireSingleDocument(raw, "definition"); err != nil {
+		return "", err
 	}
 	switch {
 	case header.APIVersion == DefinitionAPIVersion && header.Kind == DefinitionKind:
