@@ -65,6 +65,9 @@ func cmdCatalog() *cli.Command {
 				Usage: "print the exact resolved catalog snapshot digest used to pin an ordered component overlay",
 				Flags: []cli.Flag{&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"}},
 				Action: func(c *cli.Context) error {
+					if err := rejectUnusedArguments(c, "data"); err != nil {
+						return err
+					}
 					view, err := selectCommandPresentation(c)
 					if err != nil {
 						return err
@@ -91,6 +94,9 @@ func cmdCatalog() *cli.Command {
 				Usage: "load and fail-closed-validate a catalog",
 				Flags: []cli.Flag{&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"}},
 				Action: func(c *cli.Context) error {
+					if err := rejectUnusedArguments(c, "data"); err != nil {
+						return err
+					}
 					view, err := selectCommandPresentation(c)
 					if err != nil {
 						return err
@@ -111,6 +117,9 @@ func cmdCatalog() *cli.Command {
 				Usage: "list components",
 				Flags: []cli.Flag{&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"}},
 				Action: func(c *cli.Context) error {
+					if err := rejectUnusedArguments(c, "data"); err != nil {
+						return err
+					}
 					view, err := selectCommandPresentation(c)
 					if err != nil {
 						return err
