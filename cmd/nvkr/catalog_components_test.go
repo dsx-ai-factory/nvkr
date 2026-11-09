@@ -116,6 +116,44 @@ func TestCatalogListRejectsBadSelectorsWithoutOutput(t *testing.T) {
 	}
 }
 
+func TestCatalogListFormatsAgreeOnFilteredMembership(t *testing.T) {
+	data := layeredCatalogPath(t)
+	filter := []string{"catalog", "list", "--data", data, "--output-type", "host-package"}
+	plain, err := runCatalogCommand(t, filter...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := runCatalogCommand(t, append(filter, "--format", "json")...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found []struct {
+		Name string `json:"name"`
+	}
+	if err := json.Unmarshal([]byte(raw), &found); err != nil || len(found) == 0 {
+		t.Fatalf("JSON list unusable: %v: %s", err, raw)
+	}
+	for _, c := range found {
+		if !strings.Contains(plain, "  "+c.Name+" ") {
+			t.Fatalf("component %q is in JSON but not in plain output: %s", c.Name, plain)
+		}
+	}
+	if got := strings.Count(plain, "\n  "); got != len(found) {
+		t.Fatalf("plain lists %d components, JSON lists %d", got, len(found))
+	}
+}
+
+func TestCatalogListNoMatchIsUsageErrorInEveryFormat(t *testing.T) {
+	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools", "operator-arm64")
+	for _, format := range []string{"text", "json"} {
+		output, err := runCatalogCommand(t, "catalog", "list", "--data", arm, "--platform", "linux/amd64", "--format", format)
+		assertLifecycleCommandCode(t, err, e.CodeUsage)
+		if output != "" {
+			t.Fatalf("%s no-match emitted %q", format, output)
+		}
+	}
+}
+
 func runCatalogCommand(t *testing.T, args ...string) (string, error) {
 	t.Helper()
 	oldStdout := os.Stdout
