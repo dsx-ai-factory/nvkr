@@ -152,6 +152,7 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 		cmdRunGraph(),
 		cmdRunDiff(),
 		cmdRunInspect(),
+		cmdRunList(),
 		cmdRunCheckArtifacts(),
 		cmdRunQualify(),
 		cmdQualificationSource(),
