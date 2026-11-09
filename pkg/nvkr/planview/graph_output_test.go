@@ -64,6 +64,22 @@ func TestGraphOutputFocusKeepsUpstreamClosureOnly(t *testing.T) {
 				if !kept["output/controller-chart"] || kept["output/nvkectl"] {
 					t.Fatalf("%s: wrong output slots kept", view)
 				}
+				routes := keptRoutes(focused)
+				if len(routes) != 1 || routes[0] != "route/output-controller-chart" {
+					t.Fatalf("%s: kept routes %v, want only route/output-controller-chart", view, routes)
+				}
+			}
+			if view == "producers" {
+				for _, key := range []string{"producer/controller-chart/build-nvke-controller-chart", "producer/cwe/linux/amd64/build-nvke-controller", "producer/cwe/linux/arm64/build-nvke-controller"} {
+					if !kept[key] {
+						t.Fatalf("producers: upstream producer %s missing", key)
+					}
+				}
+				for key := range kept {
+					if strings.HasPrefix(key, "producer/nvkectl/") {
+						t.Fatalf("producers: unrelated producer %s kept", key)
+					}
+				}
 			}
 		}
 	}
@@ -114,15 +130,73 @@ func TestGraphOutputFocusIsUpstreamClosedAndExcludesSiblingOutput(t *testing.T) 
 	for _, vertex := range full.Vertices {
 		kinds[vertex.Key] = vertex.Kind
 	}
+	// The publication path (finalizer, routed artifact, route) is kept without
+	// walking the finalizer's other inputs.
+	publication := map[string]bool{}
 	for _, edge := range full.Edges {
+		if edge.Relation == "publication route" && kept[edge.To].Key != "" {
+			publication[edge.To], publication[edge.From] = true, true
+		}
+	}
+	for _, edge := range full.Edges {
+		if edge.Relation == "produces" && publication[edge.To] {
+			publication[edge.From] = true
+		}
+	}
+	wantEdges := map[Edge]bool{}
+	for _, edge := range full.Edges {
+		if _, ok := kept[edge.From]; ok {
+			if _, ok := kept[edge.To]; ok {
+				wantEdges[edge] = true
+			}
+		}
 		to, ok := kept[edge.To]
-		if !ok || to.Kind == "route" || to.Kind == "output" {
+		if !ok || to.Kind == "route" || to.Kind == "output" || publication[edge.To] {
 			continue
 		}
 		if _, ok := kept[edge.From]; !ok {
 			t.Fatalf("%s (%s) is kept but its dependency %s (%s) is not", edge.To, to.Kind, edge.From, kinds[edge.From])
 		}
 	}
+	if len(focused.Edges) != len(wantEdges) {
+		t.Fatalf("focused graph has %d edges, want every full-graph edge between kept vertices (%d)", len(focused.Edges), len(wantEdges))
+	}
+	for _, edge := range focused.Edges {
+		if !wantEdges[edge] {
+			t.Fatalf("edge %+v is not a full-graph edge between kept vertices", edge)
+		}
+	}
+}
+
+func TestGraphOutputFocusKeepsOnlyTheSelectedOutputsPublicationRoute(t *testing.T) {
+	doc := inspectPlan(t, maintainedPlan(t))
+	full, err := doc.GraphSnapshot("complete")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, output := range doc.plan.LifecycleOutputs {
+		focused, err := doc.GraphSnapshotFor(GraphOptions{View: "complete", Format: "json", Output: output.Name})
+		if err != nil {
+			t.Fatal(err)
+		}
+		routes := keptRoutes(focused)
+		if len(routes) != 1 || routes[0] != "route/output-"+output.Name {
+			t.Fatalf("%s kept routes %v", output.Name, routes)
+		}
+		if len(focused.Vertices) >= len(full.Vertices) {
+			t.Fatalf("%s: focus did not narrow the graph", output.Name)
+		}
+	}
+}
+
+func keptRoutes(g Graph) []string {
+	var routes []string
+	for _, vertex := range g.Vertices {
+		if vertex.Kind == "route" {
+			routes = append(routes, vertex.Key)
+		}
+	}
+	return routes
 }
 
 func TestGraphOutputFocusExcludesSiblingOutputSharingBuildDigest(t *testing.T) {

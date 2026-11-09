@@ -114,15 +114,21 @@ func (d *Document) GraphSnapshotFor(o GraphOptions) (Graph, error) {
 // The closure follows incoming edges from the output, so it includes the
 // artifact, its producing operations, their consumed artifacts (including other
 // outputs' artifacts, such as an image a chart packages) and producers. Each
-// retained artifact also keeps its own publication routes and output slots, but
-// those are not followed further, so sibling outputs are not pulled back in.
+// retained artifact also keeps its output slots, but those are not followed
+// further, so sibling outputs are not pulled back in. The selected output also
+// keeps its publication path: the operation that consumes its artifact into the
+// artifact routed by output-<name>, that artifact and the route. Other inputs of
+// that operation are not followed.
 func (d *Document) graphFor(view, output string) (Graph, error) {
 	graph := d.graph(view)
 	if output == "" {
 		return graph, nil
 	}
 	start := "output/" + output
-	complete := d.graph("complete")
+	complete := graph
+	if view != "complete" {
+		complete = d.graph("complete")
+	}
 	known := false
 	for _, vertex := range complete.Vertices {
 		if vertex.Key == start {
@@ -160,8 +166,24 @@ func (d *Document) graphFor(view, output string) (Graph, error) {
 			continue
 		}
 		for _, to := range outgoing[key] {
-			if kind := kinds[to]; kind == "route" || kind == "output" {
+			if kinds[to] == "output" {
 				keep[to] = true
+			}
+		}
+	}
+	for _, vertex := range complete.Vertices {
+		if vertex.Key == start {
+			for _, op := range outgoing["artifact/"+vertex.Reference] {
+				if kinds[op] != "operation" {
+					continue
+				}
+				for _, published := range outgoing[op] {
+					for _, route := range outgoing[published] {
+						if kinds[published] == "artifact" && route == "route/output-"+output {
+							keep[op], keep[published], keep[route] = true, true, true
+						}
+					}
+				}
 			}
 		}
 	}

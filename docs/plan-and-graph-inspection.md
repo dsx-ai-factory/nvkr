@@ -70,7 +70,7 @@ nvkr run graph --plan .github/nvkr-run/plan.json --output controller-chart --for
 ```
 
 `--output NAME` focuses any view on one exact required output and its upstream dependencies, such as the
-images a chart packages. The whole Plan is admitted first, an unknown name is a usage error, and the result
+images a chart packages, plus that output's own publication route. The whole Plan is admitted first, an unknown name is a usage error, and the result
 is marked as filtered. The Plan and its digest are unchanged, and without `--output` the output is unchanged.
 
 The default `--view complete` includes every embedded producer IR node, factory operation, intermediate
