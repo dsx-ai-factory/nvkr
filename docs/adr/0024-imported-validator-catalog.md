@@ -72,38 +72,40 @@ Upstream repositories do not depend on NVKR code, catalogs, Plans or tooling. As
 inventories and entrypoints remain upstream. NVKR owns the executor that supplies checked artifacts to that
 interface, captures results and interprets them under a named contract.
 
-Every registration names the versioned executor `container-command/v1`. It declares:
+`nvkr.dev/validator/v2` registrations are admitted by the versioned executor `container-command/v1`. A
+registration declares:
 
 | Field | Meaning |
 |---|---|
 | Input roles | Exact named Run outputs, component and artifact format |
-| Test origin | Source relationship (`build-source` only, §5) |
+| Test origin | Source relationship to an input's producer (§5); a packaged test origin is not yet specified |
 | Execution image | The selected producer's pinned toolchain image; other pinned images need an admitted image owner |
 | Working directory | Relative path beneath the verified test-origin source |
 | Acquisition | Optional argument vector that prepares dependencies without the artifact |
 | Command | Argument vector executed without shell interpretation |
-| Environment | Literal values or references in the substitution grammar below |
-| Parameters | Typed suite parameters whose values the invocation supplies explicitly |
-| Requirements | Supported platforms and capabilities; logical credentials and network needs per phase |
-| Timeout | Suite execution budget, bounded as in §7 |
-| Results | Named, versioned result interpreter |
+| Environment | Literal values or documented input and parameter references |
+| Parameters | Typed suite parameters; values are defined in the registration YAML, never on the command line and never derived from a provider name |
+| Requirements | Supported platforms and capabilities |
+| Credential requirements | Logical credential names; delivery comes from the admitted TestEnvironment (§6) |
+| Network requirements | Destinations and ports, declared separately for acquisition and test execution |
+| Timeout | Suite execution budget (§7) |
+| Results | Result mode (`test-report` or `exit-code`) and a named, versioned result interpreter |
 
-Environment values and parameter defaults use a fixed grammar: `${inputs.<role>.path}`,
-`${inputs.<role>.version}`, `${inputs.<role>.digest}` and `${parameters.<name>}`, with `$$` as a literal
-`$`. There is no host-environment lookup, nesting, default expression or command substitution; an unknown
-role, field or parameter, or any other `${` form, fails admission. Substitution resolves values once and never
-passes them through a shell. Argument vectors and the working directory accept literals only.
+Documented references are `${inputs.<role>.path}`, `${inputs.<role>.version}` and `${parameters.<name>}`.
+There is no host-environment lookup; an unknown role, field or parameter fails admission, and values are never
+passed through a shell. Which fields beyond `environment` accept references is fixed with the schema.
 
-Isolation is executor-owned. A registration cannot declare mounts, devices, privileges, user, security
-options, network modes, credential values or host paths, and cannot weaken the executor's defaults. The
+Isolation is executor-owned. The schema has no fields for mounts, devices, privileges, credential values or
+host paths, and unknown fields fail (§3), so a registration cannot weaken the executor's defaults. The
 parity baseline is the existing `nvke-cli/v1` behaviour: private artifact staging, acquisition without the
 artifact, an offline test container with read-only source, artifact and root filesystem, dropped capabilities,
 no new privileges, separate phase budgets, stop/join and bounded cleanup. A new executor version, not a
 registration field, changes these properties.
 
-Exit status zero alone is never success. Each registration names a versioned interpreter that owns parsing,
-completeness and verdict rules for the command's output. The existing CLI result checks (failed, skipped,
-empty, incomplete or missing contract-package results; unchanged staged bytes) become the parity interpreter.
+A result interpreter is the versioned implementation that turns a suite's raw output into the `verdict` and
+`completeness` recorded in ValidationResult (§9). For the CLI example it is the existing CLI result checks
+(failed, skipped, empty, incomplete or missing contract-package results; unchanged staged bytes). Exit zero
+alone is never success.
 
 This adopts AICR's catalog pattern without importing its API schema, Go dependency or Job runtime. NVKR does
 not require every validator to be packaged as a standalone container image.
@@ -111,9 +113,9 @@ not require every validator to be packaged as a standalone container image.
 ### 2. Discover registrations by project, artifact and suite
 
 A registration lives at `{project}/{artifact}/{suite}.yaml` beneath one catalog root; its ID equals that
-relative path without `.yaml`, and a declared `id` that differs fails loading. Each segment contains only
-lowercase ASCII letters, digits and hyphens, starts and ends with an alphanumeric character, and is at most
-64 bytes. Examples are `nvke/nvkectl/contract` and `nvke/controller/health`.
+relative path without `.yaml`, and a declared `id` that differs fails loading. Segments keep the current
+slice's grammar: lowercase ASCII letters, digits and hyphens, alphanumeric at both ends, at most 64 bytes.
+Examples are `nvke/nvkectl/contract` and `nvke/controller/health`.
 
 ```text
 <catalog-root>/
@@ -134,16 +136,14 @@ Execution category, platform and capability requirements are metadata and never 
 
 One catalog root is loaded per invocation. NVKR ships a default catalog; `--validator-catalog <dir>` selects a
 complete replacement with no inheritance, overlay or fallback to shipped registrations. (`--data` keeps its
-existing producer-catalog meaning.) How the default is shipped is an implementation choice that must preserve
-these semantics. Existing `inputs/testing/nightly-profiles.json` retains its separate coordinator ownership.
+existing producer-catalog meaning.) How the default catalog ships is open; any choice must preserve these
+semantics. Existing `inputs/testing/nightly-profiles.json` retains its separate coordinator ownership.
 
-Loading is a bounded, cancellation-aware walk. The root contains only directories at the two parent levels and
-regular registration files at the third; any other entry, symlink, non-regular file, escaping path or deeper
-level fails loading. Reads are capped at 1 MiB per document, 16 MiB per catalog and 1,024 registrations. The
-supplied root must itself be a real directory; ancestors may resolve before it is held. Hard links are
-permitted: the loader confines traversal but does not claim exclusive file ownership or an atomic
-multi-file snapshot beyond §9. Every registration is fully validated even when unselected, so one invalid
-registration fails the invocation rather than being skipped.
+Loading is a bounded, cancellation-aware walk. Any entry that is not a `{project}/{artifact}/{suite}.yaml`
+regular file, any symlink or escaping path, a duplicate ID or an unknown field fails loading. The current
+slice's read bounds carry over: 1 MiB per document, 16 MiB per catalog and 1,024 registration files. Every
+registration is fully validated even when unselected, so one invalid registration fails the invocation rather
+than being skipped.
 
 ### 3. Use a strict, bounded registration schema
 
@@ -155,13 +155,9 @@ registration fails the invocation rather than being skipped.
 The registration takes a new version so the provisional `nvkr.dev/validator/v1` shape is never reinterpreted.
 Readers dispatch on exact version and kind and reject unknown fields, duplicate keys, invalid values and
 unresolved references. YAML and JSON decode into the same typed model; YAML aliases, merge keys and
-multi-document streams are rejected. A registration declares at most 64 input roles and 64 parameters.
-Descriptions and limitations are bounded display text and cannot select behavior; executor and interpreter
-limitations are emitted separately from authored text.
-
-`coverage` describes the intended test surface, not measured completeness: `artifact-contract`, `source` or
-`mixed`. The full CLI suite is `mixed` because ordinary unit tests compile imported source while its process
-contracts execute supplied bytes. Package or test counts are never presented as a count of artifact contracts.
+multi-document streams are rejected, and a registration declares at most 64 input roles, as in the current
+slice. Descriptions are display text and cannot select behavior. Package or test counts are never presented
+as a count of artifact contracts.
 
 The CLI contract registration has this proposed shape. It invokes the upstream supplied-executable entrypoint
 `make test-artifact`, which compiles the test harness and never rebuilds `nvkectl`; that interface is
@@ -172,14 +168,12 @@ apiVersion: nvkr.dev/validator/v2
 kind: Validator
 id: nvke/nvkectl/contract
 description: Run upstream process contracts against a built nvkectl executable.
-executor: container-command/v1
 inputs:
   executable:
     output: nvkectl
     component: nvkectl
     format: executable
 testOrigin:
-  mode: build-source
   fromInput: executable
 image:
   fromInput: executable           # the producer's pinned toolchain image
@@ -190,19 +184,19 @@ command: [make, --no-print-directory, test-artifact, GO=go, "GO_TEST_FLAGS=-coun
 environment:
   NVKECTL: "${inputs.executable.path}"
   NVKECTL_EXPECTED_VERSION: "${inputs.executable.version}"
+results:
+  mode: test-report
+  interpreter: nvke-cli-go-test/v1   # illustrative name
 requires:
   platforms: [linux/amd64, linux/arm64]
   capabilities: [docker]
 timeout: 30m
-results:
-  interpreter: nvke-cli-go-test/v1
-coverage: artifact-contract
-limitations:
-  - Package-level result checks do not establish exhaustive artifact-contract coverage
 ```
 
-The interpreter name is illustrative until the parity interpreter is implemented. The executor adds its own
-minimum requirements (for example Git for source import); a registration cannot omit them.
+The interpreter name is illustrative until the parity interpreter is implemented. If the Run's revision lacks
+the `test-artifact` target, the suite reports an execution error; no other revision is substituted. The
+executor adds its own minimum requirements (for example Git for source import); a registration cannot omit
+them.
 
 ### 4. Select suites and bind them to a completed Run
 
@@ -210,8 +204,7 @@ An invocation names one or more selections, each an exact ID or a parent path (`
 `project/artifact`). Selections are processed in user order; a parent expands deterministically to its
 registrations sorted by ID; duplicates are removed keeping the first occurrence. A parent matching no
 registration fails. There are no globs, no fuzzy aliases and no implicit run-all: zero selections is a usage
-error. At most 64 suites may remain after expansion. Suites execute sequentially in the resulting order and
-stop at the first failure, retaining completed and partial diagnostics accurately.
+error. Suites execute sequentially in the resulting order.
 
 Input mode is either build-first or an existing Run (`--run <attempt>`). Build-first reuses the existing local
 Run path with the same Definition and Environment inputs, then continues exactly as `--run`. Validation
@@ -223,23 +216,19 @@ output, component and format; a missing, ambiguous or format-incompatible output
 test-origin source, toolchain image and expected version from the Run's Plan. Every suite retains its own
 named-output bindings even when outputs share a Build Digest. Callers supply no artifact paths or digests.
 
-For controller/chart suites, the controller image and chart package bind as separate roles. The interpreter
-or upstream entrypoint must reject a chart that references a different image under test and prevent fallback
-to a default tag or rebuilt component.
-
-The example invocation, which depends on the #1578 interface at the Run's NVKE revision:
+The example invocation, which depends on the #1578 interface at the Run's NVKE revision (`--test-env` is
+omitted, so `local` is used, §6):
 
 ```sh
 nvkr validators run \
   --validator-catalog ./company-validators \
   --run .nvkr/runs/<attempt> \
-  --test-env local \
   nvke/nvkectl/contract
 ```
 
 ### 5. Derive imported suites from artifact source identity
 
-For ADR-23 artifact suites, the test origin is exclusively `build-source`. The registration designates one
+For ADR-23 artifact suites, the test origin is the producer's build source. The registration designates one
 input role as the origin; factory derives the repository, full commit and tree from that role's producer in
 the Run's validated Plan, and `sourcegit` imports and verifies it. Registrations and invocations cannot supply
 a replacement branch, `latest`, independent test commit or local checkout.
@@ -264,20 +253,25 @@ available to a validation invocation. It is diagnostic execution configuration: 
 It is also distinct from an upstream harness's own environment selection (for example NVKE
 `-e2e.environment`), which is a suite parameter.
 
-Suite fields (command, parameters) live only in registrations. Parameter values are supplied explicitly by the
-invocation and are never derived from the provider name. Credential bindings name abstract sources, such as CI
+Suite fields (command, parameters) live only in registrations; a TestEnvironment cannot add commands or
+arguments. Parameter values are defined in the registration and never derived from the provider name. How
+environment-specific values are expressed is open. Credential bindings name abstract sources, such as CI
 secret injection, explicitly selected local variables or federated identity; values are delivered only to the
 phases that need them and are excluded from retained configuration and results.
 
-One TestEnvironment is selected explicitly per invocation, by name through documented resolution with no
-fallback, or by file. Before any build, admission checks that the executor and provider integration satisfy
-every selected suite's platform, capability, credential, network and budget requirements; incompatibility
-fails then. A declared requirement grants nothing: the environment's admitted access bounds the run, and a
-network-capable environment does not widen a suite's declared access. Until `pipeline` enforces per-phase
-destinations and a credential delivery owner exists, the executor admits only the parity network model
-(networked acquisition, offline test) and no credentials; declaring more fails admission.
+One TestEnvironment is selected per invocation: `--test-env <name>` resolves a named declaration from the
+configured environment directory, and an explicit environment-file option selects one directly. When
+`--test-env` is omitted, the documented default is `local`. This is a resolution rule, not a fallback: if
+`local` cannot satisfy a selected suite's requirements, the invocation fails before any build, and an explicitly
+named environment never falls back to another. ValidationResult records the selected environment.
 
-The local environment:
+Before any build, admission checks that the executor and provider integration satisfy every selected suite's
+platform, capability, credential and network requirements. A declared requirement grants nothing, and a
+network-capable environment does not widen a suite's declared access. Until the executor can enforce declared
+destinations and a credential-delivery owner exists, any suite requiring test-phase network access or
+credentials fails admission; this ADR does not choose the enforcement or delivery mechanism.
+
+The `local` environment (docker capability, no credentials, no test-phase network):
 
 ```yaml
 apiVersion: nvkr.dev/test-environment/v1
@@ -287,12 +281,12 @@ metadata:
 provider: local
 provides:
   capabilities: [docker]
-credentialRefs: {}     # no credentials
-network:
-  egress: []           # no test-phase network
-budgets:
-  maxSuiteTimeout: 30m
+# No credentials. Tests run without network access.
 ```
+
+Hardware TestEnvironments use the same top-level fields (`provider`, `provides.capabilities`, `credentials`,
+`network`); their provider parameters, credential sources, endpoints, budgets and cleanup guarantees are
+being defined with the hardware lane owners and are not specified here.
 
 ### 7. Execute through the existing owners
 
@@ -307,33 +301,28 @@ For each suite: acquire the test origin and image; prepare a private workspace a
 required runtime resources; stage checked inputs and resolve invocation values; execute; capture outcome and
 diagnostics; stop and join; clean up; persist the suite result. Every blocking phase observes context.
 
-The suite timeout bounds the execution phase and is itself bounded by the lower of the executor's and the
-TestEnvironment's maximum, not a single global cap. Source, dependency acquisition and cleanup have separate
-finite executor-owned budgets; a shorter caller context wins. Registrations at `nvke-cli` parity keep its
-current bounds: 30-minute test and dependency budgets, fixed Git-command budgets and the reaper's cleanup
-budget. Cleanup uses an independent bounded context; its failure is reported without replacing an already
-observed suite failure. Partial diagnostics never become success.
+The registration timeout bounds suite execution; setup and cleanup have separate bounded timeouts, and a
+shorter caller context wins. How environment-owned budgets combine with them is defined with the provider
+integrations. Registrations at `nvke-cli` parity keep its current bounds: 30-minute test and dependency
+budgets, fixed Git-command budgets and the reaper's cleanup budget. Cleanup uses an independent bounded
+context; its failure is reported without replacing an already observed suite failure. Partial diagnostics
+never become success.
 
 Disposable local clusters (kind) may be NVKR-managed or owned by the upstream harness; this is decided per
-executor or suite. Whichever owner is chosen registers cleanup ownership before creation. Hardware providers
-(for example Forge or DSX) require an explicitly supported provider integration with defined resource
+suite, with one fresh cluster per suite as the proposed NVKR-managed default. Whichever owner is chosen
+registers cleanup ownership before creation. Hardware providers (for example Forge or DSX) require an explicitly supported provider integration with defined resource
 ownership and cleanup; none is defined here. A registration's requirements cannot allocate a runner, grant
 credentials, permit privileged execution or instantiate a provisioning engine. Hosted generation remains owned
 by ADR-21; this catalog defines neither event triggers nor runner labels or workflow permissions.
 
 ### 8. Separate captured reports, diagnostic verdicts and evidence authority
 
-Retain original reports and raw test events. Record each suite's ID, resolved nonsecret parameters, executor
-and interpreter versions, test-origin revision, execution image, platform, every role's Run output binding and
-artifact observation, process outcome, verdict and cleanup outcome. Unknown observations remain unknown;
-report fields cannot manufacture a Run, installed image, suite completion or passing verdict.
-
-| Input | Required subject description |
-|---|---|
-| Executable | Exact staged-byte SHA-256 and before/after integrity checks |
-| Controller image | Exact OCI subject, selected native child and the executed platform |
-| Chart | Exact package-byte integrity and OCI manifest when present; rendering/install observations kept separate |
-| Several artifacts | Every role's own output, source and subject, with the checked relationships recorded |
+Retain original reports and raw test events. Record each suite's ID, resolved nonsecret parameters, every
+role's Run output, producer, format and tested digest, test-origin repository, commit and tree, execution
+image, process outcome, verdict and cleanup outcome. The `results` record carries `mode`, `interpreter`,
+`granularity` (`test-case` or `command`), `completeness` (`not-available`, `partial` or `complete`),
+`normalizedReport` and `sourceReports`. Unknown observations remain unknown; report fields cannot manufacture a
+Run, suite completion or passing verdict.
 
 `testresults.Output` remains a descriptive handoff; `CaptureStatus=complete` describes capture, not valid
 reports, exhaustive tests or passing behavior. Only the named interpreter reports a verdict, under its own
@@ -342,8 +331,7 @@ parsing and completeness contract; the Hydrophone route cannot inherit another i
 For exhaustive artifact-suite acceptance, the upstream revision must own a machine-checkable inventory or
 completion protocol, and the interpreter rejects missing, zero-test, skipped, filtered or incomplete required
 coverage. NVKR does not maintain copied test-name lists or expected counts. The existing CLI package guard is
-weaker and its parity interpreter must disclose that exhaustive completeness is unknown; a stronger `coverage`
-label cannot upgrade it.
+weaker and its parity interpreter must disclose that exhaustive completeness is unknown.
 
 The lane remains **none (descriptive)**. A result does not issue a ConformanceReceipt, satisfy ADR-13
 evidence, authorize signing or promote a release. ADR-16 qualification consumes independently produced and
@@ -358,7 +346,7 @@ Execution progresses through package-owned records:
 | ValidationRequest | Selections, catalog root, input mode, TestEnvironment reference | An invocation was supplied |
 | PreparedValidation | Ordered suites, admitted registrations, source-document digests, the admitted TestEnvironment, build inputs or Run locator | Configuration is valid; a build may start |
 | BoundValidation | Completed Run identity, exact artifact bindings, resolved test origins | Inputs are checked; runtime preparation may begin |
-| ValidationResult | Build outcome, per-suite execution state, verdict, termination, logs, cleanup status | Outcomes and cleanup are recorded |
+| ValidationResult | Build outcome, selected TestEnvironment, per-suite execution state, termination, verdict, results, logs, cleanup status | Outcomes and cleanup are recorded |
 
 PreparedValidation is frozen: execution never reopens registration or environment files. A ValidationResult
 is created before build or runtime work and updated through cleanup; secrets are excluded, and cleanup status
@@ -376,9 +364,8 @@ cache or cross-output reuse is introduced.
 The existing provisional slice — `catalog.yaml` index, `nvkr.dev/validator/v1` entries, the typed
 `nvke-cli/v1` adapter and `validators run --profile` with `nvkr.dev/validation-profile/v1` local-plan
 bindings, plus `client/v1` `ListValidators`, `DescribeValidator` and `PrepareValidatorProfile` — remains until
-an explicit migration step. That step introduces the new schema versions and route and either removes the
-profile route or retains it for a stated window; profile documents are never silently reinterpreted as Run
-bindings, and a failed catalog lookup never falls back to hard-coded execution. `validators` stays hidden until
+an explicit migration step. That step introduces the new schema versions and route; when the profile route is
+removed is open. Profile documents are never silently reinterpreted as Run bindings, and a failed catalog lookup never falls back to hard-coded execution. `validators` stays hidden until
 its schemas are ratified.
 
 The unversioned JSON `validate --config` keeps its current published-source semantics and its independently
@@ -413,9 +400,9 @@ repository as data when its upstream interface fits the executor. Run binding re
 paths. Named input roles support controller and chart combinations without committing the catalog to a
 single-artifact model. Existing execution and lifecycle owners remain where correctness is enforced.
 
-The cost is a strict loader, a substitution grammar, versioned interpreters, a TestEnvironment schema and an
+The cost is a strict loader, documented references, versioned interpreters, a TestEnvironment schema and an
 explicit migration from the provisional slice. A generic executor concentrates risk: its isolation, budgets
-and grammar must be reviewed once and changed only by version. Registrations cannot make unsupported
+and references must be reviewed once and changed only by version. Registrations cannot make unsupported
 interfaces work, so adding a repository may still require upstream adoption. A single green summary would
 conceal materially different claims, so diagnostic and evidence contracts stay separate.
 
@@ -440,7 +427,7 @@ conceal materially different claims, so diagnostic and evidence contracts stay s
 Acceptance is staged; each stage has its own acceptance and none is implied by an earlier one.
 
 1. **CLI parity through Run binding:** strict discovery and validate-all loading, ordered selection and
-   deduplication, substitution-grammar and isolation refusals, and TestEnvironment refusal before any build.
+   deduplication, reference and isolation refusals, and TestEnvironment refusal before any build.
    Both `nvke/nvkectl/contract` and `nvke/nvkectl/cli` run through `container-command/v1` with the `local`
    environment on native Linux AMD64 and ARM64, from `--run` and from build-first, at an NVKE revision
    exposing #1578 with refreshed maintained pins. Negatives: broken or wrong-version executable, changed
