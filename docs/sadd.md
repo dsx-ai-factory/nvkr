@@ -61,10 +61,10 @@ integration results remain outside product lifecycle and v1 qualification
 acceptance (ADR-16/18).
 
 Proposed [ADR-24](adr/0024-imported-validator-catalog.md) separates imported-validator discovery from upstream
-test ownership and binds named artifact roles through explicit diagnostic profiles. The provisional CLI
-slice implements strict loading/discovery and frozen local-plan dispatch through the existing execution
-owners; native upstream catalog execution remains unexercised. Shared schema stabilization, published
-adapters and controller/chart integration are deferred. Existing CLI and legacy validation diagnostics
+test ownership, runs registered container commands under a versioned executor and binds named artifact roles
+to a completed Run in an admitted TestEnvironment. The provisional CLI slice predates that design: it uses an
+index, a typed adapter and local-plan profiles through the existing execution owners; see
+[reconciliation](adr/reconciliation/adr-24.md) for its status. Existing CLI and legacy validation diagnostics
 retain their separate admission and result contracts; catalog registration grants no qualification authority.
 
 Proposed [ADR-26](adr/0026-definition-composition.md) designs composite Definitions, which release the outputs of

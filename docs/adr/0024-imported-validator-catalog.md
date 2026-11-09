@@ -1,10 +1,18 @@
 # ADR-24 — Imported validator catalog and artifact bindings
 
 - **Decision status:** Proposed (pending named-decider ratification)
-- **Implementation maturity:** Initial provisional CLI catalog, strict loading/discovery and local-plan profile dispatch
-  are implemented. Broader migration, published adapters and stabilization remain deferred; see `reconciliation/README.md`.
-- **Acceptance-test maturity:** Initial discovery/admission/snapshot and mocked CLI dispatch contracts are tested.
-  No new actual upstream catalog execution or native-platform catalog acceptance is claimed.
+- **Amendment:** This revision aligns the proposal with the draft validator-catalog technical design. It replaces
+  typed adapters with a generic `container-command/v1` executor, the explicit `catalog.yaml` index with path
+  discovery, profile selection with ordered ID/parent-path selection, local-plan/artifact-path profiles with
+  completed-Run binding, and adds an invocation-scoped TestEnvironment. Implementation has not followed: the
+  current code is the existing provisional slice (`catalog.yaml`, `nvkr.dev/validator/v1` entries, the typed
+  `nvke-cli/v1` adapter and `ValidationProfile` local-plan binding) and is to be migrated under §10.
+- **Implementation maturity:** Only the existing provisional slice is implemented: strict bounded index/entry
+  loading, discovery and local-plan profile dispatch for the CLI suites. Nothing introduced by the amendment is
+  implemented; see `reconciliation/README.md`.
+- **Acceptance-test maturity:** The provisional slice's discovery/admission/snapshot and mocked CLI dispatch
+  contracts are tested. No catalog execution against an actual upstream suite and no native-platform acceptance
+  is claimed.
 - **Deciders:** Pending; validation, artifact-production and upstream interface owners must be named before ratification.
 - **Index:** Proposed ADR-24 supplements ADR-01–22 and proposed ADR-23; it remains outside the consolidated
   contract set until accepted.
@@ -12,9 +20,10 @@
   ADR-17 (package ownership and resource lifetimes), ADR-18 (execution admission), ADR-19 (downstream ownership),
   ADR-20 (artifact subjects), ADR-21 (generated workflows), ADR-22 (source and tool pins),
   ADR-23 (upstream artifact-test interfaces).
-- **Scope:** Discovery, organization, selection and artifact binding for imported validation suites across
-  repositories. This decision defines diagnostic catalog contracts; it does not implement controller/chart
-  adapters, cluster provisioning, CI scheduling, authenticated Run membership or release qualification.
+- **Scope:** Discovery, organization, selection, Run binding, test-environment admission and execution of
+  imported validation suites across repositories. This decision defines diagnostic contracts; it does not
+  implement hardware provider integrations, CI scheduling, authenticated publication membership or release
+  qualification.
 
 ## Context
 
@@ -27,10 +36,11 @@ executes the upstream `contract` or `cli` suite against privately staged bytes. 
 selection and execution conventions are specific to the CLI implementation.
 
 Controller images, Helm charts and artifacts from additional repositories need the same discoverability.
-Adding command branches and scattered scripts for each suite would hide requirements, repeat Plan
+Adding command branches, scattered scripts or a Go adapter per repository would hide requirements, repeat Plan
 interpretation and make it difficult to answer which validators accept a particular output. Conversely, a
-generic shell pipeline language would duplicate execution ownership and make a readable catalog responsible
-for arbitrary infrastructure and authority decisions.
+shell pipeline language would duplicate execution ownership and make a readable catalog responsible for
+infrastructure and authority decisions. Upstream artifact-test interfaces are commands run in a container
+from a source checkout, so one executor with fixed isolation can serve them without per-repository code.
 
 AICR supplies a useful organizational precedent. Its [validator catalog](https://github.com/NVIDIA/aicr/blob/3a6e8609a6c3661b3e0220054232180b50388a67/recipes/validators/catalog.yaml)
 names checks and records execution metadata; [implementations](https://github.com/NVIDIA/aicr/tree/3a6e8609a6c3661b3e0220054232180b50388a67/validators/deployment)
@@ -42,281 +52,281 @@ It must also preserve exact source relationships and support validators consumin
 There are already two relevant execution surfaces. `validators run` is a trusted-input local CLI diagnostic;
 `validate` dispatches explicitly configured published-source `kube-conformance` checks through Hydrophone.
 The latter retains publication authentication and separately admits complete local diagnostic Runs through
-its existing conformance owner. Its local Run route is distinct from the new CLI local-plan binding.
-`testresults` describes external report capture without parsing reports or granting a passing verdict.
-The [CLI diagnostic](../artifact-testing.md) and [external test output contract](../external-test-output-contract.md) document those implemented boundaries.
+its existing conformance owner. `testresults` describes external report capture without parsing reports or
+granting a passing verdict. The [CLI diagnostic](../artifact-testing.md) and
+[external test output contract](../external-test-output-contract.md) document those implemented boundaries.
 A common catalog must preserve these different input and result contracts.
 
 ## Decision
 
-### 1. Catalog adapters and suite references while keeping assertions upstream
+### 1. Register container commands while keeping assertions upstream
 
-Introduce a validator catalog as diagnostic configuration, separate from the producer catalog. A validator
-entry describes a reusable check; a validation profile selects named instances of those checks and binds
-their artifact inputs. Neither becomes a seventh public lifecycle object. Definitions retain ownership of
-what is built, and Environments and execution owners retain their existing policy responsibilities.
+Introduce a validator catalog as diagnostic configuration, separate from the producer catalog. A
+registration describes one reusable suite: its input roles, test origin, execution image, command and
+requirements. Neither the catalog nor a TestEnvironment becomes a seventh public lifecycle object.
+Definitions retain ownership of what is built, and Environments and execution owners retain their existing
+policy responsibilities.
 
 The dependency is one-way: NVKR consumes upstream sources and producer-neutral artifact-test interfaces.
 Upstream repositories do not depend on NVKR code, catalogs, Plans or tooling. Assertions, fixtures, suite
-inventories and entrypoints remain upstream. NVKR owns the adapter that translates validated artifact inputs
-into that interface, captures results and checks the adapter's documented obligations.
+inventories and entrypoints remain upstream. NVKR owns the executor that supplies checked artifacts to that
+interface, captures results and interprets them under a named contract.
 
-An entry chooses a versioned adapter and one of that adapter's supported suite selectors. It cannot name an
-arbitrary executable, embed shell commands, supply unrestricted Make targets, or override container mounts,
-security settings or credentials. Adding a new interface requires an admitted adapter implementation and
-contract review. New entries using an existing supported interface can remain data changes.
+Every registration names the versioned executor `container-command/v1`. It declares:
+
+| Field | Meaning |
+|---|---|
+| Input roles | Exact named Run outputs, component and artifact format |
+| Test origin | Source relationship (`build-source` only, §5) |
+| Execution image | The selected producer's pinned toolchain image; other pinned images need an admitted image owner |
+| Working directory | Relative path beneath the verified test-origin source |
+| Acquisition | Optional argument vector that prepares dependencies without the artifact |
+| Command | Argument vector executed without shell interpretation |
+| Environment | Literal values or references in the substitution grammar below |
+| Parameters | Typed suite parameters whose values the invocation supplies explicitly |
+| Requirements | Supported platforms and capabilities; logical credentials and network needs per phase |
+| Timeout | Suite execution budget, bounded as in §7 |
+| Results | Named, versioned result interpreter |
+
+Environment values and parameter defaults use a fixed grammar: `${inputs.<role>.path}`,
+`${inputs.<role>.version}`, `${inputs.<role>.digest}` and `${parameters.<name>}`, with `$$` as a literal
+`$`. There is no host-environment lookup, nesting, default expression or command substitution; an unknown
+role, field or parameter, or any other `${` form, fails admission. Substitution resolves values once and never
+passes them through a shell. Argument vectors and the working directory accept literals only.
+
+Isolation is executor-owned. A registration cannot declare mounts, devices, privileges, user, security
+options, network modes, credential values or host paths, and cannot weaken the executor's defaults. The
+parity baseline is the existing `nvke-cli/v1` behaviour: private artifact staging, acquisition without the
+artifact, an offline test container with read-only source, artifact and root filesystem, dropped capabilities,
+no new privileges, separate phase budgets, stop/join and bounded cleanup. A new executor version, not a
+registration field, changes these properties.
+
+Exit status zero alone is never success. Each registration names a versioned interpreter that owns parsing,
+completeness and verdict rules for the command's output. The existing CLI result checks (failed, skipped,
+empty, incomplete or missing contract-package results; unchanged staged bytes) become the parity interpreter.
 
 This adopts AICR's catalog pattern without importing its API schema, Go dependency or Job runtime. NVKR does
 not require every validator to be packaged as a standalone container image.
 
-### 2. Organize entries by repository, artifact and suite
+### 2. Discover registrations by project, artifact and suite
 
-The authored owner is `inputs/testing/validators/`. Its root `catalog.yaml` explicitly indexes entry files;
-the entry files are the single owners of their metadata. Discovery never recursively executes or registers
-files because they happen to exist on disk. Existing `inputs/testing/nightly-profiles.json` retains its
-separate coordinator ownership until an explicit migration is implemented.
-
-The proposed layout is:
+A registration lives at `{project}/{artifact}/{suite}.yaml` beneath one catalog root; its ID equals that
+relative path without `.yaml`, and a declared `id` that differs fails loading. Each segment contains only
+lowercase ASCII letters, digits and hyphens, starts and ends with an alphanumeric character, and is at most
+64 bytes. Examples are `nvke/nvkectl/contract` and `nvke/controller/health`.
 
 ```text
-inputs/testing/
-  validators/
-    catalog.yaml
-    nvke/
-      nvkectl/
-        contract.yaml
-        cli.yaml
-      controller/
-        health.yaml
-        capd-lifecycle.yaml
-      charts/
-        render.yaml
-        install.yaml
-    other-project/
-      ...
-  profiles/
-    nvke-local.yaml
-    nvke-ci.yaml
+<catalog-root>/
+  nvke/
+    nvkectl/
+      contract.yaml
+      cli.yaml
+    controller/
+      health.yaml
+  other-project/
+    ...
 ```
 
-These paths illustrate organization, not registered capabilities. The first implementation registers only
-supported CLI entries; future controller/chart entries must not be installed as executable placeholders.
+These paths illustrate organization, not registered capabilities; future controller/chart registrations must
+not be installed as placeholders. The project segment is an ownership namespace, not a Git source identity
+or implicit repository URL. Renaming a registration changes its ID; there is no fuzzy lookup or alias.
+Execution category, platform and capability requirements are metadata and never determine the directory tree.
 
-Entry IDs have exactly three lowercase path segments, `project/artifact/suite`; each segment contains only
-ASCII letters, digits and hyphens, starts and ends with an alphanumeric character, and is at most 64 bytes.
-Examples are `nvke/nvkectl/contract` and `nvke/controller/health`. IDs are unique across the loaded catalog.
-The project segment identifies an ownership namespace, not a Git source identity or an implicit repository URL.
-Filesystem location is excluded from execution semantics: a move preserving the entry's ID and content does
-not change what runs. Renaming an ID requires explicit profile migration; no fuzzy lookup or implicit alias.
+One catalog root is loaded per invocation. NVKR ships a default catalog; `--validator-catalog <dir>` selects a
+complete replacement with no inheritance, overlay or fallback to shipped registrations. (`--data` keeps its
+existing producer-catalog meaning.) How the default is shipped is an implementation choice that must preserve
+these semantics. Existing `inputs/testing/nightly-profiles.json` retains its separate coordinator ownership.
 
-Execution category, platform and capability requirements are metadata. They do not determine the primary
-directory tree or imply an order among checks. Controller installation may require a chart and an image;
-placing its entry under `controller/` does not restrict it to a single input.
+Loading is a bounded, cancellation-aware walk. The root contains only directories at the two parent levels and
+regular registration files at the third; any other entry, symlink, non-regular file, escaping path or deeper
+level fails loading. Reads are capped at 1 MiB per document, 16 MiB per catalog and 1,024 registrations. The
+supplied root must itself be a real directory; ancestors may resolve before it is held. Hard links are
+permitted: the loader confines traversal but does not claim exclusive file ownership or an atomic
+multi-file snapshot beyond §9. Every registration is fully validated even when unselected, so one invalid
+registration fails the invocation rather than being skipped.
 
-Go implementations stay under the existing package ownership model. Repository/artifact naming may be
-mirrored in adapter code where useful, but several entries may share an adapter. Do not create a parallel
-top-level tree containing copied upstream test implementations.
-
-### 3. Use strict, bounded schemas with one metadata owner
-
-Define separate authored schemas:
+### 3. Use a strict, bounded registration schema
 
 | Document | Proposed API version | Kind | Owns |
 |---|---|---|---|
-| Catalog index | `nvkr.dev/validator-catalog/v1` | `ValidatorCatalog` | Explicit entry paths |
-| Validator entry | `nvkr.dev/validator/v1` | `Validator` | Reusable adapter, suite and input requirements |
-| Validation profile | `nvkr.dev/validation-profile/v1` | `ValidationProfile` | Selected instances and concrete bindings |
+| Registration | `nvkr.dev/validator/v2` | `Validator` | Executor configuration, roles, test origin and requirements |
+| Test environment | `nvkr.dev/test-environment/v1` | `TestEnvironment` | Provider, capabilities, credential bindings, network and budgets (§6) |
 
-Readers dispatch on exact version and kind and reject unknown fields, duplicate keys, duplicate IDs, invalid
-values and unresolved references. YAML and JSON decode into the same typed model; YAML aliases, merge keys and
-multi-document streams are rejected. There is no overlay inheritance, recursive index inclusion, merge by
-name, implicit built-in fallback or last-writer-wins behavior. One explicit catalog is loaded per invocation.
+The registration takes a new version so the provisional `nvkr.dev/validator/v1` shape is never reinterpreted.
+Readers dispatch on exact version and kind and reject unknown fields, duplicate keys, invalid values and
+unresolved references. YAML and JSON decode into the same typed model; YAML aliases, merge keys and
+multi-document streams are rejected. A registration declares at most 64 input roles and 64 parameters.
+Descriptions and limitations are bounded display text and cannot select behavior; executor and interpreter
+limitations are emitted separately from authored text.
 
-The index contains only its schema envelope and an `entries` list; entry paths are unique and their list
-order has no execution meaning. For the initial two CLI entries:
+`coverage` describes the intended test surface, not measured completeness: `artifact-contract`, `source` or
+`mixed`. The full CLI suite is `mixed` because ordinary unit tests compile imported source while its process
+contracts execute supplied bytes. Package or test counts are never presented as a count of artifact contracts.
 
-```yaml
-apiVersion: nvkr.dev/validator-catalog/v1
-kind: ValidatorCatalog
-entries:
-  - nvke/nvkectl/contract.yaml
-  - nvke/nvkectl/cli.yaml
-```
-
-Index paths are relative to its directory, remain beneath that root and identify regular files. Absolute
-paths, parent traversal and symlink traversal are rejected. The operator-supplied index/profile parent directory
-must itself be a real directory; use its resolved path when that final parent is a symlink. Ancestor
-symlinks may resolve before that directory is held. Hard links are permitted: this descriptive loader
-confines path traversal, but does not claim exclusive file ownership or an atomic multi-file snapshot.
-The loader uses context-aware bounded reads:
-at most 1 MiB per document, 16 MiB across one catalog, 1,024 entry files and 16 directory levels. A profile has
-at most 64 uniquely named check instances and each entry declares at most 64 input roles. Unknown adapters can
-be described as unavailable during discovery, but any selected unavailable adapter fails execution admission.
-Unselected entries still undergo complete schema, reference and uniqueness validation.
-
-An entry declares its ID, description, adapter protocol/version, suite selector, input-role requirements,
-suite-source relationship, platform constraints, execution requirements, timeout, coverage category and known
-limitations. Limitations are bounded display text; they disclose constraints without changing admission rules.
-Adapters own typed configuration and supported values; free-form fields cannot bypass their validation.
-Descriptions are display text and cannot select behavior. Adapter minimum limitations are emitted separately
-from authored display text. An entry/adapter disagreement remains describable as unavailable and cannot be
-selected for execution.
-
-For example, the CLI contract entry would have this proposed shape:
+The CLI contract registration has this proposed shape. It invokes the upstream supplied-executable entrypoint
+`make test-artifact`, which compiles the test harness and never rebuilds `nvkectl`; that interface is
+proposed in NVKE [#1578](https://github.com/dsx-ai-factory/nvke/pull/1578), which is not yet merged:
 
 ```yaml
-apiVersion: nvkr.dev/validator/v1
+apiVersion: nvkr.dev/validator/v2
 kind: Validator
 id: nvke/nvkectl/contract
-description: Run upstream process contracts against a supplied nvkectl executable
-adapter: nvke-cli/v1
-suite: contract
+description: Run upstream process contracts against a built nvkectl executable.
+executor: container-command/v1
 inputs:
   executable:
+    output: nvkectl
     component: nvkectl
     format: executable
-suiteSource:
+testOrigin:
   mode: build-source
   fromInput: executable
-platforms: [linux/amd64, linux/arm64]
-requires: [docker, git]
+image:
+  fromInput: executable           # the producer's pinned toolchain image
+workingDirectory: cli
+acquisition:
+  command: [go, mod, download]
+command: [make, --no-print-directory, test-artifact, GO=go, "GO_TEST_FLAGS=-count=1 -timeout=15m -json"]
+environment:
+  NVKECTL: "${inputs.executable.path}"
+  NVKECTL_EXPECTED_VERSION: "${inputs.executable.version}"
+requires:
+  platforms: [linux/amd64, linux/arm64]
+  capabilities: [docker]
 timeout: 30m
+results:
+  interpreter: nvke-cli-go-test/v1
 coverage: artifact-contract
 limitations:
   - Package-level result checks do not establish exhaustive artifact-contract coverage
 ```
 
-The initial CLI slice accepts this provisional entry shape; it does not establish stable compatibility.
-`coverage` describes the intended test surface, not measured completeness: `artifact-contract`, `source`,
-or `mixed`. The full CLI suite is `mixed` because ordinary unit tests compile imported source while its
-process contracts execute supplied bytes.
-Package/test counts cannot be presented as a count of artifact contracts.
+The interpreter name is illustrative until the parity interpreter is implemented. The executor adds its own
+minimum requirements (for example Git for source import); a registration cannot omit them.
 
-### 4. Bind named artifact roles explicitly and validate the complete selection
+### 4. Select suites and bind them to a completed Run
 
-A profile selects an explicit nonempty list of check instances. Each names one validator ID and binds every
-required role to an exact named output. No glob selection, automatic run-all, inferred output by filename,
-or silently omitted inapplicable check is admitted. Discovery can suggest candidates; execution still needs
-explicit selection. With no individual check selector, execution runs the profile's selected checks only.
+An invocation names one or more selections, each an exact ID or a parent path (`project/` or
+`project/artifact`). Selections are processed in user order; a parent expands deterministically to its
+registrations sorted by ID; duplicates are removed keeping the first occurrence. A parent matching no
+registration fails. There are no globs, no fuzzy aliases and no implicit run-all: zero selections is a usage
+error. At most 64 suites may remain after expansion. Suites execute sequentially in the resulting order and
+stop at the first failure, retaining completed and partial diagnostics accurately.
 
-The new profile binds runtime inputs separately from reusable entries. This example shows a local diagnostic
-with one explicit check; file paths resolve relative to the profile, and artifact locations are not content
-identities or proof of membership:
+Input mode is either build-first or an existing Run (`--run <attempt>`). Build-first reuses the existing local
+Run path with the same Definition and Environment inputs, then continues exactly as `--run`. Validation
+continues only from a successfully completed Run; incomplete, failed or uncommitted Runs fail.
 
-```yaml
-apiVersion: nvkr.dev/validation-profile/v1
-kind: ValidationProfile
-catalog: ../validators/catalog.yaml
-source:
-  kind: local-plan
-  plan: ../../../.nvkr/example/plan.json
-checks:
-  - name: cli-contract
-    validator: nvke/nvkectl/contract
-    inputs:
-      executable:
-        output: nvkectl
-        artifact: ../../../.nvkr/example/nvkectl
+Lifecycle opens the Run through `CaptureLocalDiagnosticArtifacts`, which replays its compiler reads and checks
+every named payload's bytes. Each input role binds to exactly one named Run output matching the registration's
+output, component and format; a missing, ambiguous or format-incompatible output fails. Factory derives the
+test-origin source, toolchain image and expected version from the Run's Plan. Every suite retains its own
+named-output bindings even when outputs share a Build Digest. Callers supply no artifact paths or digests.
+
+For controller/chart suites, the controller image and chart package bind as separate roles. The interpreter
+or upstream entrypoint must reject a chart that references a different image under test and prevent fallback
+to a default tag or rebuilt component.
+
+The example invocation, which depends on the #1578 interface at the Run's NVKE revision:
+
+```sh
+nvkr validators run \
+  --validator-catalog ./company-validators \
+  --run .nvkr/runs/<attempt> \
+  --test-env local \
+  nvke/nvkectl/contract
 ```
-
-The separate legacy published route selects an immutable publication reference and independent policy;
-local artifact paths are forbidden there. New profiles admit local-plan only and reject adapter configuration
-extensions until a reviewed versioned interface owns them. Check instance and role names use the same
-segment grammar as ID segments; output names retain existing Plan naming rules.
-Checks execute sequentially in authored profile order and stop at the first failure, retaining completed and
-partial diagnostics accurately. Index/discovery order is sorted by ID and does not alter profile order.
-There is no dependency graph, parallel scheduler or automatic provisioning in the initial profile protocol.
-
-Each role declares component compatibility and artifact format. An adapter may additionally constrain source
-interface, native platform and relationships among roles. A profile binds output names, not a re-authored
-producer graph. Multiple matching outputs require an explicit choice. Every required role must resolve exactly
-once; unknown or extra roles fail. An output may fill more than one role only when the adapter explicitly
-permits it. Every check invocation retains its own named-output bindings even if outputs share a Build Digest.
-
-The initial new-profile source mode is explicit `local-plan` diagnostics. New-format published mode and
-mixing trust modes within one profile are deferred. In local mode, a complete canonical Plan and supplied
-artifact locations are mandatory. Factory validates the complete Plan before selecting named outputs;
-paths and hashes remain caller-supplied descriptions until owning checks run. The separate legacy published
-route retains existing publication authentication, policy and held-output consumption; local mode cannot
-inherit those capabilities merely by using the same catalog entry.
-
-Before workspace creation, source acquisition, artifact staging or subprocess execution, validate the complete
-profile, catalog references, selected adapters, role key sets, Plan shape and statically knowable capabilities.
-Admission does not prove that an upstream entrypoint exists or an execution environment is available. Those
-checks occur in their owning bounded phases, before the corresponding suite can run, with cleanup on failure.
-
-For controller/chart checks, bind the controller image and chart package as separate roles. The adapter must
-reject a chart that references a different image under test and prevent fallback to a default tag or rebuilding
-the selected component. Runtime environment requirements are also explicit; a catalog declaration does not
-prove cluster ownership, locality, privileges or available capacity.
 
 ### 5. Derive imported suites from artifact source identity
 
-For ADR-23 artifact suites, the initial source mode is exclusively `build-source`. The entry designates one
-input role as the suite source. Factory derives the repository, full commit and tree from that role's exact
-producer in the validated Plan. The existing source owner imports and verifies it. Catalog entries and
-profiles cannot supply a replacement branch, `latest`, independent test commit or local checkout.
+For ADR-23 artifact suites, the test origin is exclusively `build-source`. The registration designates one
+input role as the origin; factory derives the repository, full commit and tree from that role's producer in
+the Run's validated Plan, and `sourcegit` imports and verifies it. Registrations and invocations cannot supply
+a replacement branch, `latest`, independent test commit or local checkout.
 
-The designated role is necessary for checks consuming several artifacts. Each other input retains its own
-source identity, native platform and artifact subject. Sharing a repository URL, project namespace or version
-string never establishes a common revision. An adapter must explicitly enforce any required same-source
-relationship; otherwise the result describes a test of the supplied combination and cannot claim each input
-was checked by tests from its own revision. A separately versioned CLI and controller are not silently aligned.
+Each other input retains its own source identity, native platform and artifact subject. Sharing a repository
+URL, project namespace or version string never establishes a common revision. The interpreter or upstream
+entrypoint must explicitly enforce any required same-source relationship; otherwise the result describes a
+test of the supplied combination. An independently pinned external harness, such as the existing Hydrophone
+or downstream nightly harness, remains a distinct protocol with its own pin owner. Supporting another
+repository means adopting its producer-neutral interface, not adding repository-specific loader branches.
 
-An independently pinned external harness, such as the existing Hydrophone or downstream nightly harness,
-remains a distinct adapter protocol with its own existing pin owner. It cannot be represented as an ADR-23
-matching-source suite. Supporting another repository means implementing or adopting its producer-neutral
-interface and source mapping, not introducing repository-specific branches in the catalog loader.
+The producer Plan remains the owner of build pins and toolchain selection. Registrations cannot repeat or
+override toolchain digests or use AICR-style release-tag rewriting. Additional tools resolve through an
+admitted tool owner.
 
-The producer Plan remains the owner of build pins and toolchain selection. The CLI adapter reuses its selected
-toolchain; another adapter needing additional tools must resolve them through an admitted tool owner. Catalog
-entries cannot repeat or override toolchain digests or use AICR-style release-tag rewriting. General external
-catalog distribution, independent harness-source modes and new tool-pin mechanisms require separate adoption.
+### 6. Admit one TestEnvironment per invocation
 
-### 6. Preserve package ownership and execution isolation
+A TestEnvironment (`nvkr.dev/test-environment/v1`, kind `TestEnvironment`) is a versioned declaration of the
+provider, provided capabilities, credential bindings, permitted network access and environment-owned budgets
+available to a validation invocation. It is diagnostic execution configuration: it is not the lifecycle
+`Environment` (`nvkr.dev/environment/v1`), not a public lifecycle object and does not affect Build identity.
+It is also distinct from an upstream harness's own environment selection (for example NVKE
+`-e2e.environment`), which is a suite parameter.
 
-`validation` owns catalog/profile admission, discovery and dispatch. Factory owns complete producer Plan
-interpretation and artifact-test input selection; `sourcegit` owns exact source import; pipeline owns container
-execution and process cleanup; lifecycle, delivery and conformance retain published-output authentication and
-their existing diagnostic ownership. `testresults` continues to own descriptive output contracts. The CLI and
-SDK delegate; they do not reproduce source selection, digest interpretation or execution rules.
+Suite fields (command, parameters) live only in registrations. Parameter values are supplied explicitly by the
+invocation and are never derived from the provider name. Credential bindings name abstract sources, such as CI
+secret injection, explicitly selected local variables or federated identity; values are delivered only to the
+phases that need them and are excluded from retained configuration and results.
 
-Adapters are registered Go implementations with explicit supported source modes, suite selectors, input roles,
-platforms and configuration. They do not implement new producers or bypass capability admission. Package
-placement must preserve the existing dependency direction; a shared dispatcher is not permission to move
-factory or lifecycle invariants into command code or create an import cycle.
+One TestEnvironment is selected explicitly per invocation, by name through documented resolution with no
+fallback, or by file. Before any build, admission checks that the executor and provider integration satisfy
+every selected suite's platform, capability, credential, network and budget requirements; incompatibility
+fails then. A declared requirement grants nothing: the environment's admitted access bounds the run, and a
+network-capable environment does not widen a suite's declared access. Until `pipeline` enforces per-phase
+destinations and a credential delivery owner exists, the executor admits only the parity network model
+(networked acquisition, offline test) and no credentials; declaring more fails admission.
 
-Entry requirements must satisfy the adapter's minimum capabilities. An entry may narrow platform support,
-but cannot weaken isolation, omit required capabilities or extend adapter-owned maximum budgets. The installed
-CLI adapter admits only Docker and Git requirements and refuses additions with no installed admission owner.
-Its selected toolchain must provide Go and Make. Disagreement is an admission error, not an instruction to
-trust the entry over executable contracts.
+The local environment:
 
-Local and CI execution resolve the same entry and use the same adapter contracts. Runtime locations and
-admitted infrastructure may differ. For the first CLI migration, retain Docker execution, private artifact
-staging, dependency acquisition without the artifact, and offline tests with read-only source/artifact/root,
-dropped capabilities and no new privileges. Catalog introduction does not widen network or credential access.
+```yaml
+apiVersion: nvkr.dev/test-environment/v1
+kind: TestEnvironment
+metadata:
+  name: local
+provider: local
+provides:
+  capabilities: [docker]
+credentialRefs: {}     # no credentials
+network:
+  egress: []           # no test-phase network
+budgets:
+  maxSuiteTimeout: 30m
+```
 
-`timeout` bounds the suite execution phase. Source acquisition, dependency acquisition and cleanup have
-separate finite adapter-owned budgets; it is not an end-to-end deadline. A shorter caller context wins, and
-profile configuration cannot increase catalog limits. For CLI parity, retain its current per-container bound
-and fixed Git-command budgets. Every blocking phase observes context, and each owner stops and joins its
-children before releasing their workspace. Cleanup uses an independent bounded context; its failure is
-reported without replacing an already observed suite failure. Partial diagnostics never become success.
+### 7. Execute through the existing owners
 
-Cluster setup, leases, registry transport and teardown require an admitted adapter or downstream environment
-owner. An entry's `requires` list cannot allocate a runner, grant credentials, permit privileged execution or
-instantiate a generic provisioning engine. Hosted generation remains owned by ADR-21; this catalog defines
-neither event triggers nor new runner labels or workflow permissions.
+`validation` orchestrates and owns registration loading, selection, preparation, binding and result
+recording. Factory keeps Plan interpretation, `sourcegit` source import, pipeline container execution,
+process lifetime and network enforcement, and lifecycle Run opening, byte checks and the build-first Run path.
+Proposed files (`catalog*.go`, `selection.go`, `request.go`, `build.go`, `artifacts.go`, `execute.go`,
+`kind.go`, `results.go`) are thin orchestration over those owners. The CLI and SDK delegate; package placement
+preserves the dependency direction and creates no import cycle.
 
-### 7. Separate captured reports, diagnostic verdicts and evidence authority
+For each suite: acquire the test origin and image; prepare a private workspace and dependencies; prepare
+required runtime resources; stage checked inputs and resolve invocation values; execute; capture outcome and
+diagnostics; stop and join; clean up; persist the suite result. Every blocking phase observes context.
 
-Retain original reports and raw test events. Record the selected entry and profile configuration, adapter
-version, upstream suite selector and revision, harness identity where applicable, execution platform, each
-named input/output binding, artifact observations, process outcome and cleanup outcome. Unknown observations
-remain unknown; report fields cannot manufacture a Run, installed image, suite completion or passing verdict.
+The suite timeout bounds the execution phase and is itself bounded by the lower of the executor's and the
+TestEnvironment's maximum, not a single global cap. Source, dependency acquisition and cleanup have separate
+finite executor-owned budgets; a shorter caller context wins. Registrations at `nvke-cli` parity keep its
+current bounds: 30-minute test and dependency budgets, fixed Git-command budgets and the reaper's cleanup
+budget. Cleanup uses an independent bounded context; its failure is reported without replacing an already
+observed suite failure. Partial diagnostics never become success.
 
-Required artifact observations depend on the format:
+Disposable local clusters (kind) may be NVKR-managed or owned by the upstream harness; this is decided per
+executor or suite. Whichever owner is chosen registers cleanup ownership before creation. Hardware providers
+(for example Forge or DSX) require an explicitly supported provider integration with defined resource
+ownership and cleanup; none is defined here. A registration's requirements cannot allocate a runner, grant
+credentials, permit privileged execution or instantiate a provisioning engine. Hosted generation remains owned
+by ADR-21; this catalog defines neither event triggers nor runner labels or workflow permissions.
+
+### 8. Separate captured reports, diagnostic verdicts and evidence authority
+
+Retain original reports and raw test events. Record each suite's ID, resolved nonsecret parameters, executor
+and interpreter versions, test-origin revision, execution image, platform, every role's Run output binding and
+artifact observation, process outcome, verdict and cleanup outcome. Unknown observations remain unknown;
+report fields cannot manufacture a Run, installed image, suite completion or passing verdict.
 
 | Input | Required subject description |
 |---|---|
@@ -325,97 +335,89 @@ Required artifact observations depend on the format:
 | Chart | Exact package-byte integrity and OCI manifest when present; rendering/install observations kept separate |
 | Several artifacts | Every role's own output, source and subject, with the checked relationships recorded |
 
-`testresults.Output` remains a descriptive handoff. `CaptureStatus=complete` describes report capture and does
-not mean valid reports, exhaustive tests or passing behavior. The catalog supplies none of those verdicts.
-An adapter may report a diagnostic verdict only under its own explicit parsing and completeness contract;
-the existing Hydrophone route cannot inherit the CLI diagnostic's pass/fail interpretation. Original report
-capture and adapter verdicts must remain separately inspectable.
+`testresults.Output` remains a descriptive handoff; `CaptureStatus=complete` describes capture, not valid
+reports, exhaustive tests or passing behavior. Only the named interpreter reports a verdict, under its own
+parsing and completeness contract; the Hydrophone route cannot inherit another interpreter's interpretation.
 
 For exhaustive artifact-suite acceptance, the upstream revision must own a machine-checkable inventory or
-completion protocol. The adapter rejects missing, zero-test, skipped, filtered or incomplete required
-coverage. NVKR does not maintain copied test-name lists or hard-coded expected counts. The existing CLI
-package guard is weaker: cataloging it preserves diagnostic behavior but must disclose that exhaustive
-completeness is unknown. A validator entry cannot upgrade that guard by declaring a stronger coverage label.
+completion protocol, and the interpreter rejects missing, zero-test, skipped, filtered or incomplete required
+coverage. NVKR does not maintain copied test-name lists or expected counts. The existing CLI package guard is
+weaker and its parity interpreter must disclose that exhaustive completeness is unknown; a stronger `coverage`
+label cannot upgrade it.
 
-The lane remains **none (descriptive)** with unqualified diagnostic results. A result does not issue a
-ConformanceReceipt, authenticate artifact membership, satisfy ADR-13 evidence, authorize signing or promote
-a release. ADR-16 qualification consumes independently produced and authenticated conformance evidence;
-running a cataloged suite does not satisfy that separate handoff.
+The lane remains **none (descriptive)**. A result does not issue a ConformanceReceipt, satisfy ADR-13
+evidence, authorize signing or promote a release. ADR-16 qualification consumes independently produced and
+authenticated conformance evidence; running a cataloged suite does not satisfy that handoff.
 
-### 8. Freeze diagnostic configuration without changing Build identity
+### 9. Freeze diagnostic configuration without changing Build identity
 
-Resolve the complete selected configuration once before execution. Execute that admitted snapshot rather than
-reopening mutable entry files between phases. Retained diagnostics include canonical resolved configuration
-and exact source-document byte digests, so a reviewer can distinguish an entry edit from an artifact change.
-Credential values are excluded; runtime secret handles remain with execution owners. Factory's opaque
-diagnostic invocation freezes complete Plan interpretation before execution
-without issuing an authenticated receipt. Artifact paths are frozen; bytes retain the staging-time integrity
-contract. Exact admitted Plan document integrity is retained with catalog selection metadata.
+Execution progresses through package-owned records:
 
-Use the canonical codec for generated structured descriptions and raw SHA-256 only for exact file/report
-integrity. This ADR allocates no new authenticated receipt or semantic digest family. A future evidence-bound
-validation identity requires registration and governing authentication rules under ADR-01 and ADR-16.
+| Record | Contents | Establishes |
+|---|---|---|
+| ValidationRequest | Selections, catalog root, input mode, TestEnvironment reference | An invocation was supplied |
+| PreparedValidation | Ordered suites, admitted registrations, source-document digests, the admitted TestEnvironment, build inputs or Run locator | Configuration is valid; a build may start |
+| BoundValidation | Completed Run identity, exact artifact bindings, resolved test origins | Inputs are checked; runtime preparation may begin |
+| ValidationResult | Build outcome, per-suite execution state, verdict, termination, logs, cleanup status | Outcomes and cleanup are recorded |
 
-Validator/profile edits do not change producer Build Digests or modify an existing Plan. Changed validators,
-input bindings, suite revisions, tools or platform observations are distinct diagnostic executions; results
-cannot be reused solely because Build Digests match. No result cache or cross-output reuse is introduced.
-File paths and display-only descriptions cannot determine artifact identity.
+PreparedValidation is frozen: execution never reopens registration or environment files. A ValidationResult
+is created before build or runtime work and updated through cleanup; secrets are excluded, and cleanup status
+is recorded separately from the verdict. Exact source-document byte digests let a reviewer distinguish a
+registration edit from an artifact change.
 
-### 9. Migrate through explicit boundaries
+Use the canonical codec for structured descriptions and raw SHA-256 only for exact file/report integrity.
+This ADR allocates no new authenticated receipt or semantic digest family; a future evidence-bound validation
+identity requires registration under ADR-01 and ADR-16. Registration and TestEnvironment edits do not change
+Build Digests or modify an existing Plan. Results cannot be reused because Build Digests match; no result
+cache or cross-output reuse is introduced.
 
-First add catalog discovery and strict loading, then catalog the existing `contract` and `cli` suites through
-their current Go owners. `validators run` is the sole NVKR interface for these suites and keeps the diagnostic's suite-failure exit status, timeout classification, cleanup and limitations; admission errors use the profile loader's codes. This lands before named-owner ratification of the profile schema, which remains pending.
-There is no automatic switch from a failed catalog lookup back to hard-coded execution.
+### 10. Migrate through explicit boundaries
 
-`nvke-cli/v1` caps catalog suite execution at 30 minutes and retains a separate 30-minute dependency budget;
-longer test timeouts are intentionally unsupported.
+The existing provisional slice — `catalog.yaml` index, `nvkr.dev/validator/v1` entries, the typed
+`nvke-cli/v1` adapter and `validators run --profile` with `nvkr.dev/validation-profile/v1` local-plan
+bindings, plus `client/v1` `ListValidators`, `DescribeValidator` and `PrepareValidatorProfile` — remains until
+an explicit migration step. That step introduces the new schema versions and route and either removes the
+profile route or retains it for a stated window; profile documents are never silently reinterpreted as Run
+bindings, and a failed catalog lookup never falls back to hard-coded execution. `validators` stays hidden until
+its schemas are ratified.
 
-The existing unversioned JSON `validate --config` profile keeps its current published-source semantics and
-its independently admitted complete-local-Run conformance route.
-The new versioned profile is an explicit format and capability transition; legacy documents are not silently
-reinterpreted, and local support is not enabled by relaxing the legacy source check. Discovery reports
-availability and requirements; it does not execute checks or interpret a descriptor as proof of support.
-
-The provisional hidden `validators list|describe|run` commands delegate to the shared owner. The corresponding
-`client/v1` methods are `ListValidators`, `DescribeValidator` and `PrepareValidatorProfile`; ADR-17 records
-their provisional coupling to deep-owner types. New selection remains explicit and
-errors preserve ADR-03's existing distinctions among invalid configuration, unsupported capability, fetch
-failure, suite failure and timeout. This ADR allocates no new exit codes.
+The unversioned JSON `validate --config` keeps its current published-source semantics and its independently
+admitted complete-local-Run conformance route. Discovery reports availability and requirements without
+fetching sources or launching infrastructure. Errors preserve ADR-03's distinctions among invalid
+configuration, unsupported capability, fetch failure, suite failure and timeout; no new exit codes are allocated.
 
 ## Boundaries the catalog cannot resolve
 
 | Boundary | Required owner or prerequisite | Catalog limitation |
 |---|---|---|
-| Upstream adoption | Upstream owners provide and maintain the external-artifact interface at the selected revision | Registration cannot create a missing entrypoint or approve its adoption |
-| Maintained pin readiness | Producer catalog owners refresh explicit pins and regenerate Plans | An entry cannot patch a checkout or substitute a convenient test revision |
-| Suite completeness | Upstream owns an inventory/completion protocol; the adapter validates it | Package presence, test counts and process exit zero cannot establish exhaustive coverage |
-| Run/output membership | Artifact owners authenticate exact attempt, output, platform and bytes | A supplied Plan plus matching checksum is still a trusted-input diagnostic |
-| Installed identity | Existing conformance owns strict test-bound OCI observations; proposed ADR-29 assigns standalone collection/comparison to the observation owner, with deployment owners supplying installation records | Image/chart test adapters consume the applicable observations; catalog entries, requested references and rendering do not establish installed identity |
-| Infrastructure | Execution/downstream owners admit tools, networking, privileges, leases and cleanup | A declared requirement is not available capacity or environment authority |
-| Report validity and verdict | Adapter-specific parsers and completeness checks | A report format label or complete capture is not a passing result |
+| Upstream adoption | Upstream owners provide and maintain the external-artifact interface at the selected revision (for the CLI, NVKE #1578) | Registration cannot create a missing entrypoint or approve its adoption |
+| Maintained pin readiness | Producer catalog owners refresh explicit pins and regenerate Plans | A registration cannot patch a checkout or substitute a convenient test revision |
+| Suite completeness | Upstream owns an inventory/completion protocol; the interpreter validates it | Package presence, test counts and exit zero cannot establish exhaustive coverage |
+| Run/output membership | Lifecycle checks a committed local Run's bytes; publication authentication stays with its owners | Local Run binding is diagnostic: no signatures, producer identity or ArtifactCheckReceipt |
+| Installed identity | Existing conformance owns strict test-bound OCI observations; proposed ADR-29 assigns standalone collection/comparison to the observation owner, with deployment owners supplying installation records | Registrations, requested references and rendering do not establish installed identity |
+| Isolation, network and credentials | The executor owns isolation; pipeline enforces network; a delivery owner injects credentials | A declared requirement or TestEnvironment entry grants no access the executor cannot enforce |
+| Infrastructure | Per-executor/suite cluster owner; explicitly supported provider integrations for hardware | A declared capability is not available capacity, a lease or cleanup ownership |
+| Report validity and verdict | Named, versioned result interpreters | A report format label, complete capture or exit zero is not a passing result |
 | CI policy | Workflow generator and downstream coordinators own transport, triggers and credentials | Catalog files do not authorize workflow generation, scheduling or runner changes |
 | Qualification | Independent evidence production, authentication and policy under ADR-16 | Diagnostic success cannot strengthen itself into release authority |
 
 These boundaries are acceptance prerequisites for stronger claims, not reasons to hide useful diagnostics.
-Discovery must show the supported interface and known limitations so operators can distinguish a cataloged
-diagnostic from an exhaustively checked or authenticated result.
-
-Discovery availability means the installed adapter supports the entry's declared protocol and static
-requirements. Upstream entrypoint readiness, artifact membership and runtime capacity remain unverified until
-their owning phases run. Discovery must not fetch sources or launch infrastructure to turn those unknowns
-into an availability claim.
+Discovery shows the executor, interpreter and known limitations so operators can distinguish a cataloged
+diagnostic from an exhaustively checked or authenticated result. Upstream entrypoint readiness, Run
+availability and runtime capacity remain unverified until their owning phases run.
 
 ## Consequences
 
-Engineers can find validators by project and artifact, inspect their requirements, and reuse suite definitions
-without copying assertions or maintaining another source-pin registry. Named input roles support controller
-and chart combinations without committing the catalog to a single-artifact model. Existing execution and
-authentication owners remain the places where correctness is enforced.
+Engineers can find validators by project and artifact, inspect their requirements, and add suites for a new
+repository as data when its upstream interface fits the executor. Run binding removes caller-supplied artifact
+paths. Named input roles support controller and chart combinations without committing the catalog to a
+single-artifact model. Existing execution and lifecycle owners remain where correctness is enforced.
 
-The cost is a strict schema/loader, adapter registration, explicit profile migration and an additional reviewed
-configuration surface. Entries cannot make unsupported interfaces work, so adding a repository may require
-upstream adoption and Go adapter work. Maintaining separate diagnostic and evidence contracts is intentional;
-a single green catalog summary would conceal materially different claims.
+The cost is a strict loader, a substitution grammar, versioned interpreters, a TestEnvironment schema and an
+explicit migration from the provisional slice. A generic executor concentrates risk: its isolation, budgets
+and grammar must be reviewed once and changed only by version. Registrations cannot make unsupported
+interfaces work, so adding a repository may still require upstream adoption. A single green summary would
+conceal materially different claims, so diagnostic and evidence contracts stay separate.
 
 ## Alternatives considered
 
@@ -426,37 +428,36 @@ a single green catalog summary would conceal materially different claims.
 | Add commands or scripts for each suite | Reject: scatters discovery and repeats binding and execution logic |
 | Put validation entries in producer registries or Definitions | Reject: conflates diagnostic selection with build declarations and pin ownership |
 | Copy upstream tests and expected test-name lists into NVKR | Reject: duplicates assertion ownership and lets imports drift from their source revision |
-| Allow arbitrary commands, overlays and embedded provisioning in YAML | Reject: creates another execution language and bypasses typed adapter admission |
+| Typed Go adapter per interface; entries cannot name commands (earlier proposal) | Superseded: one executor with fixed isolation and a literal argument vector scales to more repositories without per-repository Go adapters |
+| Shell commands, mounts, overlays or embedded provisioning in YAML | Reject: creates an execution language and lets entries weaken executor isolation |
+| Explicit `catalog.yaml` index (earlier proposal) | Superseded: path-derived IDs give one owner per registration; strict layout, bounds and validate-all loading keep the safety properties |
+| Profile binding of a local Plan and artifact paths (earlier proposal) | Superseded: Run binding removes caller-supplied paths and checks bytes through lifecycle |
+| Treat TestEnvironment as the lifecycle Environment or a public object | Reject: conflates build identity with diagnostic execution access |
 | Independently pin tests to the newest compatible branch | Reject for ADR-23 imports: weakens the matching-source contract; independently versioned harnesses remain separate protocols |
-| Build a universal plugin runtime before cataloging the CLI | Defer: registered adapters and a small strict catalog cover the first use case without speculative infrastructure |
 
 ## Acceptance and follow-ups
 
-Acceptance is staged. Initial CLI catalog support requires items 1–4 and the local compatibility checks in
-item 6. Artifact expansion and hosted integration have separate acceptance; neither is implied by CLI support.
+Acceptance is staged; each stage has its own acceptance and none is implied by an earlier one.
 
-1. **Loading and discovery:** deterministic list/describe, exact version dispatch, bounded cancellation-aware
-   reads, safe paths, strict role/configuration validation, duplicate/unknown-reference refusal and admission
-   before executable work. Reordering index entries must not change resolved behavior. Discovery must distinguish
-   registered metadata from an available executable capability.
-2. **CLI parity:** both suites on native Linux AMD64 and ARM64 against fresh recipe-built executables at an
-   upstream revision exposing the required interface. Preserve separate source-test and artifact-contract
-   reporting, byte integrity, offline execution, failure statuses, timeouts and cancellation/cleanup behavior.
-   Existing recorded CLI runs are prerequisites and baselines, not proof of the new catalog path.
-3. **Binding negatives:** unknown/multiple outputs, missing/extra roles, wrong format/platform/revision/tree,
-   changed bytes and equal-Build-Digest sibling substitution. Refuse incompatible multi-artifact relationships
-   before claiming that a supplied combination was validated.
-4. **Coverage and authority negatives:** filtered/missing/skipped/empty required suites cannot become exhaustive
-   acceptance; complete report capture cannot become pass; a caller-supplied binding cannot become authenticated
-   membership; neither local nor published diagnostic results can become qualification evidence.
-5. **Artifact expansion:** one controller/chart check consuming at least two named inputs, exercising exact
-   supplied-image/package selection, refusal of default/rebuilt substitutes, runtime subject observation and
-   failed-suite teardown. Then adopt a second repository without changing generic catalog-loading rules.
-6. **Migration and CI:** explicit legacy/new-profile behavior, unchanged existing published-source admission,
-   shared local/CI adapter semantics and generator-owned workflow changes. Hosted credentials, runner allocation,
-   triggers and transport require their own acceptance; no workflow capability follows from merging this ADR.
+1. **CLI parity through Run binding:** strict discovery and validate-all loading, ordered selection and
+   deduplication, substitution-grammar and isolation refusals, and TestEnvironment refusal before any build.
+   Both `nvke/nvkectl/contract` and `nvke/nvkectl/cli` run through `container-command/v1` with the `local`
+   environment on native Linux AMD64 and ARM64, from `--run` and from build-first, at an NVKE revision
+   exposing #1578 with refreshed maintained pins. Negatives: broken or wrong-version executable, changed
+   bytes, unknown or ambiguous output, incomplete Run, missing entrypoint, unsupported capability, timeout and
+   SIGINT/SIGTERM, with parity of isolation, budgets, failure statuses and cleanup. Existing recorded CLI runs
+   are baselines, not proof of the new path.
+2. **Multiple inputs and a disposable cluster:** one controller/chart suite consuming at least two named
+   inputs, with exact supplied-image/package selection, refusal of default or rebuilt substitutes, runtime
+   subject observation, a decided cluster owner and teardown after failure, timeout and cancellation. Then
+   adopt a second repository without changing generic loading rules.
+3. **CI route:** the same registrations on generator-owned workflows (ADR-21), with per-phase network and
+   credential delivery either enforced or refused. Credentials, runner allocation, triggers and transport need
+   their own acceptance; no workflow capability follows from merging this ADR.
+4. **Hardware provider integration:** a later stage requiring an agreed upstream interface, artifact transfer,
+   a supported provider integration with resource ownership and cleanup, and its own acceptance.
 
-Named owners must ratify the schemas, adapter protocols and migration before maintained adoption. Reconciliation
-records implementation, contract tests and external execution separately. Any future authenticated evidence
-integration must resolve exact Run/output membership and independent conformance ownership in the governing
-ADRs before admitting results; catalog adoption alone does not close those decisions.
+Across stages, filtered/missing/skipped/empty required suites cannot become exhaustive acceptance, complete
+capture cannot become pass, and diagnostic results cannot become qualification evidence. Named owners must
+ratify the schemas, executor, interpreters and migration before maintained adoption. Reconciliation records
+implementation, contract tests and external execution separately.
