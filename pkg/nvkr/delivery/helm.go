@@ -233,12 +233,10 @@ func validateHelmChartMetadata(config helmChartConfig) error {
 // ORAS-go library that Helm's own registry client is built on constructs the
 // local OCI Image Layout at out; this function performs no network I/O — the
 // separate delivery Push path (registry.go) is solely responsible for
-// transporting the committed layout to a registry. This is contract-tested
-// against generic OCI-layout readers (go-containerregistry, oras-go); reading
-// the produced layout with an unmodified `helm pull`/`helm show`/`oras pull`
-// binary is not yet externally exercised. artifactType is NVKR's own package
-// identity, carried on the manifest alongside the standard fields; Helm's Pull
-// never reads a manifest-level artifactType, so this addition is inert to it.
+// transporting the committed layout to a registry. artifactType remains a
+// validated caller description for API compatibility; it is not emitted on the
+// chart manifest. NVKR package typing and evidence belong to the separate
+// publication metadata, bound to the exact chart manifest and archive digests.
 func BuildHelmChartArtifact(ctx context.Context, out, artifactType string, chartData []byte) (Result, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return Result{}, err
@@ -274,7 +272,6 @@ func BuildHelmChartArtifact(ctx context.Context, out, artifactType string, chart
 	manifest := ociManifest{
 		SchemaVersion: 2,
 		MediaType:     MediaOCIManifest,
-		ArtifactType:  artifactType,
 		Config:        Descriptor{MediaType: configDescriptor.MediaType, Digest: configDescriptor.Digest.String(), Size: configDescriptor.Size},
 		Layers:        []Descriptor{{MediaType: chartDescriptor.MediaType, Digest: chartDescriptor.Digest.String(), Size: chartDescriptor.Size}},
 		Annotations:   helmChartAnnotations(config),

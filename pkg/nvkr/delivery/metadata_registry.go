@@ -111,7 +111,7 @@ func PullMetadataWithOptions(ctx context.Context, reference, out string, request
 	if err != nil {
 		return Inspection{}, err
 	}
-	if m.ArtifactType != MediaPublicationRoot || len(m.Layers) != 0 || m.Config.MediaType != MediaPublicationRootConfig {
+	if (m.ArtifactType != "" && m.ArtifactType != MediaPublicationRoot) || len(m.Layers) != 0 || !publicationConfigProfile(m) {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "invalid metadata root")
 	}
 	if err := blob(ctx, ref.Context(), m.Config, 8<<20); err != nil {

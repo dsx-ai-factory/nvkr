@@ -48,6 +48,8 @@ _Avoid_: Plan, release, proof of qualification
 
 **Artifact**:
 Immutable bytes produced or acquired for delivery, such as an executable, image, chart, or packaged collection.
+Native Helm charts use the standard Helm OCI representation; NVKR membership and evidence remain separate,
+bound to the chart manifest and original archive identities.
 _Avoid_: Producer, expected output, release
 
 **OCI bundle**:

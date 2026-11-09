@@ -48,6 +48,9 @@ func TestReadHelmChartSharesExactExportAdmissionWithoutWrites(t *testing.T) {
 				targetDiagnostic = "selected artifact is not an exact single-chart Helm OCI payload"
 				switch tc.name {
 				case "empty config":
+					// A generic empty-config artifact requires a type; it is a
+					// valid OCI closure but must not be admitted as a Helm chart.
+					manifest.ArtifactType = "application/vnd.example.other.v1"
 					manifest.Config, err = writer.addBlobBytes([]byte("{}"), MediaEmptyConfig)
 				case "wrong layer media":
 					manifest.Layers[0].MediaType = MediaOctetStream

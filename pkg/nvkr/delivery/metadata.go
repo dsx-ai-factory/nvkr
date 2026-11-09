@@ -388,8 +388,20 @@ func metadataManifest(ctx context.Context, root string, object PublishedObject) 
 	if m.SchemaVersion != 2 || m.MediaType != publishedManifestMediaType(object) {
 		return ociManifest{}, e.New(e.CodeVerifyFailed, "metadata member has an invalid manifest schema/media type")
 	}
-	if !types.MediaType(object.ArtifactType).IsImage() && m.ArtifactType != object.ArtifactType {
+	if object.Output != nil && object.Output.Format == outputFormatHelm {
+		if !helmArtifactTypeMatches(m, object) {
+			return ociManifest{}, e.New(e.CodeVerifyFailed, "Helm metadata artifact type differs from its release binding")
+		}
+		if _, err := readHelmChartConfig(ctx, root, m); err != nil {
+			return ociManifest{}, err
+		}
+	} else if !types.MediaType(object.ArtifactType).IsImage() && !evidenceArtifactTypeMatches(m, object) {
 		return ociManifest{}, e.New(e.CodeVerifyFailed, "metadata member artifact type differs from its release binding")
+	}
+	if object.Evidence != nil && m.Config.MediaType == MediaOctetStream {
+		if err := verifyPublishedObjectBinding(ctx, root, object, Descriptor{MediaType: m.MediaType, Digest: object.DescriptorDigest, Size: object.Size}, nil); err != nil {
+			return ociManifest{}, err
+		}
 	}
 	return m, nil
 }

@@ -103,8 +103,12 @@ func TestBuildHelmChartArtifactProducesConformantChart(t *testing.T) {
 	if len(manifest.Layers) != 1 || string(manifest.Layers[0].MediaType) != MediaHelmChartLayer {
 		t.Fatalf("layers: %#v", manifest.Layers)
 	}
-	if manifest.ArtifactType != "application/vnd.nvkr.helm-chart.v1" {
-		t.Fatalf("artifact type: %s", manifest.ArtifactType)
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := fields["artifactType"]; exists {
+		t.Fatalf("standard Helm manifest must omit artifactType: %s", raw)
 	}
 
 	descriptor, layerData, err := ReadArtifact(ctx, out)

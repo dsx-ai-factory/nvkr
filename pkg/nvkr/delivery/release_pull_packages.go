@@ -61,7 +61,7 @@ func pullHelmOutput(ctx context.Context, reference, out, metadataRoot, workspace
 		return PulledFile{}, err
 	}
 	if object.Output == nil || object.Output.Format != outputFormatHelm || object.Output.TransportPath != "" ||
-		manifest.ArtifactType != object.ArtifactType || manifest.Config.MediaType != MediaHelmConfig || len(manifest.Layers) != 1 ||
+		!helmArtifactTypeMatches(manifest, object) || manifest.Config.MediaType != MediaHelmConfig || len(manifest.Layers) != 1 ||
 		manifest.Layers[0].MediaType != MediaHelmChartLayer || manifest.Layers[0].Digest != object.BlobDigest ||
 		manifest.Layers[0].Size < 0 || manifest.Layers[0].Size > helmarchive.MaxPackageBytes {
 		return PulledFile{}, e.New(e.CodeVerifyFailed, "selected Helm output has invalid media, payload or transport binding")

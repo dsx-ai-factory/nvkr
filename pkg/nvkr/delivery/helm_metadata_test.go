@@ -136,7 +136,9 @@ func TestHelmPublicationChartMetadataAndPlatform(t *testing.T) {
 func helmMetadataLayoutFixture(t *testing.T) (string, []byte) {
 	t.Helper()
 	archive := helmChartArchiveFixture(t, map[string]string{
-		"demo/Chart.yaml": "apiVersion: v2\nname: demo\nversion: 1.2.3\nappVersion: 9.8.7\n",
+		"demo/Chart.yaml":         "apiVersion: v2\nname: demo\nversion: 1.2.3\nappVersion: 9.8.7\n",
+		"demo/values.yaml":        "image: registry.example.test/controller@sha256:" + strings.Repeat("a", 64) + "\n",
+		"demo/templates/pod.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: demo\nspec:\n  containers:\n    - name: controller\n      image: {{ .Values.image | quote }}\n",
 	})
 	root := filepath.Join(t.TempDir(), "chart")
 	if _, err := BuildHelmChartArtifact(t.Context(), root, "application/vnd.nvkr.helm-bundle.v1", archive); err != nil {

@@ -39,7 +39,7 @@ type ociManifest struct {
 	Subject       *Descriptor       `json:"subject,omitempty"`
 	SchemaVersion int               `json:"schemaVersion"`
 	MediaType     string            `json:"mediaType"`
-	ArtifactType  string            `json:"artifactType"`
+	ArtifactType  string            `json:"artifactType,omitempty"`
 	Config        Descriptor        `json:"config"`
 	Layers        []Descriptor      `json:"layers"`
 }
@@ -66,6 +66,7 @@ type objectConfig struct {
 // are nested by descriptor and copied as an exact closure; regular files become
 // one-layer OCI artifacts.
 type ObjectInput struct {
+	helmEvidence   bool
 	annotations    map[string]string
 	subject        *Descriptor
 	Output         *OutputBinding
@@ -202,6 +203,7 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 				return Result{}, ownerErr
 			}
 			input.subject = &Descriptor{MediaType: publishedManifestMediaType(owner), Digest: owner.DescriptorDigest, Size: owner.Size}
+			input.helmEvidence = owner.Output != nil && owner.Output.Format == outputFormatHelm
 		}
 		var descriptor Descriptor
 		var blobDigest string
@@ -280,12 +282,21 @@ func (writer layoutWriter) writePublicationMetadata(root PublicationRoot, descri
 	if err != nil {
 		return "", "", err
 	}
-	config, err := writer.addBlobBytes(rootBytes, MediaPublicationRootConfig)
+	configType, artifactType := MediaPublicationRootConfig, MediaPublicationRoot
+	for _, object := range root.Objects {
+		if object.Output != nil && object.Output.Format == outputFormatHelm {
+			// Older GitLab registries reject unknown artifact and config media
+			// types. Keep the schema-typed record as an opaque config blob.
+			configType, artifactType = MediaOctetStream, ""
+			break
+		}
+	}
+	config, err := writer.addBlobBytes(rootBytes, configType)
 	if err != nil {
 		return "", "", err
 	}
 	rootManifest := ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest,
-		ArtifactType: MediaPublicationRoot, Config: config, Layers: []Descriptor{}}
+		ArtifactType: artifactType, Config: config, Layers: []Descriptor{}}
 	rootDescriptor, err := writer.addJSONBlob(rootManifest, MediaOCIManifest)
 	if err != nil {
 		return "", "", err
@@ -354,7 +365,9 @@ func (writer layoutWriter) addHeldObject(ctx context.Context, input ObjectInput,
 		return Descriptor{}, "", err
 	}
 	configType := MediaDeliveryObjectConfig
-	if writer.plain {
+	if input.helmEvidence {
+		configType = MediaOctetStream
+	} else if writer.plain {
 		configBytes = []byte("{}")
 		configType = MediaEmptyConfig
 	}
@@ -364,6 +377,11 @@ func (writer layoutWriter) addHeldObject(ctx context.Context, input ObjectInput,
 	}
 	manifest := ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest, ArtifactType: input.ArtifactType,
 		Config: config, Layers: []Descriptor{layer}, Subject: input.subject, Annotations: input.annotations}
+	if input.helmEvidence {
+		// A schema-typed opaque config carries the NVKR binding without requiring
+		// artifactType (OCI's empty-config profile would require that field).
+		manifest.ArtifactType = ""
+	}
 	descriptor, err := writer.addJSONBlob(manifest, MediaOCIManifest)
 	if err != nil {
 		return Descriptor{}, "", err

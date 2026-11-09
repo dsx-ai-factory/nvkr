@@ -166,7 +166,8 @@ The [domain vocabulary](../CONTEXT.md) defines six high-level public objects:
 
 A binary bundle or generic OCI bundle is an Artifact format. Generic bundles wrap one pinned producer's
 gzip tar archive and receive a bounded delivered-file inventory. AICR renderers use this path without new
-profile or lifecycle objects; native Helm charts retain their own media contract. See
+profile or lifecycle objects; native Helm charts retain their standard Helm config and chart-layer media
+types, with NVKR typing and subject-bound evidence in separate publication records. See
 [ADR-25](adr/0025-generic-oci-bundles-and-aicr-producers.md) for integrity and evidence boundaries.
 Deployment topology and node placement are downstream concerns,
 without another NVKR authored object or generated realization.

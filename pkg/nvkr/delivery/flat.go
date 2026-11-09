@@ -26,7 +26,7 @@ const outputFormatHelm = "helm-oci"
 // The Helm OCI support media types (https://helm.sh/docs/topics/registries/), used
 // by BuildHelmChartArtifact so a packaged chart is a standards-conformant Helm OCI
 // artifact: real `helm pull`/`helm show`/`oras pull` resolve content purely from
-// these two media types, never from NVKR's own manifest-level ArtifactType.
+// these two media types. NVKR package typing stays in publication metadata.
 const (
 	MediaHelmConfig     = "application/vnd.cncf.helm.config.v1+json"
 	MediaHelmChartLayer = "application/vnd.cncf.helm.chart.content.v1.tar+gzip"
