@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -28,7 +29,7 @@ func lifecycleInputFlags() []cli.Flag {
 // so a filename that is never read cannot look as if it was checked.
 func rejectUnusedArguments(c *cli.Context, flag string) error {
 	if c.Args().Present() {
-		return e.New(e.CodeUsage, "%s accepts flags only; unexpected argument %q (pass it with --%s)", c.Command.HelpName, c.Args().First(), flag)
+		return e.New(e.CodeUsage, "%s accepts flags only; unexpected argument %q (its input is read only from --%s)", strings.TrimPrefix(c.Command.HelpName, c.App.Name+" "), c.Args().First(), flag)
 	}
 	return nil
 }

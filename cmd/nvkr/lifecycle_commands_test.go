@@ -268,8 +268,9 @@ func TestLifecycleCommandsRejectInvalidInputs(t *testing.T) {
 
 func TestFlagOnlyInspectionCommandsRejectUnusedArguments(t *testing.T) {
 	lifecycleCommandRepo(t)
-	const definition = "docs/examples/nvke-tutorial/definition.yaml"
-	const catalog = "inputs/catalogs/nvke/module-tags"
+	// Missing inputs prove rejection happens before any loader runs.
+	const definition = "missing.yaml"
+	const catalog = "missing-catalog"
 	for _, tc := range []struct {
 		name string
 		args []string
@@ -277,7 +278,7 @@ func TestFlagOnlyInspectionCommandsRejectUnusedArguments(t *testing.T) {
 	}{
 		{"definition validate", []string{"definition", "validate", "--definition", definition, "--ui", "plain", "typo.yaml"}, "--definition"},
 		{"definition inspect", []string{"definition", "inspect", "--definition", definition, "--ui", "plain", "typo.yaml"}, "--definition"},
-		{"definition pin", []string{"definition", "pin", "--definition", "missing.yaml", "--check", "typo.yaml"}, "--definition"},
+		{"definition pin", []string{"definition", "pin", "--definition", definition, "--check", "typo.yaml"}, "--definition"},
 		{"catalog validate", []string{"catalog", "validate", "--data", catalog, "--ui", "plain", "nvkectl"}, "--data"},
 		{"catalog list", []string{"catalog", "list", "--data", catalog, "--ui", "plain", "nvkectl"}, "--data"},
 		{"catalog digest", []string{"catalog", "digest", "--data", catalog, "--ui", "plain", "nvkectl"}, "--data"},
