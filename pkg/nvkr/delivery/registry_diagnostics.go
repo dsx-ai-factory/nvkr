@@ -192,11 +192,17 @@ func (observer *registryObserver) explain(ctx context.Context, err error) error 
 	// Preserve the whole wrapper, including immutable locators and uncertainty
 	// guidance; observing a readback 404 must not reclassify it as a push refusal.
 	var coded *e.Error
-	if !errors.As(err, &coded) {
+	_ = errors.As(err, &coded)
+	var response *transport.Error
+	var network registryNetworkError
+	registryCause := errors.As(err, &response) || errors.As(err, &network)
+	if !registryCause && (coded == nil || (coded.Code != e.CodeVerifyFailed && coded.Code != e.CodeInvalidCatalog && coded.Code != e.CodeEngineCapability)) {
+		return err // Local failures do not inherit the last registry response.
+	}
+	if coded == nil {
 		err = registryOperationError(ctx, err, "registry operation failed", !observer.readOnly)
 		_ = errors.As(err, &coded)
 	}
-	var response *transport.Error
 	if errors.As(err, &response) && response.Request != nil {
 		report.LastOperation, report.LastStatus = registryRequestStage(response.Request), response.StatusCode
 		report.ManifestMediaType = "unknown"
@@ -229,6 +235,11 @@ func (observer *registryObserver) explain(ctx context.Context, err error) error 
 		if observer.readOnly && (coded.Code == e.CodeTimeout || coded.Code == e.CodeUnavailable) {
 			action = "Check the endpoint, TLS trust, DNS and connectivity, then retry the bounded read-only check; no upload was attempted."
 		}
+	}
+	if !registryCause {
+		// Keep useful owner-specific guidance without attributing local errors
+		// to the registry or attaching the status of an unrelated request.
+		return fmt.Errorf("%w; %s", err, action)
 	}
 	if report.LastOperation == "api-check" && report.BaseStatus == http.StatusNotFound {
 		action = "The V2 base endpoint was not found; check the registry endpoint and proxy routing. This does not establish an older supported API."

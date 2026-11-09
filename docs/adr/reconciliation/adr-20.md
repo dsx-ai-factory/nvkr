@@ -42,5 +42,9 @@ The internal `factory registry-check` adapter prints the same report. Local resp
 optional/missing version headers, authentication, missing endpoints, proxy HTML, distinct blob/manifest/
 evidence/referrer failures and safe network causes. The exact OCI specification version and untested
 features remain unknown. These protocol-response contracts do not require a vendor certification matrix.
+Regressions keep local cleanup and integrity errors separate from registry status observations while
+preserving their coded causes and applicable guidance; joined registry/cleanup failures retain both causes.
+Helm tag refusals classify HTTP 401/403 and structured denials as `registry-auth-failed`, preserving
+authentication precedence and the existing handling of other permanent and transient tag failures.
 Write probes remain absent; the library's mutating, asynchronously cleaned-up push-permission helper is not
 used. Live registry/version coverage and hosted validation of these changes remain unverified.

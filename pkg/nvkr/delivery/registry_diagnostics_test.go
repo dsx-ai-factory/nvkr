@@ -315,3 +315,53 @@ func TestRegistryObservationCleanupPreservesUnavailable(t *testing.T) {
 		t.Fatal("missing endpoint produced a success reference")
 	}
 }
+
+func TestRegistryObservationKeepsLocalFailuresSeparate(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		code   e.Code
+		action string
+	}{
+		{"scratch cleanup", e.CodeImmutableViolation, ""},
+		{"local availability", e.CodeUnavailable, ""},
+		{"local integrity", e.CodeVerifyFailed, "Check exact manifest/blob digests"},
+		{"local tag validation", e.CodeInvalidCatalog, "Check the named tag"},
+		{"local capability", e.CodeEngineCapability, "choose an admitted alternative"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			ctx, observer := observeRegistry(t.Context())
+			observer.report.LastOperation = "manifest-upload"
+			observer.report.LastStatus = http.StatusCreated
+			cause := errors.New("local filesystem failure")
+			local := e.Wrap(test.code, cause, "%s", test.name)
+			err := observer.explain(ctx, local)
+			assertRegistryCode(t, err, test.code)
+			var registryFailure *RegistryFailure
+			if errors.As(err, &registryFailure) || strings.Contains(err.Error(), "HTTP=") || strings.Contains(err.Error(), "connectivity") {
+				t.Fatalf("local failure was attributed to the registry: %v", err)
+			}
+			if !errors.Is(err, cause) || !errors.Is(err, local) || !strings.Contains(err.Error(), test.action) {
+				t.Fatalf("local cause or owner guidance was lost: %v", err)
+			}
+			if test.action == "" && err != local {
+				t.Fatalf("local error without registry guidance was changed: %v", err)
+			}
+		})
+	}
+}
+
+func TestRegistryObservationRetainsRegistryFailureJoinedWithCleanup(t *testing.T) {
+	ctx, observer := observeRegistry(t.Context())
+	observer.report.LastOperation = "manifest-readback"
+	observer.report.LastStatus = http.StatusNotFound
+	response := &transport.Error{StatusCode: http.StatusNotFound}
+	registryErr := registryReadbackError(ctx, response, "reading back immutable publication")
+	cleanup := e.New(e.CodeImmutableViolation, "removing disk upload scratch")
+	err := observer.explain(ctx, errors.Join(registryErr, cleanup))
+	assertRegistryCode(t, err, e.CodeUnavailable)
+	var failure *RegistryFailure
+	if !errors.As(err, &failure) || !errors.Is(err, response) || !errors.Is(err, cleanup) ||
+		!strings.Contains(err.Error(), "publication readback is incomplete") {
+		t.Fatalf("registry or cleanup cause was lost: %v", err)
+	}
+}

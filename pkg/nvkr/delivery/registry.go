@@ -391,9 +391,13 @@ func isNotFoundError(err error) bool {
 // succeed instead of surfacing a coded input error. 408 and 429 are
 // transient in the pinned registry transport even though they are 4xx
 // responses, so both are reported as CodeUnavailable rather than a
-// permanent catalog error.
+// permanent catalog error. Authentication/authorization refusals take
+// precedence and use CodeRegistryAuthFailed, including structured denials.
 func helmTagPublishError(err error, tag name.Tag, chart string) error {
 	var transportErr *transport.Error
+	if errors.As(err, &transportErr) && registryResponseCode(transportErr) == e.CodeRegistryAuthFailed {
+		return e.Wrap(e.CodeRegistryAuthFailed, err, "registry refused Helm chart tag %q for %q", tag.TagStr(), chart)
+	}
 	if errors.As(err, &transportErr) && transportErr.StatusCode >= 400 && transportErr.StatusCode < 500 &&
 		transportErr.StatusCode != http.StatusRequestTimeout && transportErr.StatusCode != http.StatusTooManyRequests {
 		return e.Wrap(e.CodeInvalidCatalog, err, "registry rejected Helm chart tag %q for %q", tag.TagStr(), chart)
