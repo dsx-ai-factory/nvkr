@@ -83,6 +83,31 @@ func TestRunGraphFormats(t *testing.T) {
 	}
 }
 
+func TestRunGraphOutputFocusIsSmallerAndMarked(t *testing.T) {
+	lifecycleCommandRepo(t)
+	decode := func(args ...string) planview.Graph {
+		t.Helper()
+		output, err := invokeLifecycleCLI(t, append([]string{"run", "graph", "--plan", ".github/nvkr-run/plan.json", "--format", "json"}, args...)...)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var graph planview.Graph
+		if err := json.Unmarshal([]byte(output), &graph); err != nil {
+			t.Fatal(err)
+		}
+		return graph
+	}
+	full, focused := decode(), decode("--output", "controller-chart")
+	if focused.Output != "controller-chart" || focused.PlanDigest != full.PlanDigest || len(focused.Vertices) == 0 || len(focused.Vertices) >= len(full.Vertices) || len(focused.Edges) >= len(full.Edges) {
+		t.Fatalf("focus did not narrow the graph: %d/%d vertices, %d/%d edges", len(focused.Vertices), len(full.Vertices), len(focused.Edges), len(full.Edges))
+	}
+	for _, vertex := range focused.Vertices {
+		if vertex.Key == "output/nvkectl" {
+			t.Fatal("unrelated output kept")
+		}
+	}
+}
+
 func TestRunDiffCountsAllChangesAndSupportsExitStatus(t *testing.T) {
 	lifecycleCommandRepo(t)
 	before := ".github/nvkr-run/plan.json"
@@ -144,6 +169,8 @@ func TestPlanViewCommandsRejectBeforeOutput(t *testing.T) {
 		{"extra arguments", []string{"run", "plan", "--plan", "missing", "argument"}, e.CodeUsage},
 		{"bad graph view", []string{"run", "graph", "--plan", "missing", "--view", "unknown"}, e.CodeUsage},
 		{"bad graph format", []string{"run", "graph", "--plan", "missing", "--format", "unknown"}, e.CodeUsage},
+		{"unknown graph output", []string{"run", "graph", "--plan", ".github/nvkr-run/plan.json", "--output", "no-such-output"}, e.CodeUsage},
+		{"empty graph output", []string{"run", "graph", "--plan", ".github/nvkr-run/plan.json", "--output", ""}, e.CodeUsage},
 		{"bad diff format", []string{"run", "diff", "--before", "missing", "--after", "missing", "--format", "unknown"}, e.CodeUsage},
 		{"JSON details before input", []string{"run", "diff", "--before", "missing", "--after", "missing", "--format", "json", "--details"}, e.CodeUsage},
 		{"JSON details with valid plans", []string{"run", "diff", "--before", ".github/nvkr-run/plan.json", "--after", ".github/nvkr-run/plan.json", "--format", "json", "--details"}, e.CodeUsage},

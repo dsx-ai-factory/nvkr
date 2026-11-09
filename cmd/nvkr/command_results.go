@@ -52,6 +52,9 @@ func graphDisplay(graph planview.Graph) commandDisplay {
 	if graph.View == "producers" {
 		display.Title = "Planned producers"
 	}
+	if graph.Output != "" {
+		display.Fields = append(display.Fields, commandFields("Output", graph.Output)...)
+	}
 	dependencies := make(map[string][]string)
 	for _, edge := range graph.Edges {
 		dependencies[edge.To] = append(dependencies[edge.To], edge.From)
