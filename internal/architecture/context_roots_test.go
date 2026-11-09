@@ -49,6 +49,7 @@ const (
 var contextRootExceptions = map[contextRoot]contextRootException{
 	{"cmd/nvke-demo/main.go", "main", "Background"}:                                                                   {1, processRoot},
 	{"cmd/nvkr-disk-inspect/main.go", "main", "Background"}:                                                           {1, processRoot},
+	{"cmd/nvkr-results-publish/main.go", "main", "Background"}:                                                        {1, processRoot},
 	{"cmd/nvkr-site-identity-helper/main.go", "main", "Background"}:                                                   {1, processRoot},
 	{"cmd/nvkr/main.go", "main", "Background"}:                                                                        {1, processRoot},
 	{"internal/nvkedemo/support.go", "(*OwnedProcess).finish", "Background"}:                                          {3, boundedCleanup},

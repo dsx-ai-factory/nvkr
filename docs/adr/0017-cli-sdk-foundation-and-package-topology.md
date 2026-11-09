@@ -376,7 +376,7 @@ future qualified publication needs an authenticated commit protocol before expos
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
   `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, `trust`,
-  `qualificationorigin`, `qualificationoutcome`, `releasemanifest`, `testresults`, `validation`, `conformance`, and the separate M3-C `qualification` publisher.
+  `qualificationorigin`, `qualificationoutcome`, `releasemanifest`, `resultspublish`, `testresults`, `validation`, `conformance`, and the separate M3-C `qualification` publisher.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not
@@ -390,12 +390,15 @@ owns descriptive fields, format pins and limits. This adds no public lifecycle o
 check dispatch; `conformance` owns the supported suite/harness protocol, subject observations, capture
 and cleanup. Catalog, lifecycle, delivery and held-file owners retain their existing responsibilities.
 `qualificationoutcome` owns the qualification outcome schema, its strict decoding, the triggering event's
-description and text scrubbing, in lane **none (descriptive)**. It is a leaf that directly imports only the canonical
-codec, coded errors and held files. `releasemanifest` issues the pipeline-attested M4 release manifest
-(ADR-16 §5); it also admits an outcome's inputs before qualification and classifies its own result into an
-outcome. An outcome
+description, text scrubbing and the selection of the outcomes a Run publishes, in lane **none (descriptive)**. It
+is a leaf that directly imports only the canonical codec, coded errors and held files. `releasemanifest` issues
+the pipeline-attested M4 release manifest (ADR-16 §5); it also admits an outcome's inputs before qualification
+and classifies its own result into an outcome. An outcome
 points at qualification evidence and the release manifest by digest; it adds no public lifecycle object,
-receipt or authority.
+receipt or authority. `resultspublish` owns the proposed ADR-31 results index: the bucket layout, the TestGrid
+projection and the create-only publishing protocol, in the same lane. It writes through a store interface, holds
+no credential and links no cloud SDK; the separate `cmd/nvkr-results-publish` helper supplies the store and is not
+part of the release CLI.
 
 The standalone query/diff selector workflow is removed; inspect the current lifecycle views directly.
 

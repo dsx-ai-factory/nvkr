@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="nvke-m2" tests="1" failures="1" skipped="0">
+  <testcase name="qualify">
+    <failure message="NVKR-E-TRUST-POLICY-MISSING: policy refused at éééééééééé … éééééééééééééééééééééééééééééééééé">NVKR-E-TRUST-POLICY-MISSING: policy refused at éééééééééé … éééééééééééééééééééééééééééééééééé</failure>
+  </testcase>
+</testsuite>
