@@ -9,12 +9,18 @@ import (
 	"strings"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/tekton"
 )
 
 // admitReferenceInvocation permits reuse only within one immutable GitHub run,
 // from its current or an earlier attempt. It describes scope, not authenticity;
 // the caller must still authenticate the exact predicate and publication bytes.
 func admitReferenceInvocation(candidate, current string) error {
+	// Tekton has no admitted retry reuse. The complete UID-bound invocation
+	// must match; authentication remains with the selected provider and signer.
+	if candidate == current && tekton.ValidateInvocation(current) == nil {
+		return nil
+	}
 	parse := func(raw string) (string, uint64, bool) {
 		u, err := url.Parse(raw)
 		if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.Opaque != "" ||

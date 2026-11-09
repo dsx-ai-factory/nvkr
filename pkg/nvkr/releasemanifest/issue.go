@@ -15,6 +15,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualification"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationpolicy"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 )
 
@@ -39,6 +40,8 @@ type Options struct {
 // one release manifest under the qualification identity.
 type Issuer struct {
 	newSigner func(identity string) (manifestSigner, error)
+	tekton    *qualificationpolicy.Tekton
+	readOnly  bool
 }
 
 type manifestSigner interface {
@@ -122,6 +125,9 @@ func (receipt *Receipt) require() error {
 // manifest on the publication root. It never rebuilds or substitutes artifact
 // bytes. An attestation failure may leave an attachment and never succeeds.
 func (issuer *Issuer) Issue(ctx context.Context, checks *lifecycle.ArtifactCheckReceipt, evidence []byte, policy Policy) (*Receipt, error) {
+	if issuer != nil && issuer.tekton != nil {
+		return nil, e.New(e.CodeUntrustedSigner, "Tekton manifest issuance requires its live qualifier invocation")
+	}
 	if checks == nil {
 		return nil, e.New(e.CodeGateUnmet, "release manifest requires a live artifact check receipt")
 	}
@@ -129,6 +135,12 @@ func (issuer *Issuer) Issue(ctx context.Context, checks *lifecycle.ArtifactCheck
 }
 
 func (issuer *Issuer) issue(ctx context.Context, checks checkReceipt, evidence []byte, policy Policy) (*Receipt, error) {
+	return issuer.authenticate(ctx, checks, evidence, policy, nil)
+}
+
+// authenticate shares every completeness and per-subject verification gate
+// between issuance and verification. A non-nil expected document never signs.
+func (issuer *Issuer) authenticate(ctx context.Context, checks checkReceipt, evidence []byte, policy Policy, expected []byte) (*Receipt, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "release manifest issuance requires a context")
 	}
@@ -137,6 +149,9 @@ func (issuer *Issuer) issue(ctx context.Context, checks checkReceipt, evidence [
 	}
 	if issuer == nil || issuer.newSigner == nil {
 		return nil, e.New(e.CodeEngineCapability, "release manifest issuer is unavailable")
+	}
+	if issuer.readOnly && expected == nil {
+		return nil, e.New(e.CodeEngineCapability, "manifest verifier cannot issue attestations")
 	}
 	identity := policy.QualificationIdentity
 	if identity == "" || strings.TrimSpace(identity) != identity || strings.ContainsAny(identity, " \t\r\n") {
@@ -173,6 +188,9 @@ func (issuer *Issuer) issue(ctx context.Context, checks checkReceipt, evidence [
 	if decoded.ToolSmoke.PolicyDigest != policy.QualificationPolicyDigest {
 		return nil, e.New(e.CodeTrustPolicyMissing, "qualification evidence was produced under another qualification policy")
 	}
+	if (issuer.tekton == nil) != (decoded.ToolSmoke.Policy.Tekton == nil) || (issuer.tekton != nil && *issuer.tekton != *decoded.ToolSmoke.Policy.Tekton) {
+		return nil, e.New(e.CodeTrustPolicyMissing, "release manifest differs from selected provider trust")
+	}
 	manifest, err := fromEvidence(decoded, members)
 	if err != nil {
 		return nil, err
@@ -180,6 +198,9 @@ func (issuer *Issuer) issue(ctx context.Context, checks checkReceipt, evidence [
 	raw, err := manifest.Canonical()
 	if err != nil {
 		return nil, err
+	}
+	if expected != nil && !bytes.Equal(raw, expected) {
+		return nil, e.New(e.CodeVerifyFailed, "release manifest differs from complete authenticated qualification evidence")
 	}
 	digest, err := manifest.Digest()
 	if err != nil {
@@ -219,8 +240,10 @@ func (issuer *Issuer) issue(ctx context.Context, checks checkReceipt, evidence [
 	if err := recheck("before manifest attestation"); err != nil {
 		return nil, err
 	}
-	if err := signer.AttestReleaseManifest(ctx, root, raw); err != nil {
-		return nil, withContext(err, "release manifest attestation failed; an attachment may remain")
+	if expected == nil {
+		if err := signer.AttestReleaseManifest(ctx, root, raw); err != nil {
+			return nil, withContext(err, "release manifest attestation failed; an attachment may remain")
+		}
 	}
 	if err := recheck("before manifest verification"); err != nil {
 		return nil, err

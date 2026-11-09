@@ -29,8 +29,10 @@ implementation of rendered strings that must be kept in sync.
 
 ### 1. One IR, many adapters — topology/transport only
 
-The maintained GitHub adapter and local runner use the same producer IR. GitLab, Tekton and Argo generation
+The maintained GitHub adapter and local runner use the same producer IR. GitLab and Argo generation
 are unavailable; their unused adapters are removed, as are the separate qualified GitHub/GitLab renderers.
+Tekton's cluster execution and independent key policy are specified below. Generation admits only that
+explicit contract; reconciliation records implementation checks and external acceptance separately.
 The former GitLab-only `runtime.builderImage` schema field has no retained adapter and any nonempty value
 fails capability admission. GitHub uses its pinned setup-go action for source bootstrap. The generator's
 own build selects how bootstraps obtain the runner. Any build of a local checkout emits bootstraps that install
@@ -72,6 +74,71 @@ edges, package membership and terminal-observation gates, and publication/signin
 admitted inputs. Missing, extra or substituted operations, artifacts or edges fail before execution or emission.
 Only the local runner may relocate admitted artifact paths into its selected workspace; a serialized path does
 not grant relocation authority.
+
+#### Tekton execution, signing and qualification contract
+
+This is the implementation contract for the Tekton adapter, not recorded provider acceptance. Its status
+and exact exercised scope belong to reconciliation. Tekton uses `tekton.dev/v1` PipelineRuns with embedded
+PipelineSpecs and TaskSpecs. The complete canonical Plan, shared execution graph and NVKR runner own
+producer instructions, dependency conditions, artifact membership and completion. Kubernetes resources
+schedule those operations and carry their declared inputs/results; they do not contain replacement build
+scripts. Mutable Task references, remote resolvers and implicit retries are not admitted.
+
+The operator independently selects the API endpoint, its certificate authority, namespace, native platform,
+runner image, per-task runtime image and signer-role policy. Runner and runtime images are digest-pinned.
+Each invocation binds the API endpoint, namespace, PipelineRun name and UID, complete Plan digest and exact
+embedded execution specification. Each task additionally binds its TaskRun UID, sole controlling PipelineRun,
+task name, embedded TaskSpec and service account. A caller-supplied UID, label, result or digest grants no
+authority until the owning provider module authenticates the complete binding through the selected TLS API.
+The client uses explicit credentials and roots, no ambient kubeconfig, proxy or system-root fallback, bounded
+requests and responses, and no redirects. Unknown, substituted, failed, deleted, retried or canceled execution
+cannot issue a successful transport receipt. Kubernetes and Tekton control-plane administrators are trusted
+to preserve these records; this is an explicit provider trust boundary, not protection against the cluster owner.
+
+Each producer task receives its own container daemon and private scratch volume. There is no host Docker
+socket or shared privileged daemon. The NVKR launcher still owns pinned toolchain execution, declared
+network isolation, read-only source, private output and credential scrubbing. API, registry and signing
+credentials belong to the orchestration steps and must never enter producer containers. Publisher and
+qualifier use distinct service accounts and independently selected public keys; only their respective tasks
+mount their private key. A test-only kind installation creates fresh, distinct keys in its isolated namespace.
+Those keys establish only the explicitly selected cluster's trust; they are neither GitHub identities nor a
+public Fulcio issuer. No Tekton path synthesizes `GITHUB_*` variables or consumes GitHub credentials.
+
+The native cluster route requires `per-output-v1`, public source and toolchain acquisition, and anonymous
+registry transport. GitHub credential references, private image readers, object-store destinations,
+mutable aliases and disk execution classes fail capability admission. Anonymous transport describes
+registry access, not trust: complete exact-byte signature and publication verification remain mandatory.
+The per-task Docker sidecar is privileged. Use a dedicated trusted cluster or node pool; this does not
+provide isolation against hostile tenants or a compromised node administrator.
+
+Artifact transport binds exact named Plan artifacts to producer and consumer tasks, Run/TaskRun UIDs and
+content digests. A completed TaskRun result authenticated through the provider API binds the transported
+carrier; every consumer checks the received bytes and the exhaustive carrier membership before restoring
+inputs. A writable workspace, arbitrary path or unauthenticated digest file is insufficient. Missing,
+substituted, sibling, cross-Run and corrupted carriers fail closed. Artifact transport never grants release
+or qualification authority.
+
+Publication retains ADR-20's digest-addressed OCI roots and exact named-output membership. Signing retains
+ADR-04's held executable, exact-byte and independently selected trust requirements under an explicit cluster
+key policy. The production predicate identifies the Tekton invocation and builder, never the local or GitHub
+builder. An independent qualifier verifies the complete published closure and required checks before signing
+its subject-bound qualification claim; consumers reverify the published bytes under their own policy.
+These are pipeline-attested artifact qualification claims in ADR-16's sense. They do not satisfy the distinct
+`qualified` lane's exact-byte reproduction and clearance requirements, which remain capability-rejected.
+
+A `finally` task performs exact required-operation accounting even after a producer failure. Its inputs must
+not depend on a successful producer's result variable being present: missing results must be reported rather
+than causing the finalizer to be skipped. Tasks and finalization have separate bounded time budgets within
+the PipelineRun deadline. Cancellation never becomes success; graceful cancellation schedules finalization,
+while force cancellation or provider loss may prevent it. In those cases absence of a completed, authenticated
+Run is failure, not acceptance. No retry or recovered finalizer can erase an earlier required failure.
+
+Acceptance uses a pinned native single-platform selection of the maintained core Definition, without OS
+images; the other platform is refused before work. The same kind harness runs locally and in CI. It pins
+kind, Kubernetes, Tekton and the in-cluster OCI registry, executes real NVKR producers, publishes and signs
+their outputs, runs independent qualification and verifies the published closure. It also exercises producer
+failure, omitted and corrupted transport, and cancellation. A smaller synthetic fixture or unit-test fake
+does not establish that acceptance.
 
 #### Required engine capability and transport contract
 

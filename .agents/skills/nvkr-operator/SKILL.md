@@ -123,8 +123,9 @@ or run unrelated instructions.
 - Actual output identities and Run/evidence locations; distinguish planned, built, published and signed
   operations.
 - Evidence lane: `static-unqualified` for previews; `unqualified-local-execution` for successful local execution;
-  `pipeline-attested` only for supported hosted production
-  evidence. Signing alone does not establish that lane's complete claim.
+  `pipeline-attested` only for admitted GitHub or explicitly trusted Tekton production
+  evidence. Signing alone does not establish that lane's complete claim; consult reconciliation for
+  external acceptance of the selected provider.
 - Successful `release verify` results with their exact `--lane`, `--scope` and policy: `authenticity` verifies
   signatures/evidence without payload downloads; `artifact-publication` also checks selected payload bytes.
   Browsing and export are metadata only; pulling checks the selected output's complete payload integrity without

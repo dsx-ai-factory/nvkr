@@ -259,8 +259,21 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 		return nil, nil, err
 	}
 	signing := plan.Environment.Signing
-	if signing == nil || signing.Mode != factory.SigningModeCosign || signing.Issuer != "https://token.actions.githubusercontent.com" {
+	if signing == nil || signing.Mode != factory.SigningModeCosign {
 		return nil, nil, e.New(e.CodeEngineCapability, "artifact qualification requires live GitHub build signing")
+	}
+	var publicKey string
+	if plan.Environment.Tekton != nil {
+		trusted, ok := source.(*tektonQualificationSource)
+		if !ok {
+			return nil, nil, e.New(e.CodeProvenanceMissing, "Tekton qualification requires its provider-authenticated task")
+		}
+		if err := trusted.requirePlan(&plan); err != nil {
+			return nil, nil, err
+		}
+		publicKey = plan.Environment.Tekton.PublisherPublicKey
+	} else if signing.Issuer != "https://token.actions.githubusercontent.com" {
+		return nil, nil, e.New(e.CodeEngineCapability, "artifact qualification requires its admitted provider signing policy")
 	}
 	pattern, err := regexp.Compile(signing.Identity)
 	if err != nil || !pattern.MatchString(origin.BuilderID) {
@@ -269,6 +282,9 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 	policy := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication,
 		IdentityRegexp: "^" + regexp.QuoteMeta(origin.BuilderID) + "$", Issuer: signing.Issuer,
 		MinimumDiskEvidence: DiskEvidenceBuildProvenance}
+	if publicKey != "" {
+		policy.PublicKey, policy.KeyIdentity = publicKey, origin.BuilderID
+	}
 	if consumer == nil || (consumer.verifier == nil && consumer.verifierFor == nil) || consumer.qualificationMaterializer() == nil {
 		return nil, nil, e.New(e.CodeEngineCapability, "artifact qualification requires signature and registry adapters")
 	}

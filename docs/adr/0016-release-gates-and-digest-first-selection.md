@@ -391,6 +391,17 @@ requests issuance explicitly in the same process; development qualification cann
 manifest. The retained operation owns and closes the source, invocation, artifact and smoke receipts.
 It preserves qualification diagnostics on a later manifest failure and reports the overall operation as failed.
 
+For ADR-18's Tekton route, the same artifact, native smoke, qualification and manifest gates use independently
+selected cluster public keys instead of GitHub certificates. A live authenticated factory task issues the
+source and invocation receipts; decoded provider records cannot do so. The smoke task signs its exact native
+report with a distinct worker key. The qualifier authenticates that signature, successful TaskRun UID,
+complete member coverage and fresh artifact checks before attaching qualification evidence and issuing the
+manifest. The finalizer holds no private key: it repeats published-byte artifact checks, verifies the exact
+qualification evidence on every member, and verifies the complete manifest on the publication root.
+All three stages bind the same Plan and PipelineRun UID. Consumer trust must be selected independently;
+public keys embedded in downloaded evidence never authorize themselves. These claims remain
+`pipeline-attested`, with no runtime conformance or exact-byte reproduction claim.
+
 An opaque manifest receipt is returned only after that verification; decoding a manifest cannot restore it.
 Attestation and verification are not atomic: an operational failure may leave a manifest attachment and is
 reported as a failed issuance. The release tag rule, tag creation, publisher exclusion, consumer manifest

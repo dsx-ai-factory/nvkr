@@ -35,15 +35,15 @@ type GeneratedBundle struct {
 // inputs. It is intentionally callable before catalog resolution.
 func ValidateGenerationEngine(engine string) error {
 	switch strings.ToLower(strings.TrimSpace(engine)) {
-	case EngineGitHub:
+	case EngineGitHub, EngineTekton:
 		return nil
-	case EngineGitLab, EngineTekton, EngineArgo:
+	case EngineGitLab, EngineArgo:
 		return e.New(e.CodeEngineCapability,
-			"factory generation for %s is unavailable; the supported hosted engine is github", engine)
+			"factory generation for %s is unavailable; supported engines are github and tekton", engine)
 	case "local":
 		return e.New(e.CodeUsage, "local execution uses `run local`, not `run generate`")
 	default:
-		return e.New(e.CodeUsage, "unknown factory generation engine %q (github)", engine)
+		return e.New(e.CodeUsage, "unknown factory generation engine %q (github, tekton)", engine)
 	}
 }
 
@@ -57,6 +57,12 @@ func ValidateGenerationEngine(engine string) error {
 func Render(ctx context.Context, plan *Plan, engine string) (*GeneratedBundle, error) {
 	if err := ValidateGenerationEngine(engine); err != nil {
 		return nil, err
+	}
+	if strings.EqualFold(strings.TrimSpace(engine), EngineTekton) {
+		if ProjectionAdapterSelected(ctx) {
+			return nil, e.New(e.CodeEngineCapability, "Tekton does not admit GitHub projection plugins")
+		}
+		return renderTekton(ctx, plan)
 	}
 	return renderSelected(ctx, plan)
 }
@@ -81,6 +87,13 @@ var renderSelected = func(ctx context.Context, plan *Plan) (*GeneratedBundle, er
 func CheckGenerated(ctx context.Context, plan *Plan, engine, root string) error {
 	if err := ValidateGenerationEngine(engine); err != nil {
 		return err
+	}
+	if strings.EqualFold(strings.TrimSpace(engine), EngineTekton) {
+		bundle, err := Render(ctx, plan, engine)
+		if err != nil {
+			return err
+		}
+		return CheckGeneratedBundle(ctx, root, bundle)
 	}
 	_, err := checkCoreGitHubBundle(ctx, plan, root)
 	return err

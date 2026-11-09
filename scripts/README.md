@@ -18,6 +18,11 @@ The launcher runs in a child shell, so failure does not change the caller's SSH 
 
 ## Repository CI tests
 
+`test-tekton-kind.sh` runs the native AMD64 core Definition in an owned kind cluster with pinned Tekton
+and an in-cluster registry. The [Tekton guide](../docs/generate-pipeline.md#tekton-cluster-execution)
+lists prerequisites, trust scope and retained evidence. The GitHub acceptance workflow runs this same
+command; it needs no publishing secrets. This explicit integration test fails when prerequisites are absent.
+
 `ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's eleven
 test jobs. It includes examples and fuzz seed tests, and requires exact completion of the discovered
 selection. New packages and tests need no allowlist update. `make test-shard` reproduces one matrix

@@ -77,13 +77,27 @@ func productionOCISigner(_ context.Context, plan *Plan, node Node, artifacts map
 		if err != nil {
 			return nil, err
 		}
-		return sign.NewCosignOCISigner(sign.CosignOCIOptions{
+		options := sign.CosignOCIOptions{
 			Binary:       tool.Path,
 			BinaryDigest: toolExecutableDigest(plan, plan.Definition.CosignTool),
 			Identity:     signing.Identity,
 			Issuer:       signing.Issuer,
 			Credential:   credential,
-		})
+		}
+		if settings := plan.Environment.Tekton; settings != nil {
+			digest, err := plan.IdentityDigest()
+			if err != nil {
+				return nil, err
+			}
+			if err := plan.tektonExecution.RequirePlan(digest, tektonNodeAccount(node)); err != nil {
+				return nil, err
+			}
+			options.KeyTrust = &sign.OCIKeyTrust{PublicKey: []byte(settings.PublisherPublicKey),
+				Identity: settings.APIServer + "/api/v1/namespaces/" + settings.Namespace + "/serviceaccounts/nvkr-publisher"}
+			options.PrivateKeyPath = "/nvkr/keys/private.pem"
+			options.PlainHTTP = plan.Environment.Publication.PlainHTTP
+		}
+		return sign.NewCosignOCISigner(options)
 	default:
 		return nil, e.New(e.CodeEngineCapability, "delivery signing mode %q has no adapter", signing.Mode)
 	}

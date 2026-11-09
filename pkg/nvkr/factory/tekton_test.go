@@ -1,0 +1,137 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package factory
+
+import (
+	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"encoding/json"
+	"encoding/pem"
+	"net/http/httptest"
+	"os"
+	"regexp"
+	"testing"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationpolicy"
+)
+
+func tektonTestPlan(t *testing.T) *Plan {
+	t.Helper()
+	plan := signedTestPlan(t, cosignSigningProfile(), Target{Kind: TargetOCI, Ref: "registry.example.invalid/test", Anonymous: true})
+	server := httptest.NewTLSServer(nil)
+	defer server.Close()
+	key := func() string {
+		private, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		der, err := x509.MarshalPKIXPublicKey(&private.PublicKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der}))
+	}
+	env := plan.Environment.Clone()
+	env.RunsOn = ""
+	env.Publication.Mode = "per-output-v1"
+	env.Runtime.Runtime = "docker"
+	env.Tekton = &definition.TektonExecution{Namespace: "nvkr", Platform: "linux/amd64",
+		APIServer: "https://kubernetes.default.svc", CertificateAuthority: string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})),
+		RunnerImage: env.UtilityContainer, RuntimeImage: env.UtilityContainer, StorageClass: "standard", WorkspaceGiB: 20,
+		PublisherPublicKey: key(), QualifierPublicKey: key(), SmokePublicKey: key(),
+		Smoke: qualificationpolicy.Smoke{Images: map[string]string{"linux/amd64": "index.docker.io/library/" + env.UtilityContainer}, Tools: map[string]string{"nvkectl": "nvkectl-version-json"}}}
+	env.Signing = &definition.Signing{Mode: SigningModeCosign, Issuer: env.Tekton.APIServer,
+		Identity: "^" + regexp.QuoteMeta(env.Tekton.APIServer+"/api/v1/namespaces/nvkr/serviceaccounts/nvkr-publisher") + "$"}
+	stack, err := catalog.ApplyStack(plan.CatalogSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := Compile(t.Context(), plan.Definition, env, stack, plan.GeneratorVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return result
+}
+
+func TestTektonResourcesUseRunnerAndIsolateCredentials(t *testing.T) {
+	plan := tektonTestPlan(t)
+	first, err := renderTekton(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := renderTekton(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(first.Files[tektonResourcePath], second.Files[tektonResourcePath]) {
+		t.Fatal("Tekton rendering is nondeterministic")
+	}
+	var resources struct {
+		Items []struct {
+			Kind string `json:"kind"`
+			Spec struct {
+				PipelineSpec struct {
+					Tasks []struct {
+						Name     string
+						TaskSpec struct {
+							Steps []struct {
+								Command, Args []string
+								VolumeMounts  []struct{ Name string }
+							}
+							Sidecars []struct{ VolumeMounts []struct{ Name string } }
+							Volumes  []struct {
+								Name   string
+								Secret *struct{ SecretName string }
+							}
+						}
+					}
+				} `json:"pipelineSpec"`
+			} `json:"spec"`
+		} `json:"items"`
+	}
+	if err := json.Unmarshal(first.Files[tektonResourcePath], &resources); err != nil {
+		t.Fatal(err)
+	}
+	var count int
+	for _, item := range resources.Items {
+		if item.Kind == "Secret" {
+			t.Fatal("generated bundle included private credentials")
+		}
+		if item.Kind != "PipelineRun" {
+			continue
+		}
+		count++
+		for _, task := range item.Spec.PipelineSpec.Tasks {
+			if len(task.TaskSpec.Steps) != 1 {
+				t.Fatalf("task %s bypasses the single runner", task.Name)
+			}
+			step := task.TaskSpec.Steps[0]
+			if len(step.Command) != 1 || step.Command[0] != "/usr/local/bin/nvkr" || len(step.Args) < 3 || step.Args[0] != "factory" || step.Args[1] != "tekton" {
+				t.Fatal("task embeds build policy instead of invoking the runner")
+			}
+			for _, sidecar := range task.TaskSpec.Sidecars {
+				for _, mount := range sidecar.VolumeMounts {
+					if mount.Name != "work" && mount.Name != "docker-data" && mount.Name != "docker-socket" {
+						t.Fatal("container daemon received provider credentials or transported inputs")
+					}
+				}
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatal("expected exactly one embedded PipelineRun")
+	}
+	// An explicit diagnostic export lets the pinned kind acceptance validate the
+	// same rendered bytes against its CRDs without committing machine material.
+	if destination := os.Getenv("NVKR_TEKTON_RENDER_PROBE"); destination != "" {
+		if err := os.WriteFile(destination, first.Files[tektonResourcePath], 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+}

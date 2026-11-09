@@ -5,6 +5,7 @@ package lifecycle
 
 import (
 	"context"
+	"strings"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
@@ -53,6 +54,11 @@ func generateFiles(ctx context.Context, definitionPath, environmentPath, generat
 	plan, err := CompileFiles(ctx, definitionPath, environmentPath, generatorVersion)
 	if err != nil {
 		return "", err
+	}
+	if strings.EqualFold(strings.TrimSpace(engine), factory.EngineTekton) {
+		if err := ValidateTektonPlan(plan); err != nil {
+			return "", err
+		}
 	}
 	if len(sourceCommit) != 0 {
 		if len(sourceCommit) != 1 || !runtimePlan || engine != factory.EngineGitHub {

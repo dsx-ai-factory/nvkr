@@ -95,6 +95,9 @@ type APTOutput struct {
 // Environment contains settings independently selected for one run. Publish
 // uses a registry namespace; output repositories and routes are derived.
 type Environment struct {
+	// Tekton selects the explicit cluster execution and signer trust contract.
+	// It contains public configuration only; credentials stay in scoped Secrets.
+	Tekton *TektonExecution `json:"tekton,omitempty"`
 	// GitHubBundle selects an independent generated workflow namespace; empty
 	// preserves the original generated Run paths. Paths are never authored.
 	GitHubBundle string `json:"githubBundle,omitempty"`
@@ -293,6 +296,9 @@ func (environment Environment) Validate() error {
 		return e.New(e.CodeInvalidCatalog, "environment has unsupported apiVersion/kind or invalid name")
 	}
 	if err := environment.validateObjectStores(); err != nil {
+		return err
+	}
+	if err := environment.validateTekton(); err != nil {
 		return err
 	}
 	if err := environment.ToolchainAccess.Validate(); err != nil {

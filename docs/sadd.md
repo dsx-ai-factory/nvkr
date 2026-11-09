@@ -43,6 +43,11 @@ A third tier, `static-unqualified`, describes plans and development runs without
 Dry-run signing stays in that tier. Selecting a signing mode or rendering a workflow does not itself prove that
 an artifact was signed. `pipeline-attested` never satisfies a gate requiring `qualified` evidence (ADR-16 §5).
 
+ADR-18 also defines the Tekton implementation contract: exact cluster-authenticated execution, isolated
+signer roles, digest-bound transport and publication, and independent artifact qualification. It uses
+the shared Plan, runner and lifecycle gates with explicit cluster public keys and native per-task runtimes.
+Reconciliation records external acceptance separately from that design and provider-authentication tests.
+
 The tool and its catalogs are separate products: the tool owns resolution and verification rules; catalogs
 provide reusable component producers and pins, including tool releases and GitHub actions.
 [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies) owns how generated

@@ -162,8 +162,9 @@ _Avoid_: Authored definition, execution observation
 
 **Generated execution bundle**:
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
-The maintained hosted engine is GitHub; no separate qualified renderer or authored transport-plan model is retained.
-Its entry workflow, shared composite templates and generated invocation data share one ownership manifest and
+GitHub uses hosted workflow identity; Tekton uses ADR-18's explicit cluster-authenticated execution and
+independent signer keys. No separate qualified renderer or authored transport-plan model is retained.
+The GitHub entry workflow, shared composite templates and generated invocation data share one ownership manifest and
 byte-exact drift gate. Actions expose fixed semantic interfaces for Plan operations; grouped work repeats those
 interfaces without generating group-size or output-count variants. Named invocation parameters are recomputed
 from the admitted Plan at runtime. Identical admitted step sequences can share descriptive YAML aliases;
