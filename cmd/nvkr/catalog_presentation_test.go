@@ -37,7 +37,7 @@ func catalogLeafArguments() map[string][]string {
 	return map[string][]string{
 		"source-pin": {"--data", "must-not-be-read", "source"},
 		"digest":     {"--data", "must-not-be-read"}, "validate": {"--data", "must-not-be-read"}, "list": {"--data", "must-not-be-read"},
-		"pin": {"--dir", "must-not-be-read", "source"}, "bump": {"--dir", "must-not-be-read", "source"},
+		"show": {"--data", "must-not-be-read", "component"}, "pin": {"--dir", "must-not-be-read", "source"}, "bump": {"--dir", "must-not-be-read", "source"},
 		"pin-artifacts": {"--dir", "must-not-be-read", "component"},
 		"refresh":       {"--config", "must-not-be-read"}, "update-ci": {},
 		"regenerate-overlays": {"--config", "must-not-be-read"},

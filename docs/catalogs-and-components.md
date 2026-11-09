@@ -127,6 +127,17 @@ A disk output currently selects its root and every transitive material producer 
 unrelated extras. Root-only selection does not expand dependencies automatically. See
 [node images](node-images.md) for the complete example.
 
+To see what to select, explain the root component:
+
+```sh
+bin/nvkr catalog show --data inputs/catalogs/node-images/release nvke-node-fde-amd64
+```
+
+It prints the producer mode, exact pins and platforms, the sorted material closure, and every binding
+edge, including each consumer of a shared material. Add `--format json` for a machine-readable copy.
+It explains declarations only: it changes no Definition or lock, fetches and builds nothing, and a listed
+platform is not a claim that the current host can execute it.
+
 ## Acquired executables
 
 A source `tool` selects an exact upstream executable with `format: raw`, `tar-gzip` or `zip`, an HTTPS

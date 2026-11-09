@@ -147,6 +147,45 @@ func cmdCatalog() *cli.Command {
 				},
 			},
 			{
+				Name:      "show",
+				Usage:     "explain one validated component: producer mode, pins, platforms and material closure",
+				ArgsUsage: "<component>",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"},
+					&cli.StringFlag{Name: "format", Value: "text", Usage: "text or json"},
+				},
+				Action: func(c *cli.Context) error {
+					view, err := selectCommandPresentation(c)
+					if err != nil {
+						return err
+					}
+					if c.Args().Len() != 1 {
+						return e.New(e.CodeUsage, "catalog show requires exactly one component name")
+					}
+					if format := c.String("format"); format != "text" && format != "json" {
+						return e.New(e.CodeUsage, "unknown component description format %q (use text or json)", format)
+					}
+					display := catalogCommandDisplay("Catalog component")
+					cat, err := catalog.LoadContext(c.Context, providerFor(c))
+					if err != nil {
+						return showCommandResult(c, view, display, err)
+					}
+					description, err := cat.Describe(c.Args().First())
+					if err != nil {
+						return showCommandResult(c, view, display, err)
+					}
+					if view.tui {
+						return showCommandResult(c, view, catalogComponentDescriptionDisplay(description), nil)
+					}
+					raw, err := description.Render(c.String("format"))
+					if err != nil {
+						return err
+					}
+					_, err = os.Stdout.Write(raw)
+					return err
+				},
+			},
+			{
 				Name:      "pin",
 				Usage:     "resolve a source release or exact Git commit to pins, then write the lock",
 				ArgsUsage: "<source>",
@@ -317,6 +356,71 @@ func catalogComponentsDisplay(loaded *catalog.Catalog, title string) commandDisp
 		}})
 	}
 	return display
+}
+
+// catalogComponentDescriptionDisplay presents the catalog-owned description:
+// the component's pins as fields, and each closure member as an item naming
+// the bindings that need it.
+func catalogComponentDescriptionDisplay(description catalog.ComponentDescription) commandDisplay {
+	display := catalogCommandDisplay("Catalog component")
+	display.Note = "Declarations only; platforms are not a claim that this host can execute them. Producer execution and release verification are separate."
+	add := func(label, value string) {
+		if value != "" {
+			display.Fields = append(display.Fields, progress.Field{Label: label, Value: value})
+		}
+	}
+	add("Catalog", description.Catalog)
+	add("Component", description.Name)
+	add("Producer mode", description.Mode)
+	add("Builder", description.BuilderType)
+	add("Output type", description.OutputType)
+	add("Platforms", strings.Join(description.Platforms, ", "))
+	if source := description.Source; source != nil {
+		add("Source repo", source.Repo)
+		add("Source tag", source.Tag)
+		add("Source commit", source.Commit)
+		add("Source tree hash", source.TreeHash)
+	}
+	if acquisition := description.Acquisition; acquisition != nil {
+		add("Acquired URL", acquisition.URL)
+		add("Acquired image", acquisition.Image)
+		add("Image parent digest", acquisition.ImageParentDigest)
+		for _, arch := range sortedKeys(acquisition.Digests) {
+			add(arch+" digest", acquisition.Digests[arch])
+		}
+	}
+	if tool := description.Tool; tool != nil {
+		add("Tool source", tool.Source)
+		add("Tool tag", tool.Tag)
+		add("Tool URL", tool.URL)
+		add("Tool archive digest", tool.ArchiveDigest)
+		add("Tool executable digest", tool.ExecutableDigest)
+	}
+	add("Toolchain image", description.ToolchainImage)
+	for _, arch := range sortedKeys(description.ToolchainImages) {
+		add(arch+" toolchain image", description.ToolchainImages[arch])
+	}
+	add("Exclusion reason", description.ExclusionReason)
+	add("Material closure", strconv.Itoa(len(description.Closure)))
+	for _, name := range description.Closure {
+		item := progress.Item{ID: name, Name: name, Kind: "material", State: "declared"}
+		for _, edge := range description.Edges {
+			if edge.Component == name {
+				item.Fields = append(item.Fields, progress.Field{Label: "Needed by", Value: edge.Consumer + " as " + edge.Binding})
+			}
+		}
+		display.Items = append(display.Items, item)
+	}
+	return display
+}
+
+func sortedKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // catalogUpdateState distinguishes check-only proposals from confirmed writes.
