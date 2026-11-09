@@ -22,6 +22,9 @@ has its separate maintenance owner, including its post-squash canonical-main re-
 
 ## Run a workflow branch before merging
 
+The following branch-dispatch instructions concern the unsigned NVKE E2E workflow.
+The separate full GPU-site candidate is described below.
+
 Push the branch used by your PR to your fork and enable Actions there if GitHub
 prompts you. The workflow must also exist on the fork's default branch for manual
 dispatch; sync an older fork with upstream after this workflow is merged.
@@ -115,3 +118,42 @@ that runner; these unsigned diagnostics grant no release or publication authorit
 The ARM64 build/publish/consume nightly is retired. Generated ARM64 producer
 workflows retain their existing admission policies, but no nightly invokes them
 or the legacy published-artifact consumer.
+
+## Dispatch a complete floating GPU-site candidate
+
+The generated `nvkr-run-nvke-nightly-gpu-site.yml` producer uses the complete
+[GPU-site composite](../inputs/definitions/nvke/gpu-site.composite.yaml) with its own
+[Environment](../inputs/environments/github-nvke-nightly-gpu-site.yaml). On first dispatch
+it freezes main once for `dsx-ai-factory/nvke`, `dsx-ai-factory/ovn-kubernetes`,
+`dsx-ai-factory/cluster-api-provider-nico` and `NVIDIA/aicr`. Toolchains, acquired
+dependencies and the Rancher source remain pinned. The production GPU-site workflow,
+namespace and pins are separate and unchanged.
+
+After maintainer configuration and merge to main, dispatch the generated producer:
+
+```sh
+gh workflow run nvkr-run-nvke-nightly-gpu-site.yml --repo dsx-ai-factory/nvkr --ref main
+```
+
+The producer is manual-only. The first bootstrap uploads `nvkr-runtime-inputs`; its
+`plan.json` contains `runtimeInputs.sources` (repository/ref/commit/tree/timestamp) and
+the exact captured authored input files. Every partition receives that frozen Plan.
+A retry restores the original same-Run artifact; it fails if that artifact has expired.
+Use a new dispatch to select newer main commits. Workflow topology or recipe changes
+still require reviewed regeneration.
+
+Publication is confined to `ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site` and its derived
+output repositories. The independent
+[qualification policy](../inputs/policies/nvke-nightly-gpu-site-qualification.yaml)
+generates a complete-composite qualifier and native smoke pair. Finalization and
+qualification replay the saved inputs and exact Git commits without re-resolving main.
+Artifact checks and smoke do not establish GPU-site deployment or exact-byte reproduction.
+No hosted floating-composite execution has been recorded.
+
+Maintainers must authorize the existing scoped registry writer and independent reader
+for this namespace, confirm source/private-transport readers and protected publishing/ARC
+environments, and admit the new exact main-workflow signer and qualification policy pair.
+Retain candidate manifests and exact source/material objects for at least the 14-day
+input/handoff artifact lifetime; authenticated source mirrors may supply retained commits.
+The input snapshot does not archive upstream Git objects. Missing exact inputs fail closed.
+Generation does not create credentials, registry permissions, retention policies or runners.

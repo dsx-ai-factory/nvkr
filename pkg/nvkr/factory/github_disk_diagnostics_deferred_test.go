@@ -59,7 +59,7 @@ func TestDeferredDiskEvidenceRejectsInspectionDiagnosticUpload(t *testing.T) {
 					}
 				}
 				job := document.Jobs[stage.ID]
-				job.Steps = append(job.Steps, githubInspectionDiagnosticStep(testActionRefs(t, plan), stage.DiskOutput))
+				job.Steps = append(job.Steps, githubInspectionDiagnosticStep(plan, testActionRefs(t, plan), stage.DiskOutput))
 				document.Jobs[stage.ID] = job
 				injected++
 			}

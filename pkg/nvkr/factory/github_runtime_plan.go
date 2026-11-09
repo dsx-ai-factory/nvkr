@@ -52,6 +52,11 @@ func PrepareGitHubRuntimeBundle(ctx context.Context, freshPlan *Plan, root strin
 		baselinePlan.DefinitionPath != freshPlan.DefinitionPath || baselinePlan.EnvironmentPath != freshPlan.EnvironmentPath {
 		return e.New(e.CodePipelineDrift, "runtime GitHub preparation cannot change Environment or authored input paths; regenerate the bundle")
 	}
+	if freshPlan.RuntimeInputs != nil {
+		if err := CheckFrozenAuthoredInputs(ctx, freshPlan, root); err != nil {
+			return err
+		}
+	}
 	fresh, err := RenderGitHub(ctx, freshPlan)
 	if err != nil {
 		return err

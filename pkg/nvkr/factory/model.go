@@ -135,6 +135,7 @@ type Plan struct {
 	DefinitionDigest    string                       `json:"definitionDigest,omitempty"`
 	EnvironmentPath     string                       `json:"environmentPath,omitempty"`
 	RuntimeSourceCommit string                       `json:"runtimeSourceCommit,omitempty"`
+	RuntimeInputs       *InputSnapshot               `json:"runtimeInputs,omitempty"`
 	Qualification       EvidenceTier                 `json:"qualification"`
 	CatalogDigest       string                       `json:"catalogDigest"`
 	CatalogSnapshot     *catalog.Catalog             `json:"catalogSnapshot"`

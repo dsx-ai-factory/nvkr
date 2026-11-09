@@ -50,6 +50,15 @@ func AdmitQualificationHandoff(plan *Plan) error {
 	return nil
 }
 
+// AdmitQualificationReplay admits an executable handoff. Generation uses the
+// capability-only check above because its committed Plan predates dispatch.
+func AdmitQualificationReplay(plan *Plan) error {
+	if err := AdmitQualificationHandoff(plan); err != nil {
+		return err
+	}
+	return admitRuntimeSourcesExecution(plan)
+}
+
 // CollectQualificationEvidence collects the original root and output predicates
 // from restored producer records. It never recreates, resigns, or relabels them.
 // Signature-record agreement detects an incomplete handoff; it grants no
@@ -64,7 +73,7 @@ func CollectQualificationEvidence(ctx context.Context, workspace string, plan *P
 	if err := plan.Validate(); err != nil {
 		return "", nil, err
 	}
-	if err := AdmitQualificationHandoff(plan); err != nil {
+	if err := AdmitQualificationReplay(plan); err != nil {
 		return "", nil, err
 	}
 	_, artifacts := planIndex(plan)

@@ -231,11 +231,18 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 		if plan.Environment.GitHubRuntimePlan {
 			if runner == sortedKeys(bootstrapJobs)[0] {
 				command = githubRuntimeGenerationCommand(plan)
+				if len(plan.Environment.GitHubRuntimeSources) != 0 {
+					fmt.Fprintf(&body, "      - name: Restore original frozen inputs for retry\n        if: ${{ github.run_attempt != 1 }}\n        uses: %s\n        with:\n          name: %s\n          path: %s\n", actions.Download, githubRuntimeInputsArtifact, githubRuntimeInputDirectory)
+					fmt.Fprintf(&body, "      - name: Install original frozen inputs for retry\n        if: ${{ github.run_attempt != 1 }}\n        run: %s\n", githubRuntimeInstallCommand(plan))
+				}
 			} else {
 				actions.writeDownloadStep(&body, "NVKR runtime inputs", githubRuntimeInputsArtifact, githubRuntimeInputDirectory)
 				writeGitHubShellStep(&body, "Install NVKR runtime inputs", []string{githubRuntimeInstallCommand(plan)})
 				if plan.Environment.GitHubRuntimeSource != nil {
 					command = githubRuntimeGenerationCommand(plan) + " --check"
+				}
+				if len(plan.Environment.GitHubRuntimeSources) != 0 {
+					command = "./nvkr-exec factory github check-runtime-inputs --plan " + shellQuote(layout.planPath)
 				}
 			}
 		}
@@ -365,11 +372,11 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 				fmt.Fprintf(&body, "        timeout-minutes: %d\n", minutes)
 			}
 			fmt.Fprintf(&body, "        run: %s\n", githubRunnerCommand(plan, "run-disk", "output", stage.DiskOutput))
-			writeGitHubPackerDiagnosticStep(&body, stage, actions)
+			writeGitHubPackerDiagnosticStep(&body, plan, stage, actions)
 			if githubDiskInspectionRequired(plan) {
 				// Diagnostics are short-lived descriptions, never planned evidence
 				// carriers. Preserve them even when the live inspection fails.
-				diagnostic := githubInspectionDiagnosticStep(actions, stage.DiskOutput)
+				diagnostic := githubInspectionDiagnosticStep(plan, actions, stage.DiskOutput)
 				fmt.Fprintf(&body, "      - name: %s\n        uses: %s\n        if: %s\n        continue-on-error: %t\n        timeout-minutes: %d\n        with:\n          name: %s\n          path: %s\n          include-hidden-files: %s\n          if-no-files-found: %s\n          retention-days: %s\n",
 					diagnostic.Name, diagnostic.Uses, diagnostic.If, diagnostic.ContinueOnError, diagnostic.TimeoutMinutes,
 					yamlSingle(diagnostic.With["name"]), yamlSingle(diagnostic.With["path"]), diagnostic.With["include-hidden-files"], diagnostic.With["if-no-files-found"], diagnostic.With["retention-days"])
@@ -457,9 +464,9 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 		}
 		writeCatalogValidationStep(&body, plan, "Finalize Run and check completeness", "finalize-catalog", finalize)
 		// Keep the small terminal record beyond the transient transport window.
-		fmt.Fprintf(&body, "      - name: Upload final Run record\n        id: %s\n        uses: %s\n        if: ${{ always() }}\n        with:\n          name: nvkr-lifecycle-run\n          path: .nvkr/run.json\n          if-no-files-found: error\n          retention-days: 7\n", githubRunUploadID, actions.Upload)
+		fmt.Fprintf(&body, "      - name: Upload final Run record\n        id: %s\n        uses: %s\n        if: ${{ always() }}\n        with:\n          name: nvkr-lifecycle-run\n          path: .nvkr/run.json\n          if-no-files-found: error\n          retention-days: %d\n", githubRunUploadID, actions.Upload, plan.GitHubArtifactRetentionDays())
 		if githubQualificationHandoffEnabled(plan) {
-			writeGitHubQualificationHandoffStep(&body, actions)
+			writeGitHubQualificationHandoffStep(&body, plan, actions)
 		}
 		summary := githubRunEndSummary(len(allNeeds))
 		if len(needsProjection.Collectors) != 0 {
@@ -501,8 +508,8 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 	return bundle, nil
 }
 
-func writeGitHubPackerDiagnosticStep(out *bytes.Buffer, stage githubStage, actions githubActionRefs) {
-	fmt.Fprintf(out, "      - name: Upload failed Packer diagnostics\n        if: %s\n        timeout-minutes: %d\n        uses: %s\n        with:\n          name: %s\n          path: %s\n          if-no-files-found: error\n          include-hidden-files: 'true'\n          retention-days: '1'\n", yamlSingle("${{ failure() && steps.run-disk.outputs.packer_diagnostics != '' }}"), githubDiskDiagnosticUploadMinutes, actions.Upload, yamlSingle("nvkr-packer-diagnostics-"+stage.DiskOutput), yamlSingle("${{ steps.run-disk.outputs.packer_diagnostics }}"))
+func writeGitHubPackerDiagnosticStep(out *bytes.Buffer, plan *Plan, stage githubStage, actions githubActionRefs) {
+	fmt.Fprintf(out, "      - name: Upload failed Packer diagnostics\n        if: %s\n        timeout-minutes: %d\n        uses: %s\n        with:\n          name: %s\n          path: %s\n          if-no-files-found: error\n          include-hidden-files: 'true'\n          retention-days: '%d'\n", yamlSingle("${{ failure() && steps.run-disk.outputs.packer_diagnostics != '' }}"), githubDiskDiagnosticUploadMinutes, actions.Upload, yamlSingle("nvkr-packer-diagnostics-"+stage.DiskOutput), yamlSingle("${{ steps.run-disk.outputs.packer_diagnostics }}"), githubDiagnosticRetentionDays(plan))
 }
 
 // signFamilyNode reports whether a node kind belongs to the signing family: the
@@ -632,8 +639,8 @@ func irProjectedNode(node Node) bool { return node.BuildTarget != "" && node.IRN
 
 func (actions githubActionRefs) writeUploadStep(out *bytes.Buffer, plan *Plan, label, name, path string) {
 	// Unsigned development handoffs expire quickly. Signed Runs keep room for
-	// 24-hour ARC stages and subsequent publication/finalization within seven days.
-	days := 7
+	// 24-hour ARC stages and subsequent publication/finalization.
+	days := plan.GitHubArtifactRetentionDays()
 	if githubCancelInProgress(plan) {
 		days = 1
 	}
@@ -668,11 +675,15 @@ func githubRuntimeGenerationCommand(plan *Plan) string {
 }
 
 func writeGitHubRuntimeInputsUpload(out *bytes.Buffer, plan *Plan, actions githubActionRefs) {
-	fmt.Fprintf(out, "      - name: Upload NVKR runtime inputs\n        uses: %s\n        with:\n          name: %s\n          path: |\n", actions.Upload, githubRuntimeInputsArtifact)
+	fmt.Fprintf(out, "      - name: Upload NVKR runtime inputs\n        uses: %s\n", actions.Upload)
+	if len(plan.Environment.GitHubRuntimeSources) != 0 {
+		fmt.Fprint(out, "        if: ${{ github.run_attempt == 1 }}\n")
+	}
+	fmt.Fprintf(out, "        with:\n          name: %s\n          path: |\n", githubRuntimeInputsArtifact)
 	for _, member := range githubRuntimeInputPaths(plan) {
 		fmt.Fprintf(out, "            %s\n", member)
 	}
-	fmt.Fprint(out, "          include-hidden-files: 'true'\n          if-no-files-found: error\n          retention-days: 7\n")
+	fmt.Fprintf(out, "          include-hidden-files: 'true'\n          if-no-files-found: error\n          retention-days: %d\n", plan.GitHubArtifactRetentionDays())
 }
 
 func (actions githubActionRefs) writeCheckoutStep(out *bytes.Buffer) {

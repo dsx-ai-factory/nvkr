@@ -158,6 +158,10 @@ packaging, routes and executable dependencies for a Run. Producer operations ref
 build instruction; observations are recorded separately. There is no authored compiler-handoff document.
 Readable views, linked graph exports and semantic comparisons describe the validated Plan; they do not replace
 its canonical stored bytes or grant execution or evidence authority.
+An opted-in dispatch-frozen Plan records an explicit repository/main allowlist's exact
+commits, trees and source timestamps together with captured authored inputs. Workers,
+retries and qualification reuse that selection; independent dependency and toolchain pins
+remain fixed. The record is descriptive until authenticated through its producing invocation.
 _Avoid_: Authored definition, execution observation
 
 **Generated execution bundle**:

@@ -663,6 +663,13 @@ material where applicable. These dependencies cannot be replaced by caller-suppl
 Compilation resolves the selected Definition, Environment, and component catalogs into a plan, validates the
 complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
 the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
+An explicit multi-repository runtime policy freezes each allowed main ref once in the
+first trusted bootstrap. Its Plan captures the exact source metadata and authored input
+closure, retaining complete composite attribution and independent material pins. Same-Run
+workers and retries restore that Plan; finalization and qualification replay exact commits
+without consulting current main. Missing retained inputs fail closed. The isolated GPU-site
+nightly candidate uses this route; hosted execution and provider configuration remain
+separate acceptance work (ADR-18/26).
 GitHub keeps named jobs, prerequisite closure and conditions visible, and every job retains its runner,
 permissions and time bounds. [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold)
 owns which bundle workflow carries each job, including the opt-in partition workers described below. Manifest-owned composite actions expose fixed interfaces
@@ -1110,7 +1117,9 @@ publication contract. Generic hosted runners retain bootstrap, source retrieval,
 finalization. The development account must lack production-package write/admin access; namespace names
 cannot enforce provider ACLs. Unsigned development cancels superseded Runs and retains transfers for one day.
 Signed development and production remain non-canceling with seven-day transfers; final Run records retain
-seven days and disk diagnostics one day. Development registry packages are isolated per run attempt and
+seven days and disk diagnostics one day. The dispatch-frozen multi-source candidate instead retains every
+generated upload for 14 days, including frozen inputs, helpers, carriers, Run records, handoffs, qualification
+outcomes and diagnostics. Development registry packages are isolated per run attempt and
 become cleanup candidates only with internal visibility, after completion and 24 hours of inactivity.
 A default-branch-only owner rechecks authenticated provider metadata before whole-package deletion;
 it never executes branch artifacts.

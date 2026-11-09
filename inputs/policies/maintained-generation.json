@@ -46,6 +46,13 @@
     "runtime": true
   },
   {
+    "bundle": "nvkr-run-nvke-nightly-gpu-site",
+    "group": "nightly",
+    "definition": "inputs/definitions/nvke/gpu-site.composite.yaml",
+    "environment": "inputs/environments/github-nvke-nightly-gpu-site.yaml",
+    "qualificationPolicy": "inputs/policies/nvke-nightly-gpu-site-qualification.yaml"
+  },
+  {
     "bundle": "nvkr-run-nvke-nightly-upstream-ovn-arm64",
     "group": "nightly",
     "definition": "inputs/definitions/demo/arm64-upstream-kvm.json",

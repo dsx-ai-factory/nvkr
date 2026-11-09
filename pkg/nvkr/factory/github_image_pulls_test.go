@@ -413,7 +413,7 @@ func TestGitHubStageExecutionRejectsPrivateImageOrdering(t *testing.T) {
 		t.Fatal(err)
 	}
 	var fragment bytes.Buffer
-	writeGitHubPackerDiagnosticStep(&fragment, stage, actions)
+	writeGitHubPackerDiagnosticStep(&fragment, plan, stage, actions)
 	var diagnostic struct {
 		Steps []githubStep `json:"steps"`
 	}

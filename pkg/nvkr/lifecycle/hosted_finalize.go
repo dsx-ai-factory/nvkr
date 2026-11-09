@@ -57,7 +57,16 @@ func finalizeGenerated(ctx context.Context, definitionPath, environmentPath, pla
 	if plan.RuntimeSourceCommit != "" && handoffPath != "" {
 		return nil, e.New(e.CodeEngineCapability, "runtime source selection has no qualification input-capture replay route")
 	}
-	if plan.RuntimeSourceCommit != "" {
+	if len(plan.Environment.GitHubRuntimeSources) != 0 {
+		if plan.RuntimeInputs == nil {
+			return nil, e.New(e.CodeUnpinnedSource, "hosted Run omits frozen source inputs")
+		}
+		if err := factory.CheckFrozenAuthoredInputs(ctx, plan, "."); err != nil {
+			return nil, err
+		}
+		inputs = *plan.RuntimeInputs
+		expectedPlan, err = factory.CompileSnapshot(ctx, inputs, generatorVersion)
+	} else if plan.RuntimeSourceCommit != "" {
 		expectedPlan, err = CompileRuntimeSourceFiles(ctx, definitionPath, environmentPath, generatorVersion, plan.RuntimeSourceCommit)
 	} else if handoffPath != "" {
 		expectedPlan, inputs, err = factory.CaptureCompileFiles(ctx, ".", definitionPath, environmentPath, generatorVersion)
