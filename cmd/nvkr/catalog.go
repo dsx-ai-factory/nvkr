@@ -106,7 +106,7 @@ func cmdCatalog() *cli.Command {
 						return showCommandResult(c, view, catalogCommandDisplay("Catalog validation"), err)
 					}
 					if view.tui {
-						return showCommandResult(c, view, catalogComponentsDisplay(cat, "Catalog validation"), nil)
+						return showCommandResult(c, view, catalogComponentsDisplay(cat, "Catalog validation", nil), nil)
 					}
 					fmt.Printf("ok: %s — %d component(s)\n", cat.Metadata.Name, len(cat.Components))
 					return nil
@@ -161,11 +161,13 @@ func cmdCatalog() *cli.Command {
 					}
 					listed := *cat
 					listed.Components = make(map[string]catalog.Component, len(found))
+					modes := make(map[string]string, len(found))
 					for _, d := range found {
 						listed.Components[d.Name] = cat.Components[d.Name]
+						modes[d.Name] = d.ProducerMode
 					}
 					if view.tui {
-						return showCommandResult(c, view, catalogComponentsDisplay(&listed, "Catalog components"), nil)
+						return showCommandResult(c, view, catalogComponentsDisplay(&listed, "Catalog components", modes), nil)
 					}
 					fmt.Printf("catalog: %s\n\n", cat.Metadata.Name)
 					fmt.Printf("components:\n")
@@ -331,7 +333,9 @@ func sourcePinFields(pin catalog.Pin) []progress.Field {
 	return []progress.Field{{Label: "Commit", Value: pin.Commit}, {Label: "Tree hash", Value: pin.TreeHash}, {Label: "Source epoch", Value: strconv.FormatInt(pin.SourceDateEpoch, 10)}}
 }
 
-func catalogComponentsDisplay(loaded *catalog.Catalog, title string) commandDisplay {
+// catalogComponentsDisplay shows each component; modes, when given, names the
+// producer mode Discover assigned so the TUI agrees with the JSON output.
+func catalogComponentsDisplay(loaded *catalog.Catalog, title string, modes map[string]string) commandDisplay {
 	display := catalogCommandDisplay(title)
 	display.Fields = []progress.Field{{Label: "Catalog", Value: loaded.Metadata.Name}, {Label: "Components", Value: strconv.Itoa(len(loaded.Components))}}
 	names := make([]string, 0, len(loaded.Components))
@@ -346,6 +350,9 @@ func catalogComponentsDisplay(loaded *catalog.Catalog, title string) commandDisp
 			mode = "source"
 		} else if component.Prebuilt != nil {
 			mode = "prebuilt"
+		}
+		if discovered, ok := modes[name]; ok {
+			mode = discovered
 		}
 		display.Items = append(display.Items, progress.Item{ID: name, Name: name, Kind: component.OutputType, State: "declared", Fields: []progress.Field{
 			{Label: "Producer mode", Value: mode}, {Label: "Builder", Value: component.BuilderType}, {Label: "Platforms", Value: strings.Join(component.Platforms, ", ")},
