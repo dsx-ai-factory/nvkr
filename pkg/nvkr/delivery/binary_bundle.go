@@ -24,7 +24,7 @@ type BinaryFileInput struct {
 }
 
 type BinaryBundleRequest struct {
-	OCIRepresentation OCIRepresentation
+	OCIRepresentation OCIRepresentation `json:"-"`
 	OS                string
 	Arch              string
 	Purpose           string

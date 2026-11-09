@@ -91,6 +91,15 @@ func (manifest ociManifest) plainConfig() bool {
 	return manifest.Config.MediaType == MediaEmptyConfig || manifest.Config.MediaType == MediaArtifactConfig
 }
 
+// An OCI empty config requires the manifest's artifactType field; an NVKR
+// logical-type annotation alone does not satisfy that OCI envelope rule.
+func (manifest ociManifest) validateArtifactConfig() error {
+	if manifest.Config.MediaType == MediaEmptyConfig && manifest.ArtifactType == "" {
+		return e.New(e.CodeVerifyFailed, "OCI empty config requires a manifest artifact type")
+	}
+	return nil
+}
+
 type objectConfig struct {
 	SchemaVersion  string `json:"schemaVersion"`
 	Name           string `json:"name"`

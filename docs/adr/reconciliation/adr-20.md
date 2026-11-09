@@ -12,7 +12,9 @@ without adding default-valued canonical root fields. The local Distribution fixt
 reported unknown-type rejection: it rejects a retained
 Helm wrapper, then accepts a complete diagnostic image-index, Helm, CLI and raw-SBOM publication with all
 seven declared members. Full and metadata-only readback preserve root and membership bindings. Opt-in
-Helm v4.3.0 `show chart` and `pull` against that loopback fixture preserve the exact chart archive bytes.
+Helm `show chart` and `pull` against that loopback fixture compare the exact chart archive bytes.
+The reproducible opt-in procedure is in `DEVELOPMENT.md`; the fixture logs the installed client version.
+It is outside the default gate and supplies neither Helm layout consumption nor ORAS interoperability evidence.
 Public-reader contracts accept legacy, annotated and matching dual claims for Helm, binary bundles,
 Debian carriers and root metadata, and reject missing/conflicting claims and untyped OCI empty configs.
 These are local contracts and client interoperability evidence, not acceptance by the affected GitLab
@@ -46,5 +48,15 @@ Regressions keep local cleanup and integrity errors separate from registry statu
 preserving their coded causes and applicable guidance; joined registry/cleanup failures retain both causes.
 Helm tag refusals classify HTTP 401/403 and structured denials as `registry-auth-failed`, preserving
 authentication precedence and the existing handling of other permanent and transient tag failures.
+The final per-output metadata-root push and its member readback use the same classification and redaction;
+response fixtures cover HTTP 401/403 and permanent manifest rejection without copying server text or URLs.
+Image aliases apply the same auth precedence and redact timed-out readback URLs while retaining uncertainty
+and reconciliation guidance. Read-only checks identify their credential source and can use the factory's
+explicit credential pair; usage rejection emits no report, and output failure preserves the owning error code.
+Missing/misrouted base endpoints are non-retryable input errors, separately from incomplete digest readback.
+Metadata-only readers share the full reader's empty-config rule. Verified metadata copies bind the expected
+published digest and retain exact bootstrap bytes; Packer selection JSON cannot set the representation.
+Historical default artifact/release goldens come from base `664905a46cb0b0be2ce111da24d833cf318efd96`.
+Registry-side next-action checks, compatible bundle readers and selected-output pulls are contract-tested.
 Write probes remain absent; the library's mutating, asynchronously cleaned-up push-permission helper is not
 used. Live registry/version coverage and hosted validation of these changes remain unverified.

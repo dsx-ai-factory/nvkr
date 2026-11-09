@@ -54,6 +54,10 @@ structured codes; untrusted server bodies, messages, details and request URLs ar
 presentation. The original structured cause remains available through error unwrapping.
 An absent manifest/blob during post-upload readback remains unavailable rather than proving a permanent
 format rejection; publication acceptance is not issued while that readback is incomplete.
+An unstructured 404 at the V2 base endpoint or a successful proxy/HTML response that fails to establish that API uses
+`invalid-catalog` (16), not a retryable publication error. Correct the endpoint or proxy configuration;
+neither response establishes an older protocol. Known structured refusals retain their classifications above.
+This is distinct from a missing digest during readback.
 Diagnostic reports additionally describe the observed API family and request stage, while preserving an
 unknown exact OCI specification version and unknown untested features. Typed DNS and certificate failures
 receive safe connection diagnostics instead of printing credential-bearing client URLs. Next-action guidance
@@ -102,7 +106,8 @@ error-message text. The coded cause and retryability remain authoritative; obser
 - **ADR-17:** the CLI maps a typed error to its process exit code and surfaces the retryable predicate.
 - **ADR-06 / ADR-18 / ADR-21 / ADR-22:** `status-checkpoint` (52), `engine-capability` (29), optimistic
   `write-conflict` (53), and `pin-set-mismatch` (54) are allocated. The last reports disagreement with a pinned
-  umbrella's member declaration or provenance. Existing numeric meanings remain frozen.
+  umbrella's member declaration or provenance. ADR-20 publication additionally allocates
+  `registry-auth-failed` (55) and `registry-rejected` (56). Existing numeric meanings remain frozen.
 
 ## Acceptance evidence
 

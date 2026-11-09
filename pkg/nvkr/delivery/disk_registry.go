@@ -30,11 +30,8 @@ func PushDiskArtifact(ctx context.Context, artifact *DiskArtifact, repository, s
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
 	}
-	if _, bounded := ctx.Deadline(); !bounded {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 30*time.Minute)
-		defer cancel()
-	}
+	ctx, cancel := registryPublicationContext(ctx, 30*time.Minute)
+	defer cancel()
 	if err := options.Validate(); err != nil {
 		return "", err
 	}

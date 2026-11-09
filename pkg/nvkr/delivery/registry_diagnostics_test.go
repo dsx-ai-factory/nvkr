@@ -37,8 +37,8 @@ func TestRegistryCheckObservesAPINotFeatureVersion(t *testing.T) {
 		{"unrecognized header", "PRIVATE_SENTINEL", "application/json", "distribution-v2", "unrecognized", 200, ""},
 		{"challenge is not feature support", "registry/2.0", "application/json", "distribution-v2", "registry/2.0", 401, e.CodeRegistryAuthFailed},
 		{"denied is not unsupported", "", "application/json", "unknown", "absent", 403, e.CodeRegistryAuthFailed},
-		{"missing endpoint", "", "application/json", "unknown", "absent", 404, e.CodeUnavailable},
-		{"proxy html", "", "text/html", "unknown", "absent", 200, e.CodeRegistryRejected},
+		{"missing endpoint", "", "application/json", "unknown", "absent", 404, e.CodeInvalidCatalog},
+		{"proxy html", "", "text/html", "unknown", "absent", 200, e.CodeInvalidCatalog},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			var requests atomic.Int32
@@ -76,6 +76,9 @@ func TestRegistryCheckObservesAPINotFeatureVersion(t *testing.T) {
 				}
 				if strings.Contains(err.Error(), "partial uploads") {
 					t.Fatal("read-only check claimed to upload content")
+				}
+				if test.code == e.CodeInvalidCatalog && (e.Retryable(err) || !strings.Contains(err.Error(), "endpoint and proxy routing")) {
+					t.Fatalf("missing endpoint correction guidance or permanent classification: %v", err)
 				}
 			}
 			if report.API != test.api || report.AdvertisedAPIVersion != test.advertised || report.OCIDistributionVersion != "unknown" ||
@@ -158,7 +161,7 @@ func TestRegistryCheckRejectsHTMLAfterAuthentication(t *testing.T) {
 	report, err := CheckRegistry(t.Context(), strings.TrimPrefix(server.URL, "http://")+"/project", RegistryOptions{
 		Username: "synthetic-user", Password: "synthetic-password", PlainHTTP: true,
 	})
-	assertRegistryCode(t, err, e.CodeRegistryRejected)
+	assertRegistryCode(t, err, e.CodeInvalidCatalog)
 	if report.API != "unknown" || !report.AuthChallenge {
 		t.Fatalf("earlier challenge masked a later proxy response: %+v", report)
 	}
@@ -243,14 +246,29 @@ func TestRegistryCheckHonorsCallerDeadline(t *testing.T) {
 	defer cancel()
 	_, err := CheckRegistry(ctx, strings.TrimPrefix(server.URL, "http://")+"/project", RegistryOptions{Anonymous: true, PlainHTTP: true})
 	assertRegistryCode(t, err, e.CodeTimeout)
+	if !strings.Contains(err.Error(), "no upload was attempted") {
+		t.Fatalf("missing read-only deadline guidance: %v", err)
+	}
 	if strings.Contains(err.Error(), "partial uploads") {
 		t.Fatal("read-only timeout claimed partial uploads")
 	}
 }
 
 func TestRegistryObservationDistinguishesBlobAndEvidenceFailures(t *testing.T) {
-	for _, stage := range []string{"blob-upload", "subject-attachment", "referrer-discovery"} {
-		t.Run(stage, func(t *testing.T) {
+	for _, test := range []struct {
+		stage      string
+		status     int
+		diagnostic string
+		code       e.Code
+		action     string
+	}{
+		{"blob-upload", http.StatusForbidden, "DENIED", e.CodeRegistryAuthFailed, "configured credential"},
+		{"subject-attachment", http.StatusForbidden, "DENIED", e.CodeRegistryAuthFailed, "configured credential"},
+		{"referrer-discovery", http.StatusForbidden, "DENIED", e.CodeRegistryAuthFailed, "configured credential"},
+		{"subject-attachment", http.StatusBadRequest, "MANIFEST_INVALID", e.CodeRegistryRejected, "do not drop evidence"},
+	} {
+		t.Run(test.stage+"/"+test.diagnostic, func(t *testing.T) {
+			stage := test.stage
 			request := releasePublicationRequestWithRepresentation(t, "", "", OCINVKRCompatibleV1)
 			prepared, attested := filepath.Join(t.TempDir(), "prepared"), filepath.Join(t.TempDir(), "attested")
 			if _, err := BuildPublicationRoot(t.Context(), prepared, request); err != nil {
@@ -277,18 +295,21 @@ func TestRegistryObservationDistinguishesBlobAndEvidenceFailures(t *testing.T) {
 					stage == "referrer-discovery" && strings.Contains(r.URL.Path, "/referrers/")
 				if refuse {
 					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusForbidden)
-					_, _ = fmt.Fprint(w, `{"errors":[{"code":"DENIED","message":"PRIVATE_SENTINEL"}]}`)
+					w.WriteHeader(test.status)
+					_, _ = fmt.Fprintf(w, `{"errors":[{"code":%q,"message":"PRIVATE_SENTINEL"}]}`, test.diagnostic)
 					return
 				}
 				handler.ServeHTTP(w, r)
 			}))
 			defer server.Close()
 			ref, err := Push(t.Context(), attested, strings.TrimPrefix(server.URL, "http://")+"/product/releases", RegistryOptions{PlainHTTP: true, Anonymous: true})
-			assertRegistryCode(t, err, e.CodeRegistryAuthFailed)
+			assertRegistryCode(t, err, test.code)
 			var failure *RegistryFailure
 			if ref != "" || !errors.As(err, &failure) || failure.Report.LastOperation != stage || strings.Contains(err.Error(), "PRIVATE_SENTINEL") {
 				t.Fatalf("publication failure analysis: ref=%s err=%v", ref, err)
+			}
+			if !strings.Contains(failure.Action, test.action) {
+				t.Fatalf("wrong stage-specific guidance: %s", failure.Action)
 			}
 			after, err := Inspect(t.Context(), attested)
 			if err != nil || after.RootDigest != result.RootDigest {
@@ -305,12 +326,12 @@ func canceledRegistryContext(t *testing.T) context.Context {
 	return ctx
 }
 
-func TestRegistryObservationCleanupPreservesUnavailable(t *testing.T) {
+func TestRegistryObservationMissingBaseIsInvalidEndpoint(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
 	defer server.Close()
 	root, _ := releasePublicationFixture(t)
 	ref, err := Push(t.Context(), root, strings.TrimPrefix(server.URL, "http://")+"/product/releases", RegistryOptions{PlainHTTP: true, Anonymous: true})
-	assertRegistryCode(t, err, e.CodeUnavailable)
+	assertRegistryCode(t, err, e.CodeInvalidCatalog)
 	if ref != "" {
 		t.Fatal("missing endpoint produced a success reference")
 	}
@@ -327,6 +348,7 @@ func TestRegistryObservationKeepsLocalFailuresSeparate(t *testing.T) {
 		{"local integrity", e.CodeVerifyFailed, "Check exact manifest/blob digests"},
 		{"local tag validation", e.CodeInvalidCatalog, "Check the named tag"},
 		{"local capability", e.CodeEngineCapability, "choose an admitted alternative"},
+		{"local timeout", e.CodeTimeout, "reconcile partial uploads before retrying"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, observer := observeRegistry(t.Context())

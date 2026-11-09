@@ -12,10 +12,20 @@ import (
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 )
+
+// Registry publication preserves caller deadlines and otherwise bounds its own
+// work. The returned cleanup owns only a deadline installed by this boundary.
+func registryPublicationContext(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if _, bounded := ctx.Deadline(); bounded {
+		return ctx, func() {}
+	}
+	return context.WithTimeout(ctx, timeout)
+}
 
 // Classify responses, not error strings or presumed registry versions. A refusal
 // never authorizes rewriting an already identified manifest or dropping evidence.
@@ -115,7 +125,7 @@ func registryResponseCode(response *transport.Error) e.Code {
 	}
 	if response.StatusCode == http.StatusNotFound && len(response.Errors) == 0 && response.Request != nil &&
 		response.Request.Method == http.MethodGet && response.Request.URL != nil && response.Request.URL.Path == "/v2/" {
-		return e.CodeUnavailable
+		return e.CodeInvalidCatalog
 	}
 	if response.StatusCode >= 400 && response.StatusCode < 500 {
 		if len(response.Errors) == 1 {

@@ -377,6 +377,24 @@ func ExportMetadataWithExpectedRoot(ctx context.Context, source, out, expectedRo
 	return exportMetadata(ctx, source, out, expectedRoot)
 }
 
+// CopyMetadataWithExpectedRoot preserves the exact bootstrap of a metadata-only
+// or full source after bounded metadata inspection and expected-root binding.
+// It copies controls and evidence only, never issuing payload or trust authority.
+func CopyMetadataWithExpectedRoot(ctx context.Context, source, out, expectedRoot string) (Result, error) {
+	if !canonical.IsDigest(expectedRoot) {
+		return Result{}, e.New(e.CodeUsage, "metadata copy requires an exact expected root digest")
+	}
+	inspection, err := inspectMetadataProgress(ctx, source, true, expectedRoot, nil)
+	if err != nil {
+		return Result{}, err
+	}
+	sources := map[string]string{}
+	for _, object := range inspection.Root.Objects {
+		sources[object.Name] = source
+	}
+	return buildMetadataRoot(ctx, out, inspection.Root, sources, expectedRoot, source)
+}
+
 func exportMetadata(ctx context.Context, source, out, expectedRoot string) (Result, error) {
 	inspection, err := Inspect(ctx, source)
 	if err != nil {
@@ -435,6 +453,9 @@ func metadataManifest(ctx context.Context, root string, object PublishedObject) 
 	}
 	if m.SchemaVersion != 2 || m.MediaType != publishedManifestMediaType(object) {
 		return ociManifest{}, e.New(e.CodeVerifyFailed, "metadata member has an invalid manifest schema/media type")
+	}
+	if err := m.validateArtifactConfig(); err != nil {
+		return ociManifest{}, err
 	}
 	if !types.MediaType(object.ArtifactType).IsImage() && m.artifactType() != object.ArtifactType {
 		return ociManifest{}, e.New(e.CodeVerifyFailed, "metadata member artifact type differs from its release binding")

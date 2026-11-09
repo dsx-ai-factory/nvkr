@@ -11,9 +11,11 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/registry"
@@ -42,15 +44,31 @@ func TestRegistryPublicationFailureClassification(t *testing.T) {
 		{"timeout response", 408, nil, e.CodeUnavailable},
 		{"throttled", 429, []transport.ErrorCode{transport.TooManyRequestsErrorCode}, e.CodeUnavailable},
 		{"server error", 503, nil, e.CodeUnavailable},
+		{"base missing", 404, nil, e.CodeInvalidCatalog},
+		{"base unsupported", 404, []transport.ErrorCode{transport.UnsupportedErrorCode}, e.CodeEngineCapability},
+		{"base denied", 404, []transport.ErrorCode{transport.DeniedErrorCode}, e.CodeRegistryAuthFailed},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			response := &transport.Error{StatusCode: scenario.status}
+			if strings.HasPrefix(scenario.name, "base ") {
+				response.Request, _ = http.NewRequestWithContext(t.Context(), http.MethodGet, "https://registry.invalid/v2/", nil)
+			}
 			for _, code := range scenario.codes {
 				response.Errors = append(response.Errors, transport.Diagnostic{Code: code,
 					Message: "SYNTHETIC_PRIVATE_VALUE unknown media type", Detail: "SYNTHETIC_PRIVATE_VALUE"})
 			}
 			err := registryPublishError(t.Context(), fmt.Errorf("outer: %w", response), "publishing output %q", "chart")
 			assertRegistryCode(t, err, scenario.want)
+			if strings.HasPrefix(scenario.name, "base ") {
+				ctx, observer := observeRegistry(t.Context())
+				observer.report.LastOperation, observer.report.BaseStatus = "api-check", scenario.status
+				analyzed := observer.explain(ctx, err)
+				assertRegistryCode(t, analyzed, scenario.want)
+				wantAction := map[e.Code]string{e.CodeInvalidCatalog: "endpoint and proxy routing", e.CodeEngineCapability: "choose an admitted alternative", e.CodeRegistryAuthFailed: "configured credential"}[scenario.want]
+				if !strings.Contains(analyzed.Error(), wantAction) {
+					t.Fatalf("endpoint correction overrode the structured refusal: %v", analyzed)
+				}
+			}
 			var retained *transport.Error
 			if !errors.As(err, &retained) || retained != response {
 				t.Fatal("structured diagnostic cause was lost")
@@ -107,6 +125,9 @@ func TestRegistryPublicationRejectionReachesPublicBoundary(t *testing.T) {
 				analyzed.Report.OCIDistributionVersion != "unknown" || analyzed.Report.LastStatus != http.StatusBadRequest || analyzed.Action == "" {
 				t.Fatalf("public publisher did not analyze the actual protocol failure: %v", err)
 			}
+			if diagnostic.code == "MANIFEST_INVALID" && !strings.Contains(analyzed.Action, "does not establish which field") {
+				t.Fatalf("missing manifest rejection guidance: %s", analyzed.Action)
+			}
 			if ref != "" || e.Retryable(err) {
 				t.Fatalf("permanent refusal returned success or authorized retry: %s %v", ref, err)
 			}
@@ -118,5 +139,96 @@ func TestRegistryPublicationRejectionReachesPublicBoundary(t *testing.T) {
 				t.Fatalf("rejection changed identified local bytes: %v", err)
 			}
 		})
+	}
+}
+
+func TestRegistryMetadataPublicationClassifiesAndRedactsFailures(t *testing.T) {
+	for _, stage := range []string{"root", "member"} {
+		for _, test := range []struct {
+			name, diagnostic string
+			status           int
+			want             e.Code
+		}{
+			{"unauthorized", "DENIED", http.StatusUnauthorized, e.CodeRegistryAuthFailed},
+			{"forbidden", "DENIED", http.StatusForbidden, e.CodeRegistryAuthFailed},
+			{"manifest invalid", "MANIFEST_INVALID", http.StatusBadRequest, e.CodeRegistryRejected},
+		} {
+			t.Run(stage+"/"+test.name, func(t *testing.T) {
+				root, digest := releasePublicationFixture(t)
+				metadata := filepath.Join(t.TempDir(), "metadata")
+				if _, err := ExportMetadata(t.Context(), root, metadata); err != nil {
+					t.Fatal(err)
+				}
+				var active atomic.Bool
+				var refusals atomic.Int32
+				handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					isRoot := strings.HasSuffix(r.URL.Path, "/manifests/"+digest)
+					if active.Load() && stage == "root" && isRoot && r.Method == http.MethodHead {
+						http.NotFound(w, r)
+						return
+					}
+					if active.Load() && strings.Contains(r.URL.Path, "/manifests/") &&
+						(stage == "root" && isRoot && r.Method == http.MethodPut || stage == "member" && !isRoot) {
+						refusals.Add(1)
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(test.status)
+						_, _ = fmt.Fprintf(w, `{"errors":[{"code":%q,"message":"PRIVATE_SENTINEL\u001b[31m\n::error::PRIVATE_SENTINEL","detail":{"value":"PRIVATE_SENTINEL"}}]}`, test.diagnostic)
+						return
+					}
+					handler.ServeHTTP(w, r)
+				}))
+				defer server.Close()
+				repo := strings.TrimPrefix(server.URL, "http://") + "/product/releases"
+				options := RegistryOptions{PlainHTTP: true, Anonymous: true}
+				if _, err := Push(t.Context(), root, repo, options); err != nil {
+					t.Fatal(err)
+				}
+				active.Store(true)
+				ref, err := PushMetadata(t.Context(), metadata, repo, options)
+				assertRegistryCode(t, err, test.want)
+				var failure *RegistryFailure
+				var response *transport.Error
+				if ref != "" || e.Retryable(err) || !errors.As(err, &failure) || !errors.As(err, &response) ||
+					strings.Contains(err.Error(), "PRIVATE_SENTINEL") || strings.Contains(err.Error(), server.URL) {
+					t.Fatalf("unsafe or misclassified metadata publication failure: %s %v", ref, err)
+				}
+				if refusals.Load() != 1 || failure.Report.LastStatus != test.status {
+					t.Fatalf("unexpected retry or status: %d %+v", refusals.Load(), failure.Report)
+				}
+			})
+		}
+	}
+}
+
+func TestRegistryPublicationDeadlineOwnership(t *testing.T) {
+	for _, timeout := range []time.Duration{20 * time.Minute, 30 * time.Minute} {
+		for _, bounded := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/bounded=%t", timeout, bounded), func(t *testing.T) {
+				parent := t.Context()
+				if bounded {
+					var cancel context.CancelFunc
+					parent, cancel = context.WithTimeout(parent, time.Minute)
+					defer cancel()
+				}
+				before := time.Now()
+				child, cancel := registryPublicationContext(parent, timeout)
+				deadline, ok := child.Deadline()
+				if !ok {
+					t.Fatal("publication is unbounded")
+				}
+				if expected, exists := parent.Deadline(); exists {
+					if !deadline.Equal(expected) {
+						t.Fatal("caller deadline was changed")
+					}
+				} else if deadline.Before(before.Add(timeout)) || deadline.After(time.Now().Add(timeout)) {
+					t.Fatal("publication did not install its documented default deadline")
+				}
+				cancel()
+				if parent.Err() != nil || !bounded && child.Err() == nil {
+					t.Fatal("cleanup canceled the caller or failed to release its own deadline")
+				}
+			})
+		}
 	}
 }

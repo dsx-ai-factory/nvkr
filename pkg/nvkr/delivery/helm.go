@@ -234,9 +234,10 @@ func validateHelmChartMetadata(config helmChartConfig) error {
 // local OCI Image Layout at out; this function performs no network I/O — the
 // separate delivery Push path (registry.go) is solely responsible for
 // transporting the committed layout to a registry. This is contract-tested
-// against generic OCI-layout readers (go-containerregistry, oras-go); reading
-// the produced layout with an unmodified `helm pull`/`helm show`/`oras pull`
-// binary is separately exercised by the opt-in interoperability fixture.
+// against generic OCI-layout readers (go-containerregistry, oras-go). The
+// opt-in interoperability fixture logs the installed Helm version and checks
+// registry `show chart` and `pull` with exact archive bytes; it does not read
+// the layout with Helm or run ORAS.
 // Default construction retains NVKR's artifactType. An explicit compatible
 // selection binds that logical type in an annotation and local descriptor.
 func BuildHelmChartArtifact(ctx context.Context, out, artifactType string, chartData []byte) (Result, error) {

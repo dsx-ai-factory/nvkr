@@ -198,6 +198,15 @@ func TestRegistryCompatibilityCompletePublication(t *testing.T) {
 	if _, err := PullMetadata(t.Context(), pinned, filepath.Join(t.TempDir(), "metadata"), options); err != nil {
 		t.Fatal(err)
 	}
+	outputs, err := MetadataOutputs(before.Root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, output := range outputs {
+		if _, err := PullOutput(t.Context(), pinned, output.Name, filepath.Join(t.TempDir(), "selected"), t.TempDir(), options); err != nil {
+			t.Fatalf("compatible output %q could not be pulled: %v", output.Name, err)
+		}
+	}
 	if _, err := OpenPublication(t.Context(), destination, digestBytes([]byte("stale root"))); err == nil {
 		t.Fatal("stale identity accepted")
 	} else {
@@ -327,6 +336,7 @@ func TestRegistryCompatibilityHelmConsumption(t *testing.T) {
 		}
 		return raw
 	}
+	t.Logf("Helm client: %s", strings.TrimSpace(string(run("version", "--short"))))
 	shown := run("show", "chart", "oci://"+repository+"/chart", "--version", "1.2.3", "--plain-http")
 	if !bytes.Contains(shown, []byte("version: 1.2.3")) {
 		t.Fatalf("unexpected chart metadata: %s", shown)
@@ -345,7 +355,7 @@ func TestRegistryCompatibilityHelmConsumption(t *testing.T) {
 // Exercise the public readers with retained and conflicting wrappers, rather
 // than testing only the annotation lookup helper.
 func TestRegistryCompatibilityTypeRepresentations(t *testing.T) {
-	for _, kind := range []string{"helm", "binary", "debian", "metadata"} {
+	for _, kind := range []string{"helm", "binary", "bundle", "debian", "metadata"} {
 		for _, representation := range []string{"legacy", "annotated", "matching", "conflicting", "missing", "untyped empty config", "payload config"} {
 			t.Run(kind+"/"+representation, func(t *testing.T) {
 				var root string
@@ -357,6 +367,17 @@ func TestRegistryCompatibilityTypeRepresentations(t *testing.T) {
 				case "binary":
 					root = releasePublicationRequestWithRepresentation(t, "", "", OCINVKRCompatibleV1).Objects[0].Path
 					check = func() error { _, _, err := InspectBinaryBundle(t.Context(), root); return err }
+				case "bundle":
+					archive := helmChartArchiveFixture(t, map[string]string{"files/item.txt": "synthetic bundle file"})
+					source := filepath.Join(t.TempDir(), "bundle.tgz")
+					if err := os.WriteFile(source, archive, 0o600); err != nil {
+						t.Fatal(err)
+					}
+					root = filepath.Join(t.TempDir(), "bundle")
+					if _, err := BuildBundleArtifactWithRepresentation(t.Context(), root, "files", source, digestBytes(archive), OCINVKRCompatibleV1); err != nil {
+						t.Fatal(err)
+					}
+					check = func() error { _, _, err := ReadArtifact(t.Context(), root); return err }
 				case "debian":
 					payload := []byte("synthetic original package bytes")
 					source := filepath.Join(t.TempDir(), "package.deb")

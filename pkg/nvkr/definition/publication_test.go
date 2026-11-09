@@ -44,7 +44,8 @@ func TestPublicationOCIRepresentationAdmission(t *testing.T) {
 			}
 			loaded, err := LoadEnvironment(t.Context(), path)
 			if value == "unknown" {
-				if err == nil || loaded.Publication != nil {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability || loaded.Publication != nil {
 					t.Fatalf("strict loader returned an unsupported representation: %v", err)
 				}
 			} else if err != nil || loaded.Publication.OCIRepresentation != value {

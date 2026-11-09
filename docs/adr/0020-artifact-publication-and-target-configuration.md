@@ -410,7 +410,8 @@ action for credentials/permissions, endpoint/proxy routing, unsupported operatio
 integrity or transient connection failures. Evidence attachment failure cannot authorize unsigned fallback.
 The internal diagnostic CLI is a presentation adapter over delivery and issues no test upload or deletion.
 Read-only network checks have a 15-second deadline; ambient helper behavior remains with its existing owner.
-Publication retains caller deadlines or supplies a bounded default. Observations neither mint authority nor
+Publication retains caller deadlines; otherwise full-layout and disk pushes use a 30-minute deadline,
+and metadata-root publication uses a 20-minute deadline. Observations neither mint authority nor
 alter a frozen Plan, selected representation, exact signed bytes, imported manifests or required membership.
 
 The config uses `nvkr.dev/publication-root/v4` and `application/vnd.nvkr.publication-root.config.v4+json`.

@@ -56,11 +56,19 @@ The JSON report distinguishes the observed Distribution V2 API family, the optio
 `registry/2.0` header, and the exact OCI specification version, which remains unknown. A base response does
 not prove push permission, artifact-type acceptance, referrer support or complete publication acceptance.
 Normal publish traffic can add observations of successful upload or referrer responses; those observations
-are descriptive and do not certify conformance. The check uses the existing registry credential owner;
-`--anonymous` disables ambient credentials and `--plain-http` explicitly selects HTTP for a local registry.
+are descriptive and do not certify conformance. The check uses the publication credential pair
+`NVKR_REGISTRY_USER` and `NVKR_CREDENTIAL` when both are set, otherwise the existing ambient registry
+credential owner. A half-set pair is a usage error before network I/O. `--anonymous` overrides both
+sources; `--plain-http` explicitly selects HTTP for a local registry. The report identifies the selected
+source as `explicit`, `ambient` or `anonymous`, never a credential value. To diagnose a CI refusal, run
+with the same scoped credential that publication uses; a different personal Docker login tests another identity.
 Network requests have a 15-second bound; ambient credential-helper behavior remains with the existing
 credential owner. The diagnostic issues no test uploads or cleanup requests. Proxy HTML and missing
 endpoints produce endpoint guidance rather than a guessed older protocol or silent downgrade.
+Missing V2 endpoints and successful HTML/proxy responses use non-retryable `invalid-catalog` (16).
+Publication preserves caller deadlines. Without one, full-layout and disk pushes have a 30-minute
+deadline; metadata-root publication has a 20-minute deadline. A timeout requires reconciling partial
+uploads and uncertain tag changes before retrying the same identified bytes.
 
 ## Troubleshoot Helm and registry rejections
 

@@ -48,11 +48,8 @@ func PushWithOptions(ctx context.Context, layoutPath, reference string, request 
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
 	}
-	if _, bounded := ctx.Deadline(); !bounded {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 30*time.Minute)
-		defer cancel()
-	}
+	ctx, cancel := registryPublicationContext(ctx, 30*time.Minute)
+	defer cancel()
 	// PushOptions.Validate includes the identical registry credential validation,
 	// followed by tag admission, before Inspect or any registry operation.
 	if err := request.Validate(); err != nil {

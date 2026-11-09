@@ -28,6 +28,7 @@ import (
 // Unknown is deliberately distinct from a refusal or an observed successful API.
 type RegistryReport struct {
 	API                    string `json:"api"`
+	CredentialSource       string `json:"credentialSource"`
 	AdvertisedAPIVersion   string `json:"advertisedAPIVersion"`
 	OCIDistributionVersion string `json:"ociDistributionVersion"`
 	BaseStatus             int    `json:"baseStatus,omitempty"`
@@ -42,7 +43,7 @@ type RegistryReport struct {
 }
 
 func unknownRegistryReport() RegistryReport {
-	return RegistryReport{API: "unknown", AdvertisedAPIVersion: "absent", OCIDistributionVersion: "unknown",
+	return RegistryReport{API: "unknown", CredentialSource: "unknown", AdvertisedAPIVersion: "absent", OCIDistributionVersion: "unknown",
 		ManifestUpload: "unknown", BlobUpload: "unknown", ReferrersAPI: "unknown", ArtifactTypeAcceptance: "unknown", LastOperation: "unknown", ManifestMediaType: "unknown"}
 }
 
@@ -196,7 +197,7 @@ func (observer *registryObserver) explain(ctx context.Context, err error) error 
 	var response *transport.Error
 	var network registryNetworkError
 	registryCause := errors.As(err, &response) || errors.As(err, &network)
-	if !registryCause && (coded == nil || (coded.Code != e.CodeVerifyFailed && coded.Code != e.CodeInvalidCatalog && coded.Code != e.CodeEngineCapability)) {
+	if !registryCause && (coded == nil || (coded.Code != e.CodeVerifyFailed && coded.Code != e.CodeInvalidCatalog && coded.Code != e.CodeEngineCapability && coded.Code != e.CodeTimeout)) {
 		return err // Local failures do not inherit the last registry response.
 	}
 	if coded == nil {
@@ -241,8 +242,8 @@ func (observer *registryObserver) explain(ctx context.Context, err error) error 
 		// to the registry or attaching the status of an unrelated request.
 		return fmt.Errorf("%w; %s", err, action)
 	}
-	if report.LastOperation == "api-check" && report.BaseStatus == http.StatusNotFound {
-		action = "The V2 base endpoint was not found; check the registry endpoint and proxy routing. This does not establish an older supported API."
+	if coded != nil && coded.Code == e.CodeInvalidCatalog && report.LastOperation == "api-check" && report.API == "unknown" && report.BaseStatus != 0 {
+		action = "The response did not establish the V2 registry API; check the registry endpoint and proxy routing. This does not establish an older supported API."
 	}
 	if response != nil && registryResponseCode(response) == e.CodeRegistryAuthFailed {
 		action = "Check the configured credential and permissions for the exact repository; authentication refusal does not establish an unsupported API."
@@ -269,6 +270,12 @@ func CheckRegistry(ctx context.Context, repository string, options RegistryOptio
 	defer cancel()
 	ctx, observer := observeRegistry(ctx)
 	observer.readOnly = true
+	observer.report.CredentialSource = "ambient"
+	if options.Anonymous {
+		observer.report.CredentialSource = "anonymous"
+	} else if options.Password != "" {
+		observer.report.CredentialSource = "explicit"
+	}
 	registry, err := orasremote.NewRegistry(repo.RegistryStr())
 	if err != nil {
 		return report, e.Wrap(e.CodeUsage, err, "parsing registry check endpoint")
@@ -295,9 +302,6 @@ func CheckRegistry(ctx context.Context, repository string, options RegistryOptio
 		}}
 	err = registry.Ping(ctx)
 	originalErr := err
-	if err == nil && observer.snapshot().API == "unknown" {
-		err = e.New(e.CodeRegistryRejected, "base response did not establish the V2 registry API; check the endpoint and proxy")
-	}
 	var response *errcode.ErrorResponse
 	if errors.As(err, &response) {
 		// Normalize the pinned client's typed diagnostics, never its error text.
@@ -314,6 +318,14 @@ func CheckRegistry(ctx context.Context, repository string, options RegistryOptio
 		if status == http.StatusUnauthorized || status == http.StatusForbidden {
 			err = &transport.Error{StatusCode: status}
 		}
+	}
+	observed := observer.snapshot()
+	var classified *transport.Error
+	authRefused := errors.As(err, &classified) && registryResponseCode(classified) == e.CodeRegistryAuthFailed
+	unstructuredMissing := observed.BaseStatus == http.StatusNotFound && (classified == nil || len(classified.Errors) == 0)
+	if !authRefused && observed.LastOperation == "api-check" && observed.API == "unknown" && (err == nil || unstructuredMissing) {
+		err = e.Wrap(e.CodeInvalidCatalog, registryResponseError{&transport.Error{StatusCode: observed.BaseStatus}},
+			"base response did not establish the V2 registry API; check the endpoint and proxy")
 	}
 	if err != nil {
 		err = registryOperationError(ctx, err, "checking registry API (read-only)", false)

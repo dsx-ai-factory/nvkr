@@ -355,8 +355,8 @@ func verifyDescriptorHoldingDisks(ctx context.Context, root string, descriptor D
 		if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.artifactType() == "" {
 			return e.New(e.CodeVerifyFailed, "OCI artifact manifest has an invalid schema")
 		}
-		if manifest.Config.MediaType == MediaEmptyConfig && manifest.ArtifactType == "" {
-			return e.New(e.CodeVerifyFailed, "OCI empty config requires a manifest artifact type")
+		if err := manifest.validateArtifactConfig(); err != nil {
+			return err
 		}
 		if manifest.artifactType() == MediaBundle {
 			if err := validateBundleManifestDocument(raw); err != nil {
