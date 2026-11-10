@@ -345,6 +345,9 @@ func macBuildProbeFixtures(t *testing.T, repo, bin string) ([]string, string, st
 	if err := os.CopyFS(catalogDirectory, os.DirFS(filepath.Join("..", "..", "inputs", "catalogs", "tools", "native"))); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.CopyFS(filepath.Join(repo, "inputs", "catalogs", "shared"), os.DirFS(filepath.Join("..", "..", "inputs", "catalogs", "shared"))); err != nil {
+		t.Fatal(err)
+	}
 	loaded, err := catalog.LoadContext(t.Context(), catalog.Dir(catalogDirectory))
 	if err != nil {
 		t.Fatal(err)

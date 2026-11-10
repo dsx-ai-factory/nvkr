@@ -107,7 +107,8 @@ if [[ "${ubuntu_version}" == 24.04 ]]; then
   definition_overlays='["../../../catalogs/node-images/variants/native-toolchains.yaml","../../../catalogs/node-images/variants/ubuntu24.json"]'
 fi
 required_inputs=("${definition_source}" "${environment_source}"
-  "${catalog_source}/registry.yaml" "${catalog_source}/pins.lock.yaml")
+  "${catalog_source}/registry.yaml" "${catalog_source}/pins.lock.yaml"
+  "inputs/catalogs/shared/node-images.yaml")
 if [[ -n "${overlay_source}" ]]; then
   required_inputs+=("${overlay_source}")
 fi
@@ -141,10 +142,12 @@ if [[ ! "${toolchain_image}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
   exit 1
 fi
 
-mkdir -p "${input_root}/catalog"
+# Preserve sibling fragment references inside this attempt, rather than leaving
+# them pointed at mutable declarations outside the frozen input root.
+mkdir -p "${input_root}/${catalog_source}" "${input_root}/inputs/catalogs/shared"
 cp "${environment_source}" "${input_root}/environment-local.yaml"
-cp "${catalog_source}/pins.lock.yaml" "${input_root}/catalog/pins.lock.yaml"
-cp "${catalog_source}/registry.yaml" "${input_root}/catalog/registry.yaml"
+cp -R "${catalog_source}/." "${input_root}/${catalog_source}/"
+cp -R inputs/catalogs/shared/. "${input_root}/inputs/catalogs/shared/"
 if [[ -n "${overlay_source}" ]]; then
   cp "${overlay_source}" "${input_root}/$(basename "${overlay_source}")"
 fi
@@ -178,12 +181,12 @@ frozen_definition="${input_root}/definition.yaml"
 # Keep the exact selected catalog stack and source patches local to this attempt.
 # Reject authored drift instead of silently replacing an unexpected catalog.
 "${runner}" definition inspect --definition "${definition_source}" |
-  jq --arg catalog "${definition_catalog}" --argjson overlays "${definition_overlays}" '
+  jq --arg catalog "${definition_catalog}" --arg frozen_catalog "${catalog_source}" --argjson overlays "${definition_overlays}" '
     if .catalog.base != $catalog or any(.outputs[]; .catalog != null) or
       (.catalog.overlays // []) != $overlays then
       error("OS bootstrap requires the maintained catalog and ordered overlays")
     else . end |
-    .catalog.base = "catalog" |
+    .catalog.base = $frozen_catalog |
     if .catalog.overlays then .catalog.overlays |= map(split("/") | last) else . end' \
   >"${frozen_definition}"
 # The native Docker build is an attempt input, not a maintained release pin.

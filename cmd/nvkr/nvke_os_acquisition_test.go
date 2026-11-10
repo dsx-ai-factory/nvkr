@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
-	"go.yaml.in/yaml/v3"
 )
 
 func TestOSAgentAcquisitionUsesGoTransportFallback(t *testing.T) {
@@ -29,19 +28,11 @@ func TestOSAgentAcquisitionUsesGoTransportFallback(t *testing.T) {
 		t.Skipf("authored module-pin checks require sha256sum: %v", err)
 	}
 	root := filepath.Dir(filepath.Dir(demoScript(t, "nvke-os-local.sh")))
-	raw, err := os.ReadFile(filepath.Join(root, "inputs/catalogs/node-images/diagnostic/registry.yaml"))
+	sources, err := catalog.ReadSourcesContext(t.Context(), catalog.Dir(filepath.Join(root, "inputs/catalogs/node-images/diagnostic")))
 	if err != nil {
 		t.Fatal(err)
 	}
-	var registry struct {
-		Sources map[string]struct {
-			VendorCommand []string `yaml:"vendorCommand"`
-		}
-	}
-	if err := yaml.Unmarshal(raw, &registry); err != nil {
-		t.Fatal(err)
-	}
-	command := registry.Sources["nvke-os"].VendorCommand
+	command := sources["nvke-os"].VendorCommand
 	if len(command) != 3 || command[0] != "bash" || command[1] != "-ec" {
 		t.Fatalf("unexpected agent preparation command: %v", command)
 	}

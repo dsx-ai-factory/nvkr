@@ -435,7 +435,7 @@ func TestOSBootstrapFreezesSelectedUbuntuRecipe(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				for _, directory := range []string{"inputs/definitions/diagnostics", "inputs/environments", "inputs/catalogs/node-images"} {
+				for _, directory := range []string{"inputs/definitions/diagnostics", "inputs/environments", "inputs/catalogs/node-images", "inputs/catalogs/shared"} {
 					if err := os.CopyFS(filepath.Join(root, directory), os.DirFS(filepath.Join(repository, directory))); err != nil {
 						t.Fatal(err)
 					}
@@ -482,6 +482,11 @@ exec "$NVKR_AUTHORING_TEST_EXE" -test.run='^TestAuthoringLabCLIProcess$' -- "$@"
 				}
 				if !strings.Contains(string(raw), ".nvkr/inputs/test-attempt/definition-attempt.json\n") {
 					t.Fatalf("run did not receive frozen Definition: %s", raw)
+				}
+				// A later shared-declaration edit must not change an already frozen
+				// attempt or force it to read outside its own input directory.
+				if err := os.WriteFile(filepath.Join(root, "inputs/catalogs/shared/node-images.yaml"), []byte("changed after freezing\n"), 0600); err != nil {
+					t.Fatal(err)
 				}
 				t.Chdir(root)
 				planRaw, err := runCLIWithCapturedStdout(t, newApp(), "nvkr", "run", "plan",
