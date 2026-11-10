@@ -191,6 +191,45 @@ func cmdCatalog() *cli.Command {
 				},
 			},
 			{
+				Name:      "show",
+				Usage:     "explain one validated component: producer mode, pins, platforms and material closure",
+				ArgsUsage: "<component>",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"},
+					&cli.StringFlag{Name: "format", Value: "text", Usage: "text or json"},
+				},
+				Action: func(c *cli.Context) error {
+					view, err := selectCommandPresentation(c)
+					if err != nil {
+						return err
+					}
+					display := catalogCommandDisplay("Catalog component")
+					if c.Args().Len() != 1 {
+						return showCommandResult(c, view, display, e.New(e.CodeUsage, "catalog show requires exactly one component name"))
+					}
+					if format := c.String("format"); format != "text" && format != "json" {
+						return showCommandResult(c, view, display, e.New(e.CodeUsage, "unknown component description format %q (use text or json)", format))
+					}
+					cat, err := catalog.LoadContext(c.Context, providerFor(c))
+					if err != nil {
+						return showCommandResult(c, view, display, err)
+					}
+					description, err := cat.Describe(c.Args().First())
+					if err != nil {
+						return showCommandResult(c, view, display, err)
+					}
+					if view.tui {
+						return showCommandResult(c, view, catalogComponentDescriptionDisplay(description), nil)
+					}
+					raw, err := description.Render(c.String("format"))
+					if err != nil {
+						return err
+					}
+					_, err = os.Stdout.Write(raw)
+					return err
+				},
+			},
+			{
 				Name:      "pin",
 				Usage:     "resolve a source release or exact Git commit to pins, then write the lock",
 				ArgsUsage: "<source>",
@@ -390,6 +429,28 @@ func catalogComponentsDisplay(loaded *catalog.Catalog, title string, modes map[s
 		display.Items = append(display.Items, progress.Item{ID: name, Name: name, Kind: component.OutputType, State: "declared", Fields: []progress.Field{
 			{Label: "Producer mode", Value: mode}, {Label: "Builder", Value: component.BuilderType}, {Label: "Platforms", Value: strings.Join(component.Platforms, ", ")},
 		}})
+	}
+	return display
+}
+
+// catalogComponentDescriptionDisplay presents the catalog-owned description:
+// the component's pins as fields, and each closure member as an item naming
+// the bindings that need it.
+func catalogComponentDescriptionDisplay(description catalog.ComponentDescription) commandDisplay {
+	display := catalogCommandDisplay("Catalog component")
+	display.Note = "Declarations only; platforms are not a claim that this host can execute them. Producer execution and release verification are separate."
+	for _, field := range description.Fields() {
+		display.Fields = append(display.Fields, progress.Field{Label: strings.ToUpper(field.Label[:1]) + field.Label[1:], Value: field.Value})
+	}
+	display.Fields = append(display.Fields, progress.Field{Label: "Material closure", Value: strconv.Itoa(len(description.Closure))})
+	for _, name := range description.Closure {
+		item := progress.Item{ID: name, Name: name, Kind: "material", State: "declared"}
+		for _, edge := range description.Edges {
+			if edge.Component == name {
+				item.Fields = append(item.Fields, progress.Field{Label: "Needed by", Value: edge.Consumer + " as " + edge.Binding})
+			}
+		}
+		display.Items = append(display.Items, item)
 	}
 	return display
 }
