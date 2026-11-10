@@ -24,10 +24,7 @@ import (
 // upstream source tree or claim that the resulting Plan can build its producers.
 func controllerCatalogFixture(t *testing.T, directory string) (*catalog.Catalog, string) {
 	t.Helper()
-	dir := t.TempDir()
-	if err := os.CopyFS(dir, os.DirFS(directory)); err != nil {
-		t.Fatal(err)
-	}
+	dir := copyMaintainedCatalogFixture(t, directory)
 	lock, err := catalog.LoadLockContext(t.Context(), dir)
 	if err != nil {
 		t.Fatal(err)
@@ -111,6 +108,21 @@ func controllerCatalogFixture(t *testing.T, directory string) (*catalog.Catalog,
 		t.Fatal(err)
 	}
 	return cat, commit
+}
+
+// Preserve the maintained catalog/shared layout when isolating an authored
+// catalog. A registry and lock alone no longer contain its declaration closure.
+func copyMaintainedCatalogFixture(t *testing.T, directory string) string {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), "catalogs")
+	dir := filepath.Join(root, filepath.Base(filepath.Dir(directory)), filepath.Base(directory))
+	if err := os.CopyFS(dir, os.DirFS(directory)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.CopyFS(filepath.Join(root, "shared"), os.DirFS(filepath.Join(directory, "..", "..", "shared"))); err != nil {
+		t.Fatal(err)
+	}
+	return dir
 }
 
 var fullCommit = regexp.MustCompile(`^[0-9a-f]{40}$`)

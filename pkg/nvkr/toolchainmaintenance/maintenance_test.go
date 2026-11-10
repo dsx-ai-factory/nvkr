@@ -483,13 +483,29 @@ func TestRepinRebindsOverlayAndInspectorProfile(t *testing.T) {
 	testRepinFixture(t, nil)
 }
 
-func testRepinFixture(t *testing.T, beforeRepin func()) {
+func TestRepinRebindsSharedToolchainDeclaration(t *testing.T) {
+	testRepinFixture(t, nil, true)
+}
+
+func testRepinFixture(t *testing.T, beforeRepin func(), shared ...bool) {
 	t.Helper()
 	isolateGitEnvironment(t)
 	root := t.TempDir()
 	r := recordFixture()
 	registry := map[string]any{"apiVersion": "nvkr.dev/catalog/v3", "kind": "SourceBuildRegistry", "metadata": map[string]any{"name": "fixture"}, "sources": map[string]any{"tool": map[string]any{"repo": "https://example.invalid/tool", "constraint": "1.x", "toolchainImagesByArch": map[string]string{"arm64": Registry + "/packer-native@" + digest("old-arm")}}}, "components": map[string]any{"tool": map[string]any{"fromSource": true, "source": "tool", "platforms": []string{"linux/arm64"}, "outputType": "host-package", "artifactPath": "tool", "buildCommand": []string{"go", "build", "-o", "tool", "."}}}}
 	baseDir := filepath.Join(root, "inputs/catalogs/fixture")
+	wantChanges := 3
+	if len(shared) > 0 && shared[0] {
+		fragmentPath := filepath.Join(root, "inputs/catalogs/shared/toolchain.yaml")
+		writeJSON(t, fragmentPath, map[string]any{"apiVersion": "nvkr.dev/catalog-fragment/v1", "kind": "CatalogFragment", "sources": registry["sources"]})
+		fragment, err := os.ReadFile(fragmentPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		delete(registry, "sources")
+		registry["imports"] = []any{map[string]any{"path": "../shared/toolchain.yaml", "sha256": fmt.Sprintf("%x", sha256.Sum256(fragment)), "sources": map[string]string{"tool": "tool"}}}
+		wantChanges++
+	}
 	writeJSON(t, filepath.Join(baseDir, "registry.yaml"), registry)
 	writeJSON(t, filepath.Join(baseDir, "pins.lock.yaml"), map[string]any{"apiVersion": "nvkr.dev/lock/v1", "kind": "PinLock", "pins": map[string]any{"tool": map[string]any{"commit": strings.Repeat("a", 40), "tag": "v1.0.0", "treeHash": strings.Repeat("b", 40), "sourceDateEpoch": 1}}})
 	base, err := catalog.LoadContext(t.Context(), catalog.Dir(baseDir))
@@ -524,12 +540,46 @@ func testRepinFixture(t *testing.T, beforeRepin func()) {
 	if beforeRepin != nil {
 		beforeRepin()
 	}
+	// Planning must evaluate proposed fragments without writing them or the lock.
+	beforeFiles := map[string][]byte{}
+	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			if entry.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		raw, err := os.ReadFile(path)
+		beforeFiles[path] = raw
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	planned, err := repin(t.Context(), root, r, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for path, before := range beforeFiles {
+		after, err := os.ReadFile(path)
+		if err != nil || !bytes.Equal(before, after) {
+			t.Fatalf("planning changed %s: %v", path, err)
+		}
+	}
 	changed, err := repin(t.Context(), root, r, true)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(changed) != 3 || !slices.IsSorted(changed) {
+	if len(changed) != wantChanges || !slices.IsSorted(changed) || !slices.Equal(planned, changed) {
 		t.Fatalf("incomplete changes: %v", changed)
+	}
+	lockPath := filepath.Join(baseDir, catalog.LockFile)
+	lockAfter, err := os.ReadFile(lockPath)
+	if err != nil || !bytes.Equal(beforeFiles[lockPath], lockAfter) {
+		t.Fatalf("repin changed source lock: %v", err)
 	}
 	updated, err := catalog.LoadContext(t.Context(), catalog.Dir(baseDir))
 	if err != nil {
@@ -544,6 +594,9 @@ func testRepinFixture(t *testing.T, beforeRepin func()) {
 		t.Fatal(err)
 	}
 	packer, _ := selectedImage(r, "arm64", "packer")
+	if updated.Components["tool"].ToolchainImages["arm64"] != packer.Reference() {
+		t.Fatal("base did not consume the proposed shared toolchain declaration")
+	}
 	if stack.Catalog.Components["tool"].ToolchainImages["arm64"] != packer.Reference() {
 		t.Fatal("overlay did not move with base")
 	}

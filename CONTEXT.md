@@ -440,6 +440,8 @@ _Avoid_: Build status, local clock, mutable release contents
 
 **Component catalog**:
 Reusable producer, source, tool, and pin declarations from which Definitions select their inputs.
+A registry may select shared, digest-pinned declaration fragments; its lock still owns the complete expanded
+source and artifact key sets. Fragments are authoring inputs, not additional lifecycle objects.
 _Avoid_: Inventory, registry destination
 
 **Component producer**:

@@ -16,11 +16,9 @@ components:
       evidence:
         none: true
 sources:
-  syft:
-    repo: https://github.com/anchore/syft
-    constraint: 1.51.1
-    tool:
-      format: tar-gzip
-      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_arm64.tar.gz
-      platform: linux/arm64
-      executablePath: syft
+
+imports:
+- sources:
+    syft: syft-arm64
+  path: "../../shared/syft.yaml"
+  sha256: f52faff48638dde1ee3b2c6ff7e71501739cefbed502fe80ad296b9de370a897

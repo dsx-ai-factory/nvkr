@@ -18,10 +18,91 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"sigs.k8s.io/yaml"
 )
 
 const snapshotDefinition = "config/definition.json"
 const snapshotEnvironment = "config/environment.json"
+
+func TestCompileSnapshotCapturesCatalogFragments(t *testing.T) {
+	root, _, _ := snapshotFixture(t)
+	before, _, err := CaptureCompileFiles(t.Context(), root, snapshotDefinition, snapshotEnvironment, "snapshot-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	registryPath := filepath.Join(root, "catalog/registry.yaml")
+	raw, err := os.ReadFile(registryPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var registry map[string]any
+	if err := yaml.UnmarshalStrict(raw, &registry); err != nil {
+		t.Fatal(err)
+	}
+	sources := registry["sources"].(map[string]any)
+	fragment, err := yaml.Marshal(map[string]any{"apiVersion": "nvkr.dev/catalog-fragment/v1", "kind": "CatalogFragment", "sources": sources})
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected := map[string]string{}
+	for name := range sources {
+		selected[name] = name
+	}
+	delete(registry, "sources")
+	registry["imports"] = []any{map[string]any{"path": "../shared/sources.yaml", "sha256": fmt.Sprintf("%x", sha256.Sum256(fragment)), "sources": selected}}
+	writeSnapshotFixtureDocument(t, root, "catalog/registry.yaml", registry)
+	writeSnapshotFixtureFile(t, root, "shared/sources.yaml", fragment)
+	after, snapshot, err := CaptureCompileFiles(t.Context(), root, snapshotDefinition, snapshotEnvironment, "snapshot-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := before.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := after.Digest()
+	if err != nil || got != want {
+		t.Fatalf("fragment changed Plan: %s / %s: %v", got, want, err)
+	}
+	for _, tc := range []struct {
+		name    string
+		mutate  func(*InputSnapshot)
+		success bool
+	}{
+		{"complete replay", func(*InputSnapshot) {}, true},
+		{"missing fragment", func(s *InputSnapshot) {
+			s.Files = slices.DeleteFunc(s.Files, func(f InputFile) bool { return f.Path == "shared/sources.yaml" })
+		}, false},
+		{"changed fragment", func(s *InputSnapshot) {
+			for i := range s.Files {
+				if s.Files[i].Path == "shared/sources.yaml" {
+					s.Files[i].Data = []byte("changed")
+				}
+			}
+		}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			copy := snapshot
+			copy.Files = slices.Clone(snapshot.Files)
+			tc.mutate(&copy)
+			plan, err := CompileSnapshot(t.Context(), copy, "snapshot-test")
+			if !tc.success {
+				assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+				if err == nil || plan != nil {
+					t.Fatal("incomplete capture admitted")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			digest, err := plan.Digest()
+			if err != nil || digest != want {
+				t.Fatalf("replay changed Plan: %v", err)
+			}
+		})
+	}
+}
 
 func snapshotFixture(t *testing.T) (string, authored.Definition, authored.Environment) {
 	t.Helper()
@@ -253,6 +334,15 @@ func TestCaptureCompileFilesRejectsUnsafeSources(t *testing.T) {
 		}},
 		{"escaping catalog", func(_ *testing.T, _ string, d *authored.Definition) { d.Catalog.Base = "../../outside" }},
 		{"escaping overlay", func(_ *testing.T, _ string, d *authored.Definition) { d.Catalog.Overlays = []string{"../../outside"} }},
+		{"escaping fragment", func(t *testing.T, root string, _ *authored.Definition) {
+			name := filepath.Join(root, "catalog/registry.yaml")
+			raw, err := os.ReadFile(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw = append(raw, []byte("\nimports:\n- path: ../../outside.yaml\n  sha256: \""+strings.Repeat("0", 64)+"\"\n  sources: {selected: selected}\n")...)
+			writeSnapshotFixtureFile(t, root, "catalog/registry.yaml", raw)
+		}},
 		{"symlink file", func(t *testing.T, root string, _ *authored.Definition) {
 			source := filepath.Join(root, "catalog/registry.yaml")
 			if err := os.Rename(source, source+".saved"); err != nil {

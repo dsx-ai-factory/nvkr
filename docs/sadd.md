@@ -45,6 +45,8 @@ an artifact was signed. `pipeline-attested` never satisfies a gate requiring `qu
 
 The tool and its catalogs are separate products: the tool owns resolution and verification rules; catalogs
 provide reusable component producers and pins, including tool releases and GitHub actions.
+Explicit digest-pinned fragments share authored declarations before resolution; each catalog retains its own
+complete lock. Snapshot capture includes those fragment bytes and replay remains confined to captured inputs.
 [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies) owns how generated
 Runs bind action commits from the catalog lock. Definitions declare named deliverable outputs once.
 NVKR does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source

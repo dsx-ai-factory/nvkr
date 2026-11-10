@@ -16,3 +16,8 @@ See `source_metadata_test.go`, `ovn_pin_propagation_test.go` and the
 [copy inventory](../../catalog-maintenance.md#maintain-producer-copies). The native NVIDIA overlay copies
 its three maintained OVN producers from the release catalog through the same generator, preserving the resolved overlay identity and consuming Plans. The release catalog and
 excluded KVM variants remain separately authored; profile stream coordination remains downstream-owned.
+
+Digest-pinned, explicitly selected catalog fragments share source and component declarations before ordinary
+lock resolution. Catalog tests cover aliasing, collisions, unknown inputs, content mutation, pin ownership,
+provider admission and resource bounds; factory snapshot tests cover complete capture and replay. These
+contracts preserve resolved producer values and do not establish fresh build or runtime acceptance.

@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: nvkr.dev/catalog-fragment/v1
+kind: CatalogFragment
+sources:
+  syft-arm64:
+    constraint: 1.51.1
+    repo: https://github.com/anchore/syft
+    tool:
+      executablePath: syft
+      format: tar-gzip
+      platform: linux/arm64
+      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_arm64.tar.gz
+  syft:
+    constraint: 1.51.1
+    repo: https://github.com/anchore/syft
+    tool:
+      executablePath: syft
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_amd64.tar.gz

@@ -125,10 +125,10 @@ func readRegistry(p DataProvider) (*registryDoc, error) {
 	if err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "reading %s from %s", RegistryFile, p.Name())
 	}
-	return decodeRegistry(raw, fmt.Sprintf("%s from %s", RegistryFile, p.Name()))
+	return decodeRegistry(raw, fmt.Sprintf("%s from %s", RegistryFile, p.Name()), p)
 }
 
-func decodeRegistry(raw []byte, where string) (*registryDoc, error) {
+func decodeRegistry(raw []byte, where string, providers ...DataProvider) (*registryDoc, error) {
 	var reg registryDoc
 	// Strict decode: an unknown or misplaced field is a coded error, never silently
 	// dropped. Removed authoring fields and misspelled producer fields fail closed.
@@ -140,6 +140,9 @@ func decodeRegistry(raw []byte, where string) (*registryDoc, error) {
 	}
 	if reg.Kind != catalogKind {
 		return nil, e.New(e.CodeInvalidCatalog, "catalog kind %q is unsupported; want exactly %q", reg.Kind, catalogKind)
+	}
+	if err := expandFragments(&reg, providers); err != nil {
+		return nil, err
 	}
 	if err := validateRegistryDeclarations(&reg); err != nil {
 		return nil, err

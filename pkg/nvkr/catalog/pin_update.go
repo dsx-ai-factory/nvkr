@@ -406,6 +406,6 @@ func pinUpdateInputs(ctx context.Context, directory string) (*registryDoc, *PinL
 	if sha256.Sum256(raw) != lock.revision.registryDigest {
 		return nil, nil, e.New(e.CodeWriteConflict, "registry changed while reading pin inputs")
 	}
-	reg, err := decodeRegistry(raw, RegistryFile)
+	reg, err := decodeRegistry(raw, RegistryFile, provider)
 	return reg, lock, err
 }

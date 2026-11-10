@@ -261,6 +261,17 @@ func (provider *snapshotCatalogProvider) ReadDir(string) ([]string, error) {
 
 func (provider *snapshotCatalogProvider) Name() string { return "snapshot:" + provider.prefix }
 
+func (provider *snapshotCatalogProvider) ReadFragmentContext(ctx context.Context, name string) ([]byte, error) {
+	if err := catalog.ValidateFragmentPath(name); err != nil {
+		return nil, err
+	}
+	resolved, err := resolveInputPath(path.Join(provider.prefix, catalog.RegistryFile), name, false)
+	if err != nil {
+		return nil, err
+	}
+	return provider.state.readFile(ctx, resolved)
+}
+
 func (provider *snapshotCatalogProvider) ReadFileContext(ctx context.Context, name string) ([]byte, error) {
 	if err := validateInputPath(name); err != nil {
 		return nil, err
