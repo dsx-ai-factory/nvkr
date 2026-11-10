@@ -139,7 +139,7 @@ func TestKindCore(t *testing.T) {
 		if header.Kind == "PipelineRun" {
 			run = item
 		} else {
-			l.kube(ctx, item, "apply", "-f", "-")
+			l.kube(ctx, item, "apply", "--server-side", "--field-manager=nvkr-kind", "-f", "-")
 		}
 	}
 	if run == nil {

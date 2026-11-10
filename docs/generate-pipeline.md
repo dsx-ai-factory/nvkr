@@ -331,8 +331,9 @@ worker and selected-platform matrix (ADR-21).
 Select `--engine tekton` with an Environment containing `tekton` configuration. Generation writes
 `.tekton/nvkr-run/resources.json`, `plan.json` and `manifest.json`; `--check` compares their exact bytes.
 The resource list contains immutable Plan/configuration ConfigMaps, scoped service accounts and read-only
-API roles, and a `tekton.dev/v1` PipelineRun with embedded TaskSpecs. Apply the static resources and create
-the PipelineRun separately: its generated name gives each execution a fresh UID and PVC.
+API roles, and a `tekton.dev/v1` PipelineRun with embedded TaskSpecs. Use server-side apply for the static
+resources: client-side apply adds a last-applied annotation that can exceed the annotation limit for large
+immutable ConfigMaps. Create the PipelineRun separately: its generated name gives each execution a fresh UID and PVC.
 
 The Environment selects the API HTTPS endpoint and CA, namespace, native Linux platform, storage class
 and workspace size, digest-pinned runner/runtime images, three distinct public keys, and native smoke policy.
