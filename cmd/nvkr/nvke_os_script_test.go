@@ -320,6 +320,7 @@ func TestOSDockerBootstrapUsesPrivateSharedTemporaryDirectory(t *testing.T) {
 				"inputs/environments/local-linux-" + arch + "-kvm.yaml":          "fixture",
 				"inputs/catalogs/node-images/diagnostic/registry.yaml":           "fixture",
 				"inputs/catalogs/node-images/diagnostic/pins.lock.yaml":          "fixture",
+				"inputs/catalogs/shared/node-images.yaml":                        "fixture",
 				"inputs/catalogs/node-images/variants/diagnostic-arm64-kvm.yaml": "fixture",
 				"bin/docker":                      "#!/bin/sh\nexit 99\n",
 				"bin/uname":                       "#!/bin/sh\ncase \"$1\" in -s) echo Linux;; -m) echo \"$TEST_MACHINE\";; *) exit 99;; esac\n",
