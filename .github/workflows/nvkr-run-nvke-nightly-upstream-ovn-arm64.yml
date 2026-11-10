@@ -41,7 +41,6 @@ jobs:
       - name: Prepare NVKR runner (arc-arm64-kvm)
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/bootstrap-linux-arm64-runtime-plan
         with:
-          nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-arc-arm64-kvm'
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   build-runner-ubuntu-24-04:
@@ -60,7 +59,6 @@ jobs:
       - name: Prepare NVKR runner (ubuntu-24.04)
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/bootstrap-linux-amd64
         with:
-          nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -79,7 +77,6 @@ jobs:
       - name: Prepare NVKR runner (ubuntu-24.04-arm)
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/bootstrap-linux-arm64
         with:
-          nvkr-pin-source-token-0: '${{ secrets.NKE_SOURCE_TOKEN }}'
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -218,18 +215,7 @@ jobs:
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps:
-      - *check-native-linux-arm64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - &operation-execute-source-part-1
-        name: execute source part-1
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
-        with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
@@ -259,11 +245,7 @@ jobs:
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps:
-      - *check-native-linux-arm64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+    steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
@@ -293,11 +275,7 @@ jobs:
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps:
-      - *check-native-linux-arm64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+    steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
@@ -347,11 +325,7 @@ jobs:
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps:
-      - *check-native-linux-arm64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+    steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
@@ -488,12 +462,11 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: execute source part-1
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -576,11 +549,7 @@ jobs:
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps:
-      - *check-native-linux-arm64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+    steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
@@ -617,12 +586,11 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: execute source part-1
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -777,12 +745,11 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: execute source part-1
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -809,12 +776,11 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: execute source part-1
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -831,12 +797,11 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: execute source part-1
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -853,12 +818,11 @@ jobs:
       - *check-native-linux-arm64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: execute source part-1
-        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -878,11 +842,7 @@ jobs:
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps:
-      - *check-native-linux-arm64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-source-part-1
+    steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
@@ -3800,24 +3760,7 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
       - name: Finalize Run and check completeness
         id: finalize-catalog
-        env:
-          GIT_CONFIG_COUNT: '4'
-          GIT_CONFIG_GLOBAL: '/dev/null'
-          GIT_CONFIG_KEY_0: 'credential.helper'
-          GIT_CONFIG_KEY_1: 'credential.useHttpPath'
-          GIT_CONFIG_KEY_2: 'url.https://github.com/dsx-ai-factory/nvke.insteadOf'
-          GIT_CONFIG_KEY_3: 'credential.https://github.com/dsx-ai-factory/nvke.helper'
-          GIT_CONFIG_NOSYSTEM: '1'
-          GIT_CONFIG_VALUE_0: ''
-          GIT_CONFIG_VALUE_1: 'true'
-          GIT_CONFIG_VALUE_2: 'https://github.com/dsx-ai-factory/nvke'
-          GIT_CONFIG_VALUE_3: '!f() { if [ "$1" = get ]; then printf ''%s\n'' ''username=x-access-token'' "password=$NVKR_PIN_SOURCE_TOKEN_0"; fi; }; f'
-          GIT_TERMINAL_PROMPT: '0'
-          NVKR_PIN_SOURCE_TOKEN_0: '${{ secrets.NKE_SOURCE_TOKEN }}'
-        run: |
-          set -eu
-          [ -n "${NVKR_PIN_SOURCE_TOKEN_0:-}" ] || { printf '%s\n' 'nvkr: [NVKR-E-FETCH-FAILED] source credential is empty' >&2; exit 20; }
-          ./nvkr-exec run finalize --definition inputs/definitions/demo/arm64-upstream-kvm.json --environment inputs/environments/github-nightly-upstream.json --plan .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json --attempt "${{ github.run_id }}-${{ github.run_attempt }}" --workspace .nvkr/factory --out .nvkr/run.json --handoff .nvkr/qualification/handoff.json
+        run: ./nvkr-exec run finalize --definition inputs/definitions/demo/arm64-upstream-kvm.json --environment inputs/environments/github-nightly-upstream.json --plan .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json --attempt "${{ github.run_id }}-${{ github.run_attempt }}" --workspace .nvkr/factory --out .nvkr/run.json --handoff .nvkr/qualification/handoff.json
       - name: Upload final Run record
         id: upload-run-record
         uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/ci-upload

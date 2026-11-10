@@ -479,14 +479,17 @@ jobs:
           GOTOOLCHAIN: local
         run: CGO_ENABLED=0 go build -trimpath -o nvkr-exec ./cmd/nvkr
       - name: Check out exact pinned NVKE source
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: dsx-ai-factory/nvke
-          ref: ${{ needs.select.outputs.nvke_commit }}
-          token: ${{ secrets.NKE_SOURCE_TOKEN }}
-          path: .trusted/nvke
-          fetch-depth: 1
-          persist-credentials: false
+        env:
+          NVKE_REF: ${{ needs.select.outputs.nvke_commit }}
+          GIT_CONFIG_NOSYSTEM: '1'
+          GIT_CONFIG_GLOBAL: /dev/null
+          GIT_CONFIG_COUNT: '0'
+          GIT_TERMINAL_PROMPT: '0'
+        run: |
+          set -euo pipefail
+          git init .trusted/nvke
+          timeout 300 git -C .trusted/nvke -c credential.helper= fetch --depth=1 https://github.com/dsx-ai-factory/nvke "$NVKE_REF"
+          git -C .trusted/nvke checkout --detach FETCH_HEAD
 
       - name: Authenticate and package credential-free source
         id: package

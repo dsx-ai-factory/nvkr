@@ -343,14 +343,20 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Fetch private source for catalog and generation checks
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # 7.0.1
-        with:
-          repository: dsx-ai-factory/nvke
-          fetch-depth: 0
-          path: .nvkr-inputs/source
-          token: ${{ secrets.NKE_SOURCE_TOKEN }}
-          persist-credentials: false
+      - name: Fetch public source for catalog and generation checks
+        env:
+          NVKE_REF: HEAD
+          GIT_CONFIG_NOSYSTEM: '1'
+          GIT_CONFIG_GLOBAL: /dev/null
+          GIT_CONFIG_COUNT: '0'
+          GIT_TERMINAL_PROMPT: '0'
+        run: |
+          set -euo pipefail
+          git init .nvkr-inputs/source
+          timeout 300 git -C .nvkr-inputs/source -c credential.helper= fetch https://github.com/dsx-ai-factory/nvke '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
+          timeout 300 git -C .nvkr-inputs/source -c credential.helper= fetch https://github.com/dsx-ai-factory/nvke "$NVKE_REF"
+          git -C .nvkr-inputs/source checkout --detach FETCH_HEAD
+
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # 7.0.0
         with:
           go-version-file: .go-version

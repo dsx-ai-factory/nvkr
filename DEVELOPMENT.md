@@ -36,7 +36,7 @@ make check
 
 `make ci-check` runs every merge-gate check that can run locally: the code gate plus the build, actionlint,
 notices drift, workflow drift and Fern docs checks. Workflow drift re-reads the pinned NVKE source, so it needs
-read access to the private NVKE repository; the docs check needs Node and the Fern CLI. CodeQL runs only on
+network access to the public NVKE repository; the docs check needs Node and the Fern CLI. CodeQL runs only on
 GitHub.
 
 `make help` lists targets. The full release-blocking verification includes:
@@ -178,7 +178,7 @@ shared private toolchain and smoke images as well. These are additional prerequi
 output credentials above; see [registry reader setup](docs/generate-pipeline.md) for scopes and package
 access requirements.
 
-Keep `NKE_SOURCE_TOKEN` available to the fixed source-fetch/catalog-validation steps. Verify that the
+Source-fetch/catalog-validation steps read the public repositories anonymously. Verify that the
 `NVKR_REGISTRY_READ_USER` account can read the retained native Packer toolchain package. Do not grant the
 source repository Actions access to that package; see [registry reader setup](docs/generate-pipeline.md).
 The temporary toolchain read credential

@@ -48,6 +48,22 @@ func generationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPoli
 	}
 	return plan, policy
 }
+
+// selectTestSourceCredential keeps generic private-source contracts independent
+// of the maintained public-source Environments.
+func selectTestSourceCredential(t *testing.T, plan *factory.Plan) {
+	t.Helper()
+	const repository = "https://github.com/dsx-ai-factory/nvke"
+	plan.Environment.SourceAccess = map[string]definition.SourceAccess{
+		repository: {Mirror: repository, CredentialRef: "github:TEST_SOURCE_READ_TOKEN"},
+	}
+	var err error
+	plan.EnvironmentDigest, err = plan.Environment.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func generationBundle(t *testing.T) (*GeneratedWorkflows, lifecycle.QualificationPolicy) {
 	t.Helper()
 	plan, policy := generationFixture(t)
@@ -101,14 +117,20 @@ func decodeQualificationWorkflow(t *testing.T, raw []byte) qualificationWorkflow
 
 func TestQualificationGeneratedCommandsOwnStepProcess(t *testing.T) {
 	for _, tc := range []struct {
-		name    string
-		fixture func(*testing.T) (*factory.Plan, lifecycle.QualificationPolicy)
+		name          string
+		privateSource bool
+		fixture       func(*testing.T) (*factory.Plan, lifecycle.QualificationPolicy)
 	}{
-		{"production", generationFixture},
-		{"development", developmentGenerationFixture},
+		{"production public source", false, generationFixture},
+		{"development public source", false, developmentGenerationFixture},
+		{"production private source", true, generationFixture},
+		{"development private source", true, developmentGenerationFixture},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan, policy := tc.fixture(t)
+			if tc.privateSource {
+				selectTestSourceCredential(t, plan)
+			}
 			bundle, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
 			if err != nil {
 				t.Fatal(err)
@@ -135,7 +157,7 @@ func TestQualificationGeneratedCommandsOwnStepProcess(t *testing.T) {
 					if lines[len(lines)-1] != want {
 						t.Fatalf("%s does not replace its shell with the final owner command", command.workflow)
 					}
-					if lines[0] != "set -euo pipefail" || !strings.Contains(step.Run, "[ -n \"${NVKR_PIN_SOURCE_TOKEN_0:-}\" ]") || step.Timeout != 60 {
+					if lines[0] != "set -euo pipefail" || strings.Contains(step.Run, "[ -n \"${NVKR_PIN_SOURCE_TOKEN_0:-}\" ]") != tc.privateSource || step.Timeout != 60 {
 						t.Fatalf("%s changed source admission or its bounded step", command.workflow)
 					}
 					if time.Duration(step.Timeout)*time.Minute-hostedRuntimeTimeout != time.Minute {
@@ -236,9 +258,8 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 	if !reflect.DeepEqual(final.Needs, []string{"native-smoke"}) || final.Permissions["packages"] != "" || call.Permissions["packages"] != "" || native.Permissions["packages"] != "" {
 		t.Fatal("final publication and read-only worker permissions are not separated")
 	}
-	if call.Secrets["NKE_SOURCE_TOKEN"] != "${{ secrets.NKE_SOURCE_TOKEN }}" ||
-		call.Secrets["NVKR_CI_STORAGE_READ_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" ||
-		call.Secrets["NVKR_REGISTRY_READ"] != "${{ secrets.NVKR_REGISTRY_READ }}" || len(call.Secrets) != 3 {
+	if call.Secrets["NVKR_CI_STORAGE_READ_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" ||
+		call.Secrets["NVKR_REGISTRY_READ"] != "${{ secrets.NVKR_REGISTRY_READ }}" || len(call.Secrets) != 2 {
 		t.Fatalf("unexpected explicit source secrets: %v", call.Secrets)
 	}
 	contract, ok := worker.On["workflow_call"].(map[string]any)
@@ -304,7 +325,7 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 				}
 			}
 		}
-		if scoped != 1 || storageScoped != 1 || checkouts != 1 {
+		if scoped != 0 || storageScoped != 1 || checkouts != 1 {
 			t.Fatal("incorrect credential or checkout scope")
 		}
 	}
@@ -633,6 +654,7 @@ func TestQualificationGeneratedYAMLLints(t *testing.T) {
 
 func TestQualificationSourceCredentialContext(t *testing.T) {
 	plan, _ := generationFixture(t)
+	selectTestSourceCredential(t, plan)
 	auth, err := qualificationSourceAuthentication(plan)
 	if err != nil {
 		t.Fatal(err)

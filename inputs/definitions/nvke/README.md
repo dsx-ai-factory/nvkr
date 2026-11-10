@@ -458,9 +458,8 @@ The release remains one signed entry point. Retry assembly may retain earlier at
 [reconciliation](../../../docs/adr/reconciliation/m3-mvp-scope-and-acceptance-boundary.md#m3-mvp-scope-and-acceptance-boundary) records a successful
 producer completion with mixed original attempts. Successful independent retry qualification remains unproved.
 
-Only admitted source retrieval and pinned-source revalidation steps receive `NKE_SOURCE_TOKEN` for NVKE;
-native build jobs receive source bytes without that
-credential. Internal toolchain preparation uses separate ephemeral read-only package access, removed
+Source retrieval and pinned-source revalidation read the public NVKE and OVN repositories anonymously;
+native build jobs receive verified source bytes. Internal toolchain preparation uses separate ephemeral read-only package access, removed
 before producer execution. Grant the dedicated reader account only its required package roles and retire
 source-repository Actions access after migrating and validating the new workflow, as described in the
 [production credential setup](../../../docs/generate-pipeline.md). Restrict `nvkr-arc`, `nvkr-release`

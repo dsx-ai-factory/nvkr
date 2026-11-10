@@ -163,7 +163,7 @@ only on success. A `make build` binary carries a different stamp and is refused 
 
 ```sh
 make workflow-generator
-bin/nvkr-exec catalog update-ci --source-checkout dsx-ai-factory/nvke:NKE_SOURCE_TOKEN > /tmp/catalog-refresh.yaml &&
+bin/nvkr-exec catalog update-ci > /tmp/catalog-refresh.yaml &&
   mv /tmp/catalog-refresh.yaml .github/workflows/catalog-refresh.yaml
 ```
 
@@ -307,8 +307,7 @@ claims remain with the production Run and consumer policy. Even a green candidat
 
 ## Scheduled catalog refresh
 
-`.github/workflows/catalog-refresh.yaml` is installed in this repository. It is the output of `catalog update-ci
---source-checkout dsx-ai-factory/nvke:NKE_SOURCE_TOKEN`, and it is regenerated rather than edited.
+`.github/workflows/catalog-refresh.yaml` is installed in this repository. It is the output of `catalog update-ci`, and it is regenerated rather than edited.
 It permits manual dispatch from the default branch and runs daily at 02:00 UTC. The exact stable
 `v0.23.0` constraints keep refreshes at that release until an authored change widens them.
 A newer run for the same ref cancels one still in progress. The next run moves the review branch to the current
@@ -417,7 +416,7 @@ that could be truncated. The `discover` step and the renderer agree that nested 
 names are unsupported. The rendered steps also pass under Bash 3.2: their bracket expressions spell characters
 out instead of using ranges, which follow locale collation there. These rendered-step tests skip locally when
 `bash`, `git`, `jq` or `yq` is missing; with `NVKR_REQUIRE_SHELL_TOOLS=1` or `CI` set they fail instead, and the
-merge gate sets the variable. Rendering needs access to the private NVKE source, so the unit tests do not
+merge gate sets the variable. Rendering needs network access to the public NVKE source, so the unit tests do not
 compare installed bytes with the renderer's output. `make workflows-check` does, through `make
 catalog-refresh-check`: it renders `catalog update-ci` with the canonical generator stamp and fails on any
 difference from `.github/workflows/catalog-refresh.yaml`. The merge gate's regeneration job runs it, and a

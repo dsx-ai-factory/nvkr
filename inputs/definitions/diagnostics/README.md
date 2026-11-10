@@ -84,7 +84,7 @@ Manual dispatch supports these modes:
 | Mode | What runs | Source and credentials |
 |---|---|---|
 | `preflight` | Native KVM access check on one or both ARC pools | No NVKE acquisition or source credential; can inspect branch workflow bytes |
-| `toolchain` | Native source-locked toolchain assembly and image-ID observation on hosted runners | No KVM or private NVKE source; trusted main workflow |
+| `toolchain` | Native source-locked toolchain assembly and image-ID observation on hosted runners | No KVM or NVKE source acquisition; trusted main workflow |
 | `full` | Native local lifecycle build, exact QCOW2 checks and source-owned boot smoke | Trusted main selector/fetch, reviewed source handoff and KVM runners |
 
 For a full dispatch, supply an exact main-reachable NVKR commit or the copy-pr-bot mirror of a current,
@@ -95,10 +95,10 @@ Only the named SPIRE producer may use the exact pre-DSX commit/tree retained abo
 snapshot and executable source edge must both match that exception.
 This is a consistency check; the input is not itself source-owner approval.
 
-The selector and source fetch use trusted main code. The fetch job alone receives the read-only
-`NKE_SOURCE_TOKEN`; it verifies both exact source commit/tree pairs, removes persistent credentials, and
+The selector and source fetch use trusted main code. The fetch job reads the public repository
+anonymously; it verifies both exact source commit/tree pairs, removes persistent credentials, and
 transports one Git checkout containing both commits to the candidate job. The consumer verifies the
-archive digest and both pins before using that checkout. Candidate execution receives private source content and declared
+archive digest and both pins before using that checkout. Candidate execution receives verified source content and declared
 build network, but no source token. The process-local Git transport override keeps canonical source pins.
 
 The runner identity must already have read/write KVM access; the workflow prints device ownership/mode

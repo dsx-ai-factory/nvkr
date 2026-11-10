@@ -247,25 +247,15 @@ func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
 			want.Signing.Identity = "^" + regexp.QuoteMeta(identity) + "@refs/heads/main$"
 			// Each family's workflow fits flat; only the combined producer partitions.
 			want.GitHubExecutionPartitions = false
-			sources := map[string]bool{"https://github.com/dsx-ai-factory/nvke": true}
-			if nvkeDiskFamily(family.name) {
-				// Disks also build the release catalog's NVIDIA OVN fork producers.
-				sources = map[string]bool{"https://github.com/dsx-ai-factory/nvke.git": true, "https://github.com/dsx-ai-factory/ovn-kubernetes": true}
-			} else {
+			if !nvkeDiskFamily(family.name) {
 				want.GitHubARC, want.DiskEvidence = "", ""
 				want.ExecutionClasses, want.DiskInspectionProfiles = nil, nil
 				want.ToolchainAccess = &definition.ToolchainAccess{PublicRoots: []string{
 					"docker.io/alpine/helm", "docker.io/library/busybox", "docker.io/library/golang", "docker.io/moby/buildkit",
 				}}
 			}
-			for selected := range want.SourceAccess {
-				if !sources[selected] {
-					delete(want.SourceAccess, selected)
-				}
-			}
-			// Services still needs the private NVKE catalog pin-set credential,
-			// even when every selected image/chart is acquired rather than built.
-			if len(want.SourceAccess) != len(sources) || !bytes.Equal(nvkeSplitCanonical(t, env), nvkeSplitCanonical(t, want)) {
+			// Every family reads public sources and catalog pin sets anonymously.
+			if len(env.SourceAccess) != 0 || len(want.SourceAccess) != 0 || !bytes.Equal(nvkeSplitCanonical(t, env), nvkeSplitCanonical(t, want)) {
 				t.Fatal("family changes policy outside its namespace or retains the wrong source/disk capabilities")
 			}
 		})
