@@ -245,7 +245,7 @@ func (l *lab) keys(ctx context.Context, image, cosign string) map[string]string 
 	must(l.t, os.Mkdir(directory, 0700))
 	keys := map[string]string{}
 	for _, role := range []string{"publisher", "smoke", "qualifier"} {
-		l.docker(ctx, nil, "run", "--rm", "--network=none", "--entrypoint=/cosign", "-e", "COSIGN_PASSWORD=", "-v", cosign+":/cosign:ro", "-v", directory+":/keys", image, "generate-key-pair", "--output-key-prefix", "/keys/"+role)
+		l.docker(ctx, nil, "run", "--rm", "--network=none", "--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "--entrypoint=/cosign", "-e", "COSIGN_PASSWORD=", "-v", cosign+":/cosign:ro", "-v", directory+":/keys", image, "generate-key-pair", "--output-key-prefix", "/keys/"+role)
 		keys[role] = string(read(l.t, filepath.Join(directory, role+".pub")))
 		private := read(l.t, filepath.Join(directory, role+".key"))
 		secret := map[string]any{"apiVersion": "v1", "kind": "Secret", "metadata": map[string]string{"name": "nvkr-" + role + "-key", "namespace": "nvkr"}, "type": "Opaque", "data": map[string]string{"private.pem": base64.StdEncoding.EncodeToString(private)}}
