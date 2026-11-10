@@ -56,8 +56,8 @@ supported in this profile; NVKR uses exact root membership.
 Omission and explicit `artifact-v1` preserve existing construction. Existing pinned publications and release
 identities are unchanged. Selecting `helm-standard-v1` creates new affected manifest, evidence-subject and
 publication identities before signing; it does not rewrite an old release. Install an updated NVKR reader
-before consuming the new profile. The [local interoperability procedure](../DEVELOPMENT.md) exercises stock
-Helm pull/show/template and compares archive bytes; it is not live GitLab or hosted signing acceptance.
+before consuming the new profile. Local interoperability checks exercise stock Helm pull/show/template
+and compare archive bytes; they do not establish live GitLab or hosted signing acceptance.
 
 ## Registry diagnostics
 
