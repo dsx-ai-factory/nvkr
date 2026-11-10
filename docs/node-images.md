@@ -71,25 +71,30 @@ NVKR provides the checked handoff; the source-owned build defines how those form
 
 ## Inspect without starting a VM
 
-After [building the CLI](quickstart.md#build-only-the-cli), run from the repository root. These commands need no Docker,
-KVM or Packer execution:
+After [building the CLI](quickstart.md#build-only-the-cli), run from the repository root.
+This AMD64 inspection example needs no Docker, KVM or Packer execution:
 
 ```sh
 NVKR_OS_DIR=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-os.XXXXXX")
 bin/nvkr run plan \
-  --definition inputs/definitions/diagnostics/os-arm64.yaml \
-  --environment inputs/environments/local-linux-arm64-kvm.yaml \
+  --definition inputs/definitions/diagnostics/os-amd64.yaml \
+  --environment inputs/environments/local-linux-amd64-kvm.yaml \
   --json > "$NVKR_OS_DIR/plan.json"
 bin/nvkr run graph --plan "$NVKR_OS_DIR/plan.json" \
   --view producers --format mermaid > "$NVKR_OS_DIR/materials.mmd"
 bin/nvkr run local \
-  --definition inputs/definitions/diagnostics/os-arm64.yaml \
-  --environment inputs/environments/local-linux-arm64-kvm.yaml \
+  --definition inputs/definitions/diagnostics/os-amd64.yaml \
+  --environment inputs/environments/local-linux-amd64-kvm.yaml \
   --attempt os-preview --dry-run
 ```
 
 Expect `pending`, `static-unqualified` and zero observed outputs. No attempt workspace or QCOW2 is created.
 The Mermaid file describes dependencies; see [user concepts](user-concepts.md) for the identity distinctions.
+
+The unfrozen ARM64 inputs are refused by `run local`, even with `--dry-run`, with
+`NVKR-E-ENGINE-CAPABILITY`: their private Packer image has no declared `toolchainAccess` root.
+Adding a root does not admit private images on the local route. For ARM64 execution, use the
+maintained wrapper linked below, which substitutes an observed local Packer image before compiling the Plan.
 
 ## Execute with the matching runtime
 
