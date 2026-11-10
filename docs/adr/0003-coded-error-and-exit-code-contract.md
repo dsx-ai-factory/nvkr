@@ -46,6 +46,8 @@ Publication classifies structured registry responses without inferring a vendor 
 Registry authentication or authorization refusal uses `registry-auth-failed` (55); other permanent
 publication request refusals use `registry-rejected` (56). An unambiguous unsupported operation uses
 `engine-capability` (29), and an unambiguous digest or size mismatch uses `verify-failed` (22).
+Permanent refusals of Helm chart tag writes or image discovery tag writes are an exception: they use
+`invalid-catalog` (16), including structured refusals, unless authentication was refused.
 An authentication diagnostic takes precedence over any unsupported diagnostic. HTTP 408, 429 and 5xx
 responses remain transient unless authentication was explicitly refused. Ambiguous or unknown permanent
 diagnostics do not authorize automatic representation changes. `MANIFEST_INVALID` alone identifies a
