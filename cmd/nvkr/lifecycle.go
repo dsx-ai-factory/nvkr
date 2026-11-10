@@ -36,6 +36,7 @@ func rejectUnusedArguments(c *cli.Context, flag string) error {
 
 func cmdDefinition() *cli.Command {
 	return &cli.Command{Name: "definition", Usage: "validate and inspect authored product definitions", Subcommands: []*cli.Command{
+		definitionInitCommand(),
 		{Name: "validate", Usage: "validate a Definition or composite Definition and print its exact identity", Flags: append(commandPresentationFlags(), &cli.StringFlag{Name: "definition", Required: true}), Action: func(c *cli.Context) error {
 			if err := rejectUnusedArguments(c, "definition"); err != nil {
 				return err

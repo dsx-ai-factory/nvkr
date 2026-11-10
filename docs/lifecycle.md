@@ -41,6 +41,26 @@ Output-affecting build tools remain part of build identity.
 A destination or signing-setting change can change the prepared execution and generated workflow while
 preserving build identity. A dry-run signing mode records intended operations and never supplies a signature.
 
+## Start a small executable Definition
+
+`definition init` prints a plain Definition with one executable output named after `--name`, bundling
+catalog components you select explicitly. It adds no Environment, pins, signer, CI files or composite, and
+it never adds a dependency you did not name:
+
+```sh
+bin/nvkr definition init --name my-tools \
+  --catalog inputs/catalogs/tools/operator-arm64 \
+  --platform linux/arm64 --component helm --component kubectl > definition.yaml
+bin/nvkr definition validate --definition definition.yaml
+```
+
+The selection is admitted through the same catalog, platform-route and material-set checks a later run uses, and
+each component must be a `host-package` producer. A missing, duplicate or unknown component, an unsupported
+platform, an incomplete material selection or a non-executable producer fails with a coded error and prints
+nothing. Components are sorted, so the same request always prints the same bytes. `--catalog` is written as an
+absolute path so moving the file cannot change which catalog it means; edit it to a relative path when the file
+should be portable. This first version covers one executable output and a single platform.
+
 ## Inspect and generate
 
 With `bin/nvkr` built as described in the quickstart, inspect the three-output NVKE example:
