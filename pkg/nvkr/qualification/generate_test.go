@@ -236,9 +236,8 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 	if !reflect.DeepEqual(final.Needs, []string{"native-smoke"}) || final.Permissions["packages"] != "" || call.Permissions["packages"] != "" || native.Permissions["packages"] != "" {
 		t.Fatal("final publication and read-only worker permissions are not separated")
 	}
-	if call.Secrets["NKE_SOURCE_TOKEN"] != "${{ secrets.NKE_SOURCE_TOKEN }}" ||
-		call.Secrets["NVKR_CI_STORAGE_READ_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" ||
-		call.Secrets["NVKR_REGISTRY_READ"] != "${{ secrets.NVKR_REGISTRY_READ }}" || len(call.Secrets) != 3 {
+	if call.Secrets["NVKR_CI_STORAGE_READ_TOKEN"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" ||
+		call.Secrets["NVKR_REGISTRY_READ"] != "${{ secrets.NVKR_REGISTRY_READ }}" || len(call.Secrets) != 2 {
 		t.Fatalf("unexpected explicit source secrets: %v", call.Secrets)
 	}
 	contract, ok := worker.On["workflow_call"].(map[string]any)
@@ -304,7 +303,7 @@ func TestQualificationGenerationWorkflowContract(t *testing.T) {
 				}
 			}
 		}
-		if scoped != 1 || storageScoped != 1 || checkouts != 1 {
+		if scoped != 0 || storageScoped != 1 || checkouts != 1 {
 			t.Fatal("incorrect credential or checkout scope")
 		}
 	}

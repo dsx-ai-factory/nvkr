@@ -9,8 +9,8 @@ bytes are required by the FDE image; this does not introduce cross-Run cache reu
 
 The Environment selects Docker/KVM on `arc-amd64-kvm` and admits manual dispatch on
 `codex/fde-image-pipeline` as well as the default branch. GitHub's `nvkr-arc` Environment must separately
-admit that exact branch. The source-fetch stages use the existing `NKE_SOURCE_TOKEN`; the producer job
-receives source bytes without the token. Native toolchain preparation uses the workflow token with
+admit that exact branch. The source-fetch stages read public repositories anonymously; the producer job
+receives verified source bytes. Native toolchain preparation uses the workflow token with
 read-only package access and removes its temporary registry configuration before execution.
 
 Publication and signing are omitted. The generated pipeline retains raw QCOW2 bytes, their producer

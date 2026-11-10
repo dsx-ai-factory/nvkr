@@ -382,7 +382,7 @@ func TestGitHubSharedUploadRejectsOtherProviderNames(t *testing.T) {
 		{"unowned name", "arbitrary" + githubAttemptUploadNameSuffix, githubInspectionLogPath("disk")},
 		{"mismatched diagnostic path", "nvkr-inspection-disk" + githubAttemptUploadNameSuffix, githubInspectionLogPath("other")},
 		{"mismatched handoff path", githubQualificationHandoffName, ".nvkr/run.json"},
-		{"secret expression", "${{ secrets.NKE_SOURCE_TOKEN }}", githubInspectionLogPath("disk")},
+		{"secret expression", "${{ secrets.TEST_SOURCE_READ_TOKEN }}", githubInspectionLogPath("disk")},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			diagnostic := githubInspectionDiagnosticStep(plan, actions, "disk")

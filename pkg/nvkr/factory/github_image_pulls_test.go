@@ -350,7 +350,7 @@ func TestPrivateImageCredentialBoundary(t *testing.T) {
 			if token.Value != "${{ inputs.nvkr-toolchain-read-token }}" {
 				t.Fatalf("fixture image token differs: %q", token.Value)
 			}
-			token.Value = "${{ secrets.NKE_SOURCE_TOKEN }}"
+			token.Value = "${{ secrets.TEST_SOURCE_READ_TOKEN }}"
 		}},
 		{"wrong helper", member, func(t *testing.T, root *yamlv3.Node) {
 			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "operation_images")

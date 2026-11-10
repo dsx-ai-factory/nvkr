@@ -144,7 +144,7 @@ Required repository configuration:
   (`NVKR_REGISTRY_READ` / `NVKR_REGISTRY_READ_USER`). Registry tokens also need read
   access to package visibility metadata. Their secret values never enter records.
 - Retain the catalog-maintenance release App's contents, pull requests and workflows
-  write permissions, and `NKE_SOURCE_TOKEN` for private-source generation checks.
+  write permissions. Source generation checks use anonymous access to the public repositories.
 
 The manual `verify_published=true` mode still checks the currently committed pins
 without building or publishing. It cannot be combined with `approval_run`.

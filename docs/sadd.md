@@ -108,7 +108,7 @@ These assumptions are subject to the current ADRs and milestone acceptance crite
 - Source owners provide retrievable pinned commits, trees, toolchains, and acquired artifact digests. A pin
   establishes an expected identity; the fetch boundary must still check the bytes (ADR-22).
 - v1 has a networked hosted runner, reachable OCI registry, source mirror, and identity/transparency services.
-  Private NVKE inputs are materialized through a mirror with vendored dependencies (ADR-18 §8).
+  Public NVKE inputs are fetched anonymously with vendored dependencies (ADR-18 §8).
 - Workflow ownership, branch protection, and protected publication environments are security controls in v1.
   The consumer trusts the named producer and qualification identities under an explicit issuer policy.
 - Qualified reproduction assumes inputs can be normalized and the execution environment admitted against a

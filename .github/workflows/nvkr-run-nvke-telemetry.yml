@@ -411,17 +411,11 @@ jobs:
     timeout-minutes: 60
     needs: [preflight-images-ubuntu-24-04]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps:
+    steps: &steps-ubuntu-24-04-node
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - name: execute source part-1
-        uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/execute-source
-        with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - *operation-execute-node-part-1
     permissions:
       actions: read
       contents: read
@@ -447,11 +441,7 @@ jobs:
     timeout-minutes: 60
     needs: [nvkr-process-nktp-collector-image-arm64-t-4e581d283c0c]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: &steps-ubuntu-24-04-node
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
+    steps: *steps-ubuntu-24-04-node
     permissions:
       actions: read
       contents: read

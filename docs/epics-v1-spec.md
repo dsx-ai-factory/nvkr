@@ -138,8 +138,8 @@ pushes everything to OCI, and verifies it. Acceptance requires every signing and
   are pinned to commit SHAs. Regeneration with the same pinned inputs and generator must match byte for byte.
 - **The pipeline helper.** Each job downloads it, verifies its digest against the pinned value, and fails otherwise.
 - **The pinned source model.** A source is a repository, a commit, a tree hash, a toolchain image digest, and a
-  build command. Private NVKE sources are reachable from hosted runners directly or through a configured mirror, with vendored inputs and a
-  read-only fetch credential that is present only on fetch steps.
+  build command. Public NVKE sources are reachable anonymously from hosted runners, with vendored inputs.
+  Other private sources may use a configured mirror and a read-only credential present only on fetch steps.
 - **The hermetic build step.** Runs the pinned toolchain container with the network disabled, re-hashes the
   produced bytes, and writes the run record before anything downstream may use them.
 - **Software bill of materials.** After the build is observed, one CycloneDX document per built artifact,
