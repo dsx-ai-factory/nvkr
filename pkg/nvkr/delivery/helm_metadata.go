@@ -13,27 +13,12 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// Standard Helm manifests have no artifactType. Previously published NVKR
-// charts remain readable only when their legacy type matches the root binding.
-// The publication metadata, not this optional field, owns NVKR package typing.
-func helmArtifactTypeMatches(manifest ociManifest, object PublishedObject) bool {
-	return manifest.ArtifactType == "" || manifest.ArtifactType == object.ArtifactType
-}
-
-// Helm evidence uses an opaque config in a separate subject-bound manifest.
-// Legacy typed manifests remain readable. The config, payload and subject are
-// independently checked against publication membership by the owning readers.
-func evidenceArtifactTypeMatches(manifest ociManifest, object PublishedObject) bool {
-	return manifest.ArtifactType == object.ArtifactType ||
-		(object.Evidence != nil && manifest.ArtifactType == "" && manifest.Config.MediaType == MediaOctetStream)
-}
-
 func publishedHelmChartConfig(ctx context.Context, root string, object PublishedObject) (helmChartConfig, error) {
 	manifest, err := metadataManifest(ctx, root, object)
 	if err != nil {
 		return helmChartConfig{}, err
 	}
-	if object.Output == nil || object.Output.Format != outputFormatHelm || !helmArtifactTypeMatches(manifest, object) || len(manifest.Layers) != 1 ||
+	if object.Output == nil || object.Output.Format != outputFormatHelm || len(manifest.Layers) != 1 ||
 		manifest.Layers[0].Digest != object.BlobDigest || object.Output.TransportPath != "" {
 		return helmChartConfig{}, e.New(e.CodeVerifyFailed, "Helm chart metadata differs from its release binding")
 	}

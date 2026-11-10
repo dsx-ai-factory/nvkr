@@ -132,7 +132,6 @@ func attestPreparedObject(ctx context.Context, writer layoutWriter, source strin
 		return PublishedObject{}, err
 	}
 	descriptor, blob, err := writer.addBytesObject(ctx, ObjectInput{Name: object.Name, Kind: object.Kind, ArtifactType: sbom.BundleMediaType, LayerMediaType: sbom.BundleMediaType,
-		helmEvidence:   owner.Output != nil && owner.Output.Format == outputFormatHelm,
 		SemanticDigest: object.SemanticDigest, Bytes: bundle, annotations: map[string]string{"dev.sigstore.bundle.predicateType": sbom.CycloneDXPredicateType}, subject: &Descriptor{MediaType: publishedManifestMediaType(owner), Digest: owner.DescriptorDigest, Size: owner.Size}})
 	if err != nil {
 		return PublishedObject{}, err
@@ -147,7 +146,7 @@ func preparedEvidenceDocument(ctx context.Context, source string, object Publish
 	if err != nil {
 		return nil, err
 	}
-	if len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest || !evidenceArtifactTypeMatches(manifest, object) {
+	if len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest || manifest.artifactType() != object.ArtifactType {
 		return nil, e.New(e.CodeVerifyFailed, "prepared SBOM differs from its exact evidence binding")
 	}
 	return readBlob(ctx, source, manifest.Layers[0], sbom.MaxDocumentBytes)

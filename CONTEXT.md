@@ -18,7 +18,9 @@ _Avoid_: Factory, FactoryDefinition, cluster definition
 **Environment**:
 Separately selected execution settings, required publication transports and namespace, credential references,
 and signing identity policy. Selecting an unavailable transport fails before work; a supported sibling cannot
-substitute for it. Image access separately declares private and anonymous image roots and
+substitute for it. An explicit OCI representation selects construction before packaging and signing;
+it changes Environment and Plan identity, not logical Build identity or existing publication bytes.
+Image access separately declares private and anonymous image roots and
 an independent reader; publication namespaces grant no pull access. Unclassified GitHub execution images
 fail admission. Exact source/location bindings preserve logical Build identity; measured local images and
 native bundles retain separate source semantics. Prepared-image receipts are process-local runtime
@@ -48,8 +50,8 @@ _Avoid_: Plan, release, proof of qualification
 
 **Artifact**:
 Immutable bytes produced or acquired for delivery, such as an executable, image, chart, or packaged collection.
-Native Helm charts use the standard Helm OCI representation; NVKR membership and evidence remain separate,
-bound to the chart manifest and original archive identities.
+An explicit standard Helm profile preserves chart bytes while keeping NVKR membership and evidence in
+separate subject-bound records; omitted representation preserves existing artifact identities.
 _Avoid_: Producer, expected output, release
 
 **OCI bundle**:
@@ -422,6 +424,8 @@ One release index owns deliverable names/digests and stage-bound SBOM membership
 inside a signed attestation bundle in its owning artifact repository;
 per-build indexes remain internal handoffs. The root signature covers these bytes without making SBOMs new
 authored lifecycle objects or qualified evidence receipts. Run completion remains a separate claim.
+An explicit OCI representation is recorded in the digest-bound root-index annotation; inspecting that
+selection does not authorize rewriting a member or infer registry support.
 _Avoid_: Mutable tag, clearance, separately authored product object
 
 **Lifecycle status**:

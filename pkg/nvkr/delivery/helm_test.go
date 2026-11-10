@@ -9,6 +9,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -103,12 +104,8 @@ func TestBuildHelmChartArtifactProducesConformantChart(t *testing.T) {
 	if len(manifest.Layers) != 1 || string(manifest.Layers[0].MediaType) != MediaHelmChartLayer {
 		t.Fatalf("layers: %#v", manifest.Layers)
 	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &fields); err != nil {
-		t.Fatal(err)
-	}
-	if _, exists := fields["artifactType"]; exists {
-		t.Fatalf("standard Helm manifest must omit artifactType: %s", raw)
+	if manifest.ArtifactType != "application/vnd.nvkr.helm-chart.v1" {
+		t.Fatalf("artifact type: %s", manifest.ArtifactType)
 	}
 
 	descriptor, layerData, err := ReadArtifact(ctx, out)
@@ -678,12 +675,34 @@ func TestHelmTagPublishErrorClassifiesPermanentVersusTransientFailure(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	permanent := helmTagPublishError(&transport.Error{StatusCode: http.StatusBadRequest}, tag, "demo")
-	if code := e.ExitCode(permanent); code != e.ExitCode(e.New(e.CodeInvalidCatalog, "expected")) {
-		t.Fatalf("4xx registry rejection classified as %v, want CodeInvalidCatalog", permanent)
-	}
-	transient := helmTagPublishError(&transport.Error{StatusCode: http.StatusServiceUnavailable}, tag, "demo")
-	if code := e.ExitCode(transient); code != e.ExitCode(e.New(e.CodeUnavailable, "expected")) {
-		t.Fatalf("5xx registry failure classified as %v, want CodeUnavailable", transient)
+	for _, test := range []struct {
+		name   string
+		status int
+		codes  []transport.ErrorCode
+		want   e.Code
+	}{
+		{"bad request", http.StatusBadRequest, nil, e.CodeInvalidCatalog},
+		{"unauthorized", http.StatusUnauthorized, nil, e.CodeRegistryAuthFailed},
+		{"forbidden", http.StatusForbidden, nil, e.CodeRegistryAuthFailed},
+		{"denied diagnostic", http.StatusBadRequest, []transport.ErrorCode{transport.DeniedErrorCode}, e.CodeRegistryAuthFailed},
+		{"denied beats unsupported", http.StatusBadRequest, []transport.ErrorCode{transport.UnsupportedErrorCode, transport.DeniedErrorCode}, e.CodeRegistryAuthFailed},
+		{"request timeout", http.StatusRequestTimeout, nil, e.CodeUnavailable},
+		{"throttled", http.StatusTooManyRequests, nil, e.CodeUnavailable},
+		{"server failure", http.StatusServiceUnavailable, nil, e.CodeUnavailable},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			response := &transport.Error{StatusCode: test.status}
+			for _, code := range test.codes {
+				response.Errors = append(response.Errors, transport.Diagnostic{Code: code})
+			}
+			err := helmTagPublishError(response, tag, "demo")
+			assertRegistryCode(t, err, test.want)
+			// The publication boundary must preserve the tag owner's code.
+			err = registryPublishError(t.Context(), err, "publishing chart discovery tags")
+			assertRegistryCode(t, err, test.want)
+			if !errors.Is(err, response) {
+				t.Fatal("tag publication lost the registry cause")
+			}
+		})
 	}
 }

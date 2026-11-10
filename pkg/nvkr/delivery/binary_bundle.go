@@ -24,13 +24,14 @@ type BinaryFileInput struct {
 }
 
 type BinaryBundleRequest struct {
-	OS               string
-	Arch             string
-	Purpose          string
-	ReleaseSetDigest string
-	InventoryDigest  string
-	Epoch            int64
-	Files            []BinaryFileInput
+	OCIRepresentation OCIRepresentation `json:"-"`
+	OS                string
+	Arch              string
+	Purpose           string
+	ReleaseSetDigest  string
+	InventoryDigest   string
+	Epoch             int64
+	Files             []BinaryFileInput
 }
 
 type capturedBinary struct {
@@ -43,6 +44,9 @@ type capturedBinary struct {
 // capability before the output directory becomes visible.
 func BuildBinaryBundle(ctx context.Context, out string, request BinaryBundleRequest) (Result, error) {
 	if err := deliveryContext(ctx); err != nil {
+		return Result{}, err
+	}
+	if err := admitOCIRepresentation(request.OCIRepresentation); err != nil {
 		return Result{}, err
 	}
 	if len(request.Files) == 0 || len(request.Files) > maxDeliveryObjects {
@@ -89,7 +93,7 @@ func BuildBinaryBundle(ctx context.Context, out string, request BinaryBundleRequ
 		return Result{}, err
 	}
 	defer cleanupStage()
-	writer := layoutWriter{root: stage}
+	writer := layoutWriter{root: stage, compatible: request.OCIRepresentation == OCINVKRCompatibleV1}
 	configBytes, err := canonical.Marshal(bundle)
 	if err != nil {
 		return Result{}, err
@@ -105,6 +109,10 @@ func BuildBinaryBundle(ctx context.Context, out string, request BinaryBundleRequ
 	layer.Annotations = map[string]string{"org.opencontainers.image.title": "bundle.tar.gz"}
 	manifest := ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest, ArtifactType: MediaBinaryBundle,
 		Config: config, Layers: []Descriptor{layer}}
+	if writer.compatible {
+		manifest.ArtifactType = ""
+		manifest.Annotations = artifactAnnotations(MediaBinaryBundle, nil)
+	}
 	manifestDescriptor, err := writer.addJSONBlob(manifest, MediaOCIManifest)
 	if err != nil {
 		return Result{}, err
@@ -118,6 +126,10 @@ func BuildBinaryBundle(ctx context.Context, out string, request BinaryBundleRequ
 	}
 	index := ociIndex{SchemaVersion: 2, MediaType: MediaOCIIndex, ArtifactType: MediaBinaryBundle,
 		Manifests: []Descriptor{manifestDescriptor}, Annotations: map[string]string{"dev.nvkr.semantic.digest": semantic}}
+	if writer.compatible {
+		index.ArtifactType = ""
+		index.Annotations = artifactAnnotations(MediaBinaryBundle, index.Annotations)
+	}
 	rootDigest, err := writer.writeIndex(index)
 	if err != nil {
 		return Result{}, err
@@ -234,7 +246,7 @@ func InspectBinaryBundle(ctx context.Context, root string) (BinaryBundle, Result
 	if err != nil {
 		return BinaryBundle{}, Result{}, err
 	}
-	if index.ArtifactType != MediaBinaryBundle || len(index.Manifests) != 1 {
+	if index.artifactType() != MediaBinaryBundle || len(index.Manifests) != 1 {
 		return BinaryBundle{}, Result{}, e.New(e.CodeVerifyFailed, "OCI layout is not a single NVKR binary bundle")
 	}
 	visited := map[string]bool{}
@@ -273,7 +285,9 @@ func readBinaryBundleConfig(ctx context.Context, root string, raw []byte) (ociMa
 
 func readBinaryBundleConfigWith(raw []byte, read func(Descriptor, int64) ([]byte, error)) (ociManifest, BinaryBundle, error) {
 	var manifest ociManifest
-	if err := json.Unmarshal(raw, &manifest); err != nil || manifest.ArtifactType != MediaBinaryBundle || len(manifest.Layers) != 1 {
+	if err := json.Unmarshal(raw, &manifest); err != nil || manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest ||
+		manifest.artifactType() != MediaBinaryBundle || manifest.Config.MediaType != MediaBinaryBundleConfig ||
+		len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaBinaryBundleLayer {
 		return ociManifest{}, BinaryBundle{}, e.New(e.CodeVerifyFailed, "binary-bundle manifest has an invalid shape")
 	}
 	configRaw, err := read(manifest.Config, 8<<20)

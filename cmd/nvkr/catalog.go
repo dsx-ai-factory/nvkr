@@ -65,6 +65,9 @@ func cmdCatalog() *cli.Command {
 				Usage: "print the exact resolved catalog snapshot digest used to pin an ordered component overlay",
 				Flags: []cli.Flag{&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"}},
 				Action: func(c *cli.Context) error {
+					if err := rejectUnusedArguments(c, "data"); err != nil {
+						return err
+					}
 					view, err := selectCommandPresentation(c)
 					if err != nil {
 						return err
@@ -91,6 +94,9 @@ func cmdCatalog() *cli.Command {
 				Usage: "load and fail-closed-validate a catalog",
 				Flags: []cli.Flag{&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"}},
 				Action: func(c *cli.Context) error {
+					if err := rejectUnusedArguments(c, "data"); err != nil {
+						return err
+					}
 					view, err := selectCommandPresentation(c)
 					if err != nil {
 						return err
@@ -100,7 +106,7 @@ func cmdCatalog() *cli.Command {
 						return showCommandResult(c, view, catalogCommandDisplay("Catalog validation"), err)
 					}
 					if view.tui {
-						return showCommandResult(c, view, catalogComponentsDisplay(cat, "Catalog validation"), nil)
+						return showCommandResult(c, view, catalogComponentsDisplay(cat, "Catalog validation", nil), nil)
 					}
 					fmt.Printf("ok: %s — %d component(s)\n", cat.Metadata.Name, len(cat.Components))
 					return nil
@@ -108,9 +114,32 @@ func cmdCatalog() *cli.Command {
 			},
 			{
 				Name:  "list",
-				Usage: "list components",
-				Flags: []cli.Flag{&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"}},
+				Usage: "list components, optionally filtered by declared platform and output type",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"},
+					&cli.StringSliceFlag{Name: "platform", Usage: "only components declaring this exact platform (for example linux/arm64); give at most once"},
+					&cli.StringSliceFlag{Name: "output-type", Usage: "only components with this exact output type (for example host-package); give at most once"},
+					&cli.StringFlag{Name: "format", Value: "text", Usage: "text or json"},
+				},
 				Action: func(c *cli.Context) error {
+					if err := rejectUnusedArguments(c, "data"); err != nil {
+						return err
+					}
+					format := c.String("format")
+					if format != "text" && format != "json" {
+						return e.New(e.CodeUsage, "--format must be text or json, got %q", format)
+					}
+					platform, err := catalogListSelector(c, "platform")
+					if err != nil {
+						return err
+					}
+					outputType, err := catalogListSelector(c, "output-type")
+					if err != nil {
+						return err
+					}
+					if err := catalog.ValidateSelectors(platform, outputType); err != nil {
+						return err
+					}
 					view, err := selectCommandPresentation(c)
 					if err != nil {
 						return err
@@ -119,22 +148,85 @@ func cmdCatalog() *cli.Command {
 					if err != nil {
 						return showCommandResult(c, view, catalogCommandDisplay("Catalog components"), err)
 					}
+					found, err := cat.Discover(platform, outputType)
+					if err != nil {
+						return err
+					}
+					if (platform != "" || outputType != "") && len(found) == 0 {
+						noMatch := e.New(e.CodeNoMatch, "no component in catalog %q matches %s", cat.Metadata.Name, catalogListCriteria(platform, outputType))
+						return showCommandResult(c, view, catalogCommandDisplay("Catalog components"), noMatch)
+					}
+					if format == "json" {
+						encoder := json.NewEncoder(os.Stdout)
+						encoder.SetIndent("", "  ")
+						return encoder.Encode(found)
+					}
+					listed := *cat
+					listed.Components = make(map[string]catalog.Component, len(found))
+					modes := make(map[string]string, len(found))
+					for _, d := range found {
+						listed.Components[d.Name] = cat.Components[d.Name]
+						modes[d.Name] = d.ProducerMode
+					}
 					if view.tui {
-						return showCommandResult(c, view, catalogComponentsDisplay(cat, "Catalog components"), nil)
+						display := catalogComponentsDisplay(&listed, "Catalog components", modes)
+						if platform != "" || outputType != "" {
+							display.Fields = append(display.Fields, progress.Field{Label: "Filter", Value: catalogListCriteria(platform, outputType)},
+								progress.Field{Label: "Catalog total", Value: strconv.Itoa(len(cat.Components))})
+						}
+						return showCommandResult(c, view, display, nil)
 					}
 					fmt.Printf("catalog: %s\n\n", cat.Metadata.Name)
 					fmt.Printf("components:\n")
-					names := make([]string, 0, len(cat.Components))
-					for n := range cat.Components {
-						names = append(names, n)
+					names := make([]string, 0, len(found))
+					for _, d := range found {
+						names = append(names, d.Name)
 					}
-					sort.Strings(names)
 					tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 					for _, n := range names {
 						fmt.Fprintf(tw, "  %s\t%s\n", n, cat.Components[n].String())
 					}
 					tw.Flush()
 					return nil
+				},
+			},
+			{
+				Name:      "show",
+				Usage:     "explain one validated component: producer mode, pins, platforms and material closure",
+				ArgsUsage: "<component>",
+				Flags: []cli.Flag{
+					&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"},
+					&cli.StringFlag{Name: "format", Value: "text", Usage: "text or json"},
+				},
+				Action: func(c *cli.Context) error {
+					view, err := selectCommandPresentation(c)
+					if err != nil {
+						return err
+					}
+					display := catalogCommandDisplay("Catalog component")
+					if c.Args().Len() != 1 {
+						return showCommandResult(c, view, display, e.New(e.CodeUsage, "catalog show requires exactly one component name"))
+					}
+					if format := c.String("format"); format != "text" && format != "json" {
+						return showCommandResult(c, view, display, e.New(e.CodeUsage, "unknown component description format %q (use text or json)", format))
+					}
+					cat, err := catalog.LoadContext(c.Context, providerFor(c))
+					if err != nil {
+						return showCommandResult(c, view, display, err)
+					}
+					description, err := cat.Describe(c.Args().First())
+					if err != nil {
+						return showCommandResult(c, view, display, err)
+					}
+					if view.tui {
+						return showCommandResult(c, view, catalogComponentDescriptionDisplay(description), nil)
+					}
+					raw, err := description.Render(c.String("format"))
+					if err != nil {
+						return err
+					}
+					_, err = os.Stdout.Write(raw)
+					return err
 				},
 			},
 			{
@@ -287,7 +379,35 @@ func sourcePinFields(pin catalog.Pin) []progress.Field {
 	return []progress.Field{{Label: "Commit", Value: pin.Commit}, {Label: "Tree hash", Value: pin.TreeHash}, {Label: "Source epoch", Value: strconv.FormatInt(pin.SourceDateEpoch, 10)}}
 }
 
-func catalogComponentsDisplay(loaded *catalog.Catalog, title string) commandDisplay {
+// catalogListSelector returns the single value of a list selector flag.
+// Repeating a selector is refused rather than silently keeping the last value.
+func catalogListSelector(c *cli.Context, name string) (string, error) {
+	values := c.StringSlice(name)
+	switch {
+	case len(values) > 1:
+		return "", e.New(e.CodeUsage, "--%s may be given only once", name)
+	case len(values) == 1 && values[0] == "":
+		return "", e.New(e.CodeUsage, "--%s requires a value", name)
+	case len(values) == 1:
+		return values[0], nil
+	}
+	return "", nil
+}
+
+func catalogListCriteria(platform, outputType string) string {
+	var criteria []string
+	if platform != "" {
+		criteria = append(criteria, "--platform "+platform)
+	}
+	if outputType != "" {
+		criteria = append(criteria, "--output-type "+outputType)
+	}
+	return strings.Join(criteria, " ")
+}
+
+// catalogComponentsDisplay shows each component; modes, when given, names the
+// producer mode Discover assigned so the TUI agrees with the JSON output.
+func catalogComponentsDisplay(loaded *catalog.Catalog, title string, modes map[string]string) commandDisplay {
 	display := catalogCommandDisplay(title)
 	display.Fields = []progress.Field{{Label: "Catalog", Value: loaded.Metadata.Name}, {Label: "Components", Value: strconv.Itoa(len(loaded.Components))}}
 	names := make([]string, 0, len(loaded.Components))
@@ -303,9 +423,34 @@ func catalogComponentsDisplay(loaded *catalog.Catalog, title string) commandDisp
 		} else if component.Prebuilt != nil {
 			mode = "prebuilt"
 		}
+		if discovered, ok := modes[name]; ok {
+			mode = discovered
+		}
 		display.Items = append(display.Items, progress.Item{ID: name, Name: name, Kind: component.OutputType, State: "declared", Fields: []progress.Field{
 			{Label: "Producer mode", Value: mode}, {Label: "Builder", Value: component.BuilderType}, {Label: "Platforms", Value: strings.Join(component.Platforms, ", ")},
 		}})
+	}
+	return display
+}
+
+// catalogComponentDescriptionDisplay presents the catalog-owned description:
+// the component's pins as fields, and each closure member as an item naming
+// the bindings that need it.
+func catalogComponentDescriptionDisplay(description catalog.ComponentDescription) commandDisplay {
+	display := catalogCommandDisplay("Catalog component")
+	display.Note = "Declarations only; platforms are not a claim that this host can execute them. Producer execution and release verification are separate."
+	for _, field := range description.Fields() {
+		display.Fields = append(display.Fields, progress.Field{Label: strings.ToUpper(field.Label[:1]) + field.Label[1:], Value: field.Value})
+	}
+	display.Fields = append(display.Fields, progress.Field{Label: "Material closure", Value: strconv.Itoa(len(description.Closure))})
+	for _, name := range description.Closure {
+		item := progress.Item{ID: name, Name: name, Kind: "material", State: "declared"}
+		for _, edge := range description.Edges {
+			if edge.Component == name {
+				item.Fields = append(item.Fields, progress.Field{Label: "Needed by", Value: edge.Consumer + " as " + edge.Binding})
+			}
+		}
+		display.Items = append(display.Items, item)
 	}
 	return display
 }

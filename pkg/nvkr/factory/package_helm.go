@@ -121,7 +121,7 @@ func executeHelmPackage(ctx context.Context, plan *Plan, node Node, output Artif
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "reading packaged Helm chart archive")
 	}
-	_, err = delivery.BuildHelmChartArtifact(ctx, output.Path, output.MediaType, chartData)
+	_, err = delivery.BuildHelmChartArtifactWithRepresentation(ctx, output.Path, output.MediaType, chartData, publicationOCIRepresentation(plan))
 	return err
 }
 
@@ -343,6 +343,6 @@ func executeAcquiredHelmPackage(ctx context.Context, plan *Plan, output, input A
 	if _, err := helmarchive.Inspect(ctx, raw); err != nil {
 		return err
 	}
-	_, err = delivery.BuildHelmChartArtifact(ctx, output.Path, output.MediaType, raw)
+	_, err = delivery.BuildHelmChartArtifactWithRepresentation(ctx, output.Path, output.MediaType, raw, publicationOCIRepresentation(plan))
 	return err
 }

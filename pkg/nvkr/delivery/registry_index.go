@@ -230,13 +230,13 @@ func pushRegistryImageIndex(ctx context.Context, root string, object PublishedOb
 	}
 	defer cleanup()
 	if err := remote.WriteIndex(ref, index, options...); err != nil {
-		return classifyContext(ctx, e.Wrap(e.CodeUnavailable, err, "publishing image index %q", object.Name))
+		return registryPublishError(ctx, err, "publishing image index %q", object.Name)
 	}
 	// HEAD or an index-only GET cannot establish that every required child and
 	// blob is actually readable in this repository. Capture and verify all of it.
 	readback, err := fetchRegistryImageIndex(ctx, ref, object.Size, object.Output.ImageIndex.RequiredPlatforms, options)
 	if err != nil {
-		return err
+		return registryReadbackError(ctx, err, "reading back image index %q", object.Name)
 	}
 	defer func() { _ = readback.Close() }()
 	description, err := readback.Description()

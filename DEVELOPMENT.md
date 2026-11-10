@@ -325,6 +325,31 @@ For the source-chart case, set `NVKR_NVKE_CHART` to the controller chart from th
 you intend to exercise, and run `TestNVKEDeclarativeBindingWithHelm`. Both tests render local chart bytes;
 they do not build images, publish, install or verify upstream signatures.
 
+For Helm registry consumption of the explicitly compatible NVKR wrapper, run:
+
+```sh
+NVKR_TEST_HELM_REGISTRY=1 go test ./pkg/nvkr/delivery \
+  -run '^TestRegistryCompatibilityHelmConsumption$' -count=1 -v
+```
+
+This opt-in fixture logs the installed `helm version --short`, pushes synthetic artifacts to a loopback
+registry, runs Helm `show chart` and `pull`, and compares the recovered archive bytes. It does not read
+an OCI layout through Helm, invoke ORAS, exercise the affected GitLab deployment, or establish hosted
+signing or qualification. It is outside the default gate; retain the verbose run log when recording evidence.
+
+For the separate `helm-standard-v1` profile, including an unsigned registry fixture that rejects unknown
+artifact/config media types, run:
+
+```sh
+NVKR_TEST_HELM_OCI=1 go test ./pkg/nvkr/delivery \
+  -run '^TestHelmStandardPublication$' -count=1 -v
+```
+
+This checks full and metadata readback, stock Helm `pull`, `show chart` and `template`, exact archive bytes,
+and a rendered synthetic image digest. The signed case uses a generic registry and an encoding fixture;
+it retains the standard Sigstore envelope without claiming old GitLab acceptance or real signing.
+Keep the command output with the installed Helm version as local interoperability evidence.
+
 The Linux [public disk-issuer fixture](pkg/nvkr/factory/disk_evidence_runtime_linux_test.go) uses a controlled
 native ELF daemon protocol and synthetic capture/disk bytes. On a native host with sufficient observed
 composition capacity, explicitly request its issuer and memory-profile checks:

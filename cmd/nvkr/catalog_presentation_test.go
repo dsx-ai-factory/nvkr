@@ -37,7 +37,7 @@ func catalogLeafArguments() map[string][]string {
 	return map[string][]string{
 		"source-pin": {"--data", "must-not-be-read", "source"},
 		"digest":     {"--data", "must-not-be-read"}, "validate": {"--data", "must-not-be-read"}, "list": {"--data", "must-not-be-read"},
-		"pin": {"--dir", "must-not-be-read", "source"}, "bump": {"--dir", "must-not-be-read", "source"},
+		"show": {"--data", "must-not-be-read", "component"}, "pin": {"--dir", "must-not-be-read", "source"}, "bump": {"--dir", "must-not-be-read", "source"},
 		"pin-artifacts": {"--dir", "must-not-be-read", "component"},
 		"refresh":       {"--config", "must-not-be-read"}, "update-ci": {},
 		"regenerate-overlays": {"--config", "must-not-be-read"},
@@ -206,7 +206,7 @@ func TestCatalogComponentPresentationOmitsPrivateProducerConfiguration(t *testin
 		BuildCommand: []string{secret}, VersionStamp: map[string]string{secret: secret},
 		Prebuilt: &catalog.Prebuilt{URL: secret, Image: secret},
 	}}}
-	display := catalogComponentsDisplay(loaded, "Catalog components")
+	display := catalogComponentsDisplay(loaded, "Catalog components", nil)
 	raw, err := json.Marshal(display)
 	if err != nil {
 		t.Fatal(err)
@@ -216,5 +216,19 @@ func TestCatalogComponentPresentationOmitsPrivateProducerConfiguration(t *testin
 	}
 	if len(display.Items) != 1 || display.Items[0].Name != "component" || display.Items[0].Fields[2].Value != "linux/amd64" {
 		t.Fatal("public component/platform fields omitted")
+	}
+}
+
+func TestCatalogComponentPresentationUsesDiscoveredProducerMode(t *testing.T) {
+	loaded := &catalog.Catalog{Components: map[string]catalog.Component{"tool": {
+		Platforms: []string{"linux/amd64"}, BuilderType: catalog.BuilderPinnedTool, OutputType: catalog.PinnedToolOutputFile,
+	}}}
+	legacy := catalogComponentsDisplay(loaded, "Catalog components", nil)
+	if got := legacy.Items[0].Fields[0].Value; got != "excluded" {
+		t.Fatalf("validation display changed: %q", got)
+	}
+	listed := catalogComponentsDisplay(loaded, "Catalog components", map[string]string{"tool": catalog.ProducerPinnedTool})
+	if got := listed.Items[0].Fields[0].Value; got != catalog.ProducerPinnedTool {
+		t.Fatalf("producer mode = %q, want %q", got, catalog.ProducerPinnedTool)
 	}
 }
