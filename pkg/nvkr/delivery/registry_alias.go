@@ -164,11 +164,7 @@ func verifyImageAlias(ctx context.Context, alias imageAlias, afterWrite bool, op
 	}
 	got, err := remote.Get(alias.tag, options...)
 	if err != nil {
-		code := e.CodeUnavailable
-		if ctx.Err() != nil {
-			code = e.CodeTimeout
-		}
-		return e.Wrap(code, err, "%s for %q", description, alias.output)
+		return registryReadbackError(ctx, err, "%s for %q", description, alias.output)
 	}
 	if got.Digest.String() != alias.descriptor.Digest || string(got.MediaType) != MediaOCIIndex ||
 		int64(len(got.Manifest)) != alias.descriptor.Size || digestBytes(got.Manifest) != alias.descriptor.Digest {
@@ -182,6 +178,9 @@ func imageAliasPublishError(ctx context.Context, err error, alias imageAlias) er
 		return e.Wrap(e.CodeTimeout, ctx.Err(), "publishing image discovery tag %q for %q; tag may have advanced, read it before retrying; no rollback was attempted", alias.tag.TagStr(), alias.output)
 	}
 	var rejected *transport.Error
+	if errors.As(err, &rejected) && registryResponseCode(rejected) == e.CodeRegistryAuthFailed {
+		return e.Wrap(e.CodeRegistryAuthFailed, err, "registry refused image discovery tag %q for %q; no delete or rollback was attempted", alias.tag.TagStr(), alias.output)
+	}
 	if errors.As(err, &rejected) && rejected.StatusCode >= 400 && rejected.StatusCode < 500 &&
 		rejected.StatusCode != http.StatusRequestTimeout && rejected.StatusCode != http.StatusTooManyRequests {
 		return e.Wrap(e.CodeInvalidCatalog, err, "registry rejected image discovery tag %q for %q; no delete or rollback was attempted", alias.tag.TagStr(), alias.output)

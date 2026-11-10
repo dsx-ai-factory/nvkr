@@ -145,7 +145,7 @@ func TestRegistryUnavailableDoesNotExposePartialLayout(t *testing.T) {
 	}
 	layout, _ := registryPublicationFixture(t)
 	_, err = Push(context.Background(), layout, strings.TrimPrefix(server.URL, "http://")+"/missing:tag", options)
-	assertRegistryCode(t, err, e.CodeUnavailable)
+	assertRegistryCode(t, err, e.CodeInvalidCatalog)
 }
 
 func assertRegistryCode(t *testing.T, err error, want e.Code) {

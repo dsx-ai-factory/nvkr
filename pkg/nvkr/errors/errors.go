@@ -18,7 +18,7 @@
 //	10–19  Resolve / input / preflight / crypto        10–19
 //	20–29  Build / verify / trust-policy / disk        20–29
 //	30–31  Retryable / transient (32–39 reserved)      30–31
-//	40–54  Release / lifecycle                         40–54
+//	40–56  Release / lifecycle                         40–56
 package errors
 
 import (
@@ -64,22 +64,24 @@ const (
 	CodeUnavailable Code = "NVKR-E-UNAVAILABLE" // a transient availability failure (network 5xx / dial / EOF)
 	CodeTimeout     Code = "NVKR-E-TIMEOUT"     // a deadline or cancellation elapsed
 
-	// Band 40–54 — release / lifecycle.
-	CodeVectorUnpinned     Code = "NVKR-E-VECTOR-UNPINNED"     // a validation vector / expected-digests ref is not pinned
-	CodeReleaseIncomplete  Code = "NVKR-E-RELEASE-INCOMPLETE"  // a required member/artifact/evidence is missing (not promotable)
-	CodeGateUnmet          Code = "NVKR-E-GATE-UNMET"          // an independent gate (e.g. conformance) has no matching passing result
-	CodeUnverifiedRef      Code = "NVKR-E-UNVERIFIED-REF"      // a resolved digest/signature did not verify
-	CodeCompatMismatch     Code = "NVKR-E-COMPAT-MISMATCH"     // a compatibility constraint (kubernetes/nvke/platform) is unmet
-	CodeProvenanceMissing  Code = "NVKR-E-PROVENANCE-MISSING"  // required provenance/evidence is absent
-	CodeInventoryUnpinned  Code = "NVKR-E-INVENTORY-UNPINNED"  // the inventory ref is not pinned by digest
-	CodeImmutableViolation Code = "NVKR-E-IMMUTABLE-VIOLATION" // an attempt to mutate an immutable publication
-	CodeWithdrawn          Code = "NVKR-E-WITHDRAWN"           // a signed withdrawn status declaration applies (fail closed)
-	CodeUnpinnedInput      Code = "NVKR-E-UNPINNED-INPUT"      // a non-content-addressable input under air-gap/mirror
-	CodeMirrorMismatch     Code = "NVKR-E-MIRROR-MISMATCH"     // a mirrored input did not hash to its declared identity
-	CodePipelineDrift      Code = "NVKR-E-PIPELINE-DRIFT"      // a committed pipeline diverges from its IR (ADR-21)
-	CodeStatusCheckpoint   Code = "NVKR-E-STATUS-CHECKPOINT"   // a signed lifecycle checkpoint is missing, stale, or rolled back
-	CodePinSetMismatch     Code = "NVKR-E-PIN-SET-MISMATCH"    // derived member disagrees with its pinned umbrella
-	CodeWriteConflict      Code = "NVKR-E-WRITE-CONFLICT"      // optimistic compare-and-swap lost to a concurrent writer
+	// Band 40–56 — release / lifecycle.
+	CodeVectorUnpinned     Code = "NVKR-E-VECTOR-UNPINNED"      // a validation vector / expected-digests ref is not pinned
+	CodeReleaseIncomplete  Code = "NVKR-E-RELEASE-INCOMPLETE"   // a required member/artifact/evidence is missing (not promotable)
+	CodeGateUnmet          Code = "NVKR-E-GATE-UNMET"           // an independent gate (e.g. conformance) has no matching passing result
+	CodeUnverifiedRef      Code = "NVKR-E-UNVERIFIED-REF"       // a resolved digest/signature did not verify
+	CodeCompatMismatch     Code = "NVKR-E-COMPAT-MISMATCH"      // a compatibility constraint (kubernetes/nvke/platform) is unmet
+	CodeProvenanceMissing  Code = "NVKR-E-PROVENANCE-MISSING"   // required provenance/evidence is absent
+	CodeInventoryUnpinned  Code = "NVKR-E-INVENTORY-UNPINNED"   // the inventory ref is not pinned by digest
+	CodeImmutableViolation Code = "NVKR-E-IMMUTABLE-VIOLATION"  // an attempt to mutate an immutable publication
+	CodeWithdrawn          Code = "NVKR-E-WITHDRAWN"            // a signed withdrawn status declaration applies (fail closed)
+	CodeUnpinnedInput      Code = "NVKR-E-UNPINNED-INPUT"       // a non-content-addressable input under air-gap/mirror
+	CodeMirrorMismatch     Code = "NVKR-E-MIRROR-MISMATCH"      // a mirrored input did not hash to its declared identity
+	CodePipelineDrift      Code = "NVKR-E-PIPELINE-DRIFT"       // a committed pipeline diverges from its IR (ADR-21)
+	CodeStatusCheckpoint   Code = "NVKR-E-STATUS-CHECKPOINT"    // a signed lifecycle checkpoint is missing, stale, or rolled back
+	CodePinSetMismatch     Code = "NVKR-E-PIN-SET-MISMATCH"     // derived member disagrees with its pinned umbrella
+	CodeRegistryAuthFailed Code = "NVKR-E-REGISTRY-AUTH-FAILED" // registry authentication or authorization was refused
+	CodeRegistryRejected   Code = "NVKR-E-REGISTRY-REJECTED"    // registry permanently rejected a publication request
+	CodeWriteConflict      Code = "NVKR-E-WRITE-CONFLICT"       // optimistic compare-and-swap lost to a concurrent writer
 )
 
 // exitCodes maps each Code to a distinct small process exit status. The allocation
@@ -119,7 +121,7 @@ var exitCodes = map[Code]int{
 	CodeUnavailable: 30,
 	CodeTimeout:     31,
 
-	// Band 40–54 — release / lifecycle.
+	// Band 40–56 — release / lifecycle.
 	CodeVectorUnpinned:     40,
 	CodeReleaseIncomplete:  41,
 	CodeGateUnmet:          42,
@@ -135,6 +137,8 @@ var exitCodes = map[Code]int{
 	CodeStatusCheckpoint:   52,
 	CodeWriteConflict:      53,
 	CodePinSetMismatch:     54,
+	CodeRegistryAuthFailed: 55,
+	CodeRegistryRejected:   56,
 }
 
 // AllCodes is the canonical list of every declared Code, kept in exit-code order.
@@ -150,6 +154,7 @@ var AllCodes = []Code{
 	CodeVectorUnpinned, CodeReleaseIncomplete, CodeGateUnmet, CodeUnverifiedRef, CodeCompatMismatch,
 	CodeProvenanceMissing, CodeInventoryUnpinned, CodeImmutableViolation, CodeWithdrawn, CodeUnpinnedInput,
 	CodeMirrorMismatch, CodePipelineDrift, CodeStatusCheckpoint, CodeWriteConflict, CodePinSetMismatch,
+	CodeRegistryAuthFailed, CodeRegistryRejected,
 }
 
 // Error is a coded, wrappable error.

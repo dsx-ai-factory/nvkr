@@ -5,6 +5,10 @@ policy separately. Start at the repository root with `bin/nvkr` built using the 
 Browsing, export, and output pulling work on macOS and Linux; verification runs on Linux, directly or
 through Docker on macOS.
 
+If publishing failed before a release reference was produced, start with
+[Helm and registry troubleshooting](publication-architecture.md#troubleshoot-helm-and-registry-rejections).
+That guide covers the read-only API/authentication check, error guidance and explicit compatibility settings.
+
 ## Find an output
 
 Set `RELEASE_REF` to the exact publication-root reference emitted by a completed publication:

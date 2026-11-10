@@ -31,7 +31,7 @@ func executePublicationPackage(ctx context.Context, plan *Plan, node Node, outpu
 	if err != nil {
 		return err
 	}
-	result, err := delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{Release: metadata, Objects: objects})
+	result, err := delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{OCIRepresentation: publicationOCIRepresentation(plan), Release: metadata, Objects: objects})
 	if err != nil {
 		return err
 	}

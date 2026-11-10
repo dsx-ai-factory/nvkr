@@ -254,7 +254,7 @@ func assembleReferenceRelease(ctx context.Context, plan *Plan, out string, recei
 	for _, name := range sortedKeys(objects) {
 		root.Objects = append(root.Objects, objects[name])
 	}
-	_, err = delivery.BuildMetadataRoot(ctx, out, root, sources)
+	_, err = delivery.BuildMetadataRootWithRepresentation(ctx, out, root, sources, publicationOCIRepresentation(plan))
 	return err
 }
 

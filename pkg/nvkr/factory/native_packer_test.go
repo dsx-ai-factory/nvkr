@@ -81,6 +81,29 @@ func TestPrepareNativePackerUsesTheExecutionResolverBeforePublishing(t *testing.
 	}
 }
 
+func TestPrepareNativePackerRejectsAuthoredRepresentation(t *testing.T) {
+	for _, field := range []string{"ociRepresentation", "OCIRepresentation"} {
+		t.Run(field, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			raw, err := json.Marshal(map[string]string{field: "nvkr-compatible-v1"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			selection := filepath.Join(t.TempDir(), "selection.json")
+			if err := os.WriteFile(selection, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			_, err = PrepareNativePacker(t.Context(), selection, ".nvkr/dependencies")
+			if factoryErrorCode(err) != e.CodeUsage {
+				t.Fatalf("selection admitted a representation: %v", err)
+			}
+			if _, err := os.Lstat(".nvkr"); !os.IsNotExist(err) {
+				t.Fatal("invalid selection created output")
+			}
+		})
+	}
+}
+
 func TestPrepareNativePackerKernelOverrideSurvivesCapturedPlan(t *testing.T) {
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
 		t.Skip("Mac ARM64 input preparation")

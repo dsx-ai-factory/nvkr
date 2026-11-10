@@ -46,6 +46,6 @@ func executeDebianPackage(ctx context.Context, plan *Plan, node Node, output Art
 	if err != nil {
 		return err
 	}
-	_, err = delivery.BuildDebianArtifact(ctx, output.Path, output.Name, inputs[0].Path, observed.Digest)
+	_, err = delivery.BuildDebianArtifactWithRepresentation(ctx, output.Path, output.Name, inputs[0].Path, observed.Digest, publicationOCIRepresentation(plan))
 	return err
 }
