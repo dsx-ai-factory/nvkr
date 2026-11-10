@@ -74,15 +74,6 @@ components:
                 none: true
             releaseExecutable: true
         source: helm
-    helm-linux:
-        outputType: host-package
-        platforms:
-            - linux/arm64
-        prebuilt:
-            evidence:
-                none: true
-            releaseExecutable: true
-        source: helm-linux
     kind:
         outputType: host-package
         platforms:
@@ -119,26 +110,6 @@ components:
                 none: true
             releaseExecutable: true
         source: kubectl-linux
-    native-capi-exec-init-image:
-        outputType: oci-image
-        platforms:
-            - linux/amd64
-            - linux/arm64
-        prebuilt:
-            evidence:
-                none: true
-            image: docker.io/library/alpine@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
-        source: nvke-deploy
-    native-capi-exec-init-image-main:
-        outputType: oci-image
-        platforms:
-            - linux/amd64
-            - linux/arm64
-        prebuilt:
-            evidence:
-                none: true
-            image: docker.io/library/alpine@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
-        source: nvke-deploy
     native-capi-exec-plugin-image:
         outputType: oci-image
         platforms:
@@ -508,14 +479,6 @@ sources:
             format: tar-gzip
             platform: darwin/arm64
             url: https://get.helm.sh/helm-{{.Tag}}-darwin-arm64.tar.gz
-    helm-linux:
-        constraint: 4.2.4
-        repo: https://github.com/helm/helm
-        tool:
-            executablePath: linux-arm64/helm
-            format: tar-gzip
-            platform: linux/arm64
-            url: https://get.helm.sh/helm-{{.Tag}}-linux-arm64.tar.gz
     kind:
         constraint: 0.32.0
         repo: https://github.com/kubernetes-sigs/kind
@@ -635,3 +598,16 @@ sources:
             format: tar-gzip
             platform: darwin/arm64
             url: https://github.com/nirs/vmnet-helper/releases/download/{{.Tag}}/vmnet-helper.tar.gz
+
+imports:
+- sources:
+    helm-linux: helm-linux
+  components:
+    helm-linux: helm-linux
+  path: "../../shared/installer-tools.yaml"
+  sha256: b096166405b78d9fbdfcd735f0cf3f08fc58e2aec05383094245ca92411e6c72
+- components:
+    native-capi-exec-init-image: native-capi-exec-init-image
+    native-capi-exec-init-image-main: native-capi-exec-init-image
+  path: "../../shared/native-tools.yaml"
+  sha256: 1bbf5dee7d410d481fb75e4e962163c3a9cc3cf96051380ea736291f355d99b6

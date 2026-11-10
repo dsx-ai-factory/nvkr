@@ -7,24 +7,6 @@ metadata:
   name: nvke-controller
   description: NVKE controller containers and helm chart.
 components:
-  nvkectl:
-    fromSource: true
-    source: nvke-cli
-    cgo: false
-    platforms: [linux/amd64, linux/arm64]
-    outputType: host-package
-    artifactPath: cli/bin/nvkectl
-    writeDir: cli/bin
-    versionStamp:
-      NVKECTL_VERSION: '{{.ModuleTag}}'
-      NVKECTL_COMMIT: '{{.Commit}}'
-      NVKECTL_DATE: '{{.Date}}'
-    buildCommand:
-      - bash
-      - -euc
-      - |
-        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
-        make -C cli build NVKECTL_TREE=clean
   nvke-controller-profiles-image:
     fromSource: true
     source: nvke
@@ -142,24 +124,6 @@ components:
       evidence:
         none: true
 sources:
-  nvke-cli:
-    repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.23.0
-    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
-    vendorCommand:
-      - bash
-      - -euc
-      - |
-        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
-        test ! -e controller/deploy/charts/go.sum
-        pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)"
-        cd cli
-        timeout --kill-after=10s 540s go mod download
-        GOPROXY=off timeout --kill-after=10s 60s go mod verify
-        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
-        cd ..
-        printf '%s\n' "$pins" | sha256sum --quiet -c -
-        test ! -e controller/deploy/charts/go.sum
   nvke:
     pinSet:
       accounted:
@@ -199,22 +163,6 @@ sources:
     constraint: v0.23.0
     toolchainImage: alpine/helm@sha256:a6cf54599ccb99d90cf0712b30f03fdb3cab062e6b94e0418cc4db7e8a1464b2
     vendorCommand: ['dependency', 'build', 'controller/deploy/charts/controller']
-  checkout:
-    kind: github-action
-    repo: https://github.com/actions/checkout
-    constraint: 7.x
-  download-artifact:
-    kind: github-action
-    repo: https://github.com/actions/download-artifact
-    constraint: 8.x
-  setup-go:
-    kind: github-action
-    repo: https://github.com/actions/setup-go
-    constraint: 7.x
-  upload-artifact:
-    kind: github-action
-    repo: https://github.com/actions/upload-artifact
-    constraint: 7.x
   cosign:
     constraint: 3.1.3
     repo: https://github.com/sigstore/cosign
@@ -223,11 +171,22 @@ sources:
       format: raw
       platform: linux/amd64
       url: https://github.com/sigstore/cosign/releases/download/{{.Tag}}/cosign-linux-amd64
-  syft:
-    constraint: 1.51.1
-    repo: https://github.com/anchore/syft
-    tool:
-      executablePath: syft
-      format: tar-gzip
-      platform: linux/amd64
-      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_amd64.tar.gz
+
+imports:
+- sources:
+    checkout: checkout
+    download-artifact: download-artifact
+    setup-go: setup-go
+    upload-artifact: upload-artifact
+  path: "../../shared/build-actions.yaml"
+  sha256: 89919dde5a129554223e63b23d9ac4f610e9c9a0e369fe8ab188b3f13575723b
+- sources:
+    nvke-cli: nvke-cli
+  components:
+    nvkectl: nvkectl-release
+  path: "../../shared/nvke.yaml"
+  sha256: 90dbe40c5ce58b88c2722343db8a12f8f2ea4ad7f853fd20a8f69fb908994def
+- sources:
+    syft: syft
+  path: "../../shared/syft.yaml"
+  sha256: f52faff48638dde1ee3b2c6ff7e71501739cefbed502fe80ad296b9de370a897

@@ -7,31 +7,6 @@ metadata:
   name: nvke-nightly-site-arm64
   description: Source-aligned CLI, controller and charts for the reviewed NVKE nightly suite. Profile-owned candidate producers; not runtime acceptance or a qualified release.
 sources:
-  nvke-cli:
-    repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.23.0
-    # Go 1.27.3 on the existing Trixie base; the controller uses the same parent
-    # through its source-owned GOLANG_IMAGE build argument below.
-    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
-    vendorCommand:
-      - bash
-      - -euc
-      - |
-        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
-        # The source-owned charts module has no dependencies or go.sum.
-        test ! -e controller/deploy/charts/go.sum
-        pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)"
-        cd cli
-        timeout --kill-after=10s 540s go mod download
-        GOPROXY=off timeout --kill-after=10s 60s go mod verify
-        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
-        cd ..
-        printf '%s\n' "$pins" | sha256sum --quiet -c -
-        test ! -e controller/deploy/charts/go.sum
-  nvke-controller:
-    repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.23.0
-    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
   nvke-controller-helm:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: v0.23.0
@@ -111,41 +86,6 @@ sources:
           '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/deploy/charts/nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
           | sha256sum -c -
 components:
-  nvkectl:
-    fromSource: true
-    source: nvke-cli
-    cgo: false
-    platforms: [linux/arm64]
-    outputType: host-package
-    artifactPath: cli/bin/nvkectl
-    writeDir: cli/bin
-    versionStamp:
-      NVKECTL_VERSION: '{{.Tag}}'
-      NVKECTL_COMMIT: '{{.Commit}}'
-      NVKECTL_DATE: '{{.Date}}'
-    buildCommand:
-      - bash
-      - -euc
-      - |
-        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
-        # Make owns the linker symbols and proves the stamp by executing version.
-        make -C cli build NVKECTL_TREE=clean
-  nvke-controller:
-    fromSource: true
-    source: nvke-controller
-    builderType: buildkit-rootless
-    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
-    artifactPath: bin/nvke-controller-image-{{.Arch}}.oci.tar
-    writeDir: bin
-    outputType: oci-image
-    platforms: [linux/arm64]
-    versionStamp:
-      BUILD_VERSION: '{{.Tag}}'
-      GIT_VERSION: '{{.Commit}}'
-    buildCommand:
-      - sh
-      - -ec
-      - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/. --local dockerfile=/src/controller --opt platform=linux/{{.Arch}} --opt build-arg:GOLANG_IMAGE=docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b --opt "build-arg:BUILD_VERSION=$BUILD_VERSION" --opt "build-arg:GIT_VERSION=$GIT_VERSION" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" --output type=oci,dest=/src/bin/nvke-controller-image-{{.Arch}}.oci.tar,oci-mediatypes=true
   nvke-controller-chart:
     fromSource: true
     source: nvke-controller-helm
@@ -184,3 +124,13 @@ components:
           '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  /src/nvkr-chart-tools/helm' \
           | sha256sum --quiet -c -
         exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package nktp/deploy/charts/nktp --version=0.23.0 --app-version=v0.23.0 --destination=charts/
+
+imports:
+- sources:
+    nvke-cli: nvke-cli-local-site-arm64
+    nvke-controller: nvke-controller
+  components:
+    nvke-controller: nvke-controller
+    nvkectl: nvkectl
+  path: "../../shared/nvke.yaml"
+  sha256: 90dbe40c5ce58b88c2722343db8a12f8f2ea4ad7f853fd20a8f69fb908994def
