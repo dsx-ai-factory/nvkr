@@ -1,0 +1,41 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    ":gitSignOff"
+  ],
+  "enabledManagers": ["gomod", "github-actions"],
+  "includePaths": ["go.mod", "go.sum", ".github/workflows/**"],
+  "ignorePaths": [
+    ".github/nvkr-*/**",
+    ".github/workflows/nvkr-run*.yml",
+    ".github/workflows/nvkr-dev*.yml",
+    ".github/workflows/nvkr-qualify*.yml",
+    ".github/workflows/nvkr-smoke*.yml",
+    ".github/workflows/catalog-refresh.yaml",
+    "inputs/catalogs/**",
+    "**/pins.lock.yaml",
+    "toolchains/**",
+    "**/testdata/**"
+  ],
+  "timezone": "America/Los_Angeles",
+  "schedule": ["* 0-5 * * 1"],
+  "dependencyDashboard": true,
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "automerge": false,
+  "packageRules": [
+    {
+      "description": "Update the application module together and refresh its sums.",
+      "matchManagers": ["gomod"],
+      "groupName": "Go dependencies",
+      "postUpdateOptions": ["gomodTidy"]
+    },
+    {
+      "description": "Keep related action invocations such as CodeQL init and analyze together.",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    }
+  ]
+}

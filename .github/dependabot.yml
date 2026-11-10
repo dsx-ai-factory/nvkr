@@ -1,7 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Keep Go module deps and GitHub Actions current with minimal churn.
+# Dependabot owns workflow-script npm and isolated toolchain modules.
+# Renovate owns the root Go module and handwritten GitHub Actions workflows.
 version: 2
 updates:
   - package-ecosystem: npm
@@ -10,15 +11,6 @@ updates:
       interval: weekly
     groups:
       workflow-scripts:
-        patterns: ["*"]
-
-  - package-ecosystem: gomod
-    directory: /
-    schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      go-deps:
         patterns: ["*"]
 
   # Keep the scanner out of NVKR's production module graph while making its
@@ -50,23 +42,4 @@ updates:
       - dependency-name: go.yaml.in/yaml/v4
     groups:
       actionlint-tool:
-        patterns: ["*"]
-
-  - package-ecosystem: github-actions
-    directory: /
-    # Generated workflow pins must change through NVKR inputs and regeneration.
-    # Keep Dependabot updates for handwritten workflows and actions only.
-    exclude-paths:
-      - .github/workflows/catalog-refresh.yaml
-      - .github/workflows/nvkr-run*.yml
-      - .github/workflows/nvkr-dev*.yml
-      - .github/workflows/nvkr-qualify.yml
-      - .github/workflows/nvkr-smoke.yml
-      - .github/nvkr-*/**
-    schedule:
-      interval: weekly
-    # One PR per round: github/codeql-action init and analyze must move together,
-    # or analyze rejects the configuration the newer init wrote (#14, #15).
-    groups:
-      github-actions:
         patterns: ["*"]
