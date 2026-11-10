@@ -230,16 +230,18 @@ func tektonTaskSpec(plan *Plan, prefix, id, role string, inputs []string, source
 		"workspaces": workspaces, "results": []tektonObject{{"name": "outcome", "type": "string"}, {"name": "carrier", "type": "string"}},
 		"steps": []tektonObject{step}}
 	if daemon {
+		// Held runtime execution fixes this endpoint independently of ambient
+		// DOCKER_HOST. The socket directory is pod-private, never a host mount.
 		volumes = append(volumes, tektonObject{"name": "docker-socket", "emptyDir": tektonObject{}}, tektonObject{"name": "docker-data", "emptyDir": tektonObject{}})
-		mounts = append(mounts, tektonObject{"name": "docker-socket", "mountPath": "/run/nvkr"})
+		mounts = append(mounts, tektonObject{"name": "docker-socket", "mountPath": "/var/run"})
 		step["volumeMounts"] = mounts
-		step["env"] = []tektonObject{{"name": "DOCKER_HOST", "value": "unix:///run/nvkr/docker.sock"}}
+		step["env"] = []tektonObject{{"name": "DOCKER_HOST", "value": "unix:///var/run/docker.sock"}}
 		spec["sidecars"] = []tektonObject{{"name": "runtime", "image": settings.RuntimeImage,
-			"command": []string{"dockerd"}, "args": []string{"--host=unix:///run/nvkr/docker.sock", "--storage-driver=vfs"},
+			"command": []string{"dockerd"}, "args": []string{"--host=unix:///var/run/docker.sock", "--storage-driver=vfs"},
 			"securityContext": tektonObject{"privileged": true},
-			"volumeMounts": []tektonObject{{"name": "work", "mountPath": "/work"}, {"name": "docker-socket", "mountPath": "/run/nvkr"},
+			"volumeMounts": []tektonObject{{"name": "work", "mountPath": "/work"}, {"name": "docker-socket", "mountPath": "/var/run"},
 				{"name": "docker-data", "mountPath": "/var/lib/docker"}},
-			"readinessProbe": tektonObject{"exec": tektonObject{"command": []string{"docker", "--host=unix:///run/nvkr/docker.sock", "info"}},
+			"readinessProbe": tektonObject{"exec": tektonObject{"command": []string{"docker", "--host=unix:///var/run/docker.sock", "info"}},
 				"periodSeconds": 2, "timeoutSeconds": 2, "failureThreshold": 60},
 			"computeResources": tektonObject{"requests": tektonObject{"cpu": "1", "memory": "2Gi"},
 				"limits": tektonObject{"cpu": "2", "memory": "4Gi"}}}}

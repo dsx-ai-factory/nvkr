@@ -14,12 +14,13 @@ kind harness requires a native AMD64 Docker host with at least four CPUs and 6 G
 failed closed at the native-platform preflight (`got aarch64; emulation is not admitted`); the selected
 daemon also reports two CPUs and 2,054,246,400 bytes of memory. The harness preserves that selected Unix
 socket while isolating registry credentials. The same harness is wired into the AMD64 CI workflow.
-The [2026-11-10 AMD64 attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42730274634)
-at `6f222a80b69905f64dc6affc3426e53b05ebf039` reached terminal accounting but failed: both source-fetch
-tasks returned capability exit code 29, and dependent operations and finalization rejected the incomplete
-closure. The projection omitted the private daemon required by their declared dependency-vendoring
-commands. Fetch tasks with vendoring now receive that runtime; plain fetches remain daemon-free.
-Successful complete cluster acceptance remains unrecorded.
+The [2026-11-10 AMD64 attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42737979580)
+at `3b50e09345eb4988589694738eaa11fd7ac4f8c6` reached terminal accounting but failed while observing
+the held source-vendoring runtime. Dependency-vendoring tasks had a private daemon, but its socket was
+mounted outside the runner's fixed `/var/run/docker.sock` endpoint. The adapter now mounts its private
+socket there without changing the runner's closed environment. A native ARM64 Docker 29.2.1 socket-only
+probe using the pinned images and that environment failed with the old mount and connected with the
+corrected mount. That probe does not establish complete AMD64 kind acceptance, which remains unrecorded.
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|

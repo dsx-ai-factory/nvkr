@@ -84,8 +84,11 @@ func TestTektonResourcesUseRunnerAndIsolateCredentials(t *testing.T) {
 								Command, Args []string
 								VolumeMounts  []struct{ Name string }
 							}
-							Sidecars []struct{ VolumeMounts []struct{ Name string } }
-							Volumes  []struct {
+							Sidecars []struct {
+								Args         []string
+								VolumeMounts []struct{ Name, MountPath string }
+							}
+							Volumes []struct {
 								Name   string
 								Secret *struct{ SecretName string }
 							}
@@ -116,7 +119,13 @@ func TestTektonResourcesUseRunnerAndIsolateCredentials(t *testing.T) {
 				t.Fatal("task embeds build policy instead of invoking the runner")
 			}
 			for _, sidecar := range task.TaskSpec.Sidecars {
+				if len(sidecar.Args) == 0 || sidecar.Args[0] != "--host=unix:///var/run/docker.sock" {
+					t.Fatal("private daemon does not serve the held runtime endpoint")
+				}
 				for _, mount := range sidecar.VolumeMounts {
+					if mount.Name == "docker-socket" && mount.MountPath != "/var/run" {
+						t.Fatal("private socket is not mounted at the held runtime endpoint")
+					}
 					if mount.Name != "work" && mount.Name != "docker-data" && mount.Name != "docker-socket" {
 						t.Fatal("container daemon received provider credentials or transported inputs")
 					}
@@ -206,7 +215,7 @@ func TestTektonSourceVendoringReceivesPrivateRuntime(t *testing.T) {
 						}
 						hasSocket := false
 						for _, env := range task.TaskSpec.Steps[0].Env {
-							if env.Name == "DOCKER_HOST" && env.Value == "unix:///run/nvkr/docker.sock" {
+							if env.Name == "DOCKER_HOST" && env.Value == "unix:///var/run/docker.sock" {
 								hasSocket = true
 							}
 						}
