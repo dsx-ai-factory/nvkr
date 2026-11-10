@@ -5,12 +5,14 @@ package factory
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"io"
 	"net/http/httptest"
 	"os"
 	"regexp"
@@ -18,7 +20,9 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationpolicy"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 )
 
 func tektonTestPlan(t *testing.T) *Plan {
@@ -228,6 +232,51 @@ func TestTektonSourceVendoringReceivesPrivateRuntime(t *testing.T) {
 			if checked == 0 {
 				t.Fatal("fixture did not exercise source fetching")
 			}
+		})
+	}
+}
+
+func TestTektonPublicVerificationDoesNotRequireSigningAuthority(t *testing.T) {
+	plan := tektonTestPlan(t)
+	_, artifacts := planIndex(plan)
+	for _, tc := range []struct {
+		kind string
+		code e.Code
+	}{
+		{NodeVerifyPublication, ""},
+		{NodeSign, e.CodeVerifyFailed},
+		{NodeAttestEvidence, e.CodeVerifyFailed},
+		{NodePackage, e.CodeEngineCapability},
+	} {
+		t.Run(tc.kind, func(t *testing.T) {
+			node := Node{Kind: tc.kind, Target: "release"}
+			// The Plan has no authenticated execution receipt. Verification may
+			// select public trust, but it must not acquire a private key capability.
+			opts := sign.CosignOCIOptions{PrivateKeyPath: "/synthetic/unselected-key.pem"}
+			err := configureTektonOCI(plan, node, &opts)
+			if tc.code != "" {
+				assertFactoryErrorCode(t, err, tc.code)
+				return
+			}
+			if err != nil || opts.KeyTrust == nil || opts.PrivateKeyPath != "" {
+				t.Fatalf("public verification acquired signing authority: %v", err)
+			}
+			if _, err := productionOCISigner(t.Context(), plan, node, artifacts); err != nil {
+				t.Fatalf("nested publication verifier requires another task's receipt: %v", err)
+			}
+			opts.Identity, opts.Issuer = plan.Environment.Signing.Identity, plan.Environment.Signing.Issuer
+			opts.Runner = sign.RunnerFunc(func(context.Context, string, []string, io.Writer, io.Writer) error {
+				t.Fatal("public-only verifier attempted a signing subprocess")
+				return nil
+			})
+			verifier, err := sign.NewCosignOCISigner(opts)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = verifier.SignAndAttest(t.Context(), sign.Subject{
+				Ref: "registry.example.invalid/test@" + testCosignArchiveDigest, Digest: testCosignArchiveDigest,
+			}, []byte(`{"buildDefinition":{}}`))
+			assertFactoryErrorCode(t, err, e.CodeTrustPolicyMissing)
 		})
 	}
 }
