@@ -14,17 +14,14 @@ kind harness requires a native AMD64 Docker host with at least four CPUs and 6 G
 failed closed at the native-platform preflight (`got aarch64; emulation is not admitted`); the selected
 daemon also reports two CPUs and 2,054,246,400 bytes of memory. The harness preserves that selected Unix
 socket while isolating registry credentials. The same harness is wired into the AMD64 CI workflow.
-The [2026-11-10 AMD64 build attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42746883170)
-at `a83a283f25acc31bd2ab2ab64ef9204a423c0d7a` completed both source fetches and all 13 output-publication,
-signing and publication-verification tasks. It failed during reference-release assembly: nested public-key
-verification incorrectly required the account of a separate verification task. The
-[subsequent attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42751698732) at
-`b850a52e74d6f9cb50e89692e865fac3181db35f` exposed an omitted public-verifier admission for publication's
-SBOM check and a task starting before its controller child reference appeared. Public verification now
-includes that SBOM check and selects no private key; signing and attestation retain publisher receipt
-admission. Initial execution waits up to 30 seconds for the missing controller reference before doing work;
-active execution still rejects a lost binding immediately. Focused fixtures cover these repairs. Successful
-complete release assembly, independent qualification and finalization remain unrecorded.
+The [2026-11-10 AMD64 attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42755804686)
+at `9494d8fb64a97fb2f0b3c0a0721caff0b4ef7963` completed all 107 build and publication tasks, including
+all 13 output publications, signatures and verifications, plus release assembly, publication, signing and
+verification. Native smoke failed because its fresh private daemon lacked the policy's pinned image.
+The Tekton smoke task now invokes the shared anonymous image-admission owner after smoke scope admission,
+before opening the held runtime; the runtime independently reauthenticates local image bytes and does not
+pull implicitly. Shared image-admission and smoke contract fixtures cover those owners. Successful complete
+native smoke, independent qualification and finalization remain unrecorded.
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|

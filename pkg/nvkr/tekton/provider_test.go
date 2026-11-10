@@ -273,7 +273,7 @@ func TestProviderAwaitsOnlyInitialControllerReference(t *testing.T) {
 						run.Status.ChildReferences = nil
 					}
 					if n > 1 && tc.name == "canceled while waiting" {
-						run.Spec.Status = "Cancelled"
+						run.Spec.Status = "CancelledRunFinally"
 					}
 				}
 			})

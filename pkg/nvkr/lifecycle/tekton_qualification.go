@@ -13,6 +13,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationpolicy"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
@@ -214,5 +215,14 @@ func (session *TektonQualification) RunNativeSmoke(ctx context.Context) (*Native
 	if description.Task != "nvkr-smoke" {
 		return nil, nil, e.New(e.CodeEngineCapability, "only the separate Tekton smoke task executes delivered tools")
 	}
-	return runNativeToolSmoke(ctx, session.Checks, session.Invocation, session.policy, NativeToolSmokeOptions{}, session.policy.Tekton.Platform, openNativeSmokeRuntime)
+	return runNativeToolSmoke(ctx, session.Checks, session.Invocation, session.policy, NativeToolSmokeOptions{}, session.policy.Tekton.Platform,
+		func(ctx context.Context, selection pipeline.ToolSmokeSelection) (nativeSmokeRuntime, error) {
+			// Each task has a fresh daemon. Materialize only the policy's exact
+			// anonymous image after smoke admission; the held execution owner
+			// independently reauthenticates its bytes and never pulls implicitly.
+			if _, err := pipeline.PrepareContainerImage(ctx, selection.RuntimeExecutable, selection.Image, selection.Platform, pipeline.ImageAnonymous); err != nil {
+				return nil, err
+			}
+			return openNativeSmokeRuntime(ctx, selection)
+		})
 }
