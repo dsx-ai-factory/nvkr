@@ -68,8 +68,8 @@ digests through the normal catalog validator; it performs no field merge. Destin
 already match, and repeated or missing producers, incorrect dependency order and unsafe paths fail closed.
 
 The maintained [OVN inputs](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/ovn-producer-overlays.json) select NVIDIA and upstream TCG
-producer copies. The NVKE refresh policy checks these overlays before pin work and regenerates them before
-Run generation. This does not enroll OVN sources in scheduled bumping or change their release constraints.
+producer copies, plus the native NVIDIA overlay copied from the release node-image catalog. The NVKE
+refresh policy checks these overlays before pin work and regenerates them before Run generation. This does not enroll OVN sources in scheduled bumping or change their release constraints.
 To apply an explicitly reviewed OVN pin, follow the commands beside its
 [source catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/ovn-nvidia/README.md), then regenerate these copies:
 
@@ -98,7 +98,7 @@ The migration retains existing output membership. Its remaining copies have expl
 | `node-images/variants/nvidia-tcg.json` | Generated from `ovn-nvidia`; its distinct node-image producer remains explicitly frozen in the maintenance input. |
 | `node-images/variants/upstream-tcg.json` | Generated from `ovn-upstream`, after NVIDIA TCG. A NVIDIA bump updates its predecessor binding while preserving its upstream pin. |
 | `node-images/variants/nvidia-local-kvm.json`, `upstream-local-kvm.json` | Their existing complete node-image replacements stay frozen; only dependent predecessor bindings are regenerated. |
-| `node-images/variants/native-nvidia.json` and `node-images/release/registry.yaml` | Retain the separate maintained `nvke-*` package contract and source pins. Migration to generated copies is a follow-up. |
+| `node-images/variants/native-nvidia.json` | Generated from the three OVN producers in `node-images/release`; the release catalog owns their maintained `nvke-*` package contract and source pins. |
 | `node-images/variants/upstream-kvm.json` | Retains its explicit upstream 1.4.0 snapshot; not enrolled. |
 | `node-images/variants/nvidia-kvm.json` | Retains the known mismatch: commit `26cc199de8e814a7fe6d899a770fc04df0bbc2f9`, stream 1.5.18, versus the candidate NVIDIA 2.4.2 stream. It is not silently upgraded. |
 | `node-images/diagnostic` | Retains its separate source-owned package producers and upstream pin. |

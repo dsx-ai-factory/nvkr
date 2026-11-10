@@ -299,6 +299,21 @@
           }
         }
       }
+    },
+    {
+      "name": "nvke-native-arm64-nvidia",
+      "destination": "inputs/catalogs/node-images/variants/native-nvidia.json",
+      "base": "inputs/catalogs/node-images/release",
+      "producers": [
+        {
+          "catalog": "inputs/catalogs/node-images/release",
+          "components": [
+            "nvke-cni-ovn",
+            "ovn-kube-ubuntu",
+            "ovn-kubernetes-chart"
+          ]
+        }
+      ]
     }
   ]
 }

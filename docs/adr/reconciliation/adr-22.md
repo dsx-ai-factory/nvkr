@@ -13,5 +13,6 @@ lock-only propagation, chart disagreement and deferred installer expressions. Th
 not OVN builds or deployment acceptance. Existing catalogs without bindings retain their prior Build bytes;
 the candidate OVN command/environment migration intentionally changes affected Build Digests.
 See `source_metadata_test.go`, `ovn_pin_propagation_test.go` and the
-[copy inventory](../../catalog-maintenance.md#maintain-producer-copies). Maintained release/native and
+[copy inventory](../../catalog-maintenance.md#maintain-producer-copies). The native NVIDIA overlay copies
+its three maintained OVN producers from the release catalog through the same generator, preserving the resolved overlay identity and consuming Plans. The release catalog and
 excluded KVM variants remain separately authored; profile stream coordination remains downstream-owned.
