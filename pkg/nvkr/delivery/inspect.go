@@ -44,10 +44,15 @@ func readPublicationManifest(ctx context.Context, root string, descriptor Descri
 		return ociManifest{}, e.Wrap(e.CodeVerifyFailed, err, "decoding publication-root manifest")
 	}
 	if manifest.SchemaVersion != 2 || manifest.MediaType != descriptor.MediaType ||
-		manifest.artifactType() != MediaPublicationRoot || len(manifest.Layers) != 0 || manifest.Config.MediaType != MediaPublicationRootConfig {
+		manifest.artifactType() != MediaPublicationRoot || len(manifest.Layers) != 0 || !publicationConfigProfile(manifest) {
 		return ociManifest{}, e.New(e.CodeVerifyFailed, "publication-root manifest has an invalid schema or config/layer contract")
 	}
 	return manifest, nil
+}
+
+func publicationConfigProfile(manifest ociManifest) bool {
+	return manifest.Config.MediaType == MediaPublicationRootConfig ||
+		(manifest.ArtifactType == "" && manifest.Config.MediaType == MediaOctetStream)
 }
 
 // fetchOutputs is used only by Pull to fill the private staging layout from the
@@ -282,7 +287,8 @@ func verifyPublishedObjectBinding(ctx context.Context, root string, object Publi
 		}
 		return nil
 	}
-	if len(manifest.Layers) != 1 || manifest.Config.MediaType != MediaDeliveryObjectConfig {
+	if len(manifest.Layers) != 1 || (manifest.Config.MediaType != MediaDeliveryObjectConfig &&
+		!(object.Evidence != nil && manifest.ArtifactType == "" && manifest.artifactType() == object.ArtifactType && manifest.Config.MediaType == MediaOctetStream)) {
 		return e.New(e.CodeVerifyFailed, "publication object %q has an invalid delivery manifest", object.Name)
 	}
 	configRaw, err := readBlob(ctx, root, manifest.Config, 8<<20)

@@ -21,7 +21,7 @@ func TestPublicationOCIRepresentationAdmission(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, value := range []ociformat.Representation{"", ociformat.ArtifactV1, ociformat.NVKRCompatibleV1, "unknown"} {
+	for _, value := range []ociformat.Representation{"", ociformat.ArtifactV1, ociformat.NVKRCompatibleV1, ociformat.HelmStandardV1, "unknown"} {
 		t.Run(string(value), func(t *testing.T) {
 			env := base.Clone()
 			env.Publication.OCIRepresentation = value

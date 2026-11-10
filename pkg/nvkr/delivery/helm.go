@@ -289,7 +289,7 @@ func BuildHelmChartArtifactWithRepresentation(ctx context.Context, out, artifact
 		Layers:        []Descriptor{{MediaType: chartDescriptor.MediaType, Digest: chartDescriptor.Digest.String(), Size: chartDescriptor.Size}},
 		Annotations:   helmChartAnnotations(config),
 	}
-	if representation == OCINVKRCompatibleV1 {
+	if representation == OCINVKRCompatibleV1 || representation == OCIHelmStandardV1 {
 		manifest.ArtifactType = ""
 		manifest.Annotations = artifactAnnotations(artifactType, manifest.Annotations)
 	}
@@ -302,7 +302,7 @@ func BuildHelmChartArtifactWithRepresentation(ctx context.Context, out, artifact
 	}
 	// ORAS infers a descriptor type from the config when artifactType is absent.
 	// The local handoff retains the caller's NVKR type; it is not a registry wrapper.
-	if representation == OCINVKRCompatibleV1 {
+	if representation == OCINVKRCompatibleV1 || representation == OCIHelmStandardV1 {
 		if _, err := (layoutWriter{root: stage}).writeIndex(ociIndex{SchemaVersion: 2, MediaType: MediaOCIIndex,
 			Manifests: []Descriptor{{MediaType: MediaOCIManifest, Digest: digestBytes(manifestData), Size: int64(len(manifestData)), ArtifactType: artifactType}}}); err != nil {
 			return Result{}, err

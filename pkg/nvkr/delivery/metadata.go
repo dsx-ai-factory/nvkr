@@ -460,6 +460,11 @@ func metadataManifest(ctx context.Context, root string, object PublishedObject) 
 	if !types.MediaType(object.ArtifactType).IsImage() && m.artifactType() != object.ArtifactType {
 		return ociManifest{}, e.New(e.CodeVerifyFailed, "metadata member artifact type differs from its release binding")
 	}
+	if m.Config.MediaType == MediaOctetStream {
+		if err := verifyPublishedObjectBinding(ctx, root, object, Descriptor{MediaType: m.MediaType, Digest: object.DescriptorDigest, Size: object.Size}, nil); err != nil {
+			return ociManifest{}, err
+		}
+	}
 	return m, nil
 }
 

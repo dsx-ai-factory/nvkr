@@ -21,7 +21,7 @@ func TestPublicationOCIRepresentationBindsPlanBeforeExecution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, value := range []ociformat.Representation{ociformat.ArtifactV1, ociformat.NVKRCompatibleV1} {
+	for _, value := range []ociformat.Representation{ociformat.ArtifactV1, ociformat.NVKRCompatibleV1, ociformat.HelmStandardV1} {
 		t.Run(string(value), func(t *testing.T) {
 			environment := original.Environment.Clone()
 			environment.Publication.OCIRepresentation = value

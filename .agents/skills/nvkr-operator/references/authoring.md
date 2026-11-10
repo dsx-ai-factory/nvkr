@@ -39,7 +39,8 @@ contract](../../../../docs/publication-architecture.md#oci-representation) befor
 `publication.ociRepresentation`. Omission preserves the existing format. An explicit compatible selection
 changes newly constructed NVKR wrappers before identity freezing; registry errors never authorize rewriting
 identified artifacts, imported producer manifests or signed evidence. Registry and consumer acceptance still
-require their own evidence.
+require their own evidence. `helm-standard-v1` selects the narrower standard Helm profile; signed envelopes
+and non-Helm outputs still require registry support for their own media types.
 Use the same guide's registry diagnostics to inspect API observations and structured failure guidance;
 do not infer an OCI feature version from the V2 base endpoint or request a hidden write probe.
 

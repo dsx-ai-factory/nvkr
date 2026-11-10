@@ -50,6 +50,8 @@ _Avoid_: Plan, release, proof of qualification
 
 **Artifact**:
 Immutable bytes produced or acquired for delivery, such as an executable, image, chart, or packaged collection.
+An explicit standard Helm profile preserves chart bytes while keeping NVKR membership and evidence in
+separate subject-bound records; omitted representation preserves existing artifact identities.
 _Avoid_: Producer, expected output, release
 
 **OCI bundle**:

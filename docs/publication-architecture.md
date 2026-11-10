@@ -37,6 +37,28 @@ Compatible raw SBOM wrappers use a truthful NVKR config type; clients filtering 
 Use an updated NVKR consumer for this explicit profile. Existing pinned publications are not rewritten,
 and a registry rejection never automatically changes this selection.
 
+For a Helm publication to a registry that rejects unknown NVKR config media types, select the narrower
+standard Helm profile instead:
+
+```yaml
+publication:
+  ociRepresentation: helm-standard-v1
+```
+
+It emits a standard Helm chart manifest without custom `artifactType`, preserving the original chart
+archive and Helm config. Raw Helm evidence and publication metadata use separate manifests with canonical
+binding records carried under `application/octet-stream`; NVKR validates their logical types and exact
+subject bindings. Signed SBOMs and Cosign artifacts keep their standard signed envelopes, which the registry
+must also accept. Other output families and imported manifests retain their existing formats, so mixed
+publication acceptance requires separate validation. Raw evidence discovery by CycloneDX type alone is not
+supported in this profile; NVKR uses exact root membership.
+
+Omission and explicit `artifact-v1` preserve existing construction. Existing pinned publications and release
+identities are unchanged. Selecting `helm-standard-v1` creates new affected manifest, evidence-subject and
+publication identities before signing; it does not rewrite an old release. Install an updated NVKR reader
+before consuming the new profile. Local interoperability checks exercise stock Helm pull/show/template
+and compare archive bytes; they do not establish live GitLab or hosted signing acceptance.
+
 ## Registry diagnostics
 
 Publication observes the existing client's requests and reports the actual failing operation:

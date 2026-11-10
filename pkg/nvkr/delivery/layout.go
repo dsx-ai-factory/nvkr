@@ -114,6 +114,7 @@ type objectConfig struct {
 // are nested by descriptor and copied as an exact closure; regular files become
 // one-layer OCI artifacts.
 type ObjectInput struct {
+	helmEvidence   bool
 	annotations    map[string]string
 	subject        *Descriptor
 	Output         *OutputBinding
@@ -195,7 +196,7 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 	// Admit the disk profile before staging or copying a multi-GiB payload.
 	// This validates descriptions only; factory still owns receipt admission.
 	for _, input := range objects {
-		if root.ociRepresentation == OCINVKRCompatibleV1 && !input.Layout && input.ArtifactType == sbom.BundleMediaType {
+		if (root.ociRepresentation == OCINVKRCompatibleV1 || root.ociRepresentation == OCIHelmStandardV1) && !input.Layout && input.ArtifactType == sbom.BundleMediaType {
 			return Result{}, e.New(e.CodeEngineCapability, "compatible publication requires signed SBOM envelopes from the attestation owner or an exact imported layout")
 		}
 		if input.Kind != "disk-image" {
@@ -259,6 +260,7 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 				return Result{}, ownerErr
 			}
 			input.subject = &Descriptor{MediaType: publishedManifestMediaType(owner), Digest: owner.DescriptorDigest, Size: owner.Size}
+			input.helmEvidence = root.ociRepresentation == OCIHelmStandardV1 && owner.Output != nil && owner.Output.Format == outputFormatHelm
 		}
 		var descriptor Descriptor
 		var blobDigest string
@@ -337,11 +339,15 @@ func (writer layoutWriter) writePublicationMetadata(root PublicationRoot, descri
 	if err != nil {
 		return "", "", err
 	}
-	config, err := writer.addBlobBytes(rootBytes, MediaPublicationRootConfig)
+	configType := MediaPublicationRootConfig
+	if root.ociRepresentation == OCIHelmStandardV1 {
+		configType = MediaOctetStream
+	}
+	config, err := writer.addBlobBytes(rootBytes, configType)
 	if err != nil {
 		return "", "", err
 	}
-	compatible := root.ociRepresentation == OCINVKRCompatibleV1
+	compatible := root.ociRepresentation == OCINVKRCompatibleV1 || root.ociRepresentation == OCIHelmStandardV1
 	rootManifest := ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest,
 		ArtifactType: MediaPublicationRoot, Config: config, Layers: []Descriptor{}}
 	if compatible {
@@ -423,7 +429,11 @@ func (writer layoutWriter) addHeldObject(ctx context.Context, input ObjectInput,
 		return Descriptor{}, "", err
 	}
 	configType := MediaDeliveryObjectConfig
-	if writer.plain {
+	if input.helmEvidence {
+		// Keep the canonical binding record as an opaque config for registries
+		// that admit Helm but reject unregistered NVKR config media types.
+		configType = MediaOctetStream
+	} else if writer.plain {
 		configBytes = []byte("{}")
 		configType = MediaEmptyConfig
 		// OCI's empty-config media type requires artifactType. A typed config
@@ -438,7 +448,7 @@ func (writer layoutWriter) addHeldObject(ctx context.Context, input ObjectInput,
 	}
 	manifest := ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest, ArtifactType: input.ArtifactType,
 		Config: config, Layers: []Descriptor{layer}, Subject: input.subject, Annotations: input.annotations}
-	if writer.compatible {
+	if writer.compatible || input.helmEvidence {
 		manifest.ArtifactType = ""
 		manifest.Annotations = artifactAnnotations(input.ArtifactType, input.annotations)
 	}

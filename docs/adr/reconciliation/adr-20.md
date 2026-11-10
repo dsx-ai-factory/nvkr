@@ -23,6 +23,18 @@ disk wrappers and imported producer manifests retain their exact bytes; disk and
 artifact types can still encounter registry restrictions. No registry-side rewrite or universal artifact
 compatibility is claimed.
 
+The separate explicit `helm-standard-v1` profile uses standard Helm chart config/content media types
+and no chart manifest `artifactType`. Raw Helm evidence and metadata use opaque canonical binding configs;
+signed envelopes retain their standard bundle artifact type and empty config. `TestHelmStandardPublication`
+checks complete and metadata-only readback, selected chart retrieval, evidence preservation and exact archive
+bytes. Its unsigned registry fixture models GitLab's unknown-type restriction; its signed case uses a generic
+registry and synthetic attestation encoding. `TestHelmStandardRootProfileBinding` rejects mismatched root
+profiles and preserves exported bootstrap identity. Main's historical default artifact/release goldens remain
+unchanged. Stock Helm 4.2.3 pull/show/template passed locally on 2026-11-10 with `NVKR_TEST_HELM_OCI=1`. This does not
+establish acceptance by the affected GitLab deployment, a signing service or a hosted producer Run. Other output families and imported
+manifests are unchanged by this profile. Existing publications remain immutable; new opt-in construction
+requires fresh affected evidence subjects and updated readers.
+
 Retained-root regressions cover exact metadata export, including an index with retained whitespace,
 and attested completion with legacy preparation and final bootstraps. Explicit compatible generic configs use NVKR's
 artifact-config media type rather than claiming to be CycloneDX or Sigstore payload documents.

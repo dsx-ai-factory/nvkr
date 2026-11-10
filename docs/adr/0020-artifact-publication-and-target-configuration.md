@@ -381,6 +381,26 @@ NVKR wrappers; unknown selections fail with `engine-capability` before staging o
 | Signed SBOMs and cosign artifacts | Preserve the standard Sigstore bundle `artifactType`, empty config, subject and layer; the attestation owner constructs signed envelopes |
 | Native images/indexes, disks and imported/pinned manifests | Preserve exact bytes and their own format; no conversion or promise that the registry accepts every member |
 
+`helm-standard-v1` is a separate explicit construction profile for registries that accept the standard
+Helm chart format but reject unregistered NVKR artifact/config media types. It uses the same Helm config
+and unchanged chart layer as the compatible profile, omitting the chart manifest's `artifactType` and
+retaining its logical type in the checked annotation and publication membership. Raw evidence owned by
+a Helm output remains a separate subject-bound manifest: its canonical delivery-object binding config is
+carried as `application/octet-stream`, with no manifest `artifactType`. The metadata manifest uses the same
+opaque config media type for the unchanged canonical root record; its index records the explicit profile.
+Readers validate the selected config profile, logical type, canonical schema, exact payload and subject
+bindings. The raw evidence referrer type is the opaque config type, not a CycloneDX filter.
+
+This profile leaves other output families and imported manifests unchanged. Signed SBOM and Cosign
+envelopes retain their standard bundle `artifactType`, empty config and subject; registries must separately
+admit that standard signed format. A Helm-only unsigned compatibility test does not prove acceptance of a
+mixed or signed publication. Neither this option nor the compatible option changes omitted/default or
+explicit `artifact-v1` construction. Existing published artifact and release-root identities stay unchanged.
+Selecting the new profile before construction changes Environment/Plan identity and affected new wrapper,
+evidence-subject and root identities, while preserving chart archive bytes and logical Build identity.
+Existing pinned publications are never migrated; affected evidence must be generated and signed for the
+new subjects. Updated consumers are required for the new profile.
+
 The standard referrer type for a compatible raw SBOM wrapper follows its truthful config media type.
 Its NVKR logical-type annotation is not the standard `artifactType` filter: a client filtering exclusively
 for CycloneDX may not discover it. NVKR still checks exact manifest/document digests, subject and complete

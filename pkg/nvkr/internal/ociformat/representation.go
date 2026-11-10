@@ -10,8 +10,9 @@ type Representation string
 const (
 	ArtifactV1       Representation = "artifact-v1"
 	NVKRCompatibleV1 Representation = "nvkr-compatible-v1"
+	HelmStandardV1   Representation = "helm-standard-v1"
 )
 
 func Valid(value Representation) bool {
-	return value == "" || value == ArtifactV1 || value == NVKRCompatibleV1
+	return value == "" || value == ArtifactV1 || value == NVKRCompatibleV1 || value == HelmStandardV1
 }
