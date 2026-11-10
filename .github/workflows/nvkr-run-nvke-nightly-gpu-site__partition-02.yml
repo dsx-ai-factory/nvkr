@@ -1,0 +1,188 @@
+name: p02 Observe image reader availability (arc-amd64-kvm) +3
+'on':
+  workflow_call:
+    inputs:
+      dependencies:
+        type: string
+        required: true
+    outputs:
+      results:
+        value: ${{ jobs.nvkr-partition-results.outputs.results }}
+      statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      nvkr-partition-03:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-03 }}
+      nvkr-partition-04:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-04 }}
+      nvkr-partition-05:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-05 }}
+      nvkr-partition-06:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-06 }}
+      nvkr-partition-07:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-07 }}
+      nvkr-partition-12:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-12 }}
+      nvkr-partition-16:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-16 }}
+      nvkr-partition-17:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-17 }}
+      nvkr-results-00:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00 }}
+      nvkr-results-00-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00-statuses }}
+      nvkr-results-03:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-03 }}
+      nvkr-results-03-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-03-statuses }}
+      nvkr-results-0c:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0c }}
+      nvkr-results-0c-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0c-statuses }}
+    secrets:
+      NVKR_CI_STORAGE_READ_TOKEN:
+        required: true
+      NVKR_REGISTRY_READ:
+        required: true
+permissions:
+  contents: read
+jobs:
+  preflight-images-arc-amd64-kvm:
+    name: 'Observe image reader availability (arc-amd64-kvm)'
+    runs-on: 'arc-amd64-kvm'
+    timeout-minutes: 15
+    environment: 'nvkr-arc'
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Observe image reader availability (arc-amd64-kvm)
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/jobs/preflight-images-arc-amd64-kvm/part-1
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Observe exact image manifests
+        timeout-minutes: 3
+        env:
+          NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NVKR_REGISTRY_READ }}'
+          NVKR_TOOLCHAIN_READ_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+        run: ./nvkr-exec factory github preflight-images --plan .github/nvkr-run-nvke-nightly-gpu-site/plan.json --runner arc-amd64-kvm
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+  preflight-images-arc-arm64-kvm:
+    name: 'Observe image reader availability (arc-arm64-kvm)'
+    runs-on: 'arc-arm64-kvm'
+    timeout-minutes: 15
+    environment: 'nvkr-arc'
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Observe image reader availability (arc-arm64-kvm)
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/jobs/preflight-images-arc-arm64-kvm/part-1
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Observe exact image manifests
+        timeout-minutes: 3
+        env:
+          NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NVKR_REGISTRY_READ }}'
+          NVKR_TOOLCHAIN_READ_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+        run: ./nvkr-exec factory github preflight-images --plan .github/nvkr-run-nvke-nightly-gpu-site/plan.json --runner arc-arm64-kvm
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+  preflight-images-ubuntu-24-04:
+    name: 'Observe image reader availability (ubuntu-24.04)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 15
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Observe image reader availability (ubuntu-24.04)
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/jobs/preflight-images-ubuntu-24-04/part-1
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Observe exact image manifests
+        timeout-minutes: 3
+        env:
+          NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NVKR_REGISTRY_READ }}'
+          NVKR_TOOLCHAIN_READ_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+        run: ./nvkr-exec factory github preflight-images --plan .github/nvkr-run-nvke-nightly-gpu-site/plan.json --runner ubuntu-24.04
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+  preflight-images-ubuntu-24-04-arm:
+    name: 'Observe image reader availability (ubuntu-24.04-arm)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 15
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/aarch64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/arm64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Observe image reader availability (ubuntu-24.04-arm)
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/jobs/preflight-images-ubuntu-24-04-arm/part-1
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Observe exact image manifests
+        timeout-minutes: 3
+        env:
+          NVKR_TOOLCHAIN_READ_TOKEN: '${{ secrets.NVKR_REGISTRY_READ }}'
+          NVKR_TOOLCHAIN_READ_USER: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+        run: ./nvkr-exec factory github preflight-images --plan .github/nvkr-run-nvke-nightly-gpu-site/plan.json --runner ubuntu-24.04-arm
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['build-runner-arc-arm64-kvm'].result == 'success' && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04'].result == 'success' && fromJSON(inputs.dependencies)['build-runner-ubuntu-24-04-arm'].result == 'success' }}
+  nvkr-partition-results:
+    name: 'Collect provider results: nvkr-partition-results'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions: {}
+    outputs:
+      results: ${{ toJSON(needs) }}
+      statuses: ${{ join(needs.*.result, ' ') }}
+      nvkr-partition-03: ${{ format('"preflight-images-arc-amd64-kvm":{0},"preflight-images-arc-arm64-kvm":{1},"preflight-images-ubuntu-24-04":{2},"preflight-images-ubuntu-24-04-arm":{3}', toJSON(needs['preflight-images-arc-amd64-kvm']), toJSON(needs['preflight-images-arc-arm64-kvm']), toJSON(needs['preflight-images-ubuntu-24-04']), toJSON(needs['preflight-images-ubuntu-24-04-arm'])) }}
+      nvkr-partition-04: ${{ format('"preflight-images-arc-amd64-kvm":{0},"preflight-images-arc-arm64-kvm":{1},"preflight-images-ubuntu-24-04":{2},"preflight-images-ubuntu-24-04-arm":{3}', toJSON(needs['preflight-images-arc-amd64-kvm']), toJSON(needs['preflight-images-arc-arm64-kvm']), toJSON(needs['preflight-images-ubuntu-24-04']), toJSON(needs['preflight-images-ubuntu-24-04-arm'])) }}
+      nvkr-partition-05: ${{ format('"preflight-images-arc-amd64-kvm":{0},"preflight-images-arc-arm64-kvm":{1},"preflight-images-ubuntu-24-04":{2},"preflight-images-ubuntu-24-04-arm":{3}', toJSON(needs['preflight-images-arc-amd64-kvm']), toJSON(needs['preflight-images-arc-arm64-kvm']), toJSON(needs['preflight-images-ubuntu-24-04']), toJSON(needs['preflight-images-ubuntu-24-04-arm'])) }}
+      nvkr-partition-06: ${{ format('"preflight-images-arc-amd64-kvm":{0},"preflight-images-arc-arm64-kvm":{1},"preflight-images-ubuntu-24-04":{2},"preflight-images-ubuntu-24-04-arm":{3}', toJSON(needs['preflight-images-arc-amd64-kvm']), toJSON(needs['preflight-images-arc-arm64-kvm']), toJSON(needs['preflight-images-ubuntu-24-04']), toJSON(needs['preflight-images-ubuntu-24-04-arm'])) }}
+      nvkr-partition-07: ${{ format('"preflight-images-arc-amd64-kvm":{0},"preflight-images-arc-arm64-kvm":{1},"preflight-images-ubuntu-24-04":{2},"preflight-images-ubuntu-24-04-arm":{3}', toJSON(needs['preflight-images-arc-amd64-kvm']), toJSON(needs['preflight-images-arc-arm64-kvm']), toJSON(needs['preflight-images-ubuntu-24-04']), toJSON(needs['preflight-images-ubuntu-24-04-arm'])) }}
+      nvkr-partition-12: ${{ format('"preflight-images-arc-amd64-kvm":{0},"preflight-images-arc-arm64-kvm":{1},"preflight-images-ubuntu-24-04":{2},"preflight-images-ubuntu-24-04-arm":{3}', toJSON(needs['preflight-images-arc-amd64-kvm']), toJSON(needs['preflight-images-arc-arm64-kvm']), toJSON(needs['preflight-images-ubuntu-24-04']), toJSON(needs['preflight-images-ubuntu-24-04-arm'])) }}
+      nvkr-partition-16: ${{ format('"preflight-images-arc-amd64-kvm":{0},"preflight-images-arc-arm64-kvm":{1},"preflight-images-ubuntu-24-04":{2},"preflight-images-ubuntu-24-04-arm":{3}', toJSON(needs['preflight-images-arc-amd64-kvm']), toJSON(needs['preflight-images-arc-arm64-kvm']), toJSON(needs['preflight-images-ubuntu-24-04']), toJSON(needs['preflight-images-ubuntu-24-04-arm'])) }}
+      nvkr-partition-17: ${{ format('"preflight-images-arc-amd64-kvm":{0},"preflight-images-arc-arm64-kvm":{1},"preflight-images-ubuntu-24-04":{2},"preflight-images-ubuntu-24-04-arm":{3}', toJSON(needs['preflight-images-arc-amd64-kvm']), toJSON(needs['preflight-images-arc-arm64-kvm']), toJSON(needs['preflight-images-ubuntu-24-04']), toJSON(needs['preflight-images-ubuntu-24-04-arm'])) }}
+      nvkr-results-00: ${{ format('"preflight-images-arc-amd64-kvm":{0}', toJSON(needs['preflight-images-arc-amd64-kvm'])) }}
+      nvkr-results-00-statuses: ${{ format('{0}', needs['preflight-images-arc-amd64-kvm'].result) }}
+      nvkr-results-03: ${{ format('"preflight-images-ubuntu-24-04":{0}', toJSON(needs['preflight-images-ubuntu-24-04'])) }}
+      nvkr-results-03-statuses: ${{ format('{0}', needs['preflight-images-ubuntu-24-04'].result) }}
+      nvkr-results-0c: ${{ format('"preflight-images-arc-arm64-kvm":{0},"preflight-images-ubuntu-24-04-arm":{1}', toJSON(needs['preflight-images-arc-arm64-kvm']), toJSON(needs['preflight-images-ubuntu-24-04-arm'])) }}
+      nvkr-results-0c-statuses: ${{ format('{0} {1}', needs['preflight-images-arc-arm64-kvm'].result, needs['preflight-images-ubuntu-24-04-arm'].result) }}
+    steps:
+      - name: Forward provider results
+        run: ':'
+env:
+  NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
+  NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}

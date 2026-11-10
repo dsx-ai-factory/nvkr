@@ -11,3 +11,12 @@ and factory launches reauthenticate with implicit pulls disabled. Contract fixtu
 consumption, substitutions, eviction and runtime changes. This is not a reproduced maintained utility
 outage, a live private-registry/runner exercise, qualification or production acceptance. Per-runner private
 preparation and credential destruction retain their existing owner.
+
+The dispatch-frozen multi-source route records exact commit/tree/timestamp selections and authored
+input bytes in the Plan, preserves the executable bundle, restores the original selection on retries,
+and replays exact commits through complete-composite qualification without re-reading main. The
+isolated GPU-site candidate has its own generated producer/qualifier/smoke policy and 14-day uploads,
+including runtime inputs, handoffs, outcomes and diagnostics. Contract coverage
+is local only; full-candidate live-source freeze/replay remains unverified, and no hosted
+floating-composite Run or publication is recorded. Registry access, protected
+environments, signer admission and source/material retention remain maintainer configuration.

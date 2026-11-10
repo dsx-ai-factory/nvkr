@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
@@ -26,6 +27,12 @@ func TestGitHubUploadsHaveBoundedRetention(t *testing.T) {
 		{"per-output compact workflow", referenceTestPlan, "7", false},
 		{"native disk amd64", func(t *testing.T) *Plan { return arcTestPlan(t, "linux/amd64") }, "7", true},
 		{"native disk arm64", func(t *testing.T) *Plan { return arcTestPlan(t, "linux/arm64") }, "7", true},
+		{"frozen source disk", func(t *testing.T) *Plan {
+			return recompileGitHubStabilityPlan(t, arcTestPlan(t, "linux/amd64"), func(in *githubStabilityInputs) {
+				in.environment.GitHubBundle, in.environment.GitHubRuntimePlan = "frozen-disk", true
+				in.environment.GitHubRuntimeSources = []authored.GitHubRuntimeSource{{Repository: "https://github.com/containerd/containerd", Ref: "refs/heads/main"}}
+			})
+		}, "14", true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			plan := test.plan(t)
@@ -44,10 +51,13 @@ func TestGitHubUploadsHaveBoundedRetention(t *testing.T) {
 					switch {
 					case step.With["name"] == "nvkr-lifecycle-run":
 						kind, want = "record", "7"
-					case step.With["path"] == "nvkr-exec":
+					case step.With["path"] == "nvkr-exec" || strings.HasPrefix(step.With["path"], "nvkr-exec\n"):
 						kind = "helper"
 					case step.Name == "Retain inspection diagnostics" || step.Name == "Upload failed Packer diagnostics":
 						kind, want = "diagnostic", "1"
+					}
+					if test.handoffDays == "14" {
+						want = "14"
 					}
 					counts[kind]++
 					if step.With["retention-days"] != want {

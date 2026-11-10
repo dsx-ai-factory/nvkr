@@ -449,6 +449,14 @@ remain follow-ups owned by ADR-11/13; this pinning contract does not implement t
 
 ## Follow-ups
 
+ADR-18's dispatch-frozen source selection uses the catalog-owned exact-commit resolver
+and ephemeral whole-producer overlays. Its auditable record names repository, main ref,
+commit, tree and source timestamp. It does not rewrite locks or float tools and acquired
+dependencies. Replay authenticates the exact saved commit and metadata, without consulting
+the current branch. The trusted producing invocation supplies the ref-observation boundary;
+the descriptive record is not an authority receipt. Existing release-only version bindings
+still reject commit-only selections; recipes must explicitly support their selected source.
+
 - **ADR-02:** the fully-resolved pins are the `buildDigest` inputs; source-date comes from the lock.
 - **ADR-10:** toolchain and prebuilt-artifact digests the lock carries.
 - **ADR-15:** the lock and its pinned inputs are mirrorable for air-gap.

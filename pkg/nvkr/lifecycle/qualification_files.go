@@ -87,10 +87,21 @@ func CheckQualificationFiles(ctx context.Context, options QualificationFilesOpti
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := factory.AdmitQualificationHandoff(plan); err != nil {
+	if err := factory.AdmitQualificationReplay(plan); err != nil {
 		return nil, nil, err
 	}
-	expected, err := CompileFiles(ctx, options.DefinitionPath, options.EnvironmentPath, plan.GeneratorVersion)
+	var expected *factory.Plan
+	if plan.RuntimeInputs != nil {
+		if plan.DefinitionPath != options.DefinitionPath || plan.EnvironmentPath != options.EnvironmentPath {
+			return nil, nil, e.New(e.CodePipelineDrift, "frozen qualification inputs change selected authored paths")
+		}
+		if err := factory.CheckFrozenAuthoredInputs(ctx, plan, "."); err != nil {
+			return nil, nil, err
+		}
+		expected, err = factory.CompileSnapshot(ctx, *plan.RuntimeInputs, plan.GeneratorVersion)
+	} else {
+		expected, err = CompileFiles(ctx, options.DefinitionPath, options.EnvironmentPath, plan.GeneratorVersion)
+	}
 	if err != nil {
 		return nil, nil, err
 	}

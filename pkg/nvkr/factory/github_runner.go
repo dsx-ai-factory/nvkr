@@ -232,6 +232,9 @@ func admitGitHubPlan(ctx context.Context, plan *Plan) error {
 	if err := plan.Validate(); err != nil {
 		return err
 	}
+	if err := admitRuntimeSourcesExecution(plan); err != nil {
+		return err
+	}
 	if err := admitDevelopmentHostedContext(plan); err != nil {
 		return err
 	}

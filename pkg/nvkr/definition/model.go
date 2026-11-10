@@ -108,6 +108,8 @@ type Environment struct {
 	// GitHubRuntimeSource permits one exact repository revision to be frozen
 	// for this production runtime Plan; the coordinator selects the main commit.
 	GitHubRuntimeSource *GitHubRuntimeSource `json:"githubRuntimeSource,omitempty"`
+	// GitHubRuntimeSources freezes each allowed main ref once in the first bootstrap.
+	GitHubRuntimeSources []GitHubRuntimeSource `json:"githubRuntimeSources,omitempty"`
 	// GitHubDevelopment admits branch-dispatched hosted builds and, when explicitly
 	// configured, isolated signed publications under a disposable attempt namespace.
 	GitHubDevelopment bool `json:"githubDevelopment,omitempty"`

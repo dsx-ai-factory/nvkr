@@ -96,7 +96,7 @@ func writeQualificationHandoff(ctx context.Context, path, workspace string, plan
 }
 
 func admitQualificationProducer(plan *factory.Plan, source qualificationorigin.Description) error {
-	if err := factory.AdmitQualificationHandoff(plan); err != nil {
+	if err := factory.AdmitQualificationReplay(plan); err != nil {
 		return err
 	}
 	if plan.Environment.Signing == nil || plan.Environment.Signing.Mode != factory.SigningModeCosign ||

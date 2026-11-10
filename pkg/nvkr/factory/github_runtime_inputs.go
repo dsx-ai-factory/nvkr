@@ -8,6 +8,7 @@ import (
 	"path"
 	"strings"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -21,6 +22,14 @@ func CheckGitHubRuntimeInputs(ctx context.Context, plan *Plan, root string) erro
 	}
 	if plan.Environment.GitHubRuntimeSource != nil && plan.RuntimeSourceCommit == "" {
 		return e.New(e.CodeUnpinnedSource, "runtime source inputs omit the frozen commit")
+	}
+	if len(plan.Environment.GitHubRuntimeSources) != 0 && plan.RuntimeInputs == nil {
+		return e.New(e.CodeUnpinnedSource, "runtime inputs omit the frozen source snapshot")
+	}
+	if plan.RuntimeInputs != nil {
+		if err := CheckFrozenAuthoredInputs(ctx, plan, root); err != nil {
+			return err
+		}
 	}
 	if err := checkGitHubRuntimeAuthoredInputs(ctx, plan, root); err != nil {
 		return err
@@ -61,6 +70,30 @@ func checkGitHubRuntimeAuthoredInputs(ctx context.Context, plan *Plan, root stri
 	environmentPath, err := generatedDestination(root, plan.EnvironmentPath)
 	if err != nil {
 		return err
+	}
+	if plan.Composition != nil {
+		state := newInputState()
+		state.source = catalog.Dir(root).(catalog.ContextDataProvider)
+		raw, err := state.readFile(ctx, plan.DefinitionPath)
+		if err != nil {
+			return err
+		}
+		composition, err := authored.AdmitComposite(ctx, plan.DefinitionPath, raw, state.readFile)
+		if err != nil {
+			return err
+		}
+		environment, err := authored.LoadEnvironment(ctx, environmentPath)
+		if err != nil {
+			return err
+		}
+		digest, err := environment.Digest()
+		if err != nil {
+			return err
+		}
+		if composition.Digest() != plan.DefinitionDigest || digest != plan.EnvironmentDigest {
+			return e.New(e.CodePipelineDrift, "runtime composite differs from checkout inputs")
+		}
+		return nil
 	}
 	definition, err := authored.LoadDefinition(ctx, definitionPath)
 	if err != nil {

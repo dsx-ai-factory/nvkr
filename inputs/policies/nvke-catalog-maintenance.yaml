@@ -37,4 +37,7 @@ additionalRuns:
     environment: inputs/environments/github-nightly-nvidia.json
   - definition: inputs/definitions/demo/arm64-upstream-kvm.json
     environment: inputs/environments/github-nightly-upstream.json
+  - definition: inputs/definitions/nvke/gpu-site.composite.yaml
+    environment: inputs/environments/github-nvke-nightly-gpu-site.yaml
+    qualificationPolicy: inputs/policies/nvke-nightly-gpu-site-qualification.yaml
 validation: static

@@ -206,7 +206,7 @@ func prepareQualificationHandoff(ctx context.Context, raw []byte, origin qualifi
 	if err := original.Validate(); err != nil {
 		return handoff, nil, err
 	}
-	if err := factory.AdmitQualificationHandoff(&original); err != nil {
+	if err := factory.AdmitQualificationReplay(&original); err != nil {
 		return handoff, nil, err
 	}
 	// Replay reads authored inputs only from the captured closure. Catalog-owned
