@@ -251,7 +251,7 @@ native-image and exact evidence memberships stay consistent. Explicit JSON or Me
 presentation in auto mode and conflicts with explicit terminal presentation before acquisition.
 
 Normal commands are `validate`, `definition init|validate|inspect|pin`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify|qualify-local`,
-and `release verify|inspect|browse|export|pull`. Producer operations select authored inputs with `--definition` and
+and `release verify|inspect|browse|diff|export|pull`. Producer operations select authored inputs with `--definition` and
 `--environment`; artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
 and exact component/platform diagnostics remain available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
