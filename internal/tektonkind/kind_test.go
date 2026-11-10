@@ -39,9 +39,9 @@ type pins struct {
 }
 
 type lab struct {
-	t                                                                         *testing.T
-	root, scratch, name, node, kubeconfig, dockerConfig, dockerHost, evidence string
-	pins                                                                      pins
+	t                                                                                     *testing.T
+	root, scratch, name, node, kubeconfig, dockerConfig, dockerHost, dockerUser, evidence string
+	pins                                                                                  pins
 }
 
 // TestKindCore runs the maintained core Definition's complete AMD64 selection,
@@ -74,11 +74,13 @@ func TestKindCore(t *testing.T) {
 	must(t, os.MkdirAll(l.evidence, 0700))
 	must(t, json.Unmarshal(read(t, filepath.Join(l.root, "toolchains/tekton-kind/pins.json")), &l.pins))
 	var info struct {
-		Architecture string
-		MemTotal     int64
-		NCPU         int
+		Architecture    string
+		MemTotal        int64
+		NCPU            int
+		SecurityOptions []string
 	}
 	must(t, json.Unmarshal(l.docker(ctx, nil, "info", "--format", "{{json .}}"), &info))
+	l.dockerUser = keyGenerationUser(info.SecurityOptions, os.Getuid(), os.Getgid())
 	if info.Architecture != "x86_64" && info.Architecture != "amd64" {
 		t.Fatalf("native core acceptance requires an AMD64 Docker daemon; got %s (emulation is not admitted)", info.Architecture)
 	}
@@ -240,12 +242,23 @@ func (l *lab) runner(ctx context.Context, registry string) (string, string) {
 	return digest, cosign
 }
 
+// Rootless Docker maps container root to the daemon owner. A numeric host UID
+// would instead select a subordinate UID that cannot access the private mounts.
+func keyGenerationUser(securityOptions []string, uid, gid int) string {
+	for _, option := range securityOptions {
+		if option == "name=rootless" {
+			return "0:0"
+		}
+	}
+	return fmt.Sprintf("%d:%d", uid, gid)
+}
+
 func (l *lab) keys(ctx context.Context, image, cosign string) map[string]string {
 	directory := filepath.Join(l.scratch, "keys")
 	must(l.t, os.Mkdir(directory, 0700))
 	keys := map[string]string{}
 	for _, role := range []string{"publisher", "smoke", "qualifier"} {
-		l.docker(ctx, nil, "run", "--rm", "--network=none", "--user", fmt.Sprintf("%d:%d", os.Getuid(), os.Getgid()), "--entrypoint=/cosign", "-e", "COSIGN_PASSWORD=", "-v", cosign+":/cosign:ro", "-v", directory+":/keys", image, "generate-key-pair", "--output-key-prefix", "/keys/"+role)
+		l.docker(ctx, nil, "run", "--rm", "--network=none", "--user", l.dockerUser, "--entrypoint=/cosign", "-e", "COSIGN_PASSWORD=", "-v", cosign+":/cosign:ro", "-v", directory+":/keys", image, "generate-key-pair", "--output-key-prefix", "/keys/"+role)
 		keys[role] = string(read(l.t, filepath.Join(directory, role+".pub")))
 		private := read(l.t, filepath.Join(directory, role+".key"))
 		secret := map[string]any{"apiVersion": "v1", "kind": "Secret", "metadata": map[string]string{"name": "nvkr-" + role + "-key", "namespace": "nvkr"}, "type": "Opaque", "data": map[string]string{"private.pem": base64.StdEncoding.EncodeToString(private)}}
@@ -263,6 +276,7 @@ func (l *lab) keys(ctx context.Context, image, cosign string) map[string]string 
 }
 
 func (l *lab) waitRun(ctx context.Context, name string, success bool) {
+	nextReport := time.Time{}
 	for {
 		raw := l.kube(ctx, nil, "-n", "nvkr", "get", "pipelinerun", name, "-o", "json")
 		var run struct {
@@ -271,6 +285,10 @@ func (l *lab) waitRun(ctx context.Context, name string, success bool) {
 			}
 		}
 		must(l.t, json.Unmarshal(raw, &run))
+		if !time.Now().Before(nextReport) {
+			l.t.Logf("PipelineRun %s pods:\n%s", name, l.kube(ctx, nil, "-n", "nvkr", "get", "pods", "-l", "tekton.dev/pipelineRun="+name))
+			nextReport = time.Now().Add(time.Minute)
+		}
 		for _, condition := range run.Status.Conditions {
 			if condition.Type == "Succeeded" && condition.Status != "Unknown" {
 				if (condition.Status == "True") != success {
