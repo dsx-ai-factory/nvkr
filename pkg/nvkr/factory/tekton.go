@@ -12,6 +12,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/tekton"
+	"k8s.io/apimachinery/pkg/api/resource"
 )
 
 const (
@@ -139,6 +140,9 @@ func renderTekton(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 	runMetadata := metadata(prefix)
 	delete(runMetadata, "name")
 	runMetadata["generateName"] = prefix + "-"
+	// Freeze the same quantity bytes the Kubernetes PVC codec emits (1024Gi
+	// becomes 1Ti), so exact storage authentication survives API serialization.
+	storage := resource.NewQuantity(int64(settings.WorkspaceGiB)<<30, resource.BinarySI).String()
 	runSpec := tektonObject{"pipelineSpec": pipelineSpec, "taskRunSpecs": overrides,
 		"timeouts": tektonObject{"pipeline": "24h0m0s", "tasks": "22h0m0s", "finally": "2h0m0s"},
 		"taskRunTemplate": tektonObject{"serviceAccountName": "nvkr-builder", "podTemplate": tektonObject{
@@ -146,7 +150,7 @@ func renderTekton(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 			"nodeSelector":                 tektonObject{"kubernetes.io/os": "linux", "kubernetes.io/arch": strings.TrimPrefix(settings.Platform, "linux/")}}},
 		"workspaces": []tektonObject{{"name": "carriers", "volumeClaimTemplate": tektonObject{"metadata": tektonObject{}, "status": tektonObject{}, "spec": tektonObject{
 			"accessModes": []string{"ReadWriteOnce"}, "storageClassName": settings.StorageClass, "volumeMode": "Filesystem",
-			"resources": tektonObject{"requests": tektonObject{"storage": fmt.Sprintf("%dGi", settings.WorkspaceGiB)}}}}}}}
+			"resources": tektonObject{"requests": tektonObject{"storage": storage}}}}}}}
 	execution, err := canonical.Marshal(runSpec)
 	if err != nil {
 		return nil, err
