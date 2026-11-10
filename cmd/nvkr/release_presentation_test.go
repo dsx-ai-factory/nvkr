@@ -306,7 +306,7 @@ func TestReleaseBrowseLinksOnlyExactVisibleEvidenceBindings(t *testing.T) {
 	}
 	for _, selection := range []string{"", "a", "ab"} {
 		t.Run("selection="+selection, func(t *testing.T) {
-			browse, err := releasePublicationDisplay(description, selection)
+			browse, err := releasePublicationDisplay(description, releaseview.Options{Output: selection})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -367,7 +367,7 @@ func BenchmarkReleasePublicationProjection(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for b.Loop() {
-		if _, err := releasePublicationDisplay(description, ""); err != nil {
+		if _, err := releasePublicationDisplay(description, releaseview.Options{}); err != nil {
 			b.Fatal(err)
 		}
 	}
@@ -390,7 +390,7 @@ func TestReleaseBrowseAndExportDiskEvidenceDeclarationParity(t *testing.T) {
 			publication := delivery.PublicationDescription{Outputs: []delivery.PublicationOutput{{Output: artifact}}}
 			description := releaseview.Description{TotalOutputs: 1, Outputs: []releaseview.Output{{Name: artifact.Name, Kind: artifact.Kind, Digest: artifact.Digest, BuildDigest: artifact.BuildDigest,
 				Disk: &releaseview.Disk{EvidenceMode: test.mode}}}}
-			browse, err := releasePublicationDisplay(publication, "")
+			browse, err := releasePublicationDisplay(publication, releaseview.Options{})
 			if err != nil {
 				t.Fatal(err)
 			}

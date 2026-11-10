@@ -151,6 +151,66 @@ func TestReleaseBrowseNeverDownloadsOutputLayers(t *testing.T) {
 			t.Fatalf("metadata rejection downloaded output layers: %d GETs", got)
 		}
 	})
+	t.Run("kind and platform filters", func(t *testing.T) {
+		for _, test := range []struct {
+			args []string
+			want []string
+		}{
+			{args: []string{"--kind", "executable"}, want: []string{"tools"}},
+			{args: []string{"--platform", "linux/amd64"}, want: []string{"node-image", "tools"}},
+			{args: []string{"--kind", "disk-image", "--platform", "linux/amd64", "--output", "node-image"}, want: []string{"node-image"}},
+			{args: []string{"--platform", "linux/arm64"}},
+			{args: []string{"--kind", "oci"}},
+			{args: []string{"--kind", "executable", "--output", "node-image"}},
+		} {
+			t.Run(strings.Join(test.args, " "), func(t *testing.T) {
+				payloadGets.Store(0)
+				raw, err := runReleaseBrowse(t, reference, "json", "", test.args...)
+				if got := payloadGets.Load(); got != 0 {
+					t.Fatalf("filtered browse downloaded output layers: %d GETs", got)
+				}
+				if test.want == nil {
+					if cliErrorCode(err) != e.CodeUsage || raw != "" || !strings.Contains(err.Error(), "no output matching") {
+						t.Fatalf("no-match filter claimed a result: %q, %v", raw, err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				var view struct {
+					TotalOutputs int `json:"totalOutputs"`
+					Outputs      []struct {
+						Name string `json:"name"`
+					} `json:"outputs"`
+					Evidence []struct {
+						Binding struct {
+							Outputs []string `json:"outputs"`
+						} `json:"binding"`
+					} `json:"evidence"`
+				}
+				if err := json.Unmarshal([]byte(raw), &view); err != nil {
+					t.Fatal(err)
+				}
+				var names []string
+				for _, output := range view.Outputs {
+					names = append(names, output.Name)
+				}
+				if view.TotalOutputs != 2 || strings.Join(names, ",") != strings.Join(test.want, ",") || len(view.Evidence) != len(test.want) {
+					t.Fatalf("filter kept %v of %d with %d evidence: %s", names, view.TotalOutputs, len(view.Evidence), raw)
+				}
+			})
+		}
+	})
+	t.Run("reject corrupt metadata outside the filter", func(t *testing.T) {
+		corruptConfig.Store(true)
+		defer corruptConfig.Store(false)
+		payloadGets.Store(0)
+		raw, err := runReleaseBrowse(t, reference, "json", "", "--kind", "executable", "--platform", "linux/amd64")
+		if cliErrorCode(err) != e.CodeFetchFailed || raw != "" || payloadGets.Load() != 0 {
+			t.Fatalf("filter hid changed disk metadata: %q, %v, GETs=%d", raw, err, payloadGets.Load())
+		}
+	})
 	t.Run("full publication still requires payloads", func(t *testing.T) {
 		payloadGets.Store(0)
 		publication, err := delivery.PullPublication(t.Context(), reference, t.TempDir(), transport)
@@ -165,7 +225,7 @@ func TestReleaseBrowseNeverDownloadsOutputLayers(t *testing.T) {
 	})
 }
 
-func runReleaseBrowse(t *testing.T, reference, format, output string) (string, error) {
+func runReleaseBrowse(t *testing.T, reference, format, output string, extra ...string) (string, error) {
 	t.Helper()
 	var out bytes.Buffer
 	app := &cli.App{Commands: []*cli.Command{cmdRelease()}, Writer: &out}
@@ -173,6 +233,7 @@ func runReleaseBrowse(t *testing.T, reference, format, output string) (string, e
 	if output != "" {
 		args = append(args, "--output", output)
 	}
+	args = append(args, extra...)
 	err := app.RunContext(t.Context(), args)
 	return out.String(), err
 }

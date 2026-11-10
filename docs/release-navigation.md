@@ -109,6 +109,22 @@ metadata or missing evidence. Payload integrity remains outside browsing's scope
 Shared evidence keeps its complete list of output memberships in text and JSON even when only one output is
 shown. Evidence references identify the exact manifest under the derived owning output repository.
 
+## Filter by kind and platform
+
+```sh
+bin/nvkr release browse --reference "$RELEASE_REF" --kind oci --platform linux/arm64
+```
+
+`--kind` takes one exact output kind (`apt-repository`, `bundle-oci`, `debian-package`, `disk-image`,
+`executable`, `helm-oci` or `oci`). `--platform` takes one exact supported `OS/ARCH`. Filters intersect with
+each other and with `--output`; an exact name that does not satisfy the filters fails instead of being dropped.
+A native output matches its recorded platform. An aggregate OCI image matches when it contains a child for the
+platform and is still shown whole, with every child. Outputs without platform metadata, such as most charts,
+never match a platform filter. Like `--output`, filters apply only after the complete metadata closure has
+been checked, keep the original output total and the complete membership of shared evidence, and work with
+`--layout`. JSON records the filters in `selectedKind` and `selectedPlatform`. A filter that matches nothing
+fails with a coded usage error; it does not mean the release is empty.
+
 ## Pull an output
 
 Choose an exact output name from `release browse` and an explicit new destination directory:
@@ -194,7 +210,7 @@ Stable ordering makes comparisons repeatable; the JSON bytes still do not define
 | `referenceScope` | Locators derive from the supplied root reference; availability is not established |
 | `declaredQualification` | Publisher-declared qualification, separate from this inspection's result |
 | `inspection`, `inspectionDetails` | Human-readable inspection scope and explicit machine-readable checks |
-| `totalOutputs`, optional `selectedOutput` | Complete publication output count and any browse-only selection |
+| `totalOutputs`, optional `selectedOutput`, `selectedKind`, `selectedPlatform` | Complete publication output count and any browse-only selection or filters |
 | `metadata` | Recorded Definition, Environment, Plan and content identities, with invocation ID when present |
 | `outputs` | Every named artifact's exact kind, digest, reference, Build Digest, components and kind-specific metadata |
 | `evidence` | Exact evidence references/digests, output/component/stage/subject bindings and available source descriptions |
