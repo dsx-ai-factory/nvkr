@@ -76,3 +76,40 @@ func TestContainerScannerAlsoRefusesUnownedNestedDatabase(t *testing.T) {
 		t.Fatalf("container scanner assigned unheld child packages: %+v %v", components, err)
 	}
 }
+
+func TestFilesystemScannerArchiveCoordinates(t *testing.T) {
+	for _, test := range []struct {
+		name, coordinate, fullPath string
+		want                       e.Code
+	}{
+		{"root database", "/var/lib/dpkg/status", "", ""},
+		{"package archive", "/cache/packages.tar", "/cache/packages.tar!/sample.deb", ""},
+		{"nested real path", "/nested/var/lib/dpkg/status", "", e.CodeEngineCapability},
+		{"full path database", "/cache/root.tar", "/cache/root.tar!/var/lib/dpkg/status", e.CodeEngineCapability},
+		{"full path fragment", "/cache/root.tar", "/cache/root.tar!/usr/lib/dpkg/status.d/sample", e.CodeEngineCapability},
+		{"full path traversal", "/cache/root.tar", "/cache/root.tar!/../../var/lib/dpkg/status", e.CodeEngineCapability},
+		{"access path database", "/cache/root.tar!/var/lib/dpkg/status", "", e.CodeEngineCapability},
+		{"access path traversal", "/cache/root.tar!/../../var/lib/dpkg/status", "", e.CodeEngineCapability},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			raw, err := json.Marshal(map[string]any{"schema": map[string]string{"version": "16.1.13"}, "artifacts": []any{map[string]any{
+				"name": "sample", "version": "1", "type": "deb", "metadata": map[string]string{"architecture": "all"},
+				"locations": []any{map[string]string{"path": test.coordinate, "accessPath": test.coordinate, "fullPath": test.fullPath}},
+			}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			inventory, err := filesystemDependenciesFromJSON(raw, "sha256:"+strings.Repeat("a", 64))
+			if test.want == "" {
+				if err != nil || len(inventory.Components) != 1 {
+					t.Fatalf("ordinary package location refused: %+v, %v", inventory, err)
+				}
+				return
+			}
+			assertDependencyCode(t, err, test.want)
+			if len(inventory.Components) != 0 {
+				t.Fatalf("unowned archive database returned an inventory: %+v", inventory)
+			}
+		})
+	}
+}

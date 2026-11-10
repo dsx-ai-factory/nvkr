@@ -73,7 +73,7 @@ func TestDiagnosticDockerfileMatchesSourceLock(t *testing.T) {
 		t.Fatal(err)
 	}
 	dockerfile := string(data)
-	if lock.Scanner.Version != "1.51.1" || lock.Scanner.SchemaVersion != "16.1.10" || len(lock.Scanner.Archives) != 2 {
+	if lock.Scanner.Version != "1.57.1" || lock.Scanner.SchemaVersion != "16.1.13" || len(lock.Scanner.Archives) != 2 {
 		t.Fatal("scanner source does not match the reviewed full-inspector contract")
 	}
 	for _, arch := range []string{"amd64", "arm64"} {

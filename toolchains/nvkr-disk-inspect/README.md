@@ -17,6 +17,13 @@ for both AMD64 and ARM64. Transitive packages remain inside the same frozen,
 signature-checked archive; the build records the complete installed package list
 and executable hashes. Distribution copyright files remain installed.
 
+The November 9 source refresh selects snapshot `20261109T000000Z`, kernel
+`6.8.0-149.149`, and Syft 1.57.1 (native JSON schema `16.1.13`). Both architectures'
+package candidates were resolved through signed snapshot indexes; both Syft
+archives match the upstream release checksum file. A fresh native preparation
+and candidate review are still required before these sources can replace selected
+consumer images.
+
 Build the static helper from the exact NVKR source using `.go-version`, then
 assemble a local native image from the repository root. Record its actual image
 identity, executable hashes and package inventory; no tag is an authority pin:
@@ -56,7 +63,7 @@ publication or signing permission; its result establishes pull access and entryp
 complete disk bake or inspection.
 For Docker preparation, `NVKR_BUILD_ARCHIVES` selects a read-only named build
 context containing the official release filenames, including
-`syft_1.51.1_linux_ARCH.tar.gz`. The Dockerfile checks the pinned archive digest
+`syft_1.57.1_linux_ARCH.tar.gz`. The Dockerfile checks the pinned archive digest
 before extraction and never falls back to downloading a missing local archive.
 `NVKR_BUILD_CA_BUNDLE` supplies trusted public CA certificates through an ephemeral
 secret readable by APT's downloader. Archive bytes are not secret mounts.
