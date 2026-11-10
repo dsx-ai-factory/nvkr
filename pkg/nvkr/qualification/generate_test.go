@@ -37,7 +37,7 @@ func generationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPoli
 	policy.Smoke.Images = map[string]string{"linux/amd64": "ghcr.io/dsx-ai-factory/smoke@sha256:" + strings.Repeat("c", 64), "linux/arm64": "ghcr.io/dsx-ai-factory/smoke@sha256:" + strings.Repeat("d", 64)}
 	// Synthetic independent trust pins are test-only. Scope deliberately names
 	// the real maintained Plan's exact members; no payload or authority is faked.
-	policy.Smoke.Tools = map[string]string{"nvkectl": "nvkectl-version-json", "helm": "helm-version", "kubectl": "kubectl-client-version-json"}
+	policy.Smoke.Tools = map[string]string{"nvkectl-module-tags": "nvkectl-version-json", "helm-operator": "helm-version", "kubectl-operator": "kubectl-client-version-json"}
 	for _, output := range plan.LifecycleOutputs {
 		if output.Kind == lifecycle.OutputOCI {
 			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: append([]string(nil), output.Components...), Reason: "deployment-image"})
@@ -482,7 +482,9 @@ func TestQualificationGenerationAdmission(t *testing.T) {
 		{"missing selected architecture", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
 			delete(p.Smoke.Images, "linux/arm64")
 		}, e.CodeReleaseIncomplete},
-		{"missing tool", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) { delete(p.Smoke.Tools, "kubectl") }, e.CodeGateUnmet},
+		{"missing tool", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
+			delete(p.Smoke.Tools, "kubectl-operator")
+		}, e.CodeGateUnmet},
 		{"extra tool", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
 			p.Smoke.Tools["unselected"] = "helm-version"
 		}, e.CodeReleaseIncomplete},
@@ -564,7 +566,7 @@ func generationOperatorToolsFixture(t *testing.T, publicationMode string) (*fact
 	if err != nil {
 		t.Fatal(err)
 	}
-	policy.Smoke.Tools = map[string]string{"helm": "helm-version", "kubectl": "kubectl-client-version-json"}
+	policy.Smoke.Tools = map[string]string{"helm-operator": "helm-version", "kubectl-operator": "kubectl-client-version-json"}
 	policy.Smoke.NonToolOutputs = nil
 	delete(policy.Smoke.Images, "linux/arm64")
 	delete(policy.Cosign.PlatformDigests, "linux/arm64")

@@ -187,7 +187,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-capnico-controller-arm64-build-capni-b3f328de28b1, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-capnico-controller-arm64-build-capni-b3f328de28b1, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: &steps-ubuntu-24-04-two-nodes
       - *check-native-linux-amd64
@@ -233,14 +233,14 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-cluster-api-provider-provisioned-arm-97d0ad58bf4c, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-cluster-api-provider-provisioned-arm-97d0ad58bf4c, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
       contents: read
-  nvkr-controller-chart-fetch-nvke-controller-chart:
-    name: 'Fetch pinned source for nvke-controller-chart (controller-chart)'
+  nvkr-controller-chart-fetch-nvke-controll-83d688d90474:
+    name: 'Fetch pinned source for nvke-controller-chart-nightly-site (controller-chart)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -249,11 +249,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-controller-chart-build-nvke-controller-chart:
-    name: 'Build nvke-controller-chart (controller-chart)'
+  nvkr-controller-chart-build-nvke-controll-ec07ddc4d9e2:
+    name: 'Build nvke-controller-chart-nightly-site (controller-chart)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [nvkr-controller-chart-fetch-nvke-controller-chart]
+    needs: [nvkr-controller-chart-fetch-nvke-controll-83d688d90474]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -263,14 +263,14 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: controller-chart'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-controller-chart-build-nvke-controller-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-controller-chart-build-nvke-controll-ec07ddc4d9e2, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
       contents: read
-  nvkr-controller-profiles-fetch-nvke-local-profiles:
-    name: 'Fetch pinned source for nvke-local-profiles (controller-profiles)'
+  nvkr-controller-profiles-fetch-nvke-local-5b3a929c60a7:
+    name: 'Fetch pinned source for nvke-local-profiles-upstream (controller-profiles)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -279,11 +279,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-controller-profiles-build-nvke-local-profiles:
-    name: 'Build nvke-local-profiles (controller-profiles)'
+  nvkr-controller-profiles-build-nvke-local-8a8b6c01881b:
+    name: 'Build nvke-local-profiles-upstream (controller-profiles)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [nvkr-controller-profiles-fetch-nvke-local-profiles]
+    needs: [nvkr-controller-profiles-fetch-nvke-local-5b3a929c60a7]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -293,7 +293,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: controller-profiles'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-controller-profiles-build-nvke-local-profiles, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-controller-profiles-build-nvke-local-8a8b6c01881b, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -313,14 +313,14 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
       contents: read
-  nvkr-cwe-fetch-nvke-controller:
-    name: 'Fetch pinned source for nvke-controller (cwe)'
+  nvkr-cwe-fetch-nvke-controller-local-site:
+    name: 'Fetch pinned source for nvke-controller-local-site (cwe)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -329,11 +329,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-cwe-build-nvke-controller:
-    name: 'Build nvke-controller (cwe)'
+  nvkr-cwe-build-nvke-controller-local-site:
+    name: 'Build nvke-controller-local-site (cwe)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [nvkr-cwe-fetch-nvke-controller]
+    needs: [nvkr-cwe-fetch-nvke-controller-local-site]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -343,14 +343,14 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: cwe'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-cwe-build-nvke-controller, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-cwe-build-nvke-controller-local-site, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
       contents: read
-  nvkr-installer-tools-arm64-fetch-clusterctl:
-    name: 'Fetch pinned source for clusterctl (installer-tools-arm64)'
+  nvkr-installer-tools-arm64-fetch-clusterc-72096bca655d:
+    name: 'Fetch pinned source for clusterctl-installer-hosted (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -359,18 +359,18 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-installer-tools-arm64-build-clusterctl:
-    name: 'Build clusterctl (installer-tools-arm64)'
+  nvkr-installer-tools-arm64-build-clusterc-0b38f9706fef:
+    name: 'Build clusterctl-installer-hosted (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [nvkr-installer-tools-arm64-fetch-clusterctl]
+    needs: [nvkr-installer-tools-arm64-fetch-clusterc-72096bca655d]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
-  nvkr-installer-tools-arm64-fetch-kind:
-    name: 'Fetch pinned source for kind (installer-tools-arm64)'
+  nvkr-installer-tools-arm64-fetch-kind-ins-eccc9d6c1156:
+    name: 'Fetch pinned source for kind-installer-hosted (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -379,18 +379,18 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-installer-tools-arm64-build-kind:
-    name: 'Build kind (installer-tools-arm64)'
+  nvkr-installer-tools-arm64-build-kind-ins-aaa29d10ba72:
+    name: 'Build kind-installer-hosted (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [nvkr-installer-tools-arm64-fetch-kind]
+    needs: [nvkr-installer-tools-arm64-fetch-kind-ins-eccc9d6c1156]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
-  nvkr-installer-tools-arm64-fetch-kubectl:
-    name: 'Fetch pinned source for kubectl (installer-tools-arm64)'
+  nvkr-installer-tools-arm64-fetch-kubectl-926c9011565d:
+    name: 'Fetch pinned source for kubectl-installer-hosted (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -399,18 +399,18 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-installer-tools-arm64-build-kubectl:
-    name: 'Build kubectl (installer-tools-arm64)'
+  nvkr-installer-tools-arm64-build-kubectl-0c8f08443eba:
+    name: 'Build kubectl-installer-hosted (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [nvkr-installer-tools-arm64-fetch-kubectl]
+    needs: [nvkr-installer-tools-arm64-fetch-kubectl-926c9011565d]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
-  nvkr-installer-tools-arm64-fetch-oras:
-    name: 'Fetch pinned source for oras (installer-tools-arm64)'
+  nvkr-installer-tools-arm64-fetch-oras-ins-c8e621b5911b:
+    name: 'Fetch pinned source for oras-installer-hosted (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -419,11 +419,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-installer-tools-arm64-build-oras:
-    name: 'Build oras (installer-tools-arm64)'
+  nvkr-installer-tools-arm64-build-oras-ins-fa584d2ec873:
+    name: 'Build oras-installer-hosted (installer-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [nvkr-installer-tools-arm64-fetch-oras]
+    needs: [nvkr-installer-tools-arm64-fetch-oras-ins-c8e621b5911b]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -443,14 +443,14 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-installer-tools-arm64-build-clusterctl, nvkr-installer-tools-arm64-build-kind, nvkr-installer-tools-arm64-build-kubectl, nvkr-installer-tools-arm64-build-oras, nvkr-installer-tools-arm64-pull-helm, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-installer-tools-arm64-build-clusterc-0b38f9706fef, nvkr-installer-tools-arm64-build-kind-ins-aaa29d10ba72, nvkr-installer-tools-arm64-build-kubectl-0c8f08443eba, nvkr-installer-tools-arm64-build-oras-ins-fa584d2ec873, nvkr-installer-tools-arm64-pull-helm, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
       contents: read
-  nvkr-nicosim-tools-arm64-fetch-nico-sim-n-39a15ead04f7:
-    name: 'Fetch pinned source for nico-sim, nico-sim-runtime-assets, nico-simctl (nicosim-tools-arm64)'
+  nvkr-nicosim-tools-arm64-fetch-nico-sim-n-573105dff5e5:
+    name: 'Fetch pinned source for nico-sim-nicosim, nico-sim-runtime-assets-nicosim, nico-simctl-nicosim (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -470,11 +470,11 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-  nvkr-nicosim-tools-arm64-build-nico-sim:
-    name: 'Build nico-sim (nicosim-tools-arm64)'
+  nvkr-nicosim-tools-arm64-build-nico-sim-nicosim:
+    name: 'Build nico-sim-nicosim (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [nvkr-nicosim-tools-arm64-fetch-nico-sim-n-39a15ead04f7]
+    needs: [nvkr-nicosim-tools-arm64-fetch-nico-sim-n-573105dff5e5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -491,11 +491,11 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-  nvkr-nicosim-tools-arm64-build-nico-sim-r-52401c164e52:
-    name: 'Build nico-sim-runtime-assets (nicosim-tools-arm64)'
+  nvkr-nicosim-tools-arm64-build-nico-sim-r-75d355b01df4:
+    name: 'Build nico-sim-runtime-assets-nicosim (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [nvkr-nicosim-tools-arm64-fetch-nico-sim-n-39a15ead04f7]
+    needs: [nvkr-nicosim-tools-arm64-fetch-nico-sim-n-573105dff5e5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -512,11 +512,11 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-  nvkr-nicosim-tools-arm64-build-nico-simctl:
-    name: 'Build nico-simctl (nicosim-tools-arm64)'
+  nvkr-nicosim-tools-arm64-build-nico-simctl-nicosim:
+    name: 'Build nico-simctl-nicosim (nicosim-tools-arm64)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [nvkr-nicosim-tools-arm64-fetch-nico-sim-n-39a15ead04f7]
+    needs: [nvkr-nicosim-tools-arm64-fetch-nico-sim-n-573105dff5e5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -537,14 +537,14 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-nicosim-tools-arm64-build-nico-sim, nvkr-nicosim-tools-arm64-build-nico-sim-r-52401c164e52, nvkr-nicosim-tools-arm64-build-nico-simctl, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-nicosim-tools-arm64-build-nico-sim-nicosim, nvkr-nicosim-tools-arm64-build-nico-sim-r-75d355b01df4, nvkr-nicosim-tools-arm64-build-nico-simctl-nicosim, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
       contents: read
-  nvkr-nktp-fetch-nktp-chart:
-    name: 'Fetch pinned source for nktp-chart (nktp)'
+  nvkr-nktp-fetch-nktp-chart-nightly-site:
+    name: 'Fetch pinned source for nktp-chart-nightly-site (nktp)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -553,11 +553,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-nktp-build-nktp-chart:
-    name: 'Build nktp-chart (nktp)'
+  nvkr-nktp-build-nktp-chart-nightly-site:
+    name: 'Build nktp-chart-nightly-site (nktp)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [nvkr-nktp-fetch-nktp-chart]
+    needs: [nvkr-nktp-fetch-nktp-chart-nightly-site]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -567,7 +567,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: nktp'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-nktp-build-nktp-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-nktp-build-nktp-chart-nightly-site, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -836,8 +836,8 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-nvkectl-fetch-nvkectl:
-    name: 'Fetch pinned source for nvkectl (nvkectl)'
+  nvkr-nvkectl-fetch-nvkectl-local-site:
+    name: 'Fetch pinned source for nvkectl-local-site (nvkectl)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -846,11 +846,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-nvkectl-build-nvkectl:
-    name: 'Build nvkectl (nvkectl)'
+  nvkr-nvkectl-build-nvkectl-local-site:
+    name: 'Build nvkectl-local-site (nvkectl)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
-    needs: [nvkr-nvkectl-fetch-nvkectl]
+    needs: [nvkr-nvkectl-fetch-nvkectl-local-site]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-node
     permissions:
@@ -860,14 +860,14 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: nvkectl'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-nvkectl-build-nvkectl, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-nvkectl-build-nvkectl-local-site, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
       actions: read
       contents: read
-  nvkr-operator-tools-pull-helm:
-    name: 'Acquire pinned operator-tools/pull-helm'
+  nvkr-operator-tools-pull-helm-operator:
+    name: 'Acquire pinned operator-tools/pull-helm-operator'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -876,8 +876,8 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-operator-tools-pull-kubectl:
-    name: 'Acquire pinned operator-tools/pull-kubectl'
+  nvkr-operator-tools-pull-kubectl-operator:
+    name: 'Acquire pinned operator-tools/pull-kubectl-operator'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -890,7 +890,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: operator-tools'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-operator-tools-pull-helm, nvkr-operator-tools-pull-kubectl, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-operator-tools-pull-helm-operator, nvkr-operator-tools-pull-kubectl-operator, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1024,7 +1024,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1054,7 +1054,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: postgresql'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-postgresql-pull-postgresql-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-postgresql-pull-postgresql-chart, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1084,7 +1084,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1114,7 +1114,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1144,7 +1144,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1174,7 +1174,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1204,7 +1204,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-crds'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-crds-pull-spire-crds-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-spire-crds-pull-spire-crds-chart, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1234,7 +1234,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1264,7 +1264,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1294,7 +1294,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1324,7 +1324,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: spire'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-spire-pull-spire-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-spire-pull-spire-chart, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1354,7 +1354,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1384,7 +1384,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1414,7 +1414,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1444,7 +1444,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: temporal'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-temporal-pull-temporal-chart, nvkr-tool-syft, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-temporal-pull-temporal-chart, nvkr-tool-syft-module-tags, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -1460,8 +1460,8 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-tool-cosign:
-    name: 'Acquire pinned cosign'
+  nvkr-tool-cosign-module-tags:
+    name: 'Acquire pinned cosign-module-tags'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -1474,7 +1474,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-nvke-node-image-upstream-ovn-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-disk-nvke-node-image-upstream-ovn-arm64, nvkr-tool-cosign]
+    needs: [nvkr-disk-nvke-node-image-upstream-ovn-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1512,8 +1512,8 @@ jobs:
       NVKR_CREDENTIAL: '${{ secrets.NVKR_REGISTRY_WRITE }}'
       NVKR_REGISTRY_USER: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
     steps: *steps-ubuntu-24-04-node
-  nvkr-tool-syft:
-    name: 'Acquire pinned syft'
+  nvkr-tool-syft-module-tags:
+    name: 'Acquire pinned syft-module-tags'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -1536,7 +1536,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-capnico-controller-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-capnico-controller-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-capnico-controller-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1558,7 +1558,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-cluster-api-provider-provisioned-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-cluster-api-prov-7d1ac851fb60, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-cluster-api-prov-7d1ac851fb60, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1580,7 +1580,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-controller-chart'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-controller-chart, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-controller-chart, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1602,7 +1602,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-controller-profiles'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-controller-profiles, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-controller-profiles, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1624,7 +1624,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1646,7 +1646,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-cwe'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-cwe, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-cwe, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1668,7 +1668,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-installer-tools-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-installer-tools-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-installer-tools-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1690,7 +1690,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-nicosim-tools-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-nicosim-tools-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-nicosim-tools-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1712,7 +1712,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-nktp'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-nktp, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-nktp, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1734,7 +1734,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-nvkectl'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-nvkectl, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-nvkectl, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1756,7 +1756,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-operator-tools'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-operator-tools, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-operator-tools, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1778,7 +1778,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-postgresql-image-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-postgresql-image-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1800,7 +1800,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-postgresql'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-postgresql, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-postgresql, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2212,7 +2212,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-spiffe-csi-image-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-spiffe-csi-image-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2264,7 +2264,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-spire-agent-image-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-spire-agent-image-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2316,7 +2316,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-spire-bash-image-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-spire-bash-image-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2368,7 +2368,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-spire-controller-14366a611047, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-spire-controller-14366a611047, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2420,7 +2420,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-spire-crds'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-spire-crds, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-spire-crds, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2472,7 +2472,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-spire-oidc-image-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-spire-oidc-image-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2524,7 +2524,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-spire-server-image-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-spire-server-image-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2576,7 +2576,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-spire-tpm-server-image-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-spire-tpm-server-image-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2628,7 +2628,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-spire'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-spire, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-spire, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2680,7 +2680,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-temporal-admin-t-619203c9c277, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-temporal-admin-t-619203c9c277, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2732,7 +2732,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-temporal-server-image-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-temporal-server-image-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2784,7 +2784,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-temporal-ui-image-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-temporal-ui-image-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2836,7 +2836,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-temporal'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-temporal, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-temporal, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2898,7 +2898,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-tool-syft, nvkr-upstream-ovn-chart-arm64-build-ovn-k-dbc610b2ed4e, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-tool-syft-module-tags, nvkr-upstream-ovn-chart-arm64-build-ovn-k-dbc610b2ed4e, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -2928,7 +2928,7 @@ jobs:
     name: 'Verify artifacts and generate SBOMs: upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-tool-syft, nvkr-upstream-ovn-image-arm64-build-ovn-kube-ubuntu, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-tool-syft-module-tags, nvkr-upstream-ovn-image-arm64-build-ovn-kube-ubuntu, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-arc-arm64-kvm'].result == 'success' && needs['preflight-images-ubuntu-24-04'].result == 'success' && needs['preflight-images-ubuntu-24-04-arm'].result == 'success' }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -2968,7 +2968,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-upstream-ovn-chart-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-upstream-ovn-chart-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-upstream-ovn-chart-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -2990,7 +2990,7 @@ jobs:
     name: 'Create and verify SBOM attestations: output-upstream-ovn-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [nvkr-package-publication-upstream-ovn-image-arm64, nvkr-tool-cosign]
+    needs: [nvkr-package-publication-upstream-ovn-image-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -3526,7 +3526,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-00'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [build-runner-ubuntu-24-04, nvkr-package-publication-spire, nvkr-package-spire-server-image-arm64, nvkr-process-cluster-api-provider-provisi-9a13d6f6b1eb, nvkr-process-cwe-terminal-observe-cwe-sbom, nvkr-process-installer-tools-arm64-termin-de371e0bc9ee, nvkr-sign-output-controller-profiles, nvkr-sign-output-nicosim-tools-arm64, nvkr-sign-output-postgresql-image-arm64, nvkr-sign-output-temporal-admin-tools-image-arm64, nvkr-upstream-ovn-image-arm64-build-ovn-kube-ubuntu, nvkr-verify-publication-output-temporal-a-325229721989]
+    needs: [build-runner-ubuntu-24-04, nvkr-installer-tools-arm64-fetch-oras-ins-c8e621b5911b, nvkr-package-publication-spire, nvkr-package-spire-server-image-arm64, nvkr-process-cluster-api-provider-provisi-9a13d6f6b1eb, nvkr-process-cwe-terminal-observe-cwe-sbom, nvkr-process-installer-tools-arm64-termin-de371e0bc9ee, nvkr-sign-output-controller-profiles, nvkr-sign-output-nicosim-tools-arm64, nvkr-sign-output-postgresql-image-arm64, nvkr-sign-output-temporal-admin-tools-image-arm64, nvkr-upstream-ovn-image-arm64-build-ovn-kube-ubuntu, nvkr-verify-publication-output-temporal-a-325229721989]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3539,7 +3539,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-01'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-upstream-ovn-chart-arm64, nvkr-nvke-node-image-upstream-ovn-arm64-f-0b49c5f11821, nvkr-nvkectl-build-nvkectl, nvkr-package-cluster-api-provider-provisioned-arm64, nvkr-package-controller-chart, nvkr-package-controller-profiles, nvkr-package-nicosim-tools-arm64, nvkr-package-nvkectl, nvkr-package-spire-bash-image-arm64, nvkr-postgresql-pull-postgresql-chart, nvkr-process-controller-profiles-terminal-18270f0744b4, nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360, nvkr-publish-output-spire-crds, nvkr-sign-output-temporal, nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-spire-pull-spire-chart, nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-verify-publication-output-controller-chart, nvkr-verify-publication-output-controller-profiles, nvkr-verify-publication-output-nicosim-tools-arm64, nvkr-verify-publication-output-nvke-node-4ccfed0d3edb, nvkr-verify-publication-output-nvkectl, nvkr-verify-publication-output-spire-bash-image-arm64]
+    needs: [nvkr-attest-sboms-output-upstream-ovn-chart-arm64, nvkr-installer-tools-arm64-fetch-kind-ins-eccc9d6c1156, nvkr-nvke-node-image-upstream-ovn-arm64-f-0b49c5f11821, nvkr-package-cluster-api-provider-provisioned-arm64, nvkr-package-controller-chart, nvkr-package-controller-profiles, nvkr-package-nicosim-tools-arm64, nvkr-package-nvkectl, nvkr-package-spire-bash-image-arm64, nvkr-postgresql-pull-postgresql-chart, nvkr-process-controller-profiles-terminal-18270f0744b4, nvkr-process-temporal-ui-image-arm64-term-28aef3dd6360, nvkr-publish-output-spire-crds, nvkr-sign-output-temporal, nvkr-spire-oidc-image-arm64-pull-spire-oidc-image, nvkr-spire-pull-spire-chart, nvkr-spire-server-image-arm64-pull-spire-server-image, nvkr-verify-publication-output-controller-chart, nvkr-verify-publication-output-controller-profiles, nvkr-verify-publication-output-nicosim-tools-arm64, nvkr-verify-publication-output-nvke-node-4ccfed0d3edb, nvkr-verify-publication-output-nvkectl, nvkr-verify-publication-output-spire-bash-image-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3552,7 +3552,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-02'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-operator-tools, nvkr-attest-sboms-output-spire-tpm-server-image-arm64, nvkr-attest-sboms-output-temporal, nvkr-nicosim-tools-arm64-build-nico-simctl, nvkr-nvke-node-image-upstream-ovn-arm64-f-43dc0780c3d0, nvkr-package-csi-node-driver-registrar-image-arm64, nvkr-package-postgresql, nvkr-package-publication-nktp, nvkr-package-publication-postgresql-image-arm64, nvkr-process-operator-tools-terminal-obse-ad40acf7eeda, nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f, nvkr-process-spire-controller-manager-ima-3e5db62fee30, nvkr-publish-output-installer-tools-arm64, nvkr-publish-output-spire-bash-image-arm64, nvkr-publish-output-temporal-server-image-arm64, nvkr-publish-release, nvkr-sign-output-controller-chart, nvkr-sign-output-spire, nvkr-sign-output-upstream-ovn-chart-arm64, nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-verify-publication-output-postgresql]
+    needs: [nvkr-attest-sboms-output-operator-tools, nvkr-attest-sboms-output-spire-tpm-server-image-arm64, nvkr-attest-sboms-output-temporal, nvkr-nicosim-tools-arm64-build-nico-sim-nicosim, nvkr-nktp-build-nktp-chart-nightly-site, nvkr-nvke-node-image-upstream-ovn-arm64-f-43dc0780c3d0, nvkr-package-csi-node-driver-registrar-image-arm64, nvkr-package-postgresql, nvkr-package-publication-nktp, nvkr-package-publication-postgresql-image-arm64, nvkr-process-operator-tools-terminal-obse-ad40acf7eeda, nvkr-process-spiffe-csi-image-arm64-termi-984533ad1a5f, nvkr-process-spire-controller-manager-ima-3e5db62fee30, nvkr-publish-output-installer-tools-arm64, nvkr-publish-output-spire-bash-image-arm64, nvkr-publish-output-temporal-server-image-arm64, nvkr-publish-release, nvkr-sign-output-controller-chart, nvkr-sign-output-spire, nvkr-sign-output-upstream-ovn-chart-arm64, nvkr-spire-controller-manager-image-arm64-92b22b7f2333, nvkr-verify-publication-output-postgresql]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3565,7 +3565,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-03'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-nktp, nvkr-attest-sboms-output-postgresql-image-arm64, nvkr-attest-sboms-output-temporal-admin-t-9e993584a415, nvkr-disk-nvke-node-image-upstream-ovn-arm64, nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-package-publication-operator-tools, nvkr-package-spire, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-publish-output-spire-server-image-arm64, nvkr-sign-output-upstream-ovn-image-arm64, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-tool-cosign, nvkr-verify-publication-output-cluster-ap-f52c14e947ce, nvkr-verify-publication-output-spire, preflight-images-ubuntu-24-04]
+    needs: [nvkr-attest-sboms-output-nktp, nvkr-attest-sboms-output-postgresql-image-arm64, nvkr-attest-sboms-output-temporal-admin-t-9e993584a415, nvkr-controller-profiles-fetch-nvke-local-5b3a929c60a7, nvkr-cwe-build-nvke-controller-local-site, nvkr-disk-nvke-node-image-upstream-ovn-arm64, nvkr-package-publication-csi-node-driver-02a78ae16d16, nvkr-package-publication-operator-tools, nvkr-package-spire, nvkr-process-spire-bash-image-arm64-termi-7bf190bf23b6, nvkr-publish-output-spire-server-image-arm64, nvkr-sign-output-upstream-ovn-image-arm64, nvkr-spire-agent-image-arm64-pull-spire-agent-image, nvkr-temporal-ui-image-arm64-pull-temporal-ui-image, nvkr-verify-publication-output-cluster-ap-f52c14e947ce, nvkr-verify-publication-output-spire, preflight-images-ubuntu-24-04]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3578,7 +3578,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-04'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-nvke-node-image-3ffe05528fbf, nvkr-attest-sboms-output-spiffe-csi-image-arm64, nvkr-attest-sboms-output-spire-controller-f3890ce97c17, nvkr-attest-sboms-output-spire-server-image-arm64, nvkr-attest-sboms-output-upstream-ovn-image-arm64, nvkr-installer-tools-arm64-build-kind, nvkr-installer-tools-arm64-fetch-kind, nvkr-operator-tools-pull-kubectl, nvkr-package-publication-controller-chart, nvkr-process-capnico-controller-arm64-ter-bb955af0200c, nvkr-process-nktp-terminal-observe-nktp-sbom, nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79, nvkr-process-temporal-terminal-observe-temporal-sbom, nvkr-publish-output-cwe, nvkr-publish-output-temporal-admin-tools-image-arm64, nvkr-sign-output-nvkectl, nvkr-upstream-ovn-image-arm64-fetch-ovn-kube-ubuntu, nvkr-verify-publication-output-upstream-o-49a3c983341d]
+    needs: [nvkr-attest-sboms-output-nvke-node-image-3ffe05528fbf, nvkr-attest-sboms-output-spiffe-csi-image-arm64, nvkr-attest-sboms-output-spire-controller-f3890ce97c17, nvkr-attest-sboms-output-spire-server-image-arm64, nvkr-attest-sboms-output-upstream-ovn-image-arm64, nvkr-package-publication-controller-chart, nvkr-process-capnico-controller-arm64-ter-bb955af0200c, nvkr-process-nktp-terminal-observe-nktp-sbom, nvkr-process-postgresql-image-arm64-termi-0a3efe15ef79, nvkr-process-temporal-terminal-observe-temporal-sbom, nvkr-publish-output-cwe, nvkr-publish-output-temporal-admin-tools-image-arm64, nvkr-sign-output-nvkectl, nvkr-upstream-ovn-image-arm64-fetch-ovn-kube-ubuntu, nvkr-verify-publication-output-upstream-o-49a3c983341d]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3591,7 +3591,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-05'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-controller-chart, nvkr-attest-sboms-output-controller-profiles, nvkr-attest-sboms-output-nicosim-tools-arm64, nvkr-nicosim-tools-arm64-build-nico-sim-r-52401c164e52, nvkr-nvkectl-fetch-nvkectl, nvkr-package-cwe, nvkr-package-publication-spiffe-csi-image-arm64, nvkr-package-publication-temporal-ui-image-arm64, nvkr-package-publication-upstream-ovn-image-arm64, nvkr-package-release, nvkr-package-spire-controller-manager-image-arm64, nvkr-package-upstream-ovn-chart-arm64, nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-publish-output-spire-controller-mana-4c760c0ddb13, nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9, nvkr-sign-output-spire-crds, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-verify-publication-output-capnico-co-a41756165d77, nvkr-verify-publication-output-cwe, nvkr-verify-publication-release]
+    needs: [nvkr-attest-sboms-output-controller-chart, nvkr-attest-sboms-output-controller-profiles, nvkr-attest-sboms-output-nicosim-tools-arm64, nvkr-installer-tools-arm64-build-oras-ins-fa584d2ec873, nvkr-nvkectl-build-nvkectl-local-site, nvkr-package-cwe, nvkr-package-publication-spiffe-csi-image-arm64, nvkr-package-publication-temporal-ui-image-arm64, nvkr-package-publication-upstream-ovn-image-arm64, nvkr-package-release, nvkr-package-spire-controller-manager-image-arm64, nvkr-package-upstream-ovn-chart-arm64, nvkr-postgresql-image-arm64-pull-postgresql-image, nvkr-publish-output-spire-controller-mana-4c760c0ddb13, nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9, nvkr-sign-output-spire-crds, nvkr-spiffe-csi-image-arm64-pull-spiffe-csi-image, nvkr-verify-publication-output-capnico-co-a41756165d77, nvkr-verify-publication-output-cwe, nvkr-verify-publication-release]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3604,7 +3604,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-06'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-postgresql, nvkr-attest-sboms-output-spire-oidc-image-arm64, nvkr-nktp-build-nktp-chart, nvkr-operator-tools-pull-helm, nvkr-package-publication-cwe, nvkr-package-spire-agent-image-arm64, nvkr-package-spire-tpm-server-image-arm64, nvkr-process-spire-crds-terminal-observe-f6ed6995bc52, nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb, nvkr-publish-output-spire, nvkr-publish-output-upstream-ovn-chart-arm64, nvkr-sign-output-installer-tools-arm64, nvkr-upstream-ovn-chart-arm64-build-ovn-k-dbc610b2ed4e]
+    needs: [nvkr-attest-sboms-output-postgresql, nvkr-attest-sboms-output-spire-oidc-image-arm64, nvkr-installer-tools-arm64-fetch-kubectl-926c9011565d, nvkr-package-publication-cwe, nvkr-package-spire-agent-image-arm64, nvkr-package-spire-tpm-server-image-arm64, nvkr-process-spire-crds-terminal-observe-f6ed6995bc52, nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb, nvkr-publish-output-spire, nvkr-publish-output-upstream-ovn-chart-arm64, nvkr-sign-output-installer-tools-arm64, nvkr-upstream-ovn-chart-arm64-build-ovn-k-dbc610b2ed4e]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3617,7 +3617,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-07'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [build-runner-ubuntu-24-04-arm, nvkr-attest-sboms-output-temporal-server-image-arm64, nvkr-cwe-build-nvke-controller, nvkr-nicosim-tools-arm64-fetch-nico-sim-n-39a15ead04f7, nvkr-package-nktp, nvkr-package-publication-spire-tpm-server-image-arm64, nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7, nvkr-publish-output-spire-agent-image-arm64, nvkr-publish-output-upstream-ovn-image-arm64, nvkr-sign-output-spire-server-image-arm64, nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-verify-publication-output-nktp]
+    needs: [build-runner-ubuntu-24-04-arm, nvkr-attest-sboms-output-temporal-server-image-arm64, nvkr-cwe-fetch-nvke-controller-local-site, nvkr-package-nktp, nvkr-package-publication-spire-tpm-server-image-arm64, nvkr-process-spire-tpm-server-image-arm64-e735a183a8d7, nvkr-publish-output-spire-agent-image-arm64, nvkr-publish-output-upstream-ovn-image-arm64, nvkr-sign-output-spire-server-image-arm64, nvkr-spire-tpm-server-image-arm64-pull-sp-89ae27c5ee3d, nvkr-verify-publication-output-nktp]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3630,7 +3630,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-08'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-nvke-node-image-upstream-ovn-arm64-f-8eddb001351f, nvkr-package-publication-temporal-server-image-arm64, nvkr-package-publication-upstream-ovn-chart-arm64, nvkr-package-spiffe-csi-image-arm64, nvkr-package-upstream-ovn-image-arm64, nvkr-process-nvkectl-terminal-observe-nvkectl-sbom, nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd, nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b, nvkr-publish-output-nvke-node-image-upstr-b4a1b43e5991, nvkr-publish-output-nvkectl, nvkr-sign-output-capnico-controller-arm64, nvkr-sign-output-cwe, nvkr-sign-output-nktp, nvkr-verify-publication-output-spiffe-csi-image-arm64]
+    needs: [nvkr-installer-tools-arm64-build-clusterc-0b38f9706fef, nvkr-nvke-node-image-upstream-ovn-arm64-f-8eddb001351f, nvkr-package-publication-temporal-server-image-arm64, nvkr-package-publication-upstream-ovn-chart-arm64, nvkr-package-spiffe-csi-image-arm64, nvkr-package-upstream-ovn-image-arm64, nvkr-process-nvkectl-terminal-observe-nvkectl-sbom, nvkr-process-spire-agent-image-arm64-term-3cbc0f50e2bd, nvkr-process-spire-oidc-image-arm64-termi-766aa84bf32b, nvkr-publish-output-nvke-node-image-upstr-b4a1b43e5991, nvkr-publish-output-nvkectl, nvkr-sign-output-capnico-controller-arm64, nvkr-sign-output-cwe, nvkr-sign-output-nktp, nvkr-verify-publication-output-spiffe-csi-image-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3643,7 +3643,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-09'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [build-runner-arc-arm64-kvm, nvkr-attest-sboms-output-cwe, nvkr-nvke-node-image-upstream-ovn-arm64-f-78d2fff1af52, nvkr-process-csi-node-driver-registrar-im-11c07063ce1a, nvkr-process-postgresql-terminal-observe-5a421f61f894, nvkr-process-spire-server-image-arm64-ter-78345db78e5c, nvkr-process-temporal-server-image-arm64-a7b9faf98be2, nvkr-publish-output-operator-tools, nvkr-publish-output-postgresql, nvkr-sign-output-nvke-node-image-upstream-ovn-arm64, nvkr-sign-output-spire-oidc-image-arm64, nvkr-sign-output-spire-tpm-server-image-arm64, nvkr-spire-crds-pull-spire-crds-chart, nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-serv-2ffabff52266]
+    needs: [build-runner-arc-arm64-kvm, nvkr-attest-sboms-output-cwe, nvkr-installer-tools-arm64-build-kind-ins-aaa29d10ba72, nvkr-nicosim-tools-arm64-build-nico-simctl-nicosim, nvkr-nvke-node-image-upstream-ovn-arm64-f-78d2fff1af52, nvkr-nvkectl-fetch-nvkectl-local-site, nvkr-operator-tools-pull-helm-operator, nvkr-process-csi-node-driver-registrar-im-11c07063ce1a, nvkr-process-postgresql-terminal-observe-5a421f61f894, nvkr-process-spire-server-image-arm64-ter-78345db78e5c, nvkr-process-temporal-server-image-arm64-a7b9faf98be2, nvkr-publish-output-operator-tools, nvkr-publish-output-postgresql, nvkr-sign-output-nvke-node-image-upstream-ovn-arm64, nvkr-sign-output-spire-oidc-image-arm64, nvkr-sign-output-spire-tpm-server-image-arm64, nvkr-spire-crds-pull-spire-crds-chart, nvkr-temporal-admin-tools-image-arm64-pul-b57a0810f9f3, nvkr-temporal-server-image-arm64-pull-tem-fc7633f55d29, nvkr-verify-publication-output-spire-agen-690d58615fef, nvkr-verify-publication-output-spire-serv-2ffabff52266]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3656,7 +3656,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0a'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-spire-agent-image-arm64, nvkr-attest-sboms-output-temporal-ui-image-arm64, nvkr-capnico-controller-arm64-build-capni-b3f328de28b1, nvkr-cluster-api-provider-provisioned-arm-97d0ad58bf4c, nvkr-nktp-fetch-nktp-chart, nvkr-nvke-node-image-upstream-ovn-arm64-f-09f9a2b3de02, nvkr-nvke-node-image-upstream-ovn-arm64-f-684b60c6580c, nvkr-package-publication-capnico-controller-arm64, nvkr-package-publication-nicosim-tools-arm64, nvkr-package-publication-nvkectl, nvkr-package-spire-crds, nvkr-package-spire-oidc-image-arm64, nvkr-sign-output-cluster-api-provider-pro-9543d5c3a952, nvkr-sign-output-spire-controller-manager-image-arm64, nvkr-upstream-ovn-chart-arm64-fetch-ovn-k-15e776834961, nvkr-verify-publication-output-spire-crds, nvkr-verify-publication-output-spire-oidc-image-arm64]
+    needs: [nvkr-attest-sboms-output-spire-agent-image-arm64, nvkr-attest-sboms-output-temporal-ui-image-arm64, nvkr-capnico-controller-arm64-build-capni-b3f328de28b1, nvkr-cluster-api-provider-provisioned-arm-97d0ad58bf4c, nvkr-controller-chart-fetch-nvke-controll-83d688d90474, nvkr-nvke-node-image-upstream-ovn-arm64-f-09f9a2b3de02, nvkr-nvke-node-image-upstream-ovn-arm64-f-684b60c6580c, nvkr-package-publication-capnico-controller-arm64, nvkr-package-publication-nicosim-tools-arm64, nvkr-package-publication-nvkectl, nvkr-package-spire-crds, nvkr-package-spire-oidc-image-arm64, nvkr-sign-output-cluster-api-provider-pro-9543d5c3a952, nvkr-sign-output-spire-controller-manager-image-arm64, nvkr-upstream-ovn-chart-arm64-fetch-ovn-k-15e776834961, nvkr-verify-publication-output-spire-crds, nvkr-verify-publication-output-spire-oidc-image-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3669,7 +3669,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0b'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-capnico-controller-arm64, nvkr-attest-sboms-output-cluster-api-prov-64867884a7ca, nvkr-controller-profiles-fetch-nvke-local-profiles, nvkr-cwe-fetch-nvke-controller, nvkr-installer-tools-arm64-build-oras, nvkr-installer-tools-arm64-fetch-oras, nvkr-package-installer-tools-arm64, nvkr-package-publication-postgresql, nvkr-package-publication-spire-crds, nvkr-package-publication-temporal, nvkr-package-publication-temporal-admin-t-619203c9c277, nvkr-package-temporal-admin-tools-image-arm64, nvkr-package-temporal-server-image-arm64, nvkr-sign-output-spiffe-csi-image-arm64, nvkr-sign-output-spire-agent-image-arm64, nvkr-sign-output-temporal-ui-image-arm64, nvkr-verify-publication-output-installer-tools-arm64, nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91, nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac]
+    needs: [nvkr-attest-sboms-output-capnico-controller-arm64, nvkr-attest-sboms-output-cluster-api-prov-64867884a7ca, nvkr-nicosim-tools-arm64-build-nico-sim-r-75d355b01df4, nvkr-operator-tools-pull-kubectl-operator, nvkr-package-installer-tools-arm64, nvkr-package-publication-postgresql, nvkr-package-publication-spire-crds, nvkr-package-publication-temporal, nvkr-package-publication-temporal-admin-t-619203c9c277, nvkr-package-temporal-admin-tools-image-arm64, nvkr-package-temporal-server-image-arm64, nvkr-sign-output-spiffe-csi-image-arm64, nvkr-sign-output-spire-agent-image-arm64, nvkr-sign-output-temporal-ui-image-arm64, nvkr-verify-publication-output-installer-tools-arm64, nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91, nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3682,7 +3682,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0c'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-capnico-controller-arm64-fetch-capni-9ea020956c3a, nvkr-controller-chart-build-nvke-controller-chart, nvkr-controller-chart-fetch-nvke-controller-chart, nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-installer-tools-arm64-build-kubectl, nvkr-installer-tools-arm64-fetch-kubectl, nvkr-package-publication-installer-tools-arm64, nvkr-package-publication-spire-bash-image-arm64, nvkr-process-spire-terminal-observe-spire-sbom, nvkr-publish-output-capnico-controller-arm64, nvkr-publish-output-controller-profiles, nvkr-publish-output-nicosim-tools-arm64, nvkr-publish-output-nktp, nvkr-publish-output-postgresql-image-arm64, nvkr-verify-publication-output-temporal-s-030929bd4981, nvkr-verify-publication-output-upstream-o-6a771d3e2e52, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-capnico-controller-arm64-fetch-capni-9ea020956c3a, nvkr-csi-node-driver-registrar-image-arm6-7fe7ed4f7a9e, nvkr-package-publication-installer-tools-arm64, nvkr-package-publication-spire-bash-image-arm64, nvkr-process-spire-terminal-observe-spire-sbom, nvkr-publish-output-capnico-controller-arm64, nvkr-publish-output-controller-profiles, nvkr-publish-output-nicosim-tools-arm64, nvkr-publish-output-nktp, nvkr-publish-output-postgresql-image-arm64, nvkr-tool-cosign-module-tags, nvkr-verify-publication-output-temporal-s-030929bd4981, nvkr-verify-publication-output-upstream-o-6a771d3e2e52, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3695,7 +3695,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0d'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442, nvkr-attest-sboms-output-nvkectl, nvkr-attest-sboms-output-spire-bash-image-arm64, nvkr-installer-tools-arm64-build-clusterctl, nvkr-installer-tools-arm64-fetch-clusterctl, nvkr-installer-tools-arm64-pull-helm, nvkr-nicosim-tools-arm64-build-nico-sim, nvkr-package-publication-cluster-api-prov-7d1ac851fb60, nvkr-package-publication-spire-agent-image-arm64, nvkr-package-publication-spire-server-image-arm64, nvkr-process-upstream-ovn-chart-arm64-ter-d2d87c39005a, nvkr-process-upstream-ovn-image-arm64-ter-52e0c2ccb6dd, nvkr-publish-output-spire-oidc-image-arm64, nvkr-publish-output-spire-tpm-server-image-arm64, nvkr-publish-output-temporal, nvkr-sign-output-operator-tools, nvkr-sign-output-postgresql, nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-temporal-pull-temporal-chart]
+    needs: [nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442, nvkr-attest-sboms-output-nvkectl, nvkr-attest-sboms-output-spire-bash-image-arm64, nvkr-installer-tools-arm64-build-kubectl-0c8f08443eba, nvkr-installer-tools-arm64-pull-helm, nvkr-package-publication-cluster-api-prov-7d1ac851fb60, nvkr-package-publication-spire-agent-image-arm64, nvkr-package-publication-spire-server-image-arm64, nvkr-process-upstream-ovn-chart-arm64-ter-d2d87c39005a, nvkr-process-upstream-ovn-image-arm64-ter-52e0c2ccb6dd, nvkr-publish-output-spire-oidc-image-arm64, nvkr-publish-output-spire-tpm-server-image-arm64, nvkr-publish-output-temporal, nvkr-sign-output-operator-tools, nvkr-sign-output-postgresql, nvkr-spire-bash-image-arm64-pull-spire-bash-image, nvkr-temporal-pull-temporal-chart, nvkr-tool-syft-module-tags]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3708,7 +3708,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0e'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-spire-crds, nvkr-package-operator-tools, nvkr-package-publication-controller-profiles, nvkr-package-publication-spire-controller-14366a611047, nvkr-package-temporal, nvkr-package-temporal-ui-image-arm64, nvkr-process-controller-chart-terminal-ob-1c72a2221014, nvkr-process-nicosim-tools-arm64-terminal-db7be8c7b6bb, nvkr-publish-output-cluster-api-provider-4b7d31608734, nvkr-publish-output-controller-chart, nvkr-sign-output-spire-bash-image-arm64, nvkr-sign-output-temporal-server-image-arm64, nvkr-sign-release, nvkr-tool-syft, nvkr-verify-publication-output-csi-node-d-ed501e7759bf, nvkr-verify-publication-output-operator-tools, nvkr-verify-publication-output-spire-tpm-fdd5a5adf925, nvkr-verify-publication-output-temporal]
+    needs: [nvkr-attest-sboms-output-spire-crds, nvkr-installer-tools-arm64-fetch-clusterc-72096bca655d, nvkr-nktp-fetch-nktp-chart-nightly-site, nvkr-package-operator-tools, nvkr-package-publication-controller-profiles, nvkr-package-publication-spire-controller-14366a611047, nvkr-package-temporal, nvkr-package-temporal-ui-image-arm64, nvkr-process-controller-chart-terminal-ob-1c72a2221014, nvkr-process-nicosim-tools-arm64-terminal-db7be8c7b6bb, nvkr-publish-output-cluster-api-provider-4b7d31608734, nvkr-publish-output-controller-chart, nvkr-sign-output-spire-bash-image-arm64, nvkr-sign-output-temporal-server-image-arm64, nvkr-sign-release, nvkr-verify-publication-output-csi-node-d-ed501e7759bf, nvkr-verify-publication-output-operator-tools, nvkr-verify-publication-output-spire-tpm-fdd5a5adf925, nvkr-verify-publication-output-temporal]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -3721,7 +3721,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0f'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-attest-sboms-output-installer-tools-arm64, nvkr-attest-sboms-output-spire, nvkr-cluster-api-provider-provisioned-arm-d53e503b7714, nvkr-controller-profiles-build-nvke-local-profiles, nvkr-nvke-node-image-upstream-ovn-arm64-f-1aec0b309b7c, nvkr-package-capnico-controller-arm64, nvkr-package-postgresql-image-arm64, nvkr-package-publication-spire-oidc-image-arm64, nvkr-process-temporal-admin-tools-image-a-2e37748f989e, nvkr-publish-output-spiffe-csi-image-arm64, nvkr-publish-output-temporal-ui-image-arm64, nvkr-verify-publication-output-postgresql-image-arm64]
+    needs: [nvkr-attest-sboms-output-installer-tools-arm64, nvkr-attest-sboms-output-spire, nvkr-cluster-api-provider-provisioned-arm-d53e503b7714, nvkr-controller-chart-build-nvke-controll-ec07ddc4d9e2, nvkr-controller-profiles-build-nvke-local-8a8b6c01881b, nvkr-nicosim-tools-arm64-fetch-nico-sim-n-573105dff5e5, nvkr-nvke-node-image-upstream-ovn-arm64-f-1aec0b309b7c, nvkr-package-capnico-controller-arm64, nvkr-package-postgresql-image-arm64, nvkr-package-publication-spire-oidc-image-arm64, nvkr-process-temporal-admin-tools-image-a-2e37748f989e, nvkr-publish-output-spiffe-csi-image-arm64, nvkr-publish-output-temporal-ui-image-arm64, nvkr-verify-publication-output-postgresql-image-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:

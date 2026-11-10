@@ -1,6 +1,6 @@
 apiVersion: nvkr.dev/catalog-maintenance/v1
 name: nvke-deploy
-catalog: inputs/catalogs/nvke/release
+catalog: inputs/catalogs/nvke
 sources: [nvke, nvke-helm]
 sameRelease:
   - [nvke, nvke-helm]

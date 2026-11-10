@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-current-main-doca-ovs",
-  "requiresCatalogDigest": "sha256:e11dee3ba72949838761c2c13de9f297ad9d8c8c06edf87d1a28d1d8e68047aa",
+  "requiresCatalogDigest": "sha256:53da6775e58fd764a3205e47dea132fedc4a131f1692bb632323bd77bc5ce11a",
   "components": {
     "nvke-image-inputs": {
       "component": {
@@ -24,7 +24,7 @@
         "buildCommand": [
           "bash",
           "-ec",
-          "# Keep DHCP identity stable when NVKE moves L3 to its OVS bridge.\n# Stage authored VM configuration; never modify the pinned source tree.\nreadonly files=/src/nvkr-output/native-image-files\nmkdir -p \"$files\"\ncp -a /src/os-image/files/. \"$files/\"\ncat >\"$files/00-dhcp-all.yaml\" <<'NETPLAN'\nnetwork:\n  version: 2\n  renderer: networkd\n  ethernets:\n    all-en:\n      match:\n        name: \"e*\"\n      dhcp4: true\n      dhcp6: true\n      dhcp-identifier: mac\n      optional: true\nNETPLAN\nreadonly out=/src/nvkr-output\nreadonly materials=\"$out/materials\"\nmkdir -p \"$materials\"\n# The composer refuses symlinks. Copy into this private writable view while\n# preserving every original read-only material unchanged.\nfor binding in agent calico kubeadm-distro ovn spire-agent; do\n  cp --reflink=auto \"/nvkr/inputs/materials/$binding\" \"$materials/$binding\"\ndone\n# The composer accepts only .deb archive members, not the Make-generated index.\n(cd /src/os-image/packages/doca-ovs/nvkr-debs \u0026\u0026 \\\n  tar --format=ustar --sort=name --mtime=\"@$SOURCE_DATE_EPOCH\" \\\n    --owner=0 --group=0 --numeric-owner \\\n    -cf \"$materials/doca-ovs\" -- *.deb)\nexec python3 /src/os-image/packer/scripts/compose-image-inputs.py \\\n  --architecture {{.Arch}} \\\n  --materials-dir \"$materials\" \\\n  --source-files-dir \"$files\" \\\n  --output \"$out/image-inputs.tar\" \\\n  --source-date-epoch \"$SOURCE_DATE_EPOCH\"\n"
+          "# Keep DHCP identity stable when NVKE moves L3 to its OVS bridge.\n# Stage authored VM configuration; never modify the pinned source tree.\nreadonly files=/src/nvkr-output/native-image-files\nmkdir -p \"$files\"\ncp -a /src/os-image/files/. \"$files/\"\ncat \u003e\"$files/00-dhcp-all.yaml\" \u003c\u003c'NETPLAN'\nnetwork:\n  version: 2\n  renderer: networkd\n  ethernets:\n    all-en:\n      match:\n        name: \"e*\"\n      dhcp4: true\n      dhcp6: true\n      dhcp-identifier: mac\n      optional: true\nNETPLAN\nreadonly out=/src/nvkr-output\nreadonly materials=\"$out/materials\"\nmkdir -p \"$materials\"\n# The composer refuses symlinks. Copy into this private writable view while\n# preserving every original read-only material unchanged.\nfor binding in agent calico kubeadm-distro ovn spire-agent; do\n  cp --reflink=auto \"/nvkr/inputs/materials/$binding\" \"$materials/$binding\"\ndone\n# The composer accepts only .deb archive members, not the Make-generated index.\n(cd /src/os-image/packages/doca-ovs/nvkr-debs \u0026\u0026 \\\n  tar --format=ustar --sort=name --mtime=\"@$SOURCE_DATE_EPOCH\" \\\n    --owner=0 --group=0 --numeric-owner \\\n    -cf \"$materials/doca-ovs\" -- *.deb)\nexec python3 /src/os-image/packer/scripts/compose-image-inputs.py \\\n  --architecture {{.Arch}} \\\n  --materials-dir \"$materials\" \\\n  --source-files-dir \"$files\" \\\n  --output \"$out/image-inputs.tar\" \\\n  --source-date-epoch \"$SOURCE_DATE_EPOCH\"\n"
         ],
         "materials": {
           "agent": "nvke-agent",

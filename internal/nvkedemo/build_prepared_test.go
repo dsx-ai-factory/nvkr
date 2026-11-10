@@ -24,7 +24,7 @@ import (
 func TestPreparedBuildRecompilesBeforeProducers(t *testing.T) {
 	// This regression exercises the CLI qualification gate, independently of the
 	// nightly cohort fixture's additional package-shaped executable outputs.
-	catalog, err := filepath.Abs("../../inputs/catalogs/nvke/module-tags")
+	catalog, err := filepath.Abs("../../inputs/catalogs/nvke")
 	if err != nil {
 		t.Fatal(err)
 	}

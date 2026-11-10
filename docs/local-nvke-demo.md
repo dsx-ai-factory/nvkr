@@ -234,7 +234,7 @@ For the native Mac workflow, install:
 - A seed ISO builder on `PATH`: `cloud-localds`, `mkisofs` or `genisoimage`.
   Homebrew `cdrtools` supplies `mkisofs`. The CLI checks this prerequisite before deployment work; it does not install the tool.
 - Homebrew `swtpm` and its installed `libtpms` dependency. The Mac site uses a real software TPM through the supported NICoSim QEMU executable override; NVKE sources stay unchanged. These dynamically linked dependencies remain installed on the host.
-- The matched vmnet client/helper from the [shared native catalog](../inputs/catalogs/tools/native/README.md), installed at the paths required there. Private tool extraction alone does not install these prerequisites.
+- The matched vmnet client/helper from the [shared native catalog](../inputs/catalogs/tools/notes/tools-native-README.md), installed at the paths required there. Private tool extraction alone does not install these prerequisites.
 - Packer **1.15.4** and the installed QEMU plugin **1.1.6**. `packer plugins installed`
   must identify `packer-plugin-qemu_v1.1.6_x5.0_darwin_arm64` and its sibling
   `_SHA256SUM` file. BUILD discovers and captures this installation; it does not install it.
@@ -937,11 +937,11 @@ below. NVKR verifies the pinned commit and tree; NVIDIA OVN retains its separate
 
 | Part | Selected source | Owning input |
 | --- | --- | --- |
-| Native host CLI, installer and NICoSim | `v0.23.0` / `2cfd0008` | [Shared tools lock](../inputs/catalogs/tools/native/pins.lock.yaml) |
-| Site CLI/controller/charts and provisioned provider | `v0.23.0` / `2cfd0008` | [Native site lock](../inputs/catalogs/nvke/native-site/pins.lock.yaml) |
-| OS, agent and kubeadm | `v0.23.0` / `2cfd0008` | [Shared release OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) |
-| Profiles and runbooks | `v0.23.0` / `2cfd0008` | [Native profiles lock](../inputs/catalogs/controller-profiles/native-nvidia/pins.lock.yaml) |
-| Upstream SPIRE/TPM agent packaging | `v0.23.0` / `2cfd0008` | [Shared release OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) |
+| Native host CLI, installer and NICoSim | `v0.23.0` / `2cfd0008` | [Shared tools lock](../inputs/catalogs/tools/pins.lock.yaml) |
+| Site CLI/controller/charts and provisioned provider | `v0.23.0` / `2cfd0008` | [Native site lock](../inputs/catalogs/nvke/pins.lock.yaml) |
+| OS, agent and kubeadm | `v0.23.0` / `2cfd0008` | [Shared release OS lock](../inputs/catalogs/node-images/pins.lock.yaml) |
+| Profiles and runbooks | `v0.23.0` / `2cfd0008` | [Native profiles lock](../inputs/catalogs/nvke/pins.lock.yaml) |
+| Upstream SPIRE/TPM agent packaging | `v0.23.0` / `2cfd0008` | [Shared release OS lock](../inputs/catalogs/node-images/pins.lock.yaml) |
 | NVIDIA OVN image/chart | [`8af51273`](https://github.com/dsx-ai-factory/ovn-kubernetes/commit/8af51273d52dfa07454435d18d37230e582d797a), 2.4.2 | [Native NVIDIA overlay](../inputs/catalogs/node-images/variants/native-nvidia.json) |
 
 These host architectures use the same NVKE source selections. SPIRE packaging

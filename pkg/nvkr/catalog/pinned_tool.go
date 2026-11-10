@@ -109,14 +109,32 @@ func resolvePinnedTool(name string, raw rawComponent, sources map[string]Source,
 		return c, e.New(e.CodeUnpinnedSource, "pinned-tool component %q: source %q has no tool declaration", name, raw.Tool)
 	}
 	pin, ok := lock.Pins[raw.Tool]
-	if !ok || pin.Tool == nil {
+	if !ok || pin.Tool == nil && pin.Tools == nil {
 		return c, e.New(e.CodeUnpinnedSource,
 			"pinned-tool component %q: tool source %q has no lock record (run: nvkr catalog pin %s)", name, raw.Tool, raw.Tool)
 	}
 	if err := checkToolPin(src.Tool, pin); err != nil {
 		return c, e.Wrap(e.CodeUnpinnedSource, err, "pinned-tool component %q tool %q", name, raw.Tool)
 	}
-	tool := *pin.Tool
+	var tool ToolPin
+	if pin.Tool != nil {
+		tool = pin.Tool.clone()
+	} else {
+		if len(raw.Platforms) != 1 {
+			return c, e.New(e.CodeEngineCapability, "pinned-tool component %q requires one concrete target platform", name)
+		}
+		found := false
+		for _, candidate := range pin.Tools {
+			if candidate.Platform == raw.Platforms[0] {
+				tool = candidate.clone()
+				found = true
+				break
+			}
+		}
+		if !found {
+			return c, e.New(e.CodeEngineCapability, "pinned-tool component %q has no tool for its target", name)
+		}
+	}
 	c.Tool = raw.Tool
 	c.ToolExecutable = &tool
 	c.ToolArgs = slices.Clone(raw.ToolArgs)

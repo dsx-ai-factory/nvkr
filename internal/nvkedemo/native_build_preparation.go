@@ -67,11 +67,15 @@ func discoverMacPackerFiles(ctx context.Context, runner Runner, repository strin
 		return filepath.EvalSymlinks(path)
 	}
 	// The catalog owns release versions and the exact plugin archive member.
-	loaded, err := catalog.LoadContext(ctx, catalog.Dir(filepath.Join(repository, "inputs", "catalogs", "tools", "native")))
+	loaded, err := catalog.LoadContext(ctx, catalog.Dir(filepath.Join(repository, "inputs", "catalogs", "tools")))
 	if err != nil {
 		return request, err
 	}
-	packerVersion, pluginName, err := macPackerPrerequisiteSelection(loaded.Components["packer"], loaded.Tools["packer-plugin-qemu"])
+	pluginPin, err := loaded.ToolForPlatform("packer-plugin-qemu", "darwin/arm64")
+	if err != nil {
+		return request, err
+	}
+	packerVersion, pluginName, err := macPackerPrerequisiteSelection(loaded.Components["packer"], pluginPin)
 	if err != nil {
 		return request, err
 	}

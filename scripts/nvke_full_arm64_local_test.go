@@ -448,7 +448,7 @@ func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 				}
 				write(path, data, 0600)
 			}
-			write("inputs/definitions/diagnostics/demo-arm64/simulator.json", []byte(`{"catalog":{"base":"../../../catalogs/tools/native"},"outputs":[{"name":"nicosim-tools-arm64"}]}`), 0600)
+			write("inputs/definitions/diagnostics/demo-arm64/simulator.json", []byte(`{"catalog":{"base":"../../../catalogs/tools"},"outputs":[{"name":"nicosim-tools-arm64"}]}`), 0600)
 			write("toolchains/nvkr-packer/build.sh", []byte(`#!/bin/sh
 printf 'toolchain-build %s\n' "$*" >>"$TEST_CALLS"
 case " $* " in *' --print-validated-image-id '*) ;; *) exit 99;; esac
@@ -465,7 +465,7 @@ case "$1 $2" in
     if [ "$4" = .nvkr/laptop-bootstrap/id-probe/definition.json ]; then
       [ "$TEST_SELECTED_PLAN_EXIT" = 0 ] || exit "$TEST_SELECTED_PLAN_EXIT"
       jq -e '.outputs[0].catalog.overlays[-1] == "./toolchain-attempt.json" and
-        .catalog.base == "../../../inputs/definitions/diagnostics/demo-arm64/../../../catalogs/tools/native" and
+        .catalog.base == "../../../inputs/definitions/diagnostics/demo-arm64/../../../catalogs/tools" and
         .outputs[0].catalog.base == .catalog.base' "$4" >/dev/null || exit 99
       printf '%s\n' "$TEST_PLAN" | jq '. + {selected: true}'
     else printf '%s\n' "$TEST_PLAN"; fi;;
@@ -665,7 +665,7 @@ esac
 				if err != nil {
 					t.Fatal(err)
 				}
-				wantCatalog := filepath.Join(physicalDir, "inputs/catalogs/tools/native")
+				wantCatalog := filepath.Join(physicalDir, "inputs/catalogs/tools")
 				definitionDir := filepath.Join(physicalDir, ".nvkr/laptop-bootstrap/id-probe")
 				if filepath.IsAbs(authored.Catalog.Base) || filepath.Join(definitionDir, authored.Catalog.Base) != wantCatalog || len(authored.Outputs) != 1 ||
 					filepath.IsAbs(authored.Outputs[0].Catalog.Base) || filepath.Join(definitionDir, authored.Outputs[0].Catalog.Base) != wantCatalog {

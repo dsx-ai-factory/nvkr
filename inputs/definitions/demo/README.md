@@ -90,7 +90,7 @@ compiles the installer's five Linux binaries from pinned Git. The separate older
 acquired `operator-tools` selection remains in the combined artifact membership.
 
 The local OS replaces the upstream OVN producers with PR #113's
-[NVKE/NVIDIA fork producers](../../catalogs/ovn-nvidia/README.md). Its chart/image Debian
+[NVKE/NVIDIA fork producers](../../catalogs/ovn/nvidia/notes/ovn-nvidia-README.md). Its chart/image Debian
 packages and demo tenant select stream `2.4.0`. Packer still consumes staged
 materials; it does not fetch the fork or compile OVN. A fresh bake and tenant
 acceptance are separate gates from compiling this selection.

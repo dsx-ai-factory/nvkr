@@ -13,11 +13,7 @@ import (
 
 func TestNVKEReleasePinsStayAligned(t *testing.T) {
 	for _, directory := range []string{
-		"nvke/release", "nvke/release-components", "nvke/module-tags", "nvke/module-cli-arm64",
-		"nvke/local-site-arm64", "nvke/native-site", "nvke/nightly-site-arm64",
-		"node-images/release", "node-images/diagnostic",
-		"controller-profiles/nvidia-arm64", "controller-profiles/upstream-arm64", "controller-profiles/native-nvidia",
-		"nicosim", "tools/native", "runtime-dependencies",
+		"nvke", "node-images", "tools", "runtime-dependencies",
 	} {
 		t.Run(directory, func(t *testing.T) {
 			root := filepath.Join("../../../inputs/catalogs", directory)
@@ -89,7 +85,7 @@ func TestNVKEOverlayPinsStayAligned(t *testing.T) {
 // NVKE v0.23.0's image-input composer requires a doca-ovs archive whose debs
 // match the image's Ubuntu series.
 func TestNVKEImageInputsSelectSeriesDOCAOVS(t *testing.T) {
-	for _, directory := range []string{"node-images/release", "node-images/diagnostic"} {
+	for _, directory := range []string{"node-images"} {
 		t.Run(directory, func(t *testing.T) {
 			bound, err := BindContext(t.Context(), Dir(filepath.Join("../../../inputs/catalogs", directory)))
 			if err != nil {

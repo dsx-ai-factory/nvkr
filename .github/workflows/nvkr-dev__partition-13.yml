@@ -88,7 +88,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-nktp-build-nktp-chart-nktp-t-78bead2a7f7b'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-nktp-build-nktp-chart-releas-66e910e56f48'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft-module-tags'].result == 'success' }}
   nvkr-nvkectl-sbom:
     name: 'Generate SBOMs: nvkectl'
     runs-on: 'ubuntu-24.04'
@@ -117,7 +117,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-nvkectl-build-nvkectl-nvkect-ae9c2b9c3380'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-process-nvkectl-build-nvkectl-module-7a138bf8a611'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft-module-tags'].result == 'success' }}
   nvkr-package-publication-capi-controller-image:
     name: 'Package publication bundle: publication-capi-controller-image'
     runs-on: 'ubuntu-24.04'

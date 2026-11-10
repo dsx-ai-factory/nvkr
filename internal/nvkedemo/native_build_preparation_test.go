@@ -338,11 +338,11 @@ func TestDefaultMacPreparationRejectsMissingPrerequisitesBeforeWriting(t *testin
 
 func macBuildProbeFixtures(t *testing.T, repo, bin string) ([]string, string, string) {
 	t.Helper()
-	catalogDirectory := filepath.Join(repo, "inputs", "catalogs", "tools", "native")
+	catalogDirectory := filepath.Join(repo, "inputs", "catalogs", "tools")
 	if err := os.MkdirAll(filepath.Dir(catalogDirectory), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.CopyFS(catalogDirectory, os.DirFS(filepath.Join("..", "..", "inputs", "catalogs", "tools", "native"))); err != nil {
+	if err := os.CopyFS(catalogDirectory, os.DirFS(filepath.Join("..", "..", "inputs", "catalogs", "tools"))); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.CopyFS(filepath.Join(repo, "inputs", "catalogs", "shared"), os.DirFS(filepath.Join("..", "..", "inputs", "catalogs", "shared"))); err != nil {
@@ -382,8 +382,12 @@ printf '%s\n' clang`,
 	for _, tool := range []string{"jq", "git", "bash"} {
 		writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
 	}
+	pluginPin, err := loaded.ToolForPlatform("packer-plugin-qemu", "darwin/arm64")
+	if err != nil {
+		t.Fatal(err)
+	}
 	return []string{"PATH=" + bin, "TEST_GO_VERSION=go" + strings.TrimSpace(string(pin))},
-		strings.TrimPrefix(loaded.Components["packer"].Tag, "v"), filepath.Base(loaded.Tools["packer-plugin-qemu"].ExecutablePath)
+		strings.TrimPrefix(loaded.Components["packer"].Tag, "v"), filepath.Base(pluginPin.ExecutablePath)
 }
 
 func TestDefaultMacPreparationRejectsBrokenSDKAndRuntimeBeforeWork(t *testing.T) {

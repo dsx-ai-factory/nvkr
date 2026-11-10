@@ -152,8 +152,8 @@ func validateDiskScannerSelection(plan *Plan, platform, pin string) error {
 	if plan.Definition.SBOMTool == "" {
 		return nil
 	}
-	selected, ok := plan.CatalogSnapshot.Tools[plan.Definition.SBOMTool]
-	if !ok {
+	selected, err := plan.CatalogSnapshot.ToolForPlatform(plan.Definition.SBOMTool, plan.Environment.UtilityPlatform)
+	if err != nil {
 		return e.New(e.CodeUnpinnedInput, "disk scanner selection requires its selected catalog tool")
 	}
 	if selected.Platform == platform && selected.ExecutableDigest != pin {

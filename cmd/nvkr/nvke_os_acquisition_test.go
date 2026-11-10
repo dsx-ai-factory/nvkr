@@ -28,7 +28,7 @@ func TestOSAgentAcquisitionUsesGoTransportFallback(t *testing.T) {
 		t.Skipf("authored module-pin checks require sha256sum: %v", err)
 	}
 	root := filepath.Dir(filepath.Dir(demoScript(t, "nvke-os-local.sh")))
-	sources, err := catalog.ReadSourcesContext(t.Context(), catalog.Dir(filepath.Join(root, "inputs/catalogs/node-images/diagnostic")))
+	sources, err := catalog.ReadSourcesContext(t.Context(), catalog.Dir(filepath.Join(root, "inputs/catalogs/node-images")))
 	if err != nil {
 		t.Fatal(err)
 	}

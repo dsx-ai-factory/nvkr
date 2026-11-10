@@ -58,7 +58,7 @@ func TestNightlyDOCAClosurePreservesTaggedInputs(t *testing.T) {
 }
 
 func TestNightlyDOCAAcquisitionFeedsOfflineImageComposition(t *testing.T) {
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/node-images/release"))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/node-images"))
 	if err != nil {
 		t.Fatal(err)
 	}

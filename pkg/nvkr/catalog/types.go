@@ -116,14 +116,15 @@ type Source struct {
 // GoVersion and ToolchainImage are populated when the source resolves its toolchain
 // from .go-version.
 type Pin struct {
-	DerivedFrom     string   `json:"derivedFrom,omitempty"`
-	Tool            *ToolPin `json:"tool,omitempty"`
-	Tag             string   `json:"tag"`
-	Commit          string   `json:"commit"`
-	TreeHash        string   `json:"treeHash"`
-	SourceDateEpoch int64    `json:"sourceDateEpoch"`
-	GoVersion       string   `json:"goVersion,omitempty"`
-	ToolchainImage  string   `json:"toolchainImage,omitempty"`
+	DerivedFrom     string    `json:"derivedFrom,omitempty"`
+	Tool            *ToolPin  `json:"tool,omitempty"`
+	Tools           []ToolPin `json:"tools,omitempty"`
+	Tag             string    `json:"tag"`
+	Commit          string    `json:"commit"`
+	TreeHash        string    `json:"treeHash"`
+	SourceDateEpoch int64     `json:"sourceDateEpoch"`
+	GoVersion       string    `json:"goVersion,omitempty"`
+	ToolchainImage  string    `json:"toolchainImage,omitempty"`
 }
 
 // ArtifactPin is the machine-managed digest pin for a prebuilt component in the
@@ -196,6 +197,7 @@ type Prebuilt struct {
 	ReleaseExecutable bool `json:"releaseExecutable,omitempty"`
 	// Executable is loader-resolved only; registries must not author it.
 	Executable        *ToolPin          `json:"executable,omitempty"`
+	Executables       []ToolPin         `json:"executables,omitempty"`
 	OCIArchive        string            `json:"ociArchive,omitempty"` // resolved OCI layer reference, never an OCI image
 	Chart             *HelmChart        `json:"chart,omitempty"`      // authored acquisition; resolved catalogs contain URL instead
 	URL               string            `json:"url,omitempty"`
@@ -318,13 +320,14 @@ type Component struct {
 // Catalog is the loaded, fully resolved registry and lock. Producer selection is
 // explicit in each Definition output; the catalog contains no authored groups.
 type Catalog struct {
-	Actions    map[string]ActionPin
-	Tools      map[string]ToolPin
-	APIVersion string
-	Kind       string
-	Metadata   Metadata
-	Sources    map[string]Source
-	Components map[string]Component
+	Actions         map[string]ActionPin
+	Tools           map[string]ToolPin
+	ToolsByPlatform map[string][]ToolPin `json:"ToolsByPlatform,omitempty"`
+	APIVersion      string
+	Kind            string
+	Metadata        Metadata
+	Sources         map[string]Source
+	Components      map[string]Component
 
 	// sourcePins is populated only by the validated registry-and-lock loader.
 	// Keeping it private prevents callers from treating an authored PinLock as a

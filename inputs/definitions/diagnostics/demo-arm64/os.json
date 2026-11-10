@@ -1,17 +1,17 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
   "catalog": {
-    "base": "../../../catalogs/nvke/module-cli-arm64"
+    "base": "../../../catalogs/nvke"
   },
   "kind": "Definition",
   "metadata": {
-    "name": "nvke-local-dev-arm64-os",
-    "description": "Local ARM64 non-FDE TCG disk and its material closure; no publication or signing; retains mixed SPIRE exception."
+    "description": "Local ARM64 non-FDE TCG disk and its material closure; no publication or signing; retains mixed SPIRE exception.",
+    "name": "nvke-local-dev-arm64-os"
   },
   "outputs": [
     {
       "catalog": {
-        "base": "../../../catalogs/node-images/release",
+        "base": "../../../catalogs/node-images",
         "overlays": [
           "../../../catalogs/node-images/variants/nvidia-tcg.json"
         ]

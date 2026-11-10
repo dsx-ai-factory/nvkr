@@ -77,12 +77,13 @@ type DescribedFlakePin struct {
 // acquired component. A release executable also carries its source's locked
 // archive and executable identity; an OCI chart carries its archive reference.
 type DescribedAcquisition struct {
-	URL               string               `json:"url,omitempty"`
-	Image             string               `json:"image,omitempty"`
-	OCIArchive        string               `json:"ociArchive,omitempty"`
-	ImageParentDigest string               `json:"imageParentDigest,omitempty"`
-	Digests           map[string]string    `json:"digests,omitempty"`
-	Executable        *DescribedExecutable `json:"executable,omitempty"`
+	URL               string                `json:"url,omitempty"`
+	Image             string                `json:"image,omitempty"`
+	OCIArchive        string                `json:"ociArchive,omitempty"`
+	ImageParentDigest string                `json:"imageParentDigest,omitempty"`
+	Digests           map[string]string     `json:"digests,omitempty"`
+	Executable        *DescribedExecutable  `json:"executable,omitempty"`
+	Executables       []DescribedExecutable `json:"executables,omitempty"`
 }
 
 // DescribedExecutable is one locked executable inside a pinned archive.
@@ -156,6 +157,9 @@ func (cat *Catalog) Describe(name string) (ComponentDescription, error) {
 		description.Acquisition = &DescribedAcquisition{
 			URL: prebuilt.URL, Image: prebuilt.Image, OCIArchive: prebuilt.OCIArchive,
 			ImageParentDigest: prebuilt.ImageParentDigest, Digests: maps.Clone(prebuilt.Digests),
+		}
+		for _, tool := range prebuilt.Executables {
+			description.Acquisition.Executables = append(description.Acquisition.Executables, describeExecutable(tool))
 		}
 		if prebuilt.Executable != nil {
 			executable := describeExecutable(*prebuilt.Executable)
@@ -299,6 +303,9 @@ func (d ComponentDescription) Fields() []DescribedField {
 		add("image parent digest", acquisition.ImageParentDigest)
 		for _, arch := range sortedStringKeys(acquisition.Digests) {
 			add("digest "+arch, acquisition.Digests[arch])
+		}
+		for _, pin := range acquisition.Executables {
+			executable("acquired executable "+pin.Platform, pin)
 		}
 		if acquisition.Executable != nil {
 			executable("acquired executable", *acquisition.Executable)

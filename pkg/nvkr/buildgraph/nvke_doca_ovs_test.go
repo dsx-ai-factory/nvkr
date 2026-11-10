@@ -24,9 +24,9 @@ import (
 
 const nodeImageCatalogs = "../../../inputs/catalogs/node-images"
 
-func loadNodeImageCatalog(t *testing.T, name string) *catalog.Catalog {
+func loadNodeImageCatalog(t *testing.T) *catalog.Catalog {
 	t.Helper()
-	loaded, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(nodeImageCatalogs, name)))
+	loaded, err := catalog.LoadContext(t.Context(), catalog.Dir(nodeImageCatalogs))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,16 +42,14 @@ func loadNodeImageOverlay(t *testing.T, name string) catalog.Overlay {
 	return overlay
 }
 
-// The release and diagnostic catalogs mirror one DOCA OVS recipe; the Ubuntu
+// Release and diagnostic compositions share one DOCA OVS recipe; the Ubuntu
 // 24 overlay differs from it only in the Ubuntu series it stages.
 func TestDOCAOVSRecipesMirrorExceptSeries(t *testing.T) {
-	release := loadNodeImageCatalog(t, "release")
-	diagnostic := loadNodeImageCatalog(t, "diagnostic")
-	if !reflect.DeepEqual(diagnostic.Components["nvke-doca-ovs"], release.Components["nvke-doca-ovs"]) {
-		t.Fatal("diagnostic DOCA OVS recipe diverged from the release recipe")
-	}
-	if !reflect.DeepEqual(diagnostic.Sources["nvke-doca-ovs-source"], release.Sources["nvke-doca-ovs-source"]) {
-		t.Fatal("diagnostic DOCA OVS source diverged from the release source")
+	release := loadNodeImageCatalog(t)
+	for _, name := range []string{"nvke-image-inputs", "nvke-image-inputs-diagnostic"} {
+		if release.Components[name].Materials["doca-ovs"] != "nvke-doca-ovs" {
+			t.Fatalf("%s does not select the shared DOCA recipe", name)
+		}
 	}
 	// Ubuntu 24 images stack their overlay on the native toolchains; compare
 	// the two effective recipes.
@@ -84,7 +82,7 @@ func TestDOCAOVSRecipesMirrorExceptSeries(t *testing.T) {
 // The native toolchain overlay moves DOCA OVS acquisition and packaging onto
 // the measured AMD64 toolchain and leaves ARM64 on its existing pin.
 func TestDOCAOVSUsesNativeAMD64Toolchain(t *testing.T) {
-	release := loadNodeImageCatalog(t, "release")
+	release := loadNodeImageCatalog(t)
 	overlay := loadNodeImageOverlay(t, "native-toolchains.yaml")
 	var substitution *catalog.ToolchainSubstitution
 	for i := range overlay.ToolchainSubstitutions {
@@ -157,9 +155,9 @@ func TestDOCAOVSArchiveWrapperExecutesWithFixtures(t *testing.T) {
 	if err := os.Symlink(gnuTar, filepath.Join(stubs, "tar")); err != nil {
 		t.Fatal(err)
 	}
-	for _, directory := range []string{"release", "diagnostic"} {
+	for _, directory := range []string{"node-images"} {
 		for _, arch := range []string{"amd64", "arm64"} {
-			graph := compileDOCAOVS(t, loadNodeImageCatalog(t, directory), arch)
+			graph := compileDOCAOVS(t, loadNodeImageCatalog(t), arch)
 			var command []string
 			for _, node := range graph.Nodes {
 				if node.Kind == ir.KindBuild && node.Component == "nvke-doca-ovs" {

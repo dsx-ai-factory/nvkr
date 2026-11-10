@@ -24,7 +24,9 @@ import (
 )
 
 const (
-	MaxPlanBytes        = int64(4 << 20)
+	// MaxPlanBytes bounds complete captured domain catalogs; maintained composite
+	// Plans require more than 4 MiB after catalog consolidation.
+	MaxPlanBytes        = int64(8 << 20)
 	PlanSchemaVersion   = "nvkr.dev/run-plan/v5"
 	ArtifactGraphSchema = "nvkr.dev/artifact-graph/v5"
 	// DefaultRunsOn is the runner an unset Environment.runsOn falls back to. ADR-18 §8

@@ -68,7 +68,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-spire-tpm-server-image-pull-5e4c8bd40631'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft-module-tags'].result == 'success' }}
   nvkr-temporal-admin-tools-image-sbom:
     name: 'Generate SBOMs: temporal-admin-tools-image'
     runs-on: 'ubuntu-24.04'
@@ -97,7 +97,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-temporal-admin-tools-image-p-89b69e6994ff'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-temporal-admin-tools-image-p-89b69e6994ff'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft-module-tags'].result == 'success' }}
   nvkr-temporal-sbom:
     name: 'Generate SBOMs: temporal'
     runs-on: 'ubuntu-24.04'
@@ -126,7 +126,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-temporal-pull-temporal-chart-e02b82483e4b'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-temporal-pull-temporal-chart-e02b82483e4b'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft-module-tags'].result == 'success' }}
   nvkr-temporal-server-image-sbom:
     name: 'Generate SBOMs: temporal-server-image'
     runs-on: 'ubuntu-24.04'
@@ -155,7 +155,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-temporal-server-image-pull-t-8ac10b1a7911'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-temporal-server-image-pull-t-8ac10b1a7911'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft-module-tags'].result == 'success' }}
   nvkr-temporal-ui-image-sbom:
     name: 'Generate SBOMs: temporal-ui-image'
     runs-on: 'ubuntu-24.04'
@@ -184,7 +184,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-temporal-ui-image-pull-tempo-fb82f86e5756'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft-module-tags'].result == 'success' }}
   nvkr-partition-results:
     name: 'Collect provider results: nvkr-partition-results'
     runs-on: ubuntu-24.04

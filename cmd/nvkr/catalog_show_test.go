@@ -20,12 +20,12 @@ import (
 )
 
 func TestCatalogShowReportsTheLoadedSourcePin(t *testing.T) {
-	data, err := filepath.Abs(filepath.Join("..", "..", "inputs", "catalogs", "nvke", "module-tags"))
+	data, err := filepath.Abs(filepath.Join("..", "..", "inputs", "catalogs", "nvke"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	before := catalogFileBytes(t, data)
-	output, err := runCatalogCommand(t, "catalog", "show", "--data", data, "--format", "json", "nvkectl")
+	output, err := runCatalogCommand(t, "catalog", "show", "--data", data, "--format", "json", "nvkectl-module-tags")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,13 +37,13 @@ func TestCatalogShowReportsTheLoadedSourcePin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := loaded.Components["nvkectl"]
+	want := loaded.Components["nvkectl-module-tags"]
 	if description.Mode != catalog.ProducerModeSource || description.OutputType != "host-package" ||
 		description.Source == nil || description.Source.Commit != want.Commit || description.Source.TreeHash != want.TreeHash ||
 		!slices.Equal(description.Platforms, []string{"linux/amd64", "linux/arm64"}) {
 		t.Fatalf("wrong description: %+v", description)
 	}
-	text, err := runCatalogCommand(t, "catalog", "show", "--data", data, "nvkectl")
+	text, err := runCatalogCommand(t, "catalog", "show", "--data", data, "nvkectl-module-tags")
 	if err != nil {
 		t.Fatal(err)
 	}

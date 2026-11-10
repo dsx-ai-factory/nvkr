@@ -21,7 +21,7 @@ import (
 // for CAPNICo, NKTP, profiles or customer catalogs. Producers use generic routes.
 func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 	const root = "../../../inputs/definitions/nvke"
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "../../catalogs/nvke/release-components")))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "../../catalogs/nvke")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 	}{
 		{"capnico-controller", "capnico-controller"},
 		{"nico-reference-profiles-fixture", "nvke-nico-reference-profiles"},
-		{"nktp", "nktp-chart"},
+		{"nktp", "nktp-chart-release-components"},
 		{"capi-controller-image", "capi-controller-image"},
 		{"capi-kubeadm-bootstrap-image", "capi-kubeadm-bootstrap-image"},
 		{"capi-kubeadm-control-plane-image", "capi-kubeadm-control-plane-image"},
@@ -54,13 +54,15 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 		{"nktp-operator-image", "nktp-operator-image"},
 		{"nktp-target-allocator-image", "nktp-target-allocator-image"},
 	}
-	if len(cat.Components) != len(rows) {
-		t.Fatal("additional catalog membership changed")
+	for _, row := range rows {
+		if _, ok := cat.Components[row.component]; !ok {
+			t.Fatalf("missing additional producer %s", row.component)
+		}
 	}
 	for _, row := range rows {
 		t.Run(row.output, func(t *testing.T) {
 			output, ok := outputs[row.output]
-			if !ok || output.Catalog == nil || output.Catalog.Base != "../../catalogs/nvke/release-components" ||
+			if !ok || output.Catalog == nil || output.Catalog.Base != "../../catalogs/nvke" ||
 				!slices.Equal(output.Components, []string{row.component}) {
 				t.Fatal("maintained output does not select its exact producer")
 			}
@@ -72,7 +74,7 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 				arm, ok := outputs[row.output+"-arm64"]
 				if !ok || output.Format != definition.OutputOCI || output.Platform != "linux/amd64" ||
 					arm.Format != definition.OutputOCI || arm.Platform != "linux/arm64" || arm.Catalog == nil ||
-					arm.Catalog.Base != "../../catalogs/nvke/release-components" || !slices.Equal(arm.Components, output.Components) {
+					arm.Catalog.Base != "../../catalogs/nvke" || !slices.Equal(arm.Components, output.Components) {
 					t.Fatal("acquired image must retain separately named AMD64 and ARM64 outputs")
 				}
 			} else if output.Format != definition.OutputOCI ||
@@ -114,13 +116,13 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 	if _, exists := outputs["controller-profiles"]; exists {
 		t.Fatal("the combined Definition keeps the reference fixture under its own name; controller-profiles is core-family only")
 	}
-	if provisioned.Catalog == nil || provisioned.Catalog.Base != "../../catalogs/nvke/release" ||
+	if provisioned.Catalog == nil || provisioned.Catalog.Base != "../../catalogs/nvke" ||
 		!slices.Equal(provisioned.Components, []string{"cluster-api-provider-provisioned"}) ||
 		!slices.Equal(provisioned.Platforms, []string{"linux/amd64", "linux/arm64"}) {
 		t.Fatal("provisioned infrastructure provider must retain its existing independent producer")
 	}
 
-	baselineBytes, err := os.ReadFile(filepath.Join(root, "../../catalogs/nvke/release/pins.lock.yaml"))
+	baselineBytes, err := os.ReadFile(filepath.Join(root, "../../catalogs/nvke/pins.lock.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}

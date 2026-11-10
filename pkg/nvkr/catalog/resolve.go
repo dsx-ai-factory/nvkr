@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io/fs"
+	"slices"
 	"strings"
 	"text/template"
 	"time"
@@ -164,12 +165,21 @@ func resolvePrebuilt(name string, raw rawComponent, src Source, pin Pin, lock *P
 		if err := checkToolPin(src.Tool, pin); err != nil {
 			return c, err
 		}
-		if pin.Tool == nil {
+		if pin.Tool == nil && pin.Tools == nil {
 			return c, e.New(e.CodeUnpinnedSource, "release executable %q has no source tool pin", name)
 		}
 		evidence, err := renderEvidence(name, raw.Prebuilt.Evidence, pin)
 		if err != nil {
 			return c, err
+		}
+		if pin.Tools != nil {
+			c.Prebuilt = &Prebuilt{Evidence: evidence, Executables: []ToolPin{}}
+			for _, tool := range pin.Tools {
+				if slices.Contains(raw.Platforms, tool.Platform) {
+					c.Prebuilt.Executables = append(c.Prebuilt.Executables, tool.clone())
+				}
+			}
+			return c, nil
 		}
 		tool := pin.Tool.clone()
 		c.Prebuilt = &Prebuilt{URL: tool.URL, Executable: &tool,

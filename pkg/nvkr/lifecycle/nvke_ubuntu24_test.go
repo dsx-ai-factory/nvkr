@@ -68,7 +68,8 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 				if iso.Prebuilt == nil || iso.Prebuilt.URL != tc.isoURL || iso.Prebuilt.Digests[tc.arch] != tc.isoDigest || iso.Tag != "24.04.5" {
 					t.Fatalf("Ubuntu 24 installer is not bound to the exact native ISO: %+v", iso)
 				}
-				for component, producer := range build.CatalogSnapshot.Components {
+				for _, component := range build.Components {
+					producer := build.CatalogSnapshot.Components[component]
 					if producer.Packer != nil {
 						if producer.Packer.Variables["ubuntu_series"] != "24.04" || original.CatalogSnapshot.Components[component].Packer.Variables["ubuntu_series"] != "26.04" {
 							t.Fatal("disk Ubuntu series must match the selected installer")
@@ -215,7 +216,7 @@ func nvkeUbuntu24Plans(t *testing.T, definitionPath, arch string) (*factory.Plan
 	// toolchains against the retained Ubuntu 26 source/material selection.
 	prior := authored.Clone()
 	stack := prior.Outputs[0].Catalog
-	if stack == nil || stack.Base != "../../../catalogs/node-images/release" ||
+	if stack == nil || stack.Base != "../../../catalogs/node-images" ||
 		!slices.Equal(stack.Overlays, []string{"../../../catalogs/node-images/variants/native-toolchains.yaml", "../../../catalogs/node-images/variants/ubuntu24.json"}) {
 		t.Fatalf("output %s lost its exact ordered catalog stack: %+v", prior.Outputs[0].Name, stack)
 	}

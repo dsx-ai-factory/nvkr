@@ -1,7 +1,7 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
   "catalog": {
-    "base": "../../../catalogs/tools/native"
+    "base": "../../../catalogs/tools"
   },
   "kind": "Definition",
   "metadata": {
@@ -11,7 +11,7 @@
   "outputs": [
     {
       "catalog": {
-        "base": "../../../catalogs/capnico/local"
+        "base": "../../../catalogs/capnico"
       },
       "components": [
         "capnico-controller"
@@ -22,7 +22,7 @@
     },
     {
       "catalog": {
-        "base": "../../../catalogs/nvke/release"
+        "base": "../../../catalogs/nvke"
       },
       "components": [
         "cluster-api-provider-provisioned"
@@ -33,10 +33,10 @@
     },
     {
       "catalog": {
-        "base": "../../../catalogs/controller-profiles/upstream-arm64"
+        "base": "../../../catalogs/nvke"
       },
       "components": [
-        "nvke-local-profiles"
+        "nvke-local-profiles-upstream"
       ],
       "format": "oci",
       "name": "controller-profiles-upstream-ovn",
@@ -44,10 +44,10 @@
     },
     {
       "catalog": {
-        "base": "../../../catalogs/nvke/local-site-arm64"
+        "base": "../../../catalogs/nvke"
       },
       "components": [
-        "nvke-controller"
+        "nvke-controller-local-site"
       ],
       "format": "oci",
       "name": "cwe",

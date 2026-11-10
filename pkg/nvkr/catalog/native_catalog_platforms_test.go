@@ -13,12 +13,12 @@ import (
 )
 
 func TestNativeNKTPDependencyArchiveChecks(t *testing.T) {
-	cat, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/nvke/native-site"))
+	cat, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/nvke"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	const marker = "set -- nktp/deploy/charts/nktp/charts/*.tgz"
-	_, checks, found := strings.Cut(cat.Components["nktp-chart"].VendorCommand[2], marker)
+	_, checks, found := strings.Cut(cat.Components["nktp-chart-native-site"].VendorCommand[2], marker)
 	if !found {
 		t.Fatal("native chart source omits its archive admission checks")
 	}
@@ -88,10 +88,10 @@ func TestNativeCatalogsShareLinuxArchitectures(t *testing.T) {
 		directory  string
 		components []string
 	}{
-		{"nvke/native-site", []string{"nvkectl", "nvke-controller", "cluster-api-provider-provisioned", "nvke-controller-chart", "nktp-chart"}},
-		{"capnico/local", []string{"capnico-controller"}},
-		{"controller-profiles/native-nvidia", []string{"nvke-local-profiles"}},
-		{"tools/native", []string{"nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "nvkr-site-identity-helper", "native-capi-exec-init-image", "native-capi-exec-init-image-main", "native-capi-exec-plugin-image", "native-workload-image"}},
+		{"nvke", []string{"nvkectl-native-site", "nvke-controller-native-site", "cluster-api-provider-provisioned-native-site", "nvke-controller-chart-native-site", "nktp-chart-native-site"}},
+		{"capnico", []string{"capnico-controller"}},
+		{"nvke", []string{"nvke-local-profiles"}},
+		{"tools", []string{"nerdctl", "nico-sim", "nico-simctl", "nvke-installer-sources", "nvkectl", "nvkr-site-identity-helper", "native-capi-exec-init-image", "native-capi-exec-init-image-main", "native-capi-exec-plugin-image", "native-workload-image"}},
 	} {
 		t.Run(tc.directory, func(t *testing.T) {
 			cat, err := LoadContext(t.Context(), Dir(filepath.Join("../../../inputs/catalogs", tc.directory)))
@@ -120,13 +120,20 @@ func TestNativeCatalogsShareLinuxArchitectures(t *testing.T) {
 }
 
 func TestNativeAMD64AcquisitionsKeepReleaseAndPlatform(t *testing.T) {
-	cat, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/tools/native"))
+	cat, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/tools"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, tool := range []string{"clusterctl", "helm", "kind", "kubectl", "oras"} {
 		t.Run(tool, func(t *testing.T) {
-			arm, amd := cat.Components[tool+"-linux"], cat.Components[tool+"-linux-amd64"]
+			arm, err := cat.Components[tool].ForPlatform("linux/arm64")
+			if err != nil {
+				t.Fatal(err)
+			}
+			amd, err := cat.Components[tool].ForPlatform("linux/amd64")
+			if err != nil {
+				t.Fatal(err)
+			}
 			if arm.Tag != amd.Tag || arm.Commit != amd.Commit || !slices.Equal(amd.Platforms, []string{"linux/amd64"}) {
 				t.Fatal("native architecture selection changed the acquired release")
 			}
@@ -145,22 +152,25 @@ func TestNativeAMD64AcquisitionsKeepReleaseAndPlatform(t *testing.T) {
 }
 
 func TestNativeHelmVendorPinsMatchTheSharedTools(t *testing.T) {
-	site, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/nvke/native-site"))
+	site, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/nvke"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	tools, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/tools/native"))
+	tools, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/tools"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, component := range []string{"nvke-controller-chart", "nktp-chart"} {
+	for _, component := range []string{"nvke-controller-chart-native-site", "nktp-chart-native-site"} {
 		t.Run(component, func(t *testing.T) {
 			command := site.Components[component].VendorCommand
 			if len(command) != 3 {
 				t.Fatal("expected the source-owned vendor script")
 			}
-			for _, tool := range []string{"helm-linux", "helm-linux-amd64"} {
-				selected := tools.Components[tool]
+			for _, tool := range []string{"linux/arm64", "linux/amd64"} {
+				selected, err := tools.Components["helm"].ForPlatform(tool)
+				if err != nil {
+					t.Fatal(err)
+				}
 				if selected.Prebuilt == nil || selected.Prebuilt.Executable == nil {
 					t.Fatal("shared Helm acquisition is absent")
 				}
@@ -185,7 +195,7 @@ func TestNativeHelmVendorPinsMatchTheSharedTools(t *testing.T) {
 }
 
 func TestNativeHelmVendorsExecuteHostFromWorkspace(t *testing.T) {
-	site, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/nvke/native-site"))
+	site, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/nvke"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -193,7 +203,7 @@ func TestNativeHelmVendorsExecuteHostFromWorkspace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, component := range []string{"nvke-controller-chart", "nktp-chart"} {
+	for _, component := range []string{"nvke-controller-chart-native-site", "nktp-chart-native-site"} {
 		for _, tc := range []struct{ name, host, target, failure string }{
 			{"native amd64", "amd64", "amd64", ""},
 			{"native arm64", "arm64", "arm64", ""},

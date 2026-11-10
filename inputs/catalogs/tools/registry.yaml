@@ -1,0 +1,819 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+components:
+  clusterctl:
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: clusterctl
+  clusterctl-installer-hosted:
+    artifactPath: nvkr-output/clusterctl
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
+      build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+      go build -trimpath -mod=vendor \
+        -ldflags "-s -w -buildid= -X sigs.k8s.io/cluster-api/version.gitVersion=$BUILD_VERSION -X sigs.k8s.io/cluster-api/version.gitCommit=$GIT_VERSION -X sigs.k8s.io/cluster-api/version.gitReleaseCommit=$GIT_VERSION -X sigs.k8s.io/cluster-api/version.gitTreeState=clean -X sigs.k8s.io/cluster-api/version.gitMajor=$KUBE_GIT_MAJOR -X sigs.k8s.io/cluster-api/version.gitMinor=$KUBE_GIT_MINOR -X sigs.k8s.io/cluster-api/version.buildDate=$build_date" \
+        -o /src/nvkr-output/clusterctl ./cmd/clusterctl
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    platforms:
+    - linux/arm64
+    source: clusterctl-installer-hosted
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+      KUBE_GIT_MAJOR: '{{.Major}}'
+      KUBE_GIT_MINOR: '{{.Minor}}'
+    writeDir: nvkr-output
+  clusterctl-installer-local:
+    artifactPath: nvkr-output/clusterctl
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
+      build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+      go build -trimpath -mod=vendor \
+        -ldflags "-s -w -buildid= -X sigs.k8s.io/cluster-api/version.gitVersion=$BUILD_VERSION -X sigs.k8s.io/cluster-api/version.gitCommit=$GIT_VERSION -X sigs.k8s.io/cluster-api/version.gitReleaseCommit=$GIT_VERSION -X sigs.k8s.io/cluster-api/version.gitTreeState=clean -X sigs.k8s.io/cluster-api/version.gitMajor=$KUBE_GIT_MAJOR -X sigs.k8s.io/cluster-api/version.gitMinor=$KUBE_GIT_MINOR -X sigs.k8s.io/cluster-api/version.buildDate=$build_date" \
+        -o /src/nvkr-output/clusterctl ./cmd/clusterctl
+    cgo: false
+    fromSource: true
+    outputType: raw
+    platforms:
+    - linux/arm64
+    source: clusterctl-installer-hosted
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+      KUBE_GIT_MAJOR: '{{.Major}}'
+      KUBE_GIT_MINOR: '{{.Minor}}'
+    writeDir: nvkr-output
+  helm:
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: helm
+  helm-installer-local:
+    artifactPath: nvkr-output/helm
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
+      go build -trimpath -mod=vendor \
+        -ldflags "-s -w -buildid= -X helm.sh/helm/v4/internal/version.version=$BUILD_VERSION -X helm.sh/helm/v4/internal/version.metadata= -X helm.sh/helm/v4/internal/version.gitCommit=$GIT_VERSION -X helm.sh/helm/v4/internal/version.gitTreeState=clean" \
+        -o /src/nvkr-output/helm ./cmd/helm
+      version_template="$(printf '{%s}' '{.Version}')"
+      test "$(/src/nvkr-output/helm version --template "$version_template")" = "$BUILD_VERSION"
+    cgo: false
+    fromSource: true
+    outputType: raw
+    platforms:
+    - linux/arm64
+    source: helm-installer-local
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+  helm-operator:
+    outputType: host-package
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: helm-operator
+  kind:
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: kind
+  kind-installer-hosted:
+    artifactPath: nvkr-output/kind
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
+      go build -trimpath -mod=vendor \
+        -ldflags "-s -w -buildid= -X sigs.k8s.io/kind/pkg/cmd/kind/version.gitCommit=$GIT_VERSION" \
+        -o /src/nvkr-output/kind .
+      test "$(/src/nvkr-output/kind version -q)" = "$BUILD_VERSION"
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    platforms:
+    - linux/arm64
+    source: kind-installer-hosted
+    versionStamp:
+      BUILD_VERSION: '{{.Version}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+  kind-installer-local:
+    artifactPath: nvkr-output/kind
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
+      go build -trimpath -mod=vendor \
+        -ldflags "-s -w -buildid= -X sigs.k8s.io/kind/pkg/cmd/kind/version.gitCommit=$GIT_VERSION" \
+        -o /src/nvkr-output/kind .
+      test "$(/src/nvkr-output/kind version -q)" = "$BUILD_VERSION"
+    cgo: false
+    fromSource: true
+    outputType: raw
+    platforms:
+    - linux/arm64
+    source: kind-installer-hosted
+    versionStamp:
+      BUILD_VERSION: '{{.Version}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+  kubectl:
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: kubectl
+  kubectl-installer-hosted:
+    artifactPath: nvkr-output/kubectl
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=/src/go.work GOTOOLCHAIN=local GOPROXY=off
+      build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+      go build -trimpath -mod=vendor -tags selinux,notest,grpcnotrace \
+        -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$BUILD_VERSION -X k8s.io/component-base/version.gitCommit=$GIT_VERSION -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=clean -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$BUILD_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$GIT_VERSION -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=clean -X k8s.io/client-go/pkg/version.buildDate=$build_date" \
+        -o /src/nvkr-output/kubectl ./cmd/kubectl
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    platforms:
+    - linux/arm64
+    source: kubectl-installer-hosted
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+      KUBE_GIT_MAJOR: '{{.Major}}'
+      KUBE_GIT_MINOR: '{{.Minor}}'
+    writeDir: nvkr-output
+  kubectl-installer-local:
+    artifactPath: nvkr-output/kubectl
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=/src/go.work GOTOOLCHAIN=local GOPROXY=off
+      build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
+      go build -trimpath -mod=vendor -tags selinux,notest,grpcnotrace \
+        -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$BUILD_VERSION -X k8s.io/component-base/version.gitCommit=$GIT_VERSION -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=clean -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$BUILD_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$GIT_VERSION -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=clean -X k8s.io/client-go/pkg/version.buildDate=$build_date" \
+        -o /src/nvkr-output/kubectl ./cmd/kubectl
+    cgo: false
+    fromSource: true
+    outputType: raw
+    platforms:
+    - linux/arm64
+    source: kubectl-installer-hosted
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+      KUBE_GIT_MAJOR: '{{.Major}}'
+      KUBE_GIT_MINOR: '{{.Minor}}'
+    writeDir: nvkr-output
+  kubectl-operator:
+    outputType: host-package
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: kubectl-operator
+  native-capi-exec-plugin-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: ghcr.io/spiffe/k8s-spiffe-workload-jwt-exec-auth@sha256:e30e90774e5951f84eb6dfb36f972fead08b64c3bfdc0912c5b15f988e79de3a
+    source: nvke-deploy
+  native-workload-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: docker.io/library/alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+    source: nvke-deploy
+  nerdctl:
+    artifactPath: _output/nerdctl
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+      make binaries VERSION="${BUILD_VERSION:?}" REVISION="${GIT_VERSION:?}"
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    - linux/amd64
+    - linux/arm64
+    source: nerdctl-site
+    versionStamp:
+      BUILD_VERSION: '{{.Tag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: _output
+  nico-sim:
+    artifactPath: controller/nico-sim/bin/nico-sim
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      cd controller/nico-sim
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+      make build-static
+    buildCommandByPlatform:
+      darwin/arm64:
+      - go
+      - -C
+      - controller/nico-sim
+      - build
+      - -mod=vendor
+      - -o
+      - bin/nico-sim
+      - ./cmd/nico-sim
+    cgo: true
+    fromSource: true
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    - linux/amd64
+    - linux/arm64
+    source: nvke-nicosim
+    writeDir: controller/nico-sim/bin
+  nico-sim-nicosim:
+    artifactPath: controller/nico-sim/bin/nico-sim
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+      make -C controller/nico-sim build-static \
+        BUILD_VERSION="${NICO_SIM_VERSION:?}" GIT_COMMIT="${NICO_SIM_COMMIT:?}" GIT_TREE_STATE="${NICO_SIM_TREE:?}"
+    cgo: true
+    fromSource: true
+    outputType: host-package
+    patches:
+    - name: patches/version-interface.patch
+      sha256: sha256:186d3ca32819bdb0f299732414de8982e67e0b5561b9914c16a26f11641b6cde
+    platforms:
+    - linux/arm64
+    source: nvke-nicosim-nicosim
+    versionStamp:
+      NICO_SIM_COMMIT: '{{.Commit}}'
+      NICO_SIM_TREE: patched
+      NICO_SIM_VERSION: v{{.Version}}
+    writeDir: controller/nico-sim/bin
+  nico-sim-runtime-assets:
+    artifactPath: controller/nico-sim/bin/nicosim-runtime-assets.tar.gz
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      set -o pipefail
+      cd controller/nico-sim
+      tar --sort=name --format=ustar --mtime="@${SOURCE_DATE_EPOCH:?}" \
+        --owner=0 --group=0 --numeric-owner --mode=u=rwX,go=rX \
+        -cf - internal/seed/default-seed.yaml ui | \
+        gzip -n > bin/nicosim-runtime-assets.tar.gz
+    cgo: false
+    fromSource: true
+    outputType: tarball
+    platforms:
+    - darwin/arm64
+    - linux/amd64
+    - linux/arm64
+    source: nvke-nicosim
+    writeDir: controller/nico-sim/bin
+  nico-sim-runtime-assets-nicosim:
+    artifactPath: controller/nico-sim/bin/nicosim-runtime-assets.tar.gz
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      set -o pipefail
+      cd controller/nico-sim
+      # The source pin owns this diagnostic seed, UI and vendor notices.
+      # No production profiles, private credentials or VM state are included.
+      tar --sort=name --format=ustar --mtime="@${SOURCE_DATE_EPOCH:?}" \
+        --owner=0 --group=0 --numeric-owner --mode=u=rwX,go=rX \
+        -cf - internal/seed/default-seed.yaml ui | \
+        gzip -n > bin/nicosim-runtime-assets.tar.gz
+    fromSource: true
+    outputType: tarball
+    platforms:
+    - linux/arm64
+    source: nvke-nicosim-nicosim
+    writeDir: controller/nico-sim/bin
+  nico-simctl:
+    artifactPath: controller/nico-sim/bin/nico-simctl
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      cd controller/nico-sim
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+      go build -trimpath -o bin/nico-simctl ./cmd/nico-simctl
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    - linux/amd64
+    - linux/arm64
+    source: nvke-nicosim
+    writeDir: controller/nico-sim/bin
+  nico-simctl-nicosim:
+    artifactPath: controller/nico-sim/bin/nico-simctl
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      cd controller/nico-sim
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+      CGO_ENABLED=1 go build -trimpath -tags 'netgo osusergo' \
+        -ldflags "-X github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version.BuildVersion=${NICO_SIM_VERSION:?} -X github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version.GitCommit=${NICO_SIM_COMMIT:?} -X github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version.GitTreeState=${NICO_SIM_TREE:?} -linkmode external -extldflags -static" \
+        -o bin/nico-simctl ./cmd/nico-simctl
+    cgo: true
+    fromSource: true
+    outputType: host-package
+    patches:
+    - name: patches/version-interface.patch
+      sha256: sha256:186d3ca32819bdb0f299732414de8982e67e0b5561b9914c16a26f11641b6cde
+    platforms:
+    - linux/arm64
+    source: nvke-nicosim-nicosim
+    versionStamp:
+      NICO_SIM_COMMIT: '{{.Commit}}'
+      NICO_SIM_TREE: patched
+      NICO_SIM_VERSION: v{{.Version}}
+    writeDir: controller/nico-sim/bin
+  nvke-installer-sources:
+    artifactPath: bin/nvke-installer-sources.tar.gz
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      set -o pipefail
+      printf '%s\n' "${NKECTL_COMMIT:?}" > bin/SOURCE_COMMIT
+      unset CAPI_VERSION
+      make --no-print-directory -s -f make/tool-versions.mk \
+        --eval='nvkr-capi-version: ; @printf "%s\n" "$(CAPI_VERSION)"' \
+        nvkr-capi-version > bin/CAPI_VERSION
+      tar --sort=name --format=ustar --mtime="@${SOURCE_DATE_EPOCH:?}" \
+        --owner=0 --group=0 --numeric-owner --mode=u=rwX,go=rX \
+        -cf - make/tool-versions.mk deploy/nvke-deploy.sh deploy/lib deploy/nico \
+        cli/internal/bootstrap/sitespec/template.yaml \
+        controller/deploy/charts/controller nktp/deploy/charts/nktp \
+        controller/hack/apply-capi-spiffe-exec-auth.sh \
+        controller/deploy/k8s/capi-spiffe-exec-auth \
+        controller/test/fixtures/releases \
+        controller/nico-sim/internal/seed/default-seed.yaml controller/nico-sim/ui \
+        -C bin SOURCE_COMMIT CAPI_VERSION | gzip -n > bin/nvke-installer-sources.tar.gz
+    cgo: false
+    fromSource: true
+    outputType: tarball
+    platforms:
+    - darwin/arm64
+    - linux/amd64
+    - linux/arm64
+    source: nvke-deploy
+    versionStamp:
+      NKECTL_COMMIT: '{{.Commit}}'
+    writeDir: bin
+  nvkectl:
+    artifactPath: cli/bin/nvkectl
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local
+      target_os="${GOOS:?}"
+      target_arch="${GOARCH:?}"
+      env -u GOOS -u GOARCH make -C cli build-cross DIST=bin NVKECTL_PLATFORMS="$target_os/$target_arch" \
+        LEGACY_BINARY_NAME= NVKECTL_VERSION="git-${NKECTL_COMMIT}" NVKECTL_COMMIT="${NKECTL_COMMIT}" \
+        NVKECTL_DATE="${NKECTL_DATE}" NVKECTL_TREE=clean
+      cp "cli/bin/nvkectl-$target_os-$target_arch" cli/bin/nvkectl
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    - linux/amd64
+    - linux/arm64
+    source: nvke-cli
+    versionStamp:
+      NKECTL_COMMIT: '{{.Commit}}'
+      NKECTL_DATE: '{{.Date}}'
+    writeDir: cli/bin
+  nvkr-site-identity-helper:
+    artifactPath: bin/nvkr-site-identity-helper
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+      test "$(go env GOVERSION)" = "go$(cat .go-version)"
+      go build -trimpath -buildvcs=false -o bin/nvkr-site-identity-helper ./cmd/nvkr-site-identity-helper
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvkr-site-identity
+    writeDir: bin
+  oras:
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: oras
+  oras-installer-hosted:
+    artifactPath: nvkr-output/oras
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
+      go build -trimpath -mod=vendor \
+        -ldflags "-s -w -buildid= -X oras.land/oras/internal/version.BuildMetadata= -X oras.land/oras/internal/version.GitCommit=$GIT_VERSION -X oras.land/oras/internal/version.GitTreeState=clean" \
+        -o /src/nvkr-output/oras ./cmd/oras
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    platforms:
+    - linux/arm64
+    source: oras-installer-hosted
+    versionStamp:
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+  oras-installer-local:
+    artifactPath: nvkr-output/oras
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
+      go build -trimpath -mod=vendor \
+        -ldflags "-s -w -buildid= -X oras.land/oras/internal/version.BuildMetadata= -X oras.land/oras/internal/version.GitCommit=$GIT_VERSION -X oras.land/oras/internal/version.GitTreeState=clean" \
+        -o /src/nvkr-output/oras ./cmd/oras
+    cgo: false
+    fromSource: true
+    outputType: raw
+    platforms:
+    - linux/arm64
+    source: oras-installer-hosted
+    versionStamp:
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: nvkr-output
+  packer:
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: packer
+  packer-plugin-qemu:
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: packer-plugin-qemu
+  syft:
+    outputType: host-package
+    platforms:
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: syft
+  vmnet-client:
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: vmnet-client
+  vmnet-helper:
+    outputType: host-package
+    platforms:
+    - darwin/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: vmnet-helper
+imports:
+- path: ../shared/installer-tools.yaml
+  sha256: b096166405b78d9fbdfcd735f0cf3f08fc58e2aec05383094245ca92411e6c72
+  sources:
+    clusterctl-installer-hosted: clusterctl
+    kind-installer-hosted: kind
+    kubectl-installer-hosted: kubectl
+    oras-installer-hosted: oras
+- path: ../shared/syft.yaml
+  sha256: f52faff48638dde1ee3b2c6ff7e71501739cefbed502fe80ad296b9de370a897
+  sources:
+    syft: syft-arm64
+- components:
+    native-capi-exec-init-image: native-capi-exec-init-image
+    native-capi-exec-init-image-main: native-capi-exec-init-image
+  path: ../shared/native-tools.yaml
+  sha256: 1bbf5dee7d410d481fb75e4e962163c3a9cc3cf96051380ea736291f355d99b6
+kind: SourceBuildRegistry
+metadata:
+  description: Shared tools domain catalog; explicit producer variants preserve existing
+    build and acquisition contracts.
+  name: tools
+sources:
+  clusterctl:
+    constraint: 1.13.6
+    repo: https://github.com/kubernetes-sigs/cluster-api
+    tool:
+      executablePath: clusterctl
+      format: raw
+      platforms:
+      - darwin/arm64
+      - linux/amd64
+      - linux/arm64
+      url: https://github.com/kubernetes-sigs/cluster-api/releases/download/{{.Tag}}/clusterctl-{{.OS}}-{{.Arch}}
+  helm:
+    constraint: 4.2.4
+    repo: https://github.com/helm/helm
+    tool:
+      executablePath: '{{.OS}}-{{.Arch}}/helm'
+      format: tar-gzip
+      platforms:
+      - darwin/arm64
+      - linux/amd64
+      - linux/arm64
+      url: https://get.helm.sh/helm-{{.Tag}}-{{.OS}}-{{.Arch}}.tar.gz
+  helm-installer-local:
+    constraint: 4.2.4
+    repo: https://github.com/helm/helm
+    toolchainImagesByArch:
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
+    vendorCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum)"
+      timeout --kill-after=10s 540s go mod download
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      # Reuse PR113's diagnostic Local preparation. These pinned negative-test
+      # fixture links are not cmd/helm inputs. The held hosted fetch route
+      # rejects external links BEFORE this command; do not use it for this lane.
+      test "$(readlink internal/chart/v3/loader/testdata/frobnitz_with_dev_null/null)" = /dev/null
+      test "$(readlink pkg/chart/v2/loader/testdata/frobnitz_with_dev_null/null)" = /dev/null
+      test "$(readlink internal/third_party/dep/fs/testdata/symlinks/invalid-symlink)" = /non/existing/file
+      test "$(readlink internal/third_party/dep/fs/testdata/symlinks/windows-file-symlink)" = C:/Users/ibrahim/go/src/github.com/golang/dep/internal/fs/testdata/test.file
+      # Docker's vendor container may have a different UID from the checkout
+      # owner. Trust only this already pinned private source root, not '*'.
+      git -c safe.directory=/src rm -- internal/chart/v3/loader/testdata/frobnitz_with_dev_null/null \
+        pkg/chart/v2/loader/testdata/frobnitz_with_dev_null/null \
+        internal/third_party/dep/fs/testdata/symlinks/invalid-symlink \
+        internal/third_party/dep/fs/testdata/symlinks/windows-file-symlink
+  helm-operator:
+    constraint: 4.1.4
+    repo: https://github.com/helm/helm
+    tool:
+      executablePath: '{{.OS}}-{{.Arch}}/helm'
+      format: tar-gzip
+      platforms:
+      - linux/amd64
+      - linux/arm64
+      url: https://get.helm.sh/helm-{{.Tag}}-{{.OS}}-{{.Arch}}.tar.gz
+  kind:
+    constraint: 0.32.0
+    repo: https://github.com/kubernetes-sigs/kind
+    tool:
+      executablePath: kind
+      format: raw
+      platforms:
+      - darwin/arm64
+      - linux/amd64
+      - linux/arm64
+      url: https://github.com/kubernetes-sigs/kind/releases/download/{{.Tag}}/kind-{{.OS}}-{{.Arch}}
+  kubectl:
+    constraint: 1.35.9
+    repo: https://github.com/kubernetes/kubernetes
+    tool:
+      executablePath: kubectl
+      format: raw
+      platforms:
+      - darwin/arm64
+      - linux/amd64
+      - linux/arm64
+      url: https://dl.k8s.io/release/{{.Tag}}/bin/{{.OS}}/{{.Arch}}/kubectl
+  kubectl-operator:
+    constraint: 1.36.3
+    repo: https://github.com/kubernetes/kubernetes
+    tool:
+      executablePath: kubectl
+      format: raw
+      platforms:
+      - linux/amd64
+      - linux/arm64
+      url: https://dl.k8s.io/release/{{.Tag}}/bin/{{.OS}}/{{.Arch}}/kubectl
+  nerdctl-site:
+    constraint: 2.4.1
+    repo: https://github.com/containerd/nerdctl
+    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+    vendorCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum)"
+      timeout --kill-after=10s 540s go mod download
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+  nvke-cli:
+    constraint: v0.23.0
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+    vendorCommand:
+    - bash
+    - -euc
+    - |
+      cd cli
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum ../controller/api/go.mod ../controller/api/go.sum ../controller/deploy/charts/go.mod ../management-engine/go.mod ../management-engine/go.sum)"
+      timeout --kill-after=10s 540s go mod download
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+  nvke-deploy:
+    constraint: v0.23.0
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+  nvke-nicosim:
+    constraint: v0.23.0
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    toolchainImagesByArch:
+      amd64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+      arm64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+    vendorCommand:
+    - bash
+    - -euc
+    - |
+      cd controller/nico-sim
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum)"
+      timeout --kill-after=10s 540s go mod download
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+  nvke-nicosim-nicosim:
+    constraint: v0.23.0
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    toolchainImagesByArch:
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
+    vendorCommand:
+    - bash
+    - -euc
+    - |
+      cd controller/nico-sim
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum)"
+      timeout --kill-after=10s 540s go mod download
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+  nvkr-site-identity:
+    constraint: '*'
+    repo: https://github.com/dsx-ai-factory/nvkr.git
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+    vendorCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum)"
+      timeout --kill-after=10s 540s go mod download
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+  oras:
+    constraint: 1.3.3
+    repo: https://github.com/oras-project/oras
+    tool:
+      executablePath: oras
+      format: tar-gzip
+      platforms:
+      - darwin/arm64
+      - linux/amd64
+      - linux/arm64
+      url: https://github.com/oras-project/oras/releases/download/{{.Tag}}/oras_{{.Version}}_{{.OS}}_{{.Arch}}.tar.gz
+  packer:
+    constraint: 1.15.4
+    repo: https://github.com/hashicorp/packer
+    tool:
+      executablePath: packer
+      format: zip
+      platforms:
+      - darwin/arm64
+      - linux/arm64
+      url: https://releases.hashicorp.com/packer/{{.Version}}/packer_{{.Version}}_{{.OS}}_{{.Arch}}.zip
+  packer-plugin-qemu:
+    constraint: 1.1.6
+    repo: https://github.com/hashicorp/packer-plugin-qemu
+    tool:
+      executablePath: packer-plugin-qemu_v1.1.6_x5.0_{{.OS}}_{{.Arch}}
+      format: zip
+      platforms:
+      - darwin/arm64
+      - linux/arm64
+      url: https://releases.hashicorp.com/packer-plugin-qemu/{{.Version}}/packer-plugin-qemu_{{.Version}}_{{.OS}}_{{.Arch}}.zip
+  vmnet-client:
+    constraint: 0.10.0
+    repo: https://github.com/nirs/vmnet-helper
+    tool:
+      executablePath: opt/vmnet-helper/bin/vmnet-client
+      format: tar-gzip
+      platform: darwin/arm64
+      url: https://github.com/nirs/vmnet-helper/releases/download/{{.Tag}}/vmnet-helper.tar.gz
+  vmnet-helper:
+    constraint: 0.10.0
+    repo: https://github.com/nirs/vmnet-helper
+    tool:
+      executablePath: opt/vmnet-helper/bin/vmnet-helper
+      format: tar-gzip
+      platform: darwin/arm64
+      url: https://github.com/nirs/vmnet-helper/releases/download/{{.Tag}}/vmnet-helper.tar.gz

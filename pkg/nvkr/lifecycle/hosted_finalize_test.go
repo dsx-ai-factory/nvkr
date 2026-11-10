@@ -102,7 +102,7 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 		}
 	}
 	definition.Outputs = cliOutputs
-	definition.Catalog.Base = filepath.Join(repo, "inputs/catalogs/nvke/module-tags")
+	definition.Catalog.Base = filepath.Join(repo, "inputs/catalogs/nvke")
 	definitionPath = filepath.ToSlash(filepath.Join(caseRoot, "definition.json"))
 	writeCanonicalTestFile(t, definitionPath, definition)
 	environment.Signing.Mode = factory.SigningModeCosign
