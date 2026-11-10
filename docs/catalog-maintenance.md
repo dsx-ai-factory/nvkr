@@ -69,9 +69,15 @@ already match, and repeated or missing producers, incorrect dependency order and
 
 The maintained [OVN inputs](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/ovn-producer-overlays.json) select NVIDIA and upstream TCG
 producer copies, plus the native NVIDIA overlay copied from the release node-image catalog. The NVKE
-refresh policy checks these overlays before pin work and regenerates them before Run generation. This does not enroll OVN sources in scheduled bumping or change their release constraints.
-To apply an explicitly reviewed OVN pin, follow the commands beside its
-[source catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/ovn-nvidia/README.md), then regenerate these copies:
+refresh policy checks these overlays before pin work and regenerates them before Run generation. This does
+not enroll OVN sources in scheduled bumping or change their release constraints.
+For NVIDIA TCG pin updates, follow the commands beside its
+[source catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/ovn-nvidia/README.md).
+For the native NVIDIA overlay, update the release node-image catalog instead: review the constraints for
+both `ovn-kubernetes` and `nvke-cni-ovn-source`, then use `catalog pin` with
+`--dir inputs/catalogs/node-images/release` to pin each source to the same reviewed revision. Review the
+release producers' version and commit constants in that same change; they do not inherit the TCG catalog's
+source-metadata bindings. Keep lock updates machine-managed. Then regenerate the copies:
 
 ```sh
 # Before changing pins, require the existing generated baseline to be current.
