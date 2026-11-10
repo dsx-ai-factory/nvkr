@@ -47,34 +47,65 @@ type ComponentDescription struct {
 	Edges           []DescribedMaterialBinding `json:"edges"`
 }
 
-// DescribedSourcePin is the exact source revision a from-source component builds.
+// DescribedSourcePin is the exact source revision a from-source component builds,
+// with the other build-semantic inputs that change what it builds: patch
+// identities (not content) and a nix builder's locked flake.
 type DescribedSourcePin struct {
-	Repo     string `json:"repo"`
-	Tag      string `json:"tag,omitempty"`
-	Commit   string `json:"commit"`
-	TreeHash string `json:"treeHash"`
+	Repo     string             `json:"repo"`
+	Tag      string             `json:"tag,omitempty"`
+	Commit   string             `json:"commit"`
+	TreeHash string             `json:"treeHash"`
+	Patches  []DescribedPatch   `json:"patches,omitempty"`
+	Flake    *DescribedFlakePin `json:"flake,omitempty"`
+}
+
+// DescribedPatch names one verified source patch by its content digest.
+type DescribedPatch struct {
+	Name   string `json:"name"`
+	SHA256 string `json:"sha256"`
+}
+
+// DescribedFlakePin is a nix builder's locked flake.
+type DescribedFlakePin struct {
+	Ref        string `json:"ref"`
+	LockDigest string `json:"lockDigest"`
+	Output     string `json:"output"`
+	Image      string `json:"image,omitempty"`
 }
 
 // DescribedAcquisition is the pinned location and per-architecture digests of an
-// acquired component.
+// acquired component. A release executable also carries its source's locked
+// archive and executable identity; an OCI chart carries its archive reference.
 type DescribedAcquisition struct {
-	URL               string            `json:"url,omitempty"`
-	Image             string            `json:"image,omitempty"`
-	ImageParentDigest string            `json:"imageParentDigest,omitempty"`
-	Digests           map[string]string `json:"digests"`
+	URL               string               `json:"url,omitempty"`
+	Image             string               `json:"image,omitempty"`
+	OCIArchive        string               `json:"ociArchive,omitempty"`
+	ImageParentDigest string               `json:"imageParentDigest,omitempty"`
+	Digests           map[string]string    `json:"digests,omitempty"`
+	Executable        *DescribedExecutable `json:"executable,omitempty"`
 }
 
-// DescribedToolPin is the catalog source and locked executable a pinned-tool
-// producer runs.
-type DescribedToolPin struct {
-	Source           string `json:"source"`
-	Tag              string `json:"tag,omitempty"`
+// DescribedExecutable is one locked executable inside a pinned archive.
+type DescribedExecutable struct {
 	Format           string `json:"format"`
 	URL              string `json:"url"`
 	Platform         string `json:"platform"`
 	ExecutablePath   string `json:"executablePath"`
 	ArchiveDigest    string `json:"archiveDigest"`
 	ExecutableDigest string `json:"executableDigest"`
+}
+
+// DescribedToolPin is the catalog source and locked executable a pinned-tool
+// producer runs.
+type DescribedToolPin struct {
+	Source string `json:"source"`
+	Tag    string `json:"tag,omitempty"`
+	DescribedExecutable
+}
+
+func describeExecutable(pin ToolPin) DescribedExecutable {
+	return DescribedExecutable{Format: pin.Format, URL: pin.URL, Platform: pin.Platform, ExecutablePath: pin.ExecutablePath,
+		ArchiveDigest: pin.ArchiveDigest, ExecutableDigest: pin.ExecutableDigest}
 }
 
 // DescribedMaterialBinding is one declared material: Consumer stages the output
@@ -114,17 +145,24 @@ func (cat *Catalog) Describe(name string) (ComponentDescription, error) {
 	switch description.Mode {
 	case ProducerModeSource:
 		description.Source = &DescribedSourcePin{Repo: component.Repo, Tag: component.Tag, Commit: component.Commit, TreeHash: component.TreeHash}
+		for _, patch := range component.Patches {
+			description.Source.Patches = append(description.Source.Patches, DescribedPatch{Name: patch.Name, SHA256: patch.SHA256})
+		}
+		if flake := component.Flake; flake != nil {
+			description.Source.Flake = &DescribedFlakePin{Ref: flake.Ref, LockDigest: flake.LockDigest, Output: flake.Output, Image: flake.Image}
+		}
 	case ProducerModeAcquisition:
+		prebuilt := component.Prebuilt
 		description.Acquisition = &DescribedAcquisition{
-			URL: component.Prebuilt.URL, Image: component.Prebuilt.Image,
-			ImageParentDigest: component.Prebuilt.ImageParentDigest, Digests: maps.Clone(component.Prebuilt.Digests),
+			URL: prebuilt.URL, Image: prebuilt.Image, OCIArchive: prebuilt.OCIArchive,
+			ImageParentDigest: prebuilt.ImageParentDigest, Digests: maps.Clone(prebuilt.Digests),
+		}
+		if prebuilt.Executable != nil {
+			executable := describeExecutable(*prebuilt.Executable)
+			description.Acquisition.Executable = &executable
 		}
 	case ProducerModePinnedTool:
-		executable := component.ToolExecutable
-		description.Tool = &DescribedToolPin{
-			Source: component.Tool, Tag: component.Tag, Format: executable.Format, URL: executable.URL, Platform: executable.Platform,
-			ExecutablePath: executable.ExecutablePath, ArchiveDigest: executable.ArchiveDigest, ExecutableDigest: executable.ExecutableDigest,
-		}
+		description.Tool = &DescribedToolPin{Source: component.Tool, Tag: component.Tag, DescribedExecutable: describeExecutable(*component.ToolExecutable)}
 	}
 	for _, binding := range sortedStringKeys(component.Materials) {
 		description.Materials = append(description.Materials, DescribedMaterialBinding{Consumer: name, Binding: binding, Component: component.Materials[binding]})
@@ -190,45 +228,9 @@ func (d ComponentDescription) Render(format string) ([]byte, error) {
 		return nil, e.New(e.CodeUsage, "unknown component description format %q (use text or json)", format)
 	}
 	var out bytes.Buffer
-	field := func(label, value string) {
-		if value != "" {
-			fmt.Fprintf(&out, "%s: %s\n", label, terminalText(value))
-		}
+	for _, field := range d.Fields() {
+		fmt.Fprintf(&out, "%s: %s\n", terminalText(field.Label), terminalText(field.Value))
 	}
-	field("catalog", d.Catalog)
-	field("component", d.Name)
-	field("mode", d.Mode)
-	field("builder", d.BuilderType)
-	field("output type", d.OutputType)
-	field("platforms", strings.Join(d.Platforms, ", "))
-	if d.Source != nil {
-		field("source repo", d.Source.Repo)
-		field("source tag", d.Source.Tag)
-		field("source commit", d.Source.Commit)
-		field("source tree hash", d.Source.TreeHash)
-	}
-	if d.Acquisition != nil {
-		field("acquired url", d.Acquisition.URL)
-		field("acquired image", d.Acquisition.Image)
-		field("image parent digest", d.Acquisition.ImageParentDigest)
-		for _, arch := range sortedStringKeys(d.Acquisition.Digests) {
-			field("digest "+arch, d.Acquisition.Digests[arch])
-		}
-	}
-	if d.Tool != nil {
-		field("tool source", d.Tool.Source)
-		field("tool tag", d.Tool.Tag)
-		field("tool url", d.Tool.URL)
-		field("tool platform", d.Tool.Platform)
-		field("tool executable", d.Tool.ExecutablePath)
-		field("tool archive digest", d.Tool.ArchiveDigest)
-		field("tool executable digest", d.Tool.ExecutableDigest)
-	}
-	field("toolchain image", d.ToolchainImage)
-	for _, arch := range sortedStringKeys(d.ToolchainImages) {
-		field("toolchain image "+arch, d.ToolchainImages[arch])
-	}
-	field("exclusion reason", d.ExclusionReason)
 	fmt.Fprintf(&out, "materials:%s\n", emptyMarker(len(d.Materials)))
 	for _, binding := range d.Materials {
 		fmt.Fprintf(&out, "  %s -> %s\n", terminalText(binding.Binding), terminalText(binding.Component))
@@ -243,6 +245,76 @@ func (d ComponentDescription) Render(format string) ([]byte, error) {
 	}
 	out.WriteString("Declarations only; platforms are not a claim that this host can execute them.\n")
 	return out.Bytes(), nil
+}
+
+// DescribedField is one labeled value of a description.
+type DescribedField struct {
+	Label string
+	Value string
+}
+
+// Fields lists every non-empty scalar of the description, in a fixed order with
+// lowercase labels. Text output and other presentations use this one list, so
+// they show the same pins. Materials, closure and edges are listed separately.
+func (d ComponentDescription) Fields() []DescribedField {
+	var fields []DescribedField
+	add := func(label, value string) {
+		if value != "" {
+			fields = append(fields, DescribedField{Label: label, Value: value})
+		}
+	}
+	executable := func(prefix string, pin DescribedExecutable) {
+		add(prefix+" format", pin.Format)
+		add(prefix+" url", pin.URL)
+		add(prefix+" platform", pin.Platform)
+		add(prefix+" executable path", pin.ExecutablePath)
+		add(prefix+" archive digest", pin.ArchiveDigest)
+		add(prefix+" executable digest", pin.ExecutableDigest)
+	}
+	add("catalog", d.Catalog)
+	add("component", d.Name)
+	add("mode", d.Mode)
+	add("builder", d.BuilderType)
+	add("output type", d.OutputType)
+	add("platforms", strings.Join(d.Platforms, ", "))
+	if source := d.Source; source != nil {
+		add("source repo", source.Repo)
+		add("source tag", source.Tag)
+		add("source commit", source.Commit)
+		add("source tree hash", source.TreeHash)
+		for _, patch := range source.Patches {
+			add("patch "+patch.Name, patch.SHA256)
+		}
+		if flake := source.Flake; flake != nil {
+			add("flake ref", flake.Ref)
+			add("flake lock digest", flake.LockDigest)
+			add("flake output", flake.Output)
+			add("flake image", flake.Image)
+		}
+	}
+	if acquisition := d.Acquisition; acquisition != nil {
+		add("acquired url", acquisition.URL)
+		add("acquired image", acquisition.Image)
+		add("acquired oci archive", acquisition.OCIArchive)
+		add("image parent digest", acquisition.ImageParentDigest)
+		for _, arch := range sortedStringKeys(acquisition.Digests) {
+			add("digest "+arch, acquisition.Digests[arch])
+		}
+		if acquisition.Executable != nil {
+			executable("acquired executable", *acquisition.Executable)
+		}
+	}
+	if tool := d.Tool; tool != nil {
+		add("tool source", tool.Source)
+		add("tool tag", tool.Tag)
+		executable("tool", tool.DescribedExecutable)
+	}
+	add("toolchain image", d.ToolchainImage)
+	for _, arch := range sortedStringKeys(d.ToolchainImages) {
+		add("toolchain image "+arch, d.ToolchainImages[arch])
+	}
+	add("exclusion reason", d.ExclusionReason)
+	return fields
 }
 
 func emptyMarker(count int) string {

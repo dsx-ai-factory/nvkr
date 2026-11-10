@@ -5,7 +5,9 @@ package catalog
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -201,5 +203,144 @@ func TestDescribeIsDetached(t *testing.T) {
 	description.Acquisition.Digests["amd64"] = "changed"
 	if cat.Components["runtime"].Platforms[0] != "linux/amd64" || cat.Components["runtime"].Prebuilt.Digests["amd64"] != goodArtifactDigest {
 		t.Fatal("description shares storage with the catalog")
+	}
+}
+
+func TestDescribeAcquiredExecutableAndOCIArchive(t *testing.T) {
+	registry := `apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+sources:
+  upstream:
+    repo: https://github.com/example/tool
+    constraint: 1.2.3
+    tool:
+      format: tar-gzip
+      url: https://example.test/{{.Tag}}/tool.tar.gz
+      platform: linux/amd64
+      executablePath: bin/tool
+components:
+  tool:
+    source: upstream
+    platforms: [linux/amd64]
+    outputType: host-package
+    prebuilt:
+      releaseExecutable: true
+      evidence: {none: true}
+`
+	lock := `apiVersion: nvkr.dev/lock/v1
+kind: PinLock
+pins:
+  upstream:
+    tag: v1.2.3
+    commit: ` + goodCommit + `
+    treeHash: ` + goodTree + `
+    sourceDateEpoch: 123
+    tool:
+      format: tar-gzip
+      url: https://example.test/v1.2.3/tool.tar.gz
+      platform: linux/amd64
+      executablePath: bin/tool
+      archiveDigest: ` + goodArtifactDigest + `
+      executableDigest: sha256:` + strings.Repeat("b", 64) + `
+`
+	cat, err := LoadContext(t.Context(), bytesProvider{RegistryFile: []byte(registry), LockFile: []byte(lock)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tool, err := cat.Describe("tool")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := DescribedExecutable{Format: "tar-gzip", URL: "https://example.test/v1.2.3/tool.tar.gz", Platform: "linux/amd64",
+		ExecutablePath: "bin/tool", ArchiveDigest: goodArtifactDigest, ExecutableDigest: "sha256:" + strings.Repeat("b", 64)}
+	if tool.Mode != ProducerModeAcquisition || tool.Acquisition == nil || tool.Acquisition.Executable == nil || *tool.Acquisition.Executable != want {
+		t.Fatalf("release executable pin missing: %+v", tool.Acquisition)
+	}
+
+	release, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/nvke/release"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	chart, err := release.Describe("postgresql-chart")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if chart.Acquisition == nil || chart.Acquisition.OCIArchive == "" || chart.Acquisition.OCIArchive != release.Components["postgresql-chart"].Prebuilt.OCIArchive {
+		t.Fatalf("OCI archive reference missing: %+v", chart.Acquisition)
+	}
+	for _, description := range []ComponentDescription{tool, chart} {
+		assertFieldsRendered(t, description)
+	}
+}
+
+func TestDescribeSourcePinIncludesPatchesAndFlake(t *testing.T) {
+	patched := goodComponent()
+	content := "--- a/x\n+++ b/x\n"
+	patched.Patches = []Patch{{Name: "fix.patch", SHA256: fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(content))), Content: content}}
+	nix := goodComponent()
+	nix.BuilderType = BuilderNix
+	nix.Flake = &FlakePin{Ref: "github:example/flake?rev=" + goodCommit, LockDigest: goodArtifactDigest, Output: "packages.x86_64-linux.default"}
+	cat := &Catalog{Components: map[string]Component{"patched": patched, "nix": nix}}
+	if err := cat.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	description, err := cat.Describe("patched")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(description.Source.Patches, []DescribedPatch{{Name: "fix.patch", SHA256: patched.Patches[0].SHA256}}) {
+		t.Fatalf("patch identity missing: %+v", description.Source)
+	}
+	raw, err := description.Render("json")
+	if err != nil || strings.Contains(string(raw), content) {
+		t.Fatalf("patch content must not be described: %v %s", err, raw)
+	}
+	assertFieldsRendered(t, description)
+	description, err = cat.Describe("nix")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flake := description.Source.Flake; flake == nil || flake.Ref != nix.Flake.Ref || flake.LockDigest != goodArtifactDigest || flake.Output != nix.Flake.Output {
+		t.Fatalf("flake pin missing: %+v", description.Source)
+	}
+	assertFieldsRendered(t, description)
+}
+
+func TestDescribeFieldsMatchJSONForPinnedTools(t *testing.T) {
+	cat, err := LoadContext(t.Context(), bytesProvider{RegistryFile: []byte(pinnedToolRegistry), LockFile: []byte(pinnedToolLock)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	description, err := cat.Describe("bundle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	labels := map[string]string{}
+	for _, field := range description.Fields() {
+		labels[field.Label] = field.Value
+	}
+	tool := description.Tool
+	for label, want := range map[string]string{
+		"tool source": tool.Source, "tool tag": tool.Tag, "tool format": tool.Format, "tool url": tool.URL, "tool platform": tool.Platform,
+		"tool executable path": tool.ExecutablePath, "tool archive digest": tool.ArchiveDigest, "tool executable digest": tool.ExecutableDigest,
+	} {
+		if want == "" || labels[label] != want {
+			t.Fatalf("field %q = %q; want %q", label, labels[label], want)
+		}
+	}
+	assertFieldsRendered(t, description)
+}
+
+// assertFieldsRendered checks that the text view prints every described field.
+func assertFieldsRendered(t *testing.T, description ComponentDescription) {
+	t.Helper()
+	text, err := description.Render("text")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range description.Fields() {
+		if line := field.Label + ": " + field.Value + "\n"; !strings.Contains(string(text), line) {
+			t.Fatalf("text lacks %q:\n%s", line, text)
+		}
 	}
 }

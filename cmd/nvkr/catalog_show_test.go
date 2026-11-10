@@ -13,8 +13,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/runpresenter"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 )
 
 func TestCatalogShowReportsTheLoadedSourcePin(t *testing.T) {
@@ -91,4 +93,51 @@ func catalogFileBytes(t *testing.T, root string) map[string]string {
 		t.Fatal(err)
 	}
 	return files
+}
+
+func TestCatalogShowResultViewShowsEveryPin(t *testing.T) {
+	description := catalog.ComponentDescription{Catalog: "fixture", Name: "bundle", Mode: catalog.ProducerModePinnedTool, Platforms: []string{"linux/arm64"},
+		Tool: &catalog.DescribedToolPin{Source: "aicr", Tag: "v1.2.0", DescribedExecutable: catalog.DescribedExecutable{
+			Format: "tar-gzip", URL: "https://example.test/aicr.tar.gz", Platform: "linux/arm64", ExecutablePath: "aicr",
+			ArchiveDigest: "sha256:" + strings.Repeat("a", 64), ExecutableDigest: "sha256:" + strings.Repeat("b", 64),
+		}}}
+	display := catalogComponentDescriptionDisplay(description)
+	values := map[string]string{}
+	for _, field := range display.Fields {
+		values[field.Label] = field.Value
+	}
+	for label, want := range map[string]string{
+		"Tool format": "tar-gzip", "Tool platform": "linux/arm64", "Tool executable path": "aicr",
+		"Tool archive digest": description.Tool.ArchiveDigest, "Tool executable digest": description.Tool.ExecutableDigest,
+	} {
+		if values[label] != want {
+			t.Fatalf("result view %q = %q; want %q", label, values[label], want)
+		}
+	}
+	if len(display.Fields) != len(description.Fields())+1 {
+		t.Fatalf("result view shows %d fields; the description has %d plus the closure count", len(display.Fields), len(description.Fields()))
+	}
+}
+
+func TestCatalogShowUsageErrorsUseTheResultView(t *testing.T) {
+	for _, args := range [][]string{
+		{"--data", "must-not-be-read"},
+		{"--data", "must-not-be-read", "--format", "yaml", "component"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			shown := false
+			app := catalogPresentationApp(true, func(snapshot progress.Snapshot) runpresenter.Result {
+				shown = true
+				if snapshot.FailureCode != string(e.CodeUsage) {
+					t.Errorf("usage failure not shown: %+v", snapshot)
+				}
+				return runpresenter.Result{}
+			})
+			output, err := runCLIWithCapturedStdout(t, app, append([]string{"nvkr", "catalog", "show", "--ui=tui"}, args...)...)
+			assertLifecycleCommandCode(t, err, e.CodeUsage)
+			if !shown || len(output) != 0 {
+				t.Fatal("usage failure bypassed the result view or printed output")
+			}
+		})
+	}
 }
