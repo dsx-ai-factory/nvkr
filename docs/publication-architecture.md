@@ -65,10 +65,17 @@ with the same scoped credential that publication uses; a different personal Dock
 Network requests have a 15-second bound; ambient credential-helper behavior remains with the existing
 credential owner. The diagnostic issues no test uploads or cleanup requests. Proxy HTML and missing
 endpoints produce endpoint guidance rather than a guessed older protocol or silent downgrade.
-Missing V2 endpoints and successful HTML/proxy responses use non-retryable `invalid-catalog` (16).
+Missing V2 endpoints and unclassified protocol failures following a successful HTML/proxy base response
+use non-retryable `invalid-catalog` (16). Explicit HTTP refusals, transient responses and missing digest
+readback keep their established classifications.
+The pinned client used by the read-only check discards structured bodies on HTTP 404. For that status,
+the check reports endpoint configuration without inferring authorization or unsupported-operation details;
+an existing publication failure can expose those details through its own structured diagnostics.
 Publication preserves caller deadlines. Without one, full-layout and disk pushes have a 30-minute
 deadline; metadata-root publication has a 20-minute deadline. A timeout requires reconciling partial
 uploads and uncertain tag changes before retrying the same identified bytes.
+Metadata-root publication first checks its members in a read-only phase. A timeout there identifies the
+member and reports that no upload was attempted; upload uncertainty applies after the write phase begins.
 
 ## Troubleshoot Helm and registry rejections
 

@@ -232,3 +232,81 @@ func TestRegistryPublicationDeadlineOwnership(t *testing.T) {
 		}
 	}
 }
+
+func TestRegistryMetadataMemberCancellationIsReadOnly(t *testing.T) {
+	root, _ := releasePublicationFixture(t)
+	inspection, err := Inspect(t.Context(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	metadata := filepath.Join(t.TempDir(), "metadata")
+	if _, err := ExportMetadata(t.Context(), root, metadata); err != nil {
+		t.Fatal(err)
+	}
+	member := inspection.Root.Objects[0]
+	var active, reached atomic.Bool
+	var writes atomic.Int32
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if active.Load() {
+			if request.Method == http.MethodPut || request.Method == http.MethodPost || request.Method == http.MethodDelete {
+				writes.Add(1)
+			}
+			if strings.HasSuffix(request.URL.Path, "/manifests/"+member.DescriptorDigest) {
+				reached.Store(true)
+				cancel()
+				<-request.Context().Done()
+				return
+			}
+		}
+		handler.ServeHTTP(w, request)
+	}))
+	defer server.Close()
+	repository := strings.TrimPrefix(server.URL, "http://") + "/product/releases"
+	options := RegistryOptions{PlainHTTP: true, Anonymous: true}
+	if _, err := Push(t.Context(), root, repository, options); err != nil {
+		t.Fatal(err)
+	}
+	active.Store(true)
+	ref, err := PushMetadata(ctx, metadata, repository, options)
+	assertRegistryCode(t, err, e.CodeTimeout)
+	if ref != "" || !reached.Load() || writes.Load() != 0 || !errors.Is(err, context.Canceled) ||
+		!strings.Contains(err.Error(), "reading back metadata member \""+member.Name+"\"") ||
+		!strings.Contains(err.Error(), "no upload was attempted") || strings.Contains(err.Error(), "partial uploads") {
+		t.Fatalf("member cancellation lost its read-only phase or operation: %s %v (writes %d)", ref, err, writes.Load())
+	}
+}
+
+func TestRegistryReadOnlyFailureDoesNotClaimPartialUploads(t *testing.T) {
+	for _, cause := range []error{io.EOF, &transport.Error{StatusCode: http.StatusServiceUnavailable}} {
+		t.Run(fmt.Sprintf("%T", cause), func(t *testing.T) {
+			ctx, observer := observeRegistry(t.Context())
+			observer.readOnly = true
+			observer.report.LastOperation = "manifest-readback"
+			err := observer.explain(ctx, registryReadbackError(ctx, cause, "reading back metadata member %q", "tools"))
+			assertRegistryCode(t, err, e.CodeUnavailable)
+			if !strings.Contains(err.Error(), "no upload was attempted") || strings.Contains(err.Error(), "partial uploads") {
+				t.Fatalf("read-only failure claimed a write: %v", err)
+			}
+		})
+	}
+}
+
+func TestRegistryHTMLBaseKeepsExplicitResponseClassification(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusServiceUnavailable, http.StatusRequestTimeout, http.StatusTooManyRequests, http.StatusNotFound} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			ctx, observer := observeRegistry(t.Context())
+			observer.report.BaseStatus = http.StatusOK
+			observer.report.LastOperation = "manifest-readback"
+			response := &transport.Error{StatusCode: status}
+			err := registryReadbackError(ctx, response, "reading member")
+			want := e.CodeUnavailable
+			if status == http.StatusUnauthorized {
+				want = e.CodeRegistryAuthFailed
+			}
+			assertRegistryCode(t, err, want)
+		})
+	}
+}

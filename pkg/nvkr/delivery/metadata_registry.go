@@ -276,6 +276,7 @@ func PushMetadata(ctx context.Context, source, repository string, options Regist
 // root being published. Metadata publication cannot advance payload aliases.
 func PushMetadataWithOptions(ctx context.Context, source, repository string, request PushOptions) (published string, resultErr error) {
 	ctx, observer := observeRegistry(ctx)
+	observer.readOnly = true // Member admission precedes every metadata upload.
 	defer func(observedCtx context.Context) { resultErr = observer.explain(observedCtx, resultErr) }(ctx)
 	options := request.Registry
 	if err := deliveryContext(ctx); err != nil {
@@ -315,6 +316,10 @@ func PushMetadataWithOptions(ctx context.Context, source, repository string, req
 			return "", e.New(e.CodeVerifyFailed, "metadata member lacks repository")
 		}
 		if _, err := ResolveDigest(ctx, child.Name(), options); err != nil {
+			var coded *e.Error
+			if errors.As(err, &coded) && coded.Code == e.CodeTimeout {
+				return "", e.Wrap(e.CodeTimeout, err, "reading back metadata member %q", o.Name)
+			}
 			return "", registryReadbackError(ctx, err, "reading back metadata member %q", o.Name)
 		}
 	}
@@ -333,6 +338,7 @@ func PushMetadataWithOptions(ctx context.Context, source, repository string, req
 	if digest.String() != inspection.RootDigest {
 		return "", e.New(e.CodeVerifyFailed, "metadata index changed after membership inspection")
 	}
+	observer.readOnly = false
 	if err := remote.WriteIndex(ref, index, registryOptions(ctx, options)...); err != nil {
 		return "", registryPublishError(ctx, err, "publishing release metadata root")
 	}

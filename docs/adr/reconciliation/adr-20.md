@@ -58,5 +58,11 @@ Metadata-only readers share the full reader's empty-config rule. Verified metada
 published digest and retain exact bootstrap bytes; Packer selection JSON cannot set the representation.
 Historical default artifact/release goldens come from base `664905a46cb0b0be2ce111da24d833cf318efd96`.
 Registry-side next-action checks, compatible bundle readers and selected-output pulls are contract-tested.
+Unclassified protocol failures following a successful HTML/non-registry base response use non-retryable endpoint
+classification and proxy guidance. The read-only ORAS check has a documented limit: HTTP 404 bodies are
+not exposed by its pinned Ping implementation, so those checks report endpoint configuration even when
+the body contains a structured refusal. Response fixtures cover that difference without parsing bodies
+in the observation transport. Metadata-member cancellation preserves the member name and read-only
+guidance before any write, and nested alias readback classification does not duplicate its message.
 Write probes remain absent; the library's mutating, asynchronously cleaned-up push-permission helper is not
 used. Live registry/version coverage and hosted validation of these changes remain unverified.

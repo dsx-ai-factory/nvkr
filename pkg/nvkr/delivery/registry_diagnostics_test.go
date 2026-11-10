@@ -337,6 +337,53 @@ func TestRegistryObservationMissingBaseIsInvalidEndpoint(t *testing.T) {
 	}
 }
 
+func TestRegistryObservationHTMLBaseIsInvalidEndpoint(t *testing.T) {
+	var writes atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.Method == http.MethodPut || request.Method == http.MethodPost || request.Method == http.MethodDelete {
+			writes.Add(1)
+		}
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = io.WriteString(w, "<html>PRIVATE_SENTINEL login page</html>")
+	}))
+	defer server.Close()
+	root, digest := releasePublicationFixture(t)
+	ref, err := Push(t.Context(), root, strings.TrimPrefix(server.URL, "http://")+"/product/releases", RegistryOptions{PlainHTTP: true, Anonymous: true})
+	assertRegistryCode(t, err, e.CodeInvalidCatalog)
+	if ref != "" || e.Retryable(err) || !strings.Contains(err.Error(), "endpoint and proxy routing") ||
+		strings.Contains(err.Error(), "PRIVATE_SENTINEL") || writes.Load() != 0 {
+		t.Fatalf("HTML proxy was accepted, retried or given the wrong action: %s %v (writes %d)", ref, err, writes.Load())
+	}
+	inspection, err := Inspect(t.Context(), root)
+	if err != nil || inspection.RootDigest != digest {
+		t.Fatalf("endpoint rejection changed local publication bytes: %v", err)
+	}
+}
+
+func TestRegistryCheckDocumentsOpaque404Diagnostics(t *testing.T) {
+	for _, diagnostic := range []string{"DENIED", "UNSUPPORTED"} {
+		t.Run(diagnostic, func(t *testing.T) {
+			var requests atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+				requests.Add(1)
+				if request.Method != http.MethodGet || request.URL.Path != "/v2/" {
+					t.Error("check made a non-base request")
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				_, _ = fmt.Fprintf(w, `{"errors":[{"code":%q,"message":"PRIVATE_SENTINEL"}]}`, diagnostic)
+			}))
+			defer server.Close()
+			report, err := CheckRegistry(t.Context(), strings.TrimPrefix(server.URL, "http://")+"/project", RegistryOptions{PlainHTTP: true, Anonymous: true})
+			assertRegistryCode(t, err, e.CodeInvalidCatalog)
+			if requests.Load() != 1 || report.API != "unknown" || e.Retryable(err) ||
+				!strings.Contains(err.Error(), "endpoint and proxy routing") || strings.Contains(err.Error(), diagnostic) || strings.Contains(err.Error(), "PRIVATE_SENTINEL") {
+				t.Fatalf("check inferred diagnostics the pinned client does not expose: %+v %v", report, err)
+			}
+		})
+	}
+}
+
 func TestRegistryObservationKeepsLocalFailuresSeparate(t *testing.T) {
 	for _, test := range []struct {
 		name   string

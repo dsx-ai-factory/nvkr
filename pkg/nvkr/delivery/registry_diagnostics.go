@@ -234,7 +234,7 @@ func (observer *registryObserver) explain(ctx context.Context, err error) error 
 			action = "The operation was canceled or timed out; reconcile partial uploads before retrying the same identified publication."
 		}
 		if observer.readOnly && (coded.Code == e.CodeTimeout || coded.Code == e.CodeUnavailable) {
-			action = "Check the endpoint, TLS trust, DNS and connectivity, then retry the bounded read-only check; no upload was attempted."
+			action = "Check the endpoint, TLS trust, DNS and connectivity, then retry the bounded read-only operation; no upload was attempted."
 		}
 	}
 	if !registryCause {
@@ -242,7 +242,8 @@ func (observer *registryObserver) explain(ctx context.Context, err error) error 
 		// to the registry or attaching the status of an unrelated request.
 		return fmt.Errorf("%w; %s", err, action)
 	}
-	if coded != nil && coded.Code == e.CodeInvalidCatalog && report.LastOperation == "api-check" && report.API == "unknown" && report.BaseStatus != 0 {
+	if coded != nil && coded.Code == e.CodeInvalidCatalog && report.API == "unknown" &&
+		(report.BaseStatus == http.StatusOK || report.LastOperation == "api-check" && report.BaseStatus != 0) {
 		action = "The response did not establish the V2 registry API; check the registry endpoint and proxy routing. This does not establish an older supported API."
 	}
 	if response != nil && registryResponseCode(response) == e.CodeRegistryAuthFailed {
@@ -320,10 +321,9 @@ func CheckRegistry(ctx context.Context, repository string, options RegistryOptio
 		}
 	}
 	observed := observer.snapshot()
-	var classified *transport.Error
-	authRefused := errors.As(err, &classified) && registryResponseCode(classified) == e.CodeRegistryAuthFailed
-	unstructuredMissing := observed.BaseStatus == http.StatusNotFound && (classified == nil || len(classified.Errors) == 0)
-	if !authRefused && observed.LastOperation == "api-check" && observed.API == "unknown" && (err == nil || unstructuredMissing) {
+	// The pinned ORAS Registry.Ping returns ErrNotFound for every base 404
+	// without parsing its body. Do not pretend those diagnostics were observed.
+	if observed.LastOperation == "api-check" && observed.API == "unknown" && (err == nil || observed.BaseStatus == http.StatusNotFound) {
 		err = e.Wrap(e.CodeInvalidCatalog, registryResponseError{&transport.Error{StatusCode: observed.BaseStatus}},
 			"base response did not establish the V2 registry API; check the endpoint and proxy")
 	}

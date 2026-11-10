@@ -33,7 +33,21 @@ func registryPublishError(ctx context.Context, err error, operation string, args
 	return registryOperationError(ctx, err, fmt.Sprintf(operation, args...), true)
 }
 
+// A successful base response with an unrecognized API (for example HTML) is
+// endpoint evidence for this operation, not a reason to retry protocol failures.
+func registryHasInvalidBase(ctx context.Context) bool {
+	observer, ok := ctx.Value(registryObserverKey{}).(*registryObserver)
+	if !ok {
+		return false
+	}
+	report := observer.snapshot()
+	return report.BaseStatus == http.StatusOK && report.API == "unknown"
+}
+
 func registryOperationError(ctx context.Context, err error, operation string, publishing bool) error {
+	if observer, ok := ctx.Value(registryObserverKey{}).(*registryObserver); ok && observer.readOnly {
+		publishing = false
+	}
 	suffix := ""
 	if publishing {
 		suffix = "; destination may contain partial uploads"
@@ -64,7 +78,11 @@ func registryOperationError(ctx context.Context, err error, operation string, pu
 	}
 	var response *transport.Error
 	if !errors.As(err, &response) {
-		return e.Wrap(e.CodeUnavailable, registryNetworkError{err}, "%s%s", operation, suffix)
+		code := e.CodeUnavailable
+		if registryHasInvalidBase(ctx) {
+			code = e.CodeInvalidCatalog
+		}
+		return e.Wrap(code, registryNetworkError{err}, "%s%s", operation, suffix)
 	}
 	code := registryResponseCode(response)
 	return e.Wrap(code, registryResponseError{response}, "%s%s", operation, suffix)
@@ -96,6 +114,12 @@ func (failure registryNetworkError) Error() string {
 
 func registryReadbackError(ctx context.Context, err error, operation string, args ...any) error {
 	var coded *e.Error
+	if errors.As(err, &coded) {
+		switch coded.Err.(type) {
+		case registryResponseError, registryNetworkError:
+			return err // Preserve the first owning readback classification and message.
+		}
+	}
 	if ctx.Err() == nil && (!errors.As(err, &coded) || coded.Code == e.CodeUnavailable) {
 		var response *transport.Error
 		// Absence during readback can be temporary visibility. It neither

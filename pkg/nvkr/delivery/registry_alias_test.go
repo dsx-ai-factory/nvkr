@@ -481,6 +481,9 @@ func TestImageTagMutationFailuresPreserveRetryContract(t *testing.T) {
 			if want == e.CodeTimeout && !strings.Contains(err.Error(), "reconcile partial uploads") {
 				t.Fatalf("alias timeout lost recovery guidance: %v", err)
 			}
+			if mode == "readback missing" && strings.Count(err.Error(), "publication readback is incomplete") != 1 {
+				t.Fatalf("readback guidance was duplicated or lost: %v", err)
+			}
 			if ref != "" {
 				t.Fatal("failed alias write returned successful reference")
 			}

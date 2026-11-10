@@ -54,10 +54,15 @@ structured codes; untrusted server bodies, messages, details and request URLs ar
 presentation. The original structured cause remains available through error unwrapping.
 An absent manifest/blob during post-upload readback remains unavailable rather than proving a permanent
 format rejection; publication acceptance is not issued while that readback is incomplete.
-An unstructured 404 at the V2 base endpoint or a successful proxy/HTML response that fails to establish that API uses
+An unstructured 404 at the V2 base endpoint uses `invalid-catalog` (16). A successful proxy/HTML base
+response followed by an unclassified protocol failure also uses
 `invalid-catalog` (16), not a retryable publication error. Correct the endpoint or proxy configuration;
 neither response establishes an older protocol. Known structured refusals retain their classifications above.
+Explicit transient HTTP responses and readback absence retain their retryable classification.
 This is distinct from a missing digest during readback.
+The pinned read-only ORAS base check exposes any HTTP 404 only as not-found and does not parse that
+response body. It therefore reports endpoint configuration (16) even if the body contains a registry
+diagnostic; publication can classify such diagnostics from its own client's structured response.
 Diagnostic reports additionally describe the observed API family and request stage, while preserving an
 unknown exact OCI specification version and unknown untested features. Typed DNS and certificate failures
 receive safe connection diagnostics instead of printing credential-bearing client URLs. Next-action guidance
