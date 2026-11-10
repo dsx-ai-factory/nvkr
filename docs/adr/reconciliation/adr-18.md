@@ -14,14 +14,18 @@ kind harness requires a native AMD64 Docker host with at least four CPUs and 6 G
 failed closed at the native-platform preflight (`got aarch64; emulation is not admitted`); the selected
 daemon also reports two CPUs and 2,054,246,400 bytes of memory. The harness preserves that selected Unix
 socket while isolating registry credentials. The same harness is wired into the AMD64 CI workflow.
-The [2026-11-10 AMD64 attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42755804686)
-at `9494d8fb64a97fb2f0b3c0a0721caff0b4ef7963` completed all 107 build and publication tasks, including
-all 13 output publications, signatures and verifications, plus release assembly, publication, signing and
-verification. Native smoke failed because its fresh private daemon lacked the policy's pinned image.
-The Tekton smoke task now invokes the shared anonymous image-admission owner after smoke scope admission,
-before opening the held runtime; the runtime independently reauthenticates local image bytes and does not
-pull implicitly. Shared image-admission and smoke contract fixtures cover those owners. Successful complete
-native smoke, independent qualification and finalization remain unrecorded.
+The [2026-11-10 AMD64 run, attempt 2](https://github.com/dsx-ai-factory/nvkr/actions/runs/42759693766/attempts/2)
+at `0f617667aa7b472a99e324ce398ca2ea424f20e1` completed all 110 tasks in the main PipelineRun, including
+all 13 output publications, signatures and verifications, release assembly/publication/verification, native
+smoke, independent qualification and finalization. The harness authenticated and extracted the complete
+release manifest; complete carrier restoration, omission, corruption, substituted-manifest rejection and
+Run cancellation checks passed. This is native AMD64 core acceptance under fresh test-only cluster keys,
+not OS-image support, production cluster acceptance or exact-byte qualification.
+That attempt's overall harness result was failure: the failed-prepare fixture retained an empty `args`
+field that the API omitted, so exact specification authentication rejected it before authenticating the
+failed task. The fixture now omits that field too; provider comparison remains exact. The recorded attempt
+does not establish successful failed-task receipt authentication. Its first attempt failed on upstream Quay
+HTTP 502/504 responses and was rerun on the unchanged head.
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|

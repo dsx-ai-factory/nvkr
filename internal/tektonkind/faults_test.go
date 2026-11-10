@@ -170,7 +170,8 @@ func (l *lab) checkTerminalFailure(ctx context.Context, raw []byte) {
 				spec := run["spec"].(map[string]any)["pipelineSpec"].(map[string]any)["tasks"].([]any)[0].(map[string]any)["taskSpec"].(map[string]any)
 				step := spec["steps"].([]any)[0].(map[string]any)
 				step["command"] = []string{"/bin/false"}
-				step["args"] = []string{}
+				// The API omits empty args; freeze the same exact specification.
+				delete(step, "args")
 			}
 			exact, err := json.Marshal(run)
 			must(t, err)
