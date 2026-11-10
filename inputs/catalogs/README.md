@@ -106,8 +106,9 @@ ordered NVIDIA and native KVM overlays. Their other selections are:
 
 [`node-images/variants/native-nvidia.json`](node-images/variants/native-nvidia.json)
 binds its complete producer replacements to the shared release catalog's exact
-snapshot. The release catalog now carries the same NVIDIA fork 2.4.2 OVN producers
-and pins, so this overlay leaves the snapshot unchanged. The native KVM overlay binds
+snapshot. Its three NVIDIA fork 2.4.2 OVN producers are generated from the release catalog
+through `inputs/policies/ovn-producer-overlays.json`, so the release catalog owns their instructions
+and pins. This overlay leaves the snapshot unchanged. The native KVM overlay binds
 the resulting NVIDIA stack. The upstream, TCG and hosted nightly selections retain
 their source pin cohorts.
 Package metadata checks and Plan compilation establish input
