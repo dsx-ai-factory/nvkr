@@ -6,6 +6,7 @@ package toolchainmaintenance
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"maps"
 	"os"
@@ -90,7 +91,10 @@ func repin(ctx context.Context, root string, record Record, stage bool) ([]strin
 		if err != nil {
 			return nil, err
 		}
-		provider := editedRegistry{base: catalog.Dir(dir).(catalog.ContextDataProvider), raw: edits[name].after}
+		provider := editedRegistry{base: catalog.Dir(dir).(catalog.ContextDataProvider), registry: name, edits: edits}
+		if err := provider.rebindFragments(); err != nil {
+			return nil, err
+		}
 		updated, err := catalog.LoadContext(ctx, provider)
 		if err != nil {
 			return nil, err
@@ -261,8 +265,9 @@ func addReplacement(replacements map[string]string, old, updated string) error {
 }
 
 type editedRegistry struct {
-	base catalog.ContextDataProvider
-	raw  []byte
+	base     catalog.ContextDataProvider
+	registry string
+	edits    map[string]edit
 }
 
 func (p editedRegistry) Name() string                     { return "toolchain-maintenance:" + p.base.Name() }
@@ -273,10 +278,76 @@ func (p editedRegistry) ReadFileContext(ctx context.Context, name string) ([]byt
 		return nil, err
 	}
 	if name == catalog.RegistryFile {
-		return append([]byte(nil), p.raw...), nil
+		return append([]byte(nil), p.edits[p.registry].after...), nil
 	}
 	return p.base.ReadFileContext(ctx, name)
 }
 func (p editedRegistry) ReadDirContext(ctx context.Context, name string) ([]string, error) {
 	return p.base.ReadDirContext(ctx, name)
+}
+
+// fragmentEdit resolves only tracked authored inputs captured by this proposal.
+// It never falls back to disk: changed declarations and bindings must be checked
+// together before any proposed bytes are staged.
+func (p editedRegistry) fragmentEdit(name string) (edit, error) {
+	if err := catalog.ValidateFragmentPath(name); err != nil {
+		return edit{}, err
+	}
+	key := filepath.ToSlash(filepath.Join(filepath.Dir(p.registry), filepath.FromSlash(name)))
+	if key == ".." || strings.HasPrefix(key, "../") || filepath.IsAbs(key) {
+		return edit{}, e.New(e.CodeInvalidCatalog, "fragment escapes refresh root: %s", name)
+	}
+	change, ok := p.edits[key]
+	if !ok {
+		return edit{}, e.New(e.CodeInvalidCatalog, "fragment is not a tracked refresh input: %s", key)
+	}
+	return change, nil
+}
+
+func (p editedRegistry) ReadFragmentContext(ctx context.Context, name string) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	change, err := p.fragmentEdit(name)
+	if err != nil {
+		return nil, err
+	}
+	return append([]byte(nil), change.after...), nil
+}
+
+// The predecessor catalog has already been authenticated by the catalog owner.
+// Hashes here bind exact fragment bytes, never structured catalog identity.
+func (p editedRegistry) rebindFragments() error {
+	change := p.edits[p.registry]
+	var document struct {
+		Imports []struct {
+			Path   string
+			SHA256 string
+		}
+	}
+	if err := yaml.Unmarshal(change.before, &document); err != nil {
+		return e.Wrap(e.CodeInvalidCatalog, err, "read fragment bindings")
+	}
+	replacements := map[string]string{}
+	for _, imp := range document.Imports {
+		fragment, err := p.fragmentEdit(imp.Path)
+		if err != nil {
+			return err
+		}
+		if fmt.Sprintf("%x", sha256.Sum256(fragment.before)) != imp.SHA256 {
+			return e.New(e.CodeWriteConflict, "fragment changed during refresh: %s", imp.Path)
+		}
+		if err := addReplacement(replacements, imp.SHA256, fmt.Sprintf("%x", sha256.Sum256(fragment.after))); err != nil {
+			return err
+		}
+	}
+	var pairs []string
+	for _, old := range slices.Sorted(maps.Keys(replacements)) {
+		pairs = append(pairs, old, replacements[old])
+	}
+	if len(pairs) > 0 {
+		change.after = []byte(strings.NewReplacer(pairs...).Replace(string(change.after)))
+	}
+	p.edits[p.registry] = change
+	return nil
 }
