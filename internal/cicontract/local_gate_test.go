@@ -35,8 +35,9 @@ var (
 	}{
 		"golangci/golangci-lint-action@": {"lint", []string{"install-mode", "skip-cache", "version"}},
 	}
-	// Run steps that install a tool or report results, keyed by job and step name.
+	// Run steps that prepare sources, install a tool or report results, keyed by job and step name.
 	supportSteps = [][2]string{
+		{"workflows-regen", "Fetch public NVKE validation inputs"},
 		{"docs", "Install Fern CLI"},
 		{"lint", "Install checksum-pinned golangci-lint"},
 		{"tests", "Summarize test timings"},
