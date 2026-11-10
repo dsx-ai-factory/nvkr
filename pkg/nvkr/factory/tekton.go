@@ -95,6 +95,15 @@ func renderTekton(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 			if node.IRNode != "" && node.Kind != NodeFetch || node.Kind == NodePackage || node.Kind == NodeSBOM {
 				daemon = true
 			}
+			if node.IRNode != "" && node.Kind == NodeFetch {
+				_, instruction, err := plan.producerInstruction(node)
+				if err != nil {
+					return nil, err
+				}
+				// The shared source owner runs dependency vendoring in its
+				// pinned container before issuing the source closure receipt.
+				daemon = daemon || len(instruction.VendorCmd) != 0
+			}
 			if tektonNodeAccount(node) == "nvkr-publisher" {
 				role = "publisher"
 			}

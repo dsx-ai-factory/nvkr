@@ -135,3 +135,90 @@ func TestTektonResourcesUseRunnerAndIsolateCredentials(t *testing.T) {
 		}
 	}
 }
+
+func TestTektonSourceVendoringReceivesPrivateRuntime(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		command []string
+	}{
+		{"plain fetch", nil},
+		{"dependency vendoring", []string{"go", "mod", "vendor"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			original := tektonTestPlan(t)
+			base := original.CatalogSnapshot
+			for name, component := range base.Components {
+				if component.FromSource {
+					component.VendorCommand = tc.command
+					base.Components[name] = component
+				}
+			}
+			stack, err := catalog.ApplyStack(base)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan, err := Compile(t.Context(), original.Definition, original.Environment, stack, original.GeneratorVersion)
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundle, err := renderTekton(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var resources struct {
+				Items []struct {
+					Spec struct {
+						PipelineSpec struct {
+							Tasks []struct {
+								Name     string
+								TaskSpec struct {
+									Sidecars []json.RawMessage
+									Steps    []struct {
+										Env []struct{ Name, Value string }
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			if err := json.Unmarshal(bundle.Files[tektonResourcePath], &resources); err != nil {
+				t.Fatal(err)
+			}
+			projection, err := projectTektonExecution(t.Context(), plan, "linux/amd64")
+			if err != nil {
+				t.Fatal(err)
+			}
+			checked := 0
+			for _, node := range plan.Graph.Nodes {
+				if node.Kind != NodeFetch || node.IRNode == "" {
+					continue
+				}
+				for _, resource := range resources.Items {
+					for _, task := range resource.Spec.PipelineSpec.Tasks {
+						if task.Name != projection.owners[node.ID] {
+							continue
+						}
+						checked++
+						wantRuntime := len(tc.command) != 0
+						if (len(task.TaskSpec.Sidecars) == 1) != wantRuntime {
+							t.Fatalf("fetch %s runtime sidecars = %d, vendoring = %t", node.ID, len(task.TaskSpec.Sidecars), wantRuntime)
+						}
+						hasSocket := false
+						for _, env := range task.TaskSpec.Steps[0].Env {
+							if env.Name == "DOCKER_HOST" && env.Value == "unix:///run/nvkr/docker.sock" {
+								hasSocket = true
+							}
+						}
+						if hasSocket != wantRuntime {
+							t.Fatalf("fetch %s private socket = %t, vendoring = %t", node.ID, hasSocket, wantRuntime)
+						}
+					}
+				}
+			}
+			if checked == 0 {
+				t.Fatal("fixture did not exercise source fetching")
+			}
+		})
+	}
+}

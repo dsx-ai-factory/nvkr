@@ -13,8 +13,13 @@ These checks do not establish an end-to-end Tekton build, qualification or relea
 kind harness requires a native AMD64 Docker host with at least four CPUs and 6 GiB. Its local invocation
 failed closed at the native-platform preflight (`got aarch64; emulation is not admitted`); the selected
 daemon also reports two CPUs and 2,054,246,400 bytes of memory. The harness preserves that selected Unix
-socket while isolating registry credentials. The same harness is wired into the AMD64 CI workflow;
-its complete cluster run remains unrecorded.
+socket while isolating registry credentials. The same harness is wired into the AMD64 CI workflow.
+The [2026-11-10 AMD64 attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42730274634)
+at `6f222a80b69905f64dc6affc3426e53b05ebf039` reached terminal accounting but failed: both source-fetch
+tasks returned capability exit code 29, and dependent operations and finalization rejected the incomplete
+closure. The projection omitted the private daemon required by their declared dependency-vendoring
+commands. Fetch tasks with vendoring now receive that runtime; plain fetches remain daemon-free.
+Successful complete cluster acceptance remains unrecorded.
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|

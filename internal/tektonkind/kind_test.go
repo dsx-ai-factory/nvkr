@@ -390,13 +390,51 @@ func (l *lab) download(ctx context.Context, address, digest string, limit int64)
 }
 
 func (l *lab) capture() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	for _, kind := range []string{"pipelineruns", "taskruns", "pods", "events"} {
 		raw, err := l.invoke(ctx, nil, "docker", l.dockerArgs("exec", l.node, "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf", "-n", "nvkr", "get", kind, "-o", "json")...)
 		if err == nil {
 			if err := os.WriteFile(filepath.Join(l.evidence, kind+".json"), raw, 0600); err != nil {
 				l.t.Log(err)
+			}
+			if kind == "pods" {
+				l.captureFailedSteps(ctx, raw)
+			}
+		}
+	}
+}
+
+func (l *lab) captureFailedSteps(ctx context.Context, raw []byte) {
+	var pods struct {
+		Items []struct {
+			Metadata struct{ Name string }
+			Status   struct {
+				ContainerStatuses []struct {
+					Name  string
+					State struct{ Terminated *struct{ ExitCode int } }
+				}
+			}
+		}
+	}
+	if err := json.Unmarshal(raw, &pods); err != nil {
+		l.t.Log(err)
+		return
+	}
+	for _, pod := range pods.Items {
+		for _, container := range pod.Status.ContainerStatuses {
+			if !strings.HasPrefix(container.Name, "step-") || container.State.Terminated == nil || container.State.Terminated.ExitCode == 0 {
+				continue
+			}
+			name := pod.Metadata.Name + "-" + container.Name + ".log"
+			if filepath.Base(name) != name {
+				continue
+			}
+			output, err := l.invoke(ctx, nil, "docker", l.dockerArgs("exec", l.node, "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf", "-n", "nvkr", "logs", pod.Metadata.Name, "-c", container.Name, "--tail=200", "--limit-bytes=65536")...)
+			if err == nil {
+				if err := os.WriteFile(filepath.Join(l.evidence, name), output, 0600); err != nil {
+					l.t.Log(err)
+				}
 			}
 		}
 	}
