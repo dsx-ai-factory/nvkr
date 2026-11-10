@@ -236,7 +236,7 @@ func (l *lab) runner(ctx context.Context, registry string) (string, string) {
 	must(l.t, yaml.Unmarshal(read(l.t, filepath.Join(l.root, "inputs/catalogs/nvke/module-tags/pins.lock.yaml")), &lock))
 	tool := lock.Pins["cosign"].Tool
 	cosign := filepath.Join(l.scratch, "cosign")
-	must(l.t, os.WriteFile(cosign, l.download(ctx, tool.URL, strings.TrimPrefix(tool.ArchiveDigest, "sha256:"), 128<<20), 0700))
+	must(l.t, os.WriteFile(cosign, l.download(ctx, tool.URL, strings.TrimPrefix(tool.ArchiveDigest, "sha256:"), 256<<20), 0700))
 	return digest, cosign
 }
 
@@ -362,8 +362,11 @@ func (l *lab) download(ctx context.Context, address, digest string, limit int64)
 	raw, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	must(l.t, err)
 	sum := sha256.Sum256(raw)
-	if int64(len(raw)) > limit || hex.EncodeToString(sum[:]) != digest {
-		l.t.Fatal("pinned download failed exact byte verification")
+	if int64(len(raw)) > limit {
+		l.t.Fatalf("pinned download %s exceeds %d-byte limit", address, limit)
+	}
+	if actual := hex.EncodeToString(sum[:]); actual != digest {
+		l.t.Fatalf("pinned download %s failed exact byte verification: got %s, want %s", address, actual, digest)
 	}
 	return raw
 }

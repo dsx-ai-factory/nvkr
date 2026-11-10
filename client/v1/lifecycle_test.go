@@ -78,7 +78,7 @@ func unmarshalOpaque(raw []byte, value any) error { return json.Unmarshal(raw, v
 
 func TestSDKRejectsUnsupportedGenerationBeforeInputsAndUnconfiguredConsumer(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "generated")
-	_, err := client.New().GenerateLifecycleRun(context.Background(), "absent-definition.yaml", "absent-environment.yaml", "test", "tekton", root, false)
+	_, err := client.New().GenerateLifecycleRun(context.Background(), "absent-definition.yaml", "absent-environment.yaml", "test", "argo", root, false)
 	requireLifecycleCode(t, err, nvkrerr.CodeEngineCapability)
 	if _, err := os.Stat(root); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("unsupported engine created output: %v", err)

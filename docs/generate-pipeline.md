@@ -353,11 +353,11 @@ corrupt or canceled execution cannot become successful. Claims remain `pipeline-
 
 Run `bash scripts/test-tekton-kind.sh` on a native AMD64 Docker host with at least four CPUs and 6 GiB assigned to Docker,
 the repository's exact Go version, and kind v0.31.0 installed. The same command runs in
-[the kind CI workflow](../.github/workflows/tekton-kind.yml). It creates an owned disposable cluster,
+[the kind CI workflow](https://github.com/dsx-ai-factory/nvkr/blob/main/.github/workflows/tekton-kind.yml). It creates an owned disposable cluster,
 in-cluster registry and test-only keys, selects the maintained core Definition's AMD64 outputs, and checks
 publication, signing, qualification, transport faults and cancellation. Set `NVKR_TEKTON_EVIDENCE` to an
 external directory to retain public reports; keys and kubeconfig stay in disposable scratch storage.
-See [reconciliation](adr/reconciliation/adr-18.md) for the exact externally exercised scope.
+See [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-18.md) for the exact externally exercised scope.
 
 ## Recover interrupted qualification generation
 

@@ -38,7 +38,7 @@ func (provider *Provider) authenticateTaskSpec(ctx context.Context, run pipeline
 	if account != expected.ServiceAccount {
 		return e.New(e.CodePipelineDrift, "Tekton task account differs from its admitted Run")
 	}
-	want := map[string]any{"taskSpec": json.RawMessage(expected.Spec), "serviceAccountName": account,
+	want := map[string]any{"taskSpec": expected.Spec, "serviceAccountName": account,
 		"params": []nameValue{{"run-name", provider.policy.RunName}, {"run-uid", provider.policy.RunUID}}}
 	if selected.Timeout != "" {
 		want["timeout"] = selected.Timeout

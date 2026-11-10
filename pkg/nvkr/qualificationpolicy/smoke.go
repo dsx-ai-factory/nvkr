@@ -5,13 +5,14 @@
 package qualificationpolicy
 
 import (
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
-	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/google/go-containerregistry/pkg/name"
 	"maps"
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/google/go-containerregistry/pkg/name"
 )
 
 // Smoke selects immutable native execution images and exact output membership.

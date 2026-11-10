@@ -162,7 +162,7 @@ func watchTektonTask(ctx context.Context, interval time.Duration, authenticate f
 		}
 	}()
 	err := operation(ctx)
-	finished := errors.New("Tekton operation completed")
+	finished := errors.New("tekton operation completed")
 	cancel(finished)
 	<-done
 	cause := context.Cause(ctx)

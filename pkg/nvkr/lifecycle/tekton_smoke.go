@@ -243,7 +243,7 @@ func ReadTektonEvidence(ctx context.Context, path string) ([]byte, error) {
 	if err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "opening bounded Tekton evidence")
 	}
-	defer held.Close()
+	defer func() { _ = held.Close() }()
 	raw, err := held.ReadAllContext(ctx, sign.MaxQualificationPredicateBytes)
 	if err != nil {
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "reading exact Tekton evidence")
