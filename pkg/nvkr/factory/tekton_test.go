@@ -244,6 +244,7 @@ func TestTektonPublicVerificationDoesNotRequireSigningAuthority(t *testing.T) {
 		code e.Code
 	}{
 		{NodeVerifyPublication, ""},
+		{NodePublish, ""},
 		{NodeSign, e.CodeVerifyFailed},
 		{NodeAttestEvidence, e.CodeVerifyFailed},
 		{NodePackage, e.CodeEngineCapability},

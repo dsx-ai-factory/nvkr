@@ -13,12 +13,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-func providerFixture(t *testing.T, edit func(*pipelineRun, *taskRun)) (*Provider, TaskExpectation, []byte) {
+func providerFixture(t *testing.T, edit func(*pipelineRun, *taskRun), responses ...func(*pipelineRun)) (*Provider, TaskExpectation, []byte) {
 	t.Helper()
 	const runUID = "11111111-1111-1111-1111-111111111111"
 	const taskUID = "22222222-2222-2222-2222-222222222222"
@@ -60,7 +62,12 @@ func providerFixture(t *testing.T, edit func(*pipelineRun, *taskRun)) (*Provider
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/apis/tekton.dev/v1/namespaces/fixture/pipelineruns/run":
-			_ = json.NewEncoder(w).Encode(run)
+			response := run
+			response.Status.ChildReferences = append([]childReference(nil), run.Status.ChildReferences...)
+			for _, respond := range responses {
+				respond(&response)
+			}
+			_ = json.NewEncoder(w).Encode(response)
 		case "/apis/tekton.dev/v1/namespaces/fixture/taskruns/run-build":
 			_ = json.NewEncoder(w).Encode(task)
 		default:
@@ -232,6 +239,70 @@ func TestProviderCancellationAndAdmission(t *testing.T) {
 			if got != nil {
 				got.Close()
 				t.Fatal("invalid trust policy returned a provider")
+			}
+		})
+	}
+}
+
+func TestProviderAwaitsOnlyInitialControllerReference(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		code e.Code
+	}{
+		{"recorded after startup", ""},
+		{"never recorded", e.CodeTimeout},
+		{"duplicate", e.CodeVerifyFailed},
+		{"foreign Run", e.CodeVerifyFailed},
+		{"canceled while waiting", e.CodeVerifyFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var reads atomic.Int32
+			var revoked atomic.Bool
+			provider, expected, _ := providerFixture(t, func(_ *pipelineRun, task *taskRun) {
+				task.Status.Conditions[0].Status = "Unknown"
+				task.Status.CompletionTime = ""
+			}, func(run *pipelineRun) {
+				n := reads.Add(1)
+				switch tc.name {
+				case "duplicate":
+					run.Status.ChildReferences = append(run.Status.ChildReferences, run.Status.ChildReferences[0])
+				case "foreign Run":
+					run.Metadata.UID = "33333333-3333-3333-3333-333333333333"
+				default:
+					if n == 1 || tc.name == "never recorded" || revoked.Load() {
+						run.Status.ChildReferences = nil
+					}
+					if n > 1 && tc.name == "canceled while waiting" {
+						run.Spec.Status = "Cancelled"
+					}
+				}
+			})
+			ctx := t.Context()
+			if tc.name == "never recorded" {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
+				defer cancel()
+			}
+			receipt, err := provider.AwaitExecution(ctx, expected)
+			if tc.code != "" {
+				requireCode(t, err, tc.code)
+				if receipt != nil {
+					t.Fatal("incomplete or invalid binding issued a receipt")
+				}
+				if (tc.name == "duplicate" || tc.name == "foreign Run") && reads.Load() != 1 {
+					t.Fatal("startup retried an authentication failure")
+				}
+				return
+			}
+			if err != nil || receipt.State() != "running" || reads.Load() != 2 {
+				t.Fatalf("startup did not authenticate the recorded child: %v", err)
+			}
+			// Once admitted, losing the binding revokes authority immediately.
+			revoked.Store(true)
+			receipt, err = provider.AuthenticateExecution(t.Context(), expected)
+			requireCode(t, err, e.CodeVerifyFailed)
+			if receipt != nil || reads.Load() != 3 {
+				t.Fatal("active execution delayed or ignored a missing binding")
 			}
 		})
 	}

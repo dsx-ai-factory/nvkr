@@ -98,10 +98,11 @@ func productionOCISigner(_ context.Context, plan *Plan, node Node, artifacts map
 func configureTektonOCI(plan *Plan, node Node, options *sign.CosignOCIOptions) error {
 	// Release assembly also verifies earlier output publications. Their logical
 	// verify nodes do not describe the current task's account. Public-key
-	// verification needs no private key or signing execution authority.
+	// verification, including publication's SBOM check, needs no private key or
+	// signing execution authority.
 	privateKey := ""
 	switch node.Kind {
-	case NodeVerifyPublication:
+	case NodeVerifyPublication, NodePublish:
 	case NodeSign, NodeAttestEvidence:
 		digest, err := plan.IdentityDigest()
 		if err != nil {

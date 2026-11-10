@@ -14,13 +14,17 @@ kind harness requires a native AMD64 Docker host with at least four CPUs and 6 G
 failed closed at the native-platform preflight (`got aarch64; emulation is not admitted`); the selected
 daemon also reports two CPUs and 2,054,246,400 bytes of memory. The harness preserves that selected Unix
 socket while isolating registry credentials. The same harness is wired into the AMD64 CI workflow.
-The [2026-11-10 AMD64 attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42746883170)
+The [2026-11-10 AMD64 build attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42746883170)
 at `a83a283f25acc31bd2ab2ab64ef9204a423c0d7a` completed both source fetches and all 13 output-publication,
 signing and publication-verification tasks. It failed during reference-release assembly: nested public-key
-verification incorrectly required the account of a separate verification task. Public verification now
-selects only the independently configured public key; signing and attestation still require the publisher's
-authenticated execution receipt and private key. The run did not complete release assembly, independent
-qualification or finalization. Successful complete cluster acceptance remains unrecorded.
+verification incorrectly required the account of a separate verification task. The
+[subsequent attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42751698732) at
+`b850a52e74d6f9cb50e89692e865fac3181db35f` exposed an omitted public-verifier admission for publication's
+SBOM check and a task starting before its controller child reference appeared. Public verification now
+includes that SBOM check and selects no private key; signing and attestation retain publisher receipt
+admission. Initial execution waits up to 30 seconds for the missing controller reference before doing work;
+active execution still rejects a lost binding immediately. Focused fixtures cover these repairs. Successful
+complete release assembly, independent qualification and finalization remain unrecorded.
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|

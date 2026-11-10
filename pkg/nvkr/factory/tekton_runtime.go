@@ -77,7 +77,7 @@ func ExecuteTektonTaskWithEvidence(ctx context.Context, options TektonTaskOption
 	if !ok {
 		return e.New(e.CodeEngineCapability, "unknown Tekton execution stage")
 	}
-	receipt, err := runner.provider.AuthenticateExecution(ctx, tekton.TaskExpectation{Name: options.Stage, RunName: options.TaskRun, RunUID: options.TaskUID, ServiceAccount: selected.account, Spec: selected.spec})
+	receipt, err := runner.provider.AwaitExecution(ctx, tekton.TaskExpectation{Name: options.Stage, RunName: options.TaskRun, RunUID: options.TaskUID, ServiceAccount: selected.account, Spec: selected.spec})
 	if err != nil {
 		return err
 	}

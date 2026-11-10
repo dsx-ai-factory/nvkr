@@ -14,6 +14,7 @@ import (
 	"crypto/x509"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -33,6 +34,8 @@ const (
 
 var resourceName = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$`)
 var resourceUID = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
+
+var errChildPending = errors.New("controller child reference is not yet recorded")
 
 // ProviderPolicy is independently selected trust. Neither a carrier nor a
 // TaskRun supplies the API endpoint, CA, Run UID or expected complete Run specification.
@@ -241,6 +244,32 @@ func (provider *Provider) AuthenticateStage(ctx context.Context, stage, account 
 	return provider.AuthenticateExecution(ctx, TaskExpectation{Name: stage, RunName: name, RunUID: task.Metadata.UID, ServiceAccount: account, Spec: spec})
 }
 
+// AwaitExecution admits initial task startup after the controller records its
+// child reference. It waits at most 30 seconds, only for that missing status
+// field; every attempt still authenticates the exact Run and specification.
+// No task work or receipt is permitted before the complete binding passes.
+// Active leases use AuthenticateExecution instead and never delay revocation.
+func (provider *Provider) AwaitExecution(ctx context.Context, expected TaskExpectation) (*TaskReceipt, error) {
+	if err := contextError(ctx); err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	for {
+		receipt, err := provider.AuthenticateExecution(ctx, expected)
+		if !errors.Is(err, errChildPending) {
+			return receipt, err
+		}
+		timer := time.NewTimer(250 * time.Millisecond)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, contextError(ctx)
+		case <-timer.C:
+		}
+	}
+}
+
 // AuthenticateExecution authenticates an exact active or terminal child without
 // turning a failed or running task into a successful artifact receipt.
 func (provider *Provider) AuthenticateExecution(ctx context.Context, expected TaskExpectation) (*TaskReceipt, error) {
@@ -299,8 +328,11 @@ func (provider *Provider) AuthenticateExecution(ctx context.Context, expected Ta
 			}
 		}
 	}
+	if found == 0 {
+		return nil, e.Wrap(e.CodeVerifyFailed, errChildPending, "Tekton Run omits the selected child execution")
+	}
 	if found != 1 {
-		return nil, e.New(e.CodeVerifyFailed, "Tekton Run omits or repeats the selected child execution")
+		return nil, e.New(e.CodeVerifyFailed, "Tekton Run repeats the selected child execution")
 	}
 	var task taskRun
 	if err := provider.get(ctx, "taskruns", expected.RunName, &task); err != nil {

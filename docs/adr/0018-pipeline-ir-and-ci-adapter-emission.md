@@ -94,6 +94,9 @@ The client uses explicit credentials and roots, no ambient kubeconfig, proxy or 
 requests and responses, and no redirects. Unknown, substituted, failed, deleted, retried or canceled execution
 cannot issue a successful transport receipt. Kubernetes and Tekton control-plane administrators are trusted
 to preserve these records; this is an explicit provider trust boundary, not protection against the cluster owner.
+Initial admission may wait at most 30 seconds for the controller to record its child reference, with no
+execution or receipt before complete authentication. A missing binding after admission revokes active work
+without that startup grace period; substitutions, ambiguity and cancellation are never retried.
 
 Each producer task receives its own container daemon and private scratch volume. There is no host Docker
 socket or shared privileged daemon. The NVKR launcher still owns pinned toolchain execution, declared
@@ -1147,8 +1150,9 @@ requires separate runtime evidence. An opt-in native smoke test requires an expl
 and already-local exact native image ID; absence of those inputs skips it, not proves the backend works.
 No generated disk executor or stronger evidence lane is implied.
 
-Maintained lifecycle targets are local and GitHub. GitLab, Tekton and Argo selection returns
-`CodeEngineCapability` before reading authored inputs or producing output. No fallback renderer exists.
+Maintained lifecycle targets are local, GitHub and the explicit native Tekton cluster contract above.
+GitLab and Argo selection returns `CodeEngineCapability` before reading authored inputs or producing output.
+No fallback renderer exists.
 
 | Event | Admitted work and credentials |
 |---|---|
