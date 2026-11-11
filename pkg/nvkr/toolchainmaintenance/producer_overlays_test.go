@@ -148,3 +148,49 @@ func TestRepinRejectsAmbiguousLocalImageBinding(t *testing.T) {
 		t.Fatalf("ambiguous binding changed an input: %v", err)
 	}
 }
+
+func TestRepinRejectsUnsupportedProducerOverlayPolicyWithoutWrites(t *testing.T) {
+	isolateGitEnvironment(t)
+	root := t.TempDir()
+	oldImage := Registry + "/packer-native@" + digest("old-arm")
+	const registry = "inputs/catalogs/base/registry.yaml"
+	const overlay = "inputs/catalogs/variants/native.json"
+	writeJSON(t, filepath.Join(root, registry), map[string]any{
+		"apiVersion": "nvkr.dev/catalog/v3", "kind": "SourceBuildRegistry",
+		"sources": map[string]any{"tool": map[string]any{"toolchainImagesByArch": map[string]string{"arm64": oldImage}}},
+	})
+	writeJSON(t, filepath.Join(root, overlay), catalog.Overlay{
+		APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind, Name: "native", RequiresCatalogDigest: digest("base"),
+		ToolchainSubstitutions: []catalog.ToolchainSubstitution{{Arch: "arm64", From: digest("local-arm"), To: oldImage, Components: []string{"tool"}}},
+	})
+	writeJSON(t, filepath.Join(root, producerOverlayPolicy), map[string]string{"apiVersion": "nvkr.dev/producer-overlay-maintenance/v999"})
+	before := map[string][]byte{}
+	for _, name := range []string{registry, overlay, producerOverlayPolicy} {
+		raw, err := os.ReadFile(filepath.Join(root, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		before[name] = raw
+	}
+	for _, args := range [][]string{{"init", "--quiet"}, {"add", "inputs"}} {
+		if _, err := command(t.Context(), root, "git", args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	indexBefore, err := command(t.Context(), root, "git", "write-tree")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = repin(t.Context(), root, recordFixture(), true)
+	assertCode(t, err, e.CodeInvalidCatalog)
+	for name, raw := range before {
+		after, err := os.ReadFile(filepath.Join(root, name))
+		if err != nil || !bytes.Equal(raw, after) {
+			t.Fatalf("unsupported policy changed %s: %v", name, err)
+		}
+	}
+	indexAfter, err := command(t.Context(), root, "git", "write-tree")
+	if err != nil || !bytes.Equal(indexBefore, indexAfter) {
+		t.Fatalf("unsupported policy changed staged inputs: %v", err)
+	}
+}
