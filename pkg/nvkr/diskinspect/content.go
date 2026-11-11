@@ -10,7 +10,6 @@ import (
 	"io"
 	"io/fs"
 	"strings"
-	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/diskdiagnostic"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/assemble"
@@ -81,7 +80,7 @@ func RunDiskContentHelper(ctx context.Context, inspectorDigest, codecDigest, sub
 	if err := validateContext(ctx); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, helperOperationTimeout)
 	defer cancel()
 	if input == nil || output == nil || !canonical.IsDigest(subjectDigest) || size <= 0 || size > MaxDiagnosticDiskBytes || maxBytes == 0 || maxBytes > 16<<30 ||
 		(platform != "linux/amd64" && platform != "linux/arm64") {

@@ -5,6 +5,7 @@ package factory
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -12,6 +13,80 @@ import (
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
+
+func TestGitHubDiskHelperLifecycleFailures(t *testing.T) {
+	openFailure := e.New(e.CodeEngineCapability, "probe admission failed")
+	workFailure := e.New(e.CodeBuildFailed, "operation failed")
+	closeFailure := errors.New("inspector cleanup failed")
+	for _, phase := range []struct {
+		name            string
+		run             func(context.Context, func(context.Context) (func() error, error), func(context.Context) error) error
+		closeBeforeWork bool
+	}{
+		{"probe", probeGitHubDiskHelper, true},
+		{"completion", completeGitHubDiskWithHelper, false},
+	} {
+		for _, tc := range []struct {
+			name                       string
+			openErr, workErr, closeErr error
+		}{
+			{"success", nil, nil, nil},
+			{"open failure", openFailure, nil, nil},
+			{"close failure", nil, nil, closeFailure},
+			{"operation failure", nil, workFailure, nil},
+			{"operation and close failures", nil, workFailure, closeFailure},
+		} {
+			t.Run(phase.name+"/"+tc.name, func(t *testing.T) {
+				var events []string
+				err := phase.run(t.Context(), func(context.Context) (func() error, error) {
+					events = append(events, "open")
+					if tc.openErr != nil {
+						return nil, tc.openErr
+					}
+					return func() error { events = append(events, "close"); return tc.closeErr }, nil
+				}, func(context.Context) error { events = append(events, "work"); return tc.workErr })
+				want := []string{"open"}
+				workRan := tc.openErr == nil && (!phase.closeBeforeWork || tc.closeErr == nil)
+				if tc.openErr == nil {
+					if phase.closeBeforeWork {
+						want = append(want, "close")
+					}
+					if workRan {
+						want = append(want, "work")
+					}
+					if !phase.closeBeforeWork {
+						want = append(want, "close")
+					}
+				}
+				if !reflect.DeepEqual(events, want) {
+					t.Fatalf("events=%v want=%v", events, want)
+				}
+				for _, cause := range []struct {
+					err     error
+					present bool
+				}{
+					{openFailure, tc.openErr != nil},
+					{workFailure, workRan && tc.workErr != nil},
+					{closeFailure, tc.openErr == nil && tc.closeErr != nil},
+				} {
+					if errors.Is(err, cause.err) != cause.present {
+						t.Fatalf("error %v lost or invented cause %v", err, cause.err)
+					}
+				}
+				switch {
+				case tc.openErr != nil:
+					assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+				case workRan && tc.workErr != nil:
+					assertFactoryErrorCode(t, err, e.CodeBuildFailed)
+				case tc.closeErr != nil:
+					assertFactoryErrorCode(t, err, e.CodeInternal)
+				case err != nil:
+					t.Fatal(err)
+				}
+			})
+		}
+	}
+}
 
 func TestInternalToolNativeHostedPlanGeneration(t *testing.T) {
 	for _, platform := range []string{"linux/amd64", "linux/arm64"} {

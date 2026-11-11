@@ -15,6 +15,10 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
 
+// helperOperationTimeout bounds work inside the appliance. The pipeline owns
+// its separate complete-operation budget, including transport and cleanup.
+const helperOperationTimeout = 10 * time.Minute
+
 type diskInspectionReport struct {
 	Subject   string                 `json:"subject"`
 	Size      int64                  `json:"size"`
@@ -36,7 +40,7 @@ func RunDiskInspectionHelper(ctx context.Context, inspectorDigest, codecDigest, 
 	if input == nil || output == nil {
 		return e.New(e.CodeUsage, "inspection helper requires input and output streams")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	ctx, cancel := context.WithTimeout(ctx, helperOperationTimeout)
 	defer cancel()
 	codec, err := assemble.OpenQemuImgCodec(ctx, "/usr/bin/qemu-img", codecDigest)
 	if err != nil {

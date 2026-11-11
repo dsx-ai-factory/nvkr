@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
+	"strings"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -26,6 +28,10 @@ func TestProducedInspectorInjectionReal(t *testing.T) {
 	helper := os.Getenv("NVKR_TEST_PRODUCED_INSPECTOR")
 	if helper == "" {
 		t.Skip("requires a built native helper, local pinned appliance and native Docker/Podman")
+	}
+	qcow := os.Getenv("NVKR_TEST_DISK_QCOW2")
+	if missing := missingProducedInspectorVariables(os.Getenv, qcow != ""); len(missing) != 0 {
+		t.Fatalf("injection probe requires companion variables: %s", strings.Join(missing, ", "))
 	}
 	if runtime.GOOS != "linux" {
 		t.Fatal("injection probe requires native Linux")
@@ -57,7 +63,6 @@ func TestProducedInspectorInjectionReal(t *testing.T) {
 		Resources:      execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 6144, EphemeralStorageMiB: 64},
 		TimeoutSeconds: 120, MaxFilesystemBytes: 1 << 20, ScratchStorage: "memory",
 	}
-	qcow := os.Getenv("NVKR_TEST_DISK_QCOW2")
 	if qcow != "" {
 		info, err := os.Stat(qcow)
 		if err != nil {
@@ -145,4 +150,44 @@ func TestProducedInspectorInjectionReal(t *testing.T) {
 		t.Fatalf("revoked helper remained usable: %v", err)
 	}
 	t.Logf("native injected helper: platform=%s helper=%s terminal=%s appliance=%s subject=%s bytes=%d", selection.Platform, binding.Digest, binding.TerminalDigest, image, digest, size)
+}
+
+// Inventory-only QCOW2 inspection needs the runtime, appliance, inspector and
+// codec. Archive content inspection additionally authenticates all content tools.
+func missingProducedInspectorVariables(getenv func(string) string, qcow bool) []string {
+	required := []string{"NVKR_TEST_DISK_INSPECT_RUNTIME", "NVKR_TEST_DISK_INSPECT_IMAGE",
+		"NVKR_TEST_DISK_INSPECTOR_SHA256", "NVKR_TEST_DISK_CODEC_SHA256"}
+	if !qcow {
+		required = append(required, "NVKR_TEST_DISK_GUESTFISH_SHA256", "NVKR_TEST_DISK_SCANNER_SHA256", "NVKR_TEST_DISK_PACKAGE_READER_SHA256")
+	}
+	var missing []string
+	for _, name := range required {
+		if strings.TrimSpace(getenv(name)) == "" {
+			missing = append(missing, name)
+		}
+	}
+	slices.Sort(missing)
+	return missing
+}
+
+func TestProducedInspectorVariablePreflight(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		qcow    bool
+		values  map[string]string
+		missing []string
+	}{
+		{"archive missing all", false, nil, []string{"NVKR_TEST_DISK_CODEC_SHA256", "NVKR_TEST_DISK_GUESTFISH_SHA256", "NVKR_TEST_DISK_INSPECTOR_SHA256", "NVKR_TEST_DISK_INSPECT_IMAGE", "NVKR_TEST_DISK_INSPECT_RUNTIME", "NVKR_TEST_DISK_PACKAGE_READER_SHA256", "NVKR_TEST_DISK_SCANNER_SHA256"}},
+		{"qcow missing all", true, nil, []string{"NVKR_TEST_DISK_CODEC_SHA256", "NVKR_TEST_DISK_INSPECTOR_SHA256", "NVKR_TEST_DISK_INSPECT_IMAGE", "NVKR_TEST_DISK_INSPECT_RUNTIME"}},
+		{"qcow needs no content tools", true, map[string]string{"NVKR_TEST_DISK_INSPECT_RUNTIME": "docker", "NVKR_TEST_DISK_INSPECT_IMAGE": "image", "NVKR_TEST_DISK_INSPECTOR_SHA256": "inspector", "NVKR_TEST_DISK_CODEC_SHA256": "codec"}, nil},
+		{"archive incomplete content tools", false, map[string]string{"NVKR_TEST_DISK_INSPECT_RUNTIME": "docker", "NVKR_TEST_DISK_INSPECT_IMAGE": "image", "NVKR_TEST_DISK_INSPECTOR_SHA256": "inspector", "NVKR_TEST_DISK_CODEC_SHA256": "codec", "NVKR_TEST_DISK_GUESTFISH_SHA256": "guestfish", "NVKR_TEST_DISK_SCANNER_SHA256": " "}, []string{"NVKR_TEST_DISK_PACKAGE_READER_SHA256", "NVKR_TEST_DISK_SCANNER_SHA256"}},
+		{"archive complete", false, map[string]string{"NVKR_TEST_DISK_INSPECT_RUNTIME": "docker", "NVKR_TEST_DISK_INSPECT_IMAGE": "image", "NVKR_TEST_DISK_INSPECTOR_SHA256": "inspector", "NVKR_TEST_DISK_CODEC_SHA256": "codec", "NVKR_TEST_DISK_GUESTFISH_SHA256": "guestfish", "NVKR_TEST_DISK_SCANNER_SHA256": "scanner", "NVKR_TEST_DISK_PACKAGE_READER_SHA256": "reader"}, nil},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := missingProducedInspectorVariables(func(name string) string { return tc.values[name] }, tc.qcow)
+			if !slices.Equal(got, tc.missing) {
+				t.Fatalf("missing=%v want=%v", got, tc.missing)
+			}
+		})
+	}
 }

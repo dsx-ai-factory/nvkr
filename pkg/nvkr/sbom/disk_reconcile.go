@@ -153,18 +153,6 @@ type diskObservedPackageKey struct {
 	class string
 }
 
-// This class describes the actual observation operation, not installed origin.
-// Native scanner fields are projected separately; they cannot author this key.
-func withDiskContentClass(components []Component, class string) []Component {
-	result := make([]Component, len(components))
-	for index, component := range components {
-		result[index] = cloneComponent(component)
-		result[index].Properties = append(result[index].Properties, Property{Name: diskContentClassProperty, Value: class})
-		slices.SortFunc(result[index].Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
-	}
-	return result
-}
-
 func diskComponentClass(component Component) (string, error) {
 	return diskinspect.ComponentClass(component)
 }

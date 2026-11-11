@@ -22,7 +22,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
-	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
 const (
@@ -313,8 +312,4 @@ func decodeOCIJSON(raw []byte, out any) error { return ociclosure.DecodeJSON(raw
 func digestBytes(raw []byte) string {
 	sum := sha256.Sum256(raw)
 	return "sha256:" + hex.EncodeToString(sum[:])
-}
-
-func isIndexMediaType(media string) bool {
-	return types.MediaType(media).IsIndex()
 }
