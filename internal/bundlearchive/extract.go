@@ -38,12 +38,12 @@ func Extract(ctx context.Context, raw []byte, destination string) (err error) {
 	if err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "opening bundle extraction")
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	zipped, err := gzip.NewReader(bytes.NewReader(raw))
 	if err != nil {
 		return archiveError(ctx, err, "opening admitted bundle")
 	}
-	defer zipped.Close()
+	defer func() { _ = zipped.Close() }()
 	reader := tar.NewReader(contextReader{ctx: ctx, source: zipped})
 	for {
 		header, readErr := reader.Next()

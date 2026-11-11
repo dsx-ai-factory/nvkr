@@ -175,7 +175,9 @@ func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact,
 			if err != nil {
 				return nil, nil, err
 			}
-			object.ArtifactType = descriptor.ArtifactType
+			if input.Kind == PackageBundle {
+				object.ArtifactType = descriptor.ArtifactType
+			}
 			object.Layout, object.SemanticDigest = true, pipeline.FileDigest(payload)
 			object.BlobDigest, err = digestFactoryPath(ctx, filepath.Join(input.Path, "index.json"))
 			if err != nil {
