@@ -126,63 +126,23 @@ components:
       BUILD_VERSION: '{{.Version}}'
       GIT_VERSION: '{{.Commit}}'
     writeDir: bin/nvkr-aicr
+  aicr-gb300-generic-training-recipe:
+    builderType: pinned-tool
+    tool: aicr-tool-arm64
+    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+    platforms: [linux/arm64]
+    outputType: file
+    artifactPath: recipe.yaml
+    toolArgs: [recipe, --service, generic, --accelerator, gb300, --os, ubuntu, --intent, training, --output, '{{.Output}}/recipe.yaml']
   aicr-gb300-generic-training-flux:
-    artifactPath: bin/nvkr-aicr/bundle.tar.gz
-    buildCommand:
-    - bash
-    - -euo
-    - pipefail
-    - -c
-    - |
-      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off
-      build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
-      out=/src/bin/nvkr-aicr
-      mkdir -p "$out"
-      timeout --kill-after=10s 900s go build -mod=vendor -trimpath -buildvcs=false \
-        -ldflags "-s -w -buildid= -X github.com/NVIDIA/aicr/pkg/cli.version=$BUILD_VERSION -X github.com/NVIDIA/aicr/pkg/cli.commit=$GIT_VERSION -X github.com/NVIDIA/aicr/pkg/cli.date=$build_date" \
-        -o "$out/aicr" ./cmd/aicr
-      timeout --kill-after=10s 120s "$out/aicr" recipe \
-        --service "$1" --accelerator "$2" \
-        --os ubuntu --intent training --output "$out/recipe.yaml"
-      # OCI output requires an Argo CD repoURL; this literal never resolves, so consumers set their own.
-      repo=()
-      [ "$3" != argocd ] || repo=(--repo oci://registry.invalid/aicr-bundle)
-      # Layout output stages in the working directory; the source tree is read-only.
-      (
-        cd "$out"
-        timeout --kill-after=10s 120s "$out/aicr" bundle \
-          --recipe "$out/recipe.yaml" --deployer "$3" "${repo[@]}" \
-          --output "oci-layout:$out/layout"
-      )
-      # Publish AICR's own layer bytes: one manifest holding the config and exactly one layer.
-      digests() { grep -o '"digest":"sha256:[0-9a-f]\{64\}"' "$1" | cut -d: -f3 | tr -d '"'; }
-      mapfile -t manifest < <(digests "$out/layout/index.json")
-      [ "${#manifest[@]}" -eq 1 ] || { echo 'AICR layout must index one manifest' >&2; exit 1; }
-      mapfile -t blobs < <(digests "$out/layout/blobs/sha256/${manifest[0]}")
-      [ "${#blobs[@]}" -eq 2 ] || { echo 'AICR manifest must reference one config and one layer' >&2; exit 1; }
-      layer="$out/layout/blobs/sha256/${blobs[1]}"
-      printf '%s  %s\n' "${blobs[1]}" "$layer" | sha256sum --quiet -c -
-      mkdir "$out/verify"
-      tar -xzf "$layer" -C "$out/verify"
-      root="$out/verify"
-      [ "$3" != argocd-helm ] || root="$root/aicr-bundle"
-      timeout --kill-after=10s 120s "$out/aicr" verify "$root"
-      cp "$layer" "$out/bundle.tar.gz"
-    - nvkr-aicr-bundle
-    - generic
-    - gb300
-    - flux
-    cgo: false
-    fromSource: true
-    outputType: tarball
-    platforms:
-    - linux/amd64
-    - linux/arm64
-    source: aicr
-    versionStamp:
-      BUILD_VERSION: '{{.Version}}'
-      GIT_VERSION: '{{.Commit}}'
-    writeDir: bin/nvkr-aicr
+    builderType: pinned-tool
+    tool: aicr-tool-arm64
+    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+    platforms: [linux/arm64]
+    outputType: oci-layout
+    materials:
+      recipe.yaml: aicr-gb300-generic-training-recipe
+    toolArgs: [bundle, --recipe, '{{.Material "recipe.yaml"}}', --deployer, flux, --output, 'oci-layout:{{.Output}}']
   aicr-gb300-generic-training-helm:
     artifactPath: bin/nvkr-aicr/bundle.tar.gz
     buildCommand:
@@ -597,6 +557,14 @@ metadata:
     build and acquisition contracts.
   name: aicr
 sources:
+  aicr-tool-arm64:
+    repo: https://github.com/NVIDIA/aicr
+    constraint: 1.2.0
+    tool:
+      format: tar-gzip
+      url: https://github.com/NVIDIA/aicr/releases/download/{{.Tag}}/aicr_{{.Version}}_linux_arm64.tar.gz
+      platform: linux/arm64
+      executablePath: aicr
   aicr:
     repo: https://github.com/NVIDIA/aicr
     toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c

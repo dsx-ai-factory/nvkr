@@ -121,7 +121,16 @@ func observeProducerPayload(ctx context.Context, plan *Plan, input Artifact, art
 	if matches != 1 {
 		return pipeline.ArtifactResult{}, e.New(e.CodeReleaseIncomplete, "output %q component %q has no unique producer result", input.BuildTarget, input.Component)
 	}
-	return pipeline.ObserveResult(ctx, instruction, input.Path, record.Path)
+	result, err := pipeline.ObserveResult(ctx, instruction, input.Path, record.Path)
+	if err != nil {
+		return pipeline.ArtifactResult{}, err
+	}
+	if instruction.BuilderType == ir.BuilderPinnedTool && instruction.OutputType == ir.OutputOCILayout {
+		if err := observeAICRValidation(ctx, instruction, input.Path, result); err != nil {
+			return pipeline.ArtifactResult{}, err
+		}
+	}
+	return result, nil
 }
 
 // ObserveLifecyclePayload verifies one compiled lifecycle output against its
@@ -331,7 +340,7 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 		if err != nil {
 			return LifecyclePayloadObservation{}, err
 		}
-		if descriptor.ArtifactType != delivery.MediaBundle {
+		if descriptor.ArtifactType != delivery.MediaBundle && descriptor.ArtifactType != delivery.MediaAICRArtifact {
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "bundle output %q has the wrong artifact media type", expected.Name)
 		}
 		expectedDigest, err := reproduceLifecyclePackage(ctx, plan, artifact, artifacts)

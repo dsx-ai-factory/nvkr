@@ -99,6 +99,11 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 	if actual == "" || actualAbs != expectedAbs {
 		return e.New(e.CodePipelineDrift, "producer %q materialized outside its planned output", node.ID)
 	}
+	if pinnedTool && instruction.OutputType == ir.OutputOCILayout {
+		if err := validateAICRProducer(ctx, instruction, result, toolExecutable, runtime, access, stdout, stderr); err != nil {
+			return err
+		}
+	}
 	raw, err := canonical.Marshal(result)
 	if err != nil {
 		return err

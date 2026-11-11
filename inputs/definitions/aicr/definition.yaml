@@ -29,6 +29,7 @@ outputs:
     base: ../../catalogs/aicr
   components:
   - aicr-gb300-generic-training-flux
+  - aicr-gb300-generic-training-recipe
   format: bundle-oci
   name: aicr-gb300-generic-training-flux
   platform: linux/arm64

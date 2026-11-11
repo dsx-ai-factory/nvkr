@@ -18,7 +18,7 @@ func TestBundleOutputAdmission(t *testing.T) {
 	}{
 		{name: "explicit source selection"},
 		{name: "missing component", change: func(o *DefinitionOutput) { o.Components = nil }, code: e.CodeInvalidCatalog},
-		{name: "multiple components", change: func(o *DefinitionOutput) { o.Components = []string{"a", "b"} }, code: e.CodeInvalidCatalog},
+		{name: "explicit closure shape (catalog resolution checks membership)", change: func(o *DefinitionOutput) { o.Components = []string{"a", "b"} }},
 		{name: "helm binding", change: func(o *DefinitionOutput) { o.Helm = &HelmOutput{Images: map[string]string{"image": "other"}} }, code: e.CodeInvalidCatalog},
 		{name: "APT settings", change: func(o *DefinitionOutput) { o.APT = &APTOutput{Distribution: "stable", Component: "main"} }, code: e.CodeInvalidCatalog},
 		{name: "platform aggregate", change: func(o *DefinitionOutput) { o.Platform = ""; o.Platforms = []string{"linux/amd64", "linux/arm64"} }, code: e.CodeInvalidCatalog},

@@ -87,8 +87,8 @@ their [logical identity](adr/0027-pinned-tool-producers.md#2-logical-identity-co
 [execution](adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed),
 [inputs](adr/0027-pinned-tool-producers.md#4-declared-inputs-are-typed-material-bindings) and
 [outputs](adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout).
-The `file` form is implemented and contract-tested; the OCI layout form waits for the layout import, and no
-recorded Run has executed a pinned tool.
+The file form and one layout root with an explicit regular-file material closure are implemented. The AICR
+path uses a fixed post-render integrity gate before packaging; current evidence is recorded in ADR-27 reconciliation.
 
 Proposed [ADR-28](adr/0028-multi-platform-executable-indexes.md) designs multi-platform executables. ADR-28 owns
 when [one tool source covers several platforms](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform),
@@ -166,8 +166,10 @@ The [domain vocabulary](../CONTEXT.md) defines six high-level public objects:
 | Release | Immutable selected artifacts and evidence accessible through one pinned reference |
 | Verification Policy | Consumer requirements for acceptable identities, evidence, and lifecycle state |
 
-A binary bundle or generic OCI bundle is an Artifact format. Generic bundles wrap one pinned producer's
-gzip tar archive and receive a bounded delivered-file inventory. AICR renderers use this path without new
+A binary bundle or generic OCI bundle is an Artifact format. Generic bundles either wrap one pinned
+producer's gzip tar archive or import one admitted producer layout while preserving its manifest, config
+and layer. Layout import separately binds the original index and explicit regular-file material subjects;
+both paths receive bounded delivered-file inventories. AICR renderers use these paths without new
 profile or lifecycle objects; native Helm charts retain their own media contract. See
 [ADR-25](adr/0025-generic-oci-bundles-and-aicr-producers.md) for integrity and evidence boundaries.
 Deployment topology and node placement are downstream concerns,
@@ -310,7 +312,9 @@ A proposed pinned-tool producer (ADR-27) is an ordinary selected component insid
 [execution](adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed), its
 [admitted output forms](adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout)
 and the [authority of tool-side signing](adr/0027-pinned-tool-producers.md#6-tool-evidence-companions-and-tool-side-signing).
-The single-file path is implemented and contract-tested; OCI layout handoff is not.
+Single files feed declared materials; OCI layout handoff preserves the producer manifest and separately binds
+the observed index, material subjects and packaged layer. AICR post-render verification is a fixed validation
+boundary, not an authored producer step or a generic directory-input capability.
 
 A proposed multi-platform executable output (ADR-28) compiles like an OCI aggregate. ADR-28 owns its
 [native per-platform identity](adr/0028-multi-platform-executable-indexes.md#3-native-producer-identity-is-unchanged),

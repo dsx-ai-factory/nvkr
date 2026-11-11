@@ -118,8 +118,16 @@ func releaseEvidenceObjectsForOutputs(ctx context.Context, plan *Plan, node Node
 					return nil, err
 				}
 				subject, kind = image.ManifestDigest, "oci-manifest"
-			case "helm-oci", PackageBundle:
+			case "helm-oci":
 				stage, kind = "source-build", "source-archive"
+			case PackageBundle:
+				producer := artifacts["artifact/"+output.Name+"/"+component]
+				if producer.Kind == "tarball" && len(output.Components) == 1 {
+					stage, kind = "source-build", "source-archive"
+				}
+				if producer.Kind == "oci-layout" {
+					kind = "oci-layout"
+				}
 			}
 			if err := add(bom, output.Name, "", component, stage, kind, subject, input); err != nil {
 				return nil, err
