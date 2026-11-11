@@ -21,7 +21,7 @@ sources:
         pins="$(sha256sum go.mod go.sum)"
         timeout --kill-after=10s 540s go mod download
         GOPROXY=off timeout --kill-after=10s 60s go mod verify
-        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+        GOPROXY=off timeout --kill-after=10s 600s go mod vendor
         printf '%s\n' "$pins" | sha256sum --quiet -c -
 components:
   nvkr-disk-inspect:
