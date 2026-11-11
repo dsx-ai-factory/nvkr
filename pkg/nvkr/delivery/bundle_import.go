@@ -23,6 +23,33 @@ const MediaAICRArtifact = "application/vnd.nvidia.aicr.artifact"
 // bundleImportArtifactTypes lists the producer formats admitted for import.
 var bundleImportArtifactTypes = map[string]bool{MediaAICRArtifact: true}
 
+// ObservedBundleManifest binds the layout's single manifest to the exact index
+// bytes observed by its producer. It describes identity, not execution authority.
+// ImportBundleLayout subsequently authenticates the complete manifest closure.
+func ObservedBundleManifest(ctx context.Context, source, indexDigest string) (Descriptor, error) {
+	if !isDigest(indexDigest) {
+		return Descriptor{}, e.New(e.CodeVerifyFailed, "bundle requires an observed index digest")
+	}
+	index, raw, err := readIndex(ctx, source)
+	if err != nil {
+		return Descriptor{}, err
+	}
+	if digestBytes(raw) != indexDigest || len(index.Manifests) != 1 || index.Manifests[0].MediaType != MediaOCIManifest {
+		return Descriptor{}, e.New(e.CodeVerifyFailed, "bundle index differs from its exact producer observation")
+	}
+	return index.Manifests[0], nil
+}
+
+// ImportObservedBundleLayout preserves the manifest selected by the producer's
+// exact index, and admits its complete closure before creating output.
+func ImportObservedBundleLayout(ctx context.Context, out, source, indexDigest string) (Result, error) {
+	descriptor, err := ObservedBundleManifest(ctx, source, indexDigest)
+	if err != nil {
+		return Result{}, err
+	}
+	return ImportBundleLayout(ctx, out, source, descriptor.Digest)
+}
+
 // ImportBundleLayout admits a producer-written OCI image layout holding one gzip
 // tar bundle and copies its exact manifest, empty config and layer, so the
 // output digest equals the producer's own push. expectedDigest pins the

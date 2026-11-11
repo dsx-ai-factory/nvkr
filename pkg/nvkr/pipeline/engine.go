@@ -119,10 +119,11 @@ const (
 // ArtifactResult records one built artifact and its content digest — the seed for
 // the expected-digests manifest (SRD §6.3).
 type ArtifactResult struct {
-	Component     string                `json:"component"`
-	OutputType    string                `json:"outputType"`
-	Qualification ArtifactQualification `json:"qualification"`
-	Toolchain     string                `json:"toolchain,omitempty"` // digest-pinned toolchain image that produced it (provenance)
+	AICRValidation *AICRValidation       `json:"aicrValidation,omitempty"`
+	Component      string                `json:"component"`
+	OutputType     string                `json:"outputType"`
+	Qualification  ArtifactQualification `json:"qualification"`
+	Toolchain      string                `json:"toolchain,omitempty"` // digest-pinned toolchain image that produced it (provenance)
 	// InputDigest identifies the exact post-vendor, post-patch source snapshot that
 	// entered this build. It is observed by the runner, not copied from a declaration.
 	InputDigest string `json:"inputDigest,omitempty"`

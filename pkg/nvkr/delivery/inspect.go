@@ -364,11 +364,15 @@ func verifyDescriptorHoldingDisks(ctx context.Context, root string, descriptor D
 		if err := manifest.validateArtifactConfig(); err != nil {
 			return err
 		}
-		if manifest.artifactType() == MediaBundle {
-			if err := validateBundleManifestDocument(raw); err != nil {
+		if manifest.artifactType() == MediaBundle || manifest.ArtifactType == MediaAICRArtifact {
+			if manifest.ArtifactType == MediaAICRArtifact {
+				if _, err := admitBundleManifest(raw); err != nil {
+					return err
+				}
+			} else if err := validateBundleManifestDocument(raw); err != nil {
 				return err
 			}
-			if descriptor.ArtifactType != "" && descriptor.ArtifactType != MediaBundle {
+			if descriptor.ArtifactType != "" && descriptor.ArtifactType != manifest.artifactType() {
 				return e.New(e.CodeVerifyFailed, "bundle descriptor differs from its artifact type")
 			}
 			if err := inspectBundlePayload(ctx, root, manifest); err != nil {

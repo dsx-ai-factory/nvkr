@@ -30,6 +30,7 @@ type ReleaseMetadata struct {
 // OutputBinding adds meaning to the object's one descriptor; it does not repeat
 // the name or artifact digest already owned by the release index object.
 type OutputBinding struct {
+	Bundle *BundleBinding `json:"bundle,omitempty"`
 	// Publication retains the authenticated output-local handoff selected by assembly.
 	Publication *PublicationOrigin `json:"publication,omitempty"`
 	// Repository is a sibling name in the original Publication namespace when
@@ -124,6 +125,9 @@ func validateReleaseMetadata(root PublicationRoot) error {
 				return err
 			}
 		}
+		if o.Output.Bundle != nil && o.Output.Format != outputFormatBundle {
+			return e.New(e.CodeVerifyFailed, "bundle binding on another output format")
+		}
 		var kind, media string
 		switch o.Output.Format {
 		case "executable":
@@ -139,8 +143,16 @@ func validateReleaseMetadata(root PublicationRoot) error {
 			kind, media = outputFormatHelm, "application/vnd.nvkr.helm-bundle.v1"
 		case outputFormatBundle:
 			kind, media = outputFormatBundle, MediaBundle
-			if len(o.Output.Components) != 1 || o.Output.TransportPath != "" || o.SemanticDigest != o.BlobDigest {
-				return e.New(e.CodeVerifyFailed, "bundle output requires one producer and exact archive binding")
+			if o.Output.Bundle != nil {
+				if err := validateBundleBinding(o); err != nil {
+					return err
+				}
+				media = MediaAICRArtifact
+			} else if len(o.Output.Components) != 1 {
+				return e.New(e.CodeVerifyFailed, "archive bundle requires one producer")
+			}
+			if o.Output.TransportPath != "" || o.SemanticDigest != o.BlobDigest {
+				return e.New(e.CodeVerifyFailed, "bundle requires exact archive binding")
 			}
 		case "apt-repository":
 			kind, media = "apt-repository", "application/vnd.nvkr.apt-repository.v1"

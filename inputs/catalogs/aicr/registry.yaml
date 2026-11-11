@@ -7,6 +7,14 @@ metadata:
   name: aicr-bundles
   description: Pinned AICR renders packaged as OCI deployment bundles; no cluster execution or hardware qualification.
 sources:
+  aicr-tool-arm64:
+    repo: https://github.com/NVIDIA/aicr
+    constraint: 1.2.0
+    tool:
+      format: tar-gzip
+      url: https://github.com/NVIDIA/aicr/releases/download/{{.Tag}}/aicr_{{.Version}}_linux_arm64.tar.gz
+      platform: linux/arm64
+      executablePath: aicr
   aicr:
     repo: https://github.com/NVIDIA/aicr
     # Existing measured Go 1.27.2 image (AICR requires Go 1.27.0); its GNU tar only unpacks AICR's layer for verification.
@@ -100,27 +108,23 @@ components:
       - generic
       - gb300
       - argocd-helm
+  aicr-gb300-generic-training-recipe:
+    builderType: pinned-tool
+    tool: aicr-tool-arm64
+    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+    platforms: [linux/arm64]
+    outputType: file
+    artifactPath: recipe.yaml
+    toolArgs: [recipe, --service, generic, --accelerator, gb300, --os, ubuntu, --intent, training, --output, '{{.Output}}/recipe.yaml']
   aicr-gb300-generic-training-flux:
-    fromSource: true
-    source: aicr
-    cgo: false
-    platforms: [linux/amd64, linux/arm64]
-    outputType: tarball
-    artifactPath: bin/nvkr-aicr/bundle.tar.gz
-    writeDir: bin/nvkr-aicr
-    versionStamp:
-      BUILD_VERSION: '{{.Version}}'
-      GIT_VERSION: '{{.Commit}}'
-    buildCommand:
-      - bash
-      - -euo
-      - pipefail
-      - -c
-      - *render-aicr-bundle
-      - nvkr-aicr-bundle
-      - generic
-      - gb300
-      - flux
+    builderType: pinned-tool
+    tool: aicr-tool-arm64
+    toolchainImage: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
+    platforms: [linux/arm64]
+    outputType: oci-layout
+    materials:
+      recipe.yaml: aicr-gb300-generic-training-recipe
+    toolArgs: [bundle, --recipe, '{{.Material "recipe.yaml"}}', --deployer, flux, --output, 'oci-layout:{{.Output}}']
   aicr-gb300-generic-training-helm:
     fromSource: true
     source: aicr

@@ -242,9 +242,6 @@ func (definition Definition) Validate() error {
 		if output.Format == OutputOCI && len(output.Components) != 1 {
 			return e.New(e.CodeInvalidCatalog, "definition OCI output %q requires exactly one image component", output.Name)
 		}
-		if output.Format == OutputBundle && len(output.Components) != 1 {
-			return e.New(e.CodeInvalidCatalog, "definition bundle output %q requires exactly one source archive component", output.Name)
-		}
 		if output.Format == OutputDebianPackage && len(output.Components) != 1 {
 			return e.New(e.CodeInvalidCatalog, "Debian output %q requires one source producer", output.Name)
 		}
