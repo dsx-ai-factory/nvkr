@@ -19,6 +19,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/releaseview"
+	"github.com/urfave/cli/v2"
 )
 
 func TestReleaseBrowserMetadataDetailsAndExportParity(t *testing.T) {
@@ -47,7 +48,7 @@ func TestReleaseBrowserMetadataDetailsAndExportParity(t *testing.T) {
 		{"tools", "executable · linux/amd64", commandFields("cli build subject", digest, "Recorded platform", "linux/amd64")},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			display, err := releasePublicationDisplay(publication, test.name)
+			display, err := releasePublicationDisplay(publication, releaseview.Options{Output: test.name})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -124,8 +125,48 @@ func TestReleaseBrowserAutoPreservesExplicitExports(t *testing.T) {
 	}
 }
 
+func TestReleaseBrowseFiltersLocalLayout(t *testing.T) {
+	fixture := releaseBrowsePayloadFixture(t, "arm64")
+	inspection, err := delivery.Inspect(t.Context(), fixture.layout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reference := "registry.example.test/releases@" + inspection.RootDigest
+	description, err := lifecycle.InspectRelease(t.Context(), reference, lifecycle.InspectionOptions{LayoutPath: fixture.layout})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, format := range []string{"text", "json", "mermaid"} {
+		t.Run(format, func(t *testing.T) {
+			var out bytes.Buffer
+			app := &cli.App{Writer: &out, Commands: []*cli.Command{cmdRelease()}}
+			err := app.RunContext(t.Context(), []string{"nvkr", "release", "browse", "--reference", reference, "--layout", fixture.layout,
+				"--format", format, "--kind", "disk-image", "--platform", "linux/arm64", "--ui=plain"})
+			if err != nil {
+				t.Fatal(err)
+			}
+			want, err := releaseview.Render(description, releaseview.Options{Format: format, Kind: "disk-image", Platform: "linux/arm64"})
+			if err != nil || !bytes.Equal(out.Bytes(), want) || strings.Contains(out.String(), "tools") || !strings.Contains(out.String(), "node-image") {
+				t.Fatalf("local layout filter differs from the shared view: %v\n%s", err, out.String())
+			}
+		})
+	}
+	display, err := releasePublicationDisplay(description, releaseview.Options{Kind: "executable", Platform: "linux/arm64"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	fields := map[string]string{}
+	for _, field := range display.Fields {
+		fields[field.Label] = field.Value
+	}
+	if fields["Outputs"] != "1" || fields["Total outputs"] != "2" || fields["Selected kind"] != "executable" || fields["Selected platform"] != "linux/arm64" ||
+		len(display.Items) != 2 || display.Items[0].Name != "tools" {
+		t.Fatalf("TUI display lost filtered scope: %+v", display)
+	}
+}
+
 func TestReleaseBrowserUnknownSelectionHasNoPartialResult(t *testing.T) {
-	display, err := releasePublicationDisplay(delivery.PublicationDescription{}, "missing")
+	display, err := releasePublicationDisplay(delivery.PublicationDescription{}, releaseview.Options{Output: "missing"})
 	assertLifecycleCommandCode(t, err, e.CodeUsage)
 	if !reflect.DeepEqual(display, commandDisplay{}) {
 		t.Fatal("failed selection returned a partial result")

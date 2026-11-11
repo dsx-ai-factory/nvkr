@@ -26,6 +26,8 @@ type Description struct {
 	Inspection            string            `json:"inspection"`
 	InspectionDetails     InspectionDetails `json:"inspectionDetails"`
 	SelectedOutput        string            `json:"selectedOutput,omitempty"`
+	SelectedKind          string            `json:"selectedKind,omitempty"`
+	SelectedPlatform      string            `json:"selectedPlatform,omitempty"`
 	TotalOutputs          int               `json:"totalOutputs"`
 	Reference             string            `json:"reference"`
 	ReferenceScope        string            `json:"referenceScope"`
@@ -161,10 +163,11 @@ type Source struct {
 }
 
 // Describe returns the same detached, sorted description as JSON rendering,
-// optionally selecting one exact output after the owner's complete inspection.
-// Like Render, it describes that prerequisite; it does not authenticate inputs.
-func Describe(publication delivery.PublicationDescription, output string) (Description, error) {
-	selected, err := selectView(publication, Options{Output: output})
+// optionally filtering outputs after the owner's complete inspection. Format is
+// ignored. Like Render, it describes that prerequisite; it does not authenticate inputs.
+func Describe(publication delivery.PublicationDescription, options Options) (Description, error) {
+	options.Format = ""
+	selected, err := selectView(publication, options)
 	if err != nil {
 		return Description{}, err
 	}
@@ -173,7 +176,7 @@ func Describe(publication delivery.PublicationDescription, output string) (Descr
 
 func describe(selected view) Description {
 	selection := "all"
-	if selected.SelectedOutput != "" {
+	if selected.filtered() {
 		selection = "filtered"
 	}
 	result := Description{
@@ -185,7 +188,8 @@ func describe(selected view) Description {
 				ConsumerPolicy: "not-checked", RegistryAvailability: "not-checked", InstallationCompatibility: "not-checked",
 			},
 		},
-		SelectedOutput: selected.SelectedOutput, TotalOutputs: selected.TotalOutputs,
+		SelectedOutput: selected.SelectedOutput, SelectedKind: selected.SelectedKind,
+		SelectedPlatform: selected.SelectedPlatform, TotalOutputs: selected.TotalOutputs,
 		Reference: selected.Reference, ReferenceScope: selected.ReferenceScope,
 		RootDigest: selected.RootDigest, DeclaredQualification: selected.DeclaredQualification,
 		Metadata: Metadata{
