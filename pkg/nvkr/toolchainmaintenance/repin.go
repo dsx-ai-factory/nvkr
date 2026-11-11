@@ -37,13 +37,16 @@ type catalogPair struct{ before, after *catalog.Catalog }
 // This is the authored owner of the maintained generated producer overlays.
 // Other policies, especially subject-bound exceptions, are never repin inputs.
 const producerOverlayPolicy = "inputs/policies/ovn-producer-overlays.json"
+const localToolchainBindings = "toolchains/nvkr-packer/local-bindings.json"
 
 func repin(ctx context.Context, root string, record Record, stage bool) ([]string, error) {
-	files, err := command(ctx, root, "git", "ls-files", "-z", "--", "inputs/catalogs", "inputs/environments", "inputs/experiments", "docs/examples", producerOverlayPolicy)
+	files, err := command(ctx, root, "git", "ls-files", "-z", "--", "inputs/catalogs", "inputs/environments", "inputs/experiments", "docs/examples", producerOverlayPolicy, localToolchainBindings)
 	if err != nil {
 		return nil, err
 	}
 	edits := map[string]edit{}
+	localIDs := map[string]string{}
+	fileReplacements := map[string]map[string]string{}
 	var registries, overlays []string
 	for _, name := range strings.Split(strings.TrimSuffix(string(files), "\x00"), "\x00") {
 		if !(strings.HasSuffix(name, ".yaml") || strings.HasSuffix(name, ".json")) || strings.HasSuffix(name, "/pins.lock.yaml") {
@@ -53,35 +56,69 @@ func repin(ctx context.Context, root string, record Record, stage bool) ([]strin
 		if err != nil {
 			return nil, err
 		}
-		var document map[string]any
-		if err := yaml.UnmarshalStrict(raw, &document); err != nil {
+		var value any
+		if err := yaml.UnmarshalStrict(raw, &value); err != nil {
 			return nil, e.Wrap(e.CodeInvalidCatalog, err, "read authored input %s", name)
+		}
+		document, _ := value.(map[string]any)
+		if name == localToolchainBindings {
+			if _, ok := value.([]any); !ok {
+				return nil, e.New(e.CodeInvalidCatalog, "local toolchain bindings must be an array")
+			}
+		} else if document == nil {
+			return nil, e.New(e.CodeInvalidCatalog, "authored input %s must be an object", name)
 		}
 		if name == producerOverlayPolicy && document["apiVersion"] != "nvkr.dev/producer-overlay-maintenance/v1" {
 			return nil, e.New(e.CodeInvalidCatalog, "unsupported producer overlay maintenance policy")
 		}
 		replacements := map[string]string{}
-		if err := replacementsFor(document, "", record, replacements); err != nil {
+		if err := replacementsFor(value, "", record, replacements); err != nil {
 			return nil, e.Wrap(e.CodeInvalidCatalog, err, "update %s", name)
 		}
-		changed := append([]byte(nil), raw...)
-		var pairs []string
-		for _, old := range slices.Sorted(maps.Keys(replacements)) {
-			pairs = append(pairs, old, replacements[old])
-		}
-		if len(pairs) != 0 {
-			// Preserve formatting while updating all exact occurrences within this
-			// authored file, including comments and descriptive text. The resulting
-			// review diff includes those edits; discovery alone selects the pins.
-			changed = []byte(strings.NewReplacer(pairs...).Replace(string(raw)))
-		}
-		edits[name] = edit{raw, changed}
+		fileReplacements[name] = replacements
+		edits[name] = edit{raw, raw}
 		if filepath.Base(name) == "registry.yaml" {
 			registries = append(registries, name)
 		}
 		if document["kind"] == catalog.OverlayKind {
 			overlays = append(overlays, name)
+			overlay, err := catalog.DecodeOverlay(raw)
+			if err != nil {
+				return nil, err
+			}
+			for _, substitution := range overlay.ToolchainSubstitutions {
+				if !strings.HasPrefix(substitution.From, "sha256:") || !strings.HasPrefix(substitution.To, Registry+"/packer-native@sha256:") {
+					continue
+				}
+				image, err := selectedImage(record, substitution.Arch, "packer")
+				if err != nil {
+					return nil, err
+				}
+				if err := addReplacement(localIDs, substitution.From, image.ImageID); err != nil {
+					return nil, err
+				}
+			}
 		}
+	}
+	// Only explicit native substitutions bind bare local IDs to an architecture
+	// and candidate image. Update their producers and frozen copies together;
+	// the catalog owner authenticates every predecessor/substitution below before
+	// any file is staged. Unbound local IDs and excluded policies stay untouched.
+	for name, change := range edits {
+		replacements := fileReplacements[name]
+		for old, updated := range localIDs {
+			if err := addReplacement(replacements, old, updated); err != nil {
+				return nil, err
+			}
+		}
+		var pairs []string
+		for _, old := range slices.Sorted(maps.Keys(replacements)) {
+			pairs = append(pairs, old, replacements[old])
+		}
+		// Replace once against the original bytes so new pins cannot be
+		// reinterpreted as old local IDs by a subsequent replacement pass.
+		change.after = []byte(strings.NewReplacer(pairs...).Replace(string(change.before)))
+		edits[name] = change
 	}
 	// Authenticate each predecessor using the catalog owner, then derive its new
 	// digest through the same owner. Never hash marshaled YAML or patch a digest

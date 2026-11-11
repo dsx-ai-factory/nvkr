@@ -27,6 +27,8 @@ class ProposalTest(unittest.TestCase):
             "inputs/policies/toolchain-maintenance/123.json": False,
             "inputs/policies/ovn-producer-overlays.json": True,
             "inputs/policies/other-producer-overlays.json": False,
+            "toolchains/nvkr-packer/local-bindings.json": True,
+            "toolchains/nvkr-packer/toolchain.lock.json": False,
             ".github/workflows/merge-gate.yaml": False,
             "inputs/catalogs/../../secret.json": False,
             "/tmp/registry.yaml": False,

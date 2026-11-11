@@ -35,6 +35,11 @@ Repin now updates the named producer-overlay policy, and the proposal regenerate
 dependent workflows. A contract fixture reproduces the old drift and verifies that regeneration
 preserves the new pins without editing exception records. Workflow-order and proposal-path contracts
 retain the pre-repin drift check and restrict policy edits to that one owner file.
+Explicit native substitutions also bind local configuration-ID replacements to the approved
+image IDs. The overlay regression covers base/frozen producers and substitution sources; ambiguous
+cross-architecture mappings return a coded error before any input is written. The same fixture
+checks local diagnostic predecessor bindings; the proposal admits only their exact authored file
+under `toolchains/`, leaving image build locks outside its write set.
 Maintained consumer pins and local AMD64 image IDs select these published subjects; disk producer
 contracts require Packer `1.16.2`, matching the candidate source lock. Frozen/local overlays and generated
 bundles follow those inputs. The new disk Build identities have not been executed end to end.

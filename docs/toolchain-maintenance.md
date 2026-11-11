@@ -135,9 +135,12 @@ exception records and source-lock approval gates are unchanged.
 
 When a refresh changes the Packer version, review and update consumer `packerVersion`
 contracts alongside the image pins; runtime preflight requires an exact version match.
-Local AMD64 consumers also require the matching Docker configuration-ID pin and native
-overlay substitution source. Pull the approved AMD64 registry manifest before using
-that configuration ID locally.
+Repin updates local configuration-ID pins and their frozen copies when an explicit
+native substitution binds the old ID to a candidate Packer reference and architecture.
+Ambiguous mappings fail closed; unbound local IDs remain untouched. Pull the approved
+AMD64 registry manifest before using its configuration ID locally. Repin also updates
+the architecture-bound predecessor references in `toolchains/nvkr-packer/local-bindings.json`
+so local diagnostic substitutions continue to match the refreshed catalogs.
 
 Within an affected authored file, the proposal replaces every exact occurrence of
 a selected old pin or predecessor digest, including comments and descriptive text.

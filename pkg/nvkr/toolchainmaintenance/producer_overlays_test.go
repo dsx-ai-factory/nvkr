@@ -12,6 +12,8 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalogmaintenance"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
 func TestRepinPreservesGeneratedProducerOverlayInputs(t *testing.T) {
@@ -22,10 +24,11 @@ func TestRepinPreservesGeneratedProducerOverlayInputs(t *testing.T) {
 	const destination = "inputs/catalogs/variants/frozen.json"
 	const policy = "inputs/policies/ovn-producer-overlays.json"
 	oldImage := Registry + "/packer-native@" + digest("old-arm")
+	oldLocal := digest("old-local-amd")
 	writeJSON(t, filepath.Join(base, catalog.RegistryFile), map[string]any{
 		"apiVersion": "nvkr.dev/catalog/v3", "kind": "SourceBuildRegistry",
-		"sources":    map[string]any{"tool": map[string]any{"repo": "https://example.invalid/tool", "toolchainImagesByArch": map[string]string{"arm64": oldImage}}},
-		"components": map[string]any{"tool": map[string]any{"fromSource": true, "source": "tool", "platforms": []string{"linux/arm64"}, "outputType": "host-package", "artifactPath": "tool", "buildCommand": []string{"go", "build", "-o", "tool", "."}}},
+		"sources":    map[string]any{"tool": map[string]any{"repo": "https://example.invalid/tool", "toolchainImagesByArch": map[string]string{"amd64": oldLocal, "arm64": oldImage}}},
+		"components": map[string]any{"tool": map[string]any{"fromSource": true, "source": "tool", "platforms": []string{"linux/amd64", "linux/arm64"}, "outputType": "host-package", "artifactPath": "tool", "buildCommand": []string{"go", "build", "-o", "tool", "."}}},
 	})
 	writeJSON(t, filepath.Join(base, catalog.LockFile), catalog.PinLock{
 		APIVersion: "nvkr.dev/lock/v1", Kind: "PinLock", Pins: map[string]catalog.Pin{
@@ -47,20 +50,26 @@ func TestRepinPreservesGeneratedProducerOverlayInputs(t *testing.T) {
 		APIVersion: "nvkr.dev/producer-overlay-maintenance/v1",
 		Overlays:   []catalogmaintenance.ProducerOverlayInput{{Name: "frozen", Destination: destination, Base: base, Frozen: frozen}},
 	})
+	const nativePath = "inputs/catalogs/variants/native.json"
+	writeJSON(t, nativePath, catalog.Overlay{
+		APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind, Name: "native", RequiresCatalogDigest: baseDigest,
+		ToolchainSubstitutions: []catalog.ToolchainSubstitution{{Arch: "amd64", From: oldLocal, To: Registry + "/packer-native@" + digest("old-amd"), Components: []string{"tool"}}},
+	})
 	if err := catalogmaintenance.GenerateProducerOverlays(t.Context(), policy, false); err != nil {
 		t.Fatal(err)
 	}
 	if err := catalogmaintenance.GenerateProducerOverlays(t.Context(), policy, true); err != nil {
 		t.Fatal(err)
 	}
+	writeJSON(t, localToolchainBindings, []factory.LocalToolchainBinding{{Catalog: "base", Arch: "arm64", From: oldImage, Components: []string{"tool"}}})
 	// Exceptions and unrelated policies must never be rewritten with consumer pins.
 	const approval = "inputs/policies/toolchain-maintenance/123.json"
-	writeJSON(t, approval, map[string]string{"image": oldImage})
+	writeJSON(t, approval, map[string]string{"image": oldImage, "localImage": oldLocal})
 	before, err := os.ReadFile(approval)
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, args := range [][]string{{"init", "--quiet"}, {"add", "inputs"}} {
+	for _, args := range [][]string{{"init", "--quiet"}, {"add", "inputs", "toolchains"}} {
 		if _, err := command(t.Context(), root, "git", args...); err != nil {
 			t.Fatal(err)
 		}
@@ -83,8 +92,59 @@ func TestRepinPreservesGeneratedProducerOverlayInputs(t *testing.T) {
 	if err != nil || overlay.Components["tool"].Component.ToolchainImages["arm64"] != image.Reference() {
 		t.Fatalf("owner regeneration reverted the selected toolchain: %v", err)
 	}
+	bindings, err := factory.LoadLocalToolchainBindings(t.Context(), localToolchainBindings)
+	if err != nil || len(bindings) != 1 || bindings[0].From != image.Reference() {
+		t.Fatalf("local bindings retained an old predecessor: %v", err)
+	}
+	local, err := selectedImage(r, "amd64", "packer")
+	if err != nil || overlay.Components["tool"].Component.ToolchainImages["amd64"] != local.ImageID {
+		t.Fatalf("frozen producer retained an old local configuration ID: %v", err)
+	}
+	updated, err := catalog.LoadContext(t.Context(), catalog.Dir(base))
+	if err != nil || updated.Components["tool"].ToolchainImages["amd64"] != local.ImageID {
+		t.Fatalf("base producer retained an old local configuration ID: %v", err)
+	}
+	native, err := catalog.LoadOverlayContext(t.Context(), nativePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if native.ToolchainSubstitutions[0].From != local.ImageID || native.ToolchainSubstitutions[0].To != local.Reference() {
+		t.Fatal("native substitution does not bind the approved configuration and manifest")
+	}
+	if _, err := catalog.ApplyStack(updated, native); err != nil {
+		t.Fatalf("native substitution no longer applies to the local producer: %v", err)
+	}
 	after, err := os.ReadFile(approval)
 	if err != nil || !bytes.Equal(before, after) {
 		t.Fatalf("repin rewrote exception policy: %v", err)
+	}
+}
+
+func TestRepinRejectsAmbiguousLocalImageBinding(t *testing.T) {
+	isolateGitEnvironment(t)
+	root := t.TempDir()
+	path := filepath.Join(root, "inputs/catalogs/variants/native.json")
+	oldLocal := digest("shared-local-id")
+	writeJSON(t, path, catalog.Overlay{
+		APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind, Name: "native", RequiresCatalogDigest: digest("base"),
+		ToolchainSubstitutions: []catalog.ToolchainSubstitution{
+			{Arch: "amd64", From: oldLocal, To: Registry + "/packer-native@" + digest("old-amd"), Components: []string{"tool"}},
+			{Arch: "arm64", From: oldLocal, To: Registry + "/packer-native@" + digest("old-arm"), Components: []string{"tool"}},
+		},
+	})
+	before, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"init", "--quiet"}, {"add", "inputs"}} {
+		if _, err := command(t.Context(), root, "git", args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, err = repin(t.Context(), root, recordFixture(), true)
+	assertCode(t, err, e.CodeAmbiguous)
+	after, err := os.ReadFile(path)
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatalf("ambiguous binding changed an input: %v", err)
 	}
 }
