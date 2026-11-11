@@ -120,8 +120,8 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	for _, artifact := range plan.Graph.Artifacts {
 		artifacts[artifact.ID] = artifact
 	}
-	member, outer, result := artifacts["package/nvkectl"], artifacts["package/release"], artifacts["result/nvkectl/nvkectl"]
-	payloadPath := local(artifacts["artifact/nvkectl/nvkectl"].Path)
+	member, outer, result := artifacts["package/nvkectl"], artifacts["package/release"], artifacts["result/nvkectl/nvkectl-module-tags"]
+	payloadPath := local(artifacts["artifact/nvkectl/nvkectl-module-tags"].Path)
 	payload := []byte("synthetic hosted output")
 	if err := os.MkdirAll(filepath.Dir(payloadPath), 0o700); err != nil {
 		t.Fatal(err)
@@ -130,7 +130,7 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 		t.Fatal(err)
 	}
 	bundle, err := delivery.BuildBinaryBundle(ctx, local(member.Path), delivery.BinaryBundleRequest{OS: "linux", Arch: "amd64", Purpose: member.Name,
-		Files: []delivery.BinaryFileInput{{Name: "nvkectl", Path: payloadPath, InstallPath: "/usr/local/bin/nvkectl", Mode: 0o755}}})
+		Files: []delivery.BinaryFileInput{{Name: "nvkectl-module-tags", Path: payloadPath, InstallPath: "/usr/local/bin/nvkectl-module-tags", Mode: 0o755}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	request := testReleaseRequest(t, []Artifact{{Name: member.Name, Kind: OutputExecutable, Digest: descriptor.Digest, BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"nvkectl"}}}, []delivery.ObjectInput{{Name: member.Name, Kind: member.Kind, Path: local(member.Path), Layout: true, ArtifactType: member.MediaType, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest}}, map[string]string{"nvkectl": pipeline.FileDigest(payload)})
+	request := testReleaseRequest(t, []Artifact{{Name: member.Name, Kind: OutputExecutable, Digest: descriptor.Digest, BuildDigest: "sha256:" + repeat("5", 64), Components: []string{"nvkectl-module-tags"}}}, []delivery.ObjectInput{{Name: member.Name, Kind: member.Kind, Path: local(member.Path), Layout: true, ArtifactType: member.MediaType, SemanticDigest: bundle.SemanticDigest, BlobDigest: bundle.RootDigest}}, map[string]string{"nvkectl-module-tags": pipeline.FileDigest(payload)})
 	_, err = delivery.BuildPublicationRoot(ctx, local(outer.Path), request)
 	if err != nil {
 		t.Fatal(err)

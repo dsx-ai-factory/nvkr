@@ -263,9 +263,10 @@ func TestProjectionTransportsMatchInBinaryGenerator(t *testing.T) {
 	for _, name := range names {
 		plan := plans[name]
 		t.Run(name, func(t *testing.T) {
-			// One maintained Plan keeps real-product coverage in the default
-			// suite; the whole committed matrix is an extended integration check.
-			if strings.HasPrefix(name, "committed/") && name != "committed/nvkr-run-nvke-telemetry" {
+			// Keep the telemetry and largest domain-catalog Plan in the default
+			// suite: the latter exercises the increased Plan read bound through
+			// both projection transports. The remaining matrix stays opt-in.
+			if strings.HasPrefix(name, "committed/") && name != "committed/nvkr-run-nvke-telemetry" && name != "committed/nvkr-run-nvke-gpu-site" {
 				testutil.RequireExtended(t)
 			}
 			oracle, err := RenderGitHub(t.Context(), plan)

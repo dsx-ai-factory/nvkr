@@ -40,7 +40,7 @@ func TestOSAgentAcquisitionUsesGoTransportFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	producer := overlay.Components["nvke-node-image"].Component
+	producer := overlay.Components["nvke-node-image-diagnostic"].Component
 	if producer == nil || !slices.Equal(producer.VendorCommand, command) {
 		t.Fatal("ARM64 KVM producer must retain the same tested acquisition command")
 	}

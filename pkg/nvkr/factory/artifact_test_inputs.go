@@ -55,7 +55,14 @@ func selectCLIArtifactTestInputs(plan *Plan, output string) (*CLIArtifactTestInp
 	var selected *BuildPlan
 	for i := range plan.Builds {
 		build := &plan.Builds[i]
-		if len(build.Components) != 1 || build.Components[0] != "nvkectl" || (output != "" && build.Name != output) {
+		if len(build.Components) != 1 || (output != "" && build.Name != output) {
+			continue
+		}
+		// Catalog consolidation retains explicit CLI recipe variants. Names select
+		// diagnostics only; the validated producer and toolchain checks below still apply.
+		switch build.Components[0] {
+		case "nvkectl", "nvkectl-module-tags", "nvkectl-local-site", "nvkectl-native-site":
+		default:
 			continue
 		}
 		if selected != nil {
@@ -69,7 +76,8 @@ func selectCLIArtifactTestInputs(plan *Plan, output string) (*CLIArtifactTestInp
 	if selected.Platform != "linux/amd64" && selected.Platform != "linux/arm64" {
 		return nil, e.New(e.CodeEngineCapability, "CLI artifact tests require Linux AMD64 or ARM64")
 	}
-	component := selected.CatalogSnapshot.Components["nvkectl"]
+	componentName := selected.Components[0]
+	component := selected.CatalogSnapshot.Components[componentName]
 	for _, output := range plan.Definition.Outputs {
 		if output.Name == selected.Name && output.Format != "executable" {
 			return nil, e.New(e.CodeEngineCapability, "CLI artifact tests require an executable output")
@@ -92,7 +100,7 @@ func selectCLIArtifactTestInputs(plan *Plan, output string) (*CLIArtifactTestInp
 	var producer *ir.Node
 	for i := range selected.Graph.Nodes {
 		node := &selected.Graph.Nodes[i]
-		if node.Kind == ir.KindBuild && node.Component == "nvkectl" {
+		if node.Kind == ir.KindBuild && node.Component == componentName {
 			if producer != nil {
 				return nil, e.New(e.CodeEngineCapability, "CLI artifact tests require one CLI build node")
 			}
