@@ -1,6 +1,6 @@
 module github.com/dsx-ai-factory/nvkr
 
-go 1.27.3
+go 1.27.4
 
 require (
 	cloud.google.com/go/auth v0.24.1-0.20261001053825-dbc26066f70a
