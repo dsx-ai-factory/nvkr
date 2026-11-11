@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -149,48 +150,86 @@ func TestRepinRejectsAmbiguousLocalImageBinding(t *testing.T) {
 	}
 }
 
-func TestRepinRejectsUnsupportedProducerOverlayPolicyWithoutWrites(t *testing.T) {
-	isolateGitEnvironment(t)
-	root := t.TempDir()
-	oldImage := Registry + "/packer-native@" + digest("old-arm")
-	const registry = "inputs/catalogs/base/registry.yaml"
-	const overlay = "inputs/catalogs/variants/native.json"
-	writeJSON(t, filepath.Join(root, registry), map[string]any{
-		"apiVersion": "nvkr.dev/catalog/v3", "kind": "SourceBuildRegistry",
-		"sources": map[string]any{"tool": map[string]any{"toolchainImagesByArch": map[string]string{"arm64": oldImage}}},
-	})
-	writeJSON(t, filepath.Join(root, overlay), catalog.Overlay{
-		APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind, Name: "native", RequiresCatalogDigest: digest("base"),
-		ToolchainSubstitutions: []catalog.ToolchainSubstitution{{Arch: "arm64", From: digest("local-arm"), To: oldImage, Components: []string{"tool"}}},
-	})
-	writeJSON(t, filepath.Join(root, producerOverlayPolicy), map[string]string{"apiVersion": "nvkr.dev/producer-overlay-maintenance/v999"})
-	before := map[string][]byte{}
-	for _, name := range []string{registry, overlay, producerOverlayPolicy} {
-		raw, err := os.ReadFile(filepath.Join(root, name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		before[name] = raw
-	}
-	for _, args := range [][]string{{"init", "--quiet"}, {"add", "inputs"}} {
-		if _, err := command(t.Context(), root, "git", args...); err != nil {
-			t.Fatal(err)
-		}
-	}
-	indexBefore, err := command(t.Context(), root, "git", "write-tree")
-	if err != nil {
-		t.Fatal(err)
-	}
-	_, err = repin(t.Context(), root, recordFixture(), true)
-	assertCode(t, err, e.CodeInvalidCatalog)
-	for name, raw := range before {
-		after, err := os.ReadFile(filepath.Join(root, name))
-		if err != nil || !bytes.Equal(raw, after) {
-			t.Fatalf("unsupported policy changed %s: %v", name, err)
-		}
-	}
-	indexAfter, err := command(t.Context(), root, "git", "write-tree")
-	if err != nil || !bytes.Equal(indexBefore, indexAfter) {
-		t.Fatalf("unsupported policy changed staged inputs: %v", err)
+func TestRepinProducerOverlayPolicyVersion(t *testing.T) {
+	for _, tc := range []struct {
+		name, version string
+		valid         bool
+	}{
+		{"supported", "nvkr.dev/producer-overlay-maintenance/v1", true},
+		{"unsupported", "nvkr.dev/producer-overlay-maintenance/v999", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			isolateGitEnvironment(t)
+			root := t.TempDir()
+			const base = "inputs/catalogs/base"
+			const registry = base + "/registry.yaml"
+			const overlay = "inputs/catalogs/variants/frozen.json"
+			oldImage := Registry + "/packer-native@" + digest("old-arm")
+			writeJSON(t, filepath.Join(root, registry), map[string]any{
+				"apiVersion": "nvkr.dev/catalog/v3", "kind": "SourceBuildRegistry",
+				"sources":    map[string]any{"tool": map[string]any{"repo": "https://example.invalid/tool", "toolchainImagesByArch": map[string]string{"arm64": oldImage}}},
+				"components": map[string]any{"tool": map[string]any{"fromSource": true, "source": "tool", "platforms": []string{"linux/arm64"}, "outputType": "host-package", "artifactPath": "tool", "buildCommand": []string{"go", "build", "-o", "tool", "."}}},
+			})
+			writeJSON(t, filepath.Join(root, base, catalog.LockFile), catalog.PinLock{
+				APIVersion: "nvkr.dev/lock/v1", Kind: "PinLock", Pins: map[string]catalog.Pin{
+					"tool": {Tag: "v1.0.0", Commit: strings.Repeat("a", 40), TreeHash: strings.Repeat("b", 40), SourceDateEpoch: 1},
+				},
+			})
+			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, base)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			baseDigest, err := cat.SnapshotDigest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			component := cat.Components["tool"]
+			frozen := map[string]catalog.ComponentReplacement{"tool": {Component: &component}}
+			writeJSON(t, filepath.Join(root, overlay), catalog.Overlay{APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind, Name: "frozen", RequiresCatalogDigest: baseDigest, Components: frozen})
+			writeJSON(t, filepath.Join(root, producerOverlayPolicy), catalogmaintenance.ProducerOverlayInputs{
+				APIVersion: tc.version,
+				Overlays:   []catalogmaintenance.ProducerOverlayInput{{Name: "frozen", Destination: overlay, Base: base, Frozen: frozen}},
+			})
+			before := map[string][]byte{}
+			for _, name := range []string{registry, overlay, producerOverlayPolicy} {
+				raw, err := os.ReadFile(filepath.Join(root, name))
+				if err != nil {
+					t.Fatal(err)
+				}
+				before[name] = raw
+			}
+			for _, args := range [][]string{{"init", "--quiet"}, {"add", "inputs"}} {
+				if _, err := command(t.Context(), root, "git", args...); err != nil {
+					t.Fatal(err)
+				}
+			}
+			indexBefore, err := command(t.Context(), root, "git", "write-tree")
+			if err != nil {
+				t.Fatal(err)
+			}
+			changed, err := repin(t.Context(), root, recordFixture(), true)
+			if tc.valid {
+				if err != nil {
+					t.Fatal(err)
+				}
+				for name := range before {
+					if !slices.Contains(changed, name) {
+						t.Fatalf("supported policy did not refresh %s", name)
+					}
+				}
+				return
+			}
+			assertCode(t, err, e.CodeInvalidCatalog)
+			for name, raw := range before {
+				after, err := os.ReadFile(filepath.Join(root, name))
+				if err != nil || !bytes.Equal(raw, after) {
+					t.Fatalf("unsupported policy changed %s: %v", name, err)
+				}
+			}
+			indexAfter, err := command(t.Context(), root, "git", "write-tree")
+			if err != nil || !bytes.Equal(indexBefore, indexAfter) {
+				t.Fatalf("unsupported policy changed staged inputs: %v", err)
+			}
+		})
 	}
 }
