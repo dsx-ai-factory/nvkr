@@ -1,6 +1,6 @@
 module github.com/dsx-ai-factory/nvkr/toolchains/actionlint
 
-go 1.27.0
+go 1.27.4
 
 tool github.com/rhysd/actionlint/cmd/actionlint
 
