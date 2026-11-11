@@ -38,12 +38,16 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 	diskRoots := map[string]string{}
 	diskModes := map[string]string{}
 	bundleOutputs := map[string]bool{}
+	bundleRoots := map[string]string{}
 	for _, o := range publication.Objects {
 		output := o.Output
 		if output == nil {
 			continue
 		}
 		bundleOutputs[o.Name] = output.Format == outputFormatBundle
+		if output.Bundle != nil {
+			bundleRoots[o.Name] = output.Bundle.Component
+		}
 		if output.ImageIndex != nil {
 			if err := validateImageIndexObject(o); err != nil {
 				return err
@@ -115,6 +119,12 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 					binding.InspectionInputDigest = subject
 				}
 			case outputFormatHelm, outputFormatBundle:
+				if output.Bundle != nil {
+					if component == output.Bundle.Component {
+						binding.SubjectKind = "oci-layout"
+					}
+					break
+				}
 				binding.Stage = "source-build"
 				binding.SubjectKind = "source-archive"
 				if output.Format == outputFormatBundle && subject != o.BlobDigest {
@@ -251,7 +261,7 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 			}
 			diskRoot := diskRoots[outputName]
 			method := props["nvkr:dependencyInspection"]
-			if bundleOutputs[outputName] {
+			if bundleOutputs[outputName] && (bundleRoots[outputName] == "" || binding.Stage == "packaging" || bundleRoots[outputName] == binding.Component) {
 				if len(bom.Components) == 0 || method != sbom.BundleFilesMethod {
 					return e.New(e.CodeProvenanceMissing, "bundle requires an exact file inventory at both evidence stages")
 				}

@@ -137,6 +137,9 @@ func ReadArtifact(ctx context.Context, root string) (Descriptor, []byte, error) 
 	default:
 		return Descriptor{}, nil, e.New(e.CodeVerifyFailed, "artifact has an unsupported config or payload count")
 	}
+	if manifest.ArtifactType == MediaAICRArtifact {
+		descriptor.ArtifactType = MediaAICRArtifact
+	}
 	raw, err := readBlob(ctx, root, manifest.Layers[0], maxDeliveryFileBytes)
 	return descriptor, raw, err
 }

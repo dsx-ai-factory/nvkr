@@ -8,3 +8,16 @@ pins:
     sourceDateEpoch: 1793648938
     tag: v1.2.0
     treeHash: 1d4bfa6d824159dbb4c8077303fe8de154946405
+  aicr-tool-arm64:
+    commit: 935e0746dc54da890a23c1ecca998244b3a25de7
+    goVersion: 1.27.3
+    sourceDateEpoch: 1793648938
+    tag: v1.2.0
+    tool:
+      archiveDigest: sha256:26824146cd0743229239899cb75d3b68e0bc262bcdb357fccc98eca0a5b75976
+      executableDigest: sha256:16e5ac98250cdcdb0ecf18e6a9a05b041b3b3cc83aa3181f755aa0e5c5e0fe24
+      executablePath: aicr
+      format: tar-gzip
+      platform: linux/arm64
+      url: https://github.com/NVIDIA/aicr/releases/download/v1.2.0/aicr_1.2.0_linux_arm64.tar.gz
+    treeHash: 1d4bfa6d824159dbb4c8077303fe8de154946405
