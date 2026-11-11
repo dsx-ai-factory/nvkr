@@ -512,7 +512,9 @@ Acceptance tests per unit:
   composite lane recomputed as the minimum of §7; no composite production predicate for reused outputs.
 - **U10 (cutover):** before retirement, every output of the last combined candidate is present in the composite
   Release under the same name or under a rename the cutover declares, with an equivalent selection and an equal
-  per-output Build Digest. The combined `nico-reference-profiles-fixture` is delivered as the `nvke-core` member's
+  per-output Build Digest. The mapping is one-to-one: each combined output maps to a distinct composite output, so
+  two combined outputs with equal Build Digests cannot both be satisfied by one, and no composite output satisfies
+  more than one rename. The combined `nico-reference-profiles-fixture` is delivered as the `nvke-core` member's
   `controller-profiles` and is recorded as that declared rename, not as a missing output. Every composite output
   beyond the combined candidate is listed explicitly as a family-only output and attributed to its member through
   the Release's composition record. The combined input and bundles are retired through ADR-21's exact retirement;
