@@ -1,0 +1,51 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: nvkr-internal-inspector
+  description: Native static disk inspection helper; Run-only tool, not a delivery output.
+sources:
+  nvkr-inspector:
+    repo: https://github.com/njhensley/nvkr
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:a5406f41680f17b4aa0b49de641e00f116215f5c8829d548d29cb44c4f85aa4f
+      arm64: docker.io/library/golang@sha256:4f03804fe5085b5e565347663bc51a54177634097cc71e9f816af6c2672f7662
+    vendorCommand:
+      - bash
+      - -euc
+      - |
+        export GOMAXPROCS=2 GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+        test "$(go env GOVERSION)" = go1.27.3
+        pins="$(sha256sum go.mod go.sum)"
+        timeout --kill-after=10s 540s go mod download
+        GOPROXY=off timeout --kill-after=10s 60s go mod verify
+        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+        printf '%s\n' "$pins" | sha256sum --quiet -c -
+components:
+  nvkr-disk-inspect:
+    source: nvkr-inspector
+    fromSource: true
+    builderType: oci-hermetic
+    outputType: host-package
+    cgo: false
+    platforms:
+      - linux/amd64
+      - linux/arm64
+    artifactPath: nvkr-output/nvkr-disk-inspect
+    writeDir: nvkr-output
+    buildCommand:
+      - bash
+      - -euc
+      - |
+        export GOMAXPROCS=2 GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off GOFLAGS=-mod=vendor
+        test "$(go env GOVERSION)" = go1.27.3
+        CGO_ENABLED=0 GOOS=linux GOARCH={{.Arch}} go build -p 2 -trimpath -buildvcs=false -ldflags '-s -w -buildid=' -o /src/nvkr-output/nvkr-disk-inspect ./cmd/nvkr-disk-inspect
+
+imports:
+  - path: ../../shared/syft.yaml
+    sha256: f52faff48638dde1ee3b2c6ff7e71501739cefbed502fe80ad296b9de370a897
+    sources:
+      syft-amd64: syft
+      syft-arm64: syft-arm64
