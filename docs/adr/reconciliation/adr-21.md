@@ -35,6 +35,9 @@ Repin now updates the named producer-overlay policy, and the proposal regenerate
 dependent workflows. A contract fixture reproduces the old drift and verifies that regeneration
 preserves the new pins without editing exception records. Workflow-order and proposal-path contracts
 retain the pre-repin drift check and restrict policy edits to that one owner file.
+Maintained consumer pins and local AMD64 image IDs select these published subjects; disk producer
+contracts require Packer `1.16.2`, matching the candidate source lock. Frozen/local overlays and generated
+bundles follow those inputs. The new disk Build identities have not been executed end to end.
 The corrected hosted proposal/App exchange remains unexercised; this publication attempt does not
 demonstrate a human environment-approval pause or complete refresh acceptance. GitHub rulesets,
 protected-environment review, private carrier retention, review-record authenticity and registry

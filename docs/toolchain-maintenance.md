@@ -124,6 +124,12 @@ from that stale policy would restore old toolchain pins. The initial `make workf
 still rejects pre-existing drift before repinning. Other policies, historical evidence,
 exception records and source-lock approval gates are unchanged.
 
+When a refresh changes the Packer version, review and update consumer `packerVersion`
+contracts alongside the image pins; runtime preflight requires an exact version match.
+Local AMD64 consumers also require the matching Docker configuration-ID pin and native
+overlay substitution source. Pull the approved AMD64 registry manifest before using
+that configuration ID locally.
+
 Within an affected authored file, the proposal replaces every exact occurrence of
 a selected old pin or predecessor digest, including comments and descriptive text.
 Review those incidental edits along with the executable fields. Unselected files
