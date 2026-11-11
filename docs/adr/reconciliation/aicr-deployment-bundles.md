@@ -1,7 +1,8 @@
 ## AICR deployment bundles
 
 ADR-25's `bundle-oci` path is implemented through the existing Definition → Run → Release owners.
-Each named output selects one pinned source-built gzip tar archive. The AICR producers build `v1.2.0`,
+Eight source-built components each supply one gzip tar archive; GB300 generic training Flux instead
+selects a pinned-tool layout root and its explicit recipe-file material. The eight source producers build `v1.2.0`,
 render with `--output oci-layout:<dir>` and emit the layout's single layer, so the archive is the one AICR
 packaged rather than an NVKR repack. Delivery preserves its exact bytes
 in an OCI artifact; independent output observation reconstructs the wrapper from that output's producer.
@@ -16,11 +17,14 @@ root must hold only the layout entries and exactly one pinned OCI image manifest
 one gzip tar layer, an artifact type on the import allowlist (initially
 `application/vnd.nvidia.aicr.artifact`), and no unreachable blobs. The layer must also pass the bounded
 archive reader, all before output work. Contract tests import a layout copied from AICR v1.1.2's own
-registry push with the same manifest digest, and they refuse each malformed shape with no output. No
-producer, Definition format or publication path uses the import yet. Proposed ADR-27 pinned-tool producers
-admit regular files, but selecting an `oci-layout` producer, which ADR-27 routes to this import, still fails
-closed until that wiring lands. The `v1.2.0` producers above write AICR's layout and emit only its layer, so
-`bundle-oci` publication still uses the NVKR-built wrapper.
+registry push with the same manifest digest, and they refuse each malformed shape with no output. The GB300 generic training Flux output now uses this import with the released AICR v1.2.0 ARM64 executable.
+Its separate recipe producer supplies a regular-file material. Factory validates the captured layer with fixed
+`aicr verify` arguments through the same pinned tool/image, offline and bounded, before accepting the layout
+producer result. Packaging rechecks both the validation subjects and the material manifest. Publication
+preserves the original manifest digest and retains original index bytes to bind it to its build subject.
+Recipe composition, layout file inventory and final package inventory occupy separate evidence slots.
+The other eight components continue emitting their original layer into NVKR's wrapper. Historical source-built
+runs below do not establish acceptance of the converted pinned-tool path.
 
 The [focused AICR example](../../../inputs/definitions/aicr/README.md) retains one GB300
 selection across six renderer formats and one local build-only Environment. A second Definition
@@ -31,7 +35,7 @@ admission lines of each compiled producer are contract-tested under the host's b
 hand-written recipe fixtures, including a removed or malformed leaf and a list outside top-level
 `metadata`. Native Helm examples and publication Environments remain out of scope.
 
-On November 2, the current six-output GB300 Definition with the `v1.2.0` layout producers finished
+On November 2, the then-current six-output source-built GB300 Definition with the `v1.2.0` layout producers finished
 local attempt `aicr-gb300-v120-local-20261102-r1` with exit code 0. Its immutable
 `.nvkr/runs/aicr-gb300-v120-local-20261102-r1/lifecycle.json` records status `complete`, lane
 `unqualified-local-execution`, Plan digest
@@ -56,6 +60,27 @@ platform failed in `aicr recipe` with AICR's coverage error and produced no outp
 AICR's own [NVKE conformance record](https://github.com/NVIDIA/aicr/blob/935e0746dc54da890a23c1ecca998244b3a25de7/docs/conformance/cncf/v1.36/nvke/README.md)
 used this leaf at AICR commit `864dd60065f1`, not the `v1.2.0` pin. NVKR claims no hardware or AICR
 validation evidence for these bundles.
+
+On November 10, the focused single-output attempt `aicr-pinned-tool-linux-arm64-r5` completed under
+native Linux ARM64 Docker with the released AICR v1.2.0 tool. NVKR was cross-built with Go 1.27.3;
+the execution image remained the catalog's pinned Go 1.27.2 image. The Run records
+`unqualified-local-execution`, one observed output, Plan digest
+`sha256:928cc0ebcb9bf1f3107fe4ecaecf4c4c1ec67abc2cc7b7efc10d461884296e3f` and content subject
+`sha256:15b3cbed09b010c89f22e91006eb3966a0f19f04ed94f74db96e05fe6d0fa1d7`.
+The recipe's criteria were generic/gb300/ubuntu/training (platform `any`), with recipe digest
+`sha256:cb7e45a3ff6fbf0e1c2712c8499324f5f402cfa7c278bdb73b3392ad47c3f7e3`.
+The fixed validator passed 34 checksums and explicitly reported **unverified** trust: no upstream
+attestations were present. The admitted archive held 35 regular files including the checksum list.
+
+Inspection compared producer and packaged manifest, empty config and layer bytes exactly. The original
+index subject was `sha256:5bda9ada6e9ddb3b76c53320b0c10683c1afcf8d51ec6ad3f32c19b776b60af8`,
+the unchanged manifest was `sha256:b1df1357f406dd47c45704c40e6a0397f20ccff1e05aaf5cd30bac42099bc53b`,
+and the layer was `sha256:0dc28cb964c9b9ea5459dffe8bed6dc44774fa65893543a6e32a84842abc6d1d`.
+Task evidence is retained outside Git under `data/aicr-pinned-tool/linux-run/`: `command.json`,
+`execution.log`, `inspection.json`, and `.nvkr/runs/aicr-pinned-tool-linux-arm64-r5/lifecycle.json`.
+These local records are not published/authenticated evidence. This run exercised acquisition, recipe,
+rendering, fixed validation, observation, SBOM and packaging only. Publication/evidence membership and
+malformed-input refusal are contract-tested separately.
 
 Hosted AICR publication/signing and independent production consumption remain unexercised. Argo CD
 reconciliation, cluster installation, hardware behavior, air-gap dependency closure and qualified bundle

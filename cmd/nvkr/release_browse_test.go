@@ -20,7 +20,7 @@ import (
 )
 
 func TestReleaseBrowseRejectsPresentationBeforeAcquisition(t *testing.T) {
-	for _, extra := range [][]string{{"--format", "html"}, {"--timeout", "0s"}, {"--layout", "missing", "--anonymous"}, {"unexpected"}} {
+	for _, extra := range [][]string{{"--format", "html"}, {"--timeout", "0s"}, {"--kind", "oci-image"}, {"--platform", "linux/*"}, {"--platform", "arm64"}, {"--layout", "missing", "--anonymous"}, {"unexpected"}} {
 		var out bytes.Buffer
 		app := &cli.App{Commands: []*cli.Command{cmdRelease()}, Writer: &out}
 		args := []string{"nvkr", "release", "browse", "--reference", "127.0.0.1:1/releases@sha256:" + strings.Repeat("a", 64), "--workspace", filepath.Join(t.TempDir(), "must-not-exist")}

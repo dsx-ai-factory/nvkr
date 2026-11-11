@@ -8,5 +8,7 @@ metadata:
   description: Local native ARM64 bundle rendering without publication or signing.
 runtime:
   runtime: docker
+toolchainAccess:
+  publicRoots: [docker.io/library/golang]
 utilityContainer: golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c
 utilityPlatform: linux/arm64

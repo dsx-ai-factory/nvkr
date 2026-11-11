@@ -73,6 +73,11 @@ func ObserveResult(ctx context.Context, node ir.Node, payloadPath, resultPath st
 			return ArtifactResult{}, e.New(e.CodeVerifyFailed, "pull result %q does not describe a raw acquired file", node.ID)
 		}
 	}
+	if node.BuilderType == ir.BuilderPinnedTool && node.OutputType == ir.OutputOCILayout {
+		result.TransportPath = payloadPath
+		payloadPath = filepath.Join(payloadPath, "index.json")
+	}
+
 	digest, size, _, err := hashRegularBeneathContext(ctx, filepath.Dir(payloadPath), filepath.Base(payloadPath))
 	if err != nil {
 		return ArtifactResult{}, mapCancellation(ctx, e.Wrap(e.CodeVerifyFailed, err, "observing producer %q bytes", node.ID), "producer result observation")
@@ -81,7 +86,9 @@ func ObserveResult(ctx context.Context, node ir.Node, payloadPath, resultPath st
 		return ArtifactResult{}, e.New(e.CodeVerifyFailed, "producer %q bytes differ from its recorded digest or size", node.ID)
 	}
 	result.AbsPath = payloadPath
-	result.TransportPath = ""
+	if node.OutputType != ir.OutputOCILayout {
+		result.TransportPath = ""
+	}
 	if node.Kind == ir.KindPull {
 		result.Path = payloadPath
 	}

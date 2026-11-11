@@ -442,6 +442,11 @@ func metadataManifest(ctx context.Context, root string, object PublishedObject) 
 			return ociManifest{}, err
 		}
 	}
+	if object.ArtifactType == MediaAICRArtifact {
+		if _, err := admitBundleManifest(manifestBytes); err != nil {
+			return ociManifest{}, err
+		}
+	}
 	if types.MediaType(object.ArtifactType).IsImage() {
 		if err := validateImageSchemaNames(manifestBytes, reflect.TypeFor[v1.Manifest]()); err != nil {
 			return ociManifest{}, err

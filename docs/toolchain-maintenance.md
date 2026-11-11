@@ -107,8 +107,17 @@ After the record merges, a maintainer dispatches the same workflow on `main` wit
 The workflow authenticates the successful main-branch preparation attempt through
 GitHub, checks that relevant source inputs have not changed, restores that exact
 attempt's private artifacts, and authenticates all four subjects before the first
-registry write. It rechecks expiry before each image write. A changed source,
-missing archive or expired record requires another preparation/review cycle.
+registry write. It rechecks expiry before each image write. Source comparison covers
+`.go-version`, `go.mod`, `go.sum`, `go.work`, `go.work.sum`, `vendor`, `toolchains/nvkr-packer`,
+`toolchains/nvkr-disk-inspect`, `scripts/prepare-native-toolchains.sh`, and the union
+of the inspector's module-local dependency package directories at the preparation
+commit and current `HEAD`. Dependencies are resolved for both Linux architectures
+with CGO disabled; full package directories include embedded and non-Go files.
+Ancestor `.gitattributes` files are included because checkout transformations can
+change embedded or copied bytes.
+Unrelated package edits do not invalidate the retained candidate. Missing commits
+or a failed dependency listing refuse admission; workspace-based and vendored builds are unsupported. A changed guarded input, missing
+archive or expired record requires another preparation/review cycle.
 
 Publication runs inside `nvkr-release`. The independent pipeline reader then pulls
 the selected manifests on both native architectures, repeats the existing native
