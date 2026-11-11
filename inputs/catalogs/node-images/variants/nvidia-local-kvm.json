@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-nvidia-local-kvm",
-  "requiresCatalogDigest": "sha256:411b5c859dc045bfa585d4b3f949b443081fe6bf33b7174e0a0358732ddc2eaf",
+  "requiresCatalogDigest": "sha256:1f2a4ab88abad76a4ed1a58f6fde5a92a3e937322150f2b0d540c89459b366af",
   "components": {
     "nvke-node-image": {
       "component": {
@@ -34,8 +34,8 @@
         "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
         "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
         "toolchainImages": {
-          "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
-          "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
+          "amd64": "sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd",
+          "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
         },
         "outputType": "disk-image",
         "disk": {
@@ -44,7 +44,7 @@
         },
         "packer": {
           "projectPath": "os-image/packer",
-          "packerVersion": "1.15.4",
+          "packerVersion": "1.16.2",
           "buildName": "nvke-node-non-fde.qemu.nvke-non-fde",
           "architectureVariable": "architecture",
           "acceleratorVariable": "accelerator",
