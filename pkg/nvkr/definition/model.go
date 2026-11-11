@@ -62,6 +62,8 @@ type Definition struct {
 	SBOMTool   string             `json:"sbomTool,omitempty"`
 	CosignTool string             `json:"cosignTool,omitempty"`
 	Outputs    []DefinitionOutput `json:"outputs"`
+	// InternalTools selects required Run producers, never delivered output slots.
+	InternalTools []InternalTool `json:"internalTools,omitempty"`
 }
 
 type Catalog struct {
@@ -280,7 +282,7 @@ func (definition Definition) Validate() error {
 		previous = output.Name
 	}
 
-	return nil
+	return definition.validateInternalTools()
 }
 
 func (definition Definition) Digest() (string, error) {

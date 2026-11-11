@@ -88,6 +88,12 @@ func (owner *LocalRunResult) PackageReconciledDisk(ctx context.Context, plan *Pl
 	if err != nil {
 		return delivery.Result{}, nil, err
 	}
+	if receipt.profile.HelperTool != "" {
+		if len(receipt.internalToolUse) == 0 {
+			return delivery.Result{}, nil, e.New(e.CodeProvenanceMissing, "disk package lacks its original internal tool use")
+		}
+		evidence.files[internalToolUseFile] = append(append([]byte(nil), receipt.internalToolUse...), '\n')
+	}
 	if err := capture.finish(); err != nil {
 		return delivery.Result{}, nil, err
 	}

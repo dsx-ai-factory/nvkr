@@ -150,6 +150,7 @@ type Plan struct {
 	Routes           []Route                `json:"routes,omitempty"`
 	Builds           []BuildPlan            `json:"builds"`
 	LifecycleOutputs []LifecycleOutputPlan  `json:"lifecycleOutputs,omitempty"`
+	InternalTools    []InternalToolPlan     `json:"internalTools,omitempty"`
 	Graph            ArtifactGraph          `json:"graph"`
 
 	// identityDigest is the digest of this plan AS COMPILED, carried across the local
@@ -223,6 +224,7 @@ type Node struct {
 	ToolFormat       string            `json:"toolFormat,omitempty"`
 	Inputs           []string          `json:"inputs,omitempty"`
 	Outputs          []string          `json:"outputs,omitempty"`
+	InternalTools    []string          `json:"internalTools,omitempty"`
 
 	Requirements     *execution.Requirements `json:"requirements,omitempty"`
 	ExecutionBinding *execution.Binding      `json:"executionBinding,omitempty"`

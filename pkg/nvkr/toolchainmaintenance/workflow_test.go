@@ -168,6 +168,12 @@ func TestNativeToolchainPushPaths(t *testing.T) {
 			if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 				t.Fatalf("module-local dependency outside repository: %q (%v)", dir, err)
 			}
+			// These packages must not stale an inspector candidate: neither
+			// the helper nor its transitive closure owns host orchestration.
+			switch filepath.ToSlash(rel) {
+			case "pkg/nvkr/catalog", "pkg/nvkr/buildgraph", "pkg/nvkr/pipeline", "pkg/nvkr/sbom":
+				t.Fatalf("inspector helper depends on host authority package %s on %s", rel, arch)
+			}
 			want[filepath.ToSlash(rel)+"/**"] = true
 		}
 	}

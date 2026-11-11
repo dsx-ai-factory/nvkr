@@ -87,9 +87,9 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 	return nil
 }
 
-// Run-wide tools use the Definition catalog; each generator uses its output's
-// catalog. One tool name identifies one acquisition, so all selected pins must agree.
-func selectedTools(definition authored.Definition, environment authored.Environment, source *catalog.Catalog,
+// Run-wide tools use the Definition catalog. Explicit internal evidence tools
+// use their producer's catalog. One name identifies one acquisition, so pins must agree.
+func selectedTools(definition authored.Definition, environment authored.Environment, source *catalog.Catalog, builds []BuildPlan,
 ) (map[string]catalog.ToolPin, error) {
 	if source == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "tool selection requires a resolved catalog")
@@ -102,13 +102,13 @@ func selectedTools(definition authored.Definition, environment authored.Environm
 		names = append(names, definition.CosignTool)
 	}
 	tools := make(map[string]catalog.ToolPin, len(names))
-	selectTool := func(name string, selected *catalog.Catalog) error {
+	selectTool := func(name string, selected *catalog.Catalog, platform string) error {
 		pin, ok := selected.Tools[name]
 		if !ok {
 			return e.New(e.CodeUnpinnedSource, "selected catalog tool %q has no pin", name)
 		}
-		if pin.Platform != environment.UtilityPlatform {
-			return e.New(e.CodeEngineCapability, "tool %q platform %s does not match utility platform %s", name, pin.Platform, environment.UtilityPlatform)
+		if pin.Platform != platform {
+			return e.New(e.CodeEngineCapability, "tool %q platform %s does not match selected execution platform %s", name, pin.Platform, platform)
 		}
 		if previous, exists := tools[name]; exists && !reflect.DeepEqual(previous, pin) {
 			return e.New(e.CodeUnpinnedSource, "selected catalog tool %q has conflicting pins", name)
@@ -117,8 +117,31 @@ func selectedTools(definition authored.Definition, environment authored.Environm
 		return nil
 	}
 	for _, name := range uniqueSorted(names) {
-		if err := selectTool(name, source); err != nil {
+		if err := selectTool(name, source, environment.UtilityPlatform); err != nil {
 			return nil, err
+		}
+	}
+	for _, internal := range definition.InternalTools {
+		scanner := internal.SBOMTool
+		selected := source
+		if scanner == "" {
+			scanner = definition.SBOMTool
+		} else {
+			selected = nil
+			for _, build := range builds {
+				if build.Name == internalToolSelection(internal).Name {
+					selected = build.CatalogSnapshot
+					break
+				}
+			}
+			if selected == nil {
+				return nil, e.New(e.CodePipelineDrift, "internal tool %q lacks its selected scanner catalog", internal.Name)
+			}
+		}
+		if scanner != "" {
+			if err := selectTool(scanner, selected, internal.Platform); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return tools, nil

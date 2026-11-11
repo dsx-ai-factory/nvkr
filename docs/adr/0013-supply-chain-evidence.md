@@ -219,6 +219,18 @@ filesystem expansion bound and wall-time limit. Changing this observation profil
 than the logical producer Build. The pinned tools own disk/filesystem, package and OCI grammars;
 NVKR projects their observations and does not execute guest programs or package installation scripts.
 
+ADR-19's internal-tool contract permits the inspection helper to be an ordinary catalog producer
+required within the Run, without becoming a Release member. Its authenticated result must be joined
+to the exact appliance and inspected subject in the observation receipt. This is an observation-only
+dependency and preserves the logical-Build distinction above. The native hosted disk group retains
+the produced static executable and its completed evidence through inspection. Component SBOMs bind
+the helper's Build, component and exact byte digest; attempt-specific terminal bindings belong only
+to Run evidence. The package transaction records the original tool use beside the SBOM set, and
+Run completion joins it to the exact producer, evidence, appliance and disk subject. This record is
+not a delivered artifact and cannot restore an execution capability. General internal-tool consumers
+and cross-job capability transport remain deferred; extraction or generation tests alone are not
+evidence of a complete native disk Run.
+
 The original held Packer artifact retains its declared acquisition carrier before producer cleanup.
 The runtime owns capacity admission, snapshot creation, bounded offline content scanning, snapshot
 closure and permit release as one registered operation. Factory retains the original Run permit

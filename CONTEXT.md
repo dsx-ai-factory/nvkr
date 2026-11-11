@@ -462,6 +462,15 @@ AICR layouts pass a fixed, separately owned post-render integrity check before p
 Execution and acceptance evidence are scoped in the ADR-27 reconciliation.
 _Avoid_: Run-wide pipeline tool, release executable output, build script
 
+**Internal tool artifact**:
+A pinned catalog producer's result required for execution within one Run but excluded from delivered
+Release membership. ADR-19 requires its complete Plan dependency graph, authenticated producer bytes,
+consumer-bound evidence and successful completion. Build-time tools are logical consumer inputs;
+observation-only tools retain separate observation identity. This is an internal role, not a seventh
+public object or a separate preparation/publication lifecycle. The native hosted disk inspector uses
+this mechanism within one original execution owner; other consumers and cross-job use remain deferred.
+_Avoid_: Optional helper, delivered output, path as proof, publication exception
+
 **Component catalog overlay**:
 An ordered, predecessor-bound catalog change replacing a complete component producer or performing an exact
 toolchain-pin substitution for an explicit sorted component set and host architecture. Substitution fails if

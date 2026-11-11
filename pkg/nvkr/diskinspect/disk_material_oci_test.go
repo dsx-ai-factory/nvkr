@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package sbom
+package diskinspect
 
 import (
 	"bytes"
@@ -303,7 +303,7 @@ func TestNestedMaterialCumulativeAdmission(t *testing.T) {
 	}{
 		{"shared expansion exhaustion", 1024, 0, 0, e.CodeEngineCapability},
 		{"shared image count", 1 << 20, 0, 256, e.CodeEngineCapability},
-		{"shared member count", 1 << 20, maxDiskInstalledPackages, 0, e.CodeEngineCapability},
+		{"shared member count", 1 << 20, MaxInstalledPackages, 0, e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			inspection, err := inspectNestedImagesBudget(t.Context(), nestedOCIFixture(t, []string{"amd64"}, true, nil), "linux/amd64", Scanner{}, 1<<20, 0, &materialInspectionBudget{remaining: test.remaining, members: test.members, images: test.images})
@@ -364,7 +364,7 @@ func TestNestedOCIInspectsEveryImage(t *testing.T) {
 			}
 			for _, component := range inspection.Components() {
 				class, err := diskComponentClass(component)
-				if err != nil || class != diskClassContainer {
+				if err != nil || class != ClassContainer {
 					t.Fatalf("class=%q error=%v", class, err)
 				}
 			}

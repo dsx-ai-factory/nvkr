@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package sbom
+package diskinspect
 
 import (
 	"archive/tar"
@@ -124,7 +124,7 @@ func TestDiskContentPinnedScannerReal(t *testing.T) {
 				}
 				if key == (diskPackageKey{name: "nvkr-scanner-fixture", version: "2:1.0-1ubuntu4", format: "deb", architecture: "all"}) {
 					class, err := diskComponentClass(component)
-					if err != nil || class != diskClassContainer {
+					if err != nil || class != ClassContainer {
 						t.Fatalf("nested container package changed observation class: %q, %v", class, err)
 					}
 					t.Logf("scanner=%s carrier=%s bytes=%d exact nested package=%s version=%s", scanner.Digest, subject.Digest(), subject.Size(), component.Name, component.Version)
@@ -180,7 +180,7 @@ func TestDiskContentPinnedScannerReal(t *testing.T) {
 			if err != nil || report.Len() == 0 {
 				t.Fatalf("native OCI helper failed: %v", err)
 			}
-			var observed diskContentReport
+			var observed ContentReport
 			if err := canonical.UnmarshalExact(report.Bytes(), &observed); err != nil {
 				t.Fatal(err)
 			}
@@ -196,7 +196,7 @@ func TestDiskContentPinnedScannerReal(t *testing.T) {
 				}
 				if key == (diskPackageKey{name: "nvkr-scanner-fixture", version: "2:1.0-1ubuntu4", format: "deb", architecture: "all"}) {
 					class, err := diskComponentClass(component)
-					if err != nil || class != diskClassContainer {
+					if err != nil || class != ClassContainer {
 						t.Fatalf("OCI helper package class=%q error=%v", class, err)
 					}
 					return

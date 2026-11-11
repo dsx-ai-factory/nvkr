@@ -16,6 +16,9 @@ import (
 // output's producer/toolchain. The Environment and frozen Plan bind it; changing
 // it does not change the logical source Build identity.
 type DiskInspectionProfile struct {
+	// HelperTool selects a required Run artifact. Its executable digest is
+	// authenticated from the producer result at consumption, never authored here.
+	HelperTool          string                    `json:"helperTool,omitempty"`
 	Image               string                    `json:"image"`
 	InspectorDigest     string                    `json:"inspectorDigest"`
 	CodecDigest         string                    `json:"codecDigest"`
@@ -31,6 +34,9 @@ type DiskInspectionProfile struct {
 // Validate admits only an explicit native host profile and exact closure pins.
 // The adapter separately authenticates image/runtime/tool bytes and capacity.
 func (profile DiskInspectionProfile) Validate(platform string) error {
+	if profile.HelperTool != "" && !namePattern.MatchString(profile.HelperTool) {
+		return e.New(e.CodeInvalidCatalog, "disk inspection helper must name an internal tool selection")
+	}
 	if platform != "linux/amd64" && platform != "linux/arm64" {
 		return e.New(e.CodeEngineCapability, "disk inspection profile requires a native Linux AMD64 or ARM64 platform")
 	}

@@ -18,6 +18,39 @@ func inspectionProfileFixture() DiskInspectionProfile {
 		Resources: execution.ResourceRequest{CPUMillis: 1000, MemoryMiB: 8192, EphemeralStorageMiB: 16384}, TimeoutSeconds: 600, MaxFilesystemBytes: 1 << 20, ScratchStorage: "private-volume"}
 }
 
+func TestDiskInspectionInternalHelperSelection(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		helper         string
+		authoredDigest bool
+		code           e.Code
+	}{
+		{"producer selected", "inspector", true, ""},
+		{"missing virt-inspector pin", "inspector", false, e.CodeUnpinnedInput},
+		{"mutable path", "/tmp/helper", true, e.CodeInvalidCatalog},
+		{"embedded helper", "", true, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := inspectionProfileFixture()
+			p.HelperTool = tc.helper
+			if !tc.authoredDigest {
+				p.InspectorDigest = ""
+			}
+			err := p.Validate("linux/amd64")
+			if tc.code == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != tc.code {
+				t.Fatalf("got %v, want %s", err, tc.code)
+			}
+		})
+	}
+}
+
 func TestDiskInspectionProfilesAreExactNativeAndCloned(t *testing.T) {
 	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
 		t.Run(platform, func(t *testing.T) {

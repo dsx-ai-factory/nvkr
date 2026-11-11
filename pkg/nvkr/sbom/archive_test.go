@@ -300,3 +300,14 @@ func TestRealArchiveContentInspection(t *testing.T) {
 	}
 	t.Logf("subject=%s regular-members=%d complete-document-bytes=%d method=%s", digest, len(inventory.Components), len(encoded), inventory.Method)
 }
+
+type cancelProbeReader struct {
+	reader io.Reader
+	cancel context.CancelFunc
+}
+
+func (reader *cancelProbeReader) Read(raw []byte) (int, error) {
+	n, err := reader.reader.Read(raw)
+	reader.cancel()
+	return n, err
+}

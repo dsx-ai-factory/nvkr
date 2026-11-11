@@ -16,6 +16,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/diskinspect"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
@@ -55,25 +56,9 @@ type Dependency struct {
 	DependsOn []string `json:"dependsOn"`
 }
 
-type Component struct {
-	BOMRef     string     `json:"bom-ref,omitempty"`
-	Type       string     `json:"type"`
-	Name       string     `json:"name"`
-	Version    string     `json:"version,omitempty"`
-	PURL       string     `json:"purl,omitempty"`
-	Hashes     []Hash     `json:"hashes,omitempty"`
-	Properties []Property `json:"properties,omitempty"`
-}
-
-type Hash struct {
-	Alg     string `json:"alg"`
-	Content string `json:"content"`
-}
-
-type Property struct {
-	Name  string `json:"name"`
-	Value string `json:"value"`
-}
+type Component = diskinspect.Component
+type Hash = diskinspect.Hash
+type Property = diskinspect.Property
 
 func fromBuild(res *buildgraph.Resolved, buildDigest string, artifactHashes map[string]string,
 	transportIndependent bool,
@@ -464,41 +449,10 @@ func metadataBindings(properties []Property) (string, string, error) {
 }
 
 func validateSBOMComponent(field string, component Component) error {
-	if (component.Type != "application" && component.Type != "library" && component.Type != "container" && component.Type != "operating-system" && component.Type != "file") || !canonicalText(component.Name) {
-		return e.New(e.CodeInvalidCatalog, "%s is not a canonical supported component", field)
-	}
-	if component.Type == "file" && len(component.Hashes) != 1 {
-		return e.New(e.CodeUnverifiedRef, "%s file has no exact content hash", field)
-	}
-	if component.Version != "" && !canonicalText(component.Version) {
-		return e.New(e.CodeInvalidCatalog, "%s has a non-canonical version", field)
-	}
-	if component.PURL != "" && (!canonicalText(component.PURL) || strings.ContainsAny(component.PURL, " \t\r\n")) {
-		return e.New(e.CodeInvalidCatalog, "%s has a non-canonical purl", field)
-	}
-	if len(component.Hashes) > 1 {
-		return e.New(e.CodeInvalidCatalog, "%s has ambiguous duplicate hash identities", field)
-	}
-	for _, hash := range component.Hashes {
-		if hash.Alg != "SHA-256" || !canonical.IsDigest("sha256:"+hash.Content) {
-			return e.New(e.CodeUnverifiedRef, "%s has a non-canonical SHA-256 identity", field)
-		}
-	}
-	return validateProperties(field+".properties", component.Properties)
+	return diskinspect.ValidateComponent(field, component)
 }
-
 func validateProperties(field string, properties []Property) error {
-	previous := ""
-	for i, property := range properties {
-		if !canonicalText(property.Name) || !canonicalText(property.Value) {
-			return e.New(e.CodeInvalidCatalog, "%s[%d] has a non-canonical name or value", field, i)
-		}
-		if i > 0 && property.Name <= previous {
-			return e.New(e.CodeInvalidCatalog, "%s must be strictly sorted and duplicate-free", field)
-		}
-		previous = property.Name
-	}
-	return nil
+	return diskinspect.ValidateProperties(field, properties)
 }
 
 func validSerialNumber(value string) bool {

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package sbom
+package diskinspect
 
 import (
 	"archive/tar"
@@ -53,7 +53,7 @@ type materialInspectionBudget struct {
 
 func (budget *materialInspectionBudget) member() error {
 	budget.members++
-	if budget.members > maxDiskInstalledPackages {
+	if budget.members > MaxInstalledPackages {
 		return e.New(e.CodeEngineCapability, "nested material exceeds its cumulative member budget")
 	}
 	return nil
@@ -132,7 +132,7 @@ func inspectMaterialArchiveBudget(ctx context.Context, subject inspectionArchive
 	if err != nil {
 		return nil, err
 	}
-	result := &FilesystemInspection{subject: subject.Digest(), size: subject.Size(), scanner: scanner.Digest, exported: held.Digest(), components: withDiskContentClass(inventory.Components, diskClassFilesystem), files: files}
+	result := &FilesystemInspection{subject: subject.Digest(), size: subject.Size(), scanner: scanner.Digest, exported: held.Digest(), components: withDiskContentClass(inventory.Components, ClassFilesystem), files: files}
 	// Release the scanner transport before recursively holding package/image
 	// archives. The original archive remains held and authenticated throughout.
 	if err := held.Close(); err != nil {
@@ -237,8 +237,8 @@ func appendContainedArchive(root, nested *FilesystemInspection, carrierPath, car
 		component = cloneComponent(component)
 		// A deeper reader already bound this component to its immediate carrier.
 		// Do not overwrite that observation or invent a concatenated ancestry.
-		if !slices.ContainsFunc(component.Properties, func(property Property) bool { return property.Name == diskContainedInProperty }) {
-			component.Properties = append(component.Properties, Property{Name: diskContainedInProperty, Value: carrierPath + "@" + carrierDigest})
+		if !slices.ContainsFunc(component.Properties, func(property Property) bool { return property.Name == ContainedInProperty }) {
+			component.Properties = append(component.Properties, Property{Name: ContainedInProperty, Value: carrierPath + "@" + carrierDigest})
 			slices.SortFunc(component.Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
 		}
 		root.components = append(root.components, component)
@@ -255,7 +255,7 @@ func inspectCompressedImages(ctx context.Context, subject inspectionArchive, pla
 }
 
 func inspectNestedImagesBudget(ctx context.Context, subject inspectionArchive, platform string, scanner Scanner, maxBytes int64, depth int, budget *materialInspectionBudget) (*FilesystemInspection, error) {
-	if err := validateSBOMContext(ctx); err != nil {
+	if err := validateContext(ctx); err != nil {
 		return nil, err
 	}
 	filesystemDepth, _ := ctx.Value(diskFilesystemDepthKey{}).(int)
@@ -376,7 +376,7 @@ func inspectNestedImagesBudget(ctx context.Context, subject inspectionArchive, p
 		if err := errors.Join(scanErr, closeErr); err != nil {
 			return nil, err
 		}
-		result.components = append(result.components, withDiskContentClass(inventory.Components, diskClassContainer)...)
+		result.components = append(result.components, withDiskContentClass(inventory.Components, ClassContainer)...)
 	}
 	if err := subject.AssertUnchangedContext(ctx); err != nil {
 		return nil, err
@@ -552,7 +552,7 @@ func inspectDebianMaterialBudget(ctx context.Context, subject *heldfile.File, pl
 		return nil, err
 	}
 	component := Component{Type: "library", Name: fields[0], Version: fields[1], Properties: []Property{
-		{Name: diskContentClassProperty, Value: diskClassDebianArchive}, {Name: diskPackageArchitectureProperty, Value: fields[2]}, {Name: diskPackageFormatProperty, Value: "deb"},
+		{Name: ContentClassProperty, Value: ClassDebianArchive}, {Name: PackageArchitectureProperty, Value: fields[2]}, {Name: PackageFormatProperty, Value: "deb"},
 	}}
 	inspection.components = append(inspection.components, component)
 	if inspection.packageMetadataByDigest == nil {
@@ -565,4 +565,10 @@ func inspectDebianMaterialBudget(ctx context.Context, subject *heldfile.File, pl
 		return nil, e.Wrap(e.CodeVerifyFailed, err, "rechecking Debian material")
 	}
 	return inspection, nil
+}
+
+// InspectDebianMaterial observes a held package with the concrete bounded scanner.
+// It does not issue a host runtime receipt or authorize publication.
+func InspectDebianMaterial(ctx context.Context, subject *heldfile.File, platform string, scanner Scanner, packageReaderDigest string, maxBytes int64) (*FilesystemInspection, error) {
+	return inspectDebianMaterial(ctx, subject, platform, scanner, packageReaderDigest, maxBytes)
 }

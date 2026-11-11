@@ -44,9 +44,41 @@ func (container *DiskInspectionContainer) SelectionContext(ctx context.Context) 
 	selection := container.selection
 	selection.Workspace = nil
 	selection.Diagnostics = nil
+	selection.Tool = nil
+	selection.toolStage = nil
 	selection.RuntimeExecutable = container.runtime.name
 	selection.compositionKind, selection.consumerPlatform, selection.scratchVolume = "", "", ""
 	return selection, nil
+}
+
+// AuthenticateProducedTool joins the original tool capability to this runtime.
+// Equal descriptive digests from another production cannot recreate that join.
+func (container *DiskInspectionContainer) AuthenticateProducedTool(ctx context.Context, name string, tool *ProducedExecutable) (ProducedExecutableBinding, error) {
+	if err := requireRunContext(ctx, "inspection helper authentication"); err != nil {
+		return ProducedExecutableBinding{}, err
+	}
+	if container == nil || tool == nil || tool.state == nil || name == "" {
+		return ProducedExecutableBinding{}, e.New(e.CodeVerifyFailed, "inspection requires its original produced helper")
+	}
+	ctx, finish, err := container.beginOperation(ctx)
+	if err != nil {
+		return ProducedExecutableBinding{}, err
+	}
+	defer finish()
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+	if err := lockDiskInspection(ctx, &container.mu); err != nil {
+		return ProducedExecutableBinding{}, err
+	}
+	defer container.mu.Unlock()
+	selected := container.selection.Tool
+	if selected == nil || selected.state != tool.state || container.selection.ToolName != name {
+		return ProducedExecutableBinding{}, e.New(e.CodeVerifyFailed, "inspection helper belongs to another production")
+	}
+	if err := container.observeBinding(ctx); err != nil {
+		return ProducedExecutableBinding{}, err
+	}
+	return container.helperBinding, nil
 }
 
 func (observation *DiskInspectionObservation) ContentBinding() (kind, guestfish, scanner, packageReader, platform string, maxBytes uint64) {

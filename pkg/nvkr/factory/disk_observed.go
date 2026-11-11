@@ -519,8 +519,14 @@ func (result *LocalRunResult) Close() error {
 	completions := result.diskCompletions
 	result.diskCompletions = nil
 	result.materialConsumptions = nil
+	tools := result.internalExecutables
+	result.internalExecutables = nil
+	result.internalToolEvidence = nil
 	result.diskMu.Unlock()
 	var closeErr error
+	for _, name := range sortedKeys(tools) {
+		closeErr = errors.Join(closeErr, tools[name].Close())
+	}
 	for _, completion := range completions {
 		if completion.Payload != nil {
 			closeErr = errors.Join(closeErr, completion.Payload.Close())

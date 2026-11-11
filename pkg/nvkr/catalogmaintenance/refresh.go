@@ -167,8 +167,8 @@ func prepare(ctx context.Context, config Config, generatorVersion, sourceReposit
 }
 
 // definitionCatalogs admits and returns the repository-relative base catalogs a
-// Definition selects, at the top level and per output; overlays are admitted as
-// paths only.
+// Definition selects, at the top level, per output and per internal tool;
+// overlays are admitted as paths only.
 func definitionCatalogs(ctx context.Context, definitionPath string) (map[string]bool, error) {
 	// A composite contributes its effective Definition, whose catalog locators
 	// are already rebased to the composite's directory.
@@ -182,6 +182,11 @@ func definitionCatalogs(ctx context.Context, definitionPath string) (map[string]
 	for _, output := range def.Outputs {
 		if output.Catalog != nil {
 			selections = append(selections, *output.Catalog)
+		}
+	}
+	for _, tool := range def.InternalTools {
+		if tool.Catalog != nil {
+			selections = append(selections, *tool.Catalog)
 		}
 	}
 	for _, selection := range selections {

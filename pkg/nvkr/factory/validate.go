@@ -29,6 +29,9 @@ func (plan Plan) Validate() error {
 	if err := plan.validatePlanBuilds(); err != nil {
 		return err
 	}
+	if err := plan.validateInternalToolPlans(); err != nil {
+		return err
+	}
 	if err := plan.validateEvidenceAttestationGraph(); err != nil {
 		return err
 	}
@@ -132,7 +135,7 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 		return nil, e.New(e.CodeUnverifiedRef, "run plan omits or adds authored output slots")
 	}
 
-	requiredBuilds := 0
+	requiredBuilds := len(plan.Definition.InternalTools)
 	for _, output := range plan.Definition.Outputs {
 		requiredBuilds += len(nativeOutputSelections(output))
 	}

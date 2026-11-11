@@ -31,12 +31,13 @@ import (
 // live evidence join can issue it; equal-byte sibling attempts, decoded documents
 // and descriptive accessors cannot restore publication authority.
 type DiskEvidenceReceipt struct {
-	owner     *LocalRunResult
-	runtime   *sbom.DiskInspectionRuntime
-	trace     *diskMaterialTrace
-	profile   definition.DiskInspectionProfile
-	root      []byte
-	documents map[string][]byte
+	owner           *LocalRunResult
+	runtime         *sbom.DiskInspectionRuntime
+	trace           *diskMaterialTrace
+	profile         definition.DiskInspectionProfile
+	root            []byte
+	documents       map[string][]byte
+	internalToolUse []byte
 }
 
 func (receipt *DiskEvidenceReceipt) Subject() (string, int64) {
@@ -76,6 +77,10 @@ func OpenDiskEvidenceRuntime(ctx context.Context, plan *Plan, runtimeExecutable 
 // Diagnostics are optional descriptions, not part of the admitted inspection
 // profile or the authority represented by the returned runtime.
 func openDiskEvidenceRuntime(ctx context.Context, plan *Plan, runtimeExecutable string, workspace *os.File, diagnostics *diskdiagnostic.Collector) (*sbom.DiskInspectionRuntime, error) {
+	return openDiskEvidenceRuntimeWithTool(ctx, plan, runtimeExecutable, workspace, diagnostics, nil)
+}
+
+func openDiskEvidenceRuntimeWithTool(ctx context.Context, plan *Plan, runtimeExecutable string, workspace *os.File, diagnostics *diskdiagnostic.Collector, tool *pipeline.ProducedExecutable) (*sbom.DiskInspectionRuntime, error) {
 	if ctx == nil || plan == nil {
 		return nil, e.New(e.CodeUsage, "disk evidence admission requires context and Plan")
 	}
@@ -93,18 +98,26 @@ func openDiskEvidenceRuntime(ctx context.Context, plan *Plan, runtimeExecutable 
 	if err := profile.Validate(platform); err != nil {
 		return nil, err
 	}
+	if (profile.HelperTool != "") != (tool != nil) {
+		return nil, e.New(e.CodeEngineCapability, "selected inspection helper requires its original Run-owned executable")
+	}
 	if err := requireProductionDiskScratch(profile); err != nil {
 		return nil, err
 	}
 	if err := validateDiskScannerSelection(plan, platform, profile.ScannerDigest); err != nil {
 		return nil, err
 	}
-	return sbom.OpenDiskInspectionRuntime(ctx, pipeline.DiskInspectionSelection{RuntimeExecutable: runtimeExecutable, Workspace: workspace,
+	return sbom.OpenDiskInspectionRuntime(ctx, diskEvidenceRuntimeSelection(plan, profile, platform, runtimeExecutable, workspace, diagnostics, tool))
+}
+
+func diskEvidenceRuntimeSelection(plan *Plan, profile definition.DiskInspectionProfile, platform, runtimeExecutable string, workspace *os.File, diagnostics *diskdiagnostic.Collector, tool *pipeline.ProducedExecutable) pipeline.DiskInspectionSelection {
+	return pipeline.DiskInspectionSelection{RuntimeExecutable: runtimeExecutable, Workspace: workspace,
+		Tool: tool, ToolName: profile.HelperTool,
 		PodmanStorageDriver: plan.Environment.Runtime.PodmanStorageDriver,
 		Image:               profile.Image, Platform: platform, InspectorDigest: profile.InspectorDigest, CodecDigest: profile.CodecDigest,
 		GuestfishDigest: profile.GuestfishDigest, ScannerDigest: profile.ScannerDigest, PackageReaderDigest: profile.PackageReaderDigest,
 		Resources: profile.Resources, TimeoutSeconds: profile.TimeoutSeconds, MaxFilesystemBytes: profile.MaxFilesystemBytes, ScratchStorage: profile.ScratchStorage,
-		Diagnostics: diagnostics})
+		Diagnostics: diagnostics}
 }
 
 func diskEvidenceProfile(ctx context.Context, plan *Plan, inspection *sbom.DiskInspectionRuntime) (definition.DiskInspectionProfile, error) {
@@ -137,6 +150,7 @@ func diskEvidenceProfile(ctx context.Context, plan *Plan, inspection *sbom.DiskI
 
 func diskProfileFromSelection(selection pipeline.DiskInspectionSelection) definition.DiskInspectionProfile {
 	return definition.DiskInspectionProfile{Image: selection.Image, InspectorDigest: selection.InspectorDigest, CodecDigest: selection.CodecDigest,
+		HelperTool:      selection.ToolName,
 		GuestfishDigest: selection.GuestfishDigest, ScannerDigest: selection.ScannerDigest, PackageReaderDigest: selection.PackageReaderDigest,
 		Resources: selection.Resources, TimeoutSeconds: selection.TimeoutSeconds, MaxFilesystemBytes: selection.MaxFilesystemBytes, ScratchStorage: selection.ScratchStorage}
 }
@@ -166,13 +180,23 @@ func validateDiskScannerSelection(plan *Plan, platform, pin string) error {
 // acquisitions, and the complete live staged producer graph. No caller path,
 // input description or completeness boolean is admitted.
 func (owner *LocalRunResult) ReconcileDiskEvidence(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, inspection *sbom.DiskInspectionRuntime) (*DiskEvidenceReceipt, error) {
-	return owner.reconcileDiskEvidence(ctx, plan, expected, inspection,
+	receipt, err := owner.reconcileDiskEvidence(ctx, plan, expected, inspection,
 		func(ctx context.Context) (definition.DiskInspectionProfile, error) {
-			return diskEvidenceProfile(ctx, plan, inspection)
+			return owner.diskEvidenceProfile(ctx, plan, expected, inspection)
 		},
 		func(ctx context.Context, build BuildPlan, trace *diskMaterialTrace, payload *diskPayload, profile definition.DiskInspectionProfile) (diskEvidenceScan, error) {
 			return owner.scanDiskEvidence(ctx, plan, build, trace, payload, inspection, profile)
 		})
+	if err != nil {
+		return nil, err
+	}
+	if receipt.profile.HelperTool != "" {
+		receipt.internalToolUse, err = owner.recordDiskInternalToolUse(ctx, plan, expected, receipt)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return receipt, nil
 }
 
 // These private operations model scan failures and lifetime changes in contract
@@ -492,7 +516,7 @@ func diskMaterialContentKind(subjectProducer string, edges []diskMaterialEdge, m
 func (owner *LocalRunResult) ExportReconciledDisk(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, inspection *sbom.DiskInspectionRuntime, receipt *DiskEvidenceReceipt, destination io.Writer) (DiskPayloadObservation, *sbom.BOM, error) {
 	return owner.exportReconciledDisk(ctx, plan, expected, inspection, receipt, destination,
 		func(ctx context.Context) (definition.DiskInspectionProfile, error) {
-			return diskEvidenceProfile(ctx, plan, inspection)
+			return owner.diskEvidenceProfile(ctx, plan, expected, inspection)
 		})
 }
 
