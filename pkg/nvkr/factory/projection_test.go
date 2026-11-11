@@ -263,6 +263,9 @@ func TestProjectionTransportsMatchInBinaryGenerator(t *testing.T) {
 	for _, name := range names {
 		plan := plans[name]
 		t.Run(name, func(t *testing.T) {
+			if name == "committed/nvkr-run-nvke-gpu-site" {
+				t.Skip("covered by TestMaintainedGPUProjectionTransports in the default suite")
+			}
 			// Telemetry remains in the matrix default; the largest Plan has its
 			// own top-level test so CI can shard its full transport comparison.
 			if strings.HasPrefix(name, "committed/") && name != "committed/nvkr-run-nvke-telemetry" {

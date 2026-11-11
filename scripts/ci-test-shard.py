@@ -18,7 +18,9 @@ import time
 
 
 # Heavy packages split by top-level test; all other packages run whole.
-GROUPS = {"factory": ("pkg/nvkr/factory", 4), "lifecycle": ("pkg/nvkr/lifecycle", 2),
+# Six factory shards separate maintained bundle validation from GPU projection;
+# five hashes both largest cases together. Keep the workflow deadline unchanged.
+GROUPS = {"factory": ("pkg/nvkr/factory", 6), "lifecycle": ("pkg/nvkr/lifecycle", 2),
           "packages": (None, 5)}
 TEST_NAME = re.compile(r"(?:Test|Example|Fuzz)\w*\Z")
 # Retain at most 32 MiB of stdout per child, including discovery commands.
