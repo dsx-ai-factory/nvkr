@@ -4,13 +4,18 @@
 package main
 
 import (
+	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/runpresenter"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
+	"github.com/urfave/cli/v2"
 )
 
 func initOperatorArgs(t *testing.T, extra ...string) []string {
@@ -69,10 +74,85 @@ func TestDefinitionInitRefusalsPrintNoYAML(t *testing.T) {
 	}
 }
 
+func TestDefinitionInitMissingFlagIsCodedAndPrintsNothing(t *testing.T) {
+	full := initOperatorArgs(t, "--component", "helm")[3:]
+	for _, flag := range []string{"--name", "--catalog", "--platform", "--component"} {
+		t.Run(flag, func(t *testing.T) {
+			args := []string{"nvkr", "definition", "init"}
+			for i := 0; i < len(full); i += 2 {
+				if full[i] != flag {
+					args = append(args, full[i], full[i+1])
+				}
+			}
+			output, err := runCLIWithCapturedStdout(t, newApp(), args...)
+			assertLifecycleCommandCode(t, err, e.CodeUsage)
+			if len(output) != 0 {
+				t.Fatalf("missing %s printed %q", flag, output)
+			}
+		})
+	}
+}
+
 func TestDefinitionInitTUIPrintsNoYAML(t *testing.T) {
 	output, err := runCLIWithCapturedStdout(t, newApp(), initOperatorArgs(t, "--component", "helm", "--ui=tui")...)
 	assertLifecycleCommandCode(t, err, e.CodeUsage)
 	if len(output) != 0 {
 		t.Fatalf("rejected viewer printed %q", output)
+	}
+}
+
+func definitionInitPresentationApp(show func(progress.Snapshot) runpresenter.Result) *cli.App {
+	return &cli.App{Commands: []*cli.Command{cmdDefinition()}, Metadata: map[string]interface{}{
+		commandPresentationServicesKey: runPresentationServices{
+			eligible: func(io.Writer) bool { return true },
+			show: func(_ context.Context, options runpresenter.Options, source runSnapshotSource, work func(context.Context) error) runpresenter.Result {
+				if work != nil || options.Live {
+					panic("definition init presentation attempted execution")
+				}
+				return show(source.Snapshot())
+			},
+		},
+	}}
+}
+
+func TestDefinitionInitTUIShowsTheSelectionAndPrintsNoYAML(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		component string
+		status    string
+		code      e.Code
+	}{
+		{"admitted", "helm", "complete", ""},
+		{"refused", "nope", "failed", e.CodeInvalidCatalog},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var shown *progress.Snapshot
+			app := definitionInitPresentationApp(func(snapshot progress.Snapshot) runpresenter.Result {
+				shown = &snapshot
+				return runpresenter.Result{}
+			})
+			output, err := runCLIWithCapturedStdout(t, app, initOperatorArgs(t, "--component", tc.component, "--ui=tui")...)
+			if tc.code == "" && err != nil {
+				t.Fatal(err)
+			}
+			if tc.code != "" {
+				assertLifecycleCommandCode(t, err, tc.code)
+			}
+			if len(output) != 0 {
+				t.Fatalf("TUI printed %q", output)
+			}
+			if shown == nil || shown.Status != tc.status || shown.FailureCode != string(tc.code) {
+				t.Fatalf("unexpected viewer snapshot: %+v", shown)
+			}
+			if tc.code == "" {
+				fields := map[string]string{}
+				for _, field := range shown.Fields {
+					fields[field.Label] = field.Value
+				}
+				if fields["Name"] != "my-tools" || fields["Platform"] != "linux/arm64" || fields["Components"] != "helm" || !filepath.IsAbs(fields["Catalog"]) {
+					t.Fatalf("unexpected fields: %+v", shown.Fields)
+				}
+			}
+		})
 	}
 }

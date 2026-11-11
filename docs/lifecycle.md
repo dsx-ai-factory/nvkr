@@ -54,12 +54,16 @@ bin/nvkr definition init --name my-tools \
 bin/nvkr definition validate --definition definition.yaml
 ```
 
-The selection is admitted through the same catalog, platform-route and material-set checks a later run uses, and
-each component must be a `host-package` producer. A missing, duplicate or unknown component, an unsupported
-platform, an incomplete material selection or a non-executable producer fails with a coded error and prints
-nothing. Components are sorted, so the same request always prints the same bytes. `--catalog` is written as an
-absolute path so moving the file cannot change which catalog it means; edit it to a relative path when the file
-should be portable. This first version covers one executable output and a single platform.
+The selection is admitted through the same catalog, platform-route and material-set checks a later run uses,
+and init adds no rule of its own. A missing flag, a missing, duplicate or unknown component, an unsupported
+platform or an incomplete material selection fails with a coded error and prints nothing. Components are sorted, so the same request on the same checkout always prints the same
+bytes.
+
+`--catalog` is written as an absolute path, so the printed file works where it was made. That path is part of the
+Definition digest and the Plan, so the same request prints different bytes and identities on another checkout.
+Captured local runs, hosted runs and composite Definitions refuse an absolute catalog locator. Before you commit
+the file or use it in one of those runs, change `catalog.base` to a path relative to the Definition file's own
+directory, not the directory you ran `definition init` from. This first version covers one executable output and a single platform.
 
 ## Inspect and generate
 

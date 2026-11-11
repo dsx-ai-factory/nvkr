@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -124,7 +123,6 @@ func TestInitDefinitionContractPreparesFromAnotherDirectory(t *testing.T) {
 
 func TestInitDefinitionRefusesBeforeAuthoring(t *testing.T) {
 	operator := initOperatorCatalog(t)
-	layered := filepath.Join(initRepoRoot(t), "testdata", "examples", "layered-catalog")
 	ovn := filepath.Join(initRepoRoot(t), "inputs", "catalogs", "ovn-upstream")
 	for _, tc := range []struct {
 		name    string
@@ -142,7 +140,6 @@ func TestInitDefinitionRefusesBeforeAuthoring(t *testing.T) {
 		{"unsupported platform", DefinitionInit{Name: "t", Catalog: operator, Platform: "linux/amd64", Components: []string{"helm"}}, e.CodeEngineCapability},
 		{"missing catalog directory", DefinitionInit{Name: "t", Catalog: filepath.Join(t.TempDir(), "absent"), Platform: "linux/arm64", Components: []string{"helm"}}, e.CodeInvalidCatalog},
 		{"incomplete material selection", DefinitionInit{Name: "t", Catalog: ovn, Platform: "linux/arm64", Components: []string{"nvke-cni-ovn"}}, e.CodeInvalidCatalog},
-		{"non-executable producer", DefinitionInit{Name: "t", Catalog: layered, Platform: "linux/arm64", Components: []string{"pause"}}, e.CodeEngineCapability},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := InitDefinition(t.Context(), tc.request)
@@ -154,11 +151,25 @@ func TestInitDefinitionRefusesBeforeAuthoring(t *testing.T) {
 	}
 }
 
-func TestInitDefinitionNonExecutableErrorNamesTheComponent(t *testing.T) {
-	layered := filepath.Join(initRepoRoot(t), "testdata", "examples", "layered-catalog")
-	_, err := InitDefinition(t.Context(), DefinitionInit{Name: "t", Catalog: layered, Platform: "linux/arm64", Components: []string{"kubectl", "pause"}})
-	if err == nil || !strings.Contains(err.Error(), `"pause"`) || !strings.Contains(err.Error(), "oci-image") {
-		t.Fatalf("error should name the refused component and its type: %v", err)
+// A run bundles any producer output type into an executable output (the OVN
+// graphs bundle an OCI image), so init admits the same selections and adds no
+// output-type rule of its own.
+func TestInitDefinitionAdmitsWhatARunAdmits(t *testing.T) {
+	root := initRepoRoot(t)
+	for _, tc := range []struct {
+		name, catalog string
+		components    []string
+	}{
+		{"raw", "inputs/catalogs/tools/installer-local-arm64", []string{"clusterctl"}},
+		{"tarball", "inputs/catalogs/nicosim", []string{"nico-sim-runtime-assets"}},
+		{"oci-image", "testdata/examples/layered-catalog", []string{"pause"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := InitDefinition(t.Context(), DefinitionInit{Name: "t", Catalog: filepath.Join(root, tc.catalog), Platform: "linux/arm64", Components: tc.components})
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }
 

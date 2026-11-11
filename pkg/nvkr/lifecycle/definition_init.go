@@ -15,10 +15,6 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-// executableOutputType is the catalog output type that a plain executable
-// output can bundle; other output types need their own output formats.
-const executableOutputType = "host-package"
-
 // DefinitionInit selects the one executable output of a starter Definition.
 // Every field is explicit: nothing is defaulted and no dependency is added.
 type DefinitionInit struct {
@@ -68,16 +64,10 @@ func InitDefinition(ctx context.Context, request DefinitionInit) (Definition, er
 	if err != nil {
 		return Definition{}, err
 	}
-	resolved, err := buildgraph.Resolve(loaded, buildgraph.Selection{
+	if _, err := buildgraph.Resolve(loaded, buildgraph.Selection{
 		Components: components, Platform: request.Platform, OutputFormat: definition.OutputExecutable,
-	})
-	if err != nil {
+	}); err != nil {
 		return Definition{}, err
-	}
-	for _, component := range resolved.Components {
-		if component.OutputType != executableOutputType {
-			return Definition{}, e.New(e.CodeEngineCapability, "component %q has output type %q; an executable output bundles only %s components", component.Name, component.OutputType, executableOutputType)
-		}
 	}
 	return authored, nil
 }
