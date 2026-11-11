@@ -176,7 +176,7 @@ func Describe(publication delivery.PublicationDescription, options Options) (Des
 
 func describe(selected view) Description {
 	selection := "all"
-	if selected.SelectedOutput != "" || selected.SelectedKind != "" || selected.SelectedPlatform != "" {
+	if selected.filtered() {
 		selection = "filtered"
 	}
 	result := Description{

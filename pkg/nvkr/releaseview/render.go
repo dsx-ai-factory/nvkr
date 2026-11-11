@@ -90,6 +90,30 @@ type view struct {
 	delivery.PublicationDescription
 }
 
+// filtered reports whether any selection narrowed the view.
+func (selected view) filtered() bool {
+	return selected.SelectedOutput != "" || selected.SelectedKind != "" || selected.SelectedPlatform != ""
+}
+
+// scope names the counts and active filters of a narrowed view, so a partial
+// diagram cannot pass for the whole Release. An unfiltered view has none.
+func (selected view) scope() string {
+	if !selected.filtered() {
+		return ""
+	}
+	parts := []string{fmt.Sprintf("outputs %d of %d", len(selected.Outputs), selected.TotalOutputs)}
+	if selected.SelectedOutput != "" {
+		parts = append(parts, "output "+selected.SelectedOutput)
+	}
+	if selected.SelectedKind != "" {
+		parts = append(parts, "kind "+selected.SelectedKind)
+	}
+	if selected.SelectedPlatform != "" {
+		parts = append(parts, "platform "+selected.SelectedPlatform)
+	}
+	return strings.Join(parts, " | ")
+}
+
 // Render selects a presentation only after the owner checked all metadata. Its
 // inspection labels describe that prerequisite; rendering does not authenticate
 // caller-composed values. JSON follows DescriptionSchemaVersion and is readable
@@ -216,7 +240,11 @@ func renderText(selected view) string {
 func renderMermaid(selected view) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "flowchart TD\n  %%%% %s.\n", selected.Inspection)
-	fmt.Fprintf(&out, "  root[\"%s\"]\n", mermaid("Release "+shortDigest(selected.RootDigest)+" | metadata inspection"))
+	label := "Release " + shortDigest(selected.RootDigest) + " | metadata inspection"
+	if scope := selected.scope(); scope != "" {
+		label += " | " + scope
+	}
+	fmt.Fprintf(&out, "  root[\"%s\"]\n", mermaid(label))
 	outputs := make(map[string]string, len(selected.Outputs))
 	type imageChildKey struct{ output, platform, digest string }
 	imageChildren := make(map[imageChildKey]string)

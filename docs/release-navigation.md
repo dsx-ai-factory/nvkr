@@ -281,7 +281,9 @@ readability; its serialized bytes are not a canonical identity document or a ver
 The Mermaid diagram shows release membership, output components, and evidence-to-output and evidence-to-subject
 relationships. It abbreviates digest labels for readability; use text or JSON for exact locators. This is the
 published artifact/evidence graph. It does not reconstruct build ordering or claim relationships absent from
-the publication metadata. Registry-provided labels are escaped before rendering.
+the publication metadata. Registry-provided labels are escaped before rendering. A filtered diagram names the
+output count and each active selection in its root node (for example `outputs 1 of 6 | kind executable`), so a
+partial view is not mistaken for the whole Release.
 
 ## Inspect a local layout
 
