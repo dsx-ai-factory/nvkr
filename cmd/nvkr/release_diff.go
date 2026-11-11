@@ -82,7 +82,8 @@ func releaseDiffCmd() *cli.Command {
 
 func releaseComparisonDisplay(comparison releaseview.Comparison) commandDisplay {
 	display := commandDisplay{Title: "Release comparison",
-		Note: "Artifact inventory metadata only. Not compared: " + strings.Join(comparison.NotCompared, ", ") + ".",
+		Note: "Artifact inventory metadata only. Not compared: " + strings.Join(comparison.NotCompared, ", ") +
+			". The viewer shortens very long values; --format json has them in full.",
 		Fields: commandFields("Before", comparison.Before.RootDigest, "After", comparison.After.RootDigest,
 			"Added", fmt.Sprint(len(comparison.Added)), "Removed", fmt.Sprint(len(comparison.Removed)),
 			"Changed", fmt.Sprint(len(comparison.Changed)), "Unchanged", fmt.Sprint(comparison.Unchanged))}
@@ -108,7 +109,9 @@ func releaseComparisonDisplay(comparison releaseview.Comparison) commandDisplay 
 				item.Fields = append(item.Fields, progress.Field{Label: "Changed field", Value: pair.Field})
 				continue
 			}
-			item.Fields = append(item.Fields, progress.Field{Label: pair.Field, Value: pair.Before + " -> " + pair.After})
+			// One field per side, so a long before value never hides the after value.
+			item.Fields = append(item.Fields, progress.Field{Label: pair.Field + " before", Value: pair.Before},
+				progress.Field{Label: pair.Field + " after", Value: pair.After})
 		}
 		display.Items = append(display.Items, item)
 	}

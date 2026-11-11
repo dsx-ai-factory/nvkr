@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -130,12 +131,35 @@ func TestReleaseDiffTUIShowsDifferences(t *testing.T) {
 		}
 	}
 	// A changed field shows both values, and no transport reference reaches the viewer.
-	if fields["arch"] != "amd64 -> arm64" || fields["Changed field"] != "reference" {
+	if fields["arch before"] != "amd64" || fields["arch after"] != "arm64" || fields["Changed field"] != "reference" {
 		t.Fatalf("TUI tools fields: %+v", fields)
 	}
 	for _, field := range tools.Fields {
 		if strings.Contains(field.Value, "registry.example.test") {
 			t.Fatalf("TUI shows a transport reference: %+v", field)
 		}
+	}
+}
+
+// A value longer than the viewer's field bound sits in its own field, so the
+// other side of the change stays complete.
+func TestReleaseComparisonDisplayKeepsAfterValueBesideLongBefore(t *testing.T) {
+	long := make([]string, 400)
+	for index := range long {
+		long[index] = fmt.Sprintf("component-%03d", index)
+	}
+	change := releaseview.OutputChange{Name: "tools", Fields: []string{"components"},
+		Before: releaseview.Output{Name: "tools", Kind: "executable", Components: long},
+		After:  releaseview.Output{Name: "tools", Kind: "executable", Components: []string{"cli"}}}
+	display := releaseComparisonDisplay(releaseview.Comparison{Changed: []releaseview.OutputChange{change}})
+	fields := map[string]string{}
+	for _, field := range display.Items[0].Fields {
+		fields[field.Label] = field.Value
+	}
+	if len(fields["components before"]) <= 4096 || fields["components after"] != `["cli"]` {
+		t.Fatalf("before %d bytes, after %q", len(fields["components before"]), fields["components after"])
+	}
+	if !strings.Contains(display.Note, "--format json") {
+		t.Fatalf("note does not point to complete values: %q", display.Note)
 	}
 }
