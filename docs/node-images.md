@@ -98,7 +98,8 @@ maintained wrapper linked below, which substitutes an observed local Packer imag
 
 ## Execute with the matching runtime
 
-Native Docker/KVM execution requires matching Linux architecture, a running Docker daemon and CLI, Git,
+Native Docker/KVM execution requires matching Linux architecture, a running Docker daemon and CLI, a
+Buildx builder that can stream the Docker exporter (container-backed, or the containerd image store), Git,
 `jq`, KVM access, 8 CPUs, 10 GiB memory,
 64 GiB free workspace storage, and access to pinned source/toolchain inputs. Follow the
 [maintained wrapper instructions](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/diagnostics/README.md) for source-locked toolchain bootstrap

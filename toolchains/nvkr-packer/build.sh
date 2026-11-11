@@ -253,14 +253,36 @@ build_command=("${runtime}" build)
 if [[ "${runtime##*/}" == docker ]]; then
   # Buildx passes the fixed epoch into BuildKit's image config and history,
   # then rewrites image-layer file timestamps to the same epoch on export.
-  # Explicit stdout export avoids the Docker driver's automatic image-store
-  # unpack, which cannot be combined with timestamp rewriting. Hold the archive
-  # in private temporary storage and load only after successful export; failed
-  # builds must not become misleading secondary image-format errors.
+  # Explicit stdout export avoids an automatic image-store unpack, which cannot
+  # be combined with timestamp rewriting. Hold the archive in private temporary
+  # storage and load only after successful export; failed builds must not
+  # become misleading secondary image-format errors.
   # Runtime-specific recorded IDs remain independent and are checked below;
   # changes to the image sources require fresh measurements.
   "${runtime}" buildx version
   "${runtime}" version --format 'Docker server {{.Server.Version}}'
+  # Streaming the Docker exporter needs a container-backed Buildx driver, or
+  # the docker driver on a daemon using the containerd image store. The
+  # docker driver on the classic store rejects the export ("Docker exporter
+  # is not supported for the docker driver"); refuse before building.
+  # Only the docker driver depends on the daemon's image store; a
+  # container-backed builder may also be bound to another context.
+  buildx_driver="$("${runtime}" buildx inspect | sed -n 's/^Driver:[[:space:]]*//p')"
+  daemon_storage=""
+  if [[ "${buildx_driver}" == docker ]]; then
+    daemon_storage="$("${runtime}" info --format '{{json .DriverStatus}}')"
+  fi
+  if [[ "${buildx_driver}" == docker && "${daemon_storage}" != *io.containerd.snapshotter* ]]; then
+    cat >&2 <<'EOF'
+the selected Docker Buildx builder uses the docker driver on a daemon without the
+containerd image store, which cannot stream the Docker exporter this build uses.
+Select a container-backed builder, for example:
+  docker buildx create --name nvkr-toolchain --driver docker-container
+  export BUILDX_BUILDER=nvkr-toolchain
+or enable the containerd image store in the Docker daemon.
+EOF
+    exit 1
+  fi
   build_command=("${runtime}" buildx build
     --output "type=docker,dest=-,rewrite-timestamp=true"
     --build-arg SOURCE_DATE_EPOCH=0)
