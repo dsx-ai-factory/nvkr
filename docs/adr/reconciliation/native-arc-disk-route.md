@@ -133,3 +133,11 @@ projected execution images and strict inspectors; complete cross-owner inventory
 in [issue 426](https://github.com/dsx-ai-factory/nvkr/issues/426). No fresh-runner reader exercise for this
 preflight implementation is recorded for hosted AMD64, hosted ARM64, ARC AMD64 or ARC ARM64; production
 grants and connectivity on each class remain unverified.
+
+Native toolchain publication staleness is contract-tested against real Git fixtures:
+unrelated package edits remain admissible, while inspector dependencies on either Linux
+architecture, embedded assets, checkout attributes, added/removed imports, Go pins, image sources and the
+preparation script remain guarded. Both preparation and current committed snapshots
+contribute dependency directories. Missing commits, unresolved Go packages and archive
+transformations fail closed. This is a source-input admission contract, not a new
+native image build, publication or independent-reader exercise.
