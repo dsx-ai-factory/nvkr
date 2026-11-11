@@ -232,3 +232,55 @@ func TestRenderImageIndexShowsExactChildrenAndPlatformEvidence(t *testing.T) {
 		})
 	}
 }
+
+func mermaidRootLine(t *testing.T, raw []byte) string {
+	t.Helper()
+	for _, line := range strings.Split(string(raw), "\n") {
+		if strings.HasPrefix(line, "  root[") {
+			return line
+		}
+	}
+	t.Fatalf("diagram has no root node: %s", raw)
+	return ""
+}
+
+// A filtered diagram must say so in its visible root node, because a Mermaid
+// comment is not drawn and a partial view would otherwise pass for the Release.
+func TestRenderMermaidMarksFilteredScopeInRootNode(t *testing.T) {
+	description := descriptionFixture()
+	total := len(description.Outputs)
+	unfiltered, err := Render(description, Options{Format: "mermaid"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if root := mermaidRootLine(t, unfiltered); strings.Contains(root, "outputs ") || strings.Contains(root, "filter") {
+		t.Fatalf("unfiltered diagram claims a scope: %s", root)
+	}
+	for _, test := range []struct {
+		name    string
+		options Options
+		want    string
+	}{
+		{"kind", Options{Kind: "executable"}, "outputs 1 of 6 | kind executable"},
+		{"platform", Options{Platform: "linux/arm64"}, "outputs 3 of 6 | platform linux/arm64"},
+		{"kind and platform", Options{Kind: "oci", Platform: "linux/arm64"}, "outputs 2 of 6 | kind oci | platform linux/arm64"},
+		{"output", Options{Output: "tools"}, "outputs 1 of 6 | output tools"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if total != 6 {
+				t.Fatalf("fixture changed: %d outputs", total)
+			}
+			test.options.Format = "mermaid"
+			raw, err := Render(description, test.options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if root := mermaidRootLine(t, raw); !strings.Contains(root, mermaid("metadata inspection | "+test.want)) {
+				t.Fatalf("root node %q does not carry scope %q", root, test.want)
+			}
+			if !strings.HasPrefix(string(raw), "flowchart TD\n  %% metadata inspection;") {
+				t.Fatalf("scope changed the leading comment: %s", raw)
+			}
+		})
+	}
+}

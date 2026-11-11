@@ -20,7 +20,10 @@ native `helm-oci` chart artifacts, and file inventories do not establish deploym
 | Exact source or acquired-artifact pins | CLI-managed `pins.lock.yaml` |
 
 Create a customer-owned input directory or edit the explicitly selected existing inputs. Copy a suitable
-example only after checking its paths and scope; rebase relative references deliberately. Read the current
+example only after checking its paths and scope; rebase relative references deliberately. For a new single-output
+executable Definition, `definition init` prints a starting file from explicit catalog components; follow the
+[lifecycle guide](../../../../docs/lifecycle.md#start-a-small-executable-definition) to make its absolute catalog
+path relative before committing it. Read the current
 loader/schema and admitted examples rather than inventing fields. Prefer declarations using supported builders
 over new NVKR Go code. Never place real credentials in YAML or generated Plans.
 

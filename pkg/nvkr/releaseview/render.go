@@ -14,13 +14,27 @@ import (
 	"unicode"
 	"unicode/utf16"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
+// Options selects a presentation and an optional output subset. Output, Kind and
+// Platform intersect: an output is shown only when it satisfies every one given.
 type Options struct {
-	Format string
-	Output string
+	Format   string
+	Output   string
+	Kind     string
+	Platform string
+}
+
+// Kinds lists the exact output kinds accepted by a kind filter, in sorted order.
+func Kinds() []string {
+	kinds := []string{definition.OutputExecutable, definition.OutputOCI, definition.OutputAPT, definition.OutputHelm,
+		definition.OutputBundle, definition.OutputDiskImage, definition.OutputDebianPackage}
+	slices.Sort(kinds)
+	return kinds
 }
 
 // Validate rejects unsupported presentation before a CLI starts acquisition.
@@ -33,14 +47,71 @@ func (options Options) Validate() error {
 	if strings.IndexFunc(options.Output, unicode.IsControl) >= 0 {
 		return e.New(e.CodeUsage, "release output selector contains control characters")
 	}
+	if options.Kind != "" && !slices.Contains(Kinds(), options.Kind) {
+		return e.New(e.CodeUsage, "release kind filter must be one of %s", strings.Join(Kinds(), ", "))
+	}
+	if options.Platform != "" && target.ValidateExecutablePlatform(options.Platform) != nil {
+		return e.New(e.CodeUsage, "release platform filter must be linux/amd64, linux/arm64 or darwin/arm64")
+	}
 	return nil
 }
 
+func (options Options) filtered() bool {
+	return options.Output != "" || options.Kind != "" || options.Platform != ""
+}
+
+// matches reports whether an output satisfies every requested filter. A native
+// output supports its recorded platform; an aggregate image supports each child
+// platform it contains. Missing platform metadata is unknown and never matches.
+func (options Options) matches(output delivery.PublicationOutput) bool {
+	if options.Output != "" && output.Name != options.Output {
+		return false
+	}
+	if options.Kind != "" && output.Kind != options.Kind {
+		return false
+	}
+	if options.Platform == "" {
+		return true
+	}
+	if output.ImageIndex != nil {
+		return slices.ContainsFunc(output.ImageIndex.Children, func(child delivery.ImageIndexChildBinding) bool {
+			return child.Platform == options.Platform
+		})
+	}
+	return output.OS != "" && output.OS+"/"+output.Arch == options.Platform
+}
+
 type view struct {
-	Inspection     string `json:"inspection"`
-	SelectedOutput string `json:"selectedOutput,omitempty"`
-	TotalOutputs   int    `json:"totalOutputs"`
+	Inspection       string `json:"inspection"`
+	SelectedOutput   string `json:"selectedOutput,omitempty"`
+	SelectedKind     string `json:"selectedKind,omitempty"`
+	SelectedPlatform string `json:"selectedPlatform,omitempty"`
+	TotalOutputs     int    `json:"totalOutputs"`
 	delivery.PublicationDescription
+}
+
+// filtered reports whether any selection narrowed the view.
+func (selected view) filtered() bool {
+	return selected.SelectedOutput != "" || selected.SelectedKind != "" || selected.SelectedPlatform != ""
+}
+
+// scope names the counts and active filters of a narrowed view, so a partial
+// diagram cannot pass for the whole Release. An unfiltered view has none.
+func (selected view) scope() string {
+	if !selected.filtered() {
+		return ""
+	}
+	parts := []string{fmt.Sprintf("outputs %d of %d", len(selected.Outputs), selected.TotalOutputs)}
+	if selected.SelectedOutput != "" {
+		parts = append(parts, "output "+selected.SelectedOutput)
+	}
+	if selected.SelectedKind != "" {
+		parts = append(parts, "kind "+selected.SelectedKind)
+	}
+	if selected.SelectedPlatform != "" {
+		parts = append(parts, "platform "+selected.SelectedPlatform)
+	}
+	return strings.Join(parts, " | ")
 }
 
 // Render selects a presentation only after the owner checked all metadata. Its
@@ -71,25 +142,47 @@ func selectView(description delivery.PublicationDescription, options Options) (v
 		return view{}, err
 	}
 	selected := view{Inspection: "metadata inspection; payloads, signatures and policy not verified", SelectedOutput: options.Output,
+		SelectedKind: options.Kind, SelectedPlatform: options.Platform,
 		TotalOutputs: len(description.Outputs), PublicationDescription: description}
-	if options.Output != "" {
-		selected.Outputs = nil
-		selected.Evidence = []delivery.PublicationEvidence{}
-		for _, output := range description.Outputs {
-			if output.Name == options.Output {
-				selected.Outputs = append(selected.Outputs, output)
-			}
+	if !options.filtered() {
+		return selected, nil
+	}
+	selected.Outputs = nil
+	selected.Evidence = []delivery.PublicationEvidence{}
+	retained := map[string]bool{}
+	named := 0
+	for _, output := range description.Outputs {
+		if output.Name == options.Output {
+			named++
 		}
-		if len(selected.Outputs) != 1 {
-			return view{}, e.New(e.CodeUsage, "release has no unique output %q", options.Output)
+		if options.matches(output) {
+			selected.Outputs = append(selected.Outputs, output)
+			retained[output.Name] = true
 		}
-		for _, evidence := range description.Evidence {
-			if slices.Contains(evidence.Binding.Outputs, options.Output) {
-				selected.Evidence = append(selected.Evidence, evidence)
-			}
+	}
+	if options.Output != "" && named != 1 {
+		return view{}, e.New(e.CodeUsage, "release has no unique output %q", options.Output)
+	}
+	if len(selected.Outputs) == 0 {
+		return view{}, e.New(e.CodeUsage, "release has no output matching %s", options.describeFilters())
+	}
+	for _, evidence := range description.Evidence {
+		if slices.ContainsFunc(evidence.Binding.Outputs, func(name string) bool { return retained[name] }) {
+			selected.Evidence = append(selected.Evidence, evidence)
 		}
 	}
 	return selected, nil
+}
+
+// describeFilters names the active filters for a selection diagnostic.
+func (options Options) describeFilters() string {
+	var filters []string
+	for _, filter := range []struct{ name, value string }{{"output", options.Output}, {"kind", options.Kind}, {"platform", options.Platform}} {
+		if filter.value != "" {
+			filters = append(filters, filter.name+" "+strconv.Quote(filter.value))
+		}
+	}
+	return strings.Join(filters, ", ")
 }
 
 func renderText(selected view) string {
@@ -100,6 +193,12 @@ func renderText(selected view) string {
 		terminal(selected.Metadata.ContentSubject), terminal(selected.Metadata.DefinitionDigest),
 		terminal(selected.Metadata.EnvironmentDigest), terminal(selected.Metadata.PlanDigest))
 	fmt.Fprintf(&out, "Outputs: %d of %d\n", len(selected.Outputs), selected.TotalOutputs)
+	if selected.SelectedKind != "" {
+		fmt.Fprintf(&out, "Kind filter: %s\n", terminal(selected.SelectedKind))
+	}
+	if selected.SelectedPlatform != "" {
+		fmt.Fprintf(&out, "Platform filter: %s (outputs without platform metadata excluded)\n", terminal(selected.SelectedPlatform))
+	}
 	for _, output := range selected.Outputs {
 		platform := ""
 		if output.OS != "" || output.Arch != "" {
@@ -141,7 +240,11 @@ func renderText(selected view) string {
 func renderMermaid(selected view) string {
 	var out strings.Builder
 	fmt.Fprintf(&out, "flowchart TD\n  %%%% %s.\n", selected.Inspection)
-	fmt.Fprintf(&out, "  root[\"%s\"]\n", mermaid("Release "+shortDigest(selected.RootDigest)+" | metadata inspection"))
+	label := "Release " + shortDigest(selected.RootDigest) + " | metadata inspection"
+	if scope := selected.scope(); scope != "" {
+		label += " | " + scope
+	}
+	fmt.Fprintf(&out, "  root[\"%s\"]\n", mermaid(label))
 	outputs := make(map[string]string, len(selected.Outputs))
 	type imageChildKey struct{ output, platform, digest string }
 	imageChildren := make(map[imageChildKey]string)

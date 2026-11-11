@@ -171,7 +171,12 @@ docker image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' \
   "localhost/nvkr-packer-toolchain:dev-${packer_arch}"
 ```
 
-Use `packer_arch=amd64` on the separate native AMD64 host. This build helper requires Docker Buildx.
+Use `packer_arch=amd64` on the separate native AMD64 host. This build helper requires Docker Buildx
+with a builder that can stream the Docker exporter: a container-backed driver, or the default `docker`
+driver on a daemon using the containerd image store. `build.sh` refuses the `docker` driver on the
+classic store before building; create a builder with
+`docker buildx create --name nvkr-toolchain --driver docker-container` and select it with
+`BUILDX_BUILDER=nvkr-toolchain`.
 A cross-build does not supply native execution proof. A rebuilt image differing from
 a recorded runtime-specific local pin must be investigated; do not overwrite or bypass the check.
 Preparation neither pushes nor signs an image, writes a source lock, or supplies an approved repository digest.
