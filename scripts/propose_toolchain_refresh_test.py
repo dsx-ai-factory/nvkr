@@ -25,6 +25,8 @@ class ProposalTest(unittest.TestCase):
             ".github/workflows/nvkr-run.yml": True,
             "inputs/catalogs/node-images/release/pins.lock.yaml": False,
             "inputs/policies/toolchain-maintenance/123.json": False,
+            "inputs/policies/ovn-producer-overlays.json": True,
+            "inputs/policies/other-producer-overlays.json": False,
             ".github/workflows/merge-gate.yaml": False,
             "inputs/catalogs/../../secret.json": False,
             "/tmp/registry.yaml": False,

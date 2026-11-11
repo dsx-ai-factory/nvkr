@@ -34,8 +34,12 @@ func Repin(ctx context.Context, root, run string) ([]string, error) {
 type edit struct{ before, after []byte }
 type catalogPair struct{ before, after *catalog.Catalog }
 
+// This is the authored owner of the maintained generated producer overlays.
+// Other policies, especially subject-bound exceptions, are never repin inputs.
+const producerOverlayPolicy = "inputs/policies/ovn-producer-overlays.json"
+
 func repin(ctx context.Context, root string, record Record, stage bool) ([]string, error) {
-	files, err := command(ctx, root, "git", "ls-files", "-z", "--", "inputs/catalogs", "inputs/environments", "inputs/experiments", "docs/examples")
+	files, err := command(ctx, root, "git", "ls-files", "-z", "--", "inputs/catalogs", "inputs/environments", "inputs/experiments", "docs/examples", producerOverlayPolicy)
 	if err != nil {
 		return nil, err
 	}
@@ -52,6 +56,9 @@ func repin(ctx context.Context, root string, record Record, stage bool) ([]strin
 		var document map[string]any
 		if err := yaml.UnmarshalStrict(raw, &document); err != nil {
 			return nil, e.Wrap(e.CodeInvalidCatalog, err, "read authored input %s", name)
+		}
+		if name == producerOverlayPolicy && document["apiVersion"] != "nvkr.dev/producer-overlay-maintenance/v1" {
+			return nil, e.New(e.CodeInvalidCatalog, "unsupported producer overlay maintenance policy")
 		}
 		replacements := map[string]string{}
 		if err := replacementsFor(document, "", record, replacements); err != nil {
