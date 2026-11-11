@@ -101,8 +101,14 @@ func releaseComparisonDisplay(comparison releaseview.Comparison) commandDisplay 
 		}
 		item := progress.Item{ID: "output/" + change.Name, Name: change.Name, Kind: change.After.Kind, State: state, Primary: true,
 			Fields: commandFields("Before digest", change.Before.Digest, "After digest", change.After.Digest)}
-		for _, field := range change.Fields {
-			item.Fields = append(item.Fields, progress.Field{Label: "Changed field", Value: field})
+		for _, pair := range change.FieldChanges() {
+			// Transport references stay out of the TUI, as in release browse;
+			// text and JSON carry their values.
+			if pair.Field == "reference" {
+				item.Fields = append(item.Fields, progress.Field{Label: "Changed field", Value: pair.Field})
+				continue
+			}
+			item.Fields = append(item.Fields, progress.Field{Label: pair.Field, Value: pair.Before + " -> " + pair.After})
 		}
 		display.Items = append(display.Items, item)
 	}

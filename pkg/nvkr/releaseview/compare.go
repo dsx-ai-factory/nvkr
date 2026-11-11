@@ -212,13 +212,30 @@ func (comparison Comparison) Render(format string) ([]byte, error) {
 		} else {
 			fmt.Fprintf(&out, "\n~ %s: %s\n", terminal(change.Name), strings.Join(change.Fields, ", "))
 		}
-		before, _ := outputFields(change.Before)
-		after, _ := outputFields(change.After)
-		for _, field := range change.Fields {
-			fmt.Fprintf(&out, "  %s: %s -> %s\n", field, terminal(compactField(before[field])), terminal(compactField(after[field])))
+		for _, pair := range change.FieldChanges() {
+			fmt.Fprintf(&out, "  %s: %s -> %s\n", pair.Field, terminal(pair.Before), terminal(pair.After))
 		}
 	}
 	return []byte(out.String()), nil
+}
+
+// FieldChange is one changed field of a compared output with its compact
+// before and after values. "(absent)" marks a field missing on one side.
+type FieldChange struct {
+	Field, Before, After string
+}
+
+// FieldChanges pairs each changed field with its compact before and after
+// values, in the order of Fields, so every presentation shows the same values.
+func (change OutputChange) FieldChanges() []FieldChange {
+	// Both sides are Outputs this package encoded, so encoding cannot fail.
+	before, _ := outputFields(change.Before)
+	after, _ := outputFields(change.After)
+	pairs := make([]FieldChange, 0, len(change.Fields))
+	for _, field := range change.Fields {
+		pairs = append(pairs, FieldChange{Field: field, Before: compactField(before[field]), After: compactField(after[field])})
+	}
+	return pairs
 }
 
 func compactField(raw json.RawMessage) string {

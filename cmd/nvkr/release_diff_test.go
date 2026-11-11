@@ -117,4 +117,25 @@ func TestReleaseDiffTUIShowsDifferences(t *testing.T) {
 		!strings.Contains(snapshot.Note, "Not compared: deployment-compatibility, evidence-documents, policy-acceptance, signatures") {
 		t.Fatalf("TUI comparison: %+v, stdout=%q", snapshot, out.String())
 	}
+	var tools *progress.Item
+	for index := range snapshot.Items {
+		if snapshot.Items[index].Name == "tools" {
+			tools = &snapshot.Items[index]
+		}
+	}
+	fields := map[string]string{}
+	if tools != nil {
+		for _, field := range tools.Fields {
+			fields[field.Label] = field.Value
+		}
+	}
+	// A changed field shows both values, and no transport reference reaches the viewer.
+	if fields["arch"] != "amd64 -> arm64" || fields["Changed field"] != "reference" {
+		t.Fatalf("TUI tools fields: %+v", fields)
+	}
+	for _, field := range tools.Fields {
+		if strings.Contains(field.Value, "registry.example.test") {
+			t.Fatalf("TUI shows a transport reference: %+v", field)
+		}
+	}
 }
