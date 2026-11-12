@@ -127,7 +127,7 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		sources []string
 	}{
 		{"node-images/release", []string{"nvke-os", "nvke-cni-calico-source", "nvke-kubeadm-distro-source", "nvke-spire-agent-source"}},
-		// nvke-nktp-helm is NKTP's own repository; it is checked against the release below.
+		// nvke-nktp-helm is NKTP's own repository; TestNVKEReleasePinsStayAligned pins it.
 		{"nvke/native-site", []string{"nvke-cli", "nvke-controller", "nvke-controller-helm", "nvke-deploy"}},
 		{"controller-profiles/native-nvidia", []string{"nvke-profiles"}},
 		{"tools/native", []string{"nvke-cli", "nvke-deploy", "nvke-nicosim"}},
@@ -144,19 +144,6 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 				t.Fatalf("%s/%s differs from the selected native OS source identity", tc.dir, source)
 			}
 		}
-	}
-	// The native site installs the same NKTP release as the NVKE Release.
-	nativeSite, err := catalog.LoadLockContext(t.Context(), filepath.Join(repo, "inputs/catalogs/nvke/native-site"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	releaseComponents, err := catalog.LoadLockContext(t.Context(), filepath.Join(repo, "inputs/catalogs/nvke/release-components"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got, want := nativeSite.Pins["nvke-nktp-helm"], releaseComponents.Pins["nvke-nktp"]; got.Commit == "" || got.Tag != want.Tag ||
-		got.Commit != want.Commit || got.TreeHash != want.TreeHash || got.SourceDateEpoch != want.SourceDateEpoch {
-		t.Fatalf("nvke/native-site/nvke-nktp-helm %+v differs from nvke/release-components/nvke-nktp %+v", got, want)
 	}
 	for _, conformance := range []bool{false, true} {
 		path, _, err := LocalArtifactInputsFor("ovn", conformance, "linux")

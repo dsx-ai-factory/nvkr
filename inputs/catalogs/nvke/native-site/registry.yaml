@@ -71,8 +71,9 @@ sources:
       fi
       mkdir -p .nvkr-tools
       cp "/tmp/linux-$target_arch/helm" .nvkr-tools/helm
-  # NKTP is released from its own repository. Its version must match the
-  # NVKE version above, whose deploy/nico/nktp/values.yaml the chart runs with.
+  # NKTP is released from its own repository. This must be the NKTP release
+  # that the selected NVKE release's deploy/nico/nktp/values.yaml targets;
+  # bump both together.
   nvke-nktp-helm:
     repo: https://github.com/dsx-ai-factory/nvke-telemetry-pipeline.git
     tagPrefix: nktp/v

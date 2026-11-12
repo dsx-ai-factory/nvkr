@@ -37,8 +37,9 @@ sources:
         pins="$(sha256sum controller/deploy/charts/controller/Chart.yaml)"
         timeout --kill-after=10s 120s ./nvkr-chart-tools/helm dependency build controller/deploy/charts/controller
         printf '%s\n' "$pins" | sha256sum --quiet -c -
-  # NKTP is released from its own repository. Its version must match the
-  # NVKE version above, whose deploy/nico/nktp/values.yaml the chart runs with.
+  # NKTP is released from its own repository. This must be the NKTP release
+  # that the selected NVKE release's deploy/nico/nktp/values.yaml targets;
+  # bump both together.
   nvke-nktp-helm:
     repo: https://github.com/dsx-ai-factory/nvke-telemetry-pipeline.git
     tagPrefix: nktp/v

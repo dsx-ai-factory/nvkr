@@ -169,8 +169,9 @@ sources:
     repo: https://github.com/dsx-ai-factory/nvke
     constraint: v0.23.0
     toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
-  # NKTP is released from its own repository. Its version must match the NVKE
-  # release, whose deploy/nico/nktp/values.yaml the chart runs with.
+  # NKTP is released from its own repository. This must be the NKTP release
+  # that the selected NVKE release's deploy/nico/nktp/values.yaml targets;
+  # bump both together.
   nvke-nktp:
     repo: https://github.com/dsx-ai-factory/nvke-telemetry-pipeline
     tagPrefix: nktp/v
