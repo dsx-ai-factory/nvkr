@@ -2,9 +2,11 @@
 
 This profile-owned catalog selects the CLI, controller image, controller chart and NKTP chart for both
 ARM64 nightly Definitions. It follows `../local-site-arm64`; each source role keeps its distinct
-vendor closure. All four roles select NVKE tag `v0.23.0`, commit
+vendor closure. The CLI, controller image and controller chart select NVKE tag `v0.23.0`, commit
 `2cfd00081b468d85a4894ec17e9deac13c9d8169`, tree
-`a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53` and committer epoch `1793236039`.
+`a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53` and committer epoch `1793236039`. The NKTP chart selects
+NKTP's own repository at tag `nktp/v0.1.0`, commit `a97548c56d101b41740e8a00e273166c84b442e7`, tree
+`4125b283eacc8842210bf405e7dc5f04090e8b05` and committer epoch `1793913052`.
 The test-only nightly suites retain the separate `b4f90e2c4fc4ed3d07efc18a22066a7e0b9b99c8`
 entrypoint selected by the beta migration; v0.23.0 omits that entrypoint. This does not establish runtime compatibility.
 
