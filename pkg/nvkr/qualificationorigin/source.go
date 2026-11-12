@@ -43,6 +43,9 @@ type SourceRequest struct {
 
 // Description is a copy of authenticated facts, with no signing authority.
 type Description struct {
+	Provider      string `json:"provider,omitempty"`
+	Task          string `json:"task,omitempty"`
+	TaskUID       string `json:"taskUID,omitempty"`
 	Branch        string `json:"branch,omitempty"`
 	Repository    string `json:"repository"`
 	RunID         string `json:"runId"`

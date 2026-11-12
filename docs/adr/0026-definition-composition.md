@@ -441,10 +441,10 @@ Negative cases on the same inputs:
 Decided: once the composite exists, the hand-maintained combined `definition.yaml` becomes redundant, and
 retiring it is planned as a separate cutover (U10). The combined production and qualification paths depend
 on it; the fixed development bundle now belongs to the GPU site composite. The cutover is gated on the Hosted
-acceptance criterion below, followed by U10's membership and Build Digest equality. The current composite
-selection differs from the combined Definition's 69 outputs, so that equality still needs a governed
-membership and naming alignment. Composite qualification (U8) must exist before the combined qualification
-path can retire.
+acceptance criterion below, followed by U10's output equivalence. The gate names no output count: a composite
+may deliver a combined output under a declared rename and may add outputs its families own, so equivalence is
+checked per output rather than by total. Composite qualification (U8) must exist before the combined
+qualification path can retire.
 
 ## Implementation plan
 
@@ -505,13 +505,19 @@ Acceptance tests per unit:
   against a member Release both fail; required member set mismatch fails; a member-filtered view grants no
   capability and its description cannot restore authority.
 - **Hosted:** before reconciliation may claim external exercise, one hosted Run of the NVKE composite must
-  complete with every output of its members (80 for the GPU site composite) and one root, followed by independent consumer verification under explicit policy.
-  The same evidence gates U10.
+  complete with every output of its members and one root, followed by independent consumer verification under
+  explicit policy. The same evidence gates U10.
 - **U9 (follow-up):** the reuse decision's matrix, extended with: family output reused only for its same-name
   composite output; an origin outside the authored allowlist refused; equal Build Digest sibling refused;
   composite lane recomputed as the minimum of §7; no composite production predicate for reused outputs.
-- **U10 (cutover):** before retirement, the composite's Release membership and per-output Build Digests equal
-  the last combined candidate's; the combined input and bundles are retired through ADR-21's exact retirement;
+- **U10 (cutover):** before retirement, every output of the last combined candidate is present in the composite
+  Release under the same name or under a rename the cutover declares, with an equivalent selection and an equal
+  per-output Build Digest. The mapping is one-to-one: each combined output maps to a distinct composite output, so
+  two combined outputs with equal Build Digests cannot both be satisfied by one, and no composite output satisfies
+  more than one rename. The combined `nico-reference-profiles-fixture` is delivered as the `nvke-core` member's
+  `controller-profiles` and is recorded as that declared rename, not as a missing output. Every composite output
+  beyond the combined candidate is listed explicitly as a family-only output and attributed to its member through
+  the Release's composition record. The combined input and bundles are retired through ADR-21's exact retirement;
   no maintained consumer, maintenance policy or qualification policy still names them.
 
 ## Consequences

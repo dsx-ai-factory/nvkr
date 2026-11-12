@@ -300,6 +300,28 @@ makes no registry-availability claim in either acquisition mode. Registry and wo
 with `--layout`. The existing `release inspect --reference … --layout …`
 continues to return its compact artifact array.
 
+## Compare two releases
+
+```sh
+bin/nvkr release diff --before "$OLD_RELEASE_REF" --after "$RELEASE_REF"
+bin/nvkr release diff --before "$OLD_RELEASE_REF" --after "$RELEASE_REF" --format json --exit-code
+```
+
+`release diff` checks the complete metadata closure of both pinned references with the same bounded inspector
+as browsing, then compares their artifact inventories. Outputs are matched by exact name; two outputs with
+equal Build Digests but different names are reported as one removed and one added. Each changed output names
+its changed fields (such as `digest`, `os`/`arch`, `chartVersion` or `imageIndex`) and carries its complete
+before and after description. A change to the derived artifact reference alone is marked `referenceOnly`, so
+moving a release to another repository is never reported as changed payload digests.
+
+This is an artifact-inventory comparison only. Evidence documents, signatures, policy acceptance and deployment
+compatibility are not compared or established; the JSON `notCompared` field says so explicitly. Both sides
+must inspect successfully: malformed metadata or an unpinned reference on either side returns its coded error
+and no comparison. The command exits 0 whether or not the inventories differ; with `--exit-code` it exits 3
+when they differ, following `run diff`. `--timeout` bounds both inspections together.
+`--before-layout` and `--after-layout` read either side from a local OCI layout. Registry and workspace flags
+apply only to a side read from the registry. No artifact payload layers are fetched.
+
 ## Apply a verification policy separately
 
 For authenticated consumption, follow [the lifecycle verification guide](lifecycle.md#run-and-verify) and pass

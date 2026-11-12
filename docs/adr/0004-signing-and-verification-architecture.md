@@ -158,10 +158,16 @@ required SBOM membership checks remain separate and mandatory. The adapter does 
 payloads or use a local-image snapshot. Missing evidence fails without a partial successful record.
 Previously published legacy signature/provenance attachments must be reissued as bundles.
 
-The adapter is keyless only; the keyed/KMS fallback in §1 applies solely to detached qualified documents.
+The default OCI adapter is keyless. ADR-18's explicit Tekton key policy is a separate admitted mode:
+the consumer independently maps a P-256 public key to one exact cluster role identity. It rejects certificate
+bundles, while keyless policy rejects public-key bundles; neither falls back to the other. Keyed signing
+snapshots the role's mounted private key in private operation storage, strips provider/OIDC credentials,
+disables transparency upload, and re-verifies the exact subject/predicate using the pinned executable and
+selected public key. Its records include the exact public-key byte digest and claim no Fulcio certificate
+or Rekor inclusion. That key policy cannot authorize the distinct qualified lane or replace member checks.
 Catalog tool sources and locks own the acquisition reference and exact executable digest; Environment selects
 the expected identity and issuer. Ambient PATH or a version string is not a pin. Production retains normal
-transparency checks. Local-key tests deliberately substitute fixture trust and do not establish hosted acceptance.
+transparency checks in keyless mode. Local-key tests deliberately substitute fixture trust and do not establish hosted acceptance.
 
 The pipeline signs and attests each deliverable manifest in its own repository, then the release index.
 The same Run-level production predicate is subject-bound separately to each manifest. Hosted verification

@@ -97,6 +97,9 @@ func developmentRun(plan *Plan, run provenance.RunContext) (development.Namespac
 }
 
 func publicationRunContext(plan *Plan, digest string, startedOn, finishedOn time.Time) (provenance.RunContext, error) {
+	if plan.Environment.Tekton != nil {
+		return plan.tektonExecution.Context(startedOn, finishedOn)
+	}
 	if plan.Environment.GitHubDevelopment {
 		if err := admitDevelopmentEnvironment(); err != nil {
 			return nil, err

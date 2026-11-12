@@ -130,12 +130,22 @@ func admitOCIRegistry(subject Subject, credential Credential) (name.Digest, erro
 }
 
 func newRegistryBundleSource(ctx context.Context, subject Subject, credential Credential, keychain authn.Keychain) (*ociBundleSource, error) {
+	return newRegistryBundleSourceTransport(ctx, subject, credential, keychain, false)
+}
+
+func newRegistryBundleSourceTransport(ctx context.Context, subject Subject, credential Credential, keychain authn.Keychain, plainHTTP bool) (*ociBundleSource, error) {
 	if err := contextError(ctx); err != nil {
 		return nil, err
 	}
 	ref, err := admitOCIRegistry(subject, credential)
 	if err != nil {
 		return nil, err
+	}
+	if plainHTTP {
+		ref, err = name.NewDigest(subject.Ref, name.StrictValidation, name.Insecure)
+		if err != nil {
+			return nil, e.Wrap(e.CodeUnverifiedRef, err, "admitting explicit HTTP registry")
+		}
 	}
 	base := http.DefaultTransport.(*http.Transport).Clone()
 	budget := &ociReadBudget{remaining: maxOCIBundleSearchBytes}

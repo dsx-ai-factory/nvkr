@@ -75,7 +75,7 @@ func (description ToolSmokeDescription) Validate() error {
 	}
 	memberExemptions := map[string]bool{}
 	for _, rule := range policy.Smoke.NonToolMembers {
-		memberExemptions[rule.key()] = true
+		memberExemptions[rule.Key()] = true
 	}
 	for _, output := range description.ArtifactChecks.Outputs {
 		switch output.Kind {
@@ -144,6 +144,12 @@ func matchSmokeWorkerInvocation(worker, current qualificationorigin.Description)
 	}
 	if err := current.Validate(); err != nil {
 		return err
+	}
+	if worker.Provider == "tekton" || current.Provider == "tekton" {
+		if worker.Provider != "tekton" || current.Provider != "tekton" || worker.Task != "nvkr-smoke" || (current.Task != "nvkr-qualify" && current.Task != "nvkr-finalize") || worker.InvocationID != current.InvocationID || worker.TaskUID == current.TaskUID {
+			return e.New(e.CodeGateUnmet, "Tekton smoke worker differs from the exact Run or independent task")
+		}
+		return nil
 	}
 	if len(worker.Attempt) > len(current.Attempt) || len(worker.Attempt) == len(current.Attempt) && worker.Attempt > current.Attempt {
 		return e.New(e.CodeGateUnmet, "native worker invocation is newer than the current qualifier attempt")

@@ -20,6 +20,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/signkey"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
@@ -139,6 +140,10 @@ type Release struct {
 // VerificationPolicy identifies the exact lane and trust requirements a
 // consumer accepts. Empty signer policy never authorizes pipeline evidence.
 type VerificationPolicy struct {
+	// PublicKey and KeyIdentity select an explicit key authority. Empty fields
+	// retain keyless verification; there is no certificate-to-key fallback.
+	PublicKey           string                  `json:"publicKey,omitempty"`
+	KeyIdentity         string                  `json:"keyIdentity,omitempty"`
 	Lane                string                  `json:"lane"`
 	Scope               string                  `json:"scope"`
 	IdentityRegexp      string                  `json:"identityRegexp,omitempty"`
@@ -147,6 +152,14 @@ type VerificationPolicy struct {
 }
 
 func (policy VerificationPolicy) Validate() error {
+	if policy.PublicKey != "" || policy.KeyIdentity != "" {
+		if policy.Lane != LanePipeline || policy.KeyIdentity == "" || policy.IdentityRegexp != "^"+regexp.QuoteMeta(policy.KeyIdentity)+"$" {
+			return e.New(e.CodeTrustPolicyMissing, "explicit-key verification requires a pipeline-attested exact key identity")
+		}
+		if _, err := signkey.NormalizePublicKey([]byte(policy.PublicKey)); err != nil {
+			return err
+		}
+	}
 	switch policy.MinimumDiskEvidence {
 	case "", DiskEvidenceStrict, DiskEvidenceBuildProvenance:
 	default:

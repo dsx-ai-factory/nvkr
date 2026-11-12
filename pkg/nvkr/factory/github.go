@@ -125,6 +125,9 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 	if plan == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "GitHub factory rendering requires a plan")
 	}
+	if plan.Environment.Tekton != nil {
+		return nil, e.New(e.CodeEngineCapability, "Tekton execution policy cannot be lowered to GitHub")
+	}
 	if len(plan.Environment.Runtime.NativeToolchains) != 0 {
 		return nil, e.New(e.CodeEngineCapability, "native toolchain bundle execution is local-only")
 	}

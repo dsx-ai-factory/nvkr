@@ -17,7 +17,7 @@ func TestNativeNKTPDependencyArchiveChecks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const marker = "set -- nktp/deploy/charts/nktp/charts/*.tgz"
+	const marker = "set -- nktp/charts/*.tgz"
 	_, checks, found := strings.Cut(cat.Components["nktp-chart"].VendorCommand[2], marker)
 	if !found {
 		t.Fatal("native chart source omits its archive admission checks")
@@ -34,7 +34,7 @@ func TestNativeNKTPDependencyArchiveChecks(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
-			const charts = "nktp/deploy/charts/nktp/charts/"
+			const charts = "nktp/charts/"
 			if err := os.MkdirAll(filepath.Join(root, charts), 0o700); err != nil {
 				t.Fatal(err)
 			}
@@ -215,7 +215,7 @@ func TestNativeHelmVendorsExecuteHostFromWorkspace(t *testing.T) {
 					}
 				}
 				const chart = "synthetic owning chart\n"
-				for _, name := range []string{"controller/deploy/charts/controller/Chart.yaml", "nktp/deploy/charts/nktp/Chart.yaml", "nktp/deploy/charts/nktp/Chart.lock"} {
+				for _, name := range []string{"controller/deploy/charts/controller/Chart.yaml", "nktp/Chart.yaml", "nktp/Chart.lock"} {
 					write(filepath.Join(root, name), chart, 0o600)
 				}
 				for _, arch := range []string{"amd64", "arm64"} {
@@ -228,10 +228,10 @@ case "$0" in .nvkr-helm-host.*/helm|"$workspace"/.nvkr-helm-host.*/helm) ;; *) e
 [ "$NVKR_HOST_ARCH" = @ARCH@ ] || exit 45
 printf '%s %s\n' "$0" "$*" >> "$NVKR_HELM_CALLS"
 [ "$NVKR_FAILURE" != helm ] || exit 42
-if [ "$1" = dependency ] && [ "$3" = nktp/deploy/charts/nktp ]; then
-  mkdir -p nktp/deploy/charts/nktp/charts
+if [ "$1" = dependency ] && [ "$3" = nktp ]; then
+  mkdir -p nktp/charts
   for archive in metrics-server-3.13.1 prometheus-node-exporter-4.56.1 opentelemetry-kube-stack-0.25.1; do
-    printf 'synthetic chart\n' > "nktp/deploy/charts/nktp/charts/$archive.tgz"
+    printf 'synthetic chart\n' > "nktp/charts/$archive.tgz"
   done
 fi
 `
