@@ -25,6 +25,10 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 	if err != nil {
 		return nil, err
 	}
+	node := planNode(plan, artifact.Producer)
+	if err := validateInternalToolUseEvidence(ctx, plan, node, path, artifacts, local); err != nil {
+		return nil, err
+	}
 	raw, err := readFactorySBOMFile(ctx, filepath.Join(path, "index.json"), "hosted SBOM index")
 	if err != nil {
 		return nil, e.Wrap(e.CodeProvenanceMissing, err, "reading hosted SBOM index")
@@ -36,7 +40,6 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 	if err := index.Validate(); err != nil {
 		return nil, err
 	}
-	node := planNode(plan, artifact.Producer)
 	results := map[string]pipeline.ArtifactResult{}
 	for _, inputID := range node.Inputs {
 		input := artifacts[inputID]

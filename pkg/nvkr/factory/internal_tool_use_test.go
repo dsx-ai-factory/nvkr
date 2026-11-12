@@ -4,6 +4,7 @@
 package factory
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -70,6 +71,11 @@ func TestInternalToolUseCompletionJoinsExactDescriptions(t *testing.T) {
 			Digest: helperDigest, Size: 11, TerminalDigest: "sha256:" + strings.Repeat("c", 64)}}
 	local := func(path string) (string, error) { return path, nil }
 	assertFactoryErrorCode(t, validateInternalToolUseEvidence(t.Context(), plan, node, directory, artifacts, local), e.CodeProvenanceMissing)
+	missingOutput := Artifact{Path: filepath.Join(t.TempDir(), "publication")}
+	assertFactoryErrorCode(t, executePublicationPackage(t.Context(), plan, Node{Inputs: []string{"sbom/node-image"}}, missingOutput, nil, artifacts), e.CodeProvenanceMissing)
+	if _, err := os.Stat(missingOutput.Path); !os.IsNotExist(err) {
+		t.Fatal("missing helper evidence wrote publication output")
+	}
 	for _, tc := range []struct {
 		name   string
 		change func(*internalToolUseRecord)
@@ -94,6 +100,14 @@ func TestInternalToolUseCompletionJoinsExactDescriptions(t *testing.T) {
 				}
 			} else {
 				assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+				// Packaging enters the same binding join before reading even the
+				// consumer index, collecting objects, or writing a publication.
+				output := Artifact{Path: filepath.Join(t.TempDir(), "publication")}
+				publication := Node{Inputs: []string{"sbom/node-image"}}
+				assertFactoryErrorCode(t, executePublicationPackage(t.Context(), plan, publication, output, nil, artifacts), e.CodeVerifyFailed)
+				if _, err := os.Stat(output.Path); !os.IsNotExist(err) {
+					t.Fatal("foreign helper evidence wrote publication output")
+				}
 			}
 		})
 	}

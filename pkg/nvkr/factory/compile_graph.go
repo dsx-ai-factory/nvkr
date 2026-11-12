@@ -212,6 +212,8 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		}
 		if spec.Kind == PackageOCI {
 			inputs = append(inputs, packageProducerResults(inputs, nodes, artifacts)...)
+		}
+		if spec.Kind == PackageOCI || spec.Kind == PackageDiskImage {
 			inputs = append(inputs, publicationSBOMInputs(inputs, nodes, artifacts)...)
 		}
 		inputs = uniqueSorted(inputs)

@@ -136,62 +136,17 @@ func TestPublicationContainsExactBoundSBOMBytes(t *testing.T) {
 	}
 }
 
-func TestPublicationSBOMSeparatesDeclaredInternalToolResults(t *testing.T) {
-	plan, artifacts, _ := publicationSBOMFixture(t)
+func TestPublicationRejectsInternalToolOnUnsupportedConsumer(t *testing.T) {
+	plan, artifacts, node := publicationSBOMFixture(t)
 	set := artifacts["sbom/node-worker"]
-	local := func(path string) (string, error) { return path, nil }
-	expected, err := sbomPublicationObjects(t.Context(), plan, set, artifacts, local)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var subject Artifact
-	for _, candidate := range artifacts {
-		if candidate.BuildTarget == set.BuildTarget && candidate.Kind == "producer-result" {
-			subject = candidate
-			break
-		}
-	}
-	if subject.ID == "" {
-		t.Fatal("fixture has no subject result")
-	}
-	// Same component name and result bytes cannot turn a tool into another
-	// consumer subject. Only the compiler-declared input is excluded.
-	foreign := subject
-	foreign.ID, foreign.BuildTarget = "result/internal/helper/"+subject.Component, "internal/helper"
-	artifacts[foreign.ID] = foreign
-	tool := InternalToolPlan{Name: "helper", BuildTarget: foreign.BuildTarget, ResultArtifactID: foreign.ID}
-	plan.InternalTools = []InternalToolPlan{tool}
 	for i := range plan.Graph.Nodes {
 		if plan.Graph.Nodes[i].ID == set.Producer {
-			plan.Graph.Nodes[i].Inputs = append(plan.Graph.Nodes[i].Inputs, foreign.ID)
-			plan.Graph.Nodes[i].InternalTools = []string{tool.Name}
+			plan.Graph.Nodes[i].InternalTools = []string{"helper"}
 		}
 	}
-	actual, err := sbomPublicationObjects(t.Context(), plan, set, artifacts, local)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(actual) != len(expected) {
-		t.Fatal("internal tool changed consumer evidence membership")
-	}
-	for i := range actual {
-		if actual[i].Name != expected[i].Name || !bytes.Equal(actual[i].Bytes, expected[i].Bytes) {
-			t.Fatal("internal tool changed consumer evidence bytes")
-		}
-	}
-	for _, tc := range []struct {
-		name  string
-		tools []InternalToolPlan
-	}{
-		{"undeclared", nil},
-		{"different result", []InternalToolPlan{{Name: tool.Name, BuildTarget: tool.BuildTarget, ResultArtifactID: "result/internal/helper/other"}}},
-		{"different build", []InternalToolPlan{{Name: tool.Name, BuildTarget: "internal/other", ResultArtifactID: tool.ResultArtifactID}}},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			plan.InternalTools = tc.tools
-			_, err := sbomPublicationObjects(t.Context(), plan, set, artifacts, local)
-			assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
-		})
+	assertFactoryErrorCode(t, executePackage(t.Context(), plan, node, artifacts, io.Discard), e.CodeEngineCapability)
+	if _, err := os.Stat(artifacts[node.Outputs[0]].Path); !os.IsNotExist(err) {
+		t.Fatal("unsupported helper use wrote a publication")
 	}
 }
 

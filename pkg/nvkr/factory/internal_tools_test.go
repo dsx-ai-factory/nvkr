@@ -283,3 +283,34 @@ func TestInternalToolRejectsNonExecutableProducerBeforeWork(t *testing.T) {
 		})
 	}
 }
+
+func TestInternalToolPublicationTransportsProducerEvidence(t *testing.T) {
+	_, plan := internalToolPlanFixture(t)
+	tool := plan.InternalTools[0]
+	checked := 0
+	for _, node := range plan.Graph.Nodes {
+		if node.Kind != NodePackage || !slices.Contains(node.Inputs, "sbom/node-image") {
+			continue
+		}
+		checked++
+		for _, id := range tool.inputs() {
+			if !slices.Contains(node.Inputs, id) {
+				t.Fatalf("%s lacks original helper evidence %s", node.ID, id)
+			}
+		}
+	}
+	if checked < 2 {
+		t.Fatalf("checked %d packaging boundaries, want disk and publication", checked)
+	}
+	if err := plan.validatePublicationEvidence(); err != nil {
+		t.Fatal(err)
+	}
+	for i := range plan.Graph.Nodes {
+		node := &plan.Graph.Nodes[i]
+		if node.Kind != NodePackage || node.PackageKind != PackageOCI {
+			continue
+		}
+		node.Inputs = slices.DeleteFunc(node.Inputs, func(id string) bool { return id == tool.ObservationArtifactID })
+	}
+	assertFactoryErrorCode(t, plan.validatePublicationEvidence(), e.CodeProvenanceMissing)
+}
