@@ -9,6 +9,7 @@ import (
 
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 // InternalToolPlan is a compiler-derived required use, never a delivery slot or
@@ -60,6 +61,9 @@ func requiredInternalTools(definition authored.Definition, builds []BuildPlan) (
 		}
 		if selected == nil || selected.Platform != tool.Platform || !slices.Equal(selected.Components, tool.Components) {
 			return nil, e.New(e.CodePipelineDrift, "internal tool %q lacks its exact selected producer closure", tool.Name)
+		}
+		if err := pipeline.ValidateProducedExecutableProducer(selected.Graph, selected.BuildDigest, tool.Result); err != nil {
+			return nil, err
 		}
 		requirements = append(requirements, InternalToolPlan{Name: tool.Name, Platform: tool.Platform, Format: tool.Format,
 			BuildTarget: selection.Name, BuildDigest: selected.BuildDigest, Component: tool.Result,

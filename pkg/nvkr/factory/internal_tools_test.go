@@ -254,3 +254,32 @@ func TestInternalToolMissingAndUnusedSelection(t *testing.T) {
 		})
 	}
 }
+
+func TestInternalToolRejectsNonExecutableProducerBeforeWork(t *testing.T) {
+	for _, output := range []string{"host-package", "tarball", "oci-image"} {
+		t.Run(output, func(t *testing.T) {
+			_, base := internalToolPlanFixture(t)
+			component := base.CatalogSnapshot.Components["helper"]
+			component.OutputType = output
+			base.CatalogSnapshot.Components["helper"] = component
+			stack, err := catalog.ApplyStack(base.CatalogSnapshot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan, err := Compile(t.Context(), base.Definition, base.Environment, stack, "test")
+			if output == "host-package" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := plan.Validate(); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+				if plan != nil {
+					t.Fatal("unsupported producer returned an executable Plan")
+				}
+			}
+		})
+	}
+}

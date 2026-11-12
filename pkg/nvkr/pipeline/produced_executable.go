@@ -111,6 +111,21 @@ func admitProducedExecutable(ctx context.Context, graph *ir.Graph, buildDigest, 
 	if runtime.GOOS != "linux" || graph.Platform != "linux/"+runtime.GOARCH {
 		return nil, e.New(e.CodeEngineCapability, "produced executable requires its native Linux host")
 	}
+	return selectProducedExecutableProducer(graph, component)
+}
+
+// ValidateProducedExecutableProducer admits the result form without launching
+// work or requiring the producer's native host. Compilation and restored Plan
+// validation share the concrete executor's regular-file boundary.
+func ValidateProducedExecutableProducer(graph *ir.Graph, buildDigest, component string) error {
+	if err := validateGraphIdentity(graph, buildDigest); err != nil {
+		return err
+	}
+	_, err := selectProducedExecutableProducer(graph, component)
+	return err
+}
+
+func selectProducedExecutableProducer(graph *ir.Graph, component string) (*ir.Node, error) {
 	var producer *ir.Node
 	for i := range graph.Nodes {
 		node := &graph.Nodes[i]
