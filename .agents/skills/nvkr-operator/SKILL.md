@@ -47,6 +47,9 @@ declared LUKS2 disks retain encrypted bytes without decryption. Installation, ex
 separate operations requiring the customer's requested scope. Pulling checks the complete metadata closure and
 selected payload integrity; signature and policy acceptance require explicit verification.
 
+To see which outputs were added, removed or changed between two releases, use `release diff` as described in
+[release navigation](../../../docs/release-navigation.md#compare-two-releases).
+
 ## Execution and evidence boundaries
 
 Check platforms, tools, source access, runtime, destinations and evidence lane. A Plan or dry-run is

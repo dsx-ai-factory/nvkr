@@ -53,7 +53,7 @@ records source availability and remaining gaps.
 |---|---|
 | Immutable attempts, completeness, consumer policy, and SDK | [Lifecycle](lifecycle.md) |
 | Canonical Plans, graph views, comparison, and drift | [Plan and graph inspection](plan-and-graph-inspection.md) |
-| Registry/layout browsing, generic JSON export, output downloads, credentials, and metadata limits | [Release navigation](release-navigation.md) |
+| Registry/layout browsing, comparing two Releases, generic JSON export, output downloads, credentials, and metadata limits | [Release navigation](release-navigation.md) |
 | Publication graph, artifact subjects, and signing scope | [Publication architecture](publication-architecture.md) |
 | Configure or review required object-store publication | [Publication guide](publication-architecture.md#required-s3-copy), [ADR-20 contract](adr/0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract), [implementation boundary](adr/reconciliation/object-store-publication.md#object-store-publication) |
 | Review object-store dependency admission | [Dated dependency evidence](evidence/2026-11-04-object-store-dependency-admission.md) |
