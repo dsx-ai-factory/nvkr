@@ -40,7 +40,7 @@ components:
           schemaVersion: nvke.nvidia.com/os-image-materials/v1
         materialManifestVariable: material_manifest
         outputDirectoryVariable: output_directory
-        packerVersion: 1.15.4
+        packerVersion: 1.16.2
         projectPath: os-image/packer
         sshPrivateKeyVariable: ssh_private_key_file
         sshPublicKeyVariable: ssh_public_key_file
@@ -55,7 +55,7 @@ components:
       sourceDateEpoch: 1793236039
       tag: v0.23.0
       toolchainImages:
-        arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
+        arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140
       treeHash: a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53
       vendorCommand:
       - bash
@@ -87,4 +87,4 @@ components:
         }
 kind: CatalogOverlay
 name: nvke-os-arm64-native-kvm
-requiresCatalogDigest: sha256:4826dab294c70a9bc2e3376fa6170c4714d1747c689448fcc6cb0f79c1f2fdea
+requiresCatalogDigest: sha256:19629d981b60678796380a38663c2da14eba5284f7c1444ba88aaf4f924be803

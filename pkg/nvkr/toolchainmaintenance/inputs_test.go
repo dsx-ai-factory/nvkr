@@ -13,6 +13,11 @@ import (
 )
 
 func TestPreparationInputs(t *testing.T) {
+	pin, err := os.ReadFile("../../../.go-version")
+	if err != nil {
+		t.Fatal(err)
+	}
+	goVersion := strings.TrimSpace(string(pin))
 	for _, tc := range []struct {
 		name, path, content string
 		allowed             bool
@@ -29,10 +34,10 @@ func TestPreparationInputs(t *testing.T) {
 		{"removed dependency", "cmd/nvkr-disk-inspect/main.go", "package main\nfunc main() {}\n", false},
 		{"added dependency", "cmd/nvkr-disk-inspect/main.go", "package main\nimport _ \"example.test/inputs/pkg/unrelated\"\nfunc main() {}\n", false},
 		{"module", "go.mod", "module example.test/inputs\n\ngo 1.27.0\n", false},
-		{"workspace", "go.work", "go 1.27.3\nuse .\n", false},
+		{"workspace", "go.work", "go " + goVersion + "\nuse .\n", false},
 		{"vendor", "vendor/modules.txt", "changed", false},
 		{"sums", "go.sum", "changed", false},
-		{"compiler", ".go-version", "1.27.4\n", false},
+		{"compiler", ".go-version", "1.0.0\n", false},
 		{"packer", "toolchains/nvkr-packer/Dockerfile", "changed", false},
 		{"inspector", "toolchains/nvkr-disk-inspect/Dockerfile", "changed", false},
 		{"preparation", "scripts/prepare-native-toolchains.sh", "changed", false},
@@ -62,7 +67,7 @@ func TestPreparationInputs(t *testing.T) {
 			git("config", "user.name", "Fixture")
 			git("config", "user.email", "fixture@example.test")
 			for path, content := range map[string]string{
-				"go.mod": "module example.test/inputs\n\ngo 1.27.3\n", "go.sum": "", ".go-version": "1.27.3\n",
+				"go.mod": "module example.test/inputs\n\ngo " + goVersion + "\n", "go.sum": "", ".go-version": goVersion + "\n",
 				"cmd/nvkr-disk-inspect/main.go":         "package main\nimport _ \"example.test/inputs/pkg/helper\"\nfunc main() {}\n",
 				"cmd/nvkr-disk-inspect/native_arm64.go": "package main\nimport _ \"example.test/inputs/internal/arm\"\n",
 				"internal/arm/arm.go":                   "package arm\nconst Value = 1\n",

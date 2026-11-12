@@ -383,7 +383,7 @@ components:
         schemaVersion: nvke.nvidia.com/os-image-materials/v1
       materialManifestVariable: material_manifest
       outputDirectoryVariable: output_directory
-      packerVersion: 1.15.4
+      packerVersion: 1.16.2
       projectPath: os-image/packer
       sshPrivateKeyVariable: ssh_private_key_file
       sshPublicKeyVariable: ssh_public_key_file
@@ -433,7 +433,7 @@ components:
         schemaVersion: nvke.nvidia.com/os-image-materials/v1
       materialManifestVariable: material_manifest
       outputDirectoryVariable: output_directory
-      packerVersion: 1.15.4
+      packerVersion: 1.16.2
       projectPath: os-image/packer
       sshPrivateKeyVariable: ssh_private_key_file
       sshPublicKeyVariable: ssh_public_key_file
@@ -484,7 +484,7 @@ components:
         schemaVersion: nvke.nvidia.com/os-image-materials/v1
       materialManifestVariable: material_manifest
       outputDirectoryVariable: output_directory
-      packerVersion: 1.15.4
+      packerVersion: 1.16.2
       projectPath: os-image/packer
       sshPrivateKeyVariable: ssh_private_key_file
       sshPublicKeyVariable: ssh_public_key_file
@@ -534,7 +534,7 @@ components:
         schemaVersion: nvke.nvidia.com/os-image-materials/v1
       materialManifestVariable: material_manifest
       outputDirectoryVariable: output_directory
-      packerVersion: 1.15.4
+      packerVersion: 1.16.2
       projectPath: os-image/packer
       sshPrivateKeyVariable: ssh_private_key_file
       sshPublicKeyVariable: ssh_public_key_file
@@ -582,7 +582,7 @@ components:
         schemaVersion: nvke.nvidia.com/os-image-materials/v1
       materialManifestVariable: material_manifest
       outputDirectoryVariable: output_directory
-      packerVersion: 1.15.4
+      packerVersion: 1.16.2
       projectPath: os-image/packer
       sshPrivateKeyVariable: ssh_private_key_file
       sshPublicKeyVariable: ssh_public_key_file
@@ -629,7 +629,7 @@ components:
         schemaVersion: nvke.nvidia.com/os-image-materials/v1
       materialManifestVariable: material_manifest
       outputDirectoryVariable: output_directory
-      packerVersion: 1.15.4
+      packerVersion: 1.16.2
       projectPath: os-image/packer
       sshPrivateKeyVariable: ssh_private_key_file
       sshPublicKeyVariable: ssh_public_key_file
@@ -803,7 +803,7 @@ imports:
     ubuntu-installer-iso: ubuntu-installer-iso
     ubuntu-installer-iso-amd64: ubuntu-installer-iso-amd64
   path: ../shared/node-images.yaml
-  sha256: e6e440fc8842d2de5c1b41bcb1d37acd65c2535e3ca78873f297b362d910166a
+  sha256: 645a95c90ef1f68fd7e84cd660a7d0fb660e63a2932f8370cde65383a6d71225
   sources:
     nvke-cni-calico-source: nvke-cni-calico-source
     nvke-doca-ovs-source: nvke-doca-ovs-source
@@ -832,5 +832,5 @@ sources:
     constraint: 1.4.x
     repo: https://github.com/ovn-kubernetes/ovn-kubernetes
     toolchainImagesByArch:
-      amd64: sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0
-      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
+      amd64: sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140

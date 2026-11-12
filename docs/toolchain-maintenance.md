@@ -125,9 +125,22 @@ tool/helper checks and compares every inspector executable measurement. The
 proposal job additionally reads back manifest/configuration bytes and every
 compressed layer using that reader. Only after both native jobs succeed does it
 update affected authored catalogs, rebind overlay predecessor digests through the
-catalog owner, update Environment image/executable pins, and invoke
-`make workflows-generate workflows-check`. It preserves historical evidence and
-source-lock approval gates.
+catalog owner, and update Environment image/executable pins. The refresh also updates
+the frozen producer pins in `inputs/policies/ovn-producer-overlays.json`, then invokes
+`make producer-overlays-generate` before `make workflows-generate workflows-check`.
+Updating only the generated overlays leaves their authored policy stale; regenerating
+from that stale policy would restore old toolchain pins. The initial `make workflows-check`
+still rejects pre-existing drift before repinning. Other policies, historical evidence,
+exception records and source-lock approval gates are unchanged.
+
+When a refresh changes the Packer version, review and update consumer `packerVersion`
+contracts alongside the image pins; runtime preflight requires an exact version match.
+Repin updates local configuration-ID pins and their frozen copies when an explicit
+native substitution binds the old ID to a candidate Packer reference and architecture.
+Ambiguous mappings fail closed; unbound local IDs remain untouched. Pull the approved
+AMD64 registry manifest before using its configuration ID locally. Repin also updates
+the architecture-bound predecessor references in `toolchains/nvkr-packer/local-bindings.json`
+so local diagnostic substitutions continue to match the refreshed catalogs.
 
 Within an affected authored file, the proposal replaces every exact occurrence of
 a selected old pin or predecessor digest, including comments and descriptive text.
