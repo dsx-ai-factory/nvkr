@@ -1,0 +1,62 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+---
+name: Tekton kind core acceptance
+
+'on':
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/tekton-kind.yml'
+      - '.go-version'
+      - 'go.mod'
+      - 'go.sum'
+      - 'cmd/nvkr/**'
+      - 'pkg/nvkr/**'
+      - 'internal/**'
+      - 'inputs/definitions/nvke/core.yaml'
+      - 'inputs/environments/github-nvke-core.yaml'
+      - 'inputs/policies/nvke-qualification.yaml'
+      - 'inputs/catalogs/**'
+      - 'toolchains/tekton-kind/**'
+      - 'scripts/test-tekton-kind.sh'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tekton-kind-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Native core build, signing and verification in Tekton
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      GOTOOLCHAIN: local
+      GOMAXPROCS: '2'
+    steps:
+      - name: Check out the tested source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up the exact repository Go toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Install the pinned kind client
+        run: go install sigs.k8s.io/kind@v0.31.0
+      - name: Run the same kind test used locally
+        env:
+          NVKR_TEKTON_EVIDENCE: ${{ runner.temp }}/tekton-evidence
+        run: bash scripts/test-tekton-kind.sh
+      - name: Retain bounded acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: tekton-kind-evidence
+          path: ${{ runner.temp }}/tekton-evidence
+          if-no-files-found: warn
+          retention-days: 7

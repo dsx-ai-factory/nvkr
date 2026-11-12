@@ -49,6 +49,10 @@ Publication signing defaults are the existing cosign path for OCI and standard O
 metadata signing for APT. The OCI path retains explicit customer identity/issuer policy; APT must retain
 customer signing-service/key references and exact public-key trust bindings. Private signing keys are not
 catalog or Plan data. Consumer verification policy separately authenticates the expected signer and payload.
+ADR-18's Tekton route binds distinct publisher, smoke and qualifier public keys to exact cluster service
+accounts. Private keys reside only in role-scoped Kubernetes Secrets. Its OCI transport is anonymous and
+its publication mode is `per-output-v1`; signing and complete published-byte verification remain required.
+This route does not reinterpret GitHub secret references or keyless certificate policy as cluster authority.
 NVIDIA-specific services are optional adapters, not hard-coded signing authorities. Local development without
 publication/signing remains explicitly unsigned and unqualified. Required publication must fail before work
 when signing or trust inputs are absent; it cannot silently downgrade to unsigned output. APT/GPG adapter

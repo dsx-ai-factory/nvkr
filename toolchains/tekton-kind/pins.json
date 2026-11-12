@@ -1,0 +1,10 @@
+{
+  "kindVersion": "v0.31.0",
+  "nodeImage": "kindest/node:v1.35.0@sha256:452d707d4862f52530247495d180205e029056831160e22870e37e3f6c1ac31f",
+  "tektonVersion": "v1.18.0",
+  "tektonURL": "https://infra.tekton.dev/tekton-releases/pipeline/previous/v1.18.0/release.yaml",
+  "tektonSHA256": "029c8400e42d0fcd4fc669140d382af1f1d8ae86202b710d6197ae22bd48be5f",
+  "registryImage": "docker.io/library/registry:3.0.0@sha256:6c5666b861f3505b116bb9aa9b25175e71210414bd010d92035ff64018f9457e",
+  "runnerBase": "docker.io/library/docker:29.2.1-cli@sha256:cab69e2d0a1a2ea9a1ce1060252f439e83483ae41ec09317aecb33b08a0656a5",
+  "runtimeImage": "docker.io/library/docker:29.2.1-dind@sha256:68f6d9ab84623d1116c5432a3b924a07ee09960e6129ca1cb03ef14010588cb4"
+}

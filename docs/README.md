@@ -22,7 +22,7 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | Watch a local Run or inspect its recorded outcome | [Lifecycle dashboard and read-only inspection](lifecycle.md#choose-local-run-presentation) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
 | Start a small executable Definition from catalog components | [Definition init](lifecycle.md#start-a-small-executable-definition) |
-| Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
+| Visualize dependencies and generate GitHub Actions or Tekton | [Pipeline generation](generate-pipeline.md) |
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Build AICR deployment bundles as OCI artifacts | [AICR inputs, supported hardware recipes and rendering limits](../inputs/definitions/aicr/README.md) |
 | Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |

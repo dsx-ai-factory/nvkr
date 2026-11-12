@@ -47,7 +47,11 @@ func (report NativeToolSmokeReport) Validate() error {
 	if err := report.Invocation.Validate(); err != nil {
 		return err
 	}
-	if report.Invocation.Repository != checks.Origin.Repository || report.Invocation.DefaultBranch != checks.Origin.DefaultBranch || report.Invocation.Workflow == checks.Origin.Workflow || report.Invocation.RunID == checks.Origin.RunID {
+	if checks.Origin.Provider == "tekton" {
+		if report.Invocation.Provider != "tekton" || checks.Origin.Task != "" || report.Invocation.Task != "nvkr-smoke" || report.Invocation.InvocationID != checks.Origin.InvocationID {
+			return invalid()
+		}
+	} else if report.Invocation.Provider != "" || report.Invocation.Repository != checks.Origin.Repository || report.Invocation.DefaultBranch != checks.Origin.DefaultBranch || report.Invocation.Workflow == checks.Origin.Workflow || report.Invocation.RunID == checks.Origin.RunID {
 		return invalid()
 	}
 	outputs := map[string]ArtifactCheckOutput{}

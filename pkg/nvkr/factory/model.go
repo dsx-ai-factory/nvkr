@@ -21,6 +21,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/tekton"
 )
 
 const (
@@ -166,6 +167,9 @@ type Plan struct {
 	// workspace is set only by local relocation after validating the compiled
 	// plan. Serialized plans cannot use it to substitute artifact paths.
 	workspace string
+	// tektonExecution is installed only after the selected API authenticates the
+	// generated task. Serialized Plans cannot restore this execution authority.
+	tektonExecution *tekton.TaskReceipt
 }
 
 type LifecycleOutputPlan struct {

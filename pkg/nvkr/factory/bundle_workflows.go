@@ -17,6 +17,9 @@ import (
 // They must be prior-manifest-owned for retirement; unowned leftovers fail closed.
 // Other producer namespaces and operator-authored workflows remain independent.
 func checkGeneratedWorkflowContents(ctx context.Context, root string, bundle *GeneratedBundle) error {
+	if bundle.Engine == EngineTekton {
+		return nil
+	}
 	const relative = ".github/workflows"
 	directory, err := generatedDestination(root, relative)
 	if err != nil {

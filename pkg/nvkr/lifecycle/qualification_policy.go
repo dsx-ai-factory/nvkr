@@ -15,6 +15,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationpolicy"
 	yamlv2 "go.yaml.in/yaml/v2"
 	"sigs.k8s.io/yaml"
 )
@@ -33,6 +34,7 @@ type QualificationPolicy struct {
 	OutsideMVPSuites      []string                         `json:"outsideMVPSuites,omitempty"`
 	RequiredSuites        []string                         `json:"requiredSuites,omitempty"`
 	Smoke                 *QualificationSmokePolicy        `json:"smoke,omitempty"`
+	Tekton                *qualificationpolicy.Tekton      `json:"tekton,omitempty"`
 }
 
 // QualificationCosignPolicy pins the verifier and qualifier executable separately
@@ -49,7 +51,14 @@ func (policy QualificationPolicy) Validate() error {
 	if policy.SchemaVersion != QualificationPolicySchema {
 		return e.New(e.CodeTrustPolicyMissing, "qualification policy has an unsupported schema")
 	}
-	if err := policy.Source.Validate(); err != nil {
+	if policy.Tekton != nil {
+		if policy.Source != (qualificationorigin.SourcePolicy{}) || policy.QualificationWorkflow != "" || policy.Smoke == nil {
+			return e.New(e.CodeTrustPolicyMissing, "Tekton qualification requires explicit smoke and cannot contain hosted workflow trust")
+		}
+		if err := policy.Tekton.Validate(); err != nil {
+			return err
+		}
+	} else if err := policy.Source.Validate(); err != nil {
 		return err
 	}
 	if policy.Source.Development {

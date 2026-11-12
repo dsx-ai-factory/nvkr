@@ -14,6 +14,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationpolicy"
 )
 
 type smokeBundleDescriptions interface {
@@ -231,22 +232,6 @@ func expectedSmokeVersion(node ir.Node, profile string) (string, string, error) 
 	return version, commit, nil
 }
 func nativeSmokeProfile(profile string) (pipeline.ToolSmokeProfile, error) {
-	switch profile {
-	case "nvkectl-version-json":
-		return pipeline.ToolSmokeNVKECTL, nil
-	case "helm-version":
-		return pipeline.ToolSmokeHelm, nil
-	case "kubectl-client-version-json":
-		return pipeline.ToolSmokeKubectl, nil
-	case "kind-version":
-		return pipeline.ToolSmokeKind, nil
-	case "clusterctl-version-json":
-		return pipeline.ToolSmokeClusterctl, nil
-	case "oras-version":
-		return pipeline.ToolSmokeORAS, nil
-	case "nicosim-version-json", "nicosim-patched-version-json":
-		return pipeline.ToolSmokeNICoSim, nil
-	default:
-		return "", e.New(e.CodeEngineCapability, "unsupported tool smoke profile %q", profile)
-	}
+	value, err := qualificationpolicy.Profile(profile)
+	return pipeline.ToolSmokeProfile(value), err
 }
