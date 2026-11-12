@@ -13,6 +13,10 @@ sources:
     kind: github-action
     repo: https://github.com/actions/download-artifact
     constraint: 8.x
+  google-auth:
+    kind: github-action
+    repo: https://github.com/google-github-actions/auth
+    constraint: 3.x
   setup-go:
     kind: github-action
     repo: https://github.com/actions/setup-go

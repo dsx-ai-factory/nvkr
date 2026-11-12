@@ -247,6 +247,8 @@ func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
 			want.Signing.Identity = "^" + regexp.QuoteMeta(identity) + "@refs/heads/main$"
 			// Each family's workflow fits flat; only the combined producer partitions.
 			want.GitHubExecutionPartitions = false
+			// Families have no release qualifier, so only the combined release publishes results (ADR-31).
+			want.QualificationResults = nil
 			if !nvkeDiskFamily(family.name) {
 				want.GitHubARC, want.DiskEvidence = "", ""
 				want.ExecutionClasses, want.DiskInspectionProfiles = nil, nil

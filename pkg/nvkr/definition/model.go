@@ -139,6 +139,9 @@ type Environment struct {
 	Publication     *Publication            `json:"publication,omitempty"`
 	Runtime         Runtime                 `json:"runtime,omitempty"`
 	Signing         *Signing                `json:"signing,omitempty"`
+	// QualificationResults publishes the release qualifier's outcomes (ADR-31).
+	// Absent, the Environment and its digest are unchanged.
+	QualificationResults *QualificationResults `json:"qualificationResults,omitempty"`
 }
 
 // SourceAccess configures transport-only authentication and mirroring for one
@@ -323,6 +326,9 @@ func (environment Environment) Validate() error {
 		return e.New(e.CodeEngineCapability, "githubRuntimePlan requires a named production githubBundle")
 	}
 	if err := environment.validateGitHubRuntimeSource(); err != nil {
+		return err
+	}
+	if err := environment.validateQualificationResults(); err != nil {
 		return err
 	}
 	if err := ValidateGitHubBundleName(environment.GitHubBundle); err != nil {

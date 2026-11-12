@@ -36,6 +36,7 @@ jobs:
     environment: nvkr-release
     outputs:
       outcome-written: ${{ steps.outcome.outputs.written }}
+      qualify-attempt: ${{ steps.outcome.outputs.attempt }}
     steps:
       - name: Admit trusted same-commit workflow
         timeout-minutes: 1
@@ -94,6 +95,7 @@ jobs:
           written=false
           if [ -f ".nvkr/qualification-outcome/outcome-${GITHUB_RUN_ATTEMPT}.json" ]; then written=true; fi
           printf 'written=%s\n' "$written" >> "$GITHUB_OUTPUT"
+          printf 'attempt=%s\n' "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
       - name: Upload the qualification outcome
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -105,3 +107,86 @@ jobs:
           include-hidden-files: true
           if-no-files-found: warn
           retention-days: 7
+  publish:
+    name: Publish qualification outcomes
+    needs: [native-smoke, qualify]
+    if: ${{ !cancelled() && github.event_name == 'workflow_run' && github.repository == 'dsx-ai-factory/nvkr' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.repository.full_name == github.repository && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.path == '.github/workflows/nvkr-run.yml' && contains(fromJSON('["push","workflow_dispatch"]'), github.event.workflow_run.event) && contains(fromJSON('["failure","startup_failure","success","timed_out"]'), github.event.workflow_run.conclusion) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    continue-on-error: true
+    environment: nvkr-results
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Admit trusted same-commit workflow
+        timeout-minutes: 1
+        run: |
+          set -euo pipefail
+          test -n "$GITHUB_SHA"
+          test "$GITHUB_WORKFLOW_SHA" = "$GITHUB_SHA"
+      - name: Check out trusted qualifier commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Set up pinned Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Build trusted publisher
+        timeout-minutes: 5
+        env:
+          GOTOOLCHAIN: local
+          CGO_ENABLED: '0'
+        run: go build -trimpath -o nvkr-results-publish ./cmd/nvkr-results-publish
+      - name: Download the qualification outcomes
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        timeout-minutes: 5
+        with:
+          pattern: nvkr-qualification-outcome-${{ github.run_id }}-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/nvkr-qualification-outcomes
+      - name: Select the outcomes to publish
+        id: select
+        timeout-minutes: 2
+        env:
+          OUTCOMES: ${{ runner.temp }}/nvkr-qualification-outcomes
+          QUALIFY_RESULT: ${{ needs.qualify.result }}
+          QUALIFY_ATTEMPT: ${{ needs.qualify.outputs.qualify-attempt }}
+          OUTCOME_WRITTEN: ${{ needs.qualify.outputs.outcome-written }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$OUTCOMES"
+          ./nvkr-results-publish select --outcomes "$OUTCOMES" --event "$GITHUB_EVENT_PATH" --source-workflow '.github/workflows/nvkr-run.yml' --source-branch 'main' --qualify-workflow '.github/workflows/nvkr-qualify.yml' --qualify-result "$QUALIFY_RESULT" --qualify-attempt "$QUALIFY_ATTEMPT" --outcome-written "$OUTCOME_WRITTEN" --write "$OUTCOMES/built-$GITHUB_RUN_ATTEMPT.json" >> "$GITHUB_OUTPUT"
+      - name: Upload the built outcome
+        if: steps.select.outputs.built == 'true'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        timeout-minutes: 5
+        with:
+          name: nvkr-qualification-outcome-${{ github.run_id }}-${{ github.run_attempt }}-built
+          path: ${{ runner.temp }}/nvkr-qualification-outcomes/built-${{ github.run_attempt }}.json
+          if-no-files-found: error
+          retention-days: 7
+      - name: Authenticate to the results store
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        timeout-minutes: 2
+        with:
+          workload_identity_provider: ${{ secrets.NVKR_RESULTS_WIF_PROVIDER }}
+          service_account: ${{ secrets.NVKR_RESULTS_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+          export_environment_variables: false
+      - name: Publish the outcomes
+        timeout-minutes: 8
+        env:
+          OUTCOMES: ${{ runner.temp }}/nvkr-qualification-outcomes
+          QUALIFY_RESULT: ${{ needs.qualify.result }}
+          QUALIFY_ATTEMPT: ${{ needs.qualify.outputs.qualify-attempt }}
+          OUTCOME_WRITTEN: ${{ needs.qualify.outputs.outcome-written }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
+          NVKR_RESULTS_BUCKET: ${{ secrets.NVKR_RESULTS_BUCKET }}
+        run: |
+          set -euo pipefail
+          ./nvkr-results-publish publish --outcomes "$OUTCOMES" --event "$GITHUB_EVENT_PATH" --source-workflow '.github/workflows/nvkr-run.yml' --source-branch 'main' --qualify-workflow '.github/workflows/nvkr-qualify.yml' --qualify-result "$QUALIFY_RESULT" --qualify-attempt "$QUALIFY_ATTEMPT" --outcome-written "$OUTCOME_WRITTEN" --group 'nvke' --definition 'nvke-m2'

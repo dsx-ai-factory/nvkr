@@ -1223,7 +1223,10 @@ existing production and development retention remains unchanged. The production 
 unsigned qualification outcome (ADR-17 §4) otherwise retains seven days. It is uploaded
 as `nvkr-qualification-outcome-<run>-<attempt>` for any result except a canceled job (`!cancelled()`), and
 the job output `outcome-written` reports whether the command wrote it. The upload is best effort and never
-fails the job. In a public repository anyone who can read the repository can download the artifact while it
+fails the job. When the Environment declares `qualificationResults`, the job also reports `qualify-attempt`,
+and the workflow gains the ADR-31 publish job. It requests OIDC only for the results store, in its own GitHub
+Environment, and receives no registry credential. Any errored outcome it
+builds is uploaded as `nvkr-qualification-outcome-<run>-<attempt>-built` with the same retention. In a public repository anyone who can read the repository can download the artifact while it
 is kept, so redaction, not retention, protects it. Provider cancellation or runner loss can
 prevent finalization. Release finalizers have a dedicated two-hour job budget for bootstrap, bounded
 carrier acquisition/restoration, complete-release authentication and record uploads; the fifteen-minute

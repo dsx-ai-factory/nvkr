@@ -287,7 +287,10 @@ fixed native smoke worker. The qualifier uses `workflow_run`; the worker uses
 `workflow_call` from that same-repository qualifier at the same commit. Their
 independent policy, credentials and ownership are separate from the producer
 bundle and the downstream nightly E2E adapter. They add no generated cron or
-general callable producer interface.
+general callable producer interface. When the producer Environment declares
+`qualificationResults`, the production qualifier also gets a publish job that sends
+each attempt's qualification outcome to the results index (ADR-31); it runs in its
+own GitHub Environment and never fails the Run.
 Current qualification policy admission selects the default producer workflow,
 `.github/workflows/nvkr-run.yml`; named-producer qualification is not an admitted
 configuration. No maintained nightly dispatches the named nightly producers; the separate
