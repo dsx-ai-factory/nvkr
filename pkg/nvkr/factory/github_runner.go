@@ -123,6 +123,10 @@ func launchGitHubUtility(ctx context.Context, plan *Plan, node Node, options Git
 	if location.runtime == "docker" {
 		location.user, location.home = localContainerUser(), true
 	}
+	location.imageAccess, err = plan.runtimeImageAccess(node, "github")
+	if err != nil {
+		return err
+	}
 	err = executeUtilityNode(ctx, node, location, options.Stdout, options.Stderr)
 	return githubUtilityError(ctx, err)
 }
@@ -226,6 +230,9 @@ func admitGitHubPlan(ctx context.Context, plan *Plan) error {
 		return e.New(e.CodeUsage, "GitHub execution requires a Plan")
 	}
 	if err := plan.Validate(); err != nil {
+		return err
+	}
+	if err := admitRuntimeSourcesExecution(plan); err != nil {
 		return err
 	}
 	if err := admitDevelopmentHostedContext(plan); err != nil {

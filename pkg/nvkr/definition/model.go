@@ -19,6 +19,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/discoverytags"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/ociformat"
 	"github.com/google/go-containerregistry/pkg/name"
 )
 
@@ -107,6 +108,8 @@ type Environment struct {
 	// GitHubRuntimeSource permits one exact repository revision to be frozen
 	// for this production runtime Plan; the coordinator selects the main commit.
 	GitHubRuntimeSource *GitHubRuntimeSource `json:"githubRuntimeSource,omitempty"`
+	// GitHubRuntimeSources freezes each allowed main ref once in the first bootstrap.
+	GitHubRuntimeSources []GitHubRuntimeSource `json:"githubRuntimeSources,omitempty"`
 	// GitHubDevelopment admits branch-dispatched hosted builds and, when explicitly
 	// configured, isolated signed publications under a disposable attempt namespace.
 	GitHubDevelopment bool `json:"githubDevelopment,omitempty"`
@@ -146,7 +149,9 @@ type SourceAccess struct {
 // Publication selects required transports. The admitted OCI route uses one namespace;
 // release metadata/evidence use /releases and outputs use named sibling repositories.
 type Publication struct {
-	ObjectStores []ObjectStoreDestination `json:"objectStores,omitempty" yaml:"objectStores,omitempty"`
+	// OCIRepresentation is an authored construction choice, never negotiated by push.
+	OCIRepresentation ociformat.Representation `json:"ociRepresentation,omitempty"`
+	ObjectStores      []ObjectStoreDestination `json:"objectStores,omitempty" yaml:"objectStores,omitempty"`
 	// Transports is a sorted, unique selection. Omission preserves the OCI route.
 	// APT is recognized but unavailable until its publication adapter is admitted.
 	Transports []string `json:"transports,omitempty"`
@@ -186,6 +191,9 @@ type Runtime struct {
 	Variables         map[string]string `json:"variables,omitempty"`
 	Setup             []string          `json:"setup,omitempty"`
 	ToolchainRegistry string            `json:"toolchainRegistry,omitempty"`
+	// ImageLocations binds exact source repositories (including mirror.invalid
+	// keys) to transport repositories. Image content digests are preserved.
+	ImageLocations map[string]string `json:"imageLocations,omitempty"`
 	// BuildNetworkPolicy independently controls whether a producer declaration
 	// may request network access during its build. Omission is offline-only.
 	BuildNetworkPolicy string `json:"buildNetworkPolicy,omitempty"`
@@ -233,9 +241,6 @@ func (definition Definition) Validate() error {
 		}
 		if output.Format == OutputOCI && len(output.Components) != 1 {
 			return e.New(e.CodeInvalidCatalog, "definition OCI output %q requires exactly one image component", output.Name)
-		}
-		if output.Format == OutputBundle && len(output.Components) != 1 {
-			return e.New(e.CodeInvalidCatalog, "definition bundle output %q requires exactly one source archive component", output.Name)
 		}
 		if output.Format == OutputDebianPackage && len(output.Components) != 1 {
 			return e.New(e.CodeInvalidCatalog, "Debian output %q requires one source producer", output.Name)
@@ -392,6 +397,9 @@ func (environment Environment) Validate() error {
 		}
 	}
 	if publication := environment.Publication; publication != nil {
+		if !ociformat.Valid(publication.OCIRepresentation) {
+			return e.New(e.CodeEngineCapability, "OCI publication representation %q is unsupported", publication.OCIRepresentation)
+		}
 		if err := publication.validateTransports(); err != nil {
 			return err
 		}
@@ -566,8 +574,11 @@ func (profile Runtime) validate() error {
 			return e.New(e.CodeInvalidCatalog, "delivery setup line must not contain control characters")
 		}
 	}
-	if strings.ContainsAny(profile.ToolchainRegistry, "\r\n\x00 ") {
-		return e.New(e.CodeInvalidCatalog, "delivery toolchainRegistry %q is unsafe", profile.ToolchainRegistry)
+	if profile.ToolchainRegistry != "" {
+		return e.New(e.CodeEngineCapability, "runtime.toolchainRegistry is retired; declare exact runtime.imageLocations source/repository bindings")
+	}
+	if err := validateImageLocations(profile.ImageLocations); err != nil {
+		return err
 	}
 	if profile.BuildNetworkPolicy != "" && profile.BuildNetworkPolicy != BuildNetworkOfflineOnly &&
 		profile.BuildNetworkPolicy != BuildNetworkProducerDeclared {

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -73,7 +74,9 @@ func diskMaterialTraceFixtureWithPublicationMode(t *testing.T, sibling, networke
 	agent.WriteDir = "out"
 	agent.Materials = map[string]string{"runtime": "runtime"}
 	base.Components["agent"] = agent
-	environment := fixture.plan.Environment
+	environment := fixture.plan.Environment.Clone()
+	environment.ToolchainAccess.PublicRoots = append(environment.ToolchainAccess.PublicRoots, "example.test/agent")
+	slices.Sort(environment.ToolchainAccess.PublicRoots)
 	if networked {
 		image := base.Components["image"]
 		image.BuildNetwork = ir.NetworkDefault
@@ -786,6 +789,8 @@ func TestLocalProducerRecordsOnlyDiskOutputInvocations(t *testing.T) {
 					component.ToolchainImage = "example.test/runtime@sha256:" + strings.Repeat("c", 64)
 					component.BuildCommand, component.ArtifactPath, component.WriteDir = []string{"build-runtime"}, "out/runtime.deb", "out"
 					base.Components["runtime"] = component
+					plan.Environment.ToolchainAccess.PublicRoots = append(plan.Environment.ToolchainAccess.PublicRoots, "example.test/runtime")
+					slices.Sort(plan.Environment.ToolchainAccess.PublicRoots)
 					stack, err := catalog.ApplyStack(base)
 					if err != nil {
 						t.Fatal(err)

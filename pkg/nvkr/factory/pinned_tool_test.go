@@ -67,6 +67,7 @@ func pinnedToolFactoryInputs(t *testing.T, edit func(*catalog.Catalog, *authored
 	environment := authored.Environment{
 		APIVersion: authored.EnvironmentAPIVersion, Kind: authored.EnvironmentKind,
 		Metadata: authored.Metadata{Name: "test"}, RunsOn: "ubuntu-24.04",
+		ToolchainAccess:  &authored.ToolchainAccess{PublicRoots: []string{"docker.io/library/golang", "example.test/consumer", "example.test/runner"}},
 		UtilityContainer: fixtureUtilityContainer, UtilityPlatform: "linux/amd64",
 	}
 	return definition, environment, stack

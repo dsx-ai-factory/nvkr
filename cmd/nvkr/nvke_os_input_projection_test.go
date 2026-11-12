@@ -25,7 +25,7 @@ func TestOSFrozenInputProjectionPreservesSelection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const start = "  jq --arg catalog \"${definition_catalog}\" --argjson overlays \"${definition_overlays}\" '\n"
+	const start = "  jq --arg catalog \"${definition_catalog}\" --arg frozen_catalog \"${catalog_source}\" --argjson overlays \"${definition_overlays}\" '\n"
 	_, remainder, found := strings.Cut(string(script), start)
 	if !found {
 		t.Fatal("OS freeze projection invocation is missing")
@@ -114,7 +114,9 @@ func TestOSFrozenInputProjectionPreservesSelection(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
+					frozenCatalog := "inputs/catalogs/node-images/" + filepath.Base(selection.catalog)
 					command := exec.CommandContext(t.Context(), "jq", "--arg", "catalog", selection.catalog,
+						"--arg", "frozen_catalog", frozenCatalog,
 						"--argjson", "overlays", string(overlays), projection)
 					command.Stdin = bytes.NewReader(raw)
 					output, err := command.Output()
@@ -131,7 +133,7 @@ func TestOSFrozenInputProjectionPreservesSelection(t *testing.T) {
 					if err != nil {
 						t.Fatal(err)
 					}
-					if frozen.Catalog.Base != "catalog" || len(frozen.Catalog.Overlays) != len(original.Catalog.Overlays) {
+					if frozen.Catalog.Base != frozenCatalog || len(frozen.Catalog.Overlays) != len(original.Catalog.Overlays) {
 						t.Fatal("frozen Definition lost its catalog stack")
 					}
 					for i, overlay := range original.Catalog.Overlays {

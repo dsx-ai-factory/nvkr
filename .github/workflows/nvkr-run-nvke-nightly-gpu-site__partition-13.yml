@@ -1,0 +1,269 @@
+name: 'p13 Generate SBOMs: capnico-controller/linux/amd64 +6'
+'on':
+  workflow_call:
+    inputs:
+      dependencies:
+        type: string
+        required: true
+    outputs:
+      results:
+        value: ${{ jobs.nvkr-partition-results.outputs.results }}
+      statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      nvkr-partition-17:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-17 }}
+      nvkr-partition-21:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-21 }}
+      nvkr-results-00:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00 }}
+      nvkr-results-00-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-00-statuses }}
+      nvkr-results-04:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-04 }}
+      nvkr-results-04-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-04-statuses }}
+      nvkr-results-08:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-08 }}
+      nvkr-results-08-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-08-statuses }}
+      nvkr-results-0f:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f }}
+      nvkr-results-0f-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f-statuses }}
+    secrets:
+      NVKR_CI_STORAGE_READ_TOKEN:
+        required: true
+      NVKR_CI_STORAGE_WRITE_TOKEN:
+        required: true
+permissions:
+  contents: read
+jobs:
+  nvkr-capnico-controller-linux-amd64-sbom:
+    name: 'Generate SBOMs: capnico-controller/linux/amd64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-capnico-controller-linux-amd-5f43e949be81'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+  nvkr-cluster-api-provider-provisioned-lin-eba583757c10:
+    name: 'Generate SBOMs: cluster-api-provider-provisioned/linux/amd64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-cluster-api-provider-provisi-4c9d6fcd78ec'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+  nvkr-controller-chart-sbom:
+    name: 'Generate SBOMs: controller-chart'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-controller-chart-build-nvke-9024d4709c1b'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+  nvkr-controller-profiles-linux-amd64-sbom:
+    name: 'Generate SBOMs: controller-profiles/linux/amd64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-controller-profiles-linux-am-487059f86317'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+  nvkr-cwe-linux-amd64-sbom:
+    name: 'Generate SBOMs: cwe/linux/amd64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-cwe-linux-amd64-build-nvke-c-b347800ecb65'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+  nvkr-local-path-provisioner-sbom:
+    name: 'Generate SBOMs: local-path-provisioner'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-local-path-provisioner-build-70de0d069de6'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-tool-syft'].result == 'success' }}
+  nvkr-package-local-path-provisioner:
+    name: 'Bind image digest and package Helm: local-path-provisioner'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && fromJSON(inputs.dependencies)['nvkr-process-local-path-helper-image-pull-7b77e923b737'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-process-local-path-provisioner-build-70de0d069de6'].result == 'success' && fromJSON(inputs.dependencies)['nvkr-process-local-path-provisioner-image-2634c0a8ad70'].result == 'success' }}
+  nvkr-partition-results:
+    name: 'Collect provider results: nvkr-partition-results'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: [nvkr-capnico-controller-linux-amd64-sbom, nvkr-cluster-api-provider-provisioned-lin-eba583757c10, nvkr-controller-chart-sbom, nvkr-controller-profiles-linux-amd64-sbom, nvkr-cwe-linux-amd64-sbom, nvkr-local-path-provisioner-sbom, nvkr-package-local-path-provisioner]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions: {}
+    outputs:
+      results: ${{ toJSON(needs) }}
+      statuses: ${{ join(needs.*.result, ' ') }}
+      nvkr-partition-17: ${{ format('"nvkr-capnico-controller-linux-amd64-sbom":{0},"nvkr-cluster-api-provider-provisioned-lin-eba583757c10":{1},"nvkr-controller-profiles-linux-amd64-sbom":{2},"nvkr-cwe-linux-amd64-sbom":{3},"nvkr-local-path-provisioner-sbom":{4},"nvkr-package-local-path-provisioner":{5}', toJSON(needs['nvkr-capnico-controller-linux-amd64-sbom']), toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-eba583757c10']), toJSON(needs['nvkr-controller-profiles-linux-amd64-sbom']), toJSON(needs['nvkr-cwe-linux-amd64-sbom']), toJSON(needs['nvkr-local-path-provisioner-sbom']), toJSON(needs['nvkr-package-local-path-provisioner'])) }}
+      nvkr-partition-21: ${{ format('"nvkr-controller-chart-sbom":{0}', toJSON(needs['nvkr-controller-chart-sbom'])) }}
+      nvkr-results-00: ${{ format('"nvkr-cwe-linux-amd64-sbom":{0},"nvkr-package-local-path-provisioner":{1}', toJSON(needs['nvkr-cwe-linux-amd64-sbom']), toJSON(needs['nvkr-package-local-path-provisioner'])) }}
+      nvkr-results-00-statuses: ${{ format('{0} {1}', needs['nvkr-cwe-linux-amd64-sbom'].result, needs['nvkr-package-local-path-provisioner'].result) }}
+      nvkr-results-04: ${{ format('"nvkr-controller-chart-sbom":{0}', toJSON(needs['nvkr-controller-chart-sbom'])) }}
+      nvkr-results-04-statuses: ${{ format('{0}', needs['nvkr-controller-chart-sbom'].result) }}
+      nvkr-results-08: ${{ format('"nvkr-controller-profiles-linux-amd64-sbom":{0}', toJSON(needs['nvkr-controller-profiles-linux-amd64-sbom'])) }}
+      nvkr-results-08-statuses: ${{ format('{0}', needs['nvkr-controller-profiles-linux-amd64-sbom'].result) }}
+      nvkr-results-0f: ${{ format('"nvkr-capnico-controller-linux-amd64-sbom":{0},"nvkr-cluster-api-provider-provisioned-lin-eba583757c10":{1},"nvkr-local-path-provisioner-sbom":{2}', toJSON(needs['nvkr-capnico-controller-linux-amd64-sbom']), toJSON(needs['nvkr-cluster-api-provider-provisioned-lin-eba583757c10']), toJSON(needs['nvkr-local-path-provisioner-sbom'])) }}
+      nvkr-results-0f-statuses: ${{ format('{0} {1} {2}', needs['nvkr-capnico-controller-linux-amd64-sbom'].result, needs['nvkr-cluster-api-provider-provisioned-lin-eba583757c10'].result, needs['nvkr-local-path-provisioner-sbom'].result) }}
+    steps:
+      - name: Forward provider results
+        run: ':'
+env:
+  NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
+  NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}

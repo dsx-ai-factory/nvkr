@@ -82,7 +82,7 @@ func githubInspectionLogPath(output string) string {
 }
 
 // Only this exact non-evidence upload may tolerate a missing diagnostic file.
-func githubInspectionDiagnosticStep(actions githubActionRefs, output string) githubStep {
+func githubInspectionDiagnosticStep(plan *Plan, actions githubActionRefs, output string) githubStep {
 	return githubStep{
 		Name: "Retain inspection diagnostics", Uses: actions.Upload,
 		If: "${{ always() }}", ContinueOnError: true,
@@ -90,7 +90,7 @@ func githubInspectionDiagnosticStep(actions githubActionRefs, output string) git
 		With: map[string]string{
 			"name": "nvkr-inspection-" + shortStableName(output) + "-${{ github.run_id }}-${{ github.run_attempt }}",
 			"path": githubInspectionLogPath(output), "include-hidden-files": "true",
-			"if-no-files-found": "ignore", "retention-days": "1",
+			"if-no-files-found": "ignore", "retention-days": fmt.Sprint(githubDiagnosticRetentionDays(plan)),
 		},
 	}
 }

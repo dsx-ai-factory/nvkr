@@ -1,0 +1,109 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: nvkr.dev/catalog-fragment/v1
+kind: CatalogFragment
+sources:
+  nvke-cli:
+    repo: https://github.com/dsx-ai-factory/nvke
+    constraint: v0.23.0
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+    vendorCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      test ! -e controller/deploy/charts/go.sum
+      pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)"
+      cd cli
+      timeout --kill-after=10s 540s go mod download
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      cd ..
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      test ! -e controller/deploy/charts/go.sum
+  nvke-cli-local-site-arm64:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: v0.23.0
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+    vendorCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      # The source-owned charts module has no dependencies or go.sum.
+      test ! -e controller/deploy/charts/go.sum
+      pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)"
+      cd cli
+      timeout --kill-after=10s 540s go mod download
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      cd ..
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      test ! -e controller/deploy/charts/go.sum
+  nvke-controller:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: v0.23.0
+    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+components:
+  nvke-controller:
+    fromSource: true
+    source: nvke-controller
+    builderType: buildkit-rootless
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    artifactPath: bin/nvke-controller-image-{{.Arch}}.oci.tar
+    writeDir: bin
+    outputType: oci-image
+    platforms:
+    - linux/arm64
+    versionStamp:
+      BUILD_VERSION: "{{.Tag}}"
+      GIT_VERSION: "{{.Commit}}"
+    buildCommand:
+    - sh
+    - "-ec"
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/.
+      --local dockerfile=/src/controller --opt platform=linux/{{.Arch}} --opt build-arg:GOLANG_IMAGE=docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+      --opt "build-arg:BUILD_VERSION=$BUILD_VERSION" --opt "build-arg:GIT_VERSION=$GIT_VERSION"
+      --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" --output type=oci,dest=/src/bin/nvke-controller-image-{{.Arch}}.oci.tar,oci-mediatypes=true
+  nvkectl:
+    fromSource: true
+    source: nvke-cli
+    cgo: false
+    platforms:
+    - linux/arm64
+    outputType: host-package
+    artifactPath: cli/bin/nvkectl
+    writeDir: cli/bin
+    versionStamp:
+      NVKECTL_VERSION: "{{.Tag}}"
+      NVKECTL_COMMIT: "{{.Commit}}"
+      NVKECTL_DATE: "{{.Date}}"
+    buildCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+      # Make owns the linker symbols and proves the stamp by executing version.
+      make -C cli build NVKECTL_TREE=clean
+  nvkectl-release:
+    fromSource: true
+    source: nvke-cli
+    cgo: false
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    outputType: host-package
+    artifactPath: cli/bin/nvkectl
+    writeDir: cli/bin
+    versionStamp:
+      NVKECTL_VERSION: "{{.ModuleTag}}"
+      NVKECTL_COMMIT: "{{.Commit}}"
+      NVKECTL_DATE: "{{.Date}}"
+    buildCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+      make -C cli build NVKECTL_TREE=clean

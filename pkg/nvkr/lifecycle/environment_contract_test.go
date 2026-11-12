@@ -167,6 +167,9 @@ func TestEnvironmentYAMLCompilesDeterministicPlanBinding(t *testing.T) {
 kind: Environment
 metadata:
   name: execution-classes
+runtime:
+  imageLocations:
+    nvkr-toolchain-go: example.test/toolchains/go
 utilityContainer: golang@sha256:` + repeat("1", 64) + `
 utilityPlatform: linux/amd64
 executionClasses:

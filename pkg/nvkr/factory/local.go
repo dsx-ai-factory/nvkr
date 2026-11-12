@@ -657,6 +657,9 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 	if err := plan.Validate(); err != nil {
 		return err
 	}
+	if len(plan.Environment.GitHubRuntimeSources) != 0 {
+		return e.New(e.CodeEngineCapability, "dispatch-frozen sources require GitHub execution")
+	}
 	if err := rejectUnsupportedRuntimeStorage(plan, "local factory execution"); err != nil {
 		return err
 	}
@@ -682,7 +685,8 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 		return e.New(e.CodeEngineCapability,
 			"local execution does not support Environment.sourceAccess authentication")
 	}
-	return nil
+	_, err := plan.imageUses("local")
+	return err
 }
 
 func admitLocalRunners(ctx context.Context, plan *Plan, options LocalRunOptions, platforms []string) error {
@@ -924,8 +928,12 @@ func launchLocalUtility(ctx context.Context, plan *Plan, node Node, options Loca
 			return err
 		}
 	}
+	access, err := plan.runtimeImageAccess(node, "local")
+	if err != nil {
+		return err
+	}
 	return executeUtilityNode(ctx, node, utilityRunnerLocation{
-		runtime: options.Runtime, mountSource: workspace, mountTarget: "/workspace/.nvkr/factory",
+		runtime: options.Runtime, imageAccess: access, mountSource: workspace, mountTarget: "/workspace/.nvkr/factory",
 		helper: containerRunner, plan: "/workspace/.nvkr/factory/" + localPlanPath, planDigest: planDigest,
 		user: localContainerUser(), home: true,
 	}, options.Stdout, options.Stderr)

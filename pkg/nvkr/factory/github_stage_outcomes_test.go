@@ -53,6 +53,10 @@ func assertGitHubPackageStageGates(t *testing.T, plan *Plan) {
 	}
 	workflow := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 	finalizer := workflow.Jobs["nvkr-lifecycle-run"]
+	preflight, err := githubImagePreflightJobs(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
 	packages, observations := 0, 0
 	for _, stage := range stages {
 		job := workflow.Jobs[stage.ID]
@@ -63,7 +67,7 @@ func assertGitHubPackageStageGates(t *testing.T, plan *Plan) {
 				stage.Nodes[0].BuildTarget != stage.Nodes[1].BuildTarget {
 				t.Fatalf("target observation lost its independent SBOM pair: %+v", stage)
 			}
-			if job.If != "${{ always() && "+githubExecutionCondition+" }}" {
+			if job.If != githubCompletionCondition(plan, preflight) {
 				t.Fatalf("observation job no longer reports unsuccessful dependencies: %q", job.If)
 			}
 			if plan.Definition.SBOMTool != "" {

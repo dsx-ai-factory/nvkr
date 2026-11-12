@@ -4,10 +4,13 @@
 package definition
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"strings"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	yamlv3 "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
 )
 
@@ -84,6 +87,9 @@ func decodeStrict(raw []byte, label string, output any) error {
 	if err := yaml.UnmarshalStrict(raw, output); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "parsing %s", label)
 	}
+	if err := requireSingleDocument(raw, label); err != nil {
+		return err
+	}
 	// Explicit null/empty values must not extend the old version's vocabulary.
 	if environment, ok := output.(*Environment); ok && environment.APIVersion == EnvironmentAPIVersion {
 		var fields map[string]any
@@ -102,6 +108,24 @@ func decodeStrict(raw []byte, label string, output any) error {
 				}
 			}
 		}
+	}
+	return nil
+}
+
+// requireSingleDocument rejects input holding more than one YAML document. The
+// decoders that follow read only the first and would silently ignore the rest.
+func requireSingleDocument(raw []byte, label string) error {
+	decoder := yamlv3.NewDecoder(bytes.NewReader(raw))
+	// A Node records only structure; decoding into any compares every pair of mapping keys.
+	var document yamlv3.Node
+	if err := decoder.Decode(&document); err != nil {
+		if err == io.EOF {
+			return nil
+		}
+		return e.Wrap(e.CodeInvalidCatalog, err, "parsing %s", label)
+	}
+	if err := decoder.Decode(&document); err != io.EOF {
+		return e.New(e.CodeInvalidCatalog, "%s requires exactly one YAML document", label)
 	}
 	return nil
 }

@@ -30,6 +30,11 @@ group, criteria query, wildcard, specificity rule, inheritance chain, mixin, ena
 activation. Removed fields and reserved legacy `overlays/` and `mixins/` directory layouts fail closed; they
 must not become ignored inputs.
 
+Catalog registries may select explicit declarations from digest-pinned `CatalogFragment` files (ADR-22).
+This is an exact union of named declarations before ordinary pin resolution. Collisions fail; fragments cannot
+import other fragments or override fields. Component source-key bindings are explicit and do not rewrite
+commands or material edges. Output selection and resolved graph identity are unchanged.
+
 Admission checks the complete catalog, unique selected IDs, supported target declarations, exact source/artifact/
 tool pins, and the producer route before graph generation or external work. Unknown components and unsupported
 platforms are coded failures, never empty selections. For a disk output, resolution admits exactly one VM-image root and its complete selected material

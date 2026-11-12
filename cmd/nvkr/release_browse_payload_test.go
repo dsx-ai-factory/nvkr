@@ -31,6 +31,7 @@ import (
 )
 
 func TestReleaseBrowseNeverDownloadsOutputLayers(t *testing.T) {
+	t.Setenv("NVKR_METADATA_CACHE", "off")
 	// Metadata-only transport and presentation do not branch on architecture;
 	// delivery owns both native disk profile round trips.
 	fixture := releaseBrowsePayloadFixture(t, "amd64")
@@ -108,21 +109,27 @@ func TestReleaseBrowseNeverDownloadsOutputLayers(t *testing.T) {
 			payloadGets.Store(0)
 			shows := 0
 			var snapshot progress.Snapshot
-			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(_ context.Context, _ runpresenter.Options, source runSnapshotSource, work func(context.Context) error) runpresenter.Result {
+			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(ctx context.Context, options runpresenter.Options, source runSnapshotSource, work func(context.Context) error) runpresenter.Result {
 				shows++
-				snapshot = source.Snapshot()
-				if work != nil {
-					t.Fatal("read-only browser retained inspection work")
+				if !options.Live || work == nil || source.Snapshot().Status != "loading" {
+					t.Fatal("registry browser did not open in a loading state")
 				}
-				return runpresenter.Result{}
+				err := work(ctx)
+				snapshot = source.Snapshot()
+				return runpresenter.Result{WorkErr: err}
 			}}
 			var out bytes.Buffer
 			app := releasePresentationTestApp(executeReleaseVerification, &out, services)
 			err := app.RunContext(t.Context(), []string{"nvkr", "release", "browse", "--reference", reference, "--output", "tools", "--ui=tui", "--anonymous", "--plain-http"})
 			if corrupt {
 				assertLifecycleCommandCode(t, err, e.CodeFetchFailed)
-				if len(snapshot.Items) != 0 || snapshot.Status != "failed" {
+				if snapshot.Status != "failed" {
 					t.Fatal("TUI hid invalid sibling metadata behind output selection")
+				}
+				for _, item := range snapshot.Items {
+					if item.State != "loading" {
+						t.Fatal("failed closure promoted partial metadata")
+					}
 				}
 			} else if err != nil || len(snapshot.Items) != 2 || snapshot.Status != "complete" {
 				t.Fatalf("metadata-only browser failed: %+v, %v", snapshot, err)
@@ -144,6 +151,66 @@ func TestReleaseBrowseNeverDownloadsOutputLayers(t *testing.T) {
 			t.Fatalf("metadata rejection downloaded output layers: %d GETs", got)
 		}
 	})
+	t.Run("kind and platform filters", func(t *testing.T) {
+		for _, test := range []struct {
+			args []string
+			want []string
+		}{
+			{args: []string{"--kind", "executable"}, want: []string{"tools"}},
+			{args: []string{"--platform", "linux/amd64"}, want: []string{"node-image", "tools"}},
+			{args: []string{"--kind", "disk-image", "--platform", "linux/amd64", "--output", "node-image"}, want: []string{"node-image"}},
+			{args: []string{"--platform", "linux/arm64"}},
+			{args: []string{"--kind", "oci"}},
+			{args: []string{"--kind", "executable", "--output", "node-image"}},
+		} {
+			t.Run(strings.Join(test.args, " "), func(t *testing.T) {
+				payloadGets.Store(0)
+				raw, err := runReleaseBrowse(t, reference, "json", "", test.args...)
+				if got := payloadGets.Load(); got != 0 {
+					t.Fatalf("filtered browse downloaded output layers: %d GETs", got)
+				}
+				if test.want == nil {
+					if cliErrorCode(err) != e.CodeUsage || raw != "" || !strings.Contains(err.Error(), "no output matching") {
+						t.Fatalf("no-match filter claimed a result: %q, %v", raw, err)
+					}
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				var view struct {
+					TotalOutputs int `json:"totalOutputs"`
+					Outputs      []struct {
+						Name string `json:"name"`
+					} `json:"outputs"`
+					Evidence []struct {
+						Binding struct {
+							Outputs []string `json:"outputs"`
+						} `json:"binding"`
+					} `json:"evidence"`
+				}
+				if err := json.Unmarshal([]byte(raw), &view); err != nil {
+					t.Fatal(err)
+				}
+				var names []string
+				for _, output := range view.Outputs {
+					names = append(names, output.Name)
+				}
+				if view.TotalOutputs != 2 || strings.Join(names, ",") != strings.Join(test.want, ",") || len(view.Evidence) != len(test.want) {
+					t.Fatalf("filter kept %v of %d with %d evidence: %s", names, view.TotalOutputs, len(view.Evidence), raw)
+				}
+			})
+		}
+	})
+	t.Run("reject corrupt metadata outside the filter", func(t *testing.T) {
+		corruptConfig.Store(true)
+		defer corruptConfig.Store(false)
+		payloadGets.Store(0)
+		raw, err := runReleaseBrowse(t, reference, "json", "", "--kind", "executable", "--platform", "linux/amd64")
+		if cliErrorCode(err) != e.CodeFetchFailed || raw != "" || payloadGets.Load() != 0 {
+			t.Fatalf("filter hid changed disk metadata: %q, %v, GETs=%d", raw, err, payloadGets.Load())
+		}
+	})
 	t.Run("full publication still requires payloads", func(t *testing.T) {
 		payloadGets.Store(0)
 		publication, err := delivery.PullPublication(t.Context(), reference, t.TempDir(), transport)
@@ -158,7 +225,7 @@ func TestReleaseBrowseNeverDownloadsOutputLayers(t *testing.T) {
 	})
 }
 
-func runReleaseBrowse(t *testing.T, reference, format, output string) (string, error) {
+func runReleaseBrowse(t *testing.T, reference, format, output string, extra ...string) (string, error) {
 	t.Helper()
 	var out bytes.Buffer
 	app := &cli.App{Commands: []*cli.Command{cmdRelease()}, Writer: &out}
@@ -166,6 +233,7 @@ func runReleaseBrowse(t *testing.T, reference, format, output string) (string, e
 	if output != "" {
 		args = append(args, "--output", output)
 	}
+	args = append(args, extra...)
 	err := app.RunContext(t.Context(), args)
 	return out.String(), err
 }

@@ -1,6 +1,6 @@
 # AICR deployment bundles
 
-This focused example builds pinned AICR source and delivers its rendered directories
+This focused example runs pinned AICR producers and delivers its rendered directories
 as ordinary `bundle-oci` artifacts through Definition → Run → Release. One GB300
 `generic / gb300 / ubuntu / training` selection demonstrates Argo CD, Argo CD Helm,
 Flux, Helm, Helmfile and Terraform without adding a hardware-profile model. A second
@@ -13,7 +13,14 @@ compile and render offline with `aicr bundle --output oci-layout:<dir>`, check t
 the layout holds one manifest with one layer, and verify the unpacked bundle. The
 artifact is that layer's exact bytes, so its digest is the archive AICR itself
 packaged; NVKR does not repack it. NVKR still wraps it in its own `bundle-oci`
-manifest; importing AICR's manifest unchanged is follow-up work under ADR-27.
+manifest for the eight source-built components. The GB300 Flux output instead runs the released AICR v1.2.0
+Linux ARM64 executable: one recipe file producer feeds one layout producer through an explicit material
+binding. NVKR preserves that layout's manifest, config and layer bytes. A fixed internal validation boundary
+runs the same pinned executable's `verify` command over a bounded private extraction, offline, before
+packaging. The recipe, layout index, manifest and layer retain distinct subjects; no local result claims signing
+or qualification. This converted output requires a native Linux ARM64 host, including for a Docker-hosted
+NVKR invocation; invoking NVKR itself on macOS fails capability admission. Other eight components retain
+their original source build commands and supported platforms.
 
 OCI output renders AICR's registry variant of each bundle. Argo CD requires a
 repository URL, so the catalog passes the fixed literal `oci://registry.invalid/aicr-bundle`.

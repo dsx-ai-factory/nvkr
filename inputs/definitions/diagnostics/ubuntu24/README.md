@@ -100,7 +100,7 @@ bin/nvkr run generate \
 Choose another hosted Definition from the table to change architecture or encryption,
 and use its matching architecture Environment.
 All use the `nvke-os-ubuntu24` bundle name, so generate alternatives into separate scratch
-roots. Runner access, private NVKE source access, and read access to the retained native
+roots. Runner access, network access to public NVKE sources, and read access to the retained native
 Packer toolchain packages are prerequisites. Generated workflows also require their existing
 private GHCR carrier storage and scoped storage credentials. The generated workflow uses
 manual dispatch under the existing branch policy. It retains raw QCOW2 and a `static-unqualified` Run;

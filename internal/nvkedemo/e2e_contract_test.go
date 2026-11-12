@@ -399,3 +399,46 @@ func TestLocalNVKESourceRejectsMalformedCommitBeforeHostWork(t *testing.T) {
 		})
 	}
 }
+
+// Follow the active workflow's configuration through the same default selection
+// used by TestEndToEnd/BuildArtifacts. This is wiring evidence, not a live Run.
+func TestActiveNightlySelectsCompiledLocalPreparation(t *testing.T) {
+	raw, err := os.ReadFile("../../.github/workflows/nvkr-nightly.yml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				Env map[string]string
+				Run string
+			}
+		}
+	}
+	if err := yaml.Unmarshal(raw, &workflow); err != nil {
+		t.Fatal(err)
+	}
+	var invocation map[string]string
+	for _, job := range workflow.Jobs {
+		for _, step := range job.Steps {
+			if strings.Contains(step.Run, "-run '^TestEndToEnd$'") {
+				if invocation != nil {
+					t.Fatal("ambiguous active nightly invocation")
+				}
+				invocation = step.Env
+			}
+		}
+	}
+	if invocation == nil || invocation["NVKR_NVKE_E2E"] != "1" || invocation["NVKR_NVKE_E2E_CONFIG"] != "demos/nightly-nvke.yaml" {
+		t.Fatal("active nightly does not select the local E2E owner")
+	}
+	t.Chdir("../..")
+	build, _, _, err := nativeE2EConfig(t.Context(), func(key string) string { return invocation[key] })
+	if err != nil {
+		t.Fatal(err)
+	}
+	selected, err := defaultNativeBuild(&build, "linux/amd64", build.DemoExecutable)
+	if err != nil || !selected || build.Definition != "inputs/definitions/demo/amd64-nvidia-local-kvm.json" || build.Environment != "inputs/environments/local-amd64-kvm.json" {
+		t.Fatalf("nightly bypassed default compiled preparation: %+v %v", build, err)
+	}
+}

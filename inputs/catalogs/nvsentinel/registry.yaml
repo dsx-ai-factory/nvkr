@@ -70,22 +70,6 @@ sources:
     toolchainImagesByArch:
       amd64: docker.io/library/golang@sha256:eef6a67266eeed3c86dd47fd01b32faa8bf0229eb83eb3d4d466e80391bd3820
       arm64: docker.io/library/golang@sha256:6c83d163c89d1dbe66f8fc466870d66fe6325d15bb5ad1730cdc0b482fab1eec
-  syft-amd64:
-    constraint: 1.51.1
-    repo: https://github.com/anchore/syft
-    tool:
-      executablePath: syft
-      format: tar-gzip
-      platform: linux/amd64
-      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_amd64.tar.gz
-  syft-arm64:
-    constraint: 1.51.1
-    repo: https://github.com/anchore/syft
-    tool:
-      executablePath: syft
-      format: tar-gzip
-      platform: linux/arm64
-      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_arm64.tar.gz
 components:
   nvsentinel-platform-connectors-deb-ubuntu2404:
     source: nvsentinel
@@ -1025,3 +1009,10 @@ components:
         --output type=oci,dest=/src/nvkr-output/syslog-health-monitor.oci.tar,oci-mediatypes=true
     artifactPath: nvkr-output/syslog-health-monitor.oci.tar
     versionStamp: *nvsentinel-version-stamps
+
+imports:
+- sources:
+    syft-arm64: syft-arm64
+    syft-amd64: syft
+  path: "../shared/syft.yaml"
+  sha256: f52faff48638dde1ee3b2c6ff7e71501739cefbed502fe80ad296b9de370a897

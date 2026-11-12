@@ -162,7 +162,7 @@ func TestPullHelmRejectsAmbiguousConfigBeforePayload(t *testing.T) {
 				http.Error(w, "payload must not be requested", http.StatusForbidden)
 			}))
 			defer server.Close()
-			object := PublishedObject{Name: "package", ArtifactType: manifest.ArtifactType,
+			object := PublishedObject{Name: "package", ArtifactType: manifest.artifactType(),
 				DescriptorDigest: descriptor.Digest, Size: descriptor.Size, BlobDigest: digestBytes(archive),
 				Output: &OutputBinding{Format: outputFormatHelm}}
 			parent, workspace := t.TempDir(), t.TempDir()

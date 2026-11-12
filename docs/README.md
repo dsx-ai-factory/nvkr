@@ -21,10 +21,12 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | Browse public command results | [Command result browser](lifecycle.md#browse-public-command-results) |
 | Watch a local Run or inspect its recorded outcome | [Lifecycle dashboard and read-only inspection](lifecycle.md#choose-local-run-presentation) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
+| Start a small executable Definition from catalog components | [Definition init](lifecycle.md#start-a-small-executable-definition) |
 | Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Build AICR deployment bundles as OCI artifacts | [AICR inputs, supported hardware recipes and rendering limits](../inputs/definitions/aicr/README.md) |
 | Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
+| Diagnose Helm/registry publication errors and select an explicit compatible format | [Registry troubleshooting](publication-architecture.md#troubleshoot-helm-and-registry-rejections), [format selection](publication-architecture.md#oci-representation) |
 | Plan an NVKE GPU site from NVKR Releases (not yet runnable end to end) | [Working Definitions and GPU system matrix](../inputs/definitions/nvke/README.md#working-definitions-for-an-nvke-gpu-site), [site install outline](release-quickstart.md#install-an-nvke-site-from-the-releases) |
 | Run the nightly NVKE build and end-to-end test | [Nightly workflow and current admission](nvke-nightly.md) |
 | Run full build/site/tenant E2E on my PR before merging | [Run E2E tests for your pull request](nvke-nightly.md#run-a-workflow-branch-before-merging) |
@@ -118,6 +120,11 @@ test, signing or qualification capability.
 
 Proposed [ADR-30: authenticated result reuse](adr/0030-authenticated-result-reuse.md) designs cross-Run reuse
 of complete named outputs and the test matrix for implementing it; reuse is not implemented.
+
+Proposed [ADR-31: Qualification results index](adr/0031-qualification-results-index.md) publishes each production
+qualification attempt, failures included, as an unsigned outcome and a TestGrid build. The selection, projection
+and separate publisher helper are implemented and contract-tested only; the generated publish job is not
+implemented, and nothing has been published.
 
 [Development](../DEVELOPMENT.md) covers setup, package ownership, generated files, and the completion gate.
 Its [pipeline development loop](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) covers branch

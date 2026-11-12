@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
@@ -285,152 +284,6 @@ esac`,
 	}
 }
 
-func TestSimulatorToolchainScope(t *testing.T) {
-	for _, tc := range []struct {
-		name, components, entries, builds, want string
-		fail                                    bool
-	}{
-		{"sorted selected producers only", `["nico-simctl","nico-sim"]`, `"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"nico-simctl":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"unrelated":{"fromSource":true,"toolchainImages":{"arm64":"other"}}`, "", "old", false},
-		{"runtime assets share the selected toolchain", `["nico-simctl","nico-sim-runtime-assets","nico-sim"]`, `"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"nico-simctl":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"nico-sim-runtime-assets":{"fromSource":true,"toolchainImages":{"arm64":"old"}}`, "", "old", false},
-		{"empty selection", `[]`, ``, "", "expected one simulator source toolchain", true},
-		{"missing producer", `["nico-sim"]`, ``, "", "lacks a source toolchain", true},
-		{"acquired producer", `["nico-sim"]`, `"nico-sim":{"fromSource":false,"toolchainImages":{"arm64":"old"}}`, "", "lacks a source toolchain", true},
-		{"missing native pin", `["nico-sim"]`, `"nico-sim":{"fromSource":true,"toolchainImages":{"amd64":"old"}}`, "", "lacks a source toolchain", true},
-		{"mixed toolchains", `["nico-sim","nico-simctl"]`, `"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"nico-simctl":{"fromSource":true,"toolchainImages":{"arm64":"other"}}`, "", "expected one simulator source toolchain", true},
-		{"no selected build", `[]`, ``, `[]`, "expected one simulator tools build", true},
-		{"ambiguous build", `[]`, ``, `[{"name":"nicosim-tools-arm64"},{"name":"nicosim-tools-arm64"}]`, "expected one simulator tools build", true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			builds := tc.builds
-			if builds == "" {
-				builds = `[{"name":"nicosim-tools-arm64","catalogDigest":"catalog","components":` + tc.components + `,"catalogSnapshot":{"Components":{` + tc.entries + `}}}]`
-			}
-			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-			defer cancel()
-			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; simulator_toolchain_scope("arm64") | toolchain_overlay("arm64"; .pin; "fresh"; .catalogDigest; .components)`)
-			cmd.Stdin = strings.NewReader(`{"builds":` + builds + `}`)
-			out, err := cmd.CombinedOutput()
-			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
-				t.Fatalf("error=%v output=%s, want fail=%t message=%s", err, out, tc.fail, tc.want)
-			}
-			if tc.fail {
-				return
-			}
-			var overlay struct {
-				Catalog string `json:"requiresCatalogDigest"`
-				Subs    []struct {
-					Arch, From, To string
-					Components     []string
-				} `json:"toolchainSubstitutions"`
-			}
-			if err := json.Unmarshal(out, &overlay); err != nil {
-				t.Fatal(err)
-			}
-			var selected []string
-			if err := json.Unmarshal([]byte(tc.components), &selected); err != nil {
-				t.Fatal(err)
-			}
-			slices.Sort(selected)
-			if overlay.Catalog != "catalog" || len(overlay.Subs) != 1 || overlay.Subs[0].Arch != "arm64" || overlay.Subs[0].From != "old" || overlay.Subs[0].To != "fresh" || !slices.Equal(overlay.Subs[0].Components, selected) {
-				t.Fatalf("unexpected substitution: %+v", overlay)
-			}
-		})
-	}
-}
-
-func TestSiteHelmToolchainScope(t *testing.T) {
-	const plan = `{"builds":[{"name":"controller-chart","catalogDigest":"catalog","components":["nvke-controller-chart"],"catalogSnapshot":{"Components":{"nvke-controller-chart":{"fromSource":true,"toolchainImages":{"arm64":"old"}}}}},{"name":"nktp","catalogDigest":"catalog","components":["nktp-chart"],"catalogSnapshot":{"Components":{"nktp-chart":{"fromSource":true,"toolchainImages":{"arm64":"old"}}}}},{"name":"cwe","catalogDigest":"other","components":["nke-controller"]}]}`
-	for _, tc := range []struct {
-		name, input, want string
-		fail              bool
-	}{
-		{"only the two charts", plan, "old", false},
-		{"missing charts", `{"builds":[]}`, "expected two site chart builds", true},
-		{"different catalogs", strings.Replace(plan, `"name":"nktp","catalogDigest":"catalog"`, `"name":"nktp","catalogDigest":"other"`, 1), "site charts must share one catalog", true},
-		{"different toolchains", strings.Replace(plan, `"nktp-chart":{"fromSource":true,"toolchainImages":{"arm64":"old"}}`, `"nktp-chart":{"fromSource":true,"toolchainImages":{"arm64":"different"}}`, 1), "expected one site Helm toolchain", true},
-		{"acquired chart", strings.Replace(plan, `"nktp-chart":{"fromSource":true`, `"nktp-chart":{"fromSource":false`, 1), "site chart lacks a source toolchain", true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-			defer cancel()
-			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", `include "nvke-os-plan"; site_helm_toolchain_scope("arm64") | toolchain_overlay("arm64"; .pin; "fresh"; .catalogDigest; .components)`)
-			cmd.Stdin = strings.NewReader(tc.input)
-			out, err := cmd.CombinedOutput()
-			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
-				t.Fatalf("error=%v output=%s, want fail=%t message=%s", err, out, tc.fail, tc.want)
-			}
-			if tc.fail {
-				return
-			}
-			var overlay struct {
-				Catalog string `json:"requiresCatalogDigest"`
-				Subs    []struct {
-					Arch, From, To string
-					Components     []string
-				} `json:"toolchainSubstitutions"`
-			}
-			if err := json.Unmarshal(out, &overlay); err != nil {
-				t.Fatal(err)
-			}
-			if overlay.Catalog != "catalog" || len(overlay.Subs) != 1 || overlay.Subs[0].Arch != "arm64" || overlay.Subs[0].From != "old" || overlay.Subs[0].To != "fresh" || !slices.Equal(overlay.Subs[0].Components, []string{"nktp-chart", "nvke-controller-chart"}) {
-				t.Fatalf("unexpected site substitution: %+v", overlay)
-			}
-		})
-	}
-}
-
-func TestAllLocalToolchainScopes(t *testing.T) {
-	const plan = `{"builds":[
-      {"name":"nvke-node-image-arm64","catalogDigest":"os","components":["nvke-node-image","nvke-agent"],"executionGraph":{"nodes":[{"kind":"build","builderType":"vm-image","component":"nvke-node-image"}]},"catalogSnapshot":{"Components":{"nvke-node-image":{"fromSource":true,"toolchainImages":{"arm64":"packer"}},"nvke-agent":{"fromSource":true,"toolchainImages":{"arm64":"go"}}}}},
-      {"name":"nicosim-tools-arm64","catalogDigest":"simulator","components":["nico-sim"],"executionGraph":{"nodes":[]},"catalogSnapshot":{"Components":{"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"gcc"}}}}},
-      {"name":"controller-chart","catalogDigest":"site","components":["nvke-controller-chart"],"executionGraph":{"nodes":[]},"catalogSnapshot":{"Components":{"nvke-controller-chart":{"fromSource":true,"toolchainImages":{"arm64":"helm"}}}}},
-      {"name":"nktp","catalogDigest":"site","components":["nktp-chart"],"executionGraph":{"nodes":[]},"catalogSnapshot":{"Components":{"nktp-chart":{"fromSource":true,"toolchainImages":{"arm64":"helm"}}}}},
-      {"name":"cwe","catalogDigest":"site","executionGraph":{"nodes":[]}}
-    ]}`
-	for _, tc := range []struct {
-		name, input, want string
-		fail              bool
-	}{
-		{"all three catalog predecessors", plan, "", false},
-		{"shared toolchain image", strings.ReplaceAll(plan, `"toolchainImages":{"arm64":"helm"}`, `"toolchainImage":"helm"`), "", false},
-		{"AMD64", strings.ReplaceAll(plan, "arm64", "amd64"), "", false},
-		{"overlapping catalogs rejected", strings.ReplaceAll(plan, `"catalogDigest":"simulator"`, `"catalogDigest":"os"`), "distinct catalogs", true},
-		{"missing simulator rejected", strings.ReplaceAll(plan, `"name":"nicosim-tools-arm64"`, `"name":"other"`), "expected one simulator tools build", true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			arch := "arm64"
-			if tc.name == "AMD64" {
-				arch = "amd64"
-			}
-			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-			defer cancel()
-			cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-e", "--arg", "arch", arch, `include "nvke-os-plan"; local_toolchain_scopes("all"; $arch)`)
-			cmd.Stdin = strings.NewReader(tc.input)
-			out, err := cmd.CombinedOutput()
-			if (err != nil) != tc.fail || !strings.Contains(string(out), tc.want) {
-				t.Fatalf("error=%v output=%s, want failure=%t message=%s", err, out, tc.fail, tc.want)
-			}
-			if tc.fail {
-				return
-			}
-			var scopes []struct {
-				Pin, CatalogDigest  string
-				Components, Outputs []string
-			}
-			if err := json.Unmarshal(out, &scopes); err != nil {
-				t.Fatal(err)
-			}
-			if len(scopes) != 3 || scopes[0].Pin != "packer" || scopes[1].Pin != "gcc" || scopes[2].Pin != "helm" ||
-				!slices.Equal(scopes[0].Components, []string{"nvke-node-image"}) ||
-				!slices.Equal(scopes[0].Outputs, []string{"nvke-node-image-" + arch}) ||
-				!slices.Equal(scopes[1].Outputs, []string{"nicosim-tools-" + arch}) ||
-				!slices.Equal(scopes[2].Outputs, []string{"controller-chart", "cwe", "nktp"}) {
-				t.Fatalf("unexpected catalog-scoped selection: %+v", scopes)
-			}
-		})
-	}
-}
-
 func TestLocalToolchainDefinitionRetainsScopedRelativeInputs(t *testing.T) {
 	for _, tc := range []struct {
 		name, base string
@@ -472,21 +325,10 @@ func TestLocalToolchainDefinitionRetainsScopedRelativeInputs(t *testing.T) {
 	}
 }
 
-func TestLocalToolchainSubstitutionsKeepOnlyChangedPins(t *testing.T) {
-	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
-	defer cancel()
-	cmd := exec.CommandContext(ctx, "jq", "-L", ".", "-c", `include "nvke-os-plan"; local_toolchain_substitutions("same")`)
-	cmd.Stdin = strings.NewReader(`[{"pin":"same","outputs":["unchanged"]},{"pin":"old","outputs":["changed"]}]`)
-	raw, err := cmd.CombinedOutput()
-	if err != nil || string(raw) != "[{\"pin\":\"old\",\"outputs\":[\"changed\"]}]\n" {
-		t.Fatalf("unchanged image received an invalid self-substitution: %s %v", raw, err)
-	}
-}
-
 func TestSimulatorScopeRejectsBeforeToolchainWork(t *testing.T) {
 	for _, tc := range []struct{ name, plan, want string }{
-		{"unsupported build", `{"builds":[]}`, "expected one simulator tools build"},
-		{"mixed pins", `{"builds":[{"name":"nicosim-tools-arm64","components":["nico-sim","nico-simctl"],"catalogSnapshot":{"Components":{"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"nico-simctl":{"fromSource":true,"toolchainImages":{"arm64":"different"}}}}}]}`, "expected one simulator source toolchain"},
+		{"unsupported build", `{"builds":[]}`, "[NVKR-E-ENGINE-CAPABILITY] uncovered local image consumer"},
+		{"mixed pins", `{"builds":[{"name":"nicosim-tools-arm64","components":["nico-sim","nico-simctl"],"catalogSnapshot":{"Components":{"nico-sim":{"fromSource":true,"toolchainImages":{"arm64":"old"}},"nico-simctl":{"fromSource":true,"toolchainImages":{"arm64":"different"}}}}}]}`, "[NVKR-E-UNVERIFIED-REF] local toolchain predecessor differs"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -511,7 +353,7 @@ func TestSimulatorScopeRejectsBeforeToolchainWork(t *testing.T) {
 				write(path, data, 0600)
 			}
 			write("toolchains/nvkr-packer/build.sh", []byte("#!/bin/sh\nprintf 'unexpected toolchain build\\n' >>\"$TEST_CALLS\"\nexit 99\n"), 0700)
-			write("tools/runner", []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >>\"$TEST_CALLS\"\ncase \"$1 $2\" in 'run plan') printf '%s\\n' \"$TEST_PLAN\";; 'run graph') printf 'flowchart LR\\n';; *) exit 99;; esac\n"), 0700)
+			write("tools/runner", []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" >>\"$TEST_CALLS\"\ncase \"$1 $2\" in 'run plan') printf '%s\\n' \"$TEST_PLAN\";; 'run graph') printf 'flowchart LR\\n';; 'factory local-toolchain-scopes') printf '%s\\n' \"$TEST_REJECTION\" >&2; exit 42;; *) exit 99;; esac\n"), 0700)
 			write("tools/uname", []byte("#!/bin/sh\nif [ \"$1\" = -s ]; then echo Linux; else echo aarch64; fi\n"), 0700)
 			write("tools/id", []byte("#!/bin/sh\necho 1000\n"), 0700)
 			write("tools/docker", []byte(`#!/bin/sh
@@ -531,7 +373,7 @@ esac
 			cmd := exec.CommandContext(ctx, "bash", filepath.Join(dir, "scripts", "nvke-full-arm64-local.sh"), "scope-probe", "1", "simulator")
 			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(dir, "tools")+string(os.PathListSeparator)+os.Getenv("PATH"),
 				"CONTAINER_RUNTIME=docker", "NVKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",
-				"TEST_REPO="+dir, "TEST_PLAN="+tc.plan, "TEST_CALLS="+filepath.Join(dir, "calls"))
+				"TEST_REJECTION="+tc.want, "TEST_REPO="+dir, "TEST_PLAN="+tc.plan, "TEST_CALLS="+filepath.Join(dir, "calls"))
 			out, err := cmd.CombinedOutput()
 			if err == nil || !strings.Contains(string(out), tc.want) {
 				t.Fatalf("error=%v output=%s, want scope rejection %s", err, out, tc.want)
@@ -573,6 +415,8 @@ func TestSimulatorLauncherUsesValidatedToolchainID(t *testing.T) {
 		graphFail                 bool
 	}{
 		{"freeze validated ID without resolving tag", validated, "0", false, false, "", false},
+		{"fresh image differs from validated result", validated, "0", true, false, "sha256:" + strings.Repeat("b", 64), false},
+		{"coverage failure prevents execution", validated, "0", true, false, "", false},
 		{"reject empty result", "", "0", true, false, "", false},
 		{"reject result mixed with diagnostics", "diagnostic\n" + validated, "0", true, false, "", false},
 		{"failed validation cannot proceed", validated, "42", true, false, "", false},
@@ -614,6 +458,9 @@ exit "$TEST_BUILD_EXIT"
 			write("tools/runner", []byte(`#!/bin/sh
 printf '%s\n' "$*" >>"$TEST_CALLS"
 case "$1 $2" in
+  'factory local-toolchain-scopes')
+    case " $* " in *' --selected-plan '*) [ "${TEST_COVERAGE_EXIT:-0}" = 0 ] || exit 42;; esac
+    jq -cn --arg id "$TEST_VALIDATED" '[{outputs:["nicosim-tools-arm64"],overlay:{toolchainSubstitutions:[{to:$id}]}}]';;
   'run plan')
     if [ "$4" = .nvkr/laptop-bootstrap/id-probe/definition.json ]; then
       [ "$TEST_SELECTED_PLAN_EXIT" = 0 ] || exit "$TEST_SELECTED_PLAN_EXIT"
@@ -645,7 +492,8 @@ case "$1 $2" in
   'info --format') echo linux/arm64;;
   'context inspect') echo unix:///var/run/docker.sock;;
   'run --rm') cp "$TEST_REPO/tools/runner" "$TEST_REPO/.nvkr/laptop-bootstrap/id-probe/nvkr";;
-  'image inspect') echo "$TEST_INSPECTED";;
+  'image inspect')
+    case "$*" in *'{{.Os}}'*) printf '%s linux/arm64\n' "${TEST_INSPECTED:-$TEST_VALIDATED}";; *) echo "$TEST_INSPECTED";; esac;;
   *) exit 99;;
 esac
 `), 0700)
@@ -678,7 +526,7 @@ esac
 			cmd.Env = append(os.Environ(), "PATH="+filepath.Join(dir, "tools")+string(os.PathListSeparator)+os.Getenv("PATH"),
 				"CONTAINER_RUNTIME=docker", "NVKE_LOCAL_CLONE=", "DOCKER_HOST=", "DOCKER_CONTEXT=", "COLIMA_PROFILE=",
 				"TEST_REPO="+dir, "TEST_PLAN="+plan, "TEST_RETURNED="+tc.returned, "TEST_BUILD_EXIT="+tc.buildExit,
-				"TEST_VALIDATED="+validated, "TEST_CALLS="+filepath.Join(dir, "calls"), "NVKR_LOCAL_BOOTSTRAP="+shared, "TEST_INSPECTED="+tc.inspected,
+				"TEST_COVERAGE_EXIT="+map[bool]string{true: "42", false: "0"}[tc.name == "coverage failure prevents execution"], "TEST_VALIDATED="+validated, "TEST_CALLS="+filepath.Join(dir, "calls"), "NVKR_LOCAL_BOOTSTRAP="+shared, "TEST_INSPECTED="+tc.inspected,
 				"NVKE_SOURCE_TOKEN=command-log-environment-sentinel", "TEST_GRAPH_EXIT="+graphExit, "TEST_SELECTED_PLAN_EXIT="+selectedPlanExit)
 			if tc.name == "preserve OVN redirect with NVKE clone" {
 				clone := filepath.Join(dir, "nvke-clone")
@@ -779,7 +627,7 @@ esac
 			if tc.wantError {
 				wantCount = 2 // Graph or toolchain rejection prevents execution.
 			}
-			if selectedPlanExit != "0" {
+			if selectedPlanExit != "0" || tc.name == "coverage failure prevents execution" {
 				wantCount = 3 // Selected Plan rejection prevents preview and execution.
 			}
 			if len(logged) != wantCount || !slices.Equal(logged, invoked) {
@@ -791,7 +639,7 @@ esac
 			if tc.graphFail && strings.Contains(string(calls), "toolchain-build") {
 				t.Fatalf("graph failure performed toolchain work: %s", calls)
 			}
-			if !tc.shared && strings.Contains(string(calls), "image inspect") {
+			if strings.Contains(string(calls), "image inspect --format {{.Id}} {{.Os}}/{{.Architecture}} localhost/") {
 				t.Fatalf("launcher resolved validated bytes through a mutable tag: %s", calls)
 			}
 			if tc.shared && (strings.Contains(string(calls), "toolchain-build") || strings.Contains(string(calls), "pull --platform") || strings.Contains(string(calls), "make -C /src")) {
@@ -837,37 +685,38 @@ esac
 	}
 }
 
-func TestAMD64ToolchainScopesFromCompiledInputs(t *testing.T) {
+func TestLocalToolchainScopesFromMaintainedInputs(t *testing.T) {
 	t.Chdir("..")
-	plan, _, err := factory.CaptureCompileFiles(t.Context(), ".", "inputs/definitions/demo/amd64-nvidia-local-kvm.json", "inputs/environments/local-amd64-kvm.json", "test")
+	bindings, err := factory.LoadLocalToolchainBindings(t.Context(), "toolchains/nvkr-packer/local-bindings.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := canonical.Marshal(plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmd := exec.CommandContext(t.Context(), "jq", "-L", "scripts", "-e", `include "nvke-os-plan"; local_toolchain_scopes("all"; "amd64")`)
-	cmd.Stdin = bytes.NewReader(raw)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("scopes: %s %v", out, err)
-	}
-	var scopes []struct {
-		Pin, CatalogDigest string
-		Outputs            []string
-	}
-	if err := json.Unmarshal(out, &scopes); err != nil {
-		t.Fatal(err)
-	}
-	if len(scopes) != 3 {
-		t.Fatalf("expected three original toolchain scopes: %+v", scopes)
-	}
-	seen := map[string]bool{}
-	for _, scope := range scopes {
-		if scope.Pin == "" || scope.CatalogDigest == "" || seen[scope.CatalogDigest] || len(scope.Outputs) == 0 {
-			t.Fatal("incomplete or colliding toolchain scope", scope)
-		}
-		seen[scope.CatalogDigest] = true
+	for _, tc := range []struct{ name, arch string }{
+		{"amd64-nvidia-local-kvm", "amd64"},
+		{"arm64-nvidia-local-kvm", "arm64"},
+		{"arm64-upstream-local-kvm", "arm64"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plan, _, err := factory.CaptureCompileFiles(t.Context(), ".", "inputs/definitions/demo/"+tc.name+".json", "inputs/environments/local-"+tc.arch+"-kvm.json", "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			preparation, err := factory.CompileLocalToolchainPreparation(t.Context(), plan, bindings, tc.arch)
+			if err != nil {
+				t.Fatal(err)
+			}
+			scopes, err := preparation.Scopes(t.Context(), "sha256:"+strings.Repeat("a", 64))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(scopes) != 3 {
+				t.Fatalf("maintained input groups: %d", len(scopes))
+			}
+			for _, scope := range scopes {
+				if len(scope.Outputs) == 0 || scope.Overlay.RequiresCatalogDigest == "" || len(scope.Overlay.ToolchainSubstitutions) == 0 {
+					t.Fatalf("incomplete scope: %+v", scope)
+				}
+			}
+		})
 	}
 }

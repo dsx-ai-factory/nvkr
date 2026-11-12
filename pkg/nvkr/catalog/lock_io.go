@@ -43,7 +43,7 @@ func LoadLockContext(ctx context.Context, dir string) (*PinLock, error) {
 	if !registryExists {
 		return nil, e.New(e.CodeInvalidCatalog, "required %s is missing from %q", RegistryFile, abs)
 	}
-	if _, err := decodeRegistry(registryRaw, filepath.Join(abs, RegistryFile)); err != nil {
+	if _, err := decodeRegistry(registryRaw, filepath.Join(abs, RegistryFile), bound); err != nil {
 		return nil, err
 	}
 	raw, lockExists, err := readOptionalProviderFile(bound, LockFile)
@@ -153,7 +153,7 @@ func WriteLockContext(ctx context.Context, dir string, lock *PinLock) error {
 	if sha256.Sum256(registryBefore) != lock.revision.registryDigest {
 		return e.New(e.CodeWriteConflict, "registry changed before pin verification")
 	}
-	checkedRegistry, err := decodeRegistry(registryBefore, RegistryFile)
+	checkedRegistry, err := decodeRegistry(registryBefore, RegistryFile, bound)
 	if err != nil {
 		return err
 	}
@@ -201,7 +201,7 @@ func WriteLockContext(ctx context.Context, dir string, lock *PinLock) error {
 		return e.New(e.CodeWriteConflict,
 			"%s changed since LoadLock; reload catalog sources and lock before resolving pins", RegistryFile)
 	}
-	reg, err := decodeRegistry(registryRaw, filepath.Join(abs, RegistryFile))
+	reg, err := decodeRegistry(registryRaw, filepath.Join(abs, RegistryFile), bound)
 	if err != nil {
 		return err
 	}

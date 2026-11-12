@@ -14,10 +14,21 @@ import (
 func TestGitHubPartitionWorkflowPreservesJobIdentityAndFailurePolicy(t *testing.T) {
 	plan := githubTestPlan(t)
 	condition := githubDispatchCondition(plan)
-	raw := []byte("permissions: {contents: read}\njobs:\n  source:\n    runs-on: ubuntu-24.04\n  build:\n    needs: [source]\n    if: ${{ " + condition + " }}\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    steps:\n      - run: echo build\n        env:\n          TOKEN: ${{ secrets.BUILD_TOKEN }}\n          PUBLISH: ${{ secrets['SECRETS'] }}\n  inspect:\n    needs: [source]\n    if: ${{ always() && " + condition + " }}\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    steps:\n      - run: echo inspect\n")
-	model, err := newExecutionGraph(t.Context(), map[string]executionOperation{
-		"source": {}, "build": {Needs: []string{"source"}}, "inspect": {Needs: []string{"source"}, Condition: executionAfterCompletion},
-	})
+	preflight, err := githubImagePreflightJobs(plan)
+	if err != nil || len(preflight) == 0 {
+		t.Fatalf("fixture has no preflight: %v", err)
+	}
+	needs := append([]string{"source"}, preflight...)
+	var support string
+	operations := map[string]executionOperation{
+		"source": {}, "build": {Needs: needs}, "inspect": {Needs: needs, Condition: executionAfterCompletion},
+	}
+	for _, id := range preflight {
+		support += "  " + id + ":\n    runs-on: ubuntu-24.04\n"
+		operations[id] = executionOperation{}
+	}
+	raw := []byte("permissions: {contents: read}\njobs:\n" + support + "  source:\n    runs-on: ubuntu-24.04\n  build:\n    needs: [" + strings.Join(needs, ", ") + "]\n    if: ${{ " + condition + " }}\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    steps:\n      - run: echo build\n        env:\n          TOKEN: ${{ secrets.BUILD_TOKEN }}\n          PUBLISH: ${{ secrets['SECRETS'] }}\n  inspect:\n    needs: [" + strings.Join(needs, ", ") + "]\n    if: " + githubCompletionCondition(plan, preflight) + "\n    runs-on: ubuntu-24.04\n    timeout-minutes: 30\n    steps:\n      - run: echo inspect\n")
+	model, err := newExecutionGraph(t.Context(), operations)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -41,8 +52,14 @@ func TestGitHubPartitionWorkflowPreservesJobIdentityAndFailurePolicy(t *testing.
 	if githubYAMLField(build, "needs") != nil || !strings.Contains(githubYAMLValue(build, "if"), "fromJSON(inputs.dependencies)['source'].result == 'success'") {
 		t.Fatal("ordinary job lost prerequisite success admission")
 	}
-	if strings.Contains(githubYAMLValue(githubYAMLField(jobs, "inspect"), "if"), "fromJSON") {
-		t.Fatal("always job incorrectly requires prerequisite success")
+	inspectCondition := githubYAMLValue(githubYAMLField(jobs, "inspect"), "if")
+	if strings.Contains(inspectCondition, "['source'].result == 'success'") {
+		t.Fatal("always job incorrectly requires producer success")
+	}
+	for _, id := range preflight {
+		if !strings.Contains(inspectCondition, "fromJSON(inputs.dependencies)['"+id+"'].result == 'success'") {
+			t.Fatal("always job lost its preflight-success gate")
+		}
 	}
 	report := githubYAMLField(jobs, githubPartitionReporter)
 	if githubYAMLValue(githubYAMLField(report, "outputs"), "results") != "${{ toJSON(needs) }}" {

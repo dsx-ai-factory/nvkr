@@ -243,6 +243,9 @@ func DocumentKind(raw []byte) (string, error) {
 	if err := yaml.Unmarshal(raw, &header); err != nil {
 		return "", e.Wrap(e.CodeInvalidCatalog, err, "parsing definition kind")
 	}
+	if err := requireSingleDocument(raw, "definition"); err != nil {
+		return "", err
+	}
 	switch {
 	case header.APIVersion == DefinitionAPIVersion && header.Kind == DefinitionKind:
 		return DefinitionKind, nil

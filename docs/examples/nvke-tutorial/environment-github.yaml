@@ -6,6 +6,12 @@ kind: Environment
 metadata:
   description: GitHub hosted-runner publication settings with a pinned identity policy.
   name: nvke-github
+toolchainAccess:
+  publicRoots:
+    - docker.io/alpine/helm
+    - docker.io/library/busybox
+    - docker.io/library/golang
+    - docker.io/moby/buildkit
 publication:
   credentialRef: github:GITHUB_TOKEN
   repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr
@@ -15,9 +21,5 @@ signing:
   identity: ^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run\.yml@refs/heads/main$
   issuer: https://token.actions.githubusercontent.com
   mode: cosign
-sourceAccess:
-  https://github.com/dsx-ai-factory/nvke:
-    credentialRef: github:NKE_SOURCE_TOKEN
-    mirror: https://github.com/dsx-ai-factory/nvke
 utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1
 utilityPlatform: linux/amd64

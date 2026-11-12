@@ -56,6 +56,11 @@ results from committed regressions.
 
 ## Definition → Run
 
+`generate-maintained.py` drives `make workflows-generate` and `make workflows-check` from
+`inputs/policies/maintained-generation.json`. That authored list selects every maintained Plan bundle and
+the default qualifier policy. Contract tests compare the list with committed Plans and manifests, so a
+new bundle must enter the same image-access contract. Group-specific Make targets use this list too.
+
 For repository pipeline changes, `make pipeline-dev-run PIPELINE_DEV_REPO=owner/repo` checks the generated
 development bundle and calls `pipeline-dev.py`. The helper requires a clean named branch matching the
 remote commit and an active registered `nvkr-dev.yml`, then dispatches that branch explicitly. It performs
@@ -80,7 +85,7 @@ documented installed prerequisites before invoking NVKR. No Colima execution hos
 `nvke-full-arm64-local.sh ATTEMPT JOBS LANE` also supports
 [focused selections](../inputs/definitions/demo/README.md);
 `--check LANE` performs diagnostics only. The full demo compiles binaries once and shares
-one measured Packer toolchain, including Helm 4.2.4 and ORAS 1.3.3. Profiles are
+one measured Packer toolchain, including Helm 4.3.1 and ORAS 1.3.6. Profiles are
 data bundles, not a separate container image. No publication/signing is enabled.
 The launcher prints its exact shell-escaped `nvkr` invocations to stderr before execution, without printing environment values.
 

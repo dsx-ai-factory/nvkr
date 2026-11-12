@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"time"
@@ -24,8 +25,11 @@ func releaseBrowseCmd() *cli.Command {
 			&cli.StringFlag{Name: "layout", Usage: "inspect a local OCI layout instead of pulling the registry"},
 			&cli.StringFlag{Name: "format", Value: "text", Usage: "text, json or mermaid"},
 			&cli.StringFlag{Name: "output", Usage: "focus on one exact named output and its evidence"},
+			&cli.StringFlag{Name: "kind", Usage: "show only outputs of this exact kind: " + strings.Join(releaseview.Kinds(), ", ")},
+			&cli.StringFlag{Name: "platform", Usage: "show only outputs that support this exact OS/ARCH; outputs without platform metadata never match"},
 			&cli.StringFlag{Name: "workspace", Usage: "temporary registry inspection workspace"},
-			&cli.DurationFlag{Name: "timeout", Value: 10 * time.Minute, Usage: "bound the complete inspection"},
+			&cli.DurationFlag{Name: "timeout", Value: time.Hour, Usage: "bound the complete inspection"},
+			&cli.BoolFlag{Name: "no-cache", Usage: "fetch metadata without reading or writing the disk cache"},
 			&cli.BoolFlag{Name: "anonymous", Usage: "disable ambient registry credentials"},
 			&cli.BoolFlag{Name: "plain-http", Usage: "use HTTP for a local registry"},
 		}, commandPresentationFlags()...),
@@ -37,9 +41,21 @@ func releaseBrowseCmd() *cli.Command {
 			if c.NArg() != 0 || c.Duration("timeout") <= 0 {
 				return e.New(e.CodeUsage, "release browse takes flags only and requires a positive timeout")
 			}
-			presentation := releaseview.Options{Format: c.String("format"), Output: c.String("output")}
+			presentation := releaseview.Options{Format: c.String("format"), Output: c.String("output"), Kind: c.String("kind"), Platform: c.String("platform")}
 			if err := presentation.Validate(); err != nil {
 				return err
+			}
+			if view.tui && c.String("layout") == "" {
+				return showReleaseMetadataLoad(c, view, "Release metadata browse", presentation.Output, func(ctx context.Context, report func(delivery.MetadataProgress)) (commandDisplay, error) {
+					description, err := lifecycle.InspectRelease(ctx, c.String("reference"), lifecycle.InspectionOptions{
+						WorkspaceRoot: c.String("workspace"), Timeout: c.Duration("timeout"), DisableCache: c.Bool("no-cache"), Progress: report,
+						Registry: delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")},
+					})
+					if err != nil {
+						return commandDisplay{}, err
+					}
+					return releasePublicationDisplay(description, presentation)
+				})
 			}
 			shown := false
 			defer func() {
@@ -48,14 +64,14 @@ func releaseBrowseCmd() *cli.Command {
 				}
 			}()
 			description, err := lifecycle.InspectRelease(c.Context, c.String("reference"), lifecycle.InspectionOptions{
-				LayoutPath: c.String("layout"), WorkspaceRoot: c.String("workspace"), Timeout: c.Duration("timeout"),
+				LayoutPath: c.String("layout"), WorkspaceRoot: c.String("workspace"), Timeout: c.Duration("timeout"), DisableCache: c.Bool("no-cache"), Progress: releaseMetadataReporter(c, view),
 				Registry: delivery.RegistryOptions{Anonymous: c.Bool("anonymous"), PlainHTTP: c.Bool("plain-http")},
 			})
 			if err != nil {
 				return err
 			}
 			if view.tui {
-				display, err := releasePublicationDisplay(description, presentation.Output)
+				display, err := releasePublicationDisplay(description, presentation)
 				if err != nil {
 					return err
 				}
@@ -138,7 +154,7 @@ func verifiedReleaseDisplay(result releaseVerificationResult) commandDisplay {
 	return display
 }
 
-func releasePublicationDisplay(description delivery.PublicationDescription, selection string) (commandDisplay, error) {
+func releasePublicationDisplay(description delivery.PublicationDescription, selection releaseview.Options) (commandDisplay, error) {
 	described, err := releaseview.Describe(description, selection)
 	if err != nil {
 		return commandDisplay{}, err
@@ -201,6 +217,12 @@ func releaseDescriptionDisplay(description releaseview.Description) commandDispl
 		}}
 	if description.SelectedOutput != "" {
 		display.Fields = append(display.Fields, progress.Field{Label: "Selected output", Value: description.SelectedOutput})
+	}
+	if description.SelectedKind != "" {
+		display.Fields = append(display.Fields, progress.Field{Label: "Selected kind", Value: description.SelectedKind})
+	}
+	if description.SelectedPlatform != "" {
+		display.Fields = append(display.Fields, progress.Field{Label: "Selected platform", Value: description.SelectedPlatform})
 	}
 	for _, output := range description.Outputs {
 		item := progress.Item{ID: "output/" + output.Name, Name: output.Name, Kind: output.Kind, State: "metadata", Primary: true,

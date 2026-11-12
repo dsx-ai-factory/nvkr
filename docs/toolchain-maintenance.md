@@ -107,8 +107,17 @@ After the record merges, a maintainer dispatches the same workflow on `main` wit
 The workflow authenticates the successful main-branch preparation attempt through
 GitHub, checks that relevant source inputs have not changed, restores that exact
 attempt's private artifacts, and authenticates all four subjects before the first
-registry write. It rechecks expiry before each image write. A changed source,
-missing archive or expired record requires another preparation/review cycle.
+registry write. It rechecks expiry before each image write. Source comparison covers
+`.go-version`, `go.mod`, `go.sum`, `go.work`, `go.work.sum`, `vendor`, `toolchains/nvkr-packer`,
+`toolchains/nvkr-disk-inspect`, `scripts/prepare-native-toolchains.sh`, and the union
+of the inspector's module-local dependency package directories at the preparation
+commit and current `HEAD`. Dependencies are resolved for both Linux architectures
+with CGO disabled; full package directories include embedded and non-Go files.
+Ancestor `.gitattributes` files are included because checkout transformations can
+change embedded or copied bytes.
+Unrelated package edits do not invalidate the retained candidate. Missing commits
+or a failed dependency listing refuse admission; workspace-based and vendored builds are unsupported. A changed guarded input, missing
+archive or expired record requires another preparation/review cycle.
 
 Publication runs inside `nvkr-release`. The independent pipeline reader then pulls
 the selected manifests on both native architectures, repeats the existing native
@@ -116,9 +125,22 @@ tool/helper checks and compares every inspector executable measurement. The
 proposal job additionally reads back manifest/configuration bytes and every
 compressed layer using that reader. Only after both native jobs succeed does it
 update affected authored catalogs, rebind overlay predecessor digests through the
-catalog owner, update Environment image/executable pins, and invoke
-`make workflows-generate workflows-check`. It preserves historical evidence and
-source-lock approval gates.
+catalog owner, and update Environment image/executable pins. The refresh also updates
+the frozen producer pins in `inputs/policies/ovn-producer-overlays.json`, then invokes
+`make producer-overlays-generate` before `make workflows-generate workflows-check`.
+Updating only the generated overlays leaves their authored policy stale; regenerating
+from that stale policy would restore old toolchain pins. The initial `make workflows-check`
+still rejects pre-existing drift before repinning. Other policies, historical evidence,
+exception records and source-lock approval gates are unchanged.
+
+When a refresh changes the Packer version, review and update consumer `packerVersion`
+contracts alongside the image pins; runtime preflight requires an exact version match.
+Repin updates local configuration-ID pins and their frozen copies when an explicit
+native substitution binds the old ID to a candidate Packer reference and architecture.
+Ambiguous mappings fail closed; unbound local IDs remain untouched. Pull the approved
+AMD64 registry manifest before using its configuration ID locally. Repin also updates
+the architecture-bound predecessor references in `toolchains/nvkr-packer/local-bindings.json`
+so local diagnostic substitutions continue to match the refreshed catalogs.
 
 Within an affected authored file, the proposal replaces every exact occurrence of
 a selected old pin or predecessor digest, including comments and descriptive text.
@@ -144,14 +166,14 @@ Required repository configuration:
   (`NVKR_REGISTRY_READ` / `NVKR_REGISTRY_READ_USER`). Registry tokens also need read
   access to package visibility metadata. Their secret values never enter records.
 - Retain the catalog-maintenance release App's contents, pull requests and workflows
-  write permissions, and `NKE_SOURCE_TOKEN` for private-source generation checks.
+  write permissions. Source generation checks use anonymous access to the public repositories.
 
 The manual `verify_published=true` mode still checks the currently committed pins
 without building or publishing. It cannot be combined with `approval_run`.
 
 ## Declare consumer access
 
-Each native ARC Environment declares toolchain access independently of its output publication prefix:
+Each GitHub Environment declares image access independently of its output publication prefix:
 
 ```yaml
 toolchainAccess:
@@ -169,8 +191,8 @@ toolchainAccess:
 
 Roots are sorted, unique registry/repository paths. Each covers that repository and descendants at a
 slash boundary. Roots must not overlap, including across classes; at most 128 are supported. Public roots
-select anonymous pulls. Every selected execution image in a native ARC Plan, including hosted source
-preparation and strict disk inspection when enabled, must be digest-pinned and classified. Generation
+select anonymous pulls. Every selected execution image in a GitHub Plan, including producer, vendor, utility, inspector, startup
+container and service images, must be digest-pinned and classified. Generation
 fails before writing a bundle if a root is missing or a selected private root lacks a reader. Declare
 only roots trusted for that reader; an authored declaration does not verify the account's actual grants.
 Private pulls currently support GHCR only and require `native-kvm-v1`. The reader secret and username
@@ -184,8 +206,30 @@ references; those comparisons are case-insensitive. Operators still own the gran
 
 When adding a toolchain root, update the Environment, regenerate with `make workflows-generate`, and
 run `make workflows-check`. Changing only the output publication namespace needs no access-code change.
-Existing native ARC Environments without `toolchainAccess` must migrate before generating workflows.
+Existing ordinary hosted and native ARC Environments without `toolchainAccess` must migrate before
+generating workflows. Declare public roots for anonymous pulls. Private ordinary-hosted and startup
+container/service routes remain unsupported, even when a reader is declared. Standalone CLI diagnostics
+also require a declared anonymous route for a selected registry image; measured local image IDs stay local.
+Ordinary local operation helpers also require declared public roots for registry-pinned images;
+measured local image IDs and native bundles retain their local routes.
 Access declarations change Environment and Plan digests, while logical Build identity is unchanged.
+
+### Migrate source/location bindings
+
+Replace `runtime.toolchainRegistry` with explicit `runtime.imageLocations` bindings:
+
+```yaml
+runtime:
+  imageLocations:
+    mirror.invalid/compiler: ghcr.io/example/tools/compiler
+```
+
+The catalog pins `mirror.invalid/compiler@sha256:<exact-digest>`; compilation requires that exact source
+key and retains the digest at the declared destination. Both build and vendor consumers use the same
+binding. Existing bare `nvkr-toolchain-*` names can be explicit keys during migration; their names no longer
+select a registry. Missing mirror keys fail before bundle output. Direct public references need no relocation.
+Declare access for the resolved destination separately. Native bundle digests and measured local image IDs
+are never relocated. Transport changes preserve logical Build identity but change the complete Plan.
 
 ## Retention and rollback
 

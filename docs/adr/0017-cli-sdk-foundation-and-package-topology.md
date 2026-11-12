@@ -250,7 +250,7 @@ kinds and projected fields. Release browse and export share the sorted descripti
 native-image and exact evidence memberships stay consistent. Explicit JSON or Mermaid output forces plain
 presentation in auto mode and conflicts with explicit terminal presentation before acquisition.
 
-Normal commands are `validate`, `definition validate|inspect`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify|qualify-local`,
+Normal commands are `validate`, `definition init|validate|inspect|pin`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify|qualify-local`,
 and `release verify|inspect|browse|export|pull`. Producer operations select authored inputs with `--definition` and
 `--environment`; artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
 and exact component/platform diagnostics remain available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
@@ -284,8 +284,19 @@ navigation. Delivery validates the bounded metadata and evidence closure before 
 and evidence membership, without downloading or reading artifact payload layers. Local inspection accepts a
 complete publication layout or a metadata-only layout. Presentation may then focus on an exact output or
 render text, JSON, or Mermaid; platform labels describe checked config metadata. Reference and transport
-admission precede filesystem/network work. Registry inspection owns and removes a system temporary directory
-by default; an explicit caller-owned workspace is retained while its private staging child is removed.
+admission precede filesystem/network work. Uncached registry inspection owns and removes a private temporary workspace. A content-addressed disk cache
+reuses only a fully rechecked metadata closure; every hit re-verifies hashes and sizes. The owning inspection
+holds the per-root cache lock through description and evidence visits, without a redundant layout copy. Invalid entries are refetched, and publication uses a checked stage and a per-root kernel lock.
+The cache is expendable transport data, never durable authority. `NVKR_METADATA_CACHE=off` or `--no-cache`
+disables reuse; an explicit caller-owned workspace is retained while its private staging child is removed.
+The default inspection and authenticity deadlines are one hour, subject to earlier caller cancellation.
+`release verify --timeout` bounds the whole verification operation. Authenticity verifies output subjects
+with at most 16 concurrent checks, consuming results in canonical output order so error selection is
+deterministic, canceling and joining the remaining active checks on failure. Its live TUI retains loading
+state until the owning signature, evidence and policy checks all pass.
+Optional progress reports root arrival and member acquisition independently of final closure checks.
+A live registry browser may display these provisional entries labeled loading; only successful complete
+inspection and composition checks authorize a completed description.
 Each format labels metadata inspection explicitly. These detached descriptions establish no payload,
 signature or policy verification, and cannot restore an authenticated or verified Release capability. Explicit
 `artifact-publication` verification retains its full payload and policy checks; `authenticity` adds policy-bound
@@ -365,7 +376,7 @@ future qualified publication needs an authenticated commit protocol before expos
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
   `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, `trust`,
-  `qualificationorigin`, `qualificationoutcome`, `releasemanifest`, `testresults`, `validation`, `conformance`, and the separate M3-C `qualification` publisher.
+  `qualificationorigin`, `qualificationoutcome`, `releasemanifest`, `resultspublish`, `testresults`, `validation`, `conformance`, and the separate M3-C `qualification` publisher.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
   errors, and marshals through the canonical codec (ADR-01). `client/v1` composes those owners; `main` must not
@@ -379,12 +390,15 @@ owns descriptive fields, format pins and limits. This adds no public lifecycle o
 check dispatch; `conformance` owns the supported suite/harness protocol, subject observations, capture
 and cleanup. Catalog, lifecycle, delivery and held-file owners retain their existing responsibilities.
 `qualificationoutcome` owns the qualification outcome schema, its strict decoding, the triggering event's
-description and text scrubbing, in lane **none (descriptive)**. It is a leaf that directly imports only the canonical
-codec, coded errors and held files. `releasemanifest` issues the pipeline-attested M4 release manifest
-(ADR-16 §5); it also admits an outcome's inputs before qualification and classifies its own result into an
-outcome. An outcome
+description, text scrubbing and the selection of the outcomes a Run publishes, in lane **none (descriptive)**. It
+is a leaf that directly imports only the canonical codec, coded errors and held files. `releasemanifest` issues
+the pipeline-attested M4 release manifest (ADR-16 §5); it also admits an outcome's inputs before qualification
+and classifies its own result into an outcome. An outcome
 points at qualification evidence and the release manifest by digest; it adds no public lifecycle object,
-receipt or authority.
+receipt or authority. `resultspublish` owns the proposed ADR-31 results index: the bucket layout, the TestGrid
+projection and the create-only publishing protocol, in the same lane. It writes through a store interface, holds
+no credential and links no cloud SDK; the separate `cmd/nvkr-results-publish` helper supplies the store and is not
+part of the release CLI.
 
 The standalone query/diff selector workflow is removed; inspect the current lifecycle views directly.
 

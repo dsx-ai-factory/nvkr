@@ -489,6 +489,7 @@ func filesystemDependenciesFromJSON(raw []byte, scannerDigest string) (Dependenc
 			Locations []struct {
 				Path       string `json:"path"`
 				AccessPath string `json:"accessPath"`
+				FullPath   string `json:"fullPath"`
 				LayerID    string `json:"layerID"`
 			} `json:"locations"`
 			Metadata struct {
@@ -502,9 +503,10 @@ func filesystemDependenciesFromJSON(raw []byte, scannerDigest string) (Dependenc
 	if err := json.Unmarshal(raw, &report); err != nil {
 		return DependencyInventory{}, e.Wrap(e.CodeEnvelopeDecode, err, "decoding filesystem package report")
 	}
-	// Exact native schema emitted by pinned Syft v1.51.1, verified against its
-	// internal.JSONSchemaVersion. New schemas require an explicit adapter update.
-	if report.Schema.Version != "16.1.10" || len(report.Artifacts) > maxDiskInstalledPackages {
+	// Syft v1.51.1 and v1.57.1 retain the same package identity projection.
+	// v1.57.1 adds fullPath for archive coordinates, admitted below. Retain the
+	// older schema for committed images; other schemas need an explicit review.
+	if (report.Schema.Version != "16.1.10" && report.Schema.Version != "16.1.13") || len(report.Artifacts) > maxDiskInstalledPackages {
 		return DependencyInventory{}, e.New(e.CodeProvenanceMissing, "filesystem scanner returned no bounded package inventory")
 	}
 	result := DependencyInventory{Method: "syft-cyclonedx/v1", ScannerDigest: scannerDigest}
@@ -512,25 +514,30 @@ func filesystemDependenciesFromJSON(raw []byte, scannerDigest string) (Dependenc
 		component := Component{Type: "library", Name: artifact.Name, Version: artifact.Version, PURL: artifact.PURL,
 			Properties: []Property{{Name: diskPackageFormatProperty, Value: artifact.Type}}}
 		if artifact.Type == "deb" {
-			// Syft v1.51.1's dpkg-db-cataloger deliberately searches **/lib/dpkg.
+			// Syft's dpkg-db-cataloger deliberately searches **/lib/dpkg.
 			// A nested database has no independently held filesystem/image owner
 			// here. This shared decoder serves filesystem and container scans;
 			// refuse nested DBs in either rather than guessing their child owner.
 			for _, location := range artifact.Locations {
-				for _, coordinate := range []string{location.Path, location.AccessPath} {
-					clean := path.Clean("/" + coordinate)
-					for _, database := range []string{"dpkg/status", "dpkg/status.d/", "opkg/status", "opkg/info/"} {
-						marker := "/lib/" + database
-						fragment := strings.HasSuffix(marker, "/")
-						if !strings.HasSuffix(clean, marker) && !(fragment && strings.Contains(clean, marker)) {
-							continue
-						}
-						rooted := false
-						for _, prefix := range []string{"/var", "/usr", ""} {
-							rooted = rooted || clean == prefix+marker || fragment && strings.HasPrefix(clean, prefix+marker)
-						}
-						if !rooted {
-							return DependencyInventory{}, e.New(e.CodeEngineCapability, "filesystem scanner found an unsupported nested package database at %q; separate held root/container inspection is required", coordinate)
+				for _, coordinate := range []string{location.Path, location.AccessPath, location.FullPath} {
+					// Clean within each archive, never across its boundary. A child
+					// database cannot become a root database through "!/../".
+					segments := strings.Split(coordinate, "!/")
+					for _, segment := range segments {
+						clean := path.Clean("/" + segment)
+						for _, database := range []string{"dpkg/status", "dpkg/status.d/", "opkg/status", "opkg/info/"} {
+							marker := "/lib/" + database
+							fragment := strings.HasSuffix(marker, "/")
+							if !strings.HasSuffix(clean, marker) && !(fragment && strings.Contains(clean, marker)) {
+								continue
+							}
+							rooted := false
+							for _, prefix := range []string{"/var", "/usr", ""} {
+								rooted = rooted || len(segments) == 1 && (clean == prefix+marker || fragment && strings.HasPrefix(clean, prefix+marker))
+							}
+							if !rooted {
+								return DependencyInventory{}, e.New(e.CodeEngineCapability, "filesystem scanner found an unsupported nested package database at %q; separate held root/container inspection is required", coordinate)
+							}
 						}
 					}
 				}

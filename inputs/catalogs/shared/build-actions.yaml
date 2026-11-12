@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: nvkr.dev/catalog-fragment/v1
+kind: CatalogFragment
+sources:
+  checkout:
+    kind: github-action
+    repo: https://github.com/actions/checkout
+    constraint: 7.x
+  download-artifact:
+    kind: github-action
+    repo: https://github.com/actions/download-artifact
+    constraint: 8.x
+  setup-go:
+    kind: github-action
+    repo: https://github.com/actions/setup-go
+    constraint: 7.x
+  upload-artifact:
+    kind: github-action
+    repo: https://github.com/actions/upload-artifact
+    constraint: 7.x

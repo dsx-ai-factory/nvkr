@@ -75,7 +75,7 @@ func TestWorkflowLoweringPreservesExpandedGraph(t *testing.T) {
 
 func TestWorkflowLoweringPreservesScalarTypesAndAuthority(t *testing.T) {
 	actions := testActionRefs(t, githubTestPlan(t))
-	for _, value := range []string{"yes", "No", "ON", "off", "y", "N", "true", "null", "01", "1e2", "2026-10-13", "# literal", "colon: value", "first\nsecond", "${{ secrets.NKE_SOURCE_TOKEN }}"} {
+	for _, value := range []string{"yes", "No", "ON", "off", "y", "N", "true", "null", "01", "1e2", "2026-10-13", "# literal", "colon: value", "first\nsecond", "${{ secrets.TEST_SOURCE_READ_TOKEN }}"} {
 		t.Run(value, func(t *testing.T) {
 			raw := []byte(fmt.Sprintf(`'on': {workflow_dispatch: {}}
 permissions: {contents: read}
@@ -89,7 +89,7 @@ jobs:
     steps:
       - uses: %s
       - name: 'Fetch exact source'
-        env: {NVKR_SOURCE_TOKEN: '${{ secrets.NKE_SOURCE_TOKEN }}', LITERAL: %s}
+        env: {NVKR_SOURCE_TOKEN: '${{ secrets.TEST_SOURCE_READ_TOKEN }}', LITERAL: %s}
         run: |
           set -eu
           ./nvkr-exec factory github run-node --plan .github/nvkr-run/plan.json --node fetch/source
@@ -395,6 +395,9 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if len(plan.Environment.SourceAccess) != 0 {
+				t.Fatal("maintained public sources must not select credentials")
+			}
 			bundle, err := RenderGitHub(t.Context(), plan)
 			if err != nil {
 				t.Fatal(err)
@@ -451,8 +454,15 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 				if planPath == FactoryPlanPath {
 					// The default suite checks the combined bundle's emitted pin and
 					// source credential scope; the extended suite covers the others.
-					assertMaintainedPinSetCredentialScope(t, plan, emitted, true)
-					assertGitHubEmittedCredentialRefusals(t, plan, bundle, emitted)
+					assertMaintainedPinSetCredentialScope(t, plan, emitted, false)
+					// Exercise private-source guards with an explicit test credential.
+					credentialPlan := *plan
+					addTestSourceCredential(t, &credentialPlan)
+					credentialBundle, err := RenderGitHub(t.Context(), &credentialPlan)
+					if err != nil {
+						t.Fatal(err)
+					}
+					assertGitHubEmittedCredentialRefusals(t, &credentialPlan, credentialBundle, githubEmittedWorkflows(t, &credentialPlan, credentialBundle))
 				}
 				if selected.privateDiskProducers >= 0 {
 					// The emitted workers, not only their flat reference, keep each
@@ -559,7 +569,7 @@ func assertGitHubPartitionCallerSecrets(t testing.TB, bundle *GeneratedBundle, i
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(string(text), "secrets.NKE_SOURCE_TOKEN") || strings.Contains(string(text), "NVKR_PIN_SOURCE_TOKEN_") {
+		if strings.Contains(string(text), "secrets.TEST_SOURCE_READ_TOKEN") || strings.Contains(string(text), "NVKR_PIN_SOURCE_TOKEN_") {
 			t.Fatalf("entry job %s carries a pin or source credential outside secrets", id)
 		}
 	}
@@ -579,7 +589,7 @@ func assertGitHubPartitionCallerSecrets(t testing.TB, bundle *GeneratedBundle, i
 // credential guards refuse mutated copies of the maintained bundle.
 func assertGitHubEmittedCredentialRefusals(t *testing.T, plan *Plan, bundle *GeneratedBundle, emitted map[string]githubWorkflowDocument) {
 	t.Helper()
-	const sourceSecret = "${{ secrets.NKE_SOURCE_TOKEN }}"
+	const sourceSecret = "${{ secrets.TEST_SOURCE_READ_TOKEN }}"
 	scalar := func(value string) *yamlv3.Node { return &yamlv3.Node{Kind: yamlv3.ScalarNode, Value: value} }
 	for _, tc := range []struct {
 		name, want string
@@ -593,7 +603,7 @@ func assertGitHubEmittedCredentialRefusals(t *testing.T, plan *Plan, bundle *Gen
 			call.Content = append(call.Content, scalar("if"), scalar("env.NVKR_PIN_SOURCE_TOKEN_0 != ''"))
 		}},
 		{"renamed secret", "undeclared or renamed secret", func(call *yamlv3.Node) {
-			githubYAMLField(githubYAMLField(call, "secrets"), "NKE_SOURCE_TOKEN").Value = "${{ secrets.OTHER }}"
+			githubYAMLField(githubYAMLField(call, "secrets"), "TEST_SOURCE_READ_TOKEN").Value = "${{ secrets.OTHER }}"
 		}},
 		{"extra secret", "beyond", func(call *yamlv3.Node) {
 			secrets := githubYAMLField(call, "secrets")
@@ -607,7 +617,7 @@ func assertGitHubEmittedCredentialRefusals(t *testing.T, plan *Plan, bundle *Gen
 		id, call := "", (*yamlv3.Node)(nil)
 		jobs := githubYAMLField(document.Content[0], "jobs")
 		for index := 0; index < len(jobs.Content) && call == nil; index += 2 {
-			if githubYAMLField(githubYAMLField(jobs.Content[index+1], "secrets"), "NKE_SOURCE_TOKEN") != nil {
+			if githubYAMLField(githubYAMLField(jobs.Content[index+1], "secrets"), "TEST_SOURCE_READ_TOKEN") != nil {
 				id, call = jobs.Content[index].Value, jobs.Content[index+1]
 			}
 		}

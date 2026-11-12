@@ -34,7 +34,11 @@ type sourceVendor struct {
 	command  []string
 }
 
-func admitSourceVendor(ctx context.Context, node ir.Node, runtimeName string) (_ *sourceVendor, returnErr error) {
+func admitSourceVendor(ctx context.Context, node ir.Node, runtimeName string) (*sourceVendor, error) {
+	return admitSourceVendorWithAccess(ctx, node, runtimeName, ImagePreparedOnly)
+}
+
+func admitSourceVendorWithAccess(ctx context.Context, node ir.Node, runtimeName string, access ImageAccess) (_ *sourceVendor, returnErr error) {
 	if err := requireRunContext(ctx, "source vendor admission"); err != nil {
 		return nil, err
 	}
@@ -82,10 +86,11 @@ func admitSourceVendor(ctx context.Context, node ir.Node, runtimeName string) (_
 	if err := checkSourceVendorPlatform(ctx, adapter, platform); err != nil {
 		return nil, err
 	}
-	if _, err := observeHeldContainerImage(ctx, held, ir.Node{ID: node.ID, Toolchain: node.VendorImage, Platform: platform}); err != nil {
+	receipt, err := prepareHeldContainerImage(ctx, held, ir.Node{ID: node.ID, Toolchain: node.VendorImage, Platform: platform}, access)
+	if err != nil {
 		return nil, err
 	}
-	image, err := sourceVendorImage(ctx, adapter, node.VendorImage, platform)
+	image, err := sourceVendorImage(ctx, adapter, receipt.configID, platform)
 	if err != nil {
 		return nil, err
 	}
@@ -131,6 +136,9 @@ func sourceVendorImage(ctx context.Context, runtime packerContainerRuntime, refe
 	image.ID = normalizeLocalImageID(image.ID)
 	if validateSHA256(image.ID) != nil || image.OS+"/"+image.Architecture != platform || len(image.Config.Volumes) != 0 {
 		return "", e.New(e.CodeEngineCapability, "source vendor image has a mismatched native platform, invalid identity or implicit volumes")
+	}
+	if canonical.IsDigest(reference) && image.ID != reference {
+		return "", e.New(e.CodeEngineCapability, "source vendor image identity changed after admission")
 	}
 	return image.ID, nil
 }

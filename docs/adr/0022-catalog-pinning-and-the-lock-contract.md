@@ -59,6 +59,29 @@ the explicit pin-set declarations in §7.
 Lock v1 retains its version and adds optional `derivedFrom` provenance to source and artifact pins; older strict
 readers reject these new fields rather than ignoring them.
 
+**Shared declarations.** Registry `imports` select sources and components from
+`nvkr.dev/catalog-fragment/v1` / `CatalogFragment` documents. Each import declares a canonical relative
+`path`, lowercase exact-byte `sha256`, and explicit `sources`/`components` maps from consumer-local names
+to fragment names. Optional `sourceNames` binds a selected component's source key to a consumer-local
+source; unused bindings fail. These are whole declarations, with no wildcard, precedence or deep merge.
+Fragments cannot contain metadata, pins or nested imports. Imported producers cannot contain
+catalog-relative patch declarations. Keep patched
+producers local; their ordinary patch authentication remains unchanged.
+
+The fragment owns instructions; the consuming catalog owns its source and artifact pins. The lock must match
+the complete expanded registry key set. Pin/bump reads the same expanded declarations as compilation and
+continues writing only that catalog's lock. Independent release cohorts may therefore share a recipe while
+retaining different pins. Changing a fragment requires updating each consuming registry's exact hash. Existing
+registry/lock CAS binds that expected hash, and lock writes revalidate fragment bytes before commitment.
+The hash authenticates file integrity, not publisher trust. Resolved catalog and Build identity exclude the
+fragment path and hash; they bind the expanded, pinned values through their existing canonical codecs.
+
+Fragment reads use the context-bound provider and its aggregate byte ceiling, with at most 64 imports and
+1024 selected declarations. Files retain the regular-file, no-follow and per-file size checks. Filesystem
+providers allow explicit sibling references; compile snapshot providers additionally confine all references to
+the captured repository root. Captures include fragment bytes, and replay has no filesystem fallback. Missing,
+changed or unsupported inputs fail closed before a catalog is returned.
+
 Multiple components may share one source and therefore **bump atomically** (e.g. the Kubernetes-core binaries
 move together on a single lock entry).
 
@@ -448,6 +471,14 @@ remain follow-ups owned by ADR-11/13; this pinning contract does not implement t
   convention. Re-derivation at validation time makes it a property the tooling enforces.
 
 ## Follow-ups
+
+ADR-18's dispatch-frozen source selection uses the catalog-owned exact-commit resolver
+and ephemeral whole-producer overlays. Its auditable record names repository, main ref,
+commit, tree and source timestamp. It does not rewrite locks or float tools and acquired
+dependencies. Replay authenticates the exact saved commit and metadata, without consulting
+the current branch. The trusted producing invocation supplies the ref-observation boundary;
+the descriptive record is not an authority receipt. Existing release-only version bindings
+still reject commit-only selections; recipes must explicitly support their selected source.
 
 - **ADR-02:** the fully-resolved pins are the `buildDigest` inputs; source-date comes from the lock.
 - **ADR-10:** toolchain and prebuilt-artifact digests the lock carries.

@@ -1,7 +1,7 @@
 # NVIDIA Kubernetes Recipes (NVKR)
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Go](https://img.shields.io/badge/Go-1.27.3-00ADD8.svg)](.go-version)
+[![Go](https://img.shields.io/badge/Go-1.27.4-00ADD8.svg)](.go-version)
 
 **Build NVKE and AICR artifacts from pinned inputs and trace releases back to their sources.**
 NVKR gives release engineers a CLI, reusable component catalogs and declarative
@@ -100,6 +100,7 @@ Runs and the limits of what each establishes.
 | Build AICR deployment bundles | [AICR inputs and hardware limits](inputs/definitions/aicr/README.md) |
 | Build NVKE node images | [Node images](docs/node-images.md) |
 | Browse, pull or verify a published Release | [Release quickstart](docs/release-quickstart.md) |
+| Diagnose Helm or registry publication errors | [Registry diagnostics and compatibility](docs/publication-architecture.md#troubleshoot-helm-and-registry-rejections) |
 | Work with an AI agent | [Use NVKR with your AI agent](docs/use-with-agents.md) and the [operator skill](.agents/skills/nvkr-operator/SKILL.md) |
 | Look up terminology | [Concept reference](docs/user-concepts.md) |
 

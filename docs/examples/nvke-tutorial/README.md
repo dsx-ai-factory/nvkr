@@ -212,11 +212,9 @@ environment `nvkr-release` with a deployment branch policy admitting only `main`
 access must be available to the hosted runner. Real operational acceptance is recorded separately in the
 [implementation/evidence record](../../adr/reconciliation/README.md).
 
-The GitHub Environment fetches pinned source directly from the internal `dsx-ai-factory/nvke` repository.
-Its `sourceAccess` entry references the repository Actions secret `NKE_SOURCE_TOKEN`, which must grant
-read-only Contents access to `dsx-ai-factory/nvke`. Only admitted source retrieval and pinned-source revalidation
-steps receive the token; Git configuration
-is process-local, and the pinned commit/tree checks remain mandatory. The local Environment continues to
+The GitHub Environment fetches pinned source anonymously from the public `dsx-ai-factory/nvke` repository.
+No source credential is configured. Git configuration is process-local, and the pinned commit/tree checks
+remain mandatory. The local Environment continues to
 use the existing command-scoped mirror override described above.
 
 ## Catalog tools and publication

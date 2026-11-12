@@ -50,11 +50,11 @@ executionClasses:
 # includes the additional held subject snapshot.
 diskInspectionProfiles:
   linux/amd64:
-    image: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:aa4fbd23fd6e0ddeb3f94201bd1a9cc7083d1a1ff1720f7ce0cfa996e9ca5ed3
+    image: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:a429a3a8fabc76086897f1c0f75202a2c37eafa38823113aed31267403245d92
     inspectorDigest: sha256:31f25fbb70ef79d8c5487c0d8a41613b6db5c93eb391b73f990ddaa04e6ba052
     codecDigest: sha256:634320b91165669917123e8e79cce1c4d00cee0a4aa4d662d7c0a8186479b3fb
     guestfishDigest: sha256:65739abd86dbf919cbdff5ef9bb144079bd0e97dc4c9023c9455d6b8538add8c
-    scannerDigest: sha256:abca2def61de9952fa06d3977bb1e064818facb9badfce502b450d3d6846a91f
+    scannerDigest: sha256:de3982edbbc250c4a40764c7b1f30bbf54b681f9b99391ee6b85bfdfa5d4dffe
     packageReaderDigest: sha256:fc9dde782ca8309b65ab92e61d13318bf463cd1aa71daa8967b87b81b48b63d2
     resources:
       cpuMillis: 8000
@@ -64,11 +64,11 @@ diskInspectionProfiles:
     maxFilesystemBytes: 17179869184
     scratchStorage: private-volume
   linux/arm64:
-    image: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:db9e17bd3cd94008ba58291b47774601e3b06c5bc741a25974de67c72e79b6bc
+    image: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:e2379e4f2ff70755e0e2e407a998547ae8d0a9c530640b64bafefe2f75cde5cd
     inspectorDigest: sha256:e95525c7c92f9581c79c8ecc0893109519fbfbb4607a341bf473e942215bfd7b
     codecDigest: sha256:f26da24f8a7fd880ab13f6fcabf42d099fb68ea86df5de0c55e6faadfe2d9a6e
     guestfishDigest: sha256:db1f245febce9e588902858806fc63b7878cc2c02ad9651e9a87102bbebe2feb
-    scannerDigest: sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573
+    scannerDigest: sha256:b0b37d4e18dbb923c9321a332c2f5b1ef2db13f599e58d6f3aee3a1ba3545365
     packageReaderDigest: sha256:3cf93403af757e938bda51322774697b8ff1e1d030b333008b2308e0b79a8dd6
     resources:
       cpuMillis: 8000
@@ -88,15 +88,5 @@ signing:
   identity: ^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run-nvke-gpu-site\.yml@refs/heads/main$
   issuer: https://token.actions.githubusercontent.com
   mode: cosign
-sourceAccess:
-  https://github.com/dsx-ai-factory/nvke:
-    credentialRef: github:NKE_SOURCE_TOKEN
-    mirror: https://github.com/dsx-ai-factory/nvke
-  https://github.com/dsx-ai-factory/nvke.git:
-    credentialRef: github:NKE_SOURCE_TOKEN
-    mirror: https://github.com/dsx-ai-factory/nvke
-  https://github.com/dsx-ai-factory/ovn-kubernetes:
-    credentialRef: github:NKE_SOURCE_TOKEN
-    mirror: https://github.com/dsx-ai-factory/ovn-kubernetes
 utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1
 utilityPlatform: linux/amd64

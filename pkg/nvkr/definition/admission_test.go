@@ -29,31 +29,138 @@ func TestAdmissionPreservesAuthoredIdentityAndRejectsUnknownInputs(t *testing.T)
 		{"unsupported namespace", []byte(strings.Replace(string(raw), DefinitionAPIVersion, "unsupported.dev/definition/v5", 1)), e.CodeInvalidCatalog},
 		{"old version", []byte(strings.Replace(string(raw), DefinitionAPIVersion, "nvkr.dev/definition/v3", 1)), e.CodeInvalidCatalog},
 		{"unknown field", []byte(strings.Replace(string(raw), `"outputs":`, `"clusters":[],"outputs":`, 1)), e.CodeInvalidCatalog},
+		{"duplicate key", []byte(strings.Replace(string(raw), `"kind":`, `"kind":"`+DefinitionKind+`","kind":`, 1)), e.CodeInvalidCatalog},
+		{"leading document marker", []byte("---\n" + string(raw)), ""},
+		{"trailing comment", []byte(string(raw) + "\n# ---\n"), ""},
+		{"second valid document", []byte(string(raw) + "\n---\n" + string(raw)), e.CodeInvalidCatalog},
+		{"second invalid document", []byte(string(raw) + "\n---\napiVersion: broken\nkind: DefinitelyNotADefinition\n"), e.CodeInvalidCatalog},
+		{"empty second document", []byte(string(raw) + "\n---\n"), e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "definition.yaml")
 			if err := os.WriteFile(path, tc.raw, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			got, err := LoadDefinition(t.Context(), path)
-			if tc.code != "" {
-				var coded *e.Error
-				if !errors.As(err, &coded) || coded.Code != tc.code {
-					t.Fatalf("want %s; got %v", tc.code, err)
+			requireAdmission := func(got Definition, err error) {
+				t.Helper()
+				if tc.code != "" {
+					var coded *e.Error
+					if !errors.As(err, &coded) || coded.Code != tc.code {
+						t.Fatalf("want %s; got %v", tc.code, err)
+					}
+					return
 				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				want, err := input.Digest()
+				if err != nil {
+					t.Fatal(err)
+				}
+				actual, err := got.Digest()
+				if err != nil || actual != want {
+					t.Fatalf("admission changed authored identity: %q %v", actual, err)
+				}
+			}
+			requireAdmission(LoadDefinition(t.Context(), path))
+			requireAdmission(DecodeDefinition(tc.raw))
+		})
+	}
+}
+
+func TestSyntaxErrorKeepsDecoderLine(t *testing.T) {
+	raw := []byte("apiVersion: nvkr.dev/definition/v5\nkind: Definition\nmetadata:\n  name: \"x\n  other: 1\noutputs: []\n")
+	_, err := DecodeDefinition(raw)
+	requireCode(t, err, e.CodeInvalidCatalog)
+	if !strings.Contains(err.Error(), "yaml: line 7:") {
+		t.Fatalf("DecodeDefinition error = %v, want the decoder's line 7", err)
+	}
+	_, err = DocumentKind(raw)
+	requireCode(t, err, e.CodeInvalidCatalog)
+	if !strings.Contains(err.Error(), "yaml: line 7:") {
+		t.Fatalf("DocumentKind error = %v, want the decoder's line 7", err)
+	}
+}
+
+func TestRequireSingleDocument(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		raw  string
+		code e.Code
+	}{
+		{"single YAML document", "a: 1\n", ""},
+		{"single JSON document", `{"a": 1}`, ""},
+		{"empty input", "", ""},
+		{"leading document marker", "---\na: 1\n", ""},
+		{"comment before document marker", "# header\n---\na: 1\n", ""},
+		{"document marker inside block scalar", "a: |\n  ---\n  b: 2\n", ""},
+		{"trailing comment", "a: 1\n# ---\n", ""},
+		{"document end marker and comment", "a: 1\n...\n# done\n", ""},
+		{"second valid document", "a: 1\n---\nb: 2\n", e.CodeInvalidCatalog},
+		{"second document after commented marker", "a: 1\n--- # second\nb: 2\n", e.CodeInvalidCatalog},
+		{"second invalid document", "a: 1\n---\n[unclosed\n", e.CodeInvalidCatalog},
+		{"empty second document", "a: 1\n---\n", e.CodeInvalidCatalog},
+		{"document after end marker", "a: 1\n...\n---\nb: 2\n", e.CodeInvalidCatalog},
+		{"content after document end marker", "a: 1\n...\nb: 2\n", e.CodeInvalidCatalog},
+		{"second JSON document", "{\"a\": 1}\n---\n{\"b\": 2}\n", e.CodeInvalidCatalog},
+		{"invalid first document", "[unclosed\n", e.CodeInvalidCatalog},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := requireSingleDocument([]byte(tc.raw), "test")
+			if tc.code != "" {
+				requireCode(t, err, tc.code)
 				return
 			}
 			if err != nil {
 				t.Fatal(err)
 			}
-			want, err := input.Digest()
-			if err != nil {
+		})
+	}
+}
+
+func TestEnvironmentAdmitsExactlyOneDocument(t *testing.T) {
+	input := Environment{APIVersion: EnvironmentAPIVersion, Kind: EnvironmentKind, Metadata: Metadata{Name: "fixture"}, UtilityContainer: "golang@sha256:" + strings.Repeat("a", 64), UtilityPlatform: "linux/amd64"}
+	raw, err := canonical.Marshal(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := input.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name string
+		raw  string
+		code e.Code
+	}{
+		{"exact document", string(raw), ""},
+		{"leading document marker", "---\n" + string(raw), ""},
+		{"trailing comment", string(raw) + "\n# ---\n", ""},
+		{"second valid document", string(raw) + "\n---\n" + string(raw), e.CodeInvalidCatalog},
+		{"second invalid document", string(raw) + "\n---\napiVersion: broken\nkind: DefinitelyNotADefinition\n", e.CodeInvalidCatalog},
+		{"empty second document", string(raw) + "\n---\n", e.CodeInvalidCatalog},
+		{"duplicate key", strings.Replace(string(raw), `"kind":`, `"kind":"`+EnvironmentKind+`","kind":`, 1), e.CodeInvalidCatalog},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "environment.yaml")
+			if err := os.WriteFile(path, []byte(tc.raw), 0o600); err != nil {
 				t.Fatal(err)
 			}
-			actual, err := got.Digest()
-			if err != nil || actual != want {
-				t.Fatalf("admission changed authored identity: %q %v", actual, err)
+			requireAdmission := func(got Environment, err error) {
+				t.Helper()
+				if tc.code != "" {
+					requireCode(t, err, tc.code)
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				if actual, err := got.Digest(); err != nil || actual != want {
+					t.Fatalf("admission changed authored identity: %q %v", actual, err)
+				}
 			}
+			requireAdmission(LoadEnvironment(t.Context(), path))
+			requireAdmission(DecodeEnvironment([]byte(tc.raw)))
 		})
 	}
 }

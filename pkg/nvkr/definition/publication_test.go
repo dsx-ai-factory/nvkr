@@ -12,7 +12,48 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/ociformat"
 )
+
+func TestPublicationOCIRepresentationAdmission(t *testing.T) {
+	base := publicationTestEnvironment()
+	baseDigest, err := base.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []ociformat.Representation{"", ociformat.ArtifactV1, ociformat.NVKRCompatibleV1, ociformat.HelmStandardV1, "unknown"} {
+		t.Run(string(value), func(t *testing.T) {
+			env := base.Clone()
+			env.Publication.OCIRepresentation = value
+			digest, err := env.Digest()
+			if value == "unknown" {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+					t.Fatalf("unknown representation was admitted: %v", err)
+				}
+			} else if err != nil || (value == "") != (digest == baseDigest) {
+				t.Fatalf("representation was not bound to authored identity: %s %v", digest, err)
+			}
+			raw, err := canonical.Marshal(env)
+			if err != nil {
+				t.Fatal(err)
+			}
+			path := filepath.Join(t.TempDir(), "environment.yaml")
+			if err := os.WriteFile(path, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			loaded, err := LoadEnvironment(t.Context(), path)
+			if value == "unknown" {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability || loaded.Publication != nil {
+					t.Fatalf("strict loader returned an unsupported representation: %v", err)
+				}
+			} else if err != nil || loaded.Publication.OCIRepresentation != value {
+				t.Fatalf("strict loader lost representation: %v", err)
+			}
+		})
+	}
+}
 
 func TestPublicationTransportAdmissionAndStrictLoading(t *testing.T) {
 	for _, tc := range []struct {

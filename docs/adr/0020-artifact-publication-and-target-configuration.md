@@ -366,6 +366,74 @@ digest, semantic digest, size, and optional platform. The registry tag is only a
 returns, and the consumer requires, `repository@sha256:<root-index-digest>`. Full-layout pull materializes and verifies the
 complete recursive closure before the destination becomes visible.
 
+`publication.ociRepresentation` is an explicit Environment-owned construction choice, admitted before
+artifact work and bound into Environment and Plan identity. Omission preserves existing construction
+and authored bytes. Explicit `artifact-v1` uses the same wrapper format while recording the additional
+authored choice. `nvkr-compatible-v1` opts into the following representation for newly constructed
+NVKR wrappers; unknown selections fail with `engine-capability` before staging or generation.
+
+| Content | Explicit compatible representation |
+|---|---|
+| Helm | Real Helm config and unchanged TGZ layer; omit the optional NVKR `artifactType` and retain logical type in a digest-bound annotation and publication membership |
+| Binary bundles | Existing binary config and files; change only the NVKR manifest/index representation |
+| Generic, Debian/APT and raw SBOM carriers | Exact payload bytes; truthful `application/vnd.nvkr.artifact.config.v1+json` for the exact `{}` config; logical type in checked annotations and membership |
+| Publication metadata | Existing canonical root JSON and schema; explicit selection in the digest-bound `dev.nvkr.oci.representation` root-index annotation; compatible root wrapper/index |
+| Signed SBOMs and cosign artifacts | Preserve the standard Sigstore bundle `artifactType`, empty config, subject and layer; the attestation owner constructs signed envelopes |
+| Native images/indexes, disks and imported/pinned manifests | Preserve exact bytes and their own format; no conversion or promise that the registry accepts every member |
+
+`helm-standard-v1` is a separate explicit construction profile for registries that accept the standard
+Helm chart format but reject unregistered NVKR artifact/config media types. It uses the same Helm config
+and unchanged chart layer as the compatible profile, omitting the chart manifest's `artifactType` and
+retaining its logical type in the checked annotation and publication membership. Raw evidence owned by
+a Helm output remains a separate subject-bound manifest: its canonical delivery-object binding config is
+carried as `application/octet-stream`, with no manifest `artifactType`. The metadata manifest uses the same
+opaque config media type for the unchanged canonical root record; its index records the explicit profile.
+Readers validate the selected config profile, logical type, canonical schema, exact payload and subject
+bindings. The raw evidence referrer type is the opaque config type, not a CycloneDX filter.
+
+This profile leaves other output families and imported manifests unchanged. Signed SBOM and Cosign
+envelopes retain their standard bundle `artifactType`, empty config and subject; registries must separately
+admit that standard signed format. A Helm-only unsigned compatibility test does not prove acceptance of a
+mixed or signed publication. Neither this option nor the compatible option changes omitted/default or
+explicit `artifact-v1` construction. Existing published artifact and release-root identities stay unchanged.
+Selecting the new profile before construction changes Environment/Plan identity and affected new wrapper,
+evidence-subject and root identities, while preserving chart archive bytes and logical Build identity.
+Existing pinned publications are never migrated; affected evidence must be generated and signed for the
+new subjects. Updated consumers are required for the new profile.
+
+The standard referrer type for a compatible raw SBOM wrapper follows its truthful config media type.
+Its NVKR logical-type annotation is not the standard `artifactType` filter: a client filtering exclusively
+for CycloneDX may not discover it. NVKR still checks exact manifest/document digests, subject and complete
+root membership. Compatible roots require an updated reader; old-layout support in that reader does not
+promise that older clients accept the compatible format. Signed-profile requirements remain mandatory.
+
+Construction derives affected descriptors, evidence subjects and root identities before signing or
+transport. Metadata export and attested completion preserve exact inspected bootstrap bytes and selected
+intent; reading an old representation does not migrate it. Full declared membership remains mandatory.
+Structured refusals follow [ADR-03](0003-coded-error-and-exit-code-contract.md#2-retryable-vs-input-classification).
+Neither a vendor name, a successful `/v2/` response nor an ambiguous manifest rejection selects a format.
+No error, capability observation or unknown result authorizes field removal, a weaker policy or retry with
+different identified bytes. A different representation requires a deliberate construction transaction.
+
+Generic registry diagnostics are owned by delivery, independent of vendor names and format construction.
+A read-only base check reuses the existing pinned ORAS authentication client and registry credential owner.
+Publication passively observes its existing pinned registry client's normal requests without adding probes,
+reading/replacing bodies, changing retry policy or retaining secrets and raw URLs. Operation-local reports
+distinguish the observed Distribution V2 API family and recognized optional `registry/2.0` advertisement
+from an unknown exact OCI Distribution specification version. Authentication challenges, denials, proxy
+responses and absent endpoints are observations, never evidence that a particular older protocol is supported.
+Upload and referrer responses are reported separately; base reachability never establishes push permission
+or custom artifact acceptance. No vendor-version inference or global capability cache is used.
+
+Failures carry the exact typed response's request stage where available, sanitized status/codes and a next
+action for credentials/permissions, endpoint/proxy routing, unsupported operations, manifest policy/media,
+integrity or transient connection failures. Evidence attachment failure cannot authorize unsigned fallback.
+The internal diagnostic CLI is a presentation adapter over delivery and issues no test upload or deletion.
+Read-only network checks have a 15-second deadline; ambient helper behavior remains with its existing owner.
+Publication retains caller deadlines; otherwise full-layout and disk pushes use a 30-minute deadline,
+and metadata-root publication uses a 20-minute deadline. Observations neither mint authority nor
+alter a frozen Plan, selected representation, exact signed bytes, imported manifests or required membership.
+
 The config uses `nvkr.dev/publication-root/v4` and `application/vnd.nvkr.publication-root.config.v4+json`.
 Its release metadata binds the exact Definition, Environment, compiled Plan and release-content identities.
 Its output bindings carry Build Digest and exact named output membership; deployment cluster metadata is
@@ -504,6 +572,8 @@ verification record. Resolution and closure retrieval use the same admitted cred
 NVIDIA's hosted workflow publishes signed artifact bytes to its configured OCI registry. ADR-04 owns keyless
 signature/attestation storage and ADR-16 owns evidence tiers and full release acceptance. The compiler generates
 one release index from named outputs; normal authors do not wire payload → root → route.
+Proposed ADR-31's qualification results index is not artifact publication: it writes unsigned descriptions of
+qualification attempts, never artifact bytes, to a separate object store whose target is not part of `publication`.
 
 GitHub-hosted GHCR publication admits the exact destination packages before payload upload. The target
 package and all output/evidence sibling packages must have API-confirmed private/internal visibility and
@@ -675,7 +745,17 @@ schemas and memberships across the complete release metadata and evidence closur
 reading artifact payload layers. Its detached description joins exact sibling output and evidence references,
 all output memberships, Build/component subjects and evidence stage/subject bindings. Locators are explicitly
 labeled as derived from the supplied root reference; the detached view does not establish registry availability.
-Registry acquisition fetches each sibling manifest, config and bounded evidence document. For aggregate
+Registry acquisition fetches sibling manifests, configs and bounded evidence documents with at most 16
+concurrent member workers. First failure cancels and joins all workers before staging cleanup; synchronized
+byte accounting retains the per-object and 512 MiB total acquisition bounds. Index/layout bytes remain
+deterministic. Bounded control-document reads hash an owned memory snapshot; payload capabilities
+still use sealed descriptors. Repeated metadata checks within one visit may reuse these verified bytes
+in a private, capped 32 MiB memo, discarded between visits and before refetching a rejected cache entry.
+A root-digest-keyed, expendable metadata cache rechecks each blob and the complete closure
+before reuse, never caching signature or consumer-policy acceptance. A checked stage and per-root kernel
+lock prevent partial cache publication; corrupt entries are refetched. Cache loss after a crash is a miss,
+not a durable authority transition. Optional acquisition progress is descriptive and provisional: loading
+entries and counts cannot assert completeness, even when all downloads have finished. For aggregate
 images it also fetches the exact finite native child manifests/configs bound by the index and release metadata,
 never their layers. Child platform, digest and size substitutions fail before a metadata view is returned. Local inspection
 accepts complete or metadata-only layouts and does not probe the supplied registry namespace. Executable,
@@ -727,7 +807,8 @@ its policy. Full release verification retains its existing payload and policy ch
 remain Run artifacts and are not converted into a publication by this export interface.
 
 Each required SBOM is embedded once as a CycloneDX predicate in a signed in-toto statement inside a standard
-Sigstore v0.3 bundle. An empty-config OCI referrer manifest carries that bundle in the owning output repository;
+Sigstore v0.3 bundle. Its standard OCI referrer manifest retains the bundle `artifactType`, exact `{}`
+config under OCI's empty-config media type, subject and bundle layer in the owning output repository;
 no raw SBOM copy is published. Its OCI subject is the associated deliverable manifest, while the statement
 subject remains the exact inventoried binary, native image manifest, or source/final archive. Shared evidence
 belongs to the first sorted output membership's repository. Membership binds the exact subject, stage,

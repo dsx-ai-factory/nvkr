@@ -61,7 +61,7 @@ func TestExitCodeContract(t *testing.T) {
 			return "build/verify/trust/disk"
 		case status >= 30 && status <= 31:
 			return "retryable"
-		case status >= 40 && status <= 54:
+		case status >= 40 && status <= 56:
 			return "release/lifecycle"
 		default:
 			return "OUT-OF-BAND"
@@ -91,6 +91,7 @@ func TestExitCodeContract(t *testing.T) {
 		CodeWithdrawn: "release/lifecycle", CodeUnpinnedInput: "release/lifecycle",
 		CodeMirrorMismatch: "release/lifecycle", CodePipelineDrift: "release/lifecycle",
 		CodePinSetMismatch: "release/lifecycle", CodeStatusCheckpoint: "release/lifecycle", CodeWriteConflict: "release/lifecycle",
+		CodeRegistryAuthFailed: "release/lifecycle", CodeRegistryRejected: "release/lifecycle",
 	}
 	for c, status := range exitCodes {
 		got := band(status)
@@ -112,6 +113,8 @@ func TestExitCode(t *testing.T) {
 		{"nil", nil, 0},
 		{"coded", New(CodeNoMatch, "x"), 10},
 		{"wrapped-coded", fmt.Errorf("outer: %w", New(CodeVerifyFailed, "y")), 22},
+		{"registry-auth", New(CodeRegistryAuthFailed, "denied"), 55},
+		{"registry-rejected", New(CodeRegistryRejected, "manifest rejected"), 56},
 		{"plain", stderrors.New("boom"), 1},
 		{"unmapped-code", &Error{Code: "NVKR-E-NOPE", Msg: "z"}, 1},
 	}
@@ -133,6 +136,8 @@ func TestRetryable(t *testing.T) {
 		{"timeout", New(CodeTimeout, "deadline"), true},
 		{"wrapped-timeout", fmt.Errorf("outer: %w", New(CodeTimeout, "deadline")), true},
 		{"build-failed", New(CodeBuildFailed, "nonzero"), false},
+		{"registry-auth", New(CodeRegistryAuthFailed, "denied"), false},
+		{"registry-rejected", New(CodeRegistryRejected, "manifest rejected"), false},
 		{"plain", stderrors.New("boom"), false},
 	}
 	for _, tc := range cases {

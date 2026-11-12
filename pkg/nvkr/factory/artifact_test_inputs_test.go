@@ -31,7 +31,10 @@ func cliTestPlan(t *testing.T, arch, mode string, outputs int) *Plan {
 	if mode == "empty-version" {
 		component.VersionStamp["NKECTL_VERSION"] = ""
 	}
-	image := "nvkr-toolchain-cli@sha256:" + strings.Repeat("a", 64)
+	image := "source.example/cli@sha256:" + strings.Repeat("a", 64)
+	if mode == "local-image" {
+		image = "sha256:" + strings.Repeat("a", 64)
+	}
 	component.ToolchainImage = image
 	if mode == "map" || mode == "precedence" || mode == "fallback" {
 		component.ToolchainImages = map[string]string{arch: image}
@@ -66,6 +69,7 @@ func cliTestPlan(t *testing.T, arch, mode string, outputs int) *Plan {
 	}
 	base.Components["nvkectl"] = component
 	definition, environment := fixtureInputs("cli-test", "renamed-cli", DefaultRunsOn)
+	environment.ToolchainAccess.PublicRoots = append(environment.ToolchainAccess.PublicRoots, "mirror.example/tools", "source.example/cli")
 	definition.Outputs[0].Components = []string{"nvkectl"}
 	definition.Outputs[0].Platform = "linux/" + arch
 	if mode == "image" {
@@ -80,7 +84,7 @@ func cliTestPlan(t *testing.T, arch, mode string, outputs int) *Plan {
 		definition.Outputs = append([]authored.DefinitionOutput{other}, definition.Outputs...)
 	}
 	if mode == "relocated" {
-		environment.Runtime.ToolchainRegistry = "mirror.example/tools"
+		environment.Runtime.ImageLocations = map[string]string{"source.example/cli": "mirror.example/tools/cli"}
 	}
 	stack, err := catalog.ApplyStack(base)
 	if err != nil {
@@ -108,16 +112,19 @@ func writeCLIPlan(t *testing.T, plan *Plan) string {
 
 func TestCLIArtifactTestToolchains(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
-		for _, mode := range []string{"scalar", "map", "precedence", "fallback", "relocated"} {
+		for _, mode := range []string{"scalar", "map", "precedence", "fallback", "relocated", "local-image"} {
 			t.Run(arch+"/"+mode, func(t *testing.T) {
 				plan := cliTestPlan(t, arch, mode, 1)
 				inputs, err := LoadCLIArtifactTestInputs(t.Context(), writeCLIPlan(t, plan), "")
 				if err != nil {
 					t.Fatal(err)
 				}
-				want := "nvkr-toolchain-cli@sha256:" + strings.Repeat("a", 64)
+				want := "source.example/cli@sha256:" + strings.Repeat("a", 64)
 				if mode == "relocated" {
-					want = "mirror.example/tools/" + want
+					want = "mirror.example/tools/cli@sha256:" + strings.Repeat("a", 64)
+				}
+				if mode == "local-image" {
+					want = "sha256:" + strings.Repeat("a", 64)
 				}
 				if inputs.ToolchainImage != want || inputs.Platform != "linux/"+arch || inputs.Output != "renamed-cli" || inputs.ExpectedVersion != "v1" {
 					t.Fatalf("unexpected inputs: %+v", inputs)

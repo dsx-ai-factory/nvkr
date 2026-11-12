@@ -72,7 +72,7 @@ func TestGitHubRunSummariesHaveTwoOwners(t *testing.T) {
 						}
 						uploadIndex := index - 1
 						if githubQualificationHandoffEnabled(plan) {
-							wantHandoff := githubQualificationHandoffStep(githubActionRefs{Upload: plan.Actions["upload-artifact"].Uses()})
+							wantHandoff := githubQualificationHandoffStep(plan, githubActionRefs{Upload: plan.Actions["upload-artifact"].Uses()})
 							if uploadIndex < 0 || !reflect.DeepEqual(job.Steps[uploadIndex], wantHandoff) {
 								t.Fatal("closing summary does not follow the exact successful-attempt handoff upload")
 							}

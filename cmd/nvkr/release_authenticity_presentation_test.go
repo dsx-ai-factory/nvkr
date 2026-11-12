@@ -46,16 +46,17 @@ func TestReleaseAuthenticityTUIKeepsNarrowResultAndOwnerCode(t *testing.T) {
 			reporting := e.New(e.CodeUnavailable, "renderer failure")
 			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(_ context.Context, opts runpresenter.Options, source runSnapshotSource, work func(context.Context) error) runpresenter.Result {
 				shows++
-				if calls != 1 || work != nil || opts.Live {
-					t.Fatal("result viewer repeated or retained owner work")
+				if calls != 0 || work == nil || !opts.Live || !opts.StayOpen || source.Snapshot().Status != "loading" {
+					t.Fatal("live viewer did not precede authentication")
 				}
+				workErr := work(t.Context())
 				snapshot := source.Snapshot()
 				assertReleasePresentationSafe(t, snapshot)
 				if owner != nil {
 					if snapshot.Status != "failed" || snapshot.FailureCode != string(code) || len(snapshot.Items) != 0 {
 						t.Fatal("owner failure became an authenticated result")
 					}
-					return runpresenter.Result{PresentationErr: reporting}
+					return runpresenter.Result{WorkErr: workErr, PresentationErr: reporting}
 				}
 				if snapshot.Status != "complete" || !strings.Contains(snapshot.Note, "payload integrity was not checked") ||
 					len(snapshot.Items) != 1 || snapshot.Items[0].State != "authenticated" {

@@ -428,7 +428,8 @@ func TestNativePlatformValidatorNamesUnsupportedRunner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	workflow := bytes.ReplaceAll(bundle.Files[GitHubWorkflowPath], []byte("runs-on: 'ubuntu-24.04'"), []byte("runs-on: 'unknown-runner'"))
+	// Mutate the bootstrap runner without also changing the preflight job.
+	workflow := bytes.Replace(bundle.Files[GitHubWorkflowPath], []byte("runs-on: 'ubuntu-24.04'"), []byte("runs-on: 'unknown-runner'"), 1)
 	if bytes.Equal(workflow, bundle.Files[GitHubWorkflowPath]) {
 		t.Fatal("fixture did not replace any runner")
 	}

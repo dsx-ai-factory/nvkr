@@ -43,13 +43,13 @@ func pushRegistryDisk(ctx context.Context, root string, object PublishedObject, 
 		if local := owner.failure(); local != nil {
 			return local
 		}
-		return classifyContext(ctx, e.Wrap(e.CodeUnavailable, err, "publishing disk deliverable %q", object.Name))
+		return registryPublishError(ctx, err, "publishing disk deliverable %q", object.Name)
 	}
 	// Registry deduplication may skip every Compressed call, including when the
 	// entire manifest already exists. Rehash the held source regardless before
 	// this output can advance the release-root publication.
 	if _, err := ResolveDigest(ctx, ref.Name(), options); err != nil {
-		return err
+		return registryReadbackError(ctx, err, "reading back disk deliverable %q", object.Name)
 	}
 	return owner.verify()
 }

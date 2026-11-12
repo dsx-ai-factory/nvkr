@@ -30,6 +30,11 @@ import (
 // not stand for native CWE production, signed SBOMs or authenticated release use.
 func registryImageIndexFixture(t *testing.T) (string, Result, ImageIndexDescription) {
 	t.Helper()
+	return registryImageIndexWithRepresentation(t, "")
+}
+
+func registryImageIndexWithRepresentation(t *testing.T, representation OCIRepresentation) (string, Result, ImageIndexDescription) {
+	t.Helper()
 	index := assembledImageIndex(t, imageIndexInputs(t))
 	description, err := index.Description()
 	if err != nil {
@@ -87,7 +92,8 @@ func registryImageIndexFixture(t *testing.T) (string, Result, ImageIndexDescript
 	}
 	out := filepath.Join(t.TempDir(), "publication")
 	result, err := BuildPublicationRoot(t.Context(), out, PublicationRequest{
-		Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, PlanDigest: build, ContentSubject: content}, Objects: objects,
+		OCIRepresentation: representation,
+		Release:           &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, PlanDigest: build, ContentSubject: content}, Objects: objects,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -96,7 +102,16 @@ func registryImageIndexFixture(t *testing.T) (string, Result, ImageIndexDescript
 }
 
 func TestRegistryImageIndexRoundTripPreservesEveryChild(t *testing.T) {
-	publication, result, expected := registryImageIndexFixture(t)
+	for _, representation := range []OCIRepresentation{"", OCINVKRCompatibleV1} {
+		t.Run(string(representation), func(t *testing.T) {
+			registryImageIndexRoundTrip(t, representation)
+		})
+	}
+}
+
+func registryImageIndexRoundTrip(t *testing.T, representation OCIRepresentation) {
+	t.Helper()
+	publication, result, expected := registryImageIndexWithRepresentation(t, representation)
 	handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
 	var mu sync.Mutex
 	var writes []string
@@ -198,7 +213,14 @@ func TestRegistryImageIndexRoundTripPreservesEveryChild(t *testing.T) {
 		t.Fatalf("referrer fallback has unexpected membership: %+v", attachments)
 	}
 	for _, descriptor := range attachments.Manifests {
-		if !expectedEvidence[descriptor.Digest.String()] || descriptor.ArtifactType != "application/vnd.cyclonedx+json" {
+		wantType := "application/vnd.cyclonedx+json"
+		if representation == OCINVKRCompatibleV1 {
+			wantType = MediaArtifactConfig
+			if descriptor.Annotations[artifactTypeAnnotation] != "application/vnd.cyclonedx+json" {
+				t.Fatalf("compatible referrer lost its logical type: %+v", descriptor)
+			}
+		}
+		if !expectedEvidence[descriptor.Digest.String()] || descriptor.ArtifactType != wantType {
 			t.Fatalf("referrer fallback does not exclusively contain exact SBOM attachments: %+v", descriptor)
 		}
 	}

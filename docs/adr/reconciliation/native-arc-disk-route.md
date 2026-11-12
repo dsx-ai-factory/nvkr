@@ -1,7 +1,8 @@
 ## Native ARC disk route
 The single checked-in `nvkr-run.yml` selects the 69-output M2 Definition and its main-only publication
 Environment, including plain and public-bootstrap FDE disks on both native architectures. The Makefile drift
-gate repeats the exact Definition and Environment paths recorded in the committed Plan. Dispatch does not
+gate uses the authored maintained generation inventory, whose Definition and Environment paths are
+contract-checked against the committed Plans. Dispatch does not
 choose among Definitions. Alternate selections can be generated into a scratch root with their matching
 byte-exact check. The standalone `codex/fde-image-pipeline` branch used the separate one-output FDE Definition
 and build-only Environment for the recorded diagnostic below. Neither candidate selection is a ratified
@@ -87,8 +88,8 @@ that cancelled test; dispatch and signer policy select `main` only again.
 The external policy read-back retained `codex/m2-arc-validation` and `main` for `nkd-arc`, and
 `codex/m2-arc-validation`, `feat/nke-deploy-pipeline` and `main` for `nkd-release`; it did not admit the exact
 PR #97 branch. Removing an authored exception neither changes those provider policies nor bypasses them.
-The existing provider secret is `NKE_SOURCE_TOKEN`; the rename retains that exact
-credential reference, not an unprovisioned `NVKE_SOURCE_TOKEN`. Dedicated reader-account package access, native pool capacity and successful exact-head
+NVKE and OVN source repositories are public; maintained Environments select anonymous source access.
+Dedicated reader-account package access, native pool capacity and successful exact-head
 execution remain external acceptance requirements.
 
 The GPU site production [Run 42116623552](https://github.com/dsx-ai-factory/nvkr/actions/runs/42116623552)
@@ -111,6 +112,16 @@ pulls; they are not registry visibility evidence. Private reader grants, success
 native execution still require external evidence. Existing native Environments must declare all selected
 execution image roots before regeneration; undeclared roots fail closed.
 
+The image-use admission inventory now covers all GitHub producer bundles, including ordinary hosted
+Plans, vendor-only and utility-only consumers, inspector images, startup containers and services.
+Private startup and ordinary hosted routes remain refused. The maintained generation selection is authored
+once and checked against discovered Plans/manifests; the access contract derives expected subjects from
+producer IR and utility fields and checks expanded workers and composites. Exact source/location bindings
+replace basename-based relocation, preserving content digests and Build identity. Local/native routes are
+descriptive inventory entries, not runtime receipts; their preparation and runtime observation follow-ups
+remain separate. Standalone CLI diagnostic selection shares anonymous access admission. These are
+implementation/contract changes only; this change records no live registry, runner or production acceptance.
+
 Declared-access Plans now emit bounded exact-manifest/config reader preflight after final runtime
 Plan delivery, on each selected hosted or ARC placement, before producer fan-out. Completion-scheduled
 verification retains a separate reader-success gate. Local registry fixtures cover authentication,
@@ -122,3 +133,11 @@ projected execution images and strict inspectors; complete cross-owner inventory
 in [issue 426](https://github.com/dsx-ai-factory/nvkr/issues/426). No fresh-runner reader exercise for this
 preflight implementation is recorded for hosted AMD64, hosted ARM64, ARC AMD64 or ARC ARM64; production
 grants and connectivity on each class remain unverified.
+
+Native toolchain publication staleness is contract-tested against real Git fixtures:
+unrelated package edits remain admissible, while inspector dependencies on either Linux
+architecture, embedded assets, checkout attributes, added/removed imports, Go pins, image sources and the
+preparation script remain guarded. Both preparation and current committed snapshots
+contribute dependency directories. Missing commits, unresolved Go packages and archive
+transformations fail closed. This is a source-input admission contract, not a new
+native image build, publication or independent-reader exercise.

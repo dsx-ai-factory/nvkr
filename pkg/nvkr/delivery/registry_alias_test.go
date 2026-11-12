@@ -381,7 +381,7 @@ func TestImageTagsDoNotAdvanceAfterAnyClosureReadbackFailure(t *testing.T) {
 }
 
 func TestImageTagMutationFailuresPreserveRetryContract(t *testing.T) {
-	for _, mode := range []string{"head transient", "immutable", "put uncertain", "put canceled", "readback missing", "readback corrupt"} {
+	for _, mode := range []string{"head transient", "immutable", "unauthorized", "forbidden", "denied", "put uncertain", "put canceled", "readback missing", "readback corrupt", "readback canceled"} {
 		t.Run(mode, func(t *testing.T) {
 			publication, result, index := registryImageIndexFixture(t)
 			handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
@@ -401,6 +401,19 @@ func TestImageTagMutationFailuresPreserveRetryContract(t *testing.T) {
 						return
 					}
 					if r.Method == http.MethodPut {
+						if mode == "unauthorized" || mode == "forbidden" || mode == "denied" {
+							status := http.StatusBadRequest
+							if mode == "unauthorized" {
+								status = http.StatusUnauthorized
+							}
+							if mode == "forbidden" {
+								status = http.StatusForbidden
+							}
+							w.Header().Set("Content-Type", "application/json")
+							w.WriteHeader(status)
+							_, _ = io.WriteString(w, `{"errors":[{"code":"DENIED","message":"PRIVATE_SENTINEL"}]}`)
+							return
+						}
 						if mode == "immutable" {
 							w.WriteHeader(http.StatusConflict)
 							return
@@ -416,6 +429,11 @@ func TestImageTagMutationFailuresPreserveRetryContract(t *testing.T) {
 						}
 					}
 					if r.Method == http.MethodGet && writes.Load() > 0 {
+						if mode == "readback canceled" {
+							cancel()
+							w.WriteHeader(http.StatusServiceUnavailable)
+							return
+						}
 						if mode == "readback missing" {
 							http.NotFound(w, r)
 							return
@@ -446,13 +464,26 @@ func TestImageTagMutationFailuresPreserveRetryContract(t *testing.T) {
 			if mode == "immutable" {
 				want = e.CodeInvalidCatalog
 			}
-			if mode == "put canceled" {
+			if mode == "put canceled" || mode == "readback canceled" {
 				want = e.CodeTimeout
+			}
+			authRefusal := mode == "unauthorized" || mode == "forbidden" || mode == "denied"
+			if authRefusal {
+				want = e.CodeRegistryAuthFailed
 			}
 			if mode == "readback corrupt" {
 				want = e.CodeVerifyFailed
 			}
 			assertRegistryCode(t, err, want)
+			if strings.Contains(err.Error(), "PRIVATE_SENTINEL") || strings.Contains(err.Error(), server.URL+"/v2/") {
+				t.Fatalf("alias failure disclosed untrusted response text or request URL: %v", err)
+			}
+			if want == e.CodeTimeout && !strings.Contains(err.Error(), "reconcile partial uploads") {
+				t.Fatalf("alias timeout lost recovery guidance: %v", err)
+			}
+			if mode == "readback missing" && strings.Count(err.Error(), "publication readback is incomplete") != 1 {
+				t.Fatalf("readback guidance was duplicated or lost: %v", err)
+			}
 			if ref != "" {
 				t.Fatal("failed alias write returned successful reference")
 			}
@@ -476,7 +507,7 @@ func TestImageTagMutationFailuresPreserveRetryContract(t *testing.T) {
 				t.Fatal(err)
 			}
 			expected := index.Digest
-			if mode == "head transient" || mode == "immutable" {
+			if mode == "head transient" || mode == "immutable" || authRefusal {
 				expected = digestBytes(oldRaw)
 			}
 			if got.Digest.String() != expected {
@@ -484,7 +515,7 @@ func TestImageTagMutationFailuresPreserveRetryContract(t *testing.T) {
 			}
 			before := writes.Load()
 			// Once the registry is readable again, the exact accepted tag is a no-op.
-			if mode != "immutable" && mode != "head transient" {
+			if mode != "immutable" && mode != "head transient" && !authRefusal {
 				if _, err := PushWithOptions(t.Context(), publication, repository, options); err != nil {
 					t.Fatal(err)
 				}

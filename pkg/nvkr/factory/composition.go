@@ -60,11 +60,11 @@ func admitDefinitionForm(environment authored.Environment, record *CompositionRe
 }
 
 // admitCompositeEnvironment refuses execution modes ADR-26 does not admit for
-// composites before any catalog work. Runtime Plans recompile from a plain
-// Definition file at dispatch and do not carry a composition record.
+// composites before any catalog work. Only the captured multi-source runtime
+// route preserves composition and exact-input qualification replay.
 func admitCompositeEnvironment(environment authored.Environment) error {
-	if environment.GitHubRuntimePlan {
-		return e.New(e.CodeEngineCapability, "githubRuntimePlan does not support composite Definitions")
+	if environment.GitHubRuntimePlan && len(environment.GitHubRuntimeSources) == 0 {
+		return e.New(e.CodeEngineCapability, "composite runtime Plans require githubRuntimeSources")
 	}
 	return nil
 }

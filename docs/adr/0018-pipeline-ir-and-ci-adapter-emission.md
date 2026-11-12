@@ -357,10 +357,18 @@ disk producer's full material closure.
 Environment `toolchainAccess` declares transport access separately from publication. Its sorted
 `privateRoots` and `publicRoots` contain explicit registry/repository paths, with no overlap or trailing
 slash; at most 128 roots are admitted. Each root matches its repository and path-component descendants.
-Every digest-pinned execution image selected by a native ARC Plan, including source preparation on
-hosted runners and selected strict disk inspection, must match exactly one class. Unclassified images
+Every digest-pinned execution image selected by a GitHub Plan, including producer and vendor images,
+utility operations, strict disk inspection, startup containers and services, must match exactly one class.
+The owning inventory derives consumers from producer IR and utility instructions before renderer job
+grouping. Local image IDs and native bundle digests are separate sources, never registry references.
+Standalone CLI diagnostics classify their selected registry image through the same classifier and require
+an anonymous route, or retain a measured local image ID; private diagnostic materialization is deferred. Unclassified images
 fail generation and helper admission with a coded capability error before output or pulls. Public roots
 select anonymous pulls; they do not prove registry visibility. Private roots currently admit only GHCR.
+Ordinary in-process operation helpers keep shared capability checks but select local image semantics unless the
+Environment declares an explicit hosted route. Local IDs remain local; registry consumers still require
+classification. The inventory supplies route descriptions, never proof of local image availability.
+Runtime admission below owns the process-local prepared-image receipt.
 
 The optional `reader` declares one `credentialRef: github:SECRET_NAME` and
 `usernameRef: github:VARIABLE_NAME` for the private roots. A selected private root requires this reader
@@ -373,16 +381,32 @@ account variable; foreign owners and lookalike paths outside the declared roots 
 Maintained Environments declare `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains` and the independent
 `NVKR_REGISTRY_READ` / `NVKR_REGISTRY_READ_USER` references. Adding an output namespace requires no
 code allowlist or security-test enrollment. The access declaration changes Environment/Plan identity,
-not logical Build identity; existing native Environments must declare their complete selected image roots
-before regeneration. General private registry support remains deferred.
+not logical Build identity; existing GitHub Environments, including ordinary hosted configurations, must
+declare their complete selected image roots before regeneration. Private startup containers/services and
+private ordinary hosted execution remain refused before output. General private registry support remains deferred.
+
+Environment `runtime.imageLocations` maps exact source repositories to explicit registry repositories for
+build and vendor consumers, retaining each immutable content digest. The reserved `mirror.invalid/<key>`
+source requires a binding; missing keys fail compilation. Legacy bare `nvkr-toolchain-*` sources also require
+an explicit binding, and `runtime.toolchainRegistry` is refused with migration guidance. Neither a basename
+nor publication namespace selects relocation. Measured local IDs and native bundle digests bypass registry
+relocation. The authored maintained generation inventory is checked against discovered committed Plans and
+manifests; new maintained bundles must join that same access and per-job preparation contract.
 The entry workflow binds both values as explicit composite inputs; composite metadata does not evaluate
 caller-only `vars` or `secrets` contexts. Calls without image preparation omit both inputs, whose empty
 defaults are admitted only with the absent image role. The helper admits the complete Plan,
 native platform and disk host requirements before pulling; it uses a private temporary Docker
 configuration and deletes it on success or failure before source or producer execution.
-Held runtime observation accepts an already-local exact repository digest, rejects a present
-but mismatched record, and pulls only after a failed local lookup. Image/platform/tool-byte
-admission remains required. No registry credential is forwarded into producer containers.
+One pipeline-owned image admission path accepts an already-local exact repository subject and checks
+its platform and local config ID. The config ID and registry manifest digest remain distinct. Only an
+explicit anonymous route can pull after a failed local lookup, within a ten-minute admission bound.
+Private and measured-local consumers never pull: an unavailable private image requires a new invocation
+of the separately credential-bearing preparation step. Present mismatched or ambiguous metadata fails
+without retry. A process-local prepared-image receipt binds subject, platform, config ID and observed
+runtime identity; it grants neither qualification nor provider authority. Factory utility and ordinary
+producer launches reauthenticate locally through this owner and use `--pull=never`. Held source and
+qualified observers retain their held executable/daemon authentication while using the same image
+admission logic. No registry credential is forwarded into producer containers.
 The package owner grants the reader account access without granting the source repository Actions access.
 
 For Plans with declared toolchain access, generated support jobs observe exact image manifests after
@@ -458,7 +482,8 @@ proof, nor a measurement of remaining provider-job time. Near the ceiling, slow 
 carrier transfers can exhaust the shared reserves; fifteen minutes is an allowance, not evidence that those
 transfers fit. Runner capacity and transfer headroom require separate operational evidence.
 On failure the sealed Packer sink can emit one exact diagnostic-route description. The generated job uploads
-only that bounded route, with one-day retention and a five-minute upload limit; early admission or failed
+only that bounded route, with one-day retention (14 days for the dispatch-frozen multi-source lane)
+and a five-minute upload limit; early admission or failed
 sealing emits no route. Diagnostic transport grants no artifact, receipt or release authority.
 Current availability is not a capacity reservation. The local runtime observations
 remain unqualified descriptions; the complete hosted finalizer, signing and consumer checks own the production claim.
@@ -496,8 +521,9 @@ platform route. Each configured native job checks its realized kernel OS/archite
 helper use. Bootstrap builds a separate static Linux helper with explicit `GOOS`/`GOARCH` for each route;
 transport pairs each job with that route's helper. The execution entrypoint checks its own native helper
 platform against the exact Plan before work. Before build execution, the pipeline owner checks the
-actual Docker/Podman daemon platform, pulls the pinned toolchain for the selected platform, and verifies its
-reported image platform and manifest identity. Failed platform-admission pulls capture at most 1 MiB of
+actual Docker/Podman daemon platform and admits the selected image through the shared local-first
+owner and its explicit materialization route. It verifies image platform, manifest subject and local
+config identity. Failed platform-admission pulls capture at most 1 MiB of
 stderr and report only a fixed diagnostic category; raw registry messages, URLs and credentials are not
 included. Overflow and unrecognized responses remain distinct diagnostic categories. Cancellation takes
 precedence, and classification does not retry a pull or relax admission. Held source vendoring separately checks its daemon against
@@ -1120,7 +1146,10 @@ Development and production have separate generated layouts and concurrency group
 development cancels superseded same-branch Runs and retains helpers/carriers for one day. Signed development,
 like production, is non-canceling and retains helpers/carriers for seven days to cover native disk budgets.
 Final Run records and production qualification handoffs retain seven days and disk diagnostics one day.
-The production qualifier's unsigned qualification outcome (ADR-17 §4) also retains seven days. It is uploaded
+The dispatch-frozen multi-source candidate retains every generated upload for 14 days, including
+helpers, carriers, runtime inputs, Run records, qualification handoffs, outcomes and diagnostics;
+existing production and development retention remains unchanged. The production qualifier's
+unsigned qualification outcome (ADR-17 §4) otherwise retains seven days. It is uploaded
 as `nvkr-qualification-outcome-<run>-<attempt>` for any result except a canceled job (`!cancelled()`), and
 the job output `outcome-written` reports whether the command wrote it. The upload is best effort and never
 fails the job. In a public repository anyone who can read the repository can download the artifact while it
@@ -1401,6 +1430,43 @@ changes frozen Plan data, not the authored catalog files or workflow between sou
 The committed baseline is generation input, not an executable source selection. Ordinary
 input capture and qualification handoff have no replay contract for this lane and reject it;
 published artifact authentication remains separate from downstream runtime acceptance.
+
+Alternatively, `githubRuntimeSources` declares a sorted, unique allowlist of at most
+16 canonical GitHub repositories, each selecting `refs/heads/main`. It is mutually
+exclusive with the single-source dispatch-input policy. The first trusted bootstrap
+admits the complete committed bundle and all selected producers before fetching each
+allowed main ref once. Catalog owns the resulting commit, tree and source timestamp
+and applies exact-source overlays across every matching source-built producer. Commands,
+intentional variants, toolchains, patches and independent acquisitions retain their
+reviewed contracts. Every allowed repository must match a selected source producer.
+
+The frozen Plan binds a compile-input snapshot containing the original member,
+Definition, Environment, catalog, overlay and patch bytes plus the sorted resolution
+record. The existing three-file runtime transport carries that Plan to every partition.
+Additional native bootstraps check the restored inputs, never resolve main. Coordinator
+retries restore the original same-Run runtime-input artifact before generation and do
+not replace it. Missing or expired input transport fails closed; a new dispatch is a new
+selection. Finalization and complete-composite qualification recompile the snapshot,
+authenticate its exact Git commits and metadata, and compare the entire Plan identity.
+Replay does not prove current-main membership and is not bounded by main's later ancestry.
+The trusted producer invocation authenticates the original observation; a caller's
+resolution record alone grants no main-membership or publication authority.
+
+Replay still requires exact upstream source and independently pinned material availability.
+Operators must retain those objects, through authenticated mirrors where necessary, for
+at least the candidate's 14-day retention window. Missing objects fail without selecting replacements.
+The captured snapshot is an input identity and replay recipe, not an offline source archive
+or proof of exact-byte reproduction. Workflow/action bytes, scheduling, input paths and
+Environment identity remain fixed under the runtime-generation check.
+
+The maintained GPU-site floating candidate selects NVKE, OVN Kubernetes, CAPNICO and
+NVIDIA AICR main in this lane, publishes only below
+`ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site`, and has an independent qualifier/smoke
+policy. Its production GPU-site sibling retains its existing pins and namespace.
+The generated producer is manual-only; this decision adds no scheduled dispatch.
+Complete artifact qualification remains `pipeline-attested`, not GPU deployment acceptance
+or the `qualified` evidence lane. Provider configuration and hosted execution evidence
+remain separate requirements.
 
 Native preflight and pinned checkout remain explicit steps in their entry-workflow execution job.
 Operator-authored environment setup, timed producer execution and steps whose outcomes or outputs are

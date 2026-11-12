@@ -33,10 +33,11 @@ verification.
 
 [ADR-27](../0027-pinned-tool-producers.md) proposes pinned-tool producers: catalog components that run one released,
 digest-pinned executable offline in a pinned container, with no shell, a fixed argument vector and typed material
-inputs, emitting one file or a producer-written OCI layout. Units T1–T5 and T7 are implemented and
-contract-tested; selecting an `oci-layout` producer fails closed until the separately drafted layout import (#285)
-lands and T6 joins it. Beyond unrecorded local Docker runs of the AICR v1.2.0-rc1 recipe and Flux bundle
-producers, no recorded Run, hosted Run or consumer verification exercises a pinned-tool producer. AICR v1.2.0-rc1 ships the local OCI layout output (NVIDIA/aicr#3538) that AICR
+inputs, emitting one file or a producer-written OCI layout. Units T1–T7 include the
+layout-import handoff for one root with its complete explicit regular-file material closure. The AICR-specific
+post-render validation boundary retains upstream verification before packaging. Current contract and local
+execution evidence are recorded in [ADR-27](adr-27.md) and [AICR deployment bundles](aicr-deployment-bundles.md);
+hosted Run and consumer verification remain unexercised. AICR v1.2.0-rc1 ships the local OCI layout output (NVIDIA/aicr#3538) that AICR
 bundles need.
 
 [ADR-28](../0028-multi-platform-executable-indexes.md) proposes multi-platform executables: one tool source and
@@ -55,6 +56,12 @@ outputs: a Plan-derived reuse key, untrusted discovery, owner-issued acceptance 
 `reused` Run origin. It is designed, not implemented: no code, contract test, hosted Run or qualification
 exercises reuse, and every Run still executes every required output.
 
+[ADR-31](../0031-qualification-results-index.md) proposes a qualification results index: each production
+qualifier attempt's unsigned outcome, and an errored outcome for a failed producer Run, published create-only
+as a canonical record and a TestGrid build. Selection, projection, the publishing protocol and the
+`nvkr-results-publish` helper are implemented and contract-tested. The generated publish job is not, so no Run
+publishes and no TestGrid view has read an outcome.
+
 ## Ledger files
 
 Each section lives in its own file; edit only the file that owns the affected row.
@@ -65,7 +72,7 @@ Each section lives in its own file; edit only the file that owns the affected ro
 - [M3 MVP scope and acceptance boundary](m3-mvp-scope-and-acceptance-boundary.md)
 - [M4 release manifest issuance](m4-release-manifest-issuance.md)
 - [Object-store publication](object-store-publication.md)
-- Support by owner, one file per owner row group: [01–03](adr-01-03.md), [04](adr-04.md), [05](adr-05.md), [06](adr-06.md), [07–08](adr-07-08.md), [09](adr-09.md), [10](adr-10.md), [11–12](adr-11-12.md), [13](adr-13.md), [14](adr-14.md), [15](adr-15.md), [16](adr-16.md), [17](adr-17.md), [18](adr-18.md), [19](adr-19.md), [20](adr-20.md), [21](adr-21.md), [22](adr-22.md), [23](adr-23.md), [24](adr-24.md), [25](adr-25.md), [26](adr-26.md), [27](adr-27.md), [28](adr-28.md), [29](adr-29.md), [30](adr-30.md)
+- Support by owner, one file per owner row group: [01–03](adr-01-03.md), [04](adr-04.md), [05](adr-05.md), [06](adr-06.md), [07–08](adr-07-08.md), [09](adr-09.md), [10](adr-10.md), [11–12](adr-11-12.md), [13](adr-13.md), [14](adr-14.md), [15](adr-15.md), [16](adr-16.md), [17](adr-17.md), [18](adr-18.md), [19](adr-19.md), [20](adr-20.md), [21](adr-21.md), [22](adr-22.md), [23](adr-23.md), [24](adr-24.md), [25](adr-25.md), [26](adr-26.md), [27](adr-27.md), [28](adr-28.md), [29](adr-29.md), [30](adr-30.md), [31](adr-31.md)
 - [Feature-branch pipeline development](feature-branch-pipeline-development.md)
 - [Ubuntu 24 node-image inputs](ubuntu-24-node-image-inputs.md)
 - [Native disk execution and inspection](native-disk-execution-and-inspection.md)

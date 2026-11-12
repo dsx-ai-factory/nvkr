@@ -25,13 +25,12 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func TestNightlyOVNFetchReceivesSelectedSourceCredential(t *testing.T) {
+func TestNightlyOVNFetchIsAnonymous(t *testing.T) {
 	for _, test := range []struct {
 		profile, source string
-		private         bool
 	}{
-		{"nvke-nightly-arm64", "https://github.com/dsx-ai-factory/ovn-kubernetes", true},
-		{"nvke-nightly-upstream-ovn-arm64", "https://github.com/ovn-kubernetes/ovn-kubernetes", false},
+		{"nvke-nightly-arm64", "https://github.com/dsx-ai-factory/ovn-kubernetes"},
+		{"nvke-nightly-upstream-ovn-arm64", "https://github.com/ovn-kubernetes/ovn-kubernetes"},
 	} {
 		t.Run(test.profile, func(t *testing.T) {
 			root := "../../.."
@@ -63,12 +62,7 @@ func TestNightlyOVNFetchReceivesSelectedSourceCredential(t *testing.T) {
 				}
 				found++
 				environment := githubSourceEnvironment(plan, node)
-				if test.private {
-					if environment[sourceTokenEnv] != "${{ secrets.NKE_SOURCE_TOKEN }}" ||
-						environment["GIT_CONFIG_KEY_2"] != "credential."+test.source+".helper" {
-						t.Fatal("OVN fetch does not receive the selected repository-scoped token")
-					}
-				} else if len(environment) != 0 {
+				if len(environment) != 0 {
 					t.Fatal("public OVN fetch received private source configuration")
 				}
 			}
@@ -92,7 +86,7 @@ func authenticatedSourcePlan(t *testing.T) (*Plan, Node, string) {
 					continue
 				}
 				plan.Environment.SourceAccess = map[string]authored.SourceAccess{
-					source.Repo: {Mirror: "https://github.com/test-owner/private-source", CredentialRef: "github:NKE_SOURCE_TOKEN"},
+					source.Repo: {Mirror: "https://github.com/test-owner/private-source", CredentialRef: "github:TEST_SOURCE_READ_TOKEN"},
 				}
 				digest, err := plan.Environment.Digest()
 				if err != nil {
@@ -149,7 +143,7 @@ func TestGitHubSourceCredentialIsFetchStepOnly(t *testing.T) {
 			return mutateGitHubBundleYAML(t, bundle, bundle.WorkflowPath, func(root *yamlv3.Node) {
 				call := githubTestYAMLStep(t, githubTestYAMLField(t, root, "jobs", jobID, "steps"), "uses", "./"+strings.TrimSuffix(member, "/action.yml"))
 				token := githubTestYAMLField(t, call, "with", "nvkr-source-token")
-				if token.Value != "${{ secrets.NKE_SOURCE_TOKEN }}" {
+				if token.Value != "${{ secrets.TEST_SOURCE_READ_TOKEN }}" {
 					t.Fatal("fixture lost its source credential binding")
 				}
 				token.Value = "${{ secrets.OTHER_TOKEN }}"
@@ -272,6 +266,7 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			addTestSourceCredential(t, plan)
 			wantRepositories := map[string]bool{}
 			if fixture.pinSet {
 				wantRepositories["https://github.com/dsx-ai-factory/nvke"] = true
@@ -301,7 +296,7 @@ func TestMaintainedPinSetCatalogCredentials(t *testing.T) {
 func assertMaintainedPinSetCredentialScope(t testing.TB, plan *Plan, documents map[string]githubWorkflowDocument, wantPinSet bool) {
 	t.Helper()
 	wantEnvironment := map[string]string{
-		"NVKR_PIN_SOURCE_TOKEN_0": "${{ secrets.NKE_SOURCE_TOKEN }}",
+		"NVKR_PIN_SOURCE_TOKEN_0": "${{ secrets.TEST_SOURCE_READ_TOKEN }}",
 		"GIT_TERMINAL_PROMPT":     "0",
 		"GIT_CONFIG_NOSYSTEM":     "1",
 		"GIT_CONFIG_GLOBAL":       "/dev/null",
@@ -323,10 +318,10 @@ func assertMaintainedPinSetCredentialScope(t testing.TB, plan *Plan, documents m
 		}
 		return false
 	}
-	const sourceCredential = "${{ secrets.NKE_SOURCE_TOKEN }}"
+	const sourceCredential = "${{ secrets.TEST_SOURCE_READ_TOKEN }}"
 	hasSourceSecret := func(environment map[string]string) bool {
 		for _, value := range environment {
-			if strings.Contains(value, "secrets.NKE_SOURCE_TOKEN") {
+			if strings.Contains(value, "secrets.TEST_SOURCE_READ_TOKEN") {
 				return true
 			}
 		}
@@ -335,7 +330,7 @@ func assertMaintainedPinSetCredentialScope(t testing.TB, plan *Plan, documents m
 	// Credentials enter only through the env maps checked below.
 	hasCredentialText := func(values ...string) bool {
 		return slices.ContainsFunc(values, func(value string) bool {
-			return strings.Contains(value, "secrets.NKE_SOURCE_TOKEN") || strings.Contains(value, "NVKR_PIN_SOURCE_TOKEN_")
+			return strings.Contains(value, "secrets.TEST_SOURCE_READ_TOKEN") || strings.Contains(value, "NVKR_PIN_SOURCE_TOKEN_")
 		})
 	}
 	_, nodeJobs, err := githubStages(plan)
@@ -376,7 +371,7 @@ func assertMaintainedPinSetCredentialScope(t testing.TB, plan *Plan, documents m
 				if hasCredentialText(append(slices.Collect(maps.Values(step.With)), step.If)...) {
 					t.Fatalf("pin or source credential in step inputs or condition of %s/%s", at, step.ID)
 				}
-				if strings.Contains(step.Run, "secrets.NKE_SOURCE_TOKEN") {
+				if strings.Contains(step.Run, "secrets.TEST_SOURCE_READ_TOKEN") {
 					t.Fatalf("source secret entered command text in %s/%s", at, step.ID)
 				}
 				// Source fetches may independently receive this secret, but only
@@ -387,7 +382,7 @@ func assertMaintainedPinSetCredentialScope(t testing.TB, plan *Plan, documents m
 							t.Fatalf("source secret escaped catalog or selected fetch steps: %s/%s", at, step.ID)
 						}
 						for key, value := range step.Env {
-							if key != sourceTokenEnv && strings.Contains(value, "secrets.NKE_SOURCE_TOKEN") {
+							if key != sourceTokenEnv && strings.Contains(value, "secrets.TEST_SOURCE_READ_TOKEN") {
 								t.Fatalf("source secret appeared under an unrelated key in %s/%s", at, step.ID)
 							}
 						}
@@ -421,7 +416,7 @@ func assertMaintainedPinSetCredentialMutations(t *testing.T, plan *Plan, bundle 
 		name, old, replacement string
 		allOccurrences         bool
 	}{
-		{"wrong secret", "secrets.NKE_SOURCE_TOKEN", "secrets.OTHER", false},
+		{"wrong secret", "secrets.TEST_SOURCE_READ_TOKEN", "secrets.OTHER", false},
 		{"wrong mirror", "credential.https://github.com/dsx-ai-factory/nvke.helper", "credential.https://github.com/other/repo.helper", true},
 		{"missing presence check", strings.ReplaceAll(requireSourceToken, sourceTokenEnv, "NVKR_PIN_SOURCE_TOKEN_0"), "true", true},
 	} {
@@ -503,5 +498,20 @@ func TestCatalogSourceCredentialsAreRepositoryScoped(t *testing.T) {
 				t.Fatalf("repository credential lookup failed: %v", err)
 			}
 		})
+	}
+}
+
+// addTestSourceCredential exercises generic private-source support independently
+// of the maintained public-source Environments.
+func addTestSourceCredential(t testing.TB, plan *Plan) {
+	t.Helper()
+	const repo = "https://github.com/dsx-ai-factory/nvke"
+	plan.Environment.SourceAccess = map[string]authored.SourceAccess{
+		repo: {Mirror: repo, CredentialRef: "github:TEST_SOURCE_READ_TOKEN"},
+	}
+	var err error
+	plan.EnvironmentDigest, err = plan.Environment.Digest()
+	if err != nil {
+		t.Fatal(err)
 	}
 }

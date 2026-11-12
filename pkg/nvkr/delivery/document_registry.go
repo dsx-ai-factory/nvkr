@@ -28,7 +28,9 @@ const maxDocumentArtifactBytes = 128 << 20
 // single-layer OCI artifact. Config media type identifies the document family.
 // It writes only an immutable manifest reference, with no signing authority.
 // On upload failure the returned attempted reference may contain partial uploads.
-func PushDocumentArtifact(ctx context.Context, repository, mediaType string, raw []byte, options RegistryOptions) (string, error) {
+func PushDocumentArtifact(ctx context.Context, repository, mediaType string, raw []byte, options RegistryOptions) (reference string, resultErr error) {
+	ctx, observer := observeRegistry(ctx)
+	defer func(observedCtx context.Context) { resultErr = observer.explain(observedCtx, resultErr) }(ctx)
 	if err := admitDocumentTransport(ctx, mediaType, int64(len(raw)), options); err != nil {
 		return "", err
 	}
@@ -55,7 +57,7 @@ func PushDocumentArtifact(ctx context.Context, repository, mediaType string, raw
 	}
 	ref := repo.Digest(digest.String())
 	if err := remote.Write(ref, image, registryOptions(ctx, options)...); err != nil {
-		return ref.Name(), classifyContext(ctx, e.Wrap(e.CodeUnavailable, err, "publishing document transport; destination may contain partial uploads"))
+		return ref.Name(), registryPublishError(ctx, err, "publishing document transport")
 	}
 	return ref.Name(), nil
 }

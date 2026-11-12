@@ -233,12 +233,21 @@ func TestLocalRunDryRunDoesNotCreateAttempt(t *testing.T) {
 
 func TestLifecycleCommandsRejectInvalidInputs(t *testing.T) {
 	lifecycleCommandRepo(t)
+	definition, err := os.ReadFile("docs/examples/nvke-tutorial/definition.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	twoDocuments := filepath.Join(t.TempDir(), "two-definitions.yaml")
+	if err := os.WriteFile(twoDocuments, append(definition, "---\napiVersion: broken\nkind: DefinitelyNotADefinition\n"...), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct {
 		name string
 		args []string
 		code e.Code
 	}{
 		{"missing definition", []string{"definition", "validate", "--definition", "missing.yaml"}, e.CodeInvalidCatalog},
+		{"second YAML document", []string{"definition", "validate", "--definition", twoDocuments}, e.CodeInvalidCatalog},
 		{"missing inspection", []string{"definition", "inspect", "--definition", "missing.yaml"}, e.CodeInvalidCatalog},
 		{"missing plan", []string{"run", "plan", "--definition", "missing.yaml", "--environment", "missing.yaml"}, e.CodeInvalidCatalog},
 		{"missing environment", []string{"run", "plan", "--definition", "docs/examples/nvke-tutorial/definition.yaml", "--environment", "missing.yaml"}, e.CodeInvalidCatalog},
@@ -248,8 +257,42 @@ func TestLifecycleCommandsRejectInvalidInputs(t *testing.T) {
 		{"wrong factory workspace", []string{"factory", "execute-node", "--plan", "missing.json", "--node", "missing", "--workspace", "wrong"}, e.CodeUsage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := invokeLifecycleCLI(t, tc.args...)
+			output, err := invokeLifecycleCLI(t, tc.args...)
 			assertLifecycleCommandCode(t, err, tc.code)
+			if output != "" {
+				t.Fatalf("stdout = %q, want empty", output)
+			}
+		})
+	}
+}
+
+func TestFlagOnlyInspectionCommandsRejectUnusedArguments(t *testing.T) {
+	lifecycleCommandRepo(t)
+	// Missing inputs prove rejection happens before any loader runs.
+	const definition = "missing.yaml"
+	const catalog = "missing-catalog"
+	for _, tc := range []struct {
+		name string
+		args []string
+		flag string
+	}{
+		{"definition validate", []string{"definition", "validate", "--definition", definition, "--ui", "plain", "typo.yaml"}, "--definition"},
+		{"definition inspect", []string{"definition", "inspect", "--definition", definition, "--ui", "plain", "typo.yaml"}, "--definition"},
+		{"definition pin", []string{"definition", "pin", "--definition", definition, "--check", "typo.yaml"}, "--definition"},
+		{"catalog validate", []string{"catalog", "validate", "--data", catalog, "--ui", "plain", "nvkectl"}, "--data"},
+		{"catalog list", []string{"catalog", "list", "--data", catalog, "--ui", "plain", "nvkectl"}, "--data"},
+		{"catalog digest", []string{"catalog", "digest", "--data", catalog, "--ui", "plain", "nvkectl"}, "--data"},
+		{"flag-looking tokens after the argument", []string{"definition", "validate", "--definition", definition, "typo.yaml", "--ui", "plain"}, "--definition"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			output, err := invokeLifecycleCLI(t, tc.args...)
+			assertLifecycleCommandCode(t, err, e.CodeUsage)
+			if !strings.Contains(err.Error(), tc.flag) {
+				t.Fatalf("error %q does not point to %s", err, tc.flag)
+			}
+			if output != "" {
+				t.Fatalf("stdout = %q, want empty", output)
+			}
 		})
 	}
 }

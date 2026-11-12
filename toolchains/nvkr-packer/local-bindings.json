@@ -1,0 +1,83 @@
+[
+  {
+    "catalog": "nvke-local-site-arm64",
+    "arch": "arm64",
+    "from": "sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0",
+    "components": [
+      "nktp-chart",
+      "nvke-controller-chart"
+    ]
+  },
+  {
+    "catalog": "nvke-m2-os",
+    "arch": "amd64",
+    "from": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+    "components": [
+      "nvke-agent",
+      "nvke-cni-calico",
+      "nvke-doca-ovs",
+      "nvke-image-inputs",
+      "nvke-kubeadm-distro",
+      "nvke-node-image-amd64",
+      "nvke-patched-installer-iso-amd64",
+      "nvke-spire-agent"
+    ]
+  },
+  {
+    "catalog": "nvke-m2-os",
+    "arch": "arm64",
+    "from": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
+    "components": [
+      "nvke-agent",
+      "nvke-cni-calico",
+      "nvke-doca-ovs",
+      "nvke-image-inputs",
+      "nvke-kubeadm-distro",
+      "nvke-node-fde-amd64",
+      "nvke-node-fde-arm64",
+      "nvke-node-image",
+      "nvke-node-image-amd64",
+      "nvke-patched-installer-iso",
+      "nvke-patched-installer-iso-amd64",
+      "nvke-spire-agent"
+    ]
+  },
+  {
+    "catalog": "nvke-native-site",
+    "arch": "amd64",
+    "from": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+    "components": [
+      "nktp-chart",
+      "nvke-controller-chart"
+    ]
+  },
+  {
+    "catalog": "nvke-native-site",
+    "arch": "arm64",
+    "from": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+    "components": [
+      "nktp-chart",
+      "nvke-controller-chart"
+    ]
+  },
+  {
+    "catalog": "nvke-native-tools",
+    "arch": "amd64",
+    "from": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+    "components": [
+      "nico-sim",
+      "nico-sim-runtime-assets",
+      "nico-simctl"
+    ]
+  },
+  {
+    "catalog": "nvke-native-tools",
+    "arch": "arm64",
+    "from": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+    "components": [
+      "nico-sim",
+      "nico-sim-runtime-assets",
+      "nico-simctl"
+    ]
+  }
+]

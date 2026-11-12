@@ -12,7 +12,7 @@ inputs/
   definitions/   # Release, demo variants and focused diagnostics
   catalogs/      # Shared producer owners, including explicit version/packaging variants
   environments/  # Execution, credentials, signing and publication policy
-  policies/      # Independently authored verification policy
+  policies/      # Verification policy and maintained generation selections
   testing/       # Retained downstream test inputs; maintained hosted nightly configuration lives in demos/
   experiments/   # Producers outside the maintained release catalog
 ```

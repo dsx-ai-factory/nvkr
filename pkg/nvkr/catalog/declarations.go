@@ -42,6 +42,7 @@ const (
 // registryDoc is the hand-authored registry as parsed from disk, before sources
 // and lock pins are merged in.
 type registryDoc struct {
+	Imports    []fragmentImport        `json:"imports,omitempty"`
 	APIVersion string                  `json:"apiVersion"`
 	Kind       string                  `json:"kind"`
 	Metadata   Metadata                `json:"metadata"`

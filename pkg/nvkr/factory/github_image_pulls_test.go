@@ -6,9 +6,11 @@ package factory
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -185,68 +187,62 @@ func TestMaintainedNamedPrivateImageCredentialBoundary(t *testing.T) {
 	}
 }
 
-// Discover maintained bundles so a new publication namespace cannot silently
-// omit preparation. Select required stages from the pinned subjects themselves,
-// independently of the access declaration used by the renderer and validator.
+// Authored generation selections must equal independently discovered committed
+// Plans and manifests. Every bundle enters the same access/preparation contract.
 func TestMaintainedPrivateToolchainPreparation(t *testing.T) {
-	plans, err := filepath.Glob("../../../.github/*/plan.json")
-	if err != nil || len(plans) == 0 {
-		t.Fatalf("discover maintained plans: %v (%d plans)", err, len(plans))
+	raw, err := os.ReadFile("../../../inputs/policies/maintained-generation.json")
+	if err != nil {
+		t.Fatal(err)
 	}
-	for _, path := range plans {
-		t.Run(filepath.Base(filepath.Dir(path)), func(t *testing.T) {
-			plan, err := LoadPlanContext(t.Context(), path)
+	var inventory []struct{ Bundle, Definition, Environment, QualificationPolicy string }
+	if err := json.Unmarshal(raw, &inventory); err != nil {
+		t.Fatal(err)
+	}
+	var expected []string
+	var expectedManifests []string
+	for _, entry := range inventory {
+		expected = append(expected, "../../../.github/"+entry.Bundle+"/plan.json")
+		expectedManifests = append(expectedManifests, "../../../.github/"+entry.Bundle+"/manifest.json")
+		if entry.QualificationPolicy != "" {
+			var qualificationBundle string
+			if suffix, ok := strings.CutPrefix(entry.Bundle, "nvkr-dev"); ok {
+				qualificationBundle = "nvkr-dev-qualification" + suffix
+			} else if suffix, ok := strings.CutPrefix(entry.Bundle, "nvkr-run"); ok {
+				qualificationBundle = "nvkr-qualification" + suffix
+			} else {
+				t.Fatalf("unknown qualification owner for %s", entry.Bundle)
+			}
+			expectedManifests = append(expectedManifests, "../../../.github/"+qualificationBundle+"/manifest.json")
+		}
+	}
+	plans, err := filepath.Glob("../../../.github/*/plan.json")
+	if err != nil || len(plans) == 0 || !reflect.DeepEqual(plans, expected) {
+		t.Fatalf("authored/discovered Plan inventory differs: %v / %v (%v)", expected, plans, err)
+	}
+	slices.Sort(expectedManifests)
+	manifests, err := filepath.Glob("../../../.github/*/manifest.json")
+	slices.Sort(manifests)
+	if err != nil || !reflect.DeepEqual(manifests, expectedManifests) {
+		t.Fatalf("authored/discovered manifest inventory differs: %v / %v (%v)", expectedManifests, manifests, err)
+	}
+	for _, entry := range inventory {
+		t.Run(entry.Bundle, func(t *testing.T) {
+			path := "../../../.github/" + entry.Bundle
+			if _, err := os.Stat(path + "/manifest.json"); err != nil {
+				t.Fatal(err)
+			}
+			plan, err := LoadPlanContext(t.Context(), path+"/plan.json")
 			if err != nil {
 				t.Fatal(err)
 			}
-			if plan.Environment.GitHubARC != "native-kvm-v1" {
-				return
-			}
-			stages, _, err := githubStages(plan)
-			if err != nil {
-				t.Fatal(err)
-			}
-			required := map[string]bool{}
-			for _, stage := range stages {
-				for _, node := range stage.Nodes {
-					if strings.HasPrefix(node.Container, "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/") {
-						required[stage.ID] = true
-					}
-				}
-			}
-			if len(required) == 0 {
-				return
+			if plan.DefinitionPath != entry.Definition || plan.EnvironmentPath != entry.Environment {
+				t.Fatal("committed Plan differs from authored generation selection")
 			}
 			bundle, err := RenderGitHub(t.Context(), plan)
 			if err != nil {
 				t.Fatal(err)
 			}
-			for _, document := range githubEmittedWorkflows(t, plan, bundle) {
-				for id, job := range document.Jobs {
-					if !required[id] {
-						continue
-					}
-					prepared, execution := -1, -1
-					for index, step := range job.Steps {
-						if strings.Contains(step.Run, "factory github prepare-images ") {
-							if prepared >= 0 || step.Env[githubImageToken] != "${{ secrets.NVKR_REGISTRY_READ }}" || step.Env[githubImageUser] != "${{ vars.NVKR_REGISTRY_READ_USER }}" || step.If != "" || step.ContinueOnError {
-								t.Fatalf("%s: preparation must run once with the explicit reader", id)
-							}
-							prepared = index
-						}
-						if execution < 0 && (strings.Contains(step.Run, "factory github run-node ") || strings.Contains(step.Run, "factory github run-disk ")) {
-							execution = index
-						}
-					}
-					if prepared < 0 || execution <= prepared {
-						t.Errorf("%s: private native toolchain requires preparation and reader wiring before execution", id)
-					}
-					delete(required, id)
-				}
-			}
-			if len(required) != 0 {
-				t.Fatalf("private toolchain stages missing from emitted workflows: %v", required)
-			}
+			assertImageUsePreparation(t, plan, bundle)
 		})
 	}
 }
@@ -354,7 +350,7 @@ func TestPrivateImageCredentialBoundary(t *testing.T) {
 			if token.Value != "${{ inputs.nvkr-toolchain-read-token }}" {
 				t.Fatalf("fixture image token differs: %q", token.Value)
 			}
-			token.Value = "${{ secrets.NKE_SOURCE_TOKEN }}"
+			token.Value = "${{ secrets.TEST_SOURCE_READ_TOKEN }}"
 		}},
 		{"wrong helper", member, func(t *testing.T, root *yamlv3.Node) {
 			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "id", "operation_images")
@@ -417,7 +413,7 @@ func TestGitHubStageExecutionRejectsPrivateImageOrdering(t *testing.T) {
 		t.Fatal(err)
 	}
 	var fragment bytes.Buffer
-	writeGitHubPackerDiagnosticStep(&fragment, stage, actions)
+	writeGitHubPackerDiagnosticStep(&fragment, plan, stage, actions)
 	var diagnostic struct {
 		Steps []githubStep `json:"steps"`
 	}

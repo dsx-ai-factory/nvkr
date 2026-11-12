@@ -44,6 +44,11 @@ func lowerGitHubActions(plan *Plan, raw []byte, actions githubActionRefs) ([]byt
 	}
 	for index := 0; index < len(jobs.Content); index += 2 {
 		id, job := jobs.Content[index].Value, jobs.Content[index+1]
+		// Frozen-source bootstraps contain first-attempt/retry controls before the
+		// helper exists. Keep this fixed coordinator protocol in the caller scope.
+		if len(plan.Environment.GitHubRuntimeSources) != 0 && strings.HasPrefix(id, "build-runner-") {
+			continue
+		}
 		steps := githubYAMLField(job, "steps")
 		if steps == nil || steps.Kind != yamlv3.SequenceNode {
 			return nil, nil, e.New(e.CodePipelineDrift, "GitHub job %q requires steps", id)

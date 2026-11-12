@@ -13,6 +13,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -22,11 +23,18 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/layout"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
+	"golang.org/x/sync/semaphore"
 )
 
 // PullMetadata fetches bounded manifests, configs and evidence, never output
 // layers. Its result is an integrity description, not a verified publication.
 func PullMetadata(ctx context.Context, reference, out string, options RegistryOptions) (Inspection, error) {
+	return PullMetadataWithOptions(ctx, reference, out, MetadataPullOptions{Registry: options})
+}
+
+// PullMetadataWithOptions optionally reports provisional acquisition progress.
+func PullMetadataWithOptions(ctx context.Context, reference, out string, request MetadataPullOptions) (Inspection, error) {
+	options := request.Registry
 	if err := deliveryContext(ctx); err != nil {
 		return Inspection{}, err
 	}
@@ -35,7 +43,7 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 	}
 	if _, bounded := ctx.Deadline(); !bounded {
 		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 20*time.Minute)
+		ctx, cancel = context.WithTimeout(ctx, time.Hour)
 		defer cancel()
 	}
 	parse := []name.Option{name.StrictValidation}
@@ -61,7 +69,7 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata index identity/size differs")
 	}
 	var index ociIndex
-	if err := json.Unmarshal(fetched.Manifest, &index); err != nil || index.ArtifactType != MediaPublicationRoot || len(index.Manifests) != 1 {
+	if err := json.Unmarshal(fetched.Manifest, &index); err != nil || index.artifactType() != MediaPublicationRoot || len(index.Manifests) != 1 {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata index must contain one root")
 	}
 	stage, commit, cleanup, err := stageLayout(out)
@@ -70,16 +78,9 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 	}
 	defer cleanup()
 	writer := layoutWriter{root: stage, plain: true}
-	var total int64
-	put := func(raw []byte, d Descriptor, max int64) error {
-		total += int64(len(raw))
-		if int64(len(raw)) > max || total > maxMetadataBytes || d.Size != int64(len(raw)) || digestBytes(raw) != d.Digest {
-			return e.New(e.CodeVerifyFailed, "metadata object exceeds bounds or changes identity")
-		}
-		_, err := writer.addBlobBytes(raw, d.MediaType)
-		return err
-	}
-	manifest := func(repo name.Repository, d Descriptor) (ociManifest, error) {
+	boundedWriter := metadataBlobWriter{writer: writer, limit: maxMetadataBytes, inflight: semaphore.NewWeighted(maxMetadataReadBytes)}
+	put := boundedWriter.put
+	manifest := func(ctx context.Context, repo name.Repository, d Descriptor) (ociManifest, error) {
 		got, err := puller.Get(ctx, repo.Digest(d.Digest))
 		if err != nil {
 			return ociManifest{}, metadataFetchError(ctx, err, "fetch metadata manifest")
@@ -93,33 +94,27 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 		}
 		return m, nil
 	}
-	blob := func(repo name.Repository, d Descriptor, max int64) error {
-		if d.Size < 0 || d.Size > max {
-			return e.New(e.CodeVerifyFailed, "oversized metadata blob")
-		}
-		layer, err := puller.Layer(ctx, repo.Digest(d.Digest))
-		if err != nil {
-			return metadataFetchError(ctx, err, "fetch metadata blob")
-		}
-		reader, err := layer.Compressed()
-		if err != nil {
-			return metadataFetchError(ctx, err, "open metadata blob")
-		}
-		defer reader.Close()
-		raw, err := io.ReadAll(io.LimitReader(reader, max+1))
-		if err != nil {
-			return metadataFetchError(ctx, err, "read metadata blob")
-		}
-		return put(raw, d, max)
+	blob := func(ctx context.Context, repo name.Repository, d Descriptor, max int64) error {
+		return boundedWriter.copyBlob(ctx, d, max, func() (io.ReadCloser, error) {
+			layer, err := puller.Layer(ctx, repo.Digest(d.Digest))
+			if err != nil {
+				return nil, metadataFetchError(ctx, err, "fetch metadata blob")
+			}
+			reader, err := layer.Compressed()
+			if err != nil {
+				return nil, metadataFetchError(ctx, err, "open metadata blob")
+			}
+			return reader, nil
+		})
 	}
-	m, err := manifest(ref.Context(), index.Manifests[0])
+	m, err := manifest(ctx, ref.Context(), index.Manifests[0])
 	if err != nil {
 		return Inspection{}, err
 	}
-	if m.ArtifactType != MediaPublicationRoot || len(m.Layers) != 0 || m.Config.MediaType != MediaPublicationRootConfig {
+	if m.artifactType() != MediaPublicationRoot || len(m.Layers) != 0 || !publicationConfigProfile(m) {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "invalid metadata root")
 	}
-	if err := blob(ref.Context(), m.Config, 8<<20); err != nil {
+	if err := blob(ctx, ref.Context(), m.Config, 8<<20); err != nil {
 		return Inspection{}, err
 	}
 	config, err := readBlob(ctx, stage, m.Config, 8<<20)
@@ -140,43 +135,69 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 	if err != nil {
 		return Inspection{}, err
 	}
-	for _, o := range root.Objects {
+	var progressMu sync.Mutex
+	done := 0
+	report := func(object *PublishedObject) {
+		if request.Progress == nil {
+			return
+		}
+		progressMu.Lock()
+		defer progressMu.Unlock()
+		if object != nil {
+			done++
+		}
+		update := metadataProgressUpdate(ref.DigestStr(), done, len(root.Objects), object)
+		request.Progress(update)
+	}
+	report(nil)
+	fetchObject := func(ctx context.Context, o PublishedObject) error {
 		child, ok := refs[o.Name]
 		if !ok {
-			return Inspection{}, e.New(e.CodeVerifyFailed, "metadata member has no repository")
+			return e.New(e.CodeVerifyFailed, "metadata member has no repository")
 		}
 		d := Descriptor{MediaType: publishedManifestMediaType(o), Digest: o.DescriptorDigest, Size: o.Size, ArtifactType: o.ArtifactType}
-		m, err := manifest(child.Context(), d)
+		m, err := manifest(ctx, child.Context(), d)
 		if err != nil {
-			return Inspection{}, err
+			return err
 		}
 		if o.Output != nil && o.Output.ImageIndex != nil {
 			// Fetch only the bounded children named by the release binding.
 			// InspectMetadata subsequently matches them to the exact index bytes.
 			for _, native := range o.Output.ImageIndex.Children {
 				descriptor := Descriptor{MediaType: MediaOCIManifest, Digest: native.ManifestDigest, Size: native.Size}
-				image, err := manifest(child.Context(), descriptor)
+				image, err := manifest(ctx, child.Context(), descriptor)
 				if err != nil {
-					return Inspection{}, err
+					return err
 				}
-				if err := blob(child.Context(), image.Config, 8<<20); err != nil {
-					return Inspection{}, err
+				if err := blob(ctx, child.Context(), image.Config, 8<<20); err != nil {
+					return err
 				}
 			}
-			continue
+			return nil
 		}
-		if err := blob(child.Context(), m.Config, 8<<20); err != nil {
-			return Inspection{}, err
+		if err := blob(ctx, child.Context(), m.Config, 8<<20); err != nil {
+			return err
 		}
 		if o.Evidence != nil {
 			if len(m.Layers) != 1 {
-				return Inspection{}, e.New(e.CodeVerifyFailed, "evidence requires one bounded layer")
+				return e.New(e.CodeVerifyFailed, "evidence requires one bounded layer")
 			}
-			if err := blob(child.Context(), m.Layers[0], sbom.MaxBundleBytes); err != nil {
-				return Inspection{}, err
+			if err := blob(ctx, child.Context(), m.Layers[0], sbom.MaxBundleBytes); err != nil {
+				return err
 			}
 		}
+		return nil
 	}
+	if err := fetchMetadataObjects(ctx, root.Objects, func(ctx context.Context, object PublishedObject) error {
+		if err := fetchObject(ctx, object); err != nil {
+			return err
+		}
+		report(&object)
+		return nil
+	}); err != nil {
+		return Inspection{}, err
+	}
+
 	got, err := writer.writeIndex(index)
 	if err != nil {
 		return Inspection{}, err
@@ -253,7 +274,10 @@ func PushMetadata(ctx context.Context, source, repository string, options Regist
 
 // PushMetadataWithOptions binds optional prior metadata admission to the exact
 // root being published. Metadata publication cannot advance payload aliases.
-func PushMetadataWithOptions(ctx context.Context, source, repository string, request PushOptions) (string, error) {
+func PushMetadataWithOptions(ctx context.Context, source, repository string, request PushOptions) (published string, resultErr error) {
+	ctx, observer := observeRegistry(ctx)
+	observer.readOnly = true // Member admission precedes every metadata upload.
+	defer func(observedCtx context.Context) { resultErr = observer.explain(observedCtx, resultErr) }(ctx)
 	options := request.Registry
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
@@ -264,11 +288,8 @@ func PushMetadataWithOptions(ctx context.Context, source, repository string, req
 	if len(request.ImageTags) != 0 {
 		return "", e.New(e.CodeUsage, "metadata publication cannot advance image tags")
 	}
-	if _, bounded := ctx.Deadline(); !bounded {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 20*time.Minute)
-		defer cancel()
-	}
+	ctx, cancel := registryPublicationContext(ctx, 20*time.Minute)
+	defer cancel()
 	inspection, err := InspectMetadata(ctx, source)
 	if err != nil {
 		return "", err
@@ -295,7 +316,11 @@ func PushMetadataWithOptions(ctx context.Context, source, repository string, req
 			return "", e.New(e.CodeVerifyFailed, "metadata member lacks repository")
 		}
 		if _, err := ResolveDigest(ctx, child.Name(), options); err != nil {
-			return "", err
+			var coded *e.Error
+			if errors.As(err, &coded) && coded.Code == e.CodeTimeout {
+				return "", e.Wrap(e.CodeTimeout, err, "reading back metadata member %q", o.Name)
+			}
+			return "", registryReadbackError(ctx, err, "reading back metadata member %q", o.Name)
 		}
 	}
 	path, err := layout.FromPath(source)
@@ -313,8 +338,9 @@ func PushMetadataWithOptions(ctx context.Context, source, repository string, req
 	if digest.String() != inspection.RootDigest {
 		return "", e.New(e.CodeVerifyFailed, "metadata index changed after membership inspection")
 	}
+	observer.readOnly = false
 	if err := remote.WriteIndex(ref, index, registryOptions(ctx, options)...); err != nil {
-		return "", classifyContext(ctx, e.Wrap(e.CodeUnavailable, err, "publish metadata root"))
+		return "", registryPublishError(ctx, err, "publishing release metadata root")
 	}
 	return ref.Name(), nil
 }

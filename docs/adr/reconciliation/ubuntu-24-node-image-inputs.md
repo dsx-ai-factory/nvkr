@@ -1,8 +1,8 @@
 ## Ubuntu 24 node-image inputs
 
 The shared Calico vendor recipe now sets `CNI_DOCKERHUB_MIRROR=mirror.gcr.io`
-inside its declared command, including the diagnostic and NVSentinel experiment
-copies. `TestNVKECalicoVendorMirror` covers the compiled vendor argv for both
+inside its declared command. Release and diagnostic catalogs import the shared
+node-image fragment; the NVSentinel experiment keeps its own mirrored command. `TestNVKECalicoVendorMirror` covers the compiled vendor argv for both
 architectures and its changed vendor identity. On 2026-11-05, anonymous read-only
 `crane digest` and `crane manifest` checks matched all 11 Docker Hub Calico image
 digests in each architecture's v3.30.1 lock (22 exact references) at NVKE

@@ -85,8 +85,6 @@ name: p02 Acquire capi-controller-image-arm64 +63
       nvkr-results-0f-statuses:
         value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-0f-statuses }}
     secrets:
-      NKE_SOURCE_TOKEN:
-        required: true
       NVKR_CI_STORAGE_READ_TOKEN:
         required: true
       NVKR_CI_STORAGE_WRITE_TOKEN:
@@ -347,10 +345,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -377,10 +374,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -407,10 +403,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -466,10 +461,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -496,10 +490,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -526,10 +519,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -556,10 +548,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -615,10 +606,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -851,12 +841,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -883,12 +872,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -912,10 +900,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -945,12 +932,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -977,12 +963,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1009,12 +994,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1038,10 +1022,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1068,10 +1051,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1101,12 +1083,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1133,12 +1114,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1162,10 +1142,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1195,12 +1174,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1227,12 +1205,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1259,12 +1236,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1288,10 +1264,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1318,10 +1293,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1351,12 +1325,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1383,12 +1356,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1412,10 +1384,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1445,12 +1416,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1477,12 +1447,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1509,12 +1478,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1538,10 +1506,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1568,10 +1535,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1601,12 +1567,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1633,12 +1598,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1662,10 +1626,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1695,12 +1658,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1727,12 +1689,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1759,12 +1720,11 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
           nvkr-toolchain-read-token: ${{ secrets.NVKR_REGISTRY_READ }}
           nvkr-toolchain-read-user: ${{ vars.NVKR_REGISTRY_READ_USER }}
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1788,10 +1748,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1818,10 +1777,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1848,10 +1806,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
@@ -1878,10 +1835,9 @@ jobs:
         with:
           runner-artifact: 'nvkr-exec-ubuntu-24-04-arm'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - name: execute source part-1
-        uses: ./.github/nvkr-run/actions/shared/execute-source
+      - name: execute node part-1
+        uses: ./.github/nvkr-run/actions/shared/execute-node
         with:
-          nvkr-source-token: '${{ secrets.NKE_SOURCE_TOKEN }}'
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}

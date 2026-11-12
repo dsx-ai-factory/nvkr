@@ -244,7 +244,7 @@ func relocatedImageFixture(t *testing.T, hosted bool) (*factory.Plan, requiredOu
 		t.Fatal(err)
 	}
 	doc := Definition{APIVersion: DefinitionAPIVersion, Kind: DefinitionKind, Metadata: Metadata{Name: "relocated-image"}, Catalog: Catalog{Base: "catalog"}, Outputs: []DefinitionOutput{{Name: "worker", Platform: "linux/arm64", Format: OutputOCI, Components: []string{"worker"}}}}
-	env := Environment{APIVersion: EnvironmentAPIVersion, Kind: EnvironmentKind, Metadata: Metadata{Name: "test"}, UtilityContainer: "example.test/utility@" + pin, UtilityPlatform: "linux/arm64"}
+	env := Environment{APIVersion: EnvironmentAPIVersion, Kind: EnvironmentKind, Metadata: Metadata{Name: "test"}, ToolchainAccess: &ToolchainAccess{PublicRoots: []string{"example.test/utility"}}, UtilityContainer: "example.test/utility@" + pin, UtilityPlatform: "linux/arm64"}
 	if hosted {
 		doc.CosignTool = "cosign"
 		env.Publication = &Publication{RepositoryPrefix: "example.test/outputs", Anonymous: true}

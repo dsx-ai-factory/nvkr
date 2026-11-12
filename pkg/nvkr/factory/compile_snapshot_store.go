@@ -18,6 +18,7 @@ import (
 // Compilation is synchronous; this state has one owner and freezes each source
 // read the first time it is used, including shared base catalogs and patches.
 type inputState struct {
+	revisions       []*catalog.SourceRevision
 	source          catalog.ContextDataProvider
 	files           map[string][]byte
 	directories     map[string][]string
@@ -120,6 +121,9 @@ func validateInputPath(name string) error {
 }
 
 func validateInputSnapshot(snapshot InputSnapshot) error {
+	if len(snapshot.Sources) > 16 {
+		return e.New(e.CodeInvalidCatalog, "input snapshot exceeds frozen source bound")
+	}
 	if snapshot.SchemaVersion != InputSnapshotSchema {
 		return e.New(e.CodeInvalidCatalog, "unsupported input snapshot schema %q", snapshot.SchemaVersion)
 	}

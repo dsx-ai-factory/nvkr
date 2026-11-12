@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
@@ -81,10 +82,9 @@ func pinnedToolNode(nc catalog.NamedComponent, components map[string]catalog.Nam
 
 // validatePinnedToolOutputs enforces the output rules of ADR-27 §5 before any
 // acquisition or staging. An OCI layout reaches a Release only through the
-// bundle-oci layout import, which this build does not implement, so every selected
-// layout producer fails. A file producer is admitted only as a material of another
+// bundle-oci layout import. A file producer is admitted only as a material of another
 // selected producer.
-func validatePinnedToolOutputs(components []catalog.NamedComponent) error {
+func validatePinnedToolOutputs(components []catalog.NamedComponent, format string) error {
 	bound := make(map[string]bool)
 	for _, component := range components {
 		for _, name := range component.Materials {
@@ -97,8 +97,9 @@ func validatePinnedToolOutputs(components []catalog.NamedComponent) error {
 		}
 		switch component.OutputType {
 		case catalog.PinnedToolOutputOCILayout:
-			return e.New(e.CodeInvalidCatalog,
-				"pinned-tool OCI layout producer %q requires a bundle-oci output, which is not available", component.Name)
+			if format != definition.OutputBundle {
+				return e.New(e.CodeInvalidCatalog, "pinned-tool OCI layout producer %q requires a bundle-oci output", component.Name)
+			}
 		case catalog.PinnedToolOutputFile:
 			if !bound[component.Name] {
 				return e.New(e.CodeInvalidCatalog,

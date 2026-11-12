@@ -1,0 +1,78 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: nvkr.dev/catalog-fragment/v1
+kind: CatalogFragment
+sources:
+  clusterctl:
+    repo: https://github.com/kubernetes-sigs/cluster-api
+    constraint: 1.13.6
+    toolchainImagesByArch:
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
+    vendorCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum)"
+      timeout --kill-after=10s 540s go mod download
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+  helm-linux:
+    constraint: 4.2.4
+    repo: https://github.com/helm/helm
+    tool:
+      executablePath: linux-arm64/helm
+      format: tar-gzip
+      platform: linux/arm64
+      url: https://get.helm.sh/helm-{{.Tag}}-linux-arm64.tar.gz
+  kind:
+    repo: https://github.com/kubernetes-sigs/kind
+    constraint: 0.32.0
+    toolchainImagesByArch:
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
+    vendorCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum)"
+      timeout --kill-after=10s 540s go mod download
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+  kubectl:
+    repo: https://github.com/kubernetes/kubernetes
+    constraint: 1.36.0
+    toolchainImagesByArch:
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
+  oras:
+    repo: https://github.com/oras-project/oras
+    constraint: 1.3.3
+    toolchainImagesByArch:
+      arm64: docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9
+    vendorCommand:
+    - bash
+    - "-euc"
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum)"
+      timeout --kill-after=10s 540s go mod download
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+components:
+  helm-linux:
+    outputType: host-package
+    platforms:
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      releaseExecutable: true
+    source: helm-linux

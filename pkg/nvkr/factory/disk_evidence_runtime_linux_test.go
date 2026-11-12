@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -354,6 +355,8 @@ func newPublicDiskEvidenceFixture(t *testing.T, ctx context.Context, mode string
 	}
 	declared, environment, stack := vmFactoryInputs(t, "linux/"+arch, execution.CapabilityForbidden)
 	environment.Runtime.Runtime = "docker"
+	environment.ToolchainAccess.PublicRoots = append(environment.ToolchainAccess.PublicRoots, "example.test/packer", "example.test/inspection")
+	slices.Sort(environment.ToolchainAccess.PublicRoots)
 	environment.DiskInspectionProfiles = map[string]definition.DiskInspectionProfile{"linux/" + arch: profile}
 	image := stack.Catalog.Components["image"]
 	image.BuildCommand = nil

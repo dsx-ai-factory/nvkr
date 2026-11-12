@@ -7,7 +7,6 @@ import (
 	"context"
 	"regexp"
 	"sync"
-	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -110,7 +109,14 @@ func (consumer *Consumer) Authenticate(ctx context.Context, reference string, po
 	if !ok {
 		return nil, e.New(e.CodeEngineCapability, "release authentication requires signed SBOM verification")
 	}
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	timeout := consumer.inspection.Timeout
+	if timeout < 0 {
+		return nil, e.New(e.CodeUsage, "release authentication timeout must be positive")
+	}
+	if timeout == 0 {
+		timeout = defaultInspectionTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	if err := authenticateReleaseSubject(ctx, verifier, reference, policy); err != nil {
 		return nil, err
@@ -119,14 +125,13 @@ func (consumer *Consumer) Authenticate(ctx context.Context, reference string, po
 	if err != nil {
 		return nil, err
 	}
-	artifacts := make([]Artifact, 0, len(metadata.Outputs))
-	for _, output := range metadata.Outputs {
-		// APT's Output.Digest is semantic; the signing subject is always the
-		// manifest digest in Reference. Aggregate indexes are signed as a whole.
-		if err := authenticateReleaseSubject(ctx, verifier, output.Reference, policy); err != nil {
-			return nil, err
-		}
-		artifacts = append(artifacts, output.Output)
+	artifacts, err := authenticateReleaseOutputs(ctx, metadata.Outputs, func(ctx context.Context, reference string) error {
+		// APT's semantic output digest is not its signing subject. Authenticate the
+		// manifest reference; aggregate indexes are signed as a whole.
+		return authenticateReleaseSubject(ctx, verifier, reference, policy)
+	})
+	if err != nil {
+		return nil, err
 	}
 	if err := requireDiskEvidence(policy, artifacts); err != nil {
 		return nil, err

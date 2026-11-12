@@ -22,6 +22,12 @@ func TestGitHubQualificationHandoffRequiresCompleteSignedOutputPublication(t *te
 		{"dry run", func(t *testing.T) *Plan { return signedTestPlan(t, dryRunSigningProfile(), ghcrTarget()) }, false},
 		{"signed aggregate", func(t *testing.T) *Plan { return signedTestPlan(t, cosignSigningProfile(), ghcrTarget()) }, false},
 		{"signed outputs", referenceTestPlan, true},
+		{"captured runtime sources", func(t *testing.T) *Plan {
+			return recompileGitHubStabilityPlan(t, referenceTestPlan(t), func(in *githubStabilityInputs) {
+				in.environment.GitHubBundle, in.environment.GitHubRuntimePlan = "frozen-sources", true
+				in.environment.GitHubRuntimeSources = []authored.GitHubRuntimeSource{{Repository: "https://github.com/containerd/containerd", Ref: "refs/heads/main"}}
+			})
+		}, true},
 		{"exact runtime source", func(t *testing.T) *Plan {
 			return recompileGitHubStabilityPlan(t, referenceTestPlan(t), func(in *githubStabilityInputs) {
 				in.environment.GitHubBundle, in.environment.GitHubRuntimePlan = "exact-source", true
@@ -41,6 +47,10 @@ func TestGitHubQualificationHandoffRequiresCompleteSignedOutputPublication(t *te
 			if strings.Contains(joinRuns(job.Steps), " --handoff .nvkr/qualification/handoff.json") != test.want {
 				t.Fatalf("handoff capture admission differs for %s", test.name)
 			}
+			wantRetention := "7"
+			if test.name == "captured runtime sources" {
+				wantRetention = "14"
+			}
 			uploads := 0
 			for _, step := range job.Steps {
 				if step.With["name"] != "nvkr-qualification-${{ github.run_id }}-${{ github.run_attempt }}" {
@@ -48,7 +58,7 @@ func TestGitHubQualificationHandoffRequiresCompleteSignedOutputPublication(t *te
 				}
 				uploads++
 				if step.Uses != plan.Actions["upload-artifact"].Uses() || step.If != "${{ success() }}" || step.TimeoutMinutes != 5 || step.ContinueOnError || len(step.Env) != 0 || len(step.With) != 5 ||
-					step.With["path"] != ".nvkr/qualification/handoff.json" || step.With["include-hidden-files"] != "true" || step.With["if-no-files-found"] != "error" || step.With["retention-days"] != "7" {
+					step.With["path"] != ".nvkr/qualification/handoff.json" || step.With["include-hidden-files"] != "true" || step.With["if-no-files-found"] != "error" || step.With["retention-days"] != wantRetention {
 					t.Fatalf("handoff upload is not exact and bounded: %+v", step)
 				}
 			}

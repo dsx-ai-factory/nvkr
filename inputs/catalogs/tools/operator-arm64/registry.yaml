@@ -9,19 +9,6 @@
     "description": "Native ARM64 assets at the same source-owned versions as the maintained M2 operator tools; machine-pinned before execution."
   },
   "components": {
-    "helm": {
-      "source": "helm",
-      "platforms": [
-        "linux/arm64"
-      ],
-      "outputType": "host-package",
-      "prebuilt": {
-        "releaseExecutable": true,
-        "evidence": {
-          "none": true
-        }
-      }
-    },
     "kubectl": {
       "source": "kubectl",
       "platforms": [
@@ -57,5 +44,17 @@
         "executablePath": "kubectl"
       }
     }
-  }
+  },
+  "imports": [
+    {
+      "path": "../../shared/installer-tools.yaml",
+      "sha256": "b096166405b78d9fbdfcd735f0cf3f08fc58e2aec05383094245ca92411e6c72",
+      "components": {
+        "helm": "helm-linux"
+      },
+      "sourceNames": {
+        "helm-linux": "helm"
+      }
+    }
+  ]
 }

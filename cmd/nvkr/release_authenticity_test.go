@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -158,4 +159,34 @@ func assertAuthenticityCLIRejectedBeforeWork(t *testing.T, args []string) error 
 		t.Fatalf("invalid authenticity options emitted output: %s", raw)
 	}
 	return err
+}
+
+func TestReleaseVerifyTimeout(t *testing.T) {
+	for _, value := range []string{"0s", "-1s", "25ms"} {
+		t.Run(value, func(t *testing.T) {
+			args := append(authenticityCLIArgs(t.TempDir()), "--timeout", value)
+			if value != "25ms" {
+				assertErr := assertAuthenticityCLIRejectedBeforeWork(t, args)
+				if cliErrorCode(assertErr) != e.CodeUsage {
+					t.Fatalf("invalid timeout: %v", assertErr)
+				}
+				return
+			}
+			operation := func(ctx context.Context, _ string, _ lifecycle.VerificationPolicy, options lifecycle.ConsumerOptions) (lifecycle.AuthenticityDescription, error) {
+				if options.Timeout != 25*time.Millisecond {
+					t.Fatalf("timeout=%v", options.Timeout)
+				}
+				if _, ok := ctx.Deadline(); !ok {
+					t.Fatal("missing verification deadline")
+				}
+				<-ctx.Done()
+				return lifecycle.AuthenticityDescription{}, e.Wrap(e.CodeTimeout, ctx.Err(), "verification deadline")
+			}
+			app := &cli.App{Commands: []*cli.Command{cmdReleaseWithOperations(rejectFullVerification(t), operation)}}
+			raw, err := runCLIWithCapturedStdout(t, app, args...)
+			if cliErrorCode(err) != e.CodeTimeout || len(raw) != 0 {
+				t.Fatalf("output=%s error=%v", raw, err)
+			}
+		})
+	}
 }

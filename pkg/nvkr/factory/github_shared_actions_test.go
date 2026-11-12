@@ -291,12 +291,14 @@ func TestGitHubSharedAttemptUploadNamesPreserveProviderContext(t *testing.T) {
 		want    func(*Plan, githubActionRefs) githubStep
 	}{
 		{"inspection amd64", func(t *testing.T) *Plan { return arcTestPlan(t, "linux/amd64") }, func(plan *Plan, actions githubActionRefs) githubStep {
-			return githubInspectionDiagnosticStep(actions, plan.LifecycleOutputs[0].Name)
+			return githubInspectionDiagnosticStep(plan, actions, plan.LifecycleOutputs[0].Name)
 		}},
 		{"inspection arm64", func(t *testing.T) *Plan { return arcTestPlan(t, "linux/arm64") }, func(plan *Plan, actions githubActionRefs) githubStep {
-			return githubInspectionDiagnosticStep(actions, plan.LifecycleOutputs[0].Name)
+			return githubInspectionDiagnosticStep(plan, actions, plan.LifecycleOutputs[0].Name)
 		}},
-		{"qualification handoff", referenceTestPlan, func(_ *Plan, actions githubActionRefs) githubStep { return githubQualificationHandoffStep(actions) }},
+		{"qualification handoff", referenceTestPlan, func(plan *Plan, actions githubActionRefs) githubStep {
+			return githubQualificationHandoffStep(plan, actions)
+		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			plan := test.fixture(t)
@@ -380,10 +382,10 @@ func TestGitHubSharedUploadRejectsOtherProviderNames(t *testing.T) {
 		{"unowned name", "arbitrary" + githubAttemptUploadNameSuffix, githubInspectionLogPath("disk")},
 		{"mismatched diagnostic path", "nvkr-inspection-disk" + githubAttemptUploadNameSuffix, githubInspectionLogPath("other")},
 		{"mismatched handoff path", githubQualificationHandoffName, ".nvkr/run.json"},
-		{"secret expression", "${{ secrets.NKE_SOURCE_TOKEN }}", githubInspectionLogPath("disk")},
+		{"secret expression", "${{ secrets.TEST_SOURCE_READ_TOKEN }}", githubInspectionLogPath("disk")},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			diagnostic := githubInspectionDiagnosticStep(actions, "disk")
+			diagnostic := githubInspectionDiagnosticStep(plan, actions, "disk")
 			diagnostic.With["name"], diagnostic.With["path"] = test.artifact, test.path
 			document := githubWorkflowDocument{Jobs: map[string]githubJob{"diagnostic": {RunsOn: "ubuntu-24.04", Steps: []githubStep{
 				{Uses: actions.Checkout, With: map[string]string{"persist-credentials": "false"}},

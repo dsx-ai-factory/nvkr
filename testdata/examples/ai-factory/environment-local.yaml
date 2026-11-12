@@ -2,6 +2,14 @@ apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
   name: laptop-registry
+toolchainAccess:
+  publicRoots:
+    - docker.io/library/golang
+    - ghcr.io/example-ai-factory
+runtime:
+  imageLocations:
+    nvkr-toolchain-go: ghcr.io/example-ai-factory/nvkr-toolchain-go
+    nvkr-toolchain-cgo: ghcr.io/example-ai-factory/nvkr-toolchain-cgo
 publication:
   anonymous: true
   plainHTTP: true

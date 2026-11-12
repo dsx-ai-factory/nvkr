@@ -19,8 +19,10 @@ import (
 // developmentGenerationFixture loads a recorded Plan of the combined Definition
 // under the development Environment, so the test needs no source access. The
 // committed fixed development bundle belongs to the GPU site composite, covered
-// separately by TestGPUCompositeQualificationPairs. testdata/development-plan.json is main's
-// .github/nvkr-dev/plan.json at f2354a5a, before that bundle moved.
+// separately by TestGPUCompositeQualificationPairs. Regenerate this fixture with
+// run generate --definition inputs/definitions/nvke/definition.yaml
+// --environment inputs/environments/github-development.yaml --root <scratch>,
+// then copy <scratch>/.github/nvkr-dev/plan.json into testdata/development-plan.json.
 func developmentGenerationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPolicy) {
 	t.Helper()
 	plan, err := factory.LoadPlanContext(t.Context(), "testdata/development-plan.json")

@@ -165,11 +165,13 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			}
 		}
 		if spec.Kind == PackageBundle || spec.Kind == PackageDebian {
-			input := artifacts[inputs[0]]
-			if nodes[input.Producer].Kind != NodeBuild {
-				return ArtifactGraph{}, e.New(e.CodeInvalidCatalog, "bundle package %q requires a source build", spec.Name)
+			for _, id := range append([]string(nil), inputs...) {
+				input := artifacts[id]
+				if nodes[input.Producer].Kind != NodeBuild && !(spec.Kind == PackageBundle && nodes[input.Producer].Kind == NodeAcquire) {
+					return ArtifactGraph{}, e.New(e.CodeInvalidCatalog, "bundle package %q requires build producers", spec.Name)
+				}
+				inputs = append(inputs, "result/"+input.BuildTarget+"/"+input.Component)
 			}
-			inputs = append(inputs, "result/"+input.BuildTarget+"/"+input.Component)
 		}
 		// Packaging is explicitly gated by each target's terminal observation as a
 		// separate input, rather than hiding the policy edge in scheduler needs.

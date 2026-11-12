@@ -49,3 +49,41 @@ func TestGitHubRuntimeSourcePolicy(t *testing.T) {
 		})
 	}
 }
+
+func TestGitHubRuntimeSourcesPolicy(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*Environment)
+		code e.Code
+	}{
+		{"valid", func(*Environment) {}, ""},
+		{"duplicate", func(v *Environment) {
+			v.GitHubRuntimeSources = append(v.GitHubRuntimeSources, v.GitHubRuntimeSources[0])
+		}, e.CodeInvalidCatalog},
+		{"legacy conflict", func(v *Environment) { v.GitHubRuntimeSource = &v.GitHubRuntimeSources[0] }, e.CodeInvalidCatalog},
+		{"wrong ref", func(v *Environment) { v.GitHubRuntimeSources[0].Ref = "refs/heads/other" }, e.CodeInvalidCatalog},
+		{"no runtime", func(v *Environment) { v.GitHubRuntimePlan = false }, e.CodeEngineCapability},
+		{"development", func(v *Environment) { v.GitHubDevelopment = true }, e.CodeEngineCapability},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v := Environment{GitHubRuntimePlan: true, GitHubBundle: "nightly", GitHubRuntimeSources: []GitHubRuntimeSource{{Repository: "https://github.com/org/repo", Ref: "refs/heads/main"}}}
+			tc.edit(&v)
+			err := v.validateGitHubRuntimeSource()
+			if tc.code == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				clone := v.Clone()
+				clone.GitHubRuntimeSources[0].Repository = "changed"
+				if v.GitHubRuntimeSources[0].Repository == "changed" {
+					t.Fatal("shared policy clone")
+				}
+			} else {
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != tc.code {
+					t.Fatalf("got %v want %s", err, tc.code)
+				}
+			}
+		})
+	}
+}

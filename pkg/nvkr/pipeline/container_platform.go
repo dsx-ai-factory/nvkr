@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -17,52 +16,18 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// CheckContainerPlatform materializes a digest-pinned native toolchain and checks
-// the runtime's selected image config before source or build output work. This is
-// capability admission, not qualified runtime or reproduction evidence.
-func CheckContainerPlatform(ctx context.Context, runtimeBinary, image, platform string) (err error) {
-	if err := requireRunContext(ctx, "container platform admission"); err != nil {
-		return err
+// CheckContainerPlatform is the diagnostic facade over image admission. Omitted
+// access permits local inspection only; network materialization must be explicit.
+func CheckContainerPlatform(ctx context.Context, runtimeBinary, image, platform string, routes ...ImageAccess) error {
+	access := ImagePreparedOnly
+	if len(routes) > 1 {
+		return e.New(e.CodeEngineCapability, "image admission requires one access route")
 	}
-	if platform != "linux/amd64" && platform != "linux/arm64" {
-		return e.New(e.CodeEngineCapability, "container execution platform %q is unsupported", platform)
+	if len(routes) == 1 {
+		access = routes[0]
 	}
-	if _, err := imageManifestDigest(image); err != nil {
-		return e.Wrap(e.CodeUnpinnedSource, err, "container platform admission requires an immutable image")
-	}
-	switch filepath.Base(runtimeBinary) {
-	case "docker", "podman":
-	default:
-		return e.New(e.CodeEngineCapability, "container platform admission requires Docker or Podman")
-	}
-	if _, bounded := ctx.Deadline(); !bounded {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 10*time.Minute)
-		defer cancel()
-	}
-	defer func() {
-		if ctx.Err() != nil {
-			err = e.Wrap(e.CodeTimeout, ctx.Err(), "container platform admission canceled")
-		}
-	}()
-	raw, err := containerPlatformOutput(ctx, runtimeBinary, "info", "--format", "{{json .}}")
-	if err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "observing container daemon platform")
-	}
-	if err := checkContainerDaemonPlatform(raw, platform); err != nil {
-		return err
-	}
-	pull := execCmd(RunOptions{Ctx: ctx}, runtimeBinary, "pull", "--platform", platform, image)
-	var diagnostic containerPlatformBuffer
-	pull.Stdout, pull.Stderr = io.Discard, &diagnostic
-	if err := runOwnedCommand(ctx, pull); err != nil {
-		return containerPullFailure(ctx, platform, err, &diagnostic)
-	}
-	raw, err = containerPlatformOutput(ctx, runtimeBinary, "image", "inspect", "--format", "{{json .}}", image)
-	if err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "inspecting %s toolchain", platform)
-	}
-	return checkContainerPlatform(raw, image, platform)
+	_, err := PrepareContainerImage(ctx, runtimeBinary, image, platform, access)
+	return err
 }
 
 func containerPullFailure(ctx context.Context, platform string, cause error, diagnostic *containerPlatformBuffer) error {
@@ -102,31 +67,8 @@ func containerPullDiagnostic(diagnostic *containerPlatformBuffer) string {
 }
 
 func checkContainerPlatform(raw []byte, image, platform string) error {
-	if err := canonical.ValidateJSONDocument(raw); err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "validating toolchain platform JSON")
-	}
-	var inspection struct {
-		OS           string   `json:"Os"`
-		Architecture string   `json:"Architecture"`
-		RepoDigests  []string `json:"RepoDigests"`
-	}
-	if err := json.Unmarshal(bytes.TrimSpace(raw), &inspection); err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "decoding toolchain platform")
-	}
-	if inspection.OS+"/"+inspection.Architecture != platform {
-		return e.New(e.CodeEngineCapability, "toolchain provides %s/%s, not requested %s", inspection.OS, inspection.Architecture, platform)
-	}
-	want, err := imageManifestDigest(image)
-	if err != nil {
-		return e.Wrap(e.CodeUnpinnedSource, err, "invalid toolchain identity")
-	}
-	for _, ref := range inspection.RepoDigests {
-		digest, err := imageManifestDigest(ref)
-		if err == nil && digest == want {
-			return nil
-		}
-	}
-	return e.New(e.CodePreflightFailed, "runtime did not report selected toolchain manifest %s", want)
+	_, err := inspectAdmittedImage(image, platform, "diagnostic", raw)
+	return err
 }
 
 // Inspection is small JSON; bound captured bytes as well as subprocess lifetime.

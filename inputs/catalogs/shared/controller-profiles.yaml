@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: nvkr.dev/catalog-fragment/v1
+kind: CatalogFragment
+sources:
+  nvke-profiles:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: v0.23.0
+    toolchainImage: docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b

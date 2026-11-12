@@ -106,6 +106,20 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 			continue
 		}
 		if plan.Definition.SBOMTool != "" || plan.hasBundleTarget(artifact.BuildTarget) {
+			material := false
+			for _, inputID := range node.Inputs {
+				input := artifacts[inputID]
+				if input.Component == entry.Artifact && input.Kind != "producer-result" {
+					kind, err := plan.sbomPayloadKind(input)
+					if err != nil {
+						return nil, err
+					}
+					material = kind == "bundle-material"
+				}
+			}
+			if material {
+				continue
+			}
 			if len(bom.Components) == 0 {
 				return nil, e.New(e.CodeProvenanceMissing, "hosted SBOM omits required dependency inventory")
 			}
@@ -133,7 +147,7 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 			switch kind {
 			case "tarball":
 				matches = method == "helm-manifests/v1" && scanner == ""
-			case "bundle-archive":
+			case "bundle-archive", "bundle-layout":
 				matches = method == sbom.BundleFilesMethod && scanner == ""
 			case "file-archive":
 				matches = method == "archive-content/v1" && scanner == ""
