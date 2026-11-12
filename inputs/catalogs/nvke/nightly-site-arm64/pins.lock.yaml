@@ -18,7 +18,7 @@ pins:
     tag: v0.23.0
     treeHash: a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53
   nvke-nktp-helm:
-    commit: 2cfd00081b468d85a4894ec17e9deac13c9d8169
-    sourceDateEpoch: 1793236039
-    tag: v0.23.0
-    treeHash: a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53
+    commit: a97548c56d101b41740e8a00e273166c84b442e7
+    sourceDateEpoch: 1793913052
+    tag: nktp/v0.1.0
+    treeHash: 4125b283eacc8842210bf405e7dc5f04090e8b05

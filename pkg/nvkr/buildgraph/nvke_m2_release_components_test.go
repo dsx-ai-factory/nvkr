@@ -128,11 +128,9 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 	if err := yaml.UnmarshalStrict(baselineBytes, &baseline); err != nil {
 		t.Fatal(err)
 	}
-	for _, source := range []string{"nvke-content", "nvke-nktp"} {
-		pin, err := cat.SourcePin(source)
-		if err != nil || !reflect.DeepEqual(pin, baseline.Pins["nvke"]) {
-			t.Fatalf("%s must match the maintained controller source, pin=%+v err=%v", source, pin, err)
-		}
+	pin, err := cat.SourcePin("nvke-content")
+	if err != nil || !reflect.DeepEqual(pin, baseline.Pins["nvke"]) {
+		t.Fatalf("nvke-content must match the maintained controller source, pin=%+v err=%v", pin, err)
 	}
 	profilesCommand := strings.Join(cat.Components["nvke-nico-reference-profiles"].BuildCommand, " ")
 	if !strings.Contains(profilesCommand, "nico-vms-cp.yaml") || !strings.Contains(profilesCommand, "nico-vms-worker.yaml") ||

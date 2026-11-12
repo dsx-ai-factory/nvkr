@@ -39,52 +39,52 @@ artifacts:
     tag: v1.21.1
   nktp-collector-image:
     digests:
-      amd64: sha256:87adfbde7aff1288d7da30cb0cfbe00d0785b40f3919b1b16b745f0e859f0125
-      arm64: sha256:69fe8d3cc67230b95b3c506ff6af0a05a413f3fd4109b5624e7beb44723eb0fb
-    imageParentDigest: sha256:ed6862e1506e11c08a0ec4cc7e1395eb5cf10e3acf2c2ba3846edc1b6b3916d6
-    tag: v0.23.0
+      amd64: sha256:25510edb4dff3810d3dd7542db4d396ce0d870b2f57d32c93a8dcd6dde2677b6
+      arm64: sha256:d02f91eae487d99cfad338ca4a7d12ac108c9dd18e8c3a80950d70dceabd87ec
+    imageParentDigest: sha256:8f7e5aaac0302f090164d5f9c14e4437d8037c5aaa2d025fc3ad74c1922602eb
+    tag: nktp/v0.1.0
   nktp-kube-state-metrics-image:
     digests:
       amd64: sha256:01171220c7c059afc85034ffe687bfe7249e41c0cc46fbe9a5128503ceee3016
       arm64: sha256:92b46557c71ecac53825772e4827dbcd9fca876b1950060f8fb2f2ef0d7a27af
     imageParentDigest: sha256:42cfe3723a5f058171c627537fb57a3ea0f26e4380fa18555a95cb1a1b4cfc5b
-    tag: v0.23.0
+    tag: nktp/v0.1.0
   nktp-kubectl-image:
     digests:
-      amd64: sha256:da5097fcf72a7cfd16fd1d1d70e5f350b136a6cfe62ac19ef85f2fb756a140fd
-      arm64: sha256:53e3f5eec76af980ee0a3f728e76fb958e531b033a51f2c0c5ce47e50cc2660c
-    imageParentDigest: sha256:4f097593e791b1b5e4a67f74cef838034975384789ac87defa3aff50c1c8061f
-    tag: v0.23.0
+      amd64: sha256:9d08603e52103e88c896a60fd42a7f660bd37566ec3de6f2b2c948d8b3a90119
+      arm64: sha256:9054520faf548fe1b9fa5409bc3bee50be0c230d0e4cd7a1f12474c8e7b5704a
+    imageParentDigest: sha256:4e1d541a3d62f74637974e4c71f3cea91b9a36ffd059ab45e355648898783837
+    tag: nktp/v0.1.0
   nktp-lgtm-image:
     digests:
       amd64: sha256:bf33fa01b1a0314edc88c5bc2a295067e65270cf9c3f678a943a4a2c2a2472fd
       arm64: sha256:61ffd7c074d354759207d7541a0361cc2b4a897f0e06003c9672384a6b8cc2f6
     imageParentDigest: sha256:75cdf892daffadf3763ef61c16a6d7f8586216fce0b40bba7874a0b053121084
-    tag: v0.23.0
+    tag: nktp/v0.1.0
   nktp-metrics-server-image:
     digests:
       amd64: sha256:6231fb0a1ffab76c92ab880f51a0d11b290f688373647bcedff85af025dfd8a9
       arm64: sha256:9ece07f21cfaf3c2398bd4e0de1f127cfad23ec40d29ceffd8323b4f34744eb8
     imageParentDigest: sha256:b2d2efaf5ac3b366ed0f839d2412a2c4279d4fc2a2a733f12c52133faed36c41
-    tag: v0.23.0
+    tag: nktp/v0.1.0
   nktp-node-exporter-image:
     digests:
       amd64: sha256:da83fae85603c4e47e6c68369a7d746e2dda683dc35ea2e234b4f171e0d92798
       arm64: sha256:c9ef89f9464f09e7234decaae68a80ab856ff0014435677a99fd48b03dd410ea
     imageParentDigest: sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
-    tag: v0.23.0
+    tag: nktp/v0.1.0
   nktp-operator-image:
     digests:
       amd64: sha256:623759f8e8495109c937b18ef017a7ad345e7f969f7b9cab79c8018c6d644547
       arm64: sha256:e7f68d72660d0dd7bd82c0b27d488d7c626bc645124ebb9befead9209221d0b0
     imageParentDigest: sha256:76ac4fa40512b60f85ff236c60c075ca3407858efe72e22d2e96a9cf1bc82dc2
-    tag: v0.23.0
+    tag: nktp/v0.1.0
   nktp-target-allocator-image:
     digests:
       amd64: sha256:179b8353c5b14660b5e3bebe6e418a0622d0009f81d95bbacf0d0d9b9c94b8fa
       arm64: sha256:2c5349827083e9eac333f6777f1283a6d9d30bc07da28f959dafaaeb3358caef
     imageParentDigest: sha256:cf45770c658cf392618717043d9a478a8a9f97d3d5f79a31db54e85abc438718
-    tag: v0.23.0
+    tag: nktp/v0.1.0
 kind: PinLock
 pins:
   capi:
@@ -108,7 +108,7 @@ pins:
     tag: v0.23.0
     treeHash: a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53
   nvke-nktp:
-    commit: 2cfd00081b468d85a4894ec17e9deac13c9d8169
-    sourceDateEpoch: 1793236039
-    tag: v0.23.0
-    treeHash: a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53
+    commit: a97548c56d101b41740e8a00e273166c84b442e7
+    sourceDateEpoch: 1793913052
+    tag: nktp/v0.1.0
+    treeHash: 4125b283eacc8842210bf405e7dc5f04090e8b05

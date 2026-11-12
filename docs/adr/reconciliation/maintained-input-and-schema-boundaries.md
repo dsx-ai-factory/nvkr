@@ -167,7 +167,10 @@ scanner acceptance or complete production input approval. The
 The maintained release and native demo inputs now select the same stock NVKE `v0.23.0`
 source, `2cfd00081b468d85a4894ec17e9deac13c9d8169`, for OS assembly, agent, Calico,
 kubeadm, SPIRE packaging and DOCA OVS acquisition, including the renamed Packer targets, disk filenames,
-material schema and required Ubuntu-series input. SPIRE uses that release's revision-4
+material schema and required Ubuntu-series input. NVKE telemetry pipelines is packaged from its own repository,
+`dsx-ai-factory/nvke-telemetry-pipeline`, at `nktp/v0.1.0`, the release that `v0.23.0`'s site values target.
+The native installer bundle still installs `v0.23.0`'s in-tree chart until NVKR selects an NVKE release without it
+([#465](https://github.com/dsx-ai-factory/nvkr/issues/465)). SPIRE uses that release's revision-4
 package and source-owned public acquisition/packaging commands; no pre-DSX source
 rollback is selected. The default package's removal of DSX IMDS is an upstream release
 contract, not a missing private dependency waived by NVKR. Historical DSX source,
