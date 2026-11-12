@@ -194,7 +194,7 @@ func (l *lab) corePlan(ctx context.Context, image string, ca []byte, keys map[st
 	policyRaw := read(l.t, filepath.Join(l.root, "inputs/policies/nvke-qualification.yaml"))
 	var hosted lifecycle.QualificationPolicy
 	must(l.t, yaml.UnmarshalStrict(policyRaw, &hosted))
-	smoke := qualificationpolicy.Smoke{Images: map[string]string{"linux/amd64": hosted.Smoke.Images["linux/amd64"]}, Tools: map[string]string{"nvkectl": "nvkectl-version-json", "helm": "helm-version", "kubectl": "kubectl-client-version-json"}}
+	smoke := qualificationpolicy.Smoke{Images: map[string]string{"linux/amd64": hosted.Smoke.Images["linux/amd64"]}, Tools: map[string]string{"nvkectl-module-tags": "nvkectl-version-json", "helm-operator": "helm-version", "kubectl-operator": "kubectl-client-version-json"}}
 	for _, output := range outputs {
 		if output.Format == "oci" {
 			smoke.NonToolOutputs = append(smoke.NonToolOutputs, qualificationpolicy.NonToolOutput{Output: output.Name, Kind: "oci", Components: output.Components, Reason: "deployment-image"})
@@ -235,8 +235,8 @@ func (l *lab) runner(ctx context.Context, registry string) (string, string) {
 			Tool struct{ URL, ArchiveDigest string }
 		}
 	}
-	must(l.t, yaml.Unmarshal(read(l.t, filepath.Join(l.root, "inputs/catalogs/nvke/module-tags/pins.lock.yaml")), &lock))
-	tool := lock.Pins["cosign"].Tool
+	must(l.t, yaml.Unmarshal(read(l.t, filepath.Join(l.root, "inputs/catalogs/nvke/pins.lock.yaml")), &lock))
+	tool := lock.Pins["cosign-module-tags"].Tool
 	cosign := filepath.Join(l.scratch, "cosign")
 	must(l.t, os.WriteFile(cosign, l.download(ctx, tool.URL, strings.TrimPrefix(tool.ArchiveDigest, "sha256:"), 256<<20), 0700))
 	return digest, cosign
