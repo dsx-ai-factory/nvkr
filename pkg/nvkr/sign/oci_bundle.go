@@ -50,9 +50,15 @@ func ociBundleClaims(raw []byte, digest, predicateType string, policy VerifyPoli
 	if err := json.Unmarshal(raw, &bundle); err != nil {
 		return "", "", e.Wrap(e.CodeSignatureInvalid, err, "decoding keyless OCI bundle")
 	}
-	if bundle.MediaType != sbom.BundleMediaType || bundle.DSSE.PayloadType != "application/vnd.in-toto+json" ||
-		bundle.VerificationMaterial.Certificate.RawBytes == "" || len(bundle.VerificationMaterial.PublicKey) != 0 {
-		return "", "", e.New(e.CodeSignatureInvalid, "OCI verification requires a keyless Sigstore v0.3 DSSE bundle")
+	if bundle.MediaType != sbom.BundleMediaType || bundle.DSSE.PayloadType != "application/vnd.in-toto+json" {
+		return "", "", e.New(e.CodeSignatureInvalid, "OCI verification requires a Sigstore v0.3 DSSE bundle")
+	}
+	if policy.keyTrust == nil {
+		if bundle.VerificationMaterial.Certificate.RawBytes == "" || len(bundle.VerificationMaterial.PublicKey) != 0 {
+			return "", "", e.New(e.CodeSignatureInvalid, "keyless OCI verification requires certificate material")
+		}
+	} else if bundle.VerificationMaterial.Certificate.RawBytes != "" || len(bundle.VerificationMaterial.PublicKey) == 0 || string(bundle.VerificationMaterial.PublicKey) == "null" {
+		return "", "", e.New(e.CodeSignatureInvalid, "explicit-key OCI verification requires key material without a certificate")
 	}
 	payload, err := base64.StdEncoding.DecodeString(bundle.DSSE.Payload)
 	if err != nil {
@@ -79,6 +85,11 @@ func ociBundleClaims(raw []byte, digest, predicateType string, policy VerifyPoli
 		if err != nil || !bytes.Equal(expected, actual) {
 			return "", "", e.New(e.CodeVerifyFailed, "authenticated statement does not bind the expected predicate")
 		}
+	}
+	if policy.keyTrust != nil {
+		// This is an independently selected key-to-role mapping, not a claim
+		// copied from the bundle. The caller must still verify these exact bytes.
+		return policy.keyTrust.Identity, policy.Issuer, nil
 	}
 	der, err := base64.StdEncoding.DecodeString(bundle.VerificationMaterial.Certificate.RawBytes)
 	if err != nil {
@@ -128,7 +139,7 @@ func (s *CosignOCISigner) newOCIBundleSource(ctx context.Context, subject Subjec
 	if s.bundleSource != nil {
 		return s.bundleSource(ctx, subject, s.credential)
 	}
-	return newRegistryBundleSource(ctx, subject, s.credential, s.keychain)
+	return newRegistryBundleSourceTransport(ctx, subject, s.credential, s.keychain, s.plainHTTP)
 }
 
 // A type annotation controls search order only. The statement's actual type
@@ -187,6 +198,10 @@ func (s *CosignOCISigner) verifyOCIType(ctx context.Context, source *ociBundleSo
 			return "", "", nil, err
 		}
 		args := ociVerifyBundleArgs(path, subject.Digest, predicateType, policy)
+		args, err = keyedBundleArguments(ctx, args, workspace, policy.keyTrust)
+		if err != nil {
+			return "", "", nil, err
+		}
 		ran = append(ran, argv(s.binary, args))
 		if _, err := s.capture(ctx, args, environment); err != nil {
 			if ctxErr := contextError(ctx); ctxErr != nil {

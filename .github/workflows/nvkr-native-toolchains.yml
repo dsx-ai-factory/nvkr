@@ -357,6 +357,7 @@ jobs:
           set -euo pipefail
           make workflows-check
           bin/nvkr-exec factory toolchain-maintenance --operation repin --run "$APPROVAL_RUN" > "$RUNNER_TEMP/changed-pins.json"
+          make producer-overlays-generate
           make workflows-generate workflows-check
           git diff --check
       - name: Create review App token

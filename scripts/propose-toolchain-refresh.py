@@ -39,6 +39,8 @@ def allowed_path(path):
     parts = Path(path).parts
     if not parts or ".." in parts or Path(path).is_absolute():
         return False
+    if path in ("inputs/policies/ovn-producer-overlays.json", "toolchains/nvkr-packer/local-bindings.json"):
+        return True
     if path.startswith(("inputs/catalogs/", "inputs/environments/", "inputs/experiments/", "docs/examples/")):
         return path.endswith((".yaml", ".json")) and not path.endswith("/pins.lock.yaml")
     if len(parts) >= 3 and parts[0] == ".github" and parts[1].startswith("nvkr-"):

@@ -12,6 +12,11 @@ import (
 )
 
 func TestNVKEReleasePinsStayAligned(t *testing.T) {
+	// These catalogs package the NKTP chart. Each selects the NKTP release that
+	// NVKE v0.23.0's deploy/nico/nktp/values.yaml targets.
+	buildsNKTP := map[string]bool{
+		"nvke/release-components": true, "nvke/local-site-arm64": true, "nvke/native-site": true, "nvke/nightly-site-arm64": true,
+	}
 	for _, directory := range []string{
 		"nvke/release", "nvke/release-components", "nvke/module-tags", "nvke/module-cli-arm64",
 		"nvke/local-site-arm64", "nvke/native-site", "nvke/nightly-site-arm64",
@@ -33,19 +38,34 @@ func TestNVKEReleasePinsStayAligned(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			nktpSources := 0
 			for name, source := range registry.Sources {
-				if strings.TrimSuffix(source.Repo, ".git") != "https://github.com/dsx-ai-factory/nvke" {
-					continue
-				}
 				pin := lock.Pins[name]
-				if source.Constraint != "v0.23.0" || source.TagPrefix != "" || pin.Tag != "v0.23.0" || pin.Commit != "2cfd00081b468d85a4894ec17e9deac13c9d8169" || pin.TreeHash != "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53" || pin.SourceDateEpoch != 1793236039 {
-					t.Fatalf("%s must select the complete NVKE v0.23.0 identity: %+v", name, pin)
+				switch strings.TrimSuffix(source.Repo, ".git") {
+				case "https://github.com/dsx-ai-factory/nvke":
+					if source.Constraint != "v0.23.0" || source.TagPrefix != "" || pin.Tag != "v0.23.0" || pin.Commit != "2cfd00081b468d85a4894ec17e9deac13c9d8169" || pin.TreeHash != "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53" || pin.SourceDateEpoch != 1793236039 {
+						t.Fatalf("%s must select the complete NVKE v0.23.0 identity: %+v", name, pin)
+					}
+				case "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline":
+					nktpSources++
+					if source.Constraint != "0.1.0" || source.TagPrefix != "nktp/v" || pin.Tag != "nktp/v0.1.0" || pin.Commit != "a97548c56d101b41740e8a00e273166c84b442e7" || pin.TreeHash != "4125b283eacc8842210bf405e7dc5f04090e8b05" || pin.SourceDateEpoch != 1793913052 {
+						t.Fatalf("%s must select the complete NKTP nktp/v0.1.0 identity: %+v", name, pin)
+					}
+				default:
+					continue
 				}
 				for component, producer := range registry.Components {
 					if producer.Source == name && producer.Prebuilt != nil && producer.Prebuilt.Image != "" && lock.Artifacts[component].Tag != pin.Tag {
 						t.Fatalf("%s artifact selection must follow source %s at %s", component, name, pin.Tag)
 					}
 				}
+			}
+			want := 0
+			if buildsNKTP[directory] {
+				want = 1
+			}
+			if nktpSources != want {
+				t.Fatalf("%s selects %d NKTP sources, want %d", directory, nktpSources, want)
 			}
 		})
 	}

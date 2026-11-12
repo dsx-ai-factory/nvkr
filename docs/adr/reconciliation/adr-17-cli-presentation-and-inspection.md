@@ -1,8 +1,8 @@
 ## ADR-17 CLI presentation and inspection
 
-Of the 25 public command leaves, 23 expose typed terminal result browsers; local Run
-execution additionally supplies bounded operation/output progress. The separate `run check-artifacts`
-and `run qualify` commands retain canonical machine-readable diagnostics. The hidden native worker is
+Of the 33 public command leaves, 29 expose typed terminal result browsers; local Run
+execution additionally supplies bounded operation/output progress. The separate `validate`,
+`run check-artifacts`, `run qualify` and `run qualify-local` commands retain canonical machine-readable diagnostics. The hidden native worker is
 not a public command. Owners retain
 execution, record, artifact and verification authority. Lifecycle alone finalizes
 live telemetry from its returned Run/error; complete output retention and a coded

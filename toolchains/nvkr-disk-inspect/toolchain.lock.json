@@ -5,7 +5,7 @@
   "ubuntuSnapshot": "20261109T000000Z",
   "helper": {
     "source": "cmd/nvkr-disk-inspect",
-    "goToolchain": "go1.27.3",
+    "goToolchain": "go1.27.4",
     "architectures": ["amd64", "arm64"]
   },
   "packages": {

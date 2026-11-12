@@ -71,6 +71,7 @@ func (s *CosignOCISigner) attestExact(ctx context.Context, subject Subject, pred
 	if err != nil {
 		return err
 	}
+	policy.keyTrust = s.keyTrust
 	workspace, cleanup, err := newPrivateWorkspace("nvkr-exact-attest-*")
 	if err != nil {
 		return err
@@ -86,7 +87,23 @@ func (s *CosignOCISigner) attestExact(ctx context.Context, subject Subject, pred
 	}
 	environment := ociCosignEnvironment(os.Environ(), dockerConfig)
 	args := exactAttestArgs(predicateType, subject.Ref, path)
+	if s.plainHTTP {
+		args = append(args[:len(args)-1], "--allow-http-registry", subject.Ref)
+	}
+	args, err = s.keySigningArguments(ctx, args, workspace)
+	if err != nil {
+		return err
+	}
+	if s.keyTrust != nil {
+		environment = keyCosignEnvironment(environment)
+	}
 	if _, err := s.capture(ctx, args, environment); err != nil {
+		if canceled := contextError(ctx); canceled != nil {
+			return canceled
+		}
+		if s.keyTrust != nil {
+			return e.New(e.CodeSignatureInvalid, "keyed %s attestation failed", label)
+		}
 		return err
 	}
 	if err := assertPrivateFileUnchanged(path, exact); err != nil {
@@ -125,6 +142,7 @@ func (s *CosignOCISigner) verifyExact(ctx context.Context, subject Subject, pred
 	if err != nil {
 		return err
 	}
+	policy.keyTrust = s.keyTrust
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	workspace, cleanup, err := newPrivateWorkspace("nvkr-exact-verify-*")
@@ -136,6 +154,10 @@ func (s *CosignOCISigner) verifyExact(ctx context.Context, subject Subject, pred
 	if err != nil {
 		return err
 	}
-	_, _, _, err = s.verifyOCIBundles(ctx, subject, predicateType, policy, workspace, ociCosignEnvironment(os.Environ(), dockerConfig))
+	environment := ociCosignEnvironment(os.Environ(), dockerConfig)
+	if s.keyTrust != nil {
+		environment = keyCosignEnvironment(environment)
+	}
+	_, _, _, err = s.verifyOCIBundles(ctx, subject, predicateType, policy, workspace, environment)
 	return err
 }

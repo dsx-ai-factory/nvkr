@@ -126,7 +126,11 @@ func (manifest Manifest) validate() error {
 	if err := qualifier.Validate(); err != nil {
 		return err
 	}
-	if source.Commit == "" || source.BuilderID == "" || source.InvocationID == "" || qualifier.BuilderID == "" ||
+	if source.Provider == "tekton" {
+		if qualifier.Provider != "tekton" || source.Task != "" || qualifier.Task != "nvkr-qualify" || source.InvocationID != qualifier.InvocationID || source.BuilderID == qualifier.BuilderID {
+			return e.New(e.CodeVerifyFailed, "Tekton manifest requires separate publisher and qualifier tasks in the exact Run")
+		}
+	} else if qualifier.Provider != "" || source.Commit == "" || source.BuilderID == "" || source.InvocationID == "" || qualifier.BuilderID == "" ||
 		qualifier.InvocationID == "" || qualifier.Repository != source.Repository || qualifier.Ref != source.Ref ||
 		qualifier.BuilderID == source.BuilderID || qualifier.InvocationID == source.InvocationID {
 		return e.New(e.CodeVerifyFailed, "release manifest lacks separate exact build and qualification identities")

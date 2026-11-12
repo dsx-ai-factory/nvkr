@@ -72,7 +72,23 @@ func (evidence Evidence) validate() error {
 	if err := evidence.Invocation.Validate(); err != nil {
 		return err
 	}
-	if checks.Origin.Repository == "" || checks.Origin.Commit == "" || evidence.Invocation.Repository != checks.Origin.Repository ||
+	if checks.Origin.Provider == "tekton" {
+		trust := evidence.ToolSmoke.Policy.Tekton
+		if dev || trust == nil || evidence.Invocation.Provider != "tekton" || checks.Origin.Task != "" || evidence.Invocation.Task != "nvkr-qualify" || evidence.Invocation.InvocationID != checks.Origin.InvocationID {
+			return e.New(e.CodeVerifyFailed, "Tekton qualification requires separate tasks in the exact producing Run")
+		}
+		publisher, err := trust.Identity("publisher")
+		if err != nil {
+			return err
+		}
+		qualifier, err := trust.Identity("qualifier")
+		if err != nil {
+			return err
+		}
+		if checks.Origin.BuilderID != publisher || evidence.Invocation.BuilderID != qualifier || checks.Inputs.PlanDigest != trust.PlanDigest {
+			return e.New(e.CodeUntrustedSigner, "Tekton qualification differs from selected cluster roles or Plan")
+		}
+	} else if evidence.Invocation.Provider != "" || evidence.ToolSmoke.Policy.Tekton != nil || checks.Origin.Repository == "" || checks.Origin.Commit == "" || evidence.Invocation.Repository != checks.Origin.Repository ||
 		evidence.Invocation.BuilderID == checks.Origin.BuilderID || evidence.Invocation.InvocationID == checks.Origin.InvocationID ||
 		(!dev && evidence.Invocation.Ref != checks.Origin.Ref) || evidence.Invocation.BuilderID == "" || evidence.Invocation.InvocationID == "" {
 		return e.New(e.CodeVerifyFailed, "qualification evidence lacks separate exact build and qualification identities")

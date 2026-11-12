@@ -17,7 +17,7 @@ func TestGenerationEngineAdmission(t *testing.T) {
 		{EngineGitHub, ""},
 		{" GitHub ", ""},
 		{EngineGitLab, e.CodeEngineCapability},
-		{EngineTekton, e.CodeEngineCapability},
+		{EngineTekton, ""},
 		{EngineArgo, e.CodeEngineCapability},
 		{"local", e.CodeUsage},
 		{"jenkins", e.CodeUsage},

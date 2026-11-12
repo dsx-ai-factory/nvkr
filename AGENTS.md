@@ -81,7 +81,8 @@ retains its original scope; superseded requirements and plans are available only
    do not prove registries, CI, signing services, or runners.
 5. **Generated CI defaults to generic hosted runners.** ADR-18 permits only the explicit `native-kvm-v1`
    ARC disk route on `arc-amd64-kvm` and `arc-arm64-kvm`; no arbitrary self-hosted labels or qualified
-   claims. Maintained execution targets are local and GitHub; publication and signing are GitHub-only in v1.
+   claims. Execution targets are local, GitHub, and ADR-18's native Tekton route. Tekton publication and
+   signing require explicit cluster keys; external acceptance scope is recorded in reconciliation.
    ADR-31's unsigned qualification results index is a description, not publication.
 6. **Do not commit, push, tag, or open PRs unless explicitly asked.** Leave the working tree for the user to
    review.

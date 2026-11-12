@@ -70,7 +70,7 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 		if !safeGeneratedPath(name) || int64(len(bundle.Files[name])) > maxGeneratedFileBytes {
 			return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run member %q is unsafe or oversized", name)
 		}
-		if name == bundle.WorkflowPath || githubPartitionWorkflowSuffix.MatchString(name) {
+		if bundle.Engine == EngineGitHub && (name == bundle.WorkflowPath || githubPartitionWorkflowSuffix.MatchString(name)) {
 			if err := validateGitHubWorkflowSize(bundle.Files[name]); err != nil {
 				return GeneratedManifest{}, nil, err
 			}
@@ -91,6 +91,10 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 // Other legacy siblings are admitted only when retiring a prior manifest.
 func validateBundleNamespace(bundle *GeneratedBundle) error {
 	layout, ok := githubWorkflowNamespace(bundle.WorkflowPath)
+	if bundle.Engine == EngineTekton {
+		layout = generationLayout{workflowPath: tektonResourcePath, manifestPath: tektonManifestPath, planPath: tektonPlanPath}
+		ok = bundle.WorkflowPath == layout.workflowPath
+	}
 	if !ok {
 		return e.New(e.CodeInvalidCatalog, "generated Run has an invalid namespace")
 	}

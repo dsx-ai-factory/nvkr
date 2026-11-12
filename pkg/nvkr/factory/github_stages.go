@@ -176,6 +176,13 @@ func githubDiskProducerTimeoutSeconds(node Node) (uint64, error) {
 }
 
 func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
+	return projectExecutionStages(plan, plan.GitHubExecutionFor)
+}
+
+// projectExecutionStages is the common operation grouping used by CI adapters.
+// Placement only resolves where an existing operation runs. Membership, source
+// cohorts, artifact boundaries and stage contraction remain one shared policy.
+func projectExecutionStages(plan *Plan, placement func(Node) (Node, error)) ([]githubStage, map[string]string, error) {
 	ordered, schedulingKeys, err := githubSchedulingProjection(plan)
 	if err != nil {
 		return nil, nil, err
@@ -186,7 +193,7 @@ func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
 	nodeStages := make(map[string]int, len(ordered))
 	nodes, artifacts := planIndex(plan)
 	for _, node := range ordered {
-		node, err := plan.GitHubExecutionFor(node)
+		node, err := placement(node)
 		if err != nil {
 			return nil, nil, err
 		}

@@ -21,7 +21,8 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | Browse public command results | [Command result browser](lifecycle.md#browse-public-command-results) |
 | Watch a local Run or inspect its recorded outcome | [Lifecycle dashboard and read-only inspection](lifecycle.md#choose-local-run-presentation) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
-| Visualize dependencies and generate GitHub Actions | [Pipeline generation](generate-pipeline.md) |
+| Start a small executable Definition from catalog components | [Definition init](lifecycle.md#start-a-small-executable-definition) |
+| Visualize dependencies and generate GitHub Actions or Tekton | [Pipeline generation](generate-pipeline.md) |
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Build AICR deployment bundles as OCI artifacts | [AICR inputs, supported hardware recipes and rendering limits](../inputs/definitions/aicr/README.md) |
 | Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
@@ -52,7 +53,7 @@ records source availability and remaining gaps.
 |---|---|
 | Immutable attempts, completeness, consumer policy, and SDK | [Lifecycle](lifecycle.md) |
 | Canonical Plans, graph views, comparison, and drift | [Plan and graph inspection](plan-and-graph-inspection.md) |
-| Registry/layout browsing, generic JSON export, output downloads, credentials, and metadata limits | [Release navigation](release-navigation.md) |
+| Registry/layout browsing, comparing two Releases, generic JSON export, output downloads, credentials, and metadata limits | [Release navigation](release-navigation.md) |
 | Publication graph, artifact subjects, and signing scope | [Publication architecture](publication-architecture.md) |
 | Configure or review required object-store publication | [Publication guide](publication-architecture.md#required-s3-copy), [ADR-20 contract](adr/0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract), [implementation boundary](adr/reconciliation/object-store-publication.md#object-store-publication) |
 | Review object-store dependency admission | [Dated dependency evidence](evidence/2026-11-04-object-store-dependency-admission.md) |

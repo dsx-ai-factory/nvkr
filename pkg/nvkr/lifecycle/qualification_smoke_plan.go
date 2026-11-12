@@ -59,7 +59,7 @@ func toolSmokePlanScope(plan *factory.Plan, smoke QualificationSmokePolicy) ([]p
 	}
 	memberExemptions := make(map[string]QualificationNonToolMember, len(smoke.NonToolMembers))
 	for _, rule := range smoke.NonToolMembers {
-		memberExemptions[rule.key()] = rule
+		memberExemptions[rule.Key()] = rule
 	}
 	seenOutputs := map[string]bool{}
 	usedTools := map[string]bool{}

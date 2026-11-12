@@ -84,12 +84,19 @@ func (s *CosignOCISigner) AttestSBOM(ctx context.Context, digest string, predica
 // verifies the successful attempt's exact subject, predicate and trust policy.
 func (s *CosignOCISigner) createSBOMBundle(ctx context.Context, digest string, predicate []byte, input, workspace string) (string, error) {
 	environment := ociCosignEnvironment(os.Environ(), "")
+	if s.keyTrust != nil {
+		environment = keyCosignEnvironment(environment)
+	}
 	for attempt := 1; attempt <= 3; attempt++ {
 		if err := contextError(ctx); err != nil {
 			return "", err
 		}
 		output := filepath.Join(workspace, fmt.Sprintf("bundle-%d.json", attempt))
 		args := []string{"attest-blob", "--yes", "--new-bundle-format", "--bundle", output, "--type", "cyclonedx", "--predicate", input, "--hash", strings.TrimPrefix(digest, "sha256:"), "artifact"}
+		args, err := s.keySigningArguments(ctx, args, workspace)
+		if err != nil {
+			return "", err
+		}
 		var stdout, stderr cosignOutputBuffer
 		runErr := s.run(ctx, args, environment, &stdout, &stderr)
 		predicateErr := assertPrivateFileUnchanged(input, predicate)
@@ -104,6 +111,9 @@ func (s *CosignOCISigner) createSBOMBundle(ctx context.Context, digest string, p
 		}
 		if runErr == nil {
 			return output, nil
+		}
+		if s.keyTrust != nil {
+			return "", e.Wrap(e.CodeSignatureInvalid, runErr, "explicit-key SBOM signing failed")
 		}
 		if attempt == 3 || !sbomRekorEntryConflict(stderr.String()) {
 			return "", e.Wrap(e.CodeSignatureInvalid, runErr,
@@ -151,8 +161,22 @@ func (s *CosignOCISigner) VerifySBOM(ctx context.Context, digest string, bundle 
 	if err := writePrivateFile(ctx, path, bundle); err != nil {
 		return err
 	}
-	args := ociVerifyBundleArgs(path, digest, sbom.CycloneDXPredicateType, VerifyPolicy{IdentityRegexp: s.identity, Issuer: s.issuer})
-	if _, err := s.capture(ctx, args, ociCosignEnvironment(os.Environ(), "")); err != nil {
+	policy := VerifyPolicy{IdentityRegexp: s.identity, Issuer: s.issuer, keyTrust: s.keyTrust}
+	if s.keyTrust != nil {
+		if _, _, err := ociBundleClaims(bundle, digest, sbom.CycloneDXPredicateType, policy); err != nil {
+			return err
+		}
+	}
+	args := ociVerifyBundleArgs(path, digest, sbom.CycloneDXPredicateType, policy)
+	args, err = keyedBundleArguments(ctx, args, workspace, s.keyTrust)
+	if err != nil {
+		return err
+	}
+	environment := ociCosignEnvironment(os.Environ(), "")
+	if s.keyTrust != nil {
+		environment = keyCosignEnvironment(environment)
+	}
+	if _, err := s.capture(ctx, args, environment); err != nil {
 		return err
 	}
 	if err := contextError(ctx); err != nil {

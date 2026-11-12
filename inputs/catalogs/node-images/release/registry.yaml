@@ -324,7 +324,7 @@ components:
       timeoutSeconds: 21600
     packer:
       projectPath: os-image/packer
-      packerVersion: 1.15.4
+      packerVersion: 1.16.2
       buildName: nvke-node-fde.qemu.nvke-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
@@ -374,7 +374,7 @@ components:
       timeoutSeconds: 21600
     packer:
       projectPath: os-image/packer
-      packerVersion: 1.15.4
+      packerVersion: 1.16.2
       buildName: nvke-node-fde.qemu.nvke-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
@@ -425,7 +425,7 @@ components:
       timeoutSeconds: 21600
     packer:
       projectPath: os-image/packer
-      packerVersion: 1.15.4
+      packerVersion: 1.16.2
       buildName: nvke-node-non-fde.qemu.nvke-non-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
@@ -473,7 +473,7 @@ components:
       timeoutSeconds: 21600
     packer:
       projectPath: os-image/packer
-      packerVersion: 1.15.4
+      packerVersion: 1.16.2
       buildName: nvke-node-non-fde.qemu.nvke-non-fde
       architectureVariable: architecture
       acceleratorVariable: accelerator
@@ -515,4 +515,4 @@ imports:
     ubuntu-installer-iso: ubuntu-installer-iso
     ubuntu-installer-iso-amd64: ubuntu-installer-iso-amd64
   path: "../../shared/node-images.yaml"
-  sha256: e6e440fc8842d2de5c1b41bcb1d37acd65c2535e3ca78873f297b362d910166a
+  sha256: 645a95c90ef1f68fd7e84cd660a7d0fb660e63a2932f8370cde65383a6d71225

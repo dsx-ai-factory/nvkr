@@ -432,9 +432,19 @@ func authenticityRegistryAPTLayout(t *testing.T) (string, string) {
 // SBOMs. Only the aggregate is an independent signature/provenance subject.
 func authenticityRegistryIndexLayout(t *testing.T) (string, string) {
 	t.Helper()
-	platforms := []string{"linux/amd64", "linux/arm64"}
+	return indexPublicationLayout(t, "amd64", "arm64")
+}
+
+// indexPublicationLayout publishes one aggregate image output "cwe" whose index
+// holds a synthetic child for each Linux architecture given.
+func indexPublicationLayout(t *testing.T, arches ...string) (string, string) {
+	t.Helper()
+	var platforms []string
+	for _, arch := range arches {
+		platforms = append(platforms, "linux/"+arch)
+	}
 	var inputs []delivery.ImageIndexInput
-	for _, arch := range []string{"amd64", "arm64"} {
+	for _, arch := range arches {
 		root := t.TempDir()
 		binary := filepath.Join(root, "worker")
 		if err := os.WriteFile(binary, []byte("synthetic worker"), 0o755); err != nil {

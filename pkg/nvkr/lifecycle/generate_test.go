@@ -76,7 +76,7 @@ func TestGenerateFilesHonorsProjectionSelectionOnlyAtTopLevel(t *testing.T) {
 }
 
 func TestGenerateFilesRejectsUnsupportedEngineBeforeReadingInputsOrOutput(t *testing.T) {
-	for _, engine := range []string{factory.EngineGitLab, factory.EngineTekton, factory.EngineArgo} {
+	for _, engine := range []string{factory.EngineGitLab, factory.EngineArgo} {
 		t.Run(engine, func(t *testing.T) {
 			root := filepath.Join(t.TempDir(), "must-not-exist")
 			_, err := GenerateFiles(context.Background(), "missing-definition.yaml", "missing-environment.yaml", "test", engine, root, false)

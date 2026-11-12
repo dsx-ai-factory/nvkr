@@ -1,8 +1,10 @@
-# Generate a GitHub Actions pipeline
+# Generate a CI pipeline
 
 Turn a Definition and Environment into a reviewable pipeline bundle. A **Definition** selects the named
 outputs to build; an **Environment** supplies execution, publication, and signing settings. This walkthrough
 uses the three-output NVKE tutorial: a CLI executable, a container image, and a Helm chart.
+The walkthrough uses GitHub Actions. [Tekton cluster execution](#tekton-cluster-execution) uses the same
+Plan and runner with explicit cluster trust.
 
 Start at the repository root with `bin/nvkr` built as described in the [quickstart](quickstart.md#build-only-the-cli).
 Run these commands in the same terminal. They write to a temporary directory, leaving the repository's
@@ -326,6 +328,40 @@ retires unchanged obsolete actions through the previous manifest. Editing an act
 workflow. Producer jobs retain explicit dependencies and separate results; producer matrices and general
 callable workflows remain deferred. The optional qualification bundle has its own fixed reusable native
 worker and selected-platform matrix (ADR-21).
+
+## Tekton cluster execution
+
+Select `--engine tekton` with an Environment containing `tekton` configuration. Generation writes
+`.tekton/nvkr-run/resources.json`, `plan.json` and `manifest.json`; `--check` compares their exact bytes.
+The resource list contains immutable Plan/configuration ConfigMaps, scoped service accounts and read-only
+API roles, and a `tekton.dev/v1` PipelineRun with embedded TaskSpecs. Use server-side apply for the static
+resources: client-side apply adds a last-applied annotation that can exceed the annotation limit for large
+immutable ConfigMaps. Create the PipelineRun separately: its generated name gives each execution a fresh UID and PVC.
+
+The Environment selects the API HTTPS endpoint and CA, namespace, native Linux platform, storage class
+and workspace size, digest-pinned runner/runtime images, three distinct public keys, and native smoke policy.
+The signing identity is the exact publisher service-account URI, anchored as a regular expression; the issuer
+is the selected API endpoint. Create `nvkr-publisher-key`, `nvkr-smoke-key` and `nvkr-qualifier-key` Secrets in
+that namespace, each with a passwordless cosign private key under `private.pem`. Keep those keys outside
+authored inputs and generated bundles. Only the corresponding task mounts each key.
+
+Use a dedicated trusted cluster: each build task launches its own privileged Docker sidecar. The route admits
+one native platform, `per-output-v1` signed OCI publication, public source/toolchain acquisition and anonymous
+registry transport. OS images, foreign platforms, GitHub credentials, private image readers, mutable aliases
+and object-store destinations are rejected. Anonymous registry access does not bypass signature verification.
+
+The runner authenticates complete Run/task/PVC bindings and carrier bytes before consuming them. Separate
+smoke and qualification tasks reuse the existing complete artifact and delivered-tool checks. The finalizer
+has no signing key and independently verifies every member and the release manifest. A failed, omitted,
+corrupt or canceled execution cannot become successful. Claims remain `pipeline-attested`.
+
+Run `bash scripts/test-tekton-kind.sh` on a native AMD64 Docker host with at least four CPUs and 6 GiB assigned to Docker,
+the repository's exact Go version, and kind v0.31.0 installed. The same command runs in
+[the kind CI workflow](https://github.com/dsx-ai-factory/nvkr/blob/main/.github/workflows/tekton-kind.yml). It creates an owned disposable cluster,
+in-cluster registry and test-only keys, selects the maintained core Definition's AMD64 outputs, and checks
+publication, signing, qualification, transport faults and cancellation. Set `NVKR_TEKTON_EVIDENCE` to an
+external directory to retain public reports; keys and kubeconfig stay in disposable scratch storage.
+See [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-18.md) for the exact externally exercised scope.
 
 ## Recover interrupted qualification generation
 

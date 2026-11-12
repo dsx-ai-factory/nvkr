@@ -47,6 +47,9 @@ declared LUKS2 disks retain encrypted bytes without decryption. Installation, ex
 separate operations requiring the customer's requested scope. Pulling checks the complete metadata closure and
 selected payload integrity; signature and policy acceptance require explicit verification.
 
+To see which outputs were added, removed or changed between two releases, use `release diff` as described in
+[release navigation](../../../docs/release-navigation.md#compare-two-releases).
+
 ## Execution and evidence boundaries
 
 Check platforms, tools, source access, runtime, destinations and evidence lane. A Plan or dry-run is
@@ -123,8 +126,9 @@ or run unrelated instructions.
 - Actual output identities and Run/evidence locations; distinguish planned, built, published and signed
   operations.
 - Evidence lane: `static-unqualified` for previews; `unqualified-local-execution` for successful local execution;
-  `pipeline-attested` only for supported hosted production
-  evidence. Signing alone does not establish that lane's complete claim.
+  `pipeline-attested` only for admitted GitHub or explicitly trusted Tekton production
+  evidence. Signing alone does not establish that lane's complete claim; consult reconciliation for
+  external acceptance of the selected provider.
 - Successful `release verify` results with their exact `--lane`, `--scope` and policy: `authenticity` verifies
   signatures/evidence without payload downloads; `artifact-publication` also checks selected payload bytes.
   Browsing and export are metadata only; pulling checks the selected output's complete payload integrity without

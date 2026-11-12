@@ -116,6 +116,7 @@ func (s Subject) Validate() error {
 // record is never evidence that a signature verifies; the exact proof bundles
 // must pass the verifier under the consumer's policy.
 type SigningRecord struct {
+	PublicKeySHA256 string     `json:"publicKeySha256,omitempty"`
 	SchemaVersion   string     `json:"schemaVersion"`
 	DryRun          bool       `json:"dryRun"`
 	Ref             string     `json:"ref"`
@@ -133,6 +134,7 @@ type SigningRecord struct {
 // dry-run mode SignatureVerified and AttestationVerified are always false: no
 // registry was contacted and nothing was checked.
 type VerificationRecord struct {
+	PublicKeySHA256     string     `json:"publicKeySha256,omitempty"`
 	SchemaVersion       string     `json:"schemaVersion"`
 	DryRun              bool       `json:"dryRun"`
 	Ref                 string     `json:"ref"`
@@ -153,6 +155,7 @@ type VerificationRecord struct {
 // fields are mandatory: an unpinned identity or issuer would accept any Fulcio
 // certificate and is therefore not a trust decision at all.
 type VerifyPolicy struct {
+	keyTrust *OCIKeyTrust
 	// ExpectedPredicate optionally binds the exact production predicate, including Plan and invocation.
 	ExpectedPredicate  []byte
 	IdentityRegexp     string
@@ -168,6 +171,9 @@ type OCISigner interface {
 
 // Validate enforces the signing-record contract before it is published.
 func (r SigningRecord) Validate() error {
+	if r.PublicKeySHA256 != "" && (!canonical.IsDigest(r.PublicKeySHA256) || r.DryRun) {
+		return e.New(e.CodeTrustPolicyMissing, "keyed signing record requires exact executed key identity")
+	}
 	if r.SchemaVersion != SigningRecordSchemaVersion {
 		return e.New(e.CodeInvalidCatalog,
 			"signing record schemaVersion %q is unsupported (want %q)", r.SchemaVersion, SigningRecordSchemaVersion)
@@ -204,6 +210,9 @@ func (r SigningRecord) Canonical() ([]byte, error) {
 
 // Validate enforces the verification-record contract before it is published.
 func (r VerificationRecord) Validate() error {
+	if r.PublicKeySHA256 != "" && (!canonical.IsDigest(r.PublicKeySHA256) || r.DryRun) {
+		return e.New(e.CodeTrustPolicyMissing, "keyed verification record requires exact executed key identity")
+	}
 	if r.SchemaVersion != VerificationRecordSchemaVersion {
 		return e.New(e.CodeInvalidCatalog,
 			"verification record schemaVersion %q is unsupported (want %q)",
@@ -448,7 +457,13 @@ func (f EnvRunnerFunc) Run(ctx context.Context, binary string, args []string, st
 
 // CosignOCIOptions configures the cosign OCI adapter.
 type CosignOCIOptions struct {
-	Binary string
+	// PlainHTTP is an explicit transport choice for isolated test registries.
+	PlainHTTP bool
+	// KeyTrust selects an explicit key authority instead of keyless Fulcio.
+	// PrivateKeyPath is required only for signing, never for verification.
+	KeyTrust       *OCIKeyTrust
+	PrivateKeyPath string
+	Binary         string
 	// BinaryDigest pins the exact cosign executable. It is mandatory for stock
 	// execution and unused by an injected runner.
 	BinaryDigest string
@@ -464,13 +479,16 @@ type CosignOCIOptions struct {
 
 // CosignOCISigner signs and attests published OCI artifacts with cosign.
 type CosignOCISigner struct {
-	binary       string
-	binaryDigest string
-	runner       CommandRunner
-	identity     string
-	issuer       string
-	credential   Credential
-	keychain     authn.Keychain
+	plainHTTP      bool
+	keyTrust       *OCIKeyTrust
+	privateKeyPath string
+	binary         string
+	binaryDigest   string
+	runner         CommandRunner
+	identity       string
+	issuer         string
+	credential     Credential
+	keychain       authn.Keychain
 	// Tests may replace descriptive transport independently of crypto. Production
 	// always constructs one private, lazy source for the complete Verify call.
 	bundleSource func(context.Context, Subject, Credential) (*ociBundleSource, error)
@@ -492,6 +510,13 @@ func NewCosignOCISigner(options CosignOCIOptions) (*CosignOCISigner, error) {
 	}
 	identity := strings.TrimSpace(options.Identity)
 	issuer := strings.TrimSpace(options.Issuer)
+	keyTrust, err := normalizeOCIKeyTrust(options.KeyTrust, identity)
+	if err != nil {
+		return nil, err
+	}
+	if options.PrivateKeyPath != "" && keyTrust == nil {
+		return nil, e.New(e.CodeTrustPolicyMissing, "an explicit OCI private key requires an independent public-key policy")
+	}
 	if identity == "" || issuer == "" {
 		return nil, e.New(e.CodeTrustPolicyMissing,
 			"cosign OCI signing requires an expected certificate identity and OIDC issuer")
@@ -511,13 +536,16 @@ func NewCosignOCISigner(options CosignOCIOptions) (*CosignOCISigner, error) {
 			"cosign OCI signing binary digest must be an exact lowercase sha256 identity")
 	}
 	return &CosignOCISigner{
-		binary:       binary,
-		binaryDigest: options.BinaryDigest,
-		runner:       runner,
-		identity:     identity,
-		issuer:       issuer,
-		credential:   options.Credential,
-		keychain:     options.Keychain,
+		plainHTTP:      options.PlainHTTP,
+		keyTrust:       keyTrust,
+		privateKeyPath: options.PrivateKeyPath,
+		binary:         binary,
+		binaryDigest:   options.BinaryDigest,
+		runner:         runner,
+		identity:       identity,
+		issuer:         issuer,
+		credential:     options.Credential,
+		keychain:       options.Keychain,
 	}, nil
 }
 
@@ -556,14 +584,30 @@ func (s *CosignOCISigner) SignAndAttest(ctx context.Context, subject Subject, pr
 		return SigningRecord{}, err
 	}
 	environment := ociCosignEnvironment(os.Environ(), dockerConfig)
+	if s.keyTrust != nil {
+		environment = keyCosignEnvironment(environment)
+	}
 
 	signArgs := ociSignArgs(subject.Ref)
 	attestArgs := ociAttestArgs(subject.Ref, predicatePath)
+	if s.plainHTTP {
+		signArgs = append(signArgs[:len(signArgs)-1], "--allow-http-registry", subject.Ref)
+		attestArgs = append(attestArgs[:len(attestArgs)-1], "--allow-http-registry", subject.Ref)
+	}
+	if signArgs, err = s.keySigningArguments(ctx, signArgs, workspace); err != nil {
+		return SigningRecord{}, err
+	}
+	if attestArgs, err = s.keySigningArguments(ctx, attestArgs, workspace); err != nil {
+		return SigningRecord{}, err
+	}
 	for _, args := range [][]string{signArgs, attestArgs} {
 		var stdout, stderr bytes.Buffer
 		if err := s.run(ctx, args, environment, &stdout, &stderr); err != nil {
 			if ctxErr := contextError(ctx); ctxErr != nil {
 				return SigningRecord{}, ctxErr
+			}
+			if s.keyTrust != nil {
+				return SigningRecord{}, e.Wrap(e.CodeSignatureInvalid, err, "explicit-key cosign operation failed")
 			}
 			return SigningRecord{}, e.Wrap(e.CodeSignatureInvalid, err,
 				"cosign %s failed: %s", args[0], strings.TrimSpace(stderr.String()))
@@ -586,6 +630,9 @@ func (s *CosignOCISigner) SignAndAttest(ctx context.Context, subject Subject, pr
 			argv(s.binary, attestArgs),
 		},
 		CosignVersion: s.detectVersion(ctx, environment),
+	}
+	if s.keyTrust != nil {
+		record.PublicKeySHA256 = digestBytes(s.keyTrust.PublicKey)
 	}
 	if err := record.Validate(); err != nil {
 		return SigningRecord{}, err
@@ -617,6 +664,12 @@ func (s *CosignOCISigner) verifyAndCapture(ctx context.Context, subject Subject,
 	resolved, err := resolvePolicy(policy, s.identity, s.issuer)
 	if err != nil {
 		return VerificationRecord{}, err
+	}
+	if s.keyTrust != nil {
+		if resolved.IdentityRegexp != s.identity || resolved.Issuer != s.issuer {
+			return VerificationRecord{}, e.New(e.CodeUntrustedSigner, "keyed OCI verification policy differs from its selected authority")
+		}
+		resolved.keyTrust = s.keyTrust
 	}
 	credential := Credential{}
 	if supplied == nil {
@@ -661,6 +714,9 @@ func (s *CosignOCISigner) verifyAndCapture(ctx context.Context, subject Subject,
 		Identity:      resolved.IdentityRegexp,
 		Issuer:        resolved.Issuer,
 		PredicateType: ProvenancePredicateType,
+	}
+	if s.keyTrust != nil {
+		record.PublicKeySHA256 = digestBytes(s.keyTrust.PublicKey)
 	}
 
 	// The expected production predicate belongs to the provenance attestation;

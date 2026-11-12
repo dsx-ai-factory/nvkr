@@ -175,7 +175,7 @@ func cmdFactory() *cli.Command {
 				}
 				return nil
 			},
-		}, cmdFactoryGitHub()},
+		}, cmdFactoryGitHub(), cmdFactoryTekton()},
 	}
 }
 

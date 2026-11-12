@@ -110,7 +110,7 @@ func (policy LocalQualificationPolicy) freeze() (LocalQualificationPolicy, error
 		sort.Strings(frozen.Smoke.NonToolOutputs[i].Components)
 	}
 	sort.Slice(frozen.Smoke.NonToolMembers, func(i, j int) bool {
-		return frozen.Smoke.NonToolMembers[i].key() < frozen.Smoke.NonToolMembers[j].key()
+		return frozen.Smoke.NonToolMembers[i].Key() < frozen.Smoke.NonToolMembers[j].Key()
 	})
 	return frozen, nil
 }

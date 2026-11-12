@@ -74,7 +74,7 @@ func TestLaptopNKTPDependencyArchiveChecks(t *testing.T) {
 				t.Skip("positive byte probe requires explicit NVKR_TEST_NKTP_CHART_ARCHIVES")
 			}
 			dir := t.TempDir()
-			chart := filepath.Join(dir, "nktp/deploy/charts/nktp")
+			chart := filepath.Join(dir, "nktp")
 			tools := filepath.Join(dir, "tools")
 			for _, path := range []string{filepath.Join(chart, "charts"), tools} {
 				if err := os.MkdirAll(path, 0700); err != nil {
@@ -176,6 +176,12 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 				t.Fatal(err)
 			}
 			installerSource := plan.CatalogSnapshot.Sources["nvke-cli"]
+			// NKTP is released from its own repository, so its chart has its own source.
+			nktpPin, err := plan.CatalogSnapshot.SourcePin("nvke-nktp-helm")
+			if err != nil {
+				t.Fatal(err)
+			}
+			nktpSource := plan.CatalogSnapshot.Sources["nvke-nktp-helm"]
 			compiler := installerSource.ToolchainImage
 			var names []string
 			for _, output := range plan.LifecycleOutputs {
@@ -195,15 +201,19 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 						t.Fatal("site applications/charts must not fall back to acquired releases")
 					case ir.KindFetch:
 						fetches++
-						if node.Repo != installerSource.Repo || node.Commit != installerPin.Commit || node.TreeHash != installerPin.TreeHash {
-							t.Fatal("CLI, controller and charts must share the selected installer source")
+						wantSource, wantPin := installerSource, installerPin
+						if build.Name == "nktp" {
+							wantSource, wantPin = nktpSource, nktpPin
+						}
+						if node.Repo != wantSource.Repo || node.Commit != wantPin.Commit || node.TreeHash != wantPin.TreeHash {
+							t.Fatal("CLI, controller and controller chart must share the selected installer source, and NKTP its own")
 						}
 						if build.Name == "nktp" {
 							command := strings.Join(node.VendorCmd, " ")
-							for _, required := range []string{"sh -euc", "HELM_REPOSITORY_CONFIG=/tmp/", "HELM_REPOSITORY_CACHE=/tmp/", "helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts", "helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts", "helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/", "helm dependency build nktp/deploy/charts/nktp --skip-refresh", "sha256sum -c -",
-								"084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/deploy/charts/nktp/charts/metrics-server-3.13.1.tgz",
-								"e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/deploy/charts/nktp/charts/opentelemetry-kube-stack-0.25.1.tgz",
-								"70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/deploy/charts/nktp/charts/prometheus-node-exporter-4.56.1.tgz",
+							for _, required := range []string{"sh -euc", "HELM_REPOSITORY_CONFIG=/tmp/", "HELM_REPOSITORY_CACHE=/tmp/", "helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts", "helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts", "helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/", "helm dependency build nktp --skip-refresh", "sha256sum -c -",
+								"084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/charts/metrics-server-3.13.1.tgz",
+								"e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/charts/opentelemetry-kube-stack-0.25.1.tgz",
+								"70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/charts/prometheus-node-exporter-4.56.1.tgz",
 								`[ "$#" -ne 3 ]`} {
 								if !strings.Contains(command, required) {
 									t.Fatalf("NKTP dependency preparation lacks %q", required)
