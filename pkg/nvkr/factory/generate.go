@@ -58,25 +58,25 @@ func Render(ctx context.Context, plan *Plan, engine string) (*GeneratedBundle, e
 	if err := ValidateGenerationEngine(engine); err != nil {
 		return nil, err
 	}
-	if strings.EqualFold(strings.TrimSpace(engine), EngineTekton) {
-		if ProjectionAdapterSelected(ctx) {
-			return nil, e.New(e.CodeEngineCapability, "Tekton does not admit GitHub projection plugins")
-		}
-		return renderTekton(ctx, plan)
-	}
-	return renderSelected(ctx, plan)
+	return renderSelected(ctx, plan, strings.ToLower(strings.TrimSpace(engine)))
 }
 
-// renderSelected is the projection behind Render: the in-binary GitHub renderer,
+// renderSelected is the projection behind Render: the in-binary renderer,
 // or the projection plugin and transport a top-level caller selected through
 // WithProjectionAdapter. Boundary tests trap it.
-var renderSelected = func(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
+var renderSelected = func(ctx context.Context, plan *Plan, engine string) (*GeneratedBundle, error) {
 	if adapter, ok := selectedProjectionAdapter(ctx); ok {
-		plugin, err := adapter.plugin()
+		plugin, err := adapter.plugin(engine)
 		if err != nil {
 			return nil, err
 		}
-		return renderProjected(ctx, plan, plugin, adapter.Release)
+		return renderProjected(ctx, plan, engine, plugin, adapter.Release)
+	}
+	if engine == EngineTekton {
+		if plan == nil {
+			return nil, e.New(e.CodeInvalidCatalog, "projection requires a plan")
+		}
+		return renderProjected(ctx, plan, engine, builtinProjection(engine, plan.GeneratorVersion), plan.GeneratorVersion)
 	}
 	return RenderGitHub(ctx, plan)
 }
@@ -89,7 +89,7 @@ func CheckGenerated(ctx context.Context, plan *Plan, engine, root string) error 
 		return err
 	}
 	if strings.EqualFold(strings.TrimSpace(engine), EngineTekton) {
-		bundle, err := Render(ctx, plan, engine)
+		bundle, err := renderTekton(ctx, plan)
 		if err != nil {
 			return err
 		}
