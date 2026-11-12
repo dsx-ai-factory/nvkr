@@ -5,6 +5,7 @@ package pipeline
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -49,6 +50,21 @@ func (container *DiskInspectionContainer) SelectionContext(ctx context.Context) 
 	selection.RuntimeExecutable = container.runtime.name
 	selection.compositionKind, selection.consumerPlatform, selection.scratchVolume = "", "", ""
 	return selection, nil
+}
+
+// RepositoryDigestContext authenticates the selected repository manifest against
+// current runtime metadata, retaining the independent local image-ID freshness
+// check in SelectionContext. The two digest domains need not be equal.
+func (container *DiskInspectionContainer) RepositoryDigestContext(ctx context.Context) (string, error) {
+	selection, err := container.SelectionContext(ctx)
+	if err != nil {
+		return "", err
+	}
+	_, digest, ok := strings.Cut(selection.Image, "@")
+	if !ok {
+		return "", e.New(e.CodeVerifyFailed, "inspection image has no authenticated repository digest")
+	}
+	return digest, nil
 }
 
 // AuthenticateProducedTool joins the original tool capability to this runtime.

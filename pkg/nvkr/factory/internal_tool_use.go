@@ -172,7 +172,7 @@ func (owner *LocalRunResult) recordDiskInternalToolUse(ctx context.Context, plan
 	if err != nil {
 		return nil, err
 	}
-	appliance, _, _, err := receipt.runtime.BindingContext(ctx)
+	appliance, err := receipt.runtime.RepositoryDigestContext(ctx)
 	if err != nil {
 		return nil, err
 	}

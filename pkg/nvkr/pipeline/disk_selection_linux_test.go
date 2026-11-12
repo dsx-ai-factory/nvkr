@@ -67,6 +67,18 @@ func TestDiskInspectionSelectionProjectsAuthenticatedLogicalRuntime(t *testing.T
 						want = e.CodeVerifyFailed
 					}
 				}
+				repositoryDigest, repositoryErr := container.RepositoryDigestContext(ctx)
+				if code(repositoryErr) != want {
+					t.Fatalf("repository digest=%s error=%v want=%s", repositoryDigest, repositoryErr, want)
+				}
+				if want == "" {
+					_, pinned, _ := strings.Cut(selection.Image, "@")
+					if repositoryDigest != pinned || repositoryDigest == container.imageID {
+						t.Fatal("repository manifest and local image identity were conflated")
+					}
+				} else if repositoryDigest != "" {
+					t.Fatal("failed owner disclosed repository binding")
+				}
 				got, err := container.SelectionContext(ctx)
 				if code(err) != want {
 					t.Fatalf("selection=%+v error=%v want=%s", got, err, want)

@@ -42,6 +42,15 @@ func (runtime *DiskInspectionRuntime) BindingContext(ctx context.Context) (image
 	return runtime.container.BindingContext(ctx)
 }
 
+// RepositoryDigestContext authenticates the appliance manifest separately from
+// the runtime-local image identity used by BindingContext for freshness.
+func (runtime *DiskInspectionRuntime) RepositoryDigestContext(ctx context.Context) (string, error) {
+	if runtime == nil {
+		return "", e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
+	}
+	return runtime.container.RepositoryDigestContext(ctx)
+}
+
 func (runtime *DiskInspectionRuntime) Close() error {
 	if runtime == nil {
 		return nil
