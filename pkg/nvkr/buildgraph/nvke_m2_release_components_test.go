@@ -128,11 +128,14 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 	if err := yaml.UnmarshalStrict(baselineBytes, &baseline); err != nil {
 		t.Fatal(err)
 	}
-	for _, source := range []string{"nvke-content", "nvke-nktp"} {
-		pin, err := cat.SourcePin(source)
-		if err != nil || !reflect.DeepEqual(pin, baseline.Pins["nvke"]) {
-			t.Fatalf("%s must match the maintained controller source, pin=%+v err=%v", source, pin, err)
-		}
+	pin, err := cat.SourcePin("nvke-content")
+	if err != nil || !reflect.DeepEqual(pin, baseline.Pins["nvke"]) {
+		t.Fatalf("nvke-content must match the maintained controller source, pin=%+v err=%v", pin, err)
+	}
+	// NKTP is released from its own repository, at the version that matches the
+	// selected NVKE release's site values.
+	if pin, err := cat.SourcePin("nvke-nktp"); err != nil || !strings.HasPrefix(pin.Tag, "nktp/v") {
+		t.Fatalf("nvke-nktp must select an NKTP release tag, pin=%+v err=%v", pin, err)
 	}
 	profilesCommand := strings.Join(cat.Components["nvke-nico-reference-profiles"].BuildCommand, " ")
 	if !strings.Contains(profilesCommand, "nico-vms-cp.yaml") || !strings.Contains(profilesCommand, "nico-vms-worker.yaml") ||
