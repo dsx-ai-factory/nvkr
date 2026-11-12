@@ -186,6 +186,16 @@ applicability result. External suites outside this MVP use `not-evaluated` with 
 this is never interpreted as passed. Disk scope states producer-only evidence and no content inspection.
 Unknown fields, versions or verdicts, duplicate members, noncanonical bytes and inexact bindings fail closed.
 
+ADR-18's Tekton provider uses the same evidence and manifest families with explicit optional origin fields
+`provider: tekton`, `task` and `taskUID`. Its invocation URI binds the cluster HTTPS API, namespace,
+PipelineRun name and UID; its builder URI names the independently selected publisher service account.
+Worker and qualifier origins additionally name their exact TaskRun UID and distinct service-account role.
+GitHub repository, commit, workflow and attempt fields remain empty in this provider and cannot be fabricated.
+Legacy GitHub records omit the new fields, retaining their canonical bytes. A Tekton qualification policy
+includes the independently selected cluster, namespace, native platform, Plan digest and three distinct
+public keys; mixed GitHub/Tekton trust is invalid. The provider discriminator changes descriptive wire
+membership, not the evidence lane or the opaque-receipt requirement.
+
 The complete qualification-policy identity includes source and qualifier workflow selection, the distinct
 same-repository native smoke workflow, every platform executable/image pin, fixed tool profiles, explicit
 non-tool output scope and external-suite requirements. Local executable paths are locators, excluded from

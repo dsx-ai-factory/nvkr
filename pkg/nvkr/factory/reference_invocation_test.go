@@ -11,6 +11,7 @@ import (
 
 func TestReferenceInvocationRetryScope(t *testing.T) {
 	const base = "https://github.com/example/nvkr/actions/runs/12345/attempts/"
+	const tektonRun = "https://cluster.example.invalid/apis/tekton.dev/v1/namespaces/nvkr/pipelineruns/run?uid=11111111-1111-1111-1111-111111111111"
 	for _, tc := range []struct {
 		name, candidate, current string
 		valid                    bool
@@ -31,6 +32,11 @@ func TestReferenceInvocationRetryScope(t *testing.T) {
 		{"suffix", base + "1/extra", base + "2", false},
 		{"local", "local:run", "local:run", false},
 		{"invalid current", base + "1", base + "02", false},
+		{"same Tekton UID", tektonRun, tektonRun, true},
+		{"Tekton without UID", tektonRun[:len(tektonRun)-41], tektonRun, false},
+		{"foreign Tekton UID", tektonRun[:len(tektonRun)-1] + "2", tektonRun, false},
+		{"duplicate Tekton UID", tektonRun + "&uid=11111111-1111-1111-1111-111111111111", tektonRun, false},
+		{"provider substitution", base + "1", tektonRun, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			err := admitReferenceInvocation(tc.candidate, tc.current)

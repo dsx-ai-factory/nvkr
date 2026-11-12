@@ -100,8 +100,16 @@ func NewConsumer(options ConsumerOptions) (*Consumer, error) {
 		keychain = options.Registry.AmbientKeychain()
 	}
 	return &Consumer{inspection: InspectionOptions{Timeout: options.Timeout, WorkspaceRoot: options.WorkspaceRoot, Registry: options.Registry, CacheRoot: options.MetadataCacheRoot, DisableCache: options.DisableMetadataCache, Progress: options.MetadataProgress}, verifierFor: func(policy VerificationPolicy) (sign.OCISigner, error) {
+		if err := policy.Validate(); err != nil {
+			return nil, err
+		}
+		var key *sign.OCIKeyTrust
+		if policy.PublicKey != "" {
+			key = &sign.OCIKeyTrust{PublicKey: []byte(policy.PublicKey), Identity: policy.KeyIdentity}
+		}
 		return sign.NewCosignOCISigner(sign.CosignOCIOptions{Binary: options.CosignBinary,
-			BinaryDigest: options.CosignDigest, Identity: policy.IdentityRegexp, Issuer: policy.Issuer, Credential: options.Credential, Keychain: keychain})
+			BinaryDigest: options.CosignDigest, Identity: policy.IdentityRegexp, Issuer: policy.Issuer, Credential: options.Credential, Keychain: keychain,
+			KeyTrust: key, PlainHTTP: options.Registry.PlainHTTP})
 	}, materialize: func(ctx context.Context, reference string) (*delivery.Publication, error) {
 		return delivery.PullPublication(ctx, reference, root, options.Registry)
 	}, materializeChecked: func(ctx context.Context, reference string) (qualificationPublication, error) {

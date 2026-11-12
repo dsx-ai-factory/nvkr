@@ -139,11 +139,11 @@ components:
       GIT_VERSION: '{{.Commit}}'
     writeDir: bin
   nktp-chart:
-    artifactPath: charts/nktp-0.23.0.tgz
+    artifactPath: charts/nktp-0.1.0.tgz
     buildCommand:
     - sh
     - -euc
-    - helm package nktp/deploy/charts/nktp --version=0.23.0 --app-version=v0.23.0
+    - helm package nktp
       --destination=charts/
     fromSource: true
     outputType: tarball
@@ -152,11 +152,11 @@ components:
     source: nvke-nktp-helm
     writeDir: charts
   nktp-chart-native-site:
-    artifactPath: charts/nktp-0.0.0.tgz
+    artifactPath: charts/nktp-0.1.0.tgz
     buildCommand:
     - .nvkr-tools/helm
     - package
-    - nktp/deploy/charts/nktp
+    - nktp
     - --destination=charts/
     fromSource: true
     outputType: tarball
@@ -166,7 +166,7 @@ components:
     source: nvke-nktp-helm-native-site
     writeDir: charts
   nktp-chart-nightly-site:
-    artifactPath: charts/nktp-0.23.0.tgz
+    artifactPath: charts/nktp-0.1.0.tgz
     buildCommand:
     - sh
     - -euc
@@ -174,7 +174,7 @@ components:
       printf '%s\n' \
         '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  /src/nvkr-chart-tools/helm' \
         | sha256sum --quiet -c -
-      exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package nktp/deploy/charts/nktp --version=0.23.0 --app-version=v0.23.0 --destination=charts/
+      exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package nktp --destination=charts/
     fromSource: true
     outputType: tarball
     platforms:
@@ -182,11 +182,11 @@ components:
     source: nvke-nktp-helm-nightly-site
     writeDir: charts
   nktp-chart-release-components:
-    artifactPath: charts/nktp-0.23.0.tgz
+    artifactPath: charts/nktp-0.1.0.tgz
     buildCommand:
     - sh
     - -euc
-    - .nvkr-tools/helm package nktp/deploy/charts/nktp --version=0.23.0 --app-version=v0.23.0
+    - .nvkr-tools/helm package nktp
       --destination=charts/
     fromSource: true
     outputType: tarball
@@ -203,8 +203,8 @@ components:
     prebuilt:
       evidence:
         none: true
-      image: otel/opentelemetry-collector-k8s:0.162.0
-    source: nvke-content
+      image: otel/opentelemetry-collector-k8s:0.164.0
+    source: nvke-nktp
   nktp-kube-state-metrics-image:
     outputType: oci-image
     platforms:
@@ -214,7 +214,7 @@ components:
       evidence:
         none: true
       image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0
-    source: nvke-content
+    source: nvke-nktp
   nktp-kubectl-image:
     outputType: oci-image
     platforms:
@@ -223,8 +223,8 @@ components:
     prebuilt:
       evidence:
         none: true
-      image: rancher/kubectl:v1.35.6
-    source: nvke-content
+      image: registry.k8s.io/kubectl:v1.35.10
+    source: nvke-nktp
   nktp-lgtm-image:
     outputType: oci-image
     platforms:
@@ -234,7 +234,7 @@ components:
       evidence:
         none: true
       image: grafana/otel-lgtm:0.38.0
-    source: nvke-content
+    source: nvke-nktp
   nktp-metrics-server-image:
     outputType: oci-image
     platforms:
@@ -244,7 +244,7 @@ components:
       evidence:
         none: true
       image: registry.k8s.io/metrics-server/metrics-server:v0.8.1
-    source: nvke-content
+    source: nvke-nktp
   nktp-node-exporter-image:
     outputType: oci-image
     platforms:
@@ -254,7 +254,7 @@ components:
       evidence:
         none: true
       image: quay.io/prometheus/node-exporter:v1.12.1
-    source: nvke-content
+    source: nvke-nktp
   nktp-operator-image:
     outputType: oci-image
     platforms:
@@ -264,7 +264,7 @@ components:
       evidence:
         none: true
       image: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.161.0
-    source: nvke-content
+    source: nvke-nktp
   nktp-target-allocator-image:
     outputType: oci-image
     platforms:
@@ -274,7 +274,7 @@ components:
       evidence:
         none: true
       image: ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:0.161.0
-    source: nvke-content
+    source: nvke-nktp
   nvke-controller:
     artifactPath: bin/nvke-controller-image-{{.Arch}}.oci.tar
     buildCommand:
@@ -941,9 +941,12 @@ sources:
     - dependency
     - build
     - controller/deploy/charts/controller
+  # NKTP is released from its own repository. Keep these variants aligned with
+  # the NKTP release selected by NVKE's deploy/nico/nktp/values.yaml.
   nvke-nktp:
-    constraint: v0.23.0
-    repo: https://github.com/dsx-ai-factory/nvke
+    constraint: 0.1.0
+    tagPrefix: nktp/v
+    repo: https://github.com/dsx-ai-factory/nvke-telemetry-pipeline
     toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
     vendorCommand:
     - sh
@@ -961,22 +964,23 @@ sources:
       cp "/tmp/linux-$arch/helm" .nvkr-tools/helm
       export HELM_REPOSITORY_CONFIG=/tmp/nktp-repositories.yaml
       export HELM_REPOSITORY_CACHE=/tmp/nktp-cache
-      pins="$(sha256sum nktp/deploy/charts/nktp/Chart.yaml nktp/deploy/charts/nktp/Chart.lock)"
+      pins="$(sha256sum nktp/Chart.yaml nktp/Chart.lock)"
       timeout --kill-after=10s 120s .nvkr-tools/helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
       timeout --kill-after=10s 120s .nvkr-tools/helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
       timeout --kill-after=10s 120s .nvkr-tools/helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
-      timeout --kill-after=10s 120s .nvkr-tools/helm dependency build nktp/deploy/charts/nktp --skip-refresh
+      timeout --kill-after=10s 120s .nvkr-tools/helm dependency build nktp --skip-refresh
       printf '%s\n' "$pins" | sha256sum -c -
-      set -- nktp/deploy/charts/nktp/charts/*.tgz
+      set -- nktp/charts/*.tgz
       test "$#" -eq 3
       printf '%s\n' \
-        '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/deploy/charts/nktp/charts/metrics-server-3.13.1.tgz' \
-        'e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/deploy/charts/nktp/charts/opentelemetry-kube-stack-0.25.1.tgz' \
-        '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/deploy/charts/nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
+        '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/charts/metrics-server-3.13.1.tgz' \
+        'e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/charts/opentelemetry-kube-stack-0.25.1.tgz' \
+        '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
         | sha256sum -c -
   nvke-nktp-helm:
-    constraint: v0.23.0
-    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: 0.1.0
+    tagPrefix: nktp/v
+    repo: https://github.com/dsx-ai-factory/nvke-telemetry-pipeline.git
     toolchainImagesByArch:
       arm64: sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0
     vendorCommand:
@@ -987,25 +991,26 @@ sources:
       export HELM_REPOSITORY_CACHE=/tmp/nktp-cache
       # These are the three exact URLs in the selected source's Chart.yaml.
       # Helm, not a custom parser, validates Chart.yaml against Chart.lock.
-      pins="$(sha256sum nktp/deploy/charts/nktp/Chart.yaml nktp/deploy/charts/nktp/Chart.lock)"
+      pins="$(sha256sum nktp/Chart.yaml nktp/Chart.lock)"
       helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
       helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
       helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
-      helm dependency build nktp/deploy/charts/nktp --skip-refresh
+      helm dependency build nktp --skip-refresh
       printf '%s\n' "$pins" | sha256sum -c -
-      set -- nktp/deploy/charts/nktp/charts/*.tgz
+      set -- nktp/charts/*.tgz
       if [ "$#" -ne 3 ]; then
         echo 'Expected exactly three pinned NKTP dependency-chart archives.' >&2
         exit 1
       fi
       printf '%s\n' \
-        '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/deploy/charts/nktp/charts/metrics-server-3.13.1.tgz' \
-        'e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/deploy/charts/nktp/charts/opentelemetry-kube-stack-0.25.1.tgz' \
-        '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/deploy/charts/nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
+        '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/charts/metrics-server-3.13.1.tgz' \
+        'e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/charts/opentelemetry-kube-stack-0.25.1.tgz' \
+        '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
         | sha256sum -c -
   nvke-nktp-helm-native-site:
-    constraint: v0.23.0
-    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: 0.1.0
+    tagPrefix: nktp/v
+    repo: https://github.com/dsx-ai-factory/nvke-telemetry-pipeline.git
     toolchainImagesByArch:
       amd64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
       arm64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
@@ -1038,11 +1043,11 @@ sources:
       export HELM_REPOSITORY_CACHE=/tmp/nktp-cache
       # These are the three exact URLs in the selected source's Chart.yaml.
       # Helm, not a custom parser, validates Chart.yaml against Chart.lock.
-      pins="$(sha256sum nktp/deploy/charts/nktp/Chart.yaml nktp/deploy/charts/nktp/Chart.lock)"
+      pins="$(sha256sum nktp/Chart.yaml nktp/Chart.lock)"
       "$host_tools/helm" repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
       "$host_tools/helm" repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
       "$host_tools/helm" repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
-      "$host_tools/helm" dependency build nktp/deploy/charts/nktp --skip-refresh
+      "$host_tools/helm" dependency build nktp --skip-refresh
       printf '%s\n' "$pins" | sha256sum -c -
       # The captured source bytes and vendor identity bind the build target,
       # independently of the utility host used to resolve chart dependencies.
@@ -1054,14 +1059,14 @@ sources:
       fi
       mkdir -p .nvkr-tools
       cp "/tmp/linux-$target_arch/helm" .nvkr-tools/helm
-      set -- nktp/deploy/charts/nktp/charts/*.tgz
+      set -- nktp/charts/*.tgz
       if [ "$#" -ne 3 ]; then
         echo 'Expected exactly three pinned NKTP dependency-chart archives.' >&2
         exit 1
       fi
       # The reviewed release and current main both select OTEL chart 0.25.1.
       # Helm validates Chart.lock; only these independently reviewed archives pass.
-      set -- nktp/deploy/charts/nktp/charts/opentelemetry-kube-stack-*.tgz
+      set -- nktp/charts/opentelemetry-kube-stack-*.tgz
       if [ "$#" -ne 1 ]; then
         echo 'Expected exactly one reviewed NKTP OpenTelemetry archive.' >&2
         exit 1
@@ -1071,13 +1076,14 @@ sources:
         *) echo 'Unreviewed NKTP OpenTelemetry dependency archive.' >&2; exit 1 ;;
       esac
       printf '%s\n' \
-        '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/deploy/charts/nktp/charts/metrics-server-3.13.1.tgz' \
+        '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/charts/metrics-server-3.13.1.tgz' \
         "$otel_digest  $1" \
-        '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/deploy/charts/nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
+        '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
         | sha256sum -c -
   nvke-nktp-helm-nightly-site:
-    constraint: v0.23.0
-    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: 0.1.0
+    tagPrefix: nktp/v
+    repo: https://github.com/dsx-ai-factory/nvke-telemetry-pipeline.git
     toolchainImagesByArch:
       arm64: docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
     vendorCommand:
@@ -1104,21 +1110,21 @@ sources:
       export HELM_REPOSITORY_CACHE=/tmp/nktp-cache
       # These are the three exact URLs in the selected source's Chart.yaml.
       # Helm, not a custom parser, validates Chart.yaml against Chart.lock.
-      pins="$(sha256sum nktp/deploy/charts/nktp/Chart.yaml nktp/deploy/charts/nktp/Chart.lock)"
+      pins="$(sha256sum nktp/Chart.yaml nktp/Chart.lock)"
       timeout --kill-after=10s 60s ./nvkr-chart-tools/helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
       timeout --kill-after=10s 60s ./nvkr-chart-tools/helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
       timeout --kill-after=10s 60s ./nvkr-chart-tools/helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
-      timeout --kill-after=10s 180s ./nvkr-chart-tools/helm dependency build nktp/deploy/charts/nktp --skip-refresh
+      timeout --kill-after=10s 180s ./nvkr-chart-tools/helm dependency build nktp --skip-refresh
       printf '%s\n' "$pins" | sha256sum -c -
-      set -- nktp/deploy/charts/nktp/charts/*.tgz
+      set -- nktp/charts/*.tgz
       if [ "$#" -ne 3 ]; then
         echo 'Expected exactly three pinned NKTP dependency-chart archives.' >&2
         exit 1
       fi
       printf '%s\n' \
-        '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/deploy/charts/nktp/charts/metrics-server-3.13.1.tgz' \
-        'e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/deploy/charts/nktp/charts/opentelemetry-kube-stack-0.25.1.tgz' \
-        '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/deploy/charts/nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
+        '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/charts/metrics-server-3.13.1.tgz' \
+        'e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/charts/opentelemetry-kube-stack-0.25.1.tgz' \
+        '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
         | sha256sum -c -
   syft-module-tags:
     constraint: 1.51.x

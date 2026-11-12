@@ -12,6 +12,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationpolicy"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 )
 
@@ -49,6 +50,7 @@ type Publisher struct {
 	development  bool
 	cosignDigest string
 	newAttester  func(string) (qualificationAttester, error)
+	tekton       *qualificationpolicy.Tekton
 }
 type qualificationAttester interface {
 	AttestQualification(context.Context, sign.Subject, []byte) error
@@ -102,6 +104,18 @@ func (a developmentAttester) AttestQualification(ctx context.Context, subject si
 // It consumes only the opaque A and invocation receipts. Operational failures
 // never claim rollback; the returned diagnostics retain the exact earlier set.
 func (p *Publisher) Publish(ctx context.Context, checks *lifecycle.ArtifactCheckReceipt, invocation *qualificationorigin.Invocation, smoke *SmokeReceipt, policy Policy) (*Publication, error) {
+	if p != nil && p.tekton != nil {
+		return nil, e.New(e.CodeUntrustedSigner, "Tekton qualification requires its authenticated task invocation")
+	}
+	return p.publish(ctx, checks, invocation, smoke, policy)
+}
+
+type publicationInvocation interface {
+	Description() (qualificationorigin.Description, error)
+	RequireSource(qualificationorigin.Description) error
+}
+
+func (p *Publisher) publish(ctx context.Context, checks *lifecycle.ArtifactCheckReceipt, invocation publicationInvocation, smoke *SmokeReceipt, policy Policy) (*Publication, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "qualification requires context")
 	}
@@ -138,6 +152,9 @@ func (p *Publisher) Publish(ctx context.Context, checks *lifecycle.ArtifactCheck
 	}
 	if err := matchPublicationPolicy(policy, smokeDescription.Policy, p.cosignDigest); err != nil {
 		return result, err
+	}
+	if (p.tekton == nil) != (smokeDescription.Policy.Tekton == nil) || (p.tekton != nil && *p.tekton != *smokeDescription.Policy.Tekton) {
+		return result, e.New(e.CodeTrustPolicyMissing, "qualification signer differs from independently selected provider trust")
 	}
 	suites, err := outsideSuites(policy.OutsideMVPSuites)
 	if err != nil {

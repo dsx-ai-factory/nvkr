@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"runtime"
+	"strings"
 	"sync/atomic"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -197,6 +198,21 @@ func runNativeToolSmoke(ctx context.Context, checks *ArtifactCheckReceipt, invoc
 	if err != nil {
 		return nil, nil, err
 	}
+	return executeNativeSmoke(ctx, checks, invocation, nativeSmokeScope{description: description, current: current, digest: digest, smoke: *frozen.Smoke, members: members}, options, platform, open)
+}
+
+type nativeSmokeScope struct {
+	description ArtifactCheckDescription
+	current     qualificationorigin.Description
+	digest      string
+	smoke       QualificationSmokePolicy
+	members     []ToolSmokeMember
+}
+
+// executeNativeSmoke owns held-byte execution, profile evaluation and joined
+// runtime cleanup for every admitted provider. Provider admission stays above it.
+func executeNativeSmoke(ctx context.Context, checks *ArtifactCheckReceipt, invocation nativeSmokeInvocation, scope nativeSmokeScope, options NativeToolSmokeOptions, platform string, open func(context.Context, pipeline.ToolSmokeSelection) (nativeSmokeRuntime, error)) (receipt *NativeToolSmokeReceipt, report *NativeToolSmokeReport, resultErr error) {
+	description, current, digest, members := scope.description, scope.current, scope.digest, scope.members
 	native := make([]ToolSmokeMember, 0, len(members))
 	for _, member := range members {
 		if member.Platform == platform {
@@ -206,7 +222,7 @@ func runNativeToolSmoke(ctx context.Context, checks *ArtifactCheckReceipt, invoc
 	if len(native) == 0 {
 		return nil, nil, e.New(e.CodeEngineCapability, "publication has no tool members for native platform %q", platform)
 	}
-	report = &NativeToolSmokeReport{SchemaVersion: NativeToolSmokeSchema, ArtifactChecks: description, Invocation: current, PolicyDigest: digest, Platform: platform, Image: frozen.Smoke.Images[platform], Members: make([]ToolSmokeMember, 0, len(native)), Status: "fail"}
+	report = &NativeToolSmokeReport{SchemaVersion: NativeToolSmokeSchema, ArtifactChecks: description, Invocation: current, PolicyDigest: digest, Platform: platform, Image: scope.smoke.Images[platform], Members: make([]ToolSmokeMember, 0, len(native)), Status: "fail"}
 	completed, active := 0, -1
 	defer func() {
 		if resultErr != nil {
@@ -310,6 +326,25 @@ func nativeSmokeAlive(ctx context.Context, checks *ArtifactCheckReceipt, invocat
 }
 
 func matchNativeSmokeOrigins(source, current qualificationorigin.Description, policy QualificationPolicy) error {
+	if policy.Tekton != nil {
+		if err := source.Validate(); err != nil {
+			return err
+		}
+		if err := current.Validate(); err != nil {
+			return err
+		}
+		builder, err := policy.Tekton.Identity("publisher")
+		if err != nil {
+			return err
+		}
+		if source.Provider != "tekton" || current.Provider != "tekton" || source.Task != "" || current.Task == "" || source.BuilderID != builder || current.InvocationID != source.InvocationID || !strings.HasPrefix(source.InvocationID, policy.Tekton.APIServer+"/apis/tekton.dev/v1/namespaces/"+policy.Tekton.Namespace+"/pipelineruns/") {
+			return e.New(e.CodeUntrustedSigner, "Tekton smoke source or task differs from selected cluster and Run")
+		}
+		return nil
+	}
+	if source.Provider != "" || current.Provider != "" {
+		return e.New(e.CodeUntrustedSigner, "hosted smoke cannot accept another provider")
+	}
 	if source.Repository != policy.Source.Repository || source.Workflow != policy.Source.Workflow || source.DefaultBranch != policy.Source.DefaultBranch ||
 		current.Repository != source.Repository || current.DefaultBranch != source.DefaultBranch || current.Ref != "refs/heads/"+current.SourceBranch() || policy.Source.Development != (source.Branch != "") || policy.Source.Development != (current.Branch != "") || current.Workflow != policy.QualificationWorkflow || current.RunID == source.RunID {
 		return e.New(e.CodeUntrustedSigner, "native smoke source or qualification invocation differs from independent policy")

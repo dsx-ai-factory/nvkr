@@ -77,16 +77,50 @@ func productionOCISigner(_ context.Context, plan *Plan, node Node, artifacts map
 		if err != nil {
 			return nil, err
 		}
-		return sign.NewCosignOCISigner(sign.CosignOCIOptions{
+		options := sign.CosignOCIOptions{
 			Binary:       tool.Path,
 			BinaryDigest: toolExecutableDigest(plan, plan.Definition.CosignTool),
 			Identity:     signing.Identity,
 			Issuer:       signing.Issuer,
 			Credential:   credential,
-		})
+		}
+		if plan.Environment.Tekton != nil {
+			if err := configureTektonOCI(plan, node, &options); err != nil {
+				return nil, err
+			}
+		}
+		return sign.NewCosignOCISigner(options)
 	default:
 		return nil, e.New(e.CodeEngineCapability, "delivery signing mode %q has no adapter", signing.Mode)
 	}
+}
+
+func configureTektonOCI(plan *Plan, node Node, options *sign.CosignOCIOptions) error {
+	// Release assembly also verifies earlier output publications. Their logical
+	// verify nodes do not describe the current task's account. Public-key
+	// verification, including publication's SBOM check, needs no private key or
+	// signing execution authority.
+	privateKey := ""
+	switch node.Kind {
+	case NodeVerifyPublication, NodePublish:
+	case NodeSign, NodeAttestEvidence:
+		digest, err := plan.IdentityDigest()
+		if err != nil {
+			return err
+		}
+		if err := plan.tektonExecution.RequirePlan(digest, "nvkr-publisher"); err != nil {
+			return err
+		}
+		privateKey = "/nvkr/keys/private.pem"
+	default:
+		return e.New(e.CodeEngineCapability, "Tekton OCI operation %q has no signing or verification capability", node.Kind)
+	}
+	settings := plan.Environment.Tekton
+	options.KeyTrust = &sign.OCIKeyTrust{PublicKey: []byte(settings.PublisherPublicKey),
+		Identity: settings.APIServer + "/api/v1/namespaces/" + settings.Namespace + "/serviceaccounts/nvkr-publisher"}
+	options.PrivateKeyPath = privateKey
+	options.PlainHTTP = plan.Environment.Publication.PlainHTTP
+	return nil
 }
 
 // registryCredential reads the credential the target declares it needs from this

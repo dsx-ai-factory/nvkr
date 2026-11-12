@@ -251,7 +251,7 @@ func TestLifecycleCommandsRejectInvalidInputs(t *testing.T) {
 		{"missing inspection", []string{"definition", "inspect", "--definition", "missing.yaml"}, e.CodeInvalidCatalog},
 		{"missing plan", []string{"run", "plan", "--definition", "missing.yaml", "--environment", "missing.yaml"}, e.CodeInvalidCatalog},
 		{"missing environment", []string{"run", "plan", "--definition", "docs/examples/nvke-tutorial/definition.yaml", "--environment", "missing.yaml"}, e.CodeInvalidCatalog},
-		{"unsupported engine", []string{"run", "generate", "--definition", "missing.yaml", "--environment", "missing.yaml", "--engine", "tekton"}, e.CodeEngineCapability},
+		{"unsupported engine", []string{"run", "generate", "--definition", "missing.yaml", "--environment", "missing.yaml", "--engine", "argo"}, e.CodeEngineCapability},
 		{"invalid attempt", []string{"run", "local", "--definition", "docs/examples/nvke-tutorial/definition.yaml", "--environment", "docs/examples/nvke-tutorial/environment-local.yaml", "--attempt", "../escape", "--dry-run"}, e.CodeUsage},
 		{"missing finalizer inputs", []string{"run", "finalize", "--definition", "missing.yaml", "--environment", "missing.yaml", "--plan", "missing.json", "--attempt", "test-run"}, e.CodeInvalidCatalog},
 		{"wrong factory workspace", []string{"factory", "execute-node", "--plan", "missing.json", "--node", "missing", "--workspace", "wrong"}, e.CodeUsage},

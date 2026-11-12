@@ -127,7 +127,8 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		sources []string
 	}{
 		{"node-images", []string{"nvke-os", "nvke-cni-calico-source", "nvke-kubeadm-distro-source", "nvke-spire-agent-source"}},
-		{"nvke", []string{"nvke-cli-local-site", "nvke-controller", "nvke-controller-helm-native-site", "nvke-nktp-helm-native-site", "nvke-deploy"}},
+		// NKTP has its own repository; TestNVKEReleasePinsStayAligned pins its variants.
+		{"nvke", []string{"nvke-cli-local-site", "nvke-controller", "nvke-controller-helm-native-site", "nvke-deploy"}},
 		{"nvke", []string{"nvke-profiles"}},
 		{"tools", []string{"nvke-cli", "nvke-deploy", "nvke-nicosim"}},
 		{"runtime-dependencies", []string{"nvke-deployment-selection"}},

@@ -111,6 +111,18 @@ func admitOperation(ctx context.Context, plan *Plan, nodeID string) (Node, error
 	if err != nil {
 		return Node{}, err
 	}
+	if plan.Environment.Tekton != nil {
+		digest, err := plan.IdentityDigest()
+		if err != nil {
+			return Node{}, err
+		}
+		if err := plan.tektonExecution.RequirePlan(digest, tektonNodeAccount(node)); err != nil {
+			return Node{}, err
+		}
+		if plan.tektonExecution.State() != "running" {
+			return Node{}, e.New(e.CodeVerifyFailed, "Tekton execution requires a currently admitted running task")
+		}
+	}
 	if githubDiskOutput(plan, node) != "" {
 		return Node{}, e.New(e.CodeEngineCapability, "ARC disk operations require the original grouped executor")
 	}

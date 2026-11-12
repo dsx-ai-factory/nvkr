@@ -145,10 +145,11 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 	}
 	return &cli.Command{
 		Name:            "release",
-		Usage:           "inspect, pull outputs from, or verify an immutable release closure",
+		Usage:           "inspect, compare, pull outputs from, or verify an immutable release closure",
 		HideHelpCommand: true,
 		Subcommands: append([]*cli.Command{
 			releaseBrowseCmd(),
+			releaseDiffCmd(),
 			releaseExportCmd(),
 			releasePullCmd(),
 			{

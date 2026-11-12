@@ -8,7 +8,9 @@ import (
 	"os"
 	"sort"
 
+	client "github.com/dsx-ai-factory/nvkr/client/v1"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/urfave/cli/v2"
@@ -80,16 +82,13 @@ func cmdResolve() *cli.Command {
 				os.Stdout.Write(b)
 				fmt.Println()
 			case "components":
-				var comps []string
-				for _, n := range g.Nodes {
-					if n.Kind == ir.KindBuild {
-						comps = append(comps, fmt.Sprintf("%-26s %-13s %s", n.Component, n.OutputType, n.Toolchain))
-					}
+				rows, err := componentRows(resolution)
+				if err != nil {
+					return err
 				}
-				sort.Strings(comps)
 				fmt.Printf("buildDigest: %s\n\n", digest)
-				for _, l := range comps {
-					fmt.Println(l)
+				for _, row := range rows {
+					fmt.Println(row)
 				}
 			default:
 				// Only "ir" reaches this branch: validateResolveOutput rejects every other value.
@@ -103,4 +102,42 @@ func cmdResolve() *cli.Command {
 			return nil
 		},
 	}
+}
+
+func componentRows(resolution *client.Resolution) ([]string, error) {
+	producers := make(map[string]ir.Node, len(resolution.Resolved.Components))
+	for _, node := range resolution.Graph.Nodes {
+		if node.Kind == ir.KindBuild || node.Kind == ir.KindPull {
+			producers[node.Component] = node
+		}
+	}
+	rows := make([]string, 0, len(resolution.Resolved.Components))
+	for _, component := range resolution.Resolved.Components {
+		node, ok := producers[component.Name]
+		if !ok {
+			return nil, e.New(e.CodeInternal, "selected component %q has no build or pull node", component.Name)
+		}
+		mode, pins := catalog.ProducerModeSource, "toolchain="+node.Toolchain
+		switch {
+		case node.Kind == ir.KindPull:
+			mode, pins = catalog.ProducerModeAcquisition, "digest="+node.Digest
+			if node.ImageParentDigest != "" {
+				pins += " parent=" + node.ImageParentDigest
+			}
+			pins += archivePin(node)
+		case node.BuilderType == ir.BuilderPinnedTool:
+			mode = catalog.ProducerModePinnedTool
+			pins = "tool=" + node.Tool + " executable=" + node.Digest + archivePin(node) + " toolchain=" + node.Toolchain
+		}
+		rows = append(rows, fmt.Sprintf("%-26s %-13s %-11s %s", component.Name, node.OutputType, mode, pins))
+	}
+	sort.Strings(rows)
+	return rows, nil
+}
+
+func archivePin(node ir.Node) string {
+	if archive := node.ExecutableArchive; archive != nil && archive.Digest != node.Digest {
+		return " archive=" + archive.Digest
+	}
+	return ""
 }
