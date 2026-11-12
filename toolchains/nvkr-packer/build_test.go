@@ -82,6 +82,8 @@ func TestToolchainValidatedImageID(t *testing.T) {
 printf '%s\n' "$1 $2 $3" >>"$TEST_CALLS"
 case "$1 $2" in
   'buildx version'|'version --format') echo 'runtime diagnostic';;
+  'buildx inspect') echo 'Driver: docker-container';;
+  'info --format') echo '[["Backing Filesystem","extfs"]]';;
   'buildx build') printf 'archive\n'; exit "${TEST_BUILD_EXIT:-0}";;
   'image load') [ "$3" = --input ] && [ -f "$4" ] && [ -s "$4" ] || exit 96
     cat "$4" >/dev/null; echo 'load diagnostic';;
@@ -282,6 +284,8 @@ set -euo pipefail
 printf '%s\n' "$*" >>"${TEST_CALLS}"
 case "$1 $2" in
   "buildx version"|"version --format") exit 0 ;;
+  "buildx inspect") echo 'Driver: docker-container' ;;
+  "info --format") echo '[["Backing Filesystem","extfs"]]' ;;
   "buildx build")
     [[ " $* " == *" --output type=docker,dest=-,rewrite-timestamp=true "* ]]
     [[ " $* " == *" --build-arg SOURCE_DATE_EPOCH=0 "* ]]
@@ -467,6 +471,8 @@ func TestDiagnosticToolchainPinDoesNotGrantMaintainedAcceptance(t *testing.T) {
 printf '%s\n' "$*" >>"$TEST_CALLS"
 case "$1 $2" in
   'buildx version'|'version --format') exit 0 ;;
+  'buildx inspect') echo 'Driver: docker-container' ;;
+  'info --format') echo '[["Backing Filesystem","extfs"]]' ;;
   'buildx build') printf 'archive\n' ;;
   'image load') [ "$3" = --input ] && [ -f "$4" ] && [ -s "$4" ] || exit 96 ;;
   'image inspect')
@@ -496,6 +502,71 @@ esac
 			smoke := strings.Contains(string(calls), "run --rm")
 			if smoke == tc.wantError {
 				t.Fatalf("native smoke=%t; want %t: %s", smoke, !tc.wantError, calls)
+			}
+		})
+	}
+}
+
+func TestToolchainRefusesDockerDriverWithoutContainerdStore(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("toolchain script requires jq")
+	}
+	if runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64" {
+		t.Skip("toolchain supports amd64 and arm64 hosts")
+	}
+	for _, tc := range []struct {
+		name    string
+		driver  string
+		storage string
+		refuse  bool
+	}{
+		{name: "docker driver on the classic store", driver: "docker", storage: `[["Backing Filesystem","extfs"]]`, refuse: true},
+		{name: "docker driver on the containerd store", driver: "docker", storage: `[["driver-type","io.containerd.snapshotter.v1"]]`},
+		{name: "container driver on the classic store", driver: "docker-container", storage: `[["Backing Filesystem","extfs"]]`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			log := filepath.Join(dir, "calls")
+			fake := filepath.Join(dir, "docker")
+			// A build that is admitted fails with a distinct status, so the
+			// test separates refusal from an attempted export.
+			const script = `#!/bin/sh
+printf '%s\n' "$*" >>"$TEST_CALLS"
+case "$1 $2" in
+  'buildx version'|'version --format') exit 0 ;;
+  'buildx inspect') printf 'Name: test\nDriver: %s\n' "$TEST_DRIVER" ;;
+  'info --format') [ "$TEST_DRIVER" = docker ] || exit 98; printf '%s\n' "$TEST_STORAGE" ;;
+  'buildx build') exit 42 ;;
+  *) exit 99 ;;
+esac
+`
+			if err := os.WriteFile(fake, []byte(script), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "bash", "build.sh", "--arch", runtime.GOARCH)
+			cmd.Env = append(os.Environ(), "CONTAINER_RUNTIME="+fake, "TEST_CALLS="+log,
+				"TEST_DRIVER="+tc.driver, "TEST_STORAGE="+tc.storage,
+				"NVKR_BUILD_ARCHIVES=", "NVKR_BUILD_CA_BUNDLE=", "TMPDIR="+dir)
+			output, err := cmd.CombinedOutput()
+			var failure *exec.ExitError
+			if !errors.As(err, &failure) {
+				t.Fatalf("build error = %v, want an exit status:\n%s", err, output)
+			}
+			calls, err := os.ReadFile(log)
+			if err != nil {
+				t.Fatal(err)
+			}
+			built := strings.Contains(string(calls), "buildx build")
+			if tc.refuse {
+				if failure.ExitCode() != 1 || built || !strings.Contains(string(output), "--driver docker-container") {
+					t.Fatalf("exit %d, build attempted %t, want refusal before building:\n%s", failure.ExitCode(), built, output)
+				}
+				return
+			}
+			if failure.ExitCode() != 42 || !built {
+				t.Fatalf("exit %d, build attempted %t, want the admitted build's own failure:\n%s", failure.ExitCode(), built, output)
 			}
 		})
 	}

@@ -19,6 +19,24 @@ type GitHubRuntimeSource struct {
 }
 
 func (environment Environment) validateGitHubRuntimeSource() error {
+	if len(environment.GitHubRuntimeSources) != 0 {
+		if environment.GitHubRuntimeSource != nil || len(environment.GitHubRuntimeSources) > 16 {
+			return e.New(e.CodeInvalidCatalog, "runtime source policies are mutually exclusive and admit at most 16 repositories")
+		}
+		previous := ""
+		for _, source := range environment.GitHubRuntimeSources {
+			if source.Repository <= previous {
+				return e.New(e.CodeInvalidCatalog, "runtime source repositories must be sorted and unique")
+			}
+			previous = source.Repository
+			one := environment
+			one.GitHubRuntimeSources = nil
+			one.GitHubRuntimeSource = &source
+			if err := one.validateGitHubRuntimeSource(); err != nil {
+				return err
+			}
+		}
+	}
 	selection := environment.GitHubRuntimeSource
 	if selection == nil {
 		return nil

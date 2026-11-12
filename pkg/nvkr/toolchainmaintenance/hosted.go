@@ -118,10 +118,8 @@ func admit(ctx context.Context, root, run string) (*admission, error) {
 	if strings.TrimSpace(string(head)) != os.Getenv("GITHUB_SHA") {
 		return nil, e.New(e.CodeUnverifiedRef, "maintenance checkout is not the triggering main revision")
 	}
-	if _, err := command(ctx, root, "git", "diff", "--exit-code", r.SourceCommit, "HEAD", "--",
-		".go-version", "go.mod", "go.sum", "cmd/nvkr-disk-inspect", "pkg", "internal",
-		"toolchains/nvkr-packer", "toolchains/nvkr-disk-inspect", "scripts/prepare-native-toolchains.sh"); err != nil {
-		return nil, e.New(e.CodeGateUnmet, "preparation is stale against current toolchain inputs; prepare and review a new candidate")
+	if err := checkPreparationInputs(ctx, root, r.SourceCommit); err != nil {
+		return nil, err
 	}
 	var preparation preparationRun
 	if err := github(ctx, os.Getenv("GH_TOKEN"), fmt.Sprintf("repos/%s/actions/runs/%d/attempts/%d", Repository, r.RunID, r.Attempt), &preparation); err != nil {

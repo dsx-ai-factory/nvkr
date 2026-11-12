@@ -1,0 +1,236 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: nvkr.dev/catalog-fragment/v1
+kind: CatalogFragment
+sources:
+  nvke-os:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: v0.23.0
+    toolchainImagesByArch:
+      amd64: sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140
+    vendorCommand:
+    - bash
+    - "-ec"
+    - |
+      cd agent
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
+      pins="$(sha256sum go.mod go.sum)"
+      # Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.
+      # Go owns transport fallback; checksum failures never select another proxy.
+      # Keep direct fallback limited to a missing proxy module (404/410).
+      proxy=https://proxy.golang.org
+      GOPROXY="${proxy}|${proxy}/|${proxy}//,direct" \
+        timeout --kill-after=10s 540s go mod download || {
+          status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit "$status";
+        }
+      printf '%s\n' "$pins" | sha256sum --quiet -c - || {
+        echo 'agent module pins changed during download' >&2; exit 1;
+      }
+      # Offline verification and vendoring run once, after acquisition succeeds.
+      GOPROXY=off timeout --kill-after=10s 60s go mod verify || {
+        status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit "$status";
+      }
+      GOPROXY=off timeout --kill-after=10s 180s go mod vendor || {
+        status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit "$status";
+      }
+      printf '%s\n' "$pins" | sha256sum --quiet -c - || {
+        echo 'agent module pins changed during vendoring' >&2; exit 1;
+      }
+  nvke-cni-calico-source:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: v0.23.0
+    toolchainImagesByArch:
+      amd64: sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140
+    vendorCommand:
+    - bash
+    - "-ec"
+    - |
+      make -C os-image/packages/cni-calico bundle nfpm \
+        ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
+  nvke-kubeadm-distro-source:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: v0.23.0
+    toolchainImagesByArch:
+      amd64: sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140
+    vendorCommand:
+    - bash
+    - "-ec"
+    - |
+      test ! -e os-image/packages/kubeadm-distro/dist
+      test ! -L os-image/packages/kubeadm-distro/dist
+      # Stage beside the checkout; protected vendors mount /tmp with noexec.
+      bundle_root="$(mktemp -d "$(dirname "$PWD")/nvkr-kubeadm.XXXXXXXX")"
+      trap 'rm -rf -- "$bundle_root"' EXIT
+      make -C os-image/packages/kubeadm-distro bundle nfpm \
+        DIST_DIR="$bundle_root/dist" \
+        ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
+      cp -a "$bundle_root/dist" os-image/packages/kubeadm-distro/dist
+  nvke-spire-agent-source:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: v0.23.0
+    toolchainImagesByArch:
+      amd64: sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140
+    vendorCommand:
+    - bash
+    - "-ec"
+    - |
+      make -C os-image/packages/spire-agent bundle nfpm \
+        ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
+  nvke-doca-ovs-source:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: v0.23.0
+    toolchainImagesByArch:
+      amd64: sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140
+    vendorCommand:
+    - bash
+    - "-ec"
+    - |
+      test ! -e os-image/packages/doca-ovs/nvkr-debs
+      test ! -L os-image/packages/doca-ovs/nvkr-debs
+      # The source Makefile owns the DOCA version, package set and committed
+      # per-deb SHA-256 lock. Stage beside the checkout; protected vendors
+      # mount /tmp with noexec.
+      bundle_root="$(mktemp -d "$(dirname "$PWD")/nvkr-doca.XXXXXXXX")"
+      trap 'rm -rf -- "$bundle_root"' EXIT
+      timeout --kill-after=10s 540s make -C os-image/packages/doca-ovs debs \
+        ARCH={{.Arch}} UBUNTU_SERIES=26.04 \
+        DIST_DIR="$bundle_root/dist" OUT_DIR="$bundle_root/debs"
+      mkdir os-image/packages/doca-ovs/nvkr-debs
+      cp "$bundle_root/debs/"*.deb os-image/packages/doca-ovs/nvkr-debs/
+components:
+  nvke-doca-ovs:
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    fromSource: true
+    source: nvke-doca-ovs-source
+    outputType: tarball
+    buildCommand:
+    - bash
+    - "-ec"
+    - |
+      # NVIDIA publishes these DOCA OVS debs without source; the vendor stage
+      # verified each against NVKE's committed lock.
+      cd /src/os-image/packages/doca-ovs/nvkr-debs
+      packages=(*.deb)
+      test "${#packages[@]}" -eq 8
+      switch=(doca-openvswitch-switch_*_{{.Arch}}.deb)
+      test "${#switch[@]}" -eq 1
+      test -f "${switch[0]}"
+      test "$(dpkg-deb --field "${switch[0]}" Package)" = doca-openvswitch-switch
+      test "$(dpkg-deb --field "${switch[0]}" Architecture)" = "{{.Arch}}"
+      mkdir -p /src/nvkr-output
+      # The composer accepts only .deb archive members.
+      tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
+        --owner=0 --group=0 --numeric-owner \
+        -cf /src/nvkr-output/nvke-doca-ovs.tar -- *.deb
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/nvke-doca-ovs.tar
+  nvke-image-inputs:
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    fromSource: true
+    source: nvke-os
+    builderType: oci-hermetic
+    outputType: tarball
+    materials:
+      agent: nvke-agent
+      calico: nvke-cni-calico
+      kubeadm-distro: nvke-kubeadm-distro
+      ovn: nvke-cni-ovn
+      spire-agent: nvke-spire-agent
+      doca-ovs: nvke-doca-ovs
+    buildCommand:
+    - bash
+    - "-ec"
+    - |
+      exec python3 /src/os-image/packer/scripts/compose-image-inputs.py \
+        --architecture {{.Arch}} \
+        --materials-dir /nvkr/inputs/materials \
+        --source-files-dir /src/os-image/files \
+        --output /src/nvkr-output/image-inputs.tar \
+        --source-date-epoch "$SOURCE_DATE_EPOCH"
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/image-inputs.tar
+  nvke-patched-installer-iso:
+    platforms:
+    - linux/arm64
+    fromSource: true
+    source: nvke-os
+    builderType: oci-hermetic
+    outputType: raw
+    materials:
+      installer-source: ubuntu-installer-iso
+    buildCommand:
+    - bash
+    - "/src/os-image/packer/scripts/patch-installer-iso.sh"
+    - "/nvkr/inputs/materials/installer-source"
+    - "/src/nvkr-output/installer.iso"
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/installer.iso
+  nvke-patched-installer-iso-amd64:
+    platforms:
+    - linux/amd64
+    fromSource: true
+    source: nvke-os
+    builderType: oci-hermetic
+    outputType: raw
+    materials:
+      installer-source: ubuntu-installer-iso-amd64
+    buildCommand:
+    - bash
+    - "/src/os-image/packer/scripts/patch-installer-iso.sh"
+    - "/nvkr/inputs/materials/installer-source"
+    - "/src/nvkr-output/installer.iso"
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/installer.iso
+  nvke-spire-agent:
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    fromSource: true
+    source: nvke-spire-agent-source
+    outputType: tarball
+    buildCommand:
+    - bash
+    - "-ec"
+    - |
+      mkdir -p /src/nvkr-output/work/os-image/packages /src/nvkr-output/spire-agent
+      cp -a os-image/packages/spire-agent /src/nvkr-output/work/os-image/packages/
+      cp -a os-image/files /src/nvkr-output/work/os-image/
+      SPIRE_VERSION=1.14.1 TPM_PLUGIN_VERSION=1.9.0 DEB_REVISION=4 \
+        NFPM_BIN=/usr/local/bin/nfpm \
+        /src/nvkr-output/work/os-image/packages/spire-agent/packaging/build-deb.sh \
+        {{.Arch}} /src/os-image/packages/spire-agent/dist/1.14.1+tpm1.9.0/{{.Arch}} \
+        /src/nvkr-output/spire-agent
+      tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+        --numeric-owner -C /src/nvkr-output/spire-agent \
+        -cf /src/nvkr-output/nvke-spire-agent.tar .
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/nvke-spire-agent.tar
+  ubuntu-installer-iso:
+    platforms:
+    - linux/arm64
+    source: nvke-os
+    outputType: raw
+    prebuilt:
+      url: https://cdimage.ubuntu.com/ubuntu/releases/26.04.1/release/ubuntu-26.04.1-live-server-arm64.iso
+      evidence:
+        none: true
+  ubuntu-installer-iso-amd64:
+    platforms:
+    - linux/amd64
+    source: nvke-os
+    outputType: raw
+    prebuilt:
+      url: https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-live-server-amd64.iso
+      evidence:
+        none: true

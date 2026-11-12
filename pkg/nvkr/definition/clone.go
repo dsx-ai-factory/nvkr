@@ -43,6 +43,7 @@ func (input Environment) Clone() Environment {
 		value.Smoke = value.Smoke.Clone()
 		input.Tekton = &value
 	}
+	input.GitHubRuntimeSources = slices.Clone(input.GitHubRuntimeSources)
 	if input.ToolchainAccess != nil {
 		value := *input.ToolchainAccess
 		value.PrivateRoots = slices.Clone(value.PrivateRoots)

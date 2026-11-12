@@ -44,10 +44,15 @@ func readPublicationManifest(ctx context.Context, root string, descriptor Descri
 		return ociManifest{}, e.Wrap(e.CodeVerifyFailed, err, "decoding publication-root manifest")
 	}
 	if manifest.SchemaVersion != 2 || manifest.MediaType != descriptor.MediaType ||
-		manifest.ArtifactType != MediaPublicationRoot || len(manifest.Layers) != 0 || manifest.Config.MediaType != MediaPublicationRootConfig {
+		manifest.artifactType() != MediaPublicationRoot || len(manifest.Layers) != 0 || !publicationConfigProfile(manifest) {
 		return ociManifest{}, e.New(e.CodeVerifyFailed, "publication-root manifest has an invalid schema or config/layer contract")
 	}
 	return manifest, nil
+}
+
+func publicationConfigProfile(manifest ociManifest) bool {
+	return manifest.Config.MediaType == MediaPublicationRootConfig ||
+		(manifest.ArtifactType == "" && manifest.Config.MediaType == MediaOctetStream)
 }
 
 // fetchOutputs is used only by Pull to fill the private staging layout from the
@@ -72,8 +77,12 @@ func inspectPublicationWithDisks(ctx context.Context, root string, fetchOutputs 
 	if err != nil {
 		return Inspection{}, err
 	}
-	if index.ArtifactType != MediaPublicationRoot {
-		return Inspection{}, e.New(e.CodeVerifyFailed, "OCI layout is %q, not an NVKR publication root", index.ArtifactType)
+	if index.artifactType() != MediaPublicationRoot {
+		return Inspection{}, e.New(e.CodeVerifyFailed, "OCI layout is %q, not an NVKR publication root", index.artifactType())
+	}
+	representation, err := inspectOCIRepresentation(index)
+	if err != nil {
+		return Inspection{}, err
 	}
 	rootDigest := digestBytes(raw)
 	visited := map[string]bool{}
@@ -102,6 +111,9 @@ func inspectPublicationWithDisks(ctx context.Context, root string, fetchOutputs 
 			if err != nil {
 				return Inspection{}, err
 			}
+			if err := validateRootRepresentation(representation, manifest); err != nil {
+				return Inspection{}, err
+			}
 			rootConfig = manifest.Config
 		}
 	}
@@ -116,6 +128,7 @@ func inspectPublicationWithDisks(ctx context.Context, root string, fetchOutputs 
 	if err := canonical.UnmarshalExact(configRaw, &publication); err != nil {
 		return Inspection{}, e.Wrap(e.CodeVerifyFailed, err, "decoding canonical publication root")
 	}
+	publication.ociRepresentation = representation
 	if err := publication.Validate(); err != nil {
 		return Inspection{}, err
 	}
@@ -212,7 +225,7 @@ func verifyPublishedObjectBinding(ctx context.Context, root string, object Publi
 	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "decoding publication manifest")
 	}
-	if object.Kind == outputFormatBundle || object.ArtifactType == MediaBundle || manifest.ArtifactType == MediaBundle {
+	if object.Kind == outputFormatBundle || object.ArtifactType == MediaBundle || manifest.artifactType() == MediaBundle {
 		return inspectBundleMetadata(ctx, root, manifest, &object)
 	}
 	if types.MediaType(manifest.Config.MediaType).IsConfig() {
@@ -250,7 +263,7 @@ func verifyPublishedObjectBinding(ctx context.Context, root string, object Publi
 			return e.Wrap(e.CodeVerifyFailed, err, "decoding binary config")
 		}
 		semantic, err := bundle.Digest()
-		if err != nil || semantic != object.SemanticDigest || manifest.ArtifactType != MediaBinaryBundle || len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaBinaryBundleLayer || object.BlobDigest != descriptor.Digest {
+		if err != nil || semantic != object.SemanticDigest || manifest.artifactType() != MediaBinaryBundle || len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaBinaryBundleLayer || object.BlobDigest != descriptor.Digest {
 			return e.New(e.CodeVerifyFailed, "binary manifest differs from release binding")
 		}
 		return nil
@@ -262,19 +275,20 @@ func verifyPublishedObjectBinding(ctx context.Context, root string, object Publi
 			return err
 		}
 		if len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest ||
-			manifest.Layers[0].MediaType != MediaHelmChartLayer || manifest.ArtifactType != object.ArtifactType {
+			manifest.Layers[0].MediaType != MediaHelmChartLayer || manifest.artifactType() != object.ArtifactType {
 			return e.New(e.CodeVerifyFailed, "Helm chart artifact differs from release binding")
 		}
 		return nil
 	}
-	if manifest.Config.MediaType == MediaEmptyConfig {
+	if manifest.plainConfig() {
 		raw, err := readBlob(ctx, root, manifest.Config, 8<<20)
-		if err != nil || string(raw) != "{}" || len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest || manifest.ArtifactType != object.ArtifactType {
+		if err != nil || string(raw) != "{}" || len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest || manifest.artifactType() != object.ArtifactType {
 			return e.New(e.CodeVerifyFailed, "artifact differs from release binding")
 		}
 		return nil
 	}
-	if len(manifest.Layers) != 1 || manifest.Config.MediaType != MediaDeliveryObjectConfig {
+	if len(manifest.Layers) != 1 || (manifest.Config.MediaType != MediaDeliveryObjectConfig &&
+		!(object.Evidence != nil && manifest.ArtifactType == "" && manifest.artifactType() == object.ArtifactType && manifest.Config.MediaType == MediaOctetStream)) {
 		return e.New(e.CodeVerifyFailed, "publication object %q has an invalid delivery manifest", object.Name)
 	}
 	configRaw, err := readBlob(ctx, root, manifest.Config, 8<<20)
@@ -340,18 +354,25 @@ func verifyDescriptorHoldingDisks(ctx context.Context, root string, descriptor D
 		if manifest.MediaType != descriptor.MediaType {
 			return e.New(e.CodeVerifyFailed, "manifest media type differs from its descriptor")
 		}
-		if manifest.ArtifactType == "" && types.MediaType(manifest.Config.MediaType).IsConfig() {
+		if manifest.artifactType() == "" && types.MediaType(manifest.Config.MediaType).IsConfig() {
 			_, err := verifyImageManifest(ctx, root, manifest, visited)
 			return err
 		}
-		if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.ArtifactType == "" {
+		if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.artifactType() == "" {
 			return e.New(e.CodeVerifyFailed, "OCI artifact manifest has an invalid schema")
 		}
-		if manifest.ArtifactType == MediaBundle {
-			if err := validateBundleManifestDocument(raw); err != nil {
+		if err := manifest.validateArtifactConfig(); err != nil {
+			return err
+		}
+		if manifest.artifactType() == MediaBundle || manifest.ArtifactType == MediaAICRArtifact {
+			if manifest.ArtifactType == MediaAICRArtifact {
+				if _, err := admitBundleManifest(raw); err != nil {
+					return err
+				}
+			} else if err := validateBundleManifestDocument(raw); err != nil {
 				return err
 			}
-			if descriptor.ArtifactType != "" && descriptor.ArtifactType != MediaBundle {
+			if descriptor.ArtifactType != "" && descriptor.ArtifactType != manifest.artifactType() {
 				return e.New(e.CodeVerifyFailed, "bundle descriptor differs from its artifact type")
 			}
 			if err := inspectBundlePayload(ctx, root, manifest); err != nil {
@@ -480,7 +501,7 @@ func readObject(inspection Inspection, name string, read func(Descriptor, int64)
 		return PublishedObject{}, nil, err
 	}
 	var manifest ociManifest
-	if err := json.Unmarshal(manifestRaw, &manifest); err != nil || manifest.ArtifactType != object.ArtifactType || len(manifest.Layers) != 1 {
+	if err := json.Unmarshal(manifestRaw, &manifest); err != nil || manifest.artifactType() != object.ArtifactType || len(manifest.Layers) != 1 {
 		return PublishedObject{}, nil, e.New(e.CodeVerifyFailed, "publication object %q is not a single-payload delivery object", name)
 	}
 	payload, err := read(manifest.Layers[0], maxDeliveryFileBytes)

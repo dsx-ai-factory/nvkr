@@ -401,13 +401,9 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 		}
 		var err error
 		if route == "release" {
-			sources := map[string]string{}
-			for _, object := range inspection.Root.Objects {
-				sources[object.Name] = filepath.Join(workspace, "closure")
-			}
-			_, err = delivery.BuildMetadataRoot(ctx, output.Path, inspection.Root, sources)
+			_, err = delivery.CopyMetadataWithExpectedRoot(ctx, filepath.Join(workspace, "closure"), output.Path, subject.Digest)
 		} else {
-			_, err = delivery.ExportMetadata(ctx, filepath.Join(workspace, "closure"), output.Path)
+			_, err = delivery.ExportMetadataWithExpectedRoot(ctx, filepath.Join(workspace, "closure"), output.Path, subject.Digest)
 		}
 		if err != nil {
 			return err

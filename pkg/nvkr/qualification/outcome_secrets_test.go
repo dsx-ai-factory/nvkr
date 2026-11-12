@@ -62,7 +62,8 @@ func TestQualificationGenerationOutcomeSecretsCoverStep(t *testing.T) {
 	if len(findings) != 0 {
 		t.Errorf("qualify step variables %v are neither redacted from the outcome nor reviewed non-secret bindings", findings)
 	}
-	if redacted < 4 {
+	// Public source retrieval no longer adds a source-token binding.
+	if redacted != 3 {
 		t.Fatalf("found %d redacted secret bindings on the qualify step; the scan no longer sees them", redacted)
 	}
 	for _, binding := range []map[string]string{

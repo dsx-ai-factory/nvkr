@@ -314,7 +314,8 @@ func TestBundleMetadataAdmissionWithoutPayload(t *testing.T) {
 		name string
 		raw  []byte
 	}{
-		{"case alias", bytes.Replace(encoded, []byte(`"artifactType"`), []byte(`"ArtifactType"`), 1)},
+		{"case alias", bytes.Replace(encoded, []byte(`"mediaType"`), []byte(`"MediaType"`), 1)},
+		{"legacy case alias", append([]byte(`{"ArtifactType":"`+MediaBundle+`",`), encoded[1:]...)},
 		{"unknown field", append([]byte(`{"unsupported":true,`), encoded[1:]...)},
 	} {
 		t.Run(test.name, func(t *testing.T) {

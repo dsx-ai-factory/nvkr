@@ -426,6 +426,12 @@ isolated. The report is projected into deterministic component names, versions a
 records, temporary paths, timestamps and scanner-generated IDs are excluded. Scanner executable identity is
 recorded separately. Unknown versions remain unknown; they are never filled from unrelated module tags.
 
+Native filesystem/container reports admit exactly Syft JSON schemas `16.1.10` (the retained images)
+and `16.1.13` (Syft v1.57.1). Both preserve the selected package identity and Debian architecture fields.
+The latter adds `fullPath` archive coordinates alongside `path` and `accessPath`; admission checks all
+three and preserves `!/` archive boundaries while normalizing paths. A nested package database still
+requires its own held filesystem/image owner. Other schema versions remain unsupported.
+
 The separate `InspectDebianArchiveMetadata` diagnostic always uses the constant private snapshot name
 `subject.deb`, independent of the caller's filename. The caller's basename is not copied, and the extension
 supplies no format or identity proof. Syft parses a private read-only copy of the held bytes, rechecked against
@@ -433,7 +439,7 @@ the digest after scanning. Its result uses the diagnostic method `syft-debian-ar
 dependency SBOM attachment and serialized BOM validation reject. Package/control metadata cannot become
 payload dependency evidence. The ordinary path-based `InspectDependencies` and held-only
 `InspectHeldDependencies` APIs retain hint-free host-file scanning; OCI scanning is unaffected.
-The Syft v1.51.1 discovery premise is version-specific: rerun the opt-in regression when changing either
+The Syft discovery premise is version-specific: rerun the opt-in regression when changing either
 the factory catalog Syft pin or the Syft pin in `toolchains/nvkr-disk-inspect`.
 
 No maintained factory output invokes the separate Debian metadata diagnostic. Original `debian-package`

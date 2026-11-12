@@ -12,7 +12,48 @@ import (
 
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/ociformat"
 )
+
+func TestPublicationOCIRepresentationBindsPlanBeforeExecution(t *testing.T) {
+	original := imageIndexTestPlan(t)
+	originalIdentity, err := original.IdentityDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []ociformat.Representation{ociformat.ArtifactV1, ociformat.NVKRCompatibleV1, ociformat.HelmStandardV1} {
+		t.Run(string(value), func(t *testing.T) {
+			environment := original.Environment.Clone()
+			environment.Publication.OCIRepresentation = value
+			changed := compileImageIndexFixture(t, original, environment)
+			identity, err := changed.IdentityDigest()
+			if err != nil || identity == originalIdentity || changed.EnvironmentDigest == original.EnvironmentDigest {
+				t.Fatalf("representation did not bind Environment and Plan identity: %v", err)
+			}
+			for i, build := range original.Builds {
+				if build.BuildDigest != changed.Builds[i].BuildDigest {
+					t.Fatal("representation changed logical producer Build identity")
+				}
+			}
+			changed.Environment.Publication.OCIRepresentation = "unknown"
+			assertFactoryErrorCode(t, changed.Validate(), e.CodeEngineCapability)
+			bundle, err := RenderGitHub(t.Context(), changed)
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if bundle != nil {
+				t.Fatal("unknown representation emitted a partial bundle")
+			}
+			assertFactoryErrorCode(t, ExecuteNode(t.Context(), changed, "absent-node", io.Discard, io.Discard), e.CodeEngineCapability)
+		})
+	}
+	definition, environment := fixtureInputs("fixture", "cli", "")
+	definition.Catalog.Base = "absent-catalog"
+	environment.Publication = &authored.Publication{OCIRepresentation: "unknown"}
+	plan, err := CompileDocuments(t.Context(), filepath.Join(t.TempDir(), "definition.yaml"), definition, "environment.yaml", environment, "test")
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if plan != nil || !strings.Contains(err.Error(), "representation") {
+		t.Fatal("unknown representation reached catalog I/O or returned a Plan")
+	}
+}
 
 func TestUnavailablePublicationTransportBeforeCatalogIO(t *testing.T) {
 	for _, tc := range []struct {

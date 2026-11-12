@@ -235,6 +235,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-development.yaml", QualificationPolicy: "inputs/policies/nvke-gpu-site-development-qualification.yaml"},
 		{Definition: "inputs/definitions/demo/arm64-nvidia-kvm.json", Environment: "inputs/environments/github-nightly-nvidia.json"},
 		{Definition: "inputs/definitions/demo/arm64-upstream-kvm.json", Environment: "inputs/environments/github-nightly-upstream.json"},
+		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-nvke-nightly-gpu-site.yaml", QualificationPolicy: "inputs/policies/nvke-nightly-gpu-site-qualification.yaml"},
 	}
 	if len(cfg.AdditionalRuns) != len(wantAdditional) {
 		t.Fatalf("maintained policy selects %d additional Runs, want %d", len(cfg.AdditionalRuns), len(wantAdditional))
@@ -320,12 +321,14 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		".github/nvkr-dev-qualification",
 		".github/nvkr-qualification",
 		".github/nvkr-qualification-nvke-gpu-site",
+		".github/nvkr-qualification-nvke-nightly-gpu-site",
 		".github/nvkr-run",
 		".github/nvkr-run-nvke-core",
 		".github/nvkr-run-nvke-disks",
 		".github/nvkr-run-nvke-disks-ubuntu24",
 		".github/nvkr-run-nvke-gpu-site",
 		".github/nvkr-run-nvke-nightly-arm64",
+		".github/nvkr-run-nvke-nightly-gpu-site",
 		".github/nvkr-run-nvke-nightly-upstream-ovn-arm64",
 		".github/nvkr-run-nvke-services",
 		".github/nvkr-run-nvke-telemetry",
@@ -338,17 +341,20 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		".github/workflows/nvkr-dev-smoke.yml",
 		".github/workflows/nvkr-dev.yml",
 		".github/workflows/nvkr-qualify-nvke-gpu-site.yml",
+		".github/workflows/nvkr-qualify-nvke-nightly-gpu-site.yml",
 		".github/workflows/nvkr-qualify.yml",
 		".github/workflows/nvkr-run-nvke-core.yml",
 		".github/workflows/nvkr-run-nvke-disks-ubuntu24.yml",
 		".github/workflows/nvkr-run-nvke-disks.yml",
 		".github/workflows/nvkr-run-nvke-gpu-site.yml",
 		".github/workflows/nvkr-run-nvke-nightly-arm64.yml",
+		".github/workflows/nvkr-run-nvke-nightly-gpu-site.yml",
 		".github/workflows/nvkr-run-nvke-nightly-upstream-ovn-arm64.yml",
 		".github/workflows/nvkr-run-nvke-services.yml",
 		".github/workflows/nvkr-run-nvke-telemetry.yml",
 		".github/workflows/nvkr-run.yml",
 		".github/workflows/nvkr-smoke-nvke-gpu-site.yml",
+		".github/workflows/nvkr-smoke-nvke-nightly-gpu-site.yml",
 		".github/workflows/nvkr-smoke.yml",
 	}
 	if !slices.Equal(files, wantFiles) {

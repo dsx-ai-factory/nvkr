@@ -1,6 +1,6 @@
 module github.com/dsx-ai-factory/nvkr/toolchains/actionlint
 
-go 1.27.0
+go 1.27.4
 
 tool github.com/rhysd/actionlint/cmd/actionlint
 
@@ -15,6 +15,6 @@ require (
 	github.com/rhysd/actionlint v1.7.12 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.3 // indirect
-	golang.org/x/sync v0.24.0 // indirect
-	golang.org/x/sys v0.49.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 )

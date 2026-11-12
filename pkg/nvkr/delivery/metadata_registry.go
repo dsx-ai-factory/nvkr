@@ -69,7 +69,7 @@ func PullMetadataWithOptions(ctx context.Context, reference, out string, request
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata index identity/size differs")
 	}
 	var index ociIndex
-	if err := json.Unmarshal(fetched.Manifest, &index); err != nil || index.ArtifactType != MediaPublicationRoot || len(index.Manifests) != 1 {
+	if err := json.Unmarshal(fetched.Manifest, &index); err != nil || index.artifactType() != MediaPublicationRoot || len(index.Manifests) != 1 {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata index must contain one root")
 	}
 	stage, commit, cleanup, err := stageLayout(out)
@@ -111,7 +111,7 @@ func PullMetadataWithOptions(ctx context.Context, reference, out string, request
 	if err != nil {
 		return Inspection{}, err
 	}
-	if m.ArtifactType != MediaPublicationRoot || len(m.Layers) != 0 || m.Config.MediaType != MediaPublicationRootConfig {
+	if m.artifactType() != MediaPublicationRoot || len(m.Layers) != 0 || !publicationConfigProfile(m) {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "invalid metadata root")
 	}
 	if err := blob(ctx, ref.Context(), m.Config, 8<<20); err != nil {
@@ -274,7 +274,10 @@ func PushMetadata(ctx context.Context, source, repository string, options Regist
 
 // PushMetadataWithOptions binds optional prior metadata admission to the exact
 // root being published. Metadata publication cannot advance payload aliases.
-func PushMetadataWithOptions(ctx context.Context, source, repository string, request PushOptions) (string, error) {
+func PushMetadataWithOptions(ctx context.Context, source, repository string, request PushOptions) (published string, resultErr error) {
+	ctx, observer := observeRegistry(ctx)
+	observer.readOnly = true // Member admission precedes every metadata upload.
+	defer func(observedCtx context.Context) { resultErr = observer.explain(observedCtx, resultErr) }(ctx)
 	options := request.Registry
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
@@ -285,11 +288,8 @@ func PushMetadataWithOptions(ctx context.Context, source, repository string, req
 	if len(request.ImageTags) != 0 {
 		return "", e.New(e.CodeUsage, "metadata publication cannot advance image tags")
 	}
-	if _, bounded := ctx.Deadline(); !bounded {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 20*time.Minute)
-		defer cancel()
-	}
+	ctx, cancel := registryPublicationContext(ctx, 20*time.Minute)
+	defer cancel()
 	inspection, err := InspectMetadata(ctx, source)
 	if err != nil {
 		return "", err
@@ -316,7 +316,11 @@ func PushMetadataWithOptions(ctx context.Context, source, repository string, req
 			return "", e.New(e.CodeVerifyFailed, "metadata member lacks repository")
 		}
 		if _, err := ResolveDigest(ctx, child.Name(), options); err != nil {
-			return "", err
+			var coded *e.Error
+			if errors.As(err, &coded) && coded.Code == e.CodeTimeout {
+				return "", e.Wrap(e.CodeTimeout, err, "reading back metadata member %q", o.Name)
+			}
+			return "", registryReadbackError(ctx, err, "reading back metadata member %q", o.Name)
 		}
 	}
 	path, err := layout.FromPath(source)
@@ -334,8 +338,9 @@ func PushMetadataWithOptions(ctx context.Context, source, repository string, req
 	if digest.String() != inspection.RootDigest {
 		return "", e.New(e.CodeVerifyFailed, "metadata index changed after membership inspection")
 	}
+	observer.readOnly = false
 	if err := remote.WriteIndex(ref, index, registryOptions(ctx, options)...); err != nil {
-		return "", classifyContext(ctx, e.Wrap(e.CodeUnavailable, err, "publish metadata root"))
+		return "", registryPublishError(ctx, err, "publishing release metadata root")
 	}
 	return ref.Name(), nil
 }

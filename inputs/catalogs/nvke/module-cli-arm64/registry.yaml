@@ -31,16 +31,14 @@
       "writeDir": "cli/bin"
     }
   },
-  "sources": {
-    "nvke": {
-      "constraint": "v0.23.0",
-      "repo": "https://github.com/dsx-ai-factory/nvke",
-      "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
-      "vendorCommand": [
-        "bash",
-        "-euc",
-        "export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\ntest ! -e controller/deploy/charts/go.sum\npins=\"$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)\"\ncd cli\ntimeout --kill-after=10s 540s go mod download\nGOPROXY=off timeout --kill-after=10s 60s go mod verify\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor\ncd ..\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c -\ntest ! -e controller/deploy/charts/go.sum\n"
-      ]
+  "sources": {},
+  "imports": [
+    {
+      "path": "../../shared/nvke.yaml",
+      "sha256": "90dbe40c5ce58b88c2722343db8a12f8f2ea4ad7f853fd20a8f69fb908994def",
+      "sources": {
+        "nvke": "nvke-cli"
+      }
     }
-  }
+  ]
 }

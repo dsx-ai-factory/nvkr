@@ -470,18 +470,22 @@ jobs:
           cache: false
 
       # Catalog validation re-reads the pinned NVKE tree. Acquire it with a
-      # fixed action before running checkout code; never pass this token to
-      # the generator or persist credentials. Forks skip this job; do not use
+      # bounded anonymous fetch before running checkout code.
+      # Forks skip this job; do not use
       # pull_request_target to bypass that boundary.
-      - name: Fetch private NVKE validation inputs
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: dsx-ai-factory/nvke
-          ref: 6991e36bef8f15b42b6f6519ccff089c587a6e49 # v0.22.0-beta.1
-          fetch-depth: 0
-          path: .nvkr-inputs/nvke
-          token: ${{ secrets.NKE_SOURCE_TOKEN }}
-          persist-credentials: false
+      - name: Fetch public NVKE validation inputs
+        env:
+          NVKE_REF: 6991e36bef8f15b42b6f6519ccff089c587a6e49
+          GIT_CONFIG_NOSYSTEM: '1'
+          GIT_CONFIG_GLOBAL: /dev/null
+          GIT_CONFIG_COUNT: '0'
+          GIT_TERMINAL_PROMPT: '0'
+        run: |
+          set -euo pipefail
+          git init .nvkr-inputs/nvke
+          timeout 300 git -C .nvkr-inputs/nvke -c credential.helper= fetch https://github.com/dsx-ai-factory/nvke '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
+          timeout 300 git -C .nvkr-inputs/nvke -c credential.helper= fetch https://github.com/dsx-ai-factory/nvke "$NVKE_REF"
+          git -C .nvkr-inputs/nvke checkout --detach FETCH_HEAD
 
       - name: Verify committed producer, qualification and catalog refresh generation is current
         env:

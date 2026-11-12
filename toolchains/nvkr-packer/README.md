@@ -1,11 +1,11 @@
 # Direct-Packer toolchain image
 
 This directory defines the OCI toolchain consumed by NVKR's local direct-Packer
-executor. Each host-platform image contains Packer 1.15.4, the QEMU plugin 1.1.6,
+executor. Each host-platform image contains Packer 1.16.2, the QEMU plugin 1.1.8,
 QEMU for both supported guest architectures, AMD64 and ARM64 UEFI firmware, `qemu-img`,
 `ssh-keygen`, Python, `tar`, a shell and the core utilities used by the NVKE
-Packer project. It also contains Go 1.27.3, crane 0.21.9, nfpm 2.47.0,
-Helm 4.2.4 and ORAS 1.3.3,
+Packer project. It also contains Go 1.27.4, crane 0.22.1, nfpm 2.48.0,
+Helm 4.3.1 and ORAS 1.3.6,
 `dpkg-scanpackages`, `cloud-localds`, a native C compiler, Git, GnuPG, 7-Zip
 and xorriso. Those are the preparation and ISO-composition tools required by the
 exact NVKE source at `726f76944404e1106626b8333d3576bdf67b575b` for non-FDE
@@ -27,10 +27,16 @@ extracted crane, nfpm, Helm and ORAS executables. Helm archive hashes come from
 checksum file. Extracted binary hashes were measured from those exact archives.
 Both include Apache-2.0 license text, retained in the final image. The download
 helper supplies the CA bundle needed to bootstrap the signed Ubuntu snapshot
-from a minimal Ubuntu base. The Dockerfile reproduces Packer 1.15.4's documented
+from a minimal Ubuntu base. The Dockerfile reproduces Packer 1.16.2's documented
 namespaced plugin layout and checksum file from the separately verified plugin
 executable. It never executes a target-architecture Go binary while assembling
 an image. No plugin discovery or download is performed by NVKR at runtime.
+
+The November 9 source refresh selects snapshot `20261109T000000Z` and current
+Ubuntu 26.04 and download-helper indexes. Both architectures' release archives
+were checked against upstream checksum files and their executable hashes were
+measured from those archives. These are source inputs for a fresh preparation;
+existing consumer image pins and license/security approval gates remain unchanged.
 
 Build and validate one local host architecture. The runtime check proves the
 exact Packer, plugin, Go, crane, nfpm, Helm and ORAS versions; QEMU/QCOW2 and firmware
@@ -66,7 +72,7 @@ APT's unprivileged downloader to read it; it is never copied into the image.
 [named build context](https://docs.docker.com/reference/cli/docker/buildx/build/#build-context).
 Place the official Packer, QEMU plugin, Go, crane, nfpm, Helm and ORAS release archives
 there under their upstream filenames for the selected architecture. Helm uses
-`helm-v4.2.4-linux-<arch>.tar.gz`; ORAS uses `oras_1.3.3_linux_<arch>.tar.gz`. Local mode copies
+`helm-v4.3.1-linux-<arch>.tar.gz`; ORAS uses `oras_1.3.6_linux_<arch>.tar.gz`. Local mode copies
 them through read-only build mounts and applies the same archive and executable
 checksum checks. Missing or corrupt inputs fail; local mode never falls back to
 downloading release archives. The pinned base images and signed Ubuntu snapshot
@@ -165,7 +171,12 @@ docker image inspect --format '{{.Os}}/{{.Architecture}} {{.Id}}' \
   "localhost/nvkr-packer-toolchain:dev-${packer_arch}"
 ```
 
-Use `packer_arch=amd64` on the separate native AMD64 host. This build helper requires Docker Buildx.
+Use `packer_arch=amd64` on the separate native AMD64 host. This build helper requires Docker Buildx
+with a builder that can stream the Docker exporter: a container-backed driver, or the default `docker`
+driver on a daemon using the containerd image store. `build.sh` refuses the `docker` driver on the
+classic store before building; create a builder with
+`docker buildx create --name nvkr-toolchain --driver docker-container` and select it with
+`BUILDX_BUILDER=nvkr-toolchain`.
 A cross-build does not supply native execution proof. A rebuilt image differing from
 a recorded runtime-specific local pin must be investigated; do not overwrite or bypass the check.
 Preparation neither pushes nor signs an image, writes a source lock, or supplies an approved repository digest.

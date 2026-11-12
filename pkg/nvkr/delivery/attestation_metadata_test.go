@@ -17,14 +17,20 @@ import (
 // These synthetic bundles test the handoff contract. The injected verifier is
 // not cryptographic evidence or a substitute for the production signer policy.
 func TestMetadataAttestationCompletesWithoutPayloadCopies(t *testing.T) {
-	for _, arch := range []string{"amd64", "arm64"} {
-		t.Run(arch, func(t *testing.T) {
-			request, _ := diskPublicationRequest(t, arch)
+	for _, scenario := range []struct {
+		name, arch string
+		legacy     bool
+	}{{"amd64", "amd64", false}, {"arm64", "arm64", false}, {"legacy roots", "amd64", true}} {
+		t.Run(scenario.name, func(t *testing.T) {
+			request, _ := diskPublicationRequest(t, scenario.arch)
 			parent := t.TempDir()
 			source := filepath.Join(parent, "prepared")
 			prepared, err := BuildPublicationRoot(t.Context(), source, request)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if scenario.legacy {
+				prepared.RootDigest = legacyPublicationBootstrapFixture(t, source)
 			}
 			payload := request.Objects[0].Output.Disk.PayloadDigest
 			before, err := os.Stat(fixtureBlobPath(source, payload))
@@ -40,6 +46,9 @@ func TestMetadataAttestationCompletesWithoutPayloadCopies(t *testing.T) {
 			signed, err := AttestPreparedMetadata(t.Context(), controls, attested, exported.RootDigest, fixtureMetadataAttester)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if scenario.legacy {
+				signed.RootDigest = legacyPublicationBootstrapFixture(t, attested)
 			}
 			for _, metadata := range []string{controls, attested} {
 				if _, err := os.Lstat(fixtureBlobPath(metadata, payload)); !os.IsNotExist(err) {

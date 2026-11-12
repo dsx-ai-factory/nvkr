@@ -2,8 +2,9 @@
 
 The shared owner directories contain the maintained catalogs and explicit diagnostic variants. The experimental
 public OS catalog is isolated under [`../experiments/public-os-sources`](../experiments/public-os-sources/README.md).
-This is an ownership relocation, preserving registry, lock and patch contents. It does not yet reduce
-the distinct registries to one per producer owner or reconcile their differing producer baselines.
+Shared declaration owners live in [`shared/`](shared/README.md). Registries retain explicit selections and
+independent lock cohorts; identical source and component instructions are authored once in those fragments.
+The 34 catalog entrypoints retain their existing Definition references and resolved producer identities.
 
 Each leaf catalog contains `registry.yaml` and `pins.lock.yaml`. `node-images/variants/` contains
 predecessor-bound producer replacements and toolchain substitutions, not additional catalogs.
@@ -62,33 +63,27 @@ Former paths below were relative to `definitions/` at upstream commit
 | `nvke-nightly-arm64/installer-tools-catalog` | [`tools/installer-hosted-arm64`](tools/installer-hosted-arm64/registry.yaml) | Hosted installer-tool packaging and acquired Helm |
 | `nvke-local-dev-arm64/simulator-catalog` | [`tools/native`](tools/native/registry.yaml) | Shared simulator tools and runtime assets |
 
-## Remaining consolidation
+## Shared declarations and retained variants
 
-The target is one owner for each producer and pin, with explicitly named variants where contracts
-differ. Consolidate in this order:
+The shared owners consolidate 21 identical source-declaration groups and 13 component recipe groups.
+This removes 25 repeated source declarations and 14 repeated component declarations, including the seven
+node-image materials, local/nightly CLI and controller, module-tag/release CLI, hosted/native acquired Helm,
+the two identical native init-image names, and the common kubectl recipe across version cohorts.
+The ARM64 operator Helm recipe also shares the acquired Helm declaration while retaining its different pin. Explicit aliases preserve existing selections. Pins and
+artifact digests stay in the consuming locks; none are updated by this authoring migration.
 
-1. Split the mixed release-components catalog into CAPNICo, NVKE/NKTP, controller-profiles and runtime
-   dependency owners. Preserve both native platforms and each exact acquired-image subject.
-2. Reconcile CLI/controller/site versions deliberately; a shared repository URL does not require all
-   independently versioned modules to use one commit. Keep chart pin-set membership authenticated.
-3. Bring runnable fixture, release-appropriate and diagnostic profile producers under
-   controller-profiles with distinct payload names. The config-only reference fixture cannot stand in
-   for an OSProfile set.
-4. Consolidate the plain/FDE OS materials and their OVN sources, then regenerate every predecessor
-   binding affected by the new catalog snapshots. Correct the documented NVIDIA nightly OVN drift
-   as an explicit content change.
-5. Share identical installer producers while keeping intentional source-built/acquired Helm and
-   architecture/version choices explicit. Move shared workflow tool/action pins into the tools owner
-   together with a real producer catalog; an empty producer catalog is invalid.
+The [shared ownership map](shared/README.md) is the starting point for edits. Fragments contain no locks or
+nested imports. Registries select exact named declarations with a file hash; duplicate names fail rather than
+override. A fragment edit requires updating each consuming hash and validating every consumer.
 
-A catalog move preserves its resolved snapshot because its filesystem location is excluded from
-catalog identity. Splitting or merging a catalog changes that snapshot and may invalidate a producer
-replacement's required predecessor digest. Locks also require exact source and artifact key sets;
-copying a full lock beside a trimmed registry is invalid. Use the existing pin owner and catalog
-validation for those changes, then regenerate dependent bundles.
+Variants remain local when commands, output packaging, patches, platforms, toolchains, constraints, or pins
+differ. In particular source-built installer executables and raw hosted tools have different output contracts;
+controller profile patches and OVN/kernel cohorts remain explicit. Sharing an upstream URL does not authorize
+changing those contracts. The mixed release-components catalog still selects distinct CAPNICo/NKTP and image
+variants; its duplicated CAPNICo source is shared.
 
-See the [full migration map](../../docs/input-layout-migration.md) for Definition/Environment
-dispositions, parity gaps, and acceptance checks.
+See the [full migration map](../../docs/input-layout-migration.md) for Definition/Environment dispositions,
+parity gaps, and acceptance checks. No handwritten catalog, lock, or patch file was deleted.
 
 ## Native diagnostic additions
 
@@ -106,8 +101,9 @@ ordered NVIDIA and native KVM overlays. Their other selections are:
 
 [`node-images/variants/native-nvidia.json`](node-images/variants/native-nvidia.json)
 binds its complete producer replacements to the shared release catalog's exact
-snapshot. The release catalog now carries the same NVIDIA fork 2.4.2 OVN producers
-and pins, so this overlay leaves the snapshot unchanged. The native KVM overlay binds
+snapshot. Its three NVIDIA fork 2.4.2 OVN producers are generated from the release catalog
+through `inputs/policies/ovn-producer-overlays.json`, so the release catalog owns their instructions
+and pins. This overlay leaves the snapshot unchanged. The native KVM overlay binds
 the resulting NVIDIA stack. The upstream, TCG and hosted nightly selections retain
 their source pin cohorts.
 Package metadata checks and Plan compilation establish input

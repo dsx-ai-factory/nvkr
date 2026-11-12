@@ -70,6 +70,34 @@ Both outputs use the default catalog. `components` selects exact producer keys; 
 them. Neither output selects `app-cli-alt` yet. Each output remains
 independently required even when it shares a component with another output.
 
+## Find components
+
+`nvkr catalog list --data DIR` prints every component. Two optional selectors narrow it, and
+`--format json` prints a machine-readable projection:
+
+```bash
+nvkr catalog list --data inputs/catalogs/tools/operator-arm64 \
+  --platform linux/arm64 --output-type host-package --format json
+```
+
+- `--platform` and `--output-type` match exactly and combine as an intersection. Give each at most once.
+- A platform match means the catalog *declares* that platform. It says nothing about the current host or
+  about a successful build. `darwin/arm64` is accepted wherever a catalog can declare it.
+- The whole catalog is validated before filtering, so a filter cannot hide an invalid component.
+- An unknown selector value or a repeated selector is a usage error (exit 2) before the catalog is read. A
+  valid selector that matches nothing is a no-match error (exit 10). Neither prints a result.
+- Unfiltered text output is unchanged.
+
+The JSON output is a stable array sorted by component name. Each entry has `name`, `platforms`,
+`outputType` and `producerMode`. `producerMode` is one of:
+
+| Value | Meaning |
+|---|---|
+| `source` | built from a pinned source |
+| `acquired` | an executable or image delivered from a prebuilt URL or image (the `prebuilt` lane) |
+| `pinned-tool` | a pinned build tool (`file` or `oci-layout` output) |
+| `excluded` | declared but neither built nor acquired |
+
 ## Replace a producer or change a selection
 
 An overlay named `supplier.json` can replace the complete `app-cli` producer: a supplier download takes
@@ -126,6 +154,17 @@ existing component key. Missing selected materials fail validation.
 A disk output currently selects its root and every transitive material producer explicitly, with no
 unrelated extras. Root-only selection does not expand dependencies automatically. See
 [node images](node-images.md) for the complete example.
+
+To see what to select, explain the root component:
+
+```sh
+bin/nvkr catalog show --data inputs/catalogs/node-images/release nvke-node-fde-amd64
+```
+
+It prints the producer mode, exact pins and platforms, the sorted material closure, and every binding
+edge, including each consumer of a shared material. Add `--format json` for a machine-readable copy.
+It explains declarations only: it changes no Definition or lock, fetches and builds nothing, and a listed
+platform is not a claim that the current host can execute it.
 
 ## Acquired executables
 

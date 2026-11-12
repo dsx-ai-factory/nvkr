@@ -28,7 +28,7 @@ outputs:
     catalog:
       base: ../../catalogs/aicr
     format: bundle-oci
-    components: [aicr-gb300-generic-training-flux]
+    components: [aicr-gb300-generic-training-flux, aicr-gb300-generic-training-recipe]
   - name: aicr-gb300-generic-training-helm
     platform: linux/arm64
     catalog:

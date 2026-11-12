@@ -21,6 +21,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -104,8 +105,23 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 				if kindErr != nil {
 					return kindErr
 				}
+				if kind == "bundle-material" {
+					if tool != "" {
+						return e.New(e.CodeEngineCapability, "bundle materials support composition evidence only")
+					}
+					continue
+				}
 				var inventory sbom.DependencyInventory
-				if kind == "oci-image" && planNode(plan, payload.Producer).Kind == NodeAcquire {
+				if kind == "bundle-layout" {
+					if _, err := observeProducerPayload(ctx, plan, payload, artifacts); err != nil {
+						return err
+					}
+					_, raw, readErr := delivery.ReadArtifact(ctx, payload.Path)
+					if readErr != nil {
+						return readErr
+					}
+					inventory, err = sbom.InspectBundleBytes(ctx, raw)
+				} else if kind == "oci-image" && planNode(plan, payload.Producer).Kind == NodeAcquire {
 					inventory, err = inspectAcquiredImageDependencies(ctx, plan, node, payload, artifacts, entry.ArtifactSHA, scanner)
 				} else {
 					inventory, err = sbom.InspectDependencies(ctx, payload.Path, entry.ArtifactSHA, kind, scanner)
@@ -237,8 +253,11 @@ func (plan *Plan) validateSBOMGraph() error {
 					if err != nil {
 						return err
 					}
-					if kind != "host-package" && kind != "oci-image" && kind != "tarball" && kind != "file-archive" && kind != "bundle-archive" {
+					if kind != "host-package" && kind != "oci-image" && kind != "tarball" && kind != "file-archive" && kind != "bundle-archive" && kind != "bundle-layout" && kind != "bundle-material" {
 						return e.New(e.CodeEngineCapability, "SBOM dependency inspection does not support %q", candidate.Kind)
+					}
+					if kind == "bundle-material" && tool != "" {
+						return e.New(e.CodeEngineCapability, "bundle materials support composition evidence only")
 					}
 					matches++
 				}
@@ -322,8 +341,23 @@ func readProducerResult(ctx context.Context, path string) (pipeline.ArtifactResu
 func (plan *Plan) sbomPayloadKind(payload Artifact) (string, error) {
 	if plan.hasBundleTarget(payload.BuildTarget) {
 		for _, output := range plan.Definition.Outputs {
-			if output.Name != payload.BuildTarget || output.Format != authored.OutputBundle || len(output.Components) != 1 || output.Components[0] != payload.Component {
+			if output.Name != payload.BuildTarget || output.Format != authored.OutputBundle || !containsString(output.Components, payload.Component) {
 				continue
+			}
+			for _, build := range plan.Builds {
+				if build.Name != payload.BuildTarget {
+					continue
+				}
+				root, err := buildgraph.BundleRootName(build.ResolvedComponents)
+				if err != nil {
+					return "", err
+				}
+				if payload.Component != root {
+					return "bundle-material", nil
+				}
+				if payload.Kind == ir.OutputOCILayout {
+					return "bundle-layout", nil
+				}
 			}
 			producer := planNode(plan, payload.Producer)
 			if payload.Kind == "tarball" && producer.Kind == NodeBuild && producer.BuildTarget == payload.BuildTarget && containsString(producer.Outputs, payload.ID) {

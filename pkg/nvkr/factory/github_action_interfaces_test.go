@@ -465,7 +465,7 @@ func TestGitHubSourceInterfaceOwnsOnlyItsExecutionCredential(t *testing.T) {
 				continue
 			}
 			sourceCalls++
-			if id != wantJob || step.Uses != "./"+githubSharedDirectory+"execute-source" || credential != "${{ secrets.NKE_SOURCE_TOKEN }}" || len(step.Env) != 0 {
+			if id != wantJob || step.Uses != "./"+githubSharedDirectory+"execute-source" || credential != "${{ secrets.TEST_SOURCE_READ_TOKEN }}" || len(step.Env) != 0 {
 				t.Fatalf("source credential escaped its explicit execution interface: %s/%s", id, step.Name)
 			}
 		}

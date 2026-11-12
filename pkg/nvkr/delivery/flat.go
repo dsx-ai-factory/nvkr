@@ -17,6 +17,10 @@ import (
 
 const MediaEmptyConfig = "application/vnd.oci.empty.v1+json"
 
+// MediaArtifactConfig describes NVKR's deliberately empty artifact config.
+// It does not claim that {} is a payload document such as a CycloneDX SBOM.
+const MediaArtifactConfig = "application/vnd.nvkr.artifact.config.v1+json"
+
 // outputFormatHelm mirrors definition.OutputHelm and factory.PackageHelm; the
 // delivery package intentionally does not import definition to dispatch on an
 // Output.Format string, so it carries its own copy of the same literal instead
@@ -85,7 +89,7 @@ func (writer layoutWriter) importFlatLayout(ctx context.Context, input ObjectInp
 	if err != nil {
 		return Descriptor{}, "", err
 	}
-	if len(manifest.Layers) == 1 && (manifest.Config.MediaType == MediaEmptyConfig || manifest.Config.MediaType == MediaHelmConfig ||
+	if len(manifest.Layers) == 1 && (manifest.plainConfig() || manifest.Config.MediaType == MediaHelmConfig ||
 		(manifest.Config.MediaType == MediaImageConfig && manifest.Layers[0].MediaType == MediaQCOW2)) {
 		blob = manifest.Layers[0].Digest
 	}
@@ -118,13 +122,13 @@ func ReadArtifact(ctx context.Context, root string) (Descriptor, []byte, error) 
 	if len(manifest.Layers) != 1 {
 		return Descriptor{}, nil, e.New(e.CodeVerifyFailed, "artifact has an unsupported config or payload count")
 	}
-	switch manifest.Config.MediaType {
-	case MediaEmptyConfig:
+	switch {
+	case manifest.plainConfig():
 		config, err := readBlob(ctx, root, manifest.Config, 8<<20)
 		if err != nil || string(config) != "{}" {
 			return Descriptor{}, nil, e.New(e.CodeVerifyFailed, "artifact config is not empty")
 		}
-	case MediaHelmConfig:
+	case manifest.Config.MediaType == MediaHelmConfig:
 		// The Helm chart config carries real Chart.yaml-derived metadata, opaque to
 		// this reader beyond confirming it is present and within bound.
 		if _, err := readBlob(ctx, root, manifest.Config, 8<<20); err != nil {
@@ -132,6 +136,9 @@ func ReadArtifact(ctx context.Context, root string) (Descriptor, []byte, error) 
 		}
 	default:
 		return Descriptor{}, nil, e.New(e.CodeVerifyFailed, "artifact has an unsupported config or payload count")
+	}
+	if manifest.ArtifactType == MediaAICRArtifact {
+		descriptor.ArtifactType = MediaAICRArtifact
 	}
 	raw, err := readBlob(ctx, root, manifest.Layers[0], maxDeliveryFileBytes)
 	return descriptor, raw, err

@@ -108,7 +108,7 @@ func TestCatalogUpdateCIRefusesAGeneratorStampThatDiffersFromTheCommittedPlan(t 
 	oldVersion, oldCommit := version, commit
 	version, commit = "mismatched", "cafef00d"
 	t.Cleanup(func() { version, commit = oldVersion, oldCommit })
-	output, err := runCatalogCommand(t, "catalog", "update-ci", "--source-checkout", "dsx-ai-factory/nvke:NKE_SOURCE_TOKEN")
+	output, err := runCatalogCommand(t, "catalog", "update-ci", "--source-checkout", "dsx-ai-factory/nvke:TEST_SOURCE_READ_TOKEN")
 	if got := cliErrorCode(err); got != e.CodePipelineDrift {
 		t.Fatalf("code %s, want %s: %v", got, e.CodePipelineDrift, err)
 	}

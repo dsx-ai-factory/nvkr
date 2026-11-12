@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+---
+apiVersion: nvkr.dev/catalog-fragment/v1
+kind: CatalogFragment
+components:
+  native-capi-exec-init-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: docker.io/library/alpine@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
+    source: nvke-deploy

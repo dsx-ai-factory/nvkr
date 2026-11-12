@@ -251,7 +251,7 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 				return nil, nil, err
 			}
 		}
-	} else if err := factory.AdmitQualificationHandoff(&plan); err != nil {
+	} else if err := factory.AdmitQualificationReplay(&plan); err != nil {
 		return nil, nil, err
 	}
 	expectation, err := PrepareExactInputs(request.Definition, request.Environment, &plan)

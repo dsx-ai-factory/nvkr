@@ -289,8 +289,7 @@ producer-overlays-check: workflow-generator ## Check configured producer copies 
 producer-overlays-generate: workflow-generator ## Regenerate configured producer copies and predecessor bindings.
 	bin/nvkr-exec catalog regenerate-overlays --config inputs/policies/ovn-producer-overlays.json
 
-# The private NVKE source the installed catalog refresh workflow was rendered with.
-CATALOG_REFRESH_SOURCE ?= dsx-ai-factory/nvke:NKE_SOURCE_TOKEN
+# Maintained catalog sources are public and fetched anonymously.
 
 .PHONY: catalog-refresh-check
 catalog-refresh-check: workflow-generator ## Check the installed catalog refresh workflow against `catalog update-ci`.
@@ -298,7 +297,7 @@ catalog-refresh-check: workflow-generator ## Check the installed catalog refresh
 	@# same source option and the canonical generator stamp. Regenerate it with
 	@# `make catalog-refresh-generate`; never edit the file by hand.
 	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
-	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 bin/nvkr-exec catalog update-ci > "$$rendered" && \
 	 { diff -u .github/workflows/catalog-refresh.yaml "$$rendered" || { \
 	   echo "catalog-refresh.yaml differs from catalog update-ci output; regenerate it from the generator" >&2; exit 1; }; }
 
@@ -307,7 +306,7 @@ catalog-refresh-generate: workflow-generator ## Regenerate the installed catalog
 	@# Render to a temporary file and replace the installed workflow only after the renderer
 	@# succeeds: a refused render (source, stamp or closure admission) leaves it untouched.
 	@rendered="$$(mktemp .github/workflows/.catalog-refresh.XXXXXX)" && trap 'rm -f "$$rendered"' EXIT && \
-	 bin/nvkr-exec catalog update-ci --source-checkout "$(CATALOG_REFRESH_SOURCE)" > "$$rendered" && \
+	 bin/nvkr-exec catalog update-ci > "$$rendered" && \
 	 chmod 0644 "$$rendered" && mv "$$rendered" .github/workflows/catalog-refresh.yaml
 
 .PHONY: workflows-generate
@@ -350,12 +349,12 @@ check: go-version-check fmt-check definitions-location-check reconciliation-loca
 # Every merge-gate check that can run locally; CI runs `make test` as test-shard
 # slices. internal/cicontract requires this list to equal the make targets the
 # merge gate runs. CodeQL and the DCO App run only on GitHub.
-# Checks needing extra tools or private access run before the long test suite.
+# Checks needing extra tools or network access run before the long test suite.
 CI_CHECKS := fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check shellcheck actionlint test-workflow-scripts \
 	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test
 
 .PHONY: ci-check
-ci-check: go-version-check $(CI_CHECKS) ## Complete local merge gate (needs private NVKE access, Node and Fern; see CONTRIBUTING.md).
+ci-check: go-version-check $(CI_CHECKS) ## Complete local merge gate (needs public NVKE access, Node and Fern; see CONTRIBUTING.md).
 
 .PHONY: clean
 clean: ## Remove build output, coverage, and the local engine workspace.

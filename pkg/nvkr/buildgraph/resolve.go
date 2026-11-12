@@ -96,12 +96,12 @@ func Resolve(cat *catalog.Catalog, selection Selection) (*Resolved, error) {
 	if err := catalog.ValidateMaterialSet(resolved.Components); err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "selected output has an incomplete material set")
 	}
-	if err := validatePinnedToolOutputs(resolved.Components); err != nil {
+	if err := validatePinnedToolOutputs(resolved.Components, selection.OutputFormat); err != nil {
 		return nil, err
 	}
 	if selection.OutputFormat == definition.OutputBundle {
-		if len(resolved.Components) != 1 || !resolved.Components[0].FromSource || resolved.Components[0].Prebuilt != nil || resolved.Components[0].OutputType != "tarball" {
-			return nil, e.New(e.CodeInvalidCatalog, "bundle output requires exactly one source-built tarball component")
+		if _, err := BundleRootName(resolved.Components); err != nil {
+			return nil, err
 		}
 	}
 	hasDiskRoot := containsDiskRoot(resolved.Components)

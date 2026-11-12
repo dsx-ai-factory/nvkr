@@ -16,6 +16,112 @@ currently returns `engine-capability` before catalog, generation or execution wo
 APT-only does not require OCI settings to report this capability gap. A local unsigned APT layout or its OCI
 upload does not satisfy a request for a signed, installable APT repository.
 
+## OCI representation
+
+Omitting `publication.ociRepresentation` preserves the existing artifact format. Explicit `artifact-v1`
+uses that format while binding the authored selection into the Environment and Plan identity.
+To select the alternative NVKR wrapper format before packaging and signing, add this field to the
+existing publication settings:
+
+```yaml
+publication:
+  ociRepresentation: nvkr-compatible-v1
+```
+
+This changes newly constructed NVKR wrappers and records the choice in the immutable root index.
+Helm archives, native images, disks and imported manifests retain applicable exact payload bytes and
+formats. New signed evidence retains the standard Sigstore envelope; affected identities and attestations
+are recomputed before signing. It does not guarantee acceptance of every member by every registry.
+Compatible raw SBOM wrappers use a truthful NVKR config type; clients filtering only for CycloneDX
+`artifactType` may not discover them. NVKR still checks complete root-bound evidence and subjects.
+Use an updated NVKR consumer for this explicit profile. Existing pinned publications are not rewritten,
+and a registry rejection never automatically changes this selection.
+
+For a Helm publication to a registry that rejects unknown NVKR config media types, select the narrower
+standard Helm profile instead:
+
+```yaml
+publication:
+  ociRepresentation: helm-standard-v1
+```
+
+It emits a standard Helm chart manifest without custom `artifactType`, preserving the original chart
+archive and Helm config. Raw Helm evidence and publication metadata use separate manifests with canonical
+binding records carried under `application/octet-stream`; NVKR validates their logical types and exact
+subject bindings. Signed SBOMs and Cosign artifacts keep their standard signed envelopes, which the registry
+must also accept. Other output families and imported manifests retain their existing formats, so mixed
+publication acceptance requires separate validation. Raw evidence discovery by CycloneDX type alone is not
+supported in this profile; NVKR uses exact root membership.
+
+Omission and explicit `artifact-v1` preserve existing construction. Existing pinned publications and release
+identities are unchanged. Selecting `helm-standard-v1` creates new affected manifest, evidence-subject and
+publication identities before signing; it does not rewrite an old release. Install an updated NVKR reader
+before consuming the new profile. Local interoperability checks exercise stock Helm pull/show/template
+and compare archive bytes; they do not establish live GitLab or hosted signing acceptance.
+
+## Registry diagnostics
+
+Publication observes the existing client's requests and reports the actual failing operation:
+base API check, blob upload, manifest upload, evidence attachment, referrer discovery or readback.
+HTTP status and structured registry error codes determine the error class and recommended next action.
+Authentication refusal is distinct from an unsupported operation; `MANIFEST_INVALID` does not establish
+which manifest field was rejected. DNS and certificate failures retain typed causes without displaying
+credential-bearing URLs. Permanent refusals do not trigger an alternate manifest upload.
+
+For a separate read-only base check, use the internal diagnostic adapter:
+
+```sh
+bin/nvkr factory registry-check --repository registry.example/product
+```
+
+The JSON report distinguishes the observed Distribution V2 API family, the optional advertised
+`registry/2.0` header, and the exact OCI specification version, which remains unknown. A base response does
+not prove push permission, artifact-type acceptance, referrer support or complete publication acceptance.
+Normal publish traffic can add observations of successful upload or referrer responses; those observations
+are descriptive and do not certify conformance. The check uses the publication credential pair
+`NVKR_REGISTRY_USER` and `NVKR_CREDENTIAL` when both are set, otherwise the existing ambient registry
+credential owner. A half-set pair is a usage error before network I/O. `--anonymous` overrides both
+sources; `--plain-http` explicitly selects HTTP for a local registry. The report identifies the selected
+source as `explicit`, `ambient` or `anonymous`, never a credential value. To diagnose a CI refusal, run
+with the same scoped credential that publication uses; a different personal Docker login tests another identity.
+Network requests have a 15-second bound; ambient credential-helper behavior remains with the existing
+credential owner. The diagnostic issues no test uploads or cleanup requests. Proxy HTML and missing
+endpoints produce endpoint guidance rather than a guessed older protocol or silent downgrade.
+Missing V2 endpoints and unclassified protocol failures following a successful HTML/proxy base response
+use non-retryable `invalid-catalog` (16). Explicit HTTP refusals, transient responses and missing digest
+readback keep their established classifications.
+The pinned client used by the read-only check discards structured bodies on HTTP 404. For that status,
+the check reports endpoint configuration without inferring authorization or unsupported-operation details;
+an existing publication failure can expose those details through its own structured diagnostics.
+Publication preserves caller deadlines. Without one, full-layout and disk pushes have a 30-minute
+deadline; metadata-root publication has a 20-minute deadline. A timeout requires reconciling partial
+uploads and uncertain tag changes before retrying the same identified bytes.
+Metadata-root publication first checks its members in a read-only phase. A timeout there identifies the
+member and reports that no upload was attempted; upload uncertainty applies after the write phase begins.
+
+## Troubleshoot Helm and registry rejections
+
+For GitLab or another registry reporting `MANIFEST_INVALID` or `unknown media type` during a Helm push,
+first inspect the failed operation and run the [read-only registry check](#registry-diagnostics).
+The base API version does not establish whether that registry accepts a particular artifact format.
+
+| Error or observation | Next action |
+|---|---|
+| Authentication/authorization refusal (`401` or `403`) | Check the configured credential and permissions for the exact repository. |
+| Timeout, throttling (`408` or `429`) or server failure (`5xx`) | Reconcile partial uploads and uncertain tag changes, then retry transient failures with the same identified bytes. |
+| `MANIFEST_INVALID` or another permanent manifest rejection | Check the manifest media type and repository policy. This code alone does not identify the incompatible field. |
+| Explicit `UNSUPPORTED` diagnostic | Check the refused operation and select an admitted alternative before constructing a new publication. |
+| Digest, size or readback mismatch | Investigate the exact bytes and expected digest; do not accept or rewrite mismatched artifacts. |
+| HTML response or missing base endpoint | Check the registry endpoint and proxy routing; an older supported protocol has not been established. |
+
+When the rejected format involves NVKR's optional custom `artifactType`, review the
+[explicit compatible representation](#oci-representation). For Helm it retains the chart archive and real
+Helm config while constructing a wrapper without that optional field. Choose it in the Environment before
+planning, packaging and signing; regenerate the Plan and workflow with the updated Environment as described
+in [pipeline generation](generate-pipeline.md). The new wrapper has its own digest and evidence bindings.
+Existing pinned publications are preserved. Required signed profiles and complete membership remain mandatory;
+the compatible setting cannot make a registry accept every imported or signed format.
+
 ## Required S3 copy
 
 To copy every selected artifact and its original evidence to S3, use an Environment with

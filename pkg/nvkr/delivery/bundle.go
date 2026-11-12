@@ -40,7 +40,15 @@ func validateBundleManifestDocument(raw []byte) error {
 // must identify its exact bytes. This format is neither a native Helm chart nor
 // a runnable image, and validation makes no deployment compatibility claim.
 func BuildBundleArtifact(ctx context.Context, out, name, archivePath, expectedDigest string) (Result, error) {
+	return BuildBundleArtifactWithRepresentation(ctx, out, name, archivePath, expectedDigest, "")
+}
+
+// BuildBundleArtifactWithRepresentation selects the wrapper before artifact I/O.
+func BuildBundleArtifactWithRepresentation(ctx context.Context, out, name, archivePath, expectedDigest string, representation OCIRepresentation) (Result, error) {
 	if err := deliveryContext(ctx); err != nil {
+		return Result{}, err
+	}
+	if err := admitOCIRepresentation(representation); err != nil {
 		return Result{}, err
 	}
 	if !outputNamePattern.MatchString(name) || !isDigest(expectedDigest) {
@@ -59,13 +67,18 @@ func BuildBundleArtifact(ctx context.Context, out, name, archivePath, expectedDi
 		return Result{}, err
 	}
 	defer cleanup()
-	writer := layoutWriter{root: stage, plain: true}
+	writer := layoutWriter{root: stage, plain: true, compatible: representation == OCINVKRCompatibleV1}
 	descriptor, _, err := writer.addHeldObject(ctx, ObjectInput{Name: name, Kind: outputFormatBundle,
 		ArtifactType: MediaBundle, LayerMediaType: MediaBundleLayer, SemanticDigest: held.Digest(), BlobDigest: held.Digest()}, held)
 	if err != nil {
 		return Result{}, err
 	}
-	rootDigest, err := writer.writeIndex(ociIndex{SchemaVersion: 2, MediaType: MediaOCIIndex, ArtifactType: MediaBundle, Manifests: []Descriptor{descriptor}})
+	index := ociIndex{SchemaVersion: 2, MediaType: MediaOCIIndex, ArtifactType: MediaBundle, Manifests: []Descriptor{descriptor}}
+	if writer.compatible {
+		index.ArtifactType = ""
+		index.Annotations = artifactAnnotations(MediaBundle, nil)
+	}
+	rootDigest, err := writer.writeIndex(index)
 	if err != nil {
 		return Result{}, err
 	}
@@ -84,11 +97,19 @@ func BuildBundleArtifact(ctx context.Context, out, name, archivePath, expectedDi
 // inspectBundleMetadata checks the fixed wrapper and optional release binding
 // without downloading or claiming to inspect its archive payload.
 func inspectBundleMetadata(ctx context.Context, root string, manifest ociManifest, object *PublishedObject) error {
-	if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.ArtifactType != MediaBundle ||
-		manifest.Config.MediaType != MediaEmptyConfig || manifest.Subject != nil || len(manifest.Layers) != 1 ||
-		manifest.Layers[0].MediaType != MediaBundleLayer || !isDigest(manifest.Layers[0].Digest) ||
-		manifest.Layers[0].Size <= 0 || manifest.Layers[0].Size > bundlearchive.MaxArchiveBytes {
-		return e.New(e.CodeVerifyFailed, "bundle has an invalid OCI wrapper")
+	if manifest.ArtifactType == MediaAICRArtifact {
+		if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.Subject != nil ||
+			manifest.Config.MediaType != MediaEmptyConfig || manifest.Config.Digest != digestBytes([]byte("{}")) || manifest.Config.Size != 2 ||
+			len(manifest.Layers) != 1 || manifest.Layers[0].MediaType != MediaImageLayerGzip || !isDigest(manifest.Layers[0].Digest) || manifest.Layers[0].Size <= 0 || manifest.Layers[0].Size > bundlearchive.MaxArchiveBytes {
+			return e.New(e.CodeVerifyFailed, "imported bundle has an invalid OCI wrapper")
+		}
+	} else {
+		if manifest.SchemaVersion != 2 || manifest.MediaType != MediaOCIManifest || manifest.artifactType() != MediaBundle ||
+			!manifest.plainConfig() || manifest.Subject != nil || len(manifest.Layers) != 1 ||
+			manifest.Layers[0].MediaType != MediaBundleLayer || !isDigest(manifest.Layers[0].Digest) ||
+			manifest.Layers[0].Size <= 0 || manifest.Layers[0].Size > bundlearchive.MaxArchiveBytes {
+			return e.New(e.CodeVerifyFailed, "bundle has an invalid OCI wrapper")
+		}
 	}
 	config, err := readBlob(ctx, root, manifest.Config, 2)
 	if err != nil {
@@ -97,7 +118,7 @@ func inspectBundleMetadata(ctx context.Context, root string, manifest ociManifes
 	if string(config) != "{}" {
 		return e.New(e.CodeVerifyFailed, "bundle OCI config must be empty")
 	}
-	if object != nil && (object.Kind != outputFormatBundle || object.ArtifactType != MediaBundle ||
+	if object != nil && (object.Kind != outputFormatBundle || object.ArtifactType != manifest.artifactType() ||
 		object.BlobDigest != manifest.Layers[0].Digest || object.SemanticDigest != manifest.Layers[0].Digest ||
 		object.Output == nil || object.Output.Format != outputFormatBundle || object.Output.TransportPath != "") {
 		return e.New(e.CodeVerifyFailed, "bundle differs from its release binding")

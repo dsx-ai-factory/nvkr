@@ -344,7 +344,7 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 			}
 			if step.Uses == actions.Upload && step.With["if-no-files-found"] != "error" {
 				if stage, ok := byNodeForJob(stages, jobID); ok && stage.DiskOutput != "" && githubDiskInspectionRequired(plan) &&
-					reflect.DeepEqual(step, githubInspectionDiagnosticStep(actions, stage.DiskOutput)) {
+					reflect.DeepEqual(step, githubInspectionDiagnosticStep(plan, actions, stage.DiskOutput)) {
 					continue
 				}
 				return e.New(e.CodeEngineCapability, "GitHub job %q permits a missing declared output", jobID)
@@ -359,10 +359,16 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 			wantSteps = 6
 			if runner == sortedKeys(bootstrap)[0] {
 				command = githubRuntimeGenerationCommand(plan)
+				if len(plan.Environment.GitHubRuntimeSources) != 0 {
+					wantSteps += 2
+				}
 			} else {
 				wantSteps = 7
 				if plan.Environment.GitHubRuntimeSource != nil {
 					command = githubRuntimeGenerationCommand(plan) + " --check"
+				}
+				if len(plan.Environment.GitHubRuntimeSources) != 0 {
+					command = "./nvkr-exec factory github check-runtime-inputs --plan " + shellQuote(githubLayoutFor(plan).planPath)
 				}
 				if !strings.Contains(joinRuns(job.Steps), githubRuntimeInstallCommand(plan)) {
 					return e.New(e.CodeInvalidCatalog, "secondary GitHub bootstrap omits runtime input installation")
@@ -544,7 +550,7 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 		if len(job.Steps) != expectedSteps || !reflect.DeepEqual(job.Steps[3:3+len(restore.Steps)], restore.Steps) {
 			return e.New(e.CodeEngineCapability, "GitHub finalizer must restore every exact planned carrier and record its producer outcome")
 		}
-		if githubQualificationHandoffEnabled(plan) && !reflect.DeepEqual(job.Steps[len(job.Steps)-1], githubQualificationHandoffStep(actions)) {
+		if githubQualificationHandoffEnabled(plan) && !reflect.DeepEqual(job.Steps[len(job.Steps)-1], githubQualificationHandoffStep(plan, actions)) {
 			return e.New(e.CodeEngineCapability, "GitHub finalizer must upload only the complete handoff for this successful exact attempt")
 		}
 		if err := actions.validateHelperPreparedFirst("nvkr-lifecycle-run", job.Steps, plan); err != nil {
@@ -783,7 +789,7 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 			return err
 		}
 		var expected bytes.Buffer
-		writeGitHubPackerDiagnosticStep(&expected, stage, actions)
+		writeGitHubPackerDiagnosticStep(&expected, plan, stage, actions)
 		var diagnostic struct {
 			Steps []githubStep `json:"steps"`
 		}

@@ -50,6 +50,8 @@ Reconciliation records external acceptance separately from that design and provi
 
 The tool and its catalogs are separate products: the tool owns resolution and verification rules; catalogs
 provide reusable component producers and pins, including tool releases and GitHub actions.
+Explicit digest-pinned fragments share authored declarations before resolution; each catalog retains its own
+complete lock. Snapshot capture includes those fragment bytes and replay remains confined to captured inputs.
 [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies) owns how generated
 Runs bind action commits from the catalog lock. Definitions declare named deliverable outputs once.
 NVKR does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source
@@ -90,8 +92,8 @@ their [logical identity](adr/0027-pinned-tool-producers.md#2-logical-identity-co
 [execution](adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed),
 [inputs](adr/0027-pinned-tool-producers.md#4-declared-inputs-are-typed-material-bindings) and
 [outputs](adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout).
-The `file` form is implemented and contract-tested; the OCI layout form waits for the layout import, and no
-recorded Run has executed a pinned tool.
+The file form and one layout root with an explicit regular-file material closure are implemented. The AICR
+path uses a fixed post-render integrity gate before packaging; current evidence is recorded in ADR-27 reconciliation.
 
 Proposed [ADR-28](adr/0028-multi-platform-executable-indexes.md) designs multi-platform executables. ADR-28 owns
 when [one tool source covers several platforms](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform),
@@ -113,7 +115,7 @@ These assumptions are subject to the current ADRs and milestone acceptance crite
 - Source owners provide retrievable pinned commits, trees, toolchains, and acquired artifact digests. A pin
   establishes an expected identity; the fetch boundary must still check the bytes (ADR-22).
 - v1 has a networked hosted runner, reachable OCI registry, source mirror, and identity/transparency services.
-  Private NVKE inputs are materialized through a mirror with vendored dependencies (ADR-18 §8).
+  Public NVKE inputs are fetched anonymously with vendored dependencies (ADR-18 §8).
 - Workflow ownership, branch protection, and protected publication environments are security controls in v1.
   The consumer trusts the named producer and qualification identities under an explicit issuer policy.
 - Qualified reproduction assumes inputs can be normalized and the execution environment admitted against a
@@ -169,8 +171,10 @@ The [domain vocabulary](../CONTEXT.md) defines six high-level public objects:
 | Release | Immutable selected artifacts and evidence accessible through one pinned reference |
 | Verification Policy | Consumer requirements for acceptable identities, evidence, and lifecycle state |
 
-A binary bundle or generic OCI bundle is an Artifact format. Generic bundles wrap one pinned producer's
-gzip tar archive and receive a bounded delivered-file inventory. AICR renderers use this path without new
+A binary bundle or generic OCI bundle is an Artifact format. Generic bundles either wrap one pinned
+producer's gzip tar archive or import one admitted producer layout while preserving its manifest, config
+and layer. Layout import separately binds the original index and explicit regular-file material subjects;
+both paths receive bounded delivered-file inventories. AICR renderers use these paths without new
 profile or lifecycle objects; native Helm charts retain their own media contract. See
 [ADR-25](adr/0025-generic-oci-bundles-and-aicr-producers.md) for integrity and evidence boundaries.
 Deployment topology and node placement are downstream concerns,
@@ -313,7 +317,9 @@ A proposed pinned-tool producer (ADR-27) is an ordinary selected component insid
 [execution](adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed), its
 [admitted output forms](adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout)
 and the [authority of tool-side signing](adr/0027-pinned-tool-producers.md#6-tool-evidence-companions-and-tool-side-signing).
-The single-file path is implemented and contract-tested; OCI layout handoff is not.
+Single files feed declared materials; OCI layout handoff preserves the producer manifest and separately binds
+the observed index, material subjects and packaged layer. AICR post-render verification is a fixed validation
+boundary, not an authored producer step or a generic directory-input capability.
 
 A proposed multi-platform executable output (ADR-28) compiles like an OCI aggregate. ADR-28 owns its
 [native per-platform identity](adr/0028-multi-platform-executable-indexes.md#3-native-producer-identity-is-unchanged),
@@ -668,6 +674,13 @@ material where applicable. These dependencies cannot be replaced by caller-suppl
 Compilation resolves the selected Definition, Environment, and component catalogs into a plan, validates the
 complete artifact graph, and renders only admitted engines and lanes. The committed bundle is regenerated from
 the same inputs and engine; missing, extra or changed owned files cause drift failure (ADR-21).
+An explicit multi-repository runtime policy freezes each allowed main ref once in the
+first trusted bootstrap. Its Plan captures the exact source metadata and authored input
+closure, retaining complete composite attribution and independent material pins. Same-Run
+workers and retries restore that Plan; finalization and qualification replay exact commits
+without consulting current main. Missing retained inputs fail closed. The isolated GPU-site
+nightly candidate uses this route; hosted execution and provider configuration remain
+separate acceptance work (ADR-18/26).
 GitHub keeps named jobs, prerequisite closure and conditions visible, and every job retains its runner,
 permissions and time bounds. [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold)
 owns which bundle workflow carries each job, including the opt-in partition workers described below. Manifest-owned composite actions expose fixed interfaces
@@ -1115,7 +1128,9 @@ publication contract. Generic hosted runners retain bootstrap, source retrieval,
 finalization. The development account must lack production-package write/admin access; namespace names
 cannot enforce provider ACLs. Unsigned development cancels superseded Runs and retains transfers for one day.
 Signed development and production remain non-canceling with seven-day transfers; final Run records retain
-seven days and disk diagnostics one day. Development registry packages are isolated per run attempt and
+seven days and disk diagnostics one day. The dispatch-frozen multi-source candidate instead retains every
+generated upload for 14 days, including frozen inputs, helpers, carriers, Run records, handoffs, qualification
+outcomes and diagnostics. Development registry packages are isolated per run attempt and
 become cleanup candidates only with internal visibility, after completion and 24 hours of inactivity.
 A default-branch-only owner rechecks authenticated provider metadata before whole-package deletion;
 it never executes branch artifacts.

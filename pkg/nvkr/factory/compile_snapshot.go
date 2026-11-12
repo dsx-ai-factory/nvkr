@@ -21,11 +21,12 @@ const InputSnapshotSchema = "nvkr.dev/compile-inputs/v1"
 // Catalog-owned authentication of upstream pinned Git trees is deliberately not
 // captured here: replay retains those bounded external checks.
 type InputSnapshot struct {
-	SchemaVersion   string           `json:"schemaVersion"`
-	DefinitionPath  string           `json:"definitionPath"`
-	EnvironmentPath string           `json:"environmentPath"`
-	Files           []InputFile      `json:"files"`
-	Directories     []InputDirectory `json:"directories"`
+	Sources         []catalog.SourceSelection `json:"sources,omitempty"`
+	SchemaVersion   string                    `json:"schemaVersion"`
+	DefinitionPath  string                    `json:"definitionPath"`
+	EnvironmentPath string                    `json:"environmentPath"`
+	Files           []InputFile               `json:"files"`
+	Directories     []InputDirectory          `json:"directories"`
 }
 
 type InputFile struct {
@@ -88,6 +89,28 @@ func CompileSnapshot(ctx context.Context, snapshot InputSnapshot, generatorVersi
 	plan, err := compileInputState(ctx, state, snapshot.DefinitionPath, snapshot.EnvironmentPath, generatorVersion)
 	if err != nil {
 		return nil, err
+	}
+	if len(snapshot.Sources) != 0 {
+		if err := validateSourcePolicy(plan, snapshot.Sources); err != nil {
+			return nil, err
+		}
+		for _, selection := range snapshot.Sources {
+			revision, err := catalog.ReplaySourceSelection(ctx, selection)
+			if err != nil {
+				return nil, err
+			}
+			state.revisions = append(state.revisions, revision)
+		}
+		plan, err = compileInputState(ctx, state, snapshot.DefinitionPath, snapshot.EnvironmentPath, generatorVersion)
+		if err != nil {
+			return nil, err
+		}
+		owned := state.snapshot(snapshot.DefinitionPath, snapshot.EnvironmentPath)
+		owned.Sources = append([]catalog.SourceSelection(nil), snapshot.Sources...)
+		plan.RuntimeInputs = &owned
+		if err := plan.Validate(); err != nil {
+			return nil, err
+		}
 	}
 	if len(state.usedFiles) != len(state.files) || len(state.usedDirectories) != len(state.directories) {
 		return nil, e.New(e.CodeInvalidCatalog, "input snapshot contains files or directory facts outside the compiled closure")
@@ -182,7 +205,17 @@ func (state *inputState) loadStack(ctx context.Context, definitionPath string, s
 		}
 		overlays = append(overlays, overlay)
 	}
-	return catalog.ApplyStack(loaded, overlays...)
+	stack, err := catalog.ApplyStack(loaded, overlays...)
+	if err != nil {
+		return nil, err
+	}
+	for _, revision := range state.revisions {
+		stack, err = catalog.ApplySourceRevision(stack, revision)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return stack, nil
 }
 
 // Authored catalog references can traverse to a parent inside the captured root;
@@ -227,6 +260,17 @@ func (provider *snapshotCatalogProvider) ReadDir(string) ([]string, error) {
 }
 
 func (provider *snapshotCatalogProvider) Name() string { return "snapshot:" + provider.prefix }
+
+func (provider *snapshotCatalogProvider) ReadFragmentContext(ctx context.Context, name string) ([]byte, error) {
+	if err := catalog.ValidateFragmentPath(name); err != nil {
+		return nil, err
+	}
+	resolved, err := resolveInputPath(path.Join(provider.prefix, catalog.RegistryFile), name, false)
+	if err != nil {
+		return nil, err
+	}
+	return provider.state.readFile(ctx, resolved)
+}
 
 func (provider *snapshotCatalogProvider) ReadFileContext(ctx context.Context, name string) ([]byte, error) {
 	if err := validateInputPath(name); err != nil {

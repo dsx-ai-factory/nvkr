@@ -91,8 +91,15 @@ func TestWorkflowKeepsPreparationPublicationAndReviewSeparate(t *testing.T) {
 			if jobName == "publish" && strings.Contains(step.Run, "docker run") {
 				t.Fatal("producer execution in credential-bearing publication")
 			}
-			if jobName == "propose" && strings.Contains(step.Run, "--operation repin") && (!strings.Contains(step.Run, "make workflows-generate workflows-check") || !strings.Contains(step.Run, "git diff --check")) {
-				t.Fatal("pin proposal does not regenerate/check through owners")
+			if jobName == "propose" && strings.Contains(step.Run, "--operation repin") {
+				previous := -1
+				for _, operation := range []string{"make workflows-check", "--operation repin", "make producer-overlays-generate", "make workflows-generate workflows-check", "git diff --check"} {
+					position := strings.Index(step.Run, operation)
+					if position <= previous {
+						t.Fatalf("pin proposal omits or reorders owner operation %q", operation)
+					}
+					previous = position
+				}
 			}
 		}
 	}

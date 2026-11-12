@@ -3,28 +3,7 @@
 
 apiVersion: nvkr.dev/catalog/v3
 components:
-  kubectl:
-    artifactPath: nvkr-output/kubectl
-    buildCommand:
-      - bash
-      - -euc
-      - |
-        export GOENV=off GOWORK=/src/go.work GOTOOLCHAIN=local GOPROXY=off
-        build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
-        go build -trimpath -mod=vendor -tags selinux,notest,grpcnotrace -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$BUILD_VERSION -X k8s.io/component-base/version.gitCommit=$GIT_VERSION -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=dirty -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$BUILD_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$GIT_VERSION -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=dirty -X k8s.io/client-go/pkg/version.buildDate=$build_date" -o /src/nvkr-output/kubectl ./cmd/kubectl
-    cgo: false
-    fromSource: true
-    outputType: host-package
-    platforms:
-      - darwin/arm64
-      - linux/arm64
-    source: kubectl
-    versionStamp:
-      BUILD_VERSION: '{{.Tag}}-dirty'
-      GIT_VERSION: '{{.Commit}}'
-      KUBE_GIT_MAJOR: '{{.Major}}'
-      KUBE_GIT_MINOR: '{{.Minor}}'
-    writeDir: nvkr-output
+
 kind: SourceBuildRegistry
 metadata:
   description: Kubernetes v1.34.12 client with explicit hash-checked dependency updates, built with the maintained Go toolchain for the disposable v1.34.2 demo tenant; diagnostic candidate only.
@@ -47,3 +26,9 @@ sources:
         GOPROXY=off timeout --kill-after=10s 60s go mod verify
         GOPROXY=off timeout --kill-after=10s 240s go work vendor
         printf '%s\n' '6b781ad7b5a79b0f98c5cfc8a2059c413abb91cdceea10f556a39f1af89b75ba  go.mod' '9cb4e7a33a3f7294349fcb7d17ab6bd024c9ff03189c5d17ea003e01171a9283  go.sum' '8e263785e91b11b8fc0c1c6fb17308b6826ad26cb3a639cdc32a1b34ae6619d6  go.work' '061e0319d1894f3d4cc18b62cc1eff3b00893f67d32880d277c037ad9bea866f  go.work.sum' | sha256sum --quiet -c -
+
+imports:
+- path: "../../shared/kubernetes-tools.yaml"
+  sha256: 25083a650d117f2cadbb29fdd8052016253558ce62574b590e43457955d2a9bc
+  components:
+    kubectl: kubectl

@@ -33,10 +33,11 @@ verification.
 
 [ADR-27](../0027-pinned-tool-producers.md) proposes pinned-tool producers: catalog components that run one released,
 digest-pinned executable offline in a pinned container, with no shell, a fixed argument vector and typed material
-inputs, emitting one file or a producer-written OCI layout. Units T1–T5 and T7 are implemented and
-contract-tested; selecting an `oci-layout` producer fails closed until the separately drafted layout import (#285)
-lands and T6 joins it. Beyond unrecorded local Docker runs of the AICR v1.2.0-rc1 recipe and Flux bundle
-producers, no recorded Run, hosted Run or consumer verification exercises a pinned-tool producer. AICR v1.2.0-rc1 ships the local OCI layout output (NVIDIA/aicr#3538) that AICR
+inputs, emitting one file or a producer-written OCI layout. Units T1–T7 include the
+layout-import handoff for one root with its complete explicit regular-file material closure. The AICR-specific
+post-render validation boundary retains upstream verification before packaging. Current contract and local
+execution evidence are recorded in [ADR-27](adr-27.md) and [AICR deployment bundles](aicr-deployment-bundles.md);
+hosted Run and consumer verification remain unexercised. AICR v1.2.0-rc1 ships the local OCI layout output (NVIDIA/aicr#3538) that AICR
 bundles need.
 
 [ADR-28](../0028-multi-platform-executable-indexes.md) proposes multi-platform executables: one tool source and

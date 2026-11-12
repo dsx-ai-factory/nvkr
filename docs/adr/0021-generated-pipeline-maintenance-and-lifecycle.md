@@ -452,6 +452,15 @@ disallowed; that ambiguity is what makes forgotten-regen drift possible.
 Native Packer/inspector maintenance is a separate authored hosted workflow. It reuses native preparation,
 retains exact source/archive/image/executable measurements, and requires a reviewed main-branch per-image
 candidate exception with approver, scope, expiry and license/security review references before publication.
+Publication rejects changed build inputs between the preparation commit and the current main revision.
+The guarded set is the union of the static inspector's module-local Go dependency package directories
+at both revisions, resolved with `go list -deps` for Linux AMD64 and ARM64 with CGO disabled, plus
+`.go-version`, `go.mod`, `go.sum`, workspace/vendor selectors, both image-source directories and the preparation script. Whole package
+directories include embedded assets and non-Go inputs; ancestor Git attribute files are also guarded
+because checkout transformations can change embedded or copied bytes. Unrelated packages do not stale a candidate.
+Workspace-based or vendored builds, missing revisions, unresolved closures, local replacement modules outside the main module and source
+archive transformations refuse admission. The check neither rebuilds nor executes the candidate;
+retained exact subject digests and all other publication gates remain mandatory.
 Both architectures and all subjects are admitted before the first write. Publication is limited to the
 existing internal candidate packages inside the protected publication environment. Independent-reader
 registry read-back and native pulls precede a review-only catalog/overlay/Environment pin change; the existing

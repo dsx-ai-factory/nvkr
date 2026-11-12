@@ -187,7 +187,7 @@ func TestDescriptionDetachedNestedValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	got, err := Describe(publication, "")
+	got, err := Describe(publication, Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestDescriptionDetachedNestedValues(t *testing.T) {
 func TestDescribeMatchesJSONAndRejectsAmbiguousSelection(t *testing.T) {
 	for _, selection := range []string{"", "tools", "multi", "chart", "missing", "tools\n"} {
 		t.Run(selection, func(t *testing.T) {
-			got, err := Describe(descriptionFixture(), selection)
+			got, err := Describe(descriptionFixture(), Options{Output: selection})
 			if selection == "missing" || selection == "tools\n" {
 				var coded *e.Error
 				if !errors.As(err, &coded) || coded.Code != e.CodeUsage || !reflect.DeepEqual(got, Description{}) {
@@ -227,7 +227,7 @@ func TestDescribeMatchesJSONAndRejectsAmbiguousSelection(t *testing.T) {
 	}
 	publication := descriptionFixture()
 	publication.Outputs = append(publication.Outputs, publication.Outputs[len(publication.Outputs)-1])
-	got, err := Describe(publication, "tools")
+	got, err := Describe(publication, Options{Output: "tools"})
 	var coded *e.Error
 	if !errors.As(err, &coded) || coded.Code != e.CodeUsage || !reflect.DeepEqual(got, Description{}) {
 		t.Fatalf("ambiguous selection returned a partial view or wrong error: %+v, %v", got, err)
@@ -246,7 +246,7 @@ func TestDescriptionOmitsHelmOutsideBoundArchive(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			publication := descriptionFixture()
 			publication.Outputs[test.index].ChartArchiveDigest = test.digest
-			got, err := Describe(publication, test.output)
+			got, err := Describe(publication, Options{Output: test.output})
 			if err != nil || len(got.Outputs) != 1 || got.Outputs[0].Helm != nil {
 				t.Fatalf("Helm description escaped its boundary: %+v, %v", got, err)
 			}
@@ -381,4 +381,106 @@ func descriptionFixture() delivery.PublicationDescription {
 		})
 	}
 	return result
+}
+
+func TestDescriptionKindAndPlatformFiltersIntersect(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		options  Options
+		outputs  []string
+		evidence []string
+	}{
+		{name: "OCI on ARM64 keeps native and aggregate images", options: Options{Kind: "oci", Platform: "linux/arm64"},
+			outputs: []string{"image", "multi"}, evidence: []string{"sbom-image", "sbom-multi-amd64", "sbom-multi-arm64"}},
+		{name: "AMD64 keeps aggregate and native outputs only", options: Options{Platform: "linux/amd64"},
+			outputs: []string{"multi", "tools"}, evidence: []string{"sbom-multi-amd64", "sbom-multi-arm64", "sbom-package"}},
+		{name: "kind alone keeps charts without platform metadata", options: Options{Kind: "helm-oci"}, outputs: []string{"chart"}, evidence: []string{}},
+		{name: "disk on ARM64", options: Options{Kind: "disk-image", Platform: "linux/arm64"}, outputs: []string{"disk"}, evidence: []string{}},
+		{name: "exact name satisfying filters", options: Options{Output: "tools", Platform: "linux/amd64"}, outputs: []string{"tools"}, evidence: []string{"sbom-package"}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			raw, err := Render(descriptionFixture(), Options{Format: "json", Output: test.options.Output, Kind: test.options.Kind, Platform: test.options.Platform})
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := decodeDescription(t, raw)
+			var outputs, evidence []string
+			for _, output := range got.Outputs {
+				outputs = append(outputs, output.Name)
+			}
+			evidence = []string{}
+			for _, item := range got.Evidence {
+				evidence = append(evidence, item.Name)
+			}
+			if !reflect.DeepEqual(outputs, test.outputs) || !reflect.DeepEqual(evidence, test.evidence) {
+				t.Fatalf("filter kept outputs %v and evidence %v", outputs, evidence)
+			}
+			if got.TotalOutputs != 6 || got.InspectionDetails.OutputSelection != "filtered" || got.InspectionDetails.MetadataClosure != "complete" ||
+				got.SelectedKind != test.options.Kind || got.SelectedPlatform != test.options.Platform || got.SelectedOutput != test.options.Output {
+				t.Fatalf("filtered view hid its scope: %+v", got)
+			}
+			for _, item := range got.Evidence {
+				if item.Name == "sbom-package" && !reflect.DeepEqual(item.Binding.Outputs, []string{"apt", "tools"}) {
+					t.Fatalf("shared evidence lost its original membership: %v", item.Binding.Outputs)
+				}
+			}
+			for _, output := range got.Outputs {
+				if output.Name == "multi" && (len(output.ImageIndex.Children) != 2 || len(output.ImageIndex.RequiredPlatforms) != 2) {
+					t.Fatalf("platform filter redefined aggregate membership: %+v", output.ImageIndex)
+				}
+			}
+			described, err := Describe(descriptionFixture(), test.options)
+			if err != nil || !reflect.DeepEqual(described, got) {
+				t.Fatalf("typed and JSON filtered views differ: %v", err)
+			}
+		})
+	}
+}
+
+func TestDescriptionFilterRejectsNoMatchConflictsAndUnsupportedValues(t *testing.T) {
+	for _, test := range []struct {
+		name    string
+		options Options
+		message string
+	}{
+		{name: "absent platform is not a wildcard", options: Options{Kind: "helm-oci", Platform: "linux/amd64"}, message: "no output matching"},
+		{name: "exact name conflicts with kind", options: Options{Output: "tools", Kind: "oci"}, message: "no output matching"},
+		{name: "exact name conflicts with platform", options: Options{Output: "image", Platform: "linux/amd64"}, message: "no output matching"},
+		{name: "unknown name with filter", options: Options{Output: "missing", Kind: "oci"}, message: "no unique output"},
+		{name: "unsupported kind", options: Options{Kind: "OCI"}, message: "kind filter"},
+		{name: "unsupported platform", options: Options{Platform: "windows/amd64"}, message: "platform filter"},
+		{name: "wildcard platform", options: Options{Platform: "linux/*"}, message: "platform filter"},
+		{name: "architecture only", options: Options{Platform: "arm64"}, message: "platform filter"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			for _, format := range []string{"text", "json", "mermaid"} {
+				options := test.options
+				options.Format = format
+				raw, err := Render(descriptionFixture(), options)
+				var coded *e.Error
+				if !errors.As(err, &coded) || coded.Code != e.CodeUsage || !strings.Contains(err.Error(), test.message) || raw != nil {
+					t.Fatalf("%s: wrong rejection or partial view: %q, %v", format, raw, err)
+				}
+			}
+			got, err := Describe(descriptionFixture(), test.options)
+			if err == nil || !reflect.DeepEqual(got, Description{}) {
+				t.Fatalf("typed view returned a partial result: %+v, %v", got, err)
+			}
+		})
+	}
+}
+
+func TestRenderTextNamesActiveFilters(t *testing.T) {
+	raw, err := Render(descriptionFixture(), Options{Format: "text", Kind: "oci", Platform: "linux/arm64"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(raw)
+	if !strings.Contains(text, "Outputs: 2 of 6\nKind filter: oci\nPlatform filter: linux/arm64 (outputs without platform metadata excluded)\n") {
+		t.Fatalf("text view hid its filters: %s", text)
+	}
+	raw, err = Render(descriptionFixture(), Options{Format: "text"})
+	if err != nil || strings.Contains(string(raw), "filter:") {
+		t.Fatalf("unfiltered text gained a filter line: %s, %v", raw, err)
+	}
 }

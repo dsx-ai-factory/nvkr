@@ -253,25 +253,17 @@ func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
 }
 
 func TestLaptopProfilesRejectTamperedPatch(t *testing.T) {
-	dir := t.TempDir()
 	source := filepath.Join("..", "..", "..", "inputs/catalogs/controller-profiles/nvidia-arm64")
-	for _, name := range []string{"registry.yaml", "pins.lock.yaml", "patches/local-profile.patch"} {
-		data, err := os.ReadFile(filepath.Join(source, name))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if name == "patches/local-profile.patch" {
-			data = append(data, []byte("\n# substituted\n")...)
-		}
-		target := filepath.Join(dir, name)
-		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(target, data, 0o600); err != nil {
-			t.Fatal(err)
-		}
+	dir := copyMaintainedCatalogFixture(t, source)
+	patch := filepath.Join(dir, "patches/local-profile.patch")
+	data, err := os.ReadFile(patch)
+	if err != nil {
+		t.Fatal(err)
 	}
-	_, err := catalog.LoadContext(t.Context(), catalog.Dir(dir))
+	if err := os.WriteFile(patch, append(data, []byte("\n# substituted\n")...), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = catalog.LoadContext(t.Context(), catalog.Dir(dir))
 	assertFactoryErrorCode(t, err, e.CodeUnpinnedSource)
 }
 

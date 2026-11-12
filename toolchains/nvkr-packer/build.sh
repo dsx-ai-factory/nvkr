@@ -105,17 +105,17 @@ jq -e '
   .validatedNVKE.goVersion == "1.27.1" and
   .validatedNVKE.packerProject == "os-image/packer" and
   .validatedNVKE.requiredBuild == "nke-node-non-fde.qemu.nke-non-fde" and
-  .packer.version == "1.15.4" and
+  .packer.version == "1.16.2" and
   .packer.license == "BUSL-1.1" and
   .qemuPlugin.source == "github.com/hashicorp/qemu" and
-  .qemuPlugin.version == "1.1.6" and
+  .qemuPlugin.version == "1.1.8" and
   .qemuPlugin.license == "MPL-2.0" and
   .go.license == "BSD-3-Clause" and
-  .helm.version == "4.2.4" and .helm.license == "Apache-2.0" and
-  .oras.version == "1.3.3" and .oras.license == "Apache-2.0" and
-  .crane.version == "0.21.9" and
+  .helm.version == "4.3.1" and .helm.license == "Apache-2.0" and
+  .oras.version == "1.3.6" and .oras.license == "Apache-2.0" and
+  .crane.version == "0.22.1" and
   .crane.license == "Apache-2.0" and
-  .nfpm.version == "2.47.0" and
+  .nfpm.version == "2.48.0" and
   .nfpm.license == "MIT" and
   .publicationGates.packerBUSLRedistributionApproval == "not-recorded" and
   .publicationGates.vulnerabilityReviewApproval == "not-recorded" and
@@ -253,14 +253,36 @@ build_command=("${runtime}" build)
 if [[ "${runtime##*/}" == docker ]]; then
   # Buildx passes the fixed epoch into BuildKit's image config and history,
   # then rewrites image-layer file timestamps to the same epoch on export.
-  # Explicit stdout export avoids the Docker driver's automatic image-store
-  # unpack, which cannot be combined with timestamp rewriting. Hold the archive
-  # in private temporary storage and load only after successful export; failed
-  # builds must not become misleading secondary image-format errors.
+  # Explicit stdout export avoids an automatic image-store unpack, which cannot
+  # be combined with timestamp rewriting. Hold the archive in private temporary
+  # storage and load only after successful export; failed builds must not
+  # become misleading secondary image-format errors.
   # Runtime-specific recorded IDs remain independent and are checked below;
   # changes to the image sources require fresh measurements.
   "${runtime}" buildx version
   "${runtime}" version --format 'Docker server {{.Server.Version}}'
+  # Streaming the Docker exporter needs a container-backed Buildx driver, or
+  # the docker driver on a daemon using the containerd image store. The
+  # docker driver on the classic store rejects the export ("Docker exporter
+  # is not supported for the docker driver"); refuse before building.
+  # Only the docker driver depends on the daemon's image store; a
+  # container-backed builder may also be bound to another context.
+  buildx_driver="$("${runtime}" buildx inspect | sed -n 's/^Driver:[[:space:]]*//p')"
+  daemon_storage=""
+  if [[ "${buildx_driver}" == docker ]]; then
+    daemon_storage="$("${runtime}" info --format '{{json .DriverStatus}}')"
+  fi
+  if [[ "${buildx_driver}" == docker && "${daemon_storage}" != *io.containerd.snapshotter* ]]; then
+    cat >&2 <<'EOF'
+the selected Docker Buildx builder uses the docker driver on a daemon without the
+containerd image store, which cannot stream the Docker exporter this build uses.
+Select a container-backed builder, for example:
+  docker buildx create --name nvkr-toolchain --driver docker-container
+  export BUILDX_BUILDER=nvkr-toolchain
+or enable the containerd image store in the Docker daemon.
+EOF
+    exit 1
+  fi
   build_command=("${runtime}" buildx build
     --output "type=docker,dest=-,rewrite-timestamp=true"
     --build-arg SOURCE_DATE_EPOCH=0)
@@ -374,8 +396,8 @@ fi
   --entrypoint sh \
   "${image_id}" -ec '
   mkdir -p "${HOME}" "${TMPDIR}"
-  test "$(CHECKPOINT_DISABLE=1 packer version)" = "Packer v1.15.4"
-  plugin=/nvkr/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v1.1.6_x5.0_linux_'"${arch}"'
+  test "$(CHECKPOINT_DISABLE=1 packer version)" = "Packer v1.16.2"
+  plugin=/nvkr/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v1.1.8_x5.0_linux_'"${arch}"'
   test -x "${plugin}"
   test "$(cat "${plugin}_SHA256SUM")" = "$(sha256sum "${plugin}" | cut -d" " -f1)"
   test "$(packer plugins installed)" = "${plugin}"
@@ -411,10 +433,10 @@ fi
   command -v unzip >/dev/null
   command -v xorriso >/dev/null
   test "$(GOTOOLCHAIN=local go version)" = "go version go${EXPECTED_GO_VERSION} linux/'"${arch}"'"
-  test "$(crane version)" = "0.21.9"
-  test "$(helm version --template "{{.Version}}")" = "v4.2.4"
-  oras version | grep -Eq "^Version:[[:space:]]+1.3.3$"
-  nfpm --version | grep -Eq "^GitVersion:[[:space:]]+2.47.0$"
+  test "$(crane version)" = "0.22.1"
+  test "$(helm version --template "{{.Version}}")" = "v4.3.1"
+  oras version | grep -Eq "^Version:[[:space:]]+1.3.6$"
+  nfpm --version | grep -Eq "^GitVersion:[[:space:]]+2.48.0$"
   dpkg-scanpackages --version >/dev/null
   7z i >/dev/null
   xorriso -version >/dev/null 2>&1
@@ -433,11 +455,11 @@ fi
   mkdir -p "${TMPDIR}/packer-probe"
   cat >"${TMPDIR}/packer-probe/probe.pkr.hcl" <<"EOF"
 packer {
-  required_version = "= 1.15.4"
+  required_version = "= 1.16.2"
   required_plugins {
     qemu = {
       source  = "github.com/hashicorp/qemu"
-      version = "= 1.1.6"
+      version = "= 1.1.8"
     }
   }
 }

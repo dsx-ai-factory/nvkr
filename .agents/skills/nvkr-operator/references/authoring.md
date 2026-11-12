@@ -20,7 +20,10 @@ native `helm-oci` chart artifacts, and file inventories do not establish deploym
 | Exact source or acquired-artifact pins | CLI-managed `pins.lock.yaml` |
 
 Create a customer-owned input directory or edit the explicitly selected existing inputs. Copy a suitable
-example only after checking its paths and scope; rebase relative references deliberately. Read the current
+example only after checking its paths and scope; rebase relative references deliberately. For a new single-output
+executable Definition, `definition init` prints a starting file from explicit catalog components; follow the
+[lifecycle guide](../../../../docs/lifecycle.md#start-a-small-executable-definition) to make its absolute catalog
+path relative before committing it. Read the current
 loader/schema and admitted examples rather than inventing fields. Prefer declarations using supported builders
 over new NVKR Go code. Never place real credentials in YAML or generated Plans.
 
@@ -33,6 +36,16 @@ For GitHub generation or standalone CLI diagnostics, follow [consumer toolchain 
 to classify every selected image in the Environment before work. Follow its migration guidance for
 ordinary hosted access and explicit source/location bindings; private startup and ordinary hosted routes
 remain unsupported.
+
+Publication format selection belongs to the Environment. Read the [OCI representation
+contract](../../../../docs/publication-architecture.md#oci-representation) before selecting
+`publication.ociRepresentation`. Omission preserves the existing format. An explicit compatible selection
+changes newly constructed NVKR wrappers before identity freezing; registry errors never authorize rewriting
+identified artifacts, imported producer manifests or signed evidence. Registry and consumer acceptance still
+require their own evidence. `helm-standard-v1` selects the narrower standard Helm profile; signed envelopes
+and non-Helm outputs still require registry support for their own media types.
+Use the same guide's registry diagnostics to inspect API observations and structured failure guidance;
+do not infer an OCI feature version from the V2 base endpoint or request a hidden write probe.
 
 ## Review changes with the CLI
 

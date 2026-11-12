@@ -64,7 +64,7 @@
               },
               "materialManifestVariable": "material_manifest",
               "outputDirectoryVariable": "output_directory",
-              "packerVersion": "1.15.4",
+              "packerVersion": "1.16.2",
               "projectPath": "os-image/packer",
               "sshPrivateKeyVariable": "ssh_private_key_file",
               "sshPublicKeyVariable": "ssh_public_key_file",
@@ -86,8 +86,8 @@
             "sourceDateEpoch": 1793236039,
             "tag": "v0.23.0",
             "toolchainImages": {
-              "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
-              "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
+              "amd64": "sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd",
+              "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
             },
             "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
             "vendorCommand": [
@@ -155,8 +155,8 @@
             "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
             "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
             "toolchainImages": {
-              "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
-              "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
+              "amd64": "sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd",
+              "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
             },
             "outputType": "disk-image",
             "disk": {
@@ -165,7 +165,7 @@
             },
             "packer": {
               "projectPath": "os-image/packer",
-              "packerVersion": "1.15.4",
+              "packerVersion": "1.16.2",
               "buildName": "nvke-node-non-fde.qemu.nvke-non-fde",
               "architectureVariable": "architecture",
               "acceleratorVariable": "accelerator",
@@ -247,8 +247,8 @@
             "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
             "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
             "toolchainImages": {
-              "amd64": "sha256:3a570c987e819cc2852258499f3bc56fec088b0ba5e0f45a17124ddcc24d60a0",
-              "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3"
+              "amd64": "sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd",
+              "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
             },
             "outputType": "disk-image",
             "disk": {
@@ -257,7 +257,7 @@
             },
             "packer": {
               "projectPath": "os-image/packer",
-              "packerVersion": "1.15.4",
+              "packerVersion": "1.16.2",
               "buildName": "nvke-node-non-fde.qemu.nvke-non-fde",
               "architectureVariable": "architecture",
               "acceleratorVariable": "accelerator",
@@ -299,6 +299,21 @@
           }
         }
       }
+    },
+    {
+      "name": "nvke-native-arm64-nvidia",
+      "destination": "inputs/catalogs/node-images/variants/native-nvidia.json",
+      "base": "inputs/catalogs/node-images/release",
+      "producers": [
+        {
+          "catalog": "inputs/catalogs/node-images/release",
+          "components": [
+            "nvke-cni-ovn",
+            "ovn-kube-ubuntu",
+            "ovn-kubernetes-chart"
+          ]
+        }
+      ]
     }
   ]
 }

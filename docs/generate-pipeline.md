@@ -111,8 +111,11 @@ committed bundle and current authored inputs, then install them through the gene
 Routine source-version updates therefore do not require a regenerated bundle commit. CI uses the same
 inputs with `--runtime --check`: it checks baseline integrity and unchanged workflow/action bytes,
 membership and Environment policy without writing files. Changes outside that contract require normal
-regeneration and review. This mode neither follows floating upstream versions nor changes the default
-or development bundle contract; ordinary `--check` remains a complete byte comparison.
+regeneration and review. Plain runtime refresh uses reviewed pins; upstream main selection requires an
+explicit runtime source policy. The [full GPU-site candidate](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/nvke-nightly.md#dispatch-a-complete-floating-gpu-site-candidate)
+uses `githubRuntimeSources` to freeze its approved repositories once, preserve complete-composite replay,
+and retain every generated upload for 14 days. Default and development bundle contracts remain unchanged;
+ordinary `--check` remains a complete byte comparison.
 
 Generated GitHub transfers keep validated metadata in Actions artifacts using the workflow identity.
 Provenance, SBOMs, signing/verification records and control layouts must pass their exact schemas and

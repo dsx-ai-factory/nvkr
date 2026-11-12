@@ -49,6 +49,12 @@ func TestMaintainedAICRBundleInputs(t *testing.T) {
 				t.Fatalf("AICR selection must retain all %d independent renderer outputs", count)
 			}
 			for _, output := range plan.Definition.Outputs {
+				if output.Name == "aicr-gb300-generic-training-flux" {
+					if output.Format != definition.OutputBundle || output.Platform != "linux/arm64" || !slices.Equal(output.Components, []string{output.Name, "aicr-gb300-generic-training-recipe"}) {
+						t.Fatalf("Flux closure changed: %+v", output)
+					}
+					continue
+				}
 				if output.Format != definition.OutputBundle || output.Platform != "linux/arm64" ||
 					!slices.Equal(output.Components, []string{output.Name}) || output.Helm != nil {
 					t.Fatalf("renderer lost its exact generic archive output: %+v", output)
@@ -56,6 +62,11 @@ func TestMaintainedAICRBundleInputs(t *testing.T) {
 			}
 			renderers, digests := make(map[string]bool), make(map[string]bool)
 			for _, build := range plan.Builds {
+				if build.Name == "aicr-gb300-generic-training-flux" {
+					assertAICRPinnedFlux(t, build)
+					renderers["flux"], digests[build.BuildDigest] = true, true
+					continue
+				}
 				var producer, fetch ir.Node
 				for _, node := range build.Graph.Nodes {
 					switch node.Kind {
@@ -316,4 +327,29 @@ func compileAICRInput(t *testing.T, file, environment string) *Plan {
 		t.Fatal(err)
 	}
 	return plan
+}
+
+func assertAICRPinnedFlux(t *testing.T, build BuildPlan) {
+	t.Helper()
+	producers := map[string]ir.Node{}
+	for _, n := range build.Graph.Nodes {
+		if n.Kind == ir.KindVerify {
+			continue
+		}
+		if n.Kind != ir.KindBuild {
+			t.Fatalf("pinned Flux gained source or acquired artifact node: %+v", n)
+		}
+		producers[n.Component] = n
+		if n.BuilderType != ir.BuilderPinnedTool || n.Platform != "linux/arm64" || n.Digest != "sha256:16e5ac98250cdcdb0ecf18e6a9a05b041b3b3cc83aa3181f755aa0e5c5e0fe24" || n.ExecutableArchive == nil || n.ExecutableArchive.Digest != "sha256:26824146cd0743229239899cb75d3b68e0bc262bcdb357fccc98eca0a5b75976" || n.Network != ir.NetworkNone {
+			t.Fatalf("Flux lost released ARM64 tool identity: %+v", n)
+		}
+	}
+	recipe := producers["aicr-gb300-generic-training-recipe"]
+	bundle := producers["aicr-gb300-generic-training-flux"]
+	if len(producers) != 2 || recipe.OutputType != "file" || recipe.ArtifactPath != "recipe.yaml" || !slices.Equal(recipe.Command, []string{"recipe", "--service", "generic", "--accelerator", "gb300", "--os", "ubuntu", "--intent", "training", "--output", "/nvkr/output/recipe.yaml"}) {
+		t.Fatalf("recipe content selection changed: %+v", recipe)
+	}
+	if bundle.OutputType != "oci-layout" || len(bundle.Materials) != 1 || !slices.Equal(bundle.Command, []string{"bundle", "--recipe", "/nvkr/inputs/materials/recipe.yaml", "--deployer", "flux", "--output", "oci-layout:/nvkr/output/layout"}) {
+		t.Fatalf("Flux invocation changed: %+v", bundle)
+	}
 }

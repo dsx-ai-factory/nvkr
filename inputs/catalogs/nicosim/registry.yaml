@@ -10,11 +10,12 @@ sources:
   nvke-nicosim:
     repo: https://github.com/dsx-ai-factory/nvke.git
     constraint: v0.23.0
-    # Native Go 1.27.3 rebuild from workflow run 39522193703. Local launchers
-    # substitute freshly validated bytes; general license/security approval
-    # remains unresolved.
+    # Native Go 1.27.3 candidate from preparation run 42904976235. Local launchers
+    # substitute freshly validated bytes. Candidate-only license/security exceptions:
+    # inputs/policies/toolchain-maintenance/42904976235.json (expires 2027-02-08);
+    # general release approval and full-image vulnerability scanning remain deferred.
     toolchainImagesByArch:
-      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:0b849513367b69faaa033aaf602f60d42309d7f42ff0045f8c354a4e804a82a3
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140
     vendorCommand:
       - bash
       - -euc

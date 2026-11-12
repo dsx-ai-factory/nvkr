@@ -1,28 +1,28 @@
 {
   "schemaVersion": "nvkr.dev/disk-inspect-toolchain/v1",
-  "baseImage": "ubuntu@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3",
-  "downloadImage": "curlimages/curl@sha256:935d9100e9ba842cdb060de42472c7ca90cfe9a7c96e4dacb55e79e560b3ff40",
-  "ubuntuSnapshot": "20260920T000000Z",
+  "baseImage": "ubuntu@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852",
+  "downloadImage": "curlimages/curl@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93",
+  "ubuntuSnapshot": "20261109T000000Z",
   "helper": {
     "source": "cmd/nvkr-disk-inspect",
-    "goToolchain": "go1.27.3",
+    "goToolchain": "go1.27.4",
     "architectures": ["amd64", "arm64"]
   },
   "packages": {
     "guestfs-tools": "1.52.0-2ubuntu5",
     "guestfish": "1:1.52.0-5ubuntu3",
     "libguestfs0t64": "1:1.52.0-5ubuntu3",
-    "linux-image-virtual": "6.8.0-139.139",
+    "linux-image-virtual": "6.8.0-149.149",
     "qemu-system-x86": "1:8.2.2+ds-0ubuntu1.18",
     "qemu-system-arm": "1:8.2.2+ds-0ubuntu1.18",
     "qemu-utils": "1:8.2.2+ds-0ubuntu1.18"
   },
   "scanner": {
-    "version": "1.51.1",
-    "schemaVersion": "16.1.10",
+    "version": "1.57.1",
+    "schemaVersion": "16.1.13",
     "archives": {
-      "amd64": "sha256:8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
-      "arm64": "sha256:a7fd2b784e6664acd44719270574f6cd8c6864fc2b1700bf9099bd1cccda7d7f"
+      "amd64": "sha256:bf52519eb57f675d47c07d43213cb6dff6449f3d6d1147ff6701ed91f44eef0c",
+      "arm64": "sha256:aa3d3e07344f590bcce8d31043b752daa76c8a56c2aa34ceeee63c6168152582"
     }
   },
   "images": {"amd64": null, "arm64": null},

@@ -1,0 +1,123 @@
+name: p00 Prepare NVKR runner (arc-amd64-kvm)
+'on':
+  workflow_call:
+    inputs:
+      dependencies:
+        type: string
+        required: true
+    outputs:
+      results:
+        value: ${{ jobs.nvkr-partition-results.outputs.results }}
+      statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      nvkr-partition-01:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-partition-01 }}
+      nvkr-results-09:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09 }}
+      nvkr-results-09-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-09-statuses }}
+    secrets:
+      NVKR_CI_STORAGE_READ_TOKEN:
+        required: true
+      NVKR_CI_STORAGE_WRITE_TOKEN:
+        required: true
+permissions:
+  contents: read
+jobs:
+  build-runner-arc-amd64-kvm:
+    name: 'Prepare NVKR runner (arc-amd64-kvm)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 15
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Summarize Run start
+        id: summarize-run-start
+        if: ${{ success() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+        continue-on-error: true
+        run: |
+          [ -n "${GITHUB_STEP_SUMMARY:-}" ] || exit 0
+          [ ! -L "$GITHUB_STEP_SUMMARY" ] || exit 0
+          [ ! -e "$GITHUB_STEP_SUMMARY" ] || [ -f "$GITHUB_STEP_SUMMARY" ] || exit 0
+          {
+            printf '%s\n' '## NVKR Run started' '' '<code>nvke-gpu-site</code> · 83 planned outputs · <code>linux/amd64, linux/arm64</code>' '' 'Lane: <code>pipeline-attested</code>. Execution and completeness checks are pending.' ''
+          } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
+        with:
+          go-version-file: '.go-version'
+          cache: 'false'
+      - name: 'Install NVKR runner'
+        run: |
+          set -eu
+          export CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOBIN="$RUNNER_TEMP/nvkr-runner"
+          go install -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' ./cmd/nvkr
+          mv "$GOBIN/nvkr" nvkr-exec
+      - name: Restore original frozen inputs for retry
+        if: ${{ github.run_attempt != 1 }}
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/ci-download
+        with:
+          name: nvkr-runtime-inputs
+          path: .nvkr/runtime-inputs
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Install original frozen inputs for retry
+        if: ${{ github.run_attempt != 1 }}
+        run: ./nvkr-exec factory github install-runtime-inputs --plan .github/nvkr-run-nvke-nightly-gpu-site/plan.json
+      - name: Verify committed Run generation is current
+        id: validate-catalog
+        run: ./nvkr-exec run generate --engine github --definition inputs/definitions/nvke/gpu-site.composite.yaml --environment inputs/environments/github-nvke-nightly-gpu-site.yaml --root . --runtime
+      - name: Upload NVKR runtime inputs
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/ci-upload
+        if: ${{ github.run_attempt == 1 }}
+        with:
+          name: nvkr-runtime-inputs
+          path: |
+            .github/nvkr-run-nvke-nightly-gpu-site/plan.json
+            .github/nvkr-run-nvke-nightly-gpu-site/action-data.json
+            .github/nvkr-run-nvke-nightly-gpu-site/manifest.json
+          include-hidden-files: 'true'
+          if-no-files-found: error
+          retention-days: 14
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - name: 'Upload NVKR runner'
+        uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/ci-upload
+        with:
+          name: 'nvkr-exec-arc-amd64-kvm'
+          path: |
+            nvkr-exec
+            .github/nvkr-run-nvke-nightly-gpu-site/plan.json
+            .github/nvkr-run-nvke-nightly-gpu-site/action-data.json
+            .github/nvkr-run-nvke-nightly-gpu-site/manifest.json
+          include-hidden-files: 'true'
+          if-no-files-found: error
+          retention-days: 14
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+  nvkr-partition-results:
+    name: 'Collect provider results: nvkr-partition-results'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: [build-runner-arc-amd64-kvm]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    permissions: {}
+    outputs:
+      results: ${{ toJSON(needs) }}
+      statuses: ${{ join(needs.*.result, ' ') }}
+      nvkr-partition-01: ${{ format('"build-runner-arc-amd64-kvm":{0}', toJSON(needs['build-runner-arc-amd64-kvm'])) }}
+      nvkr-results-09: ${{ format('"build-runner-arc-amd64-kvm":{0}', toJSON(needs['build-runner-arc-amd64-kvm'])) }}
+      nvkr-results-09-statuses: ${{ format('{0}', needs['build-runner-arc-amd64-kvm'].result) }}
+    steps:
+      - name: Forward provider results
+        run: ':'
+env:
+  NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
+  NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}

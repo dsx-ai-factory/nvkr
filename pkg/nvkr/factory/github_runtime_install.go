@@ -44,6 +44,9 @@ func InstallGitHubRuntimeInputs(ctx context.Context, baseline *Plan, root string
 	if fresh.Environment.GitHubRuntimeSource != nil && fresh.RuntimeSourceCommit == "" {
 		return e.New(e.CodeUnpinnedSource, "staged runtime source inputs omit the frozen commit")
 	}
+	if len(fresh.Environment.GitHubRuntimeSources) != 0 && fresh.RuntimeInputs == nil {
+		return e.New(e.CodeUnpinnedSource, "staged inputs omit the frozen source snapshot")
+	}
 	if fresh.EnvironmentDigest != baseline.EnvironmentDigest || fresh.DefinitionPath != baseline.DefinitionPath || fresh.EnvironmentPath != baseline.EnvironmentPath {
 		return e.New(e.CodePipelineDrift, "staged runtime inputs change the selected namespace, Environment or authored paths")
 	}

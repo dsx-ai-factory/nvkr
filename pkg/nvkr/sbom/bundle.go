@@ -4,6 +4,7 @@
 package sbom
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -17,6 +18,11 @@ import (
 // BundleFilesMethod inventories only regular files actually present in a bundle.
 // Referenced images, charts and deployment dependencies are not fetched or scanned.
 const BundleFilesMethod = "bundle-files/v1"
+
+// InspectBundleBytes inventories an already held bundle layer without executing it.
+func InspectBundleBytes(ctx context.Context, raw []byte) (DependencyInventory, error) {
+	return inspectBundleArchive(ctx, bytes.NewReader(raw))
+}
 
 func inspectBundleArchive(ctx context.Context, source io.Reader) (DependencyInventory, error) {
 	entries, err := bundlearchive.Inspect(ctx, source)

@@ -7,10 +7,6 @@ metadata:
   name: nvke-local-upstream-ovn-profiles-arm64
   description: Native diagnostic profiles image from the pinned NVKE Dockerfile/config/runbooks and an authenticated additive local profile overlay. Installs upstream OVN 1.4.0 matching the explicit upstream disk. Not fleet configuration or compatibility proof.
 sources:
-  nvke-profiles:
-    repo: https://github.com/dsx-ai-factory/nvke.git
-    constraint: v0.23.0
-    toolchainImage: docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
 components:
   nvke-local-profiles:
     fromSource: true
@@ -47,3 +43,9 @@ components:
           --opt context:alpine:3.24.1=docker-image://docker.io/library/alpine@sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d \
           --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
           --output type=oci,dest=/src/bin/nvke-local-profiles-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true
+
+imports:
+- sources:
+    nvke-profiles: nvke-profiles
+  path: "../../shared/controller-profiles.yaml"
+  sha256: c6273cedf8c36b19509ec1933d57c680b0651539d21bda3048b1ad1a2e6f146f

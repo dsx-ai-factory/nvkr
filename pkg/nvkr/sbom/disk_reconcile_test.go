@@ -510,11 +510,11 @@ func TestReconcileDiskContentsRejectsMissingAndSubstitutedEvidence(t *testing.T)
 
 func TestFilesystemNativeMetadataAndFileProjection(t *testing.T) {
 	pin := "sha256:" + strings.Repeat("a", 64)
-	for _, schema := range []string{"16.1.10", "16.1.9", "unknown"} {
+	for _, schema := range []string{"16.1.10", "16.1.13", "16.1.9", "16.1.11", "16.1.12", "16.1.14", "unknown"} {
 		t.Run(schema, func(t *testing.T) {
 			raw := []byte(`{"schema":{"version":"` + schema + `"},"artifacts":[{"name":"sample","version":"2:1.0-1ubuntu4","type":"deb","purl":"pkg:deb/ubuntu/sample@1?arch=arm64","metadata":{"architecture":"arm64"}}]}`)
 			inventory, err := filesystemDependenciesFromJSON(raw, pin)
-			if schema != "16.1.10" {
+			if schema != "16.1.10" && schema != "16.1.13" {
 				assertDependencyCode(t, err, e.CodeProvenanceMissing)
 				return
 			}

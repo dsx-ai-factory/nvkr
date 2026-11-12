@@ -346,7 +346,7 @@ func validatePackageInputs(spec packageSpec, inputs []string, artifacts map[stri
 	if spec.Kind == PackageHelm && len(inputs) != 1 {
 		return e.New(e.CodeInvalidCatalog, "Helm package %q requires exactly one tree or source archive", spec.Name)
 	}
-	if spec.Kind == PackageBundle && len(inputs) != 1 {
+	if spec.Kind == PackageBundle && len(inputs) == 0 {
 		return e.New(e.CodeInvalidCatalog, "bundle package %q requires exactly one source archive", spec.Name)
 	}
 	if spec.Kind == PackageImage && spec.ImageIndex == nil && len(inputs) != 1 {
@@ -375,7 +375,7 @@ func validatePackageInputs(spec packageSpec, inputs []string, artifacts map[stri
 		artifact := artifacts[id]
 		switch spec.Kind {
 		case PackageBundle:
-			if artifact.Kind != "tarball" || artifact.BuildTarget != spec.Name || artifact.Component == "" {
+			if (artifact.Kind != "tarball" && artifact.Kind != "oci-layout" && artifact.Kind != "file" && artifact.Kind != "raw" && artifact.Kind != "host-package") || artifact.BuildTarget != spec.Name || artifact.Component == "" {
 				return e.New(e.CodeInvalidCatalog, "bundle package %q requires its exact source archive producer", spec.Name)
 			}
 		case PackageDiskImage:

@@ -74,11 +74,15 @@ func CompleteAttestedPreparation(ctx context.Context, source, attested, out, exp
 	}
 	defer cleanup()
 	writer := layoutWriter{root: stage, plain: true}
-	unchanged, direct, err := prepareAttestedCompletion(ctx, writer, source, attested, prepared.Root, signed.Root, verify)
+	unchanged, err := prepareAttestedCompletion(ctx, writer, source, attested, prepared.Root, signed.Root, verify)
 	if err != nil {
 		return Result{}, err
 	}
-	digest, semantic, err := writer.writePublicationMetadata(signed.Root, direct)
+	digest, err := writer.copyPublicationBootstrap(ctx, attested, expectedAttestedRoot)
+	if err != nil {
+		return Result{}, err
+	}
+	semantic, err := signed.Root.Digest()
 	if err != nil {
 		return Result{}, err
 	}
@@ -108,6 +112,9 @@ func CompleteAttestedPreparation(ctx context.Context, source, attested, out, exp
 // binding. Only the four fields describing a raw document's bundle wrapper may
 // change; adding future fields automatically keeps them immutable here.
 func unchangedAttestationBindings(prepared, attested PublicationRoot) error {
+	if prepared.ociRepresentation != attested.ociRepresentation {
+		return e.New(e.CodeVerifyFailed, "attestation changed the selected OCI representation")
+	}
 	if err := requirePreparedEvidence(prepared); err != nil {
 		return err
 	}
@@ -141,36 +148,24 @@ func unchangedAttestationBindings(prepared, attested PublicationRoot) error {
 	return nil
 }
 
-func prepareAttestedCompletion(ctx context.Context, writer layoutWriter, source, attested string, prepared, signed PublicationRoot, verify func(context.Context, string, []byte) error) (map[string]bool, []Descriptor, error) {
-	index, _, err := readIndex(ctx, source)
-	if err != nil {
-		return nil, nil, err
-	}
+func prepareAttestedCompletion(ctx context.Context, writer layoutWriter, source, attested string, prepared, signed PublicationRoot, verify func(context.Context, string, []byte) error) (map[string]bool, error) {
 	unchanged := map[string]bool{}
-	var direct []Descriptor
 	for i, object := range prepared.Objects {
 		if object.Evidence != nil {
 			if err := verifyCompletionEvidence(ctx, source, attested, object, signed.Objects[i], verify); err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			if err := copyAttestationControls(ctx, writer, attested, signed.Objects[i]); err != nil {
-				return nil, nil, err
+				return nil, err
 			}
 			continue
 		}
 		descriptor := Descriptor{MediaType: publishedManifestMediaType(object), Digest: object.DescriptorDigest, Size: object.Size, ArtifactType: object.ArtifactType}
 		if err := verifyDescriptor(ctx, source, descriptor, unchanged); err != nil {
-			return nil, nil, err
-		}
-		if object.Output == nil {
-			for _, original := range index.Manifests {
-				if original.Digest == descriptor.Digest {
-					direct = append(direct, original)
-				}
-			}
+			return nil, err
 		}
 	}
-	return unchanged, direct, nil
+	return unchanged, nil
 }
 
 func verifyCompletionEvidence(ctx context.Context, source, attested string, original, signed PublishedObject, verify func(context.Context, string, []byte) error) error {

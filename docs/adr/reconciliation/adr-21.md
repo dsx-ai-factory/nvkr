@@ -25,10 +25,28 @@ the module-local inspector dependency graph for both Linux architectures. Manife
 comparison and routing are diagnostic only; these offline tests do not exercise
 GitHub issue writes, hosted matrix outputs or a live refresh.
 
-No new preparation, publication, native pull, App exchange or complete refresh was dispatched for this
-change. The first complete exercise remains a maintainer action after merge, with exact Run and artifact
-references to be recorded here. GitHub rulesets, protected-environment review, private carrier retention,
-review-record authenticity and registry credential access remain operational prerequisites. Exceptions
+The [publication attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42939744937)
+admitted preparation `42904976235` attempt 1, published all four approved candidate subjects, and passed
+independent-reader native verification on AMD64 and ARM64. Its proposal failed after repinning:
+generated overlays had new toolchain pins while their frozen producer policy retained the old pins,
+so catalog-refresh generation returned `pipeline-drift`. Clean main at `d4cb377b` passed both overlay
+and catalog-refresh checks before repinning; the failure was introduced by the proposal path.
+Repin now updates the named producer-overlay policy, and the proposal regenerates overlays before
+dependent workflows. A contract fixture reproduces the old drift and verifies that regeneration
+preserves the new pins without editing exception records. Workflow-order and proposal-path contracts
+retain the pre-repin drift check and restrict policy edits to that one owner file.
+Explicit native substitutions also bind local configuration-ID replacements to the approved
+image IDs. The overlay regression covers base/frozen producers and substitution sources; ambiguous
+cross-architecture mappings return a coded error before any input is written. The same fixture
+checks local diagnostic predecessor bindings; the proposal admits only their exact authored file
+under `toolchains/`, leaving image build locks outside its write set.
+Maintained consumer pins and local AMD64 image IDs select these published subjects; disk producer
+contracts require Packer `1.16.2`, matching the candidate source lock. Frozen/local overlays and generated
+bundles follow those inputs. The new disk Build identities have not been executed end to end.
+The corrected hosted proposal/App exchange remains unexercised; this publication attempt does not
+demonstrate a human environment-approval pause or complete refresh acceptance. GitHub rulesets,
+protected-environment review, private carrier retention, review-record authenticity and registry
+credential access remain operational prerequisites. Exceptions
 are candidate-only; source-lock general license/security gates remain unresolved. The historical
 [Go-pin rebuild](https://github.com/dsx-ai-factory/nvkr/actions/runs/39521422867) failed on both native
 architectures at Docker archive export before validation; it supplies no publication evidence. Current

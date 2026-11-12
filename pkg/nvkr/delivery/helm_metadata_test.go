@@ -61,7 +61,7 @@ func TestPublishedHelmChartConfigWithoutPayloads(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			descriptor.ArtifactType = manifest.ArtifactType
+			descriptor.ArtifactType = manifest.artifactType()
 			index.Manifests[0] = descriptor
 			if _, err := writer.writeIndex(index); err != nil {
 				t.Fatal(err)
@@ -134,12 +134,18 @@ func TestHelmPublicationChartMetadataAndPlatform(t *testing.T) {
 }
 
 func helmMetadataLayoutFixture(t *testing.T) (string, []byte) {
+	return helmMetadataLayoutWithRepresentation(t, "")
+}
+
+func helmMetadataLayoutWithRepresentation(t *testing.T, representation OCIRepresentation) (string, []byte) {
 	t.Helper()
 	archive := helmChartArchiveFixture(t, map[string]string{
-		"demo/Chart.yaml": "apiVersion: v2\nname: demo\nversion: 1.2.3\nappVersion: 9.8.7\n",
+		"demo/Chart.yaml":         "apiVersion: v2\nname: demo\nversion: 1.2.3\nappVersion: 9.8.7\n",
+		"demo/values.yaml":        "image: registry.example.test/controller@sha256:" + strings.Repeat("a", 64) + "\n",
+		"demo/templates/pod.yaml": "apiVersion: v1\nkind: Pod\nmetadata:\n  name: demo\nspec:\n  containers:\n    - name: controller\n      image: {{ .Values.image | quote }}\n",
 	})
 	root := filepath.Join(t.TempDir(), "chart")
-	if _, err := BuildHelmChartArtifact(t.Context(), root, "application/vnd.nvkr.helm-bundle.v1", archive); err != nil {
+	if _, err := BuildHelmChartArtifactWithRepresentation(t.Context(), root, "application/vnd.nvkr.helm-bundle.v1", archive, representation); err != nil {
 		t.Fatal(err)
 	}
 	return root, archive
@@ -153,8 +159,12 @@ func helmPublicationFixture(t *testing.T, arch, configVersion string) (string, s
 // helmPublicationFixtureWith lets a test adjust the release metadata, such as
 // a composite record, before the root is built.
 func helmPublicationFixtureWith(t *testing.T, arch, configVersion string, release func(*ReleaseMetadata)) (string, string) {
+	return helmPublicationWithRepresentation(t, arch, configVersion, release, "")
+}
+
+func helmPublicationWithRepresentation(t *testing.T, arch, configVersion string, release func(*ReleaseMetadata), representation OCIRepresentation) (string, string) {
 	t.Helper()
-	layout, archive := helmMetadataLayoutFixture(t)
+	layout, archive := helmMetadataLayoutWithRepresentation(t, representation)
 	index, manifest := fixtureManifest(t, layout)
 	if configVersion != "" {
 		config, err := readBlob(t.Context(), layout, manifest.Config, 8<<20)
@@ -171,7 +181,7 @@ func helmPublicationFixtureWith(t *testing.T, arch, configVersion string, releas
 		if err != nil {
 			t.Fatal(err)
 		}
-		descriptor.ArtifactType = manifest.ArtifactType
+		descriptor.ArtifactType = manifest.artifactType()
 		index.Manifests[0] = descriptor
 		if _, err := writer.writeIndex(index); err != nil {
 			t.Fatal(err)
@@ -222,7 +232,8 @@ func helmPublicationFixtureWith(t *testing.T, arch, configVersion string, releas
 		osName = "linux"
 	}
 	request := PublicationRequest{
-		Release: &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, PlanDigest: build, ContentSubject: content},
+		OCIRepresentation: representation,
+		Release:           &ReleaseMetadata{DefinitionDigest: build, EnvironmentDigest: build, PlanDigest: build, ContentSubject: content},
 		Objects: []ObjectInput{
 			{Name: "chart", Kind: outputFormatHelm, Path: layout, Layout: true, ArtifactType: "application/vnd.nvkr.helm-bundle.v1", SemanticDigest: descriptor.Digest,
 				OS: osName, Arch: arch, Output: &OutputBinding{Repository: "chart", Format: outputFormatHelm, BuildDigest: build}},

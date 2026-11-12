@@ -107,8 +107,17 @@ After the record merges, a maintainer dispatches the same workflow on `main` wit
 The workflow authenticates the successful main-branch preparation attempt through
 GitHub, checks that relevant source inputs have not changed, restores that exact
 attempt's private artifacts, and authenticates all four subjects before the first
-registry write. It rechecks expiry before each image write. A changed source,
-missing archive or expired record requires another preparation/review cycle.
+registry write. It rechecks expiry before each image write. Source comparison covers
+`.go-version`, `go.mod`, `go.sum`, `go.work`, `go.work.sum`, `vendor`, `toolchains/nvkr-packer`,
+`toolchains/nvkr-disk-inspect`, `scripts/prepare-native-toolchains.sh`, and the union
+of the inspector's module-local dependency package directories at the preparation
+commit and current `HEAD`. Dependencies are resolved for both Linux architectures
+with CGO disabled; full package directories include embedded and non-Go files.
+Ancestor `.gitattributes` files are included because checkout transformations can
+change embedded or copied bytes.
+Unrelated package edits do not invalidate the retained candidate. Missing commits
+or a failed dependency listing refuse admission; workspace-based and vendored builds are unsupported. A changed guarded input, missing
+archive or expired record requires another preparation/review cycle.
 
 Publication runs inside `nvkr-release`. The independent pipeline reader then pulls
 the selected manifests on both native architectures, repeats the existing native
@@ -116,9 +125,22 @@ tool/helper checks and compares every inspector executable measurement. The
 proposal job additionally reads back manifest/configuration bytes and every
 compressed layer using that reader. Only after both native jobs succeed does it
 update affected authored catalogs, rebind overlay predecessor digests through the
-catalog owner, update Environment image/executable pins, and invoke
-`make workflows-generate workflows-check`. It preserves historical evidence and
-source-lock approval gates.
+catalog owner, and update Environment image/executable pins. The refresh also updates
+the frozen producer pins in `inputs/policies/ovn-producer-overlays.json`, then invokes
+`make producer-overlays-generate` before `make workflows-generate workflows-check`.
+Updating only the generated overlays leaves their authored policy stale; regenerating
+from that stale policy would restore old toolchain pins. The initial `make workflows-check`
+still rejects pre-existing drift before repinning. Other policies, historical evidence,
+exception records and source-lock approval gates are unchanged.
+
+When a refresh changes the Packer version, review and update consumer `packerVersion`
+contracts alongside the image pins; runtime preflight requires an exact version match.
+Repin updates local configuration-ID pins and their frozen copies when an explicit
+native substitution binds the old ID to a candidate Packer reference and architecture.
+Ambiguous mappings fail closed; unbound local IDs remain untouched. Pull the approved
+AMD64 registry manifest before using its configuration ID locally. Repin also updates
+the architecture-bound predecessor references in `toolchains/nvkr-packer/local-bindings.json`
+so local diagnostic substitutions continue to match the refreshed catalogs.
 
 Within an affected authored file, the proposal replaces every exact occurrence of
 a selected old pin or predecessor digest, including comments and descriptive text.
@@ -144,7 +166,7 @@ Required repository configuration:
   (`NVKR_REGISTRY_READ` / `NVKR_REGISTRY_READ_USER`). Registry tokens also need read
   access to package visibility metadata. Their secret values never enter records.
 - Retain the catalog-maintenance release App's contents, pull requests and workflows
-  write permissions, and `NKE_SOURCE_TOKEN` for private-source generation checks.
+  write permissions. Source generation checks use anonymous access to the public repositories.
 
 The manual `verify_published=true` mode still checks the currently committed pins
 without building or publishing. It cannot be combined with `approval_run`.

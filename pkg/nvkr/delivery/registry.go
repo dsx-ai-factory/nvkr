@@ -11,6 +11,7 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -40,11 +41,15 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 
 // PushWithOptions publishes immutable release bytes before optionally advancing
 // explicit image discovery tags. Tags do not establish signer or release authority.
-func PushWithOptions(ctx context.Context, layoutPath, reference string, request PushOptions) (string, error) {
+func PushWithOptions(ctx context.Context, layoutPath, reference string, request PushOptions) (published string, resultErr error) {
+	ctx, observer := observeRegistry(ctx)
+	defer func(observedCtx context.Context) { resultErr = observer.explain(observedCtx, resultErr) }(ctx)
 	options := request.Registry
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
 	}
+	ctx, cancel := registryPublicationContext(ctx, 30*time.Minute)
+	defer cancel()
 	// PushOptions.Validate includes the identical registry credential validation,
 	// followed by tag admission, before Inspect or any registry operation.
 	if err := request.Validate(); err != nil {
@@ -143,27 +148,29 @@ func PushWithOptions(ctx context.Context, layoutPath, reference string, request 
 				return "", err
 			}
 		}
-		if err := remote.Write(child, img, remoteOptions...); err != nil {
-			return "", e.Wrap(e.CodeUnavailable, err, "publishing deliverable %q", object.Name)
+		childOptions := remoteOptions
+		if object.Evidence != nil {
+			childOptions = registryOptions(context.WithValue(ctx, registryAttachmentKey{}, true), options)
+		}
+		if err := remote.Write(child, img, childOptions...); err != nil {
+			return "", registryPublishError(ctx, err, "publishing deliverable %q", object.Name)
 		}
 		if isHelm {
 			if err := tagHelmChart(ctx, img, discoveryTag, contentTag, object.Name, remoteOptions); err != nil {
-				return "", err
+				return "", registryPublishError(ctx, err, "publishing chart discovery tags for %q", object.Name)
 			}
 		}
 		if _, err := ResolveDigest(ctx, child.Name(), options); err != nil {
-			return "", err
+			return "", registryReadbackError(ctx, err, "reading back deliverable %q", object.Name)
 		}
 	}
 	if err := remote.WriteIndex(ref, index, remoteOptions...); err != nil {
-		if ctx.Err() != nil {
-			return "", e.Wrap(e.CodeTimeout, ctx.Err(), "publishing OCI release root")
-		}
-		return "", e.Wrap(e.CodeUnavailable, err, "publishing OCI release root to %s", ref.Name())
+		return "", registryPublishError(ctx, err, "publishing OCI release root")
 	}
 	pinned := ref.Context().Name() + "@" + digest.String()
 	if err := publishImageAliases(ctx, pinned, aliases, options); err != nil {
-		return "", fmt.Errorf("image alias publication failed after root upload at %s (readback acceptance is not implied): %w", pinned, err)
+		return "", fmt.Errorf("image alias publication failed after root upload at %s (readback acceptance is not implied): %w", pinned,
+			registryReadbackError(ctx, err, "publishing image aliases"))
 	}
 	return pinned, nil
 }
@@ -381,9 +388,13 @@ func isNotFoundError(err error) bool {
 // succeed instead of surfacing a coded input error. 408 and 429 are
 // transient in the pinned registry transport even though they are 4xx
 // responses, so both are reported as CodeUnavailable rather than a
-// permanent catalog error.
+// permanent catalog error. Authentication/authorization refusals take
+// precedence and use CodeRegistryAuthFailed, including structured denials.
 func helmTagPublishError(err error, tag name.Tag, chart string) error {
 	var transportErr *transport.Error
+	if errors.As(err, &transportErr) && registryResponseCode(transportErr) == e.CodeRegistryAuthFailed {
+		return e.Wrap(e.CodeRegistryAuthFailed, err, "registry refused Helm chart tag %q for %q", tag.TagStr(), chart)
+	}
 	if errors.As(err, &transportErr) && transportErr.StatusCode >= 400 && transportErr.StatusCode < 500 &&
 		transportErr.StatusCode != http.StatusRequestTimeout && transportErr.StatusCode != http.StatusTooManyRequests {
 		return e.Wrap(e.CodeInvalidCatalog, err, "registry rejected Helm chart tag %q for %q", tag.TagStr(), chart)
@@ -396,6 +407,9 @@ func helmTagPublishError(err error, tag name.Tag, chart string) error {
 // push, pull, and resolve paths.
 func registryOptions(ctx context.Context, options RegistryOptions) []remote.Option {
 	remoteOptions := []remote.Option{remote.WithContext(ctx), remote.WithUserAgent("nvkr/delivery")}
+	if observer, ok := ctx.Value(registryObserverKey{}).(*registryObserver); ok {
+		remoteOptions = append(remoteOptions, remote.WithTransport(observer.transport(remote.DefaultTransport)))
+	}
 	switch {
 	case options.Anonymous:
 		return append(remoteOptions, remote.WithAuth(authn.Anonymous))

@@ -31,7 +31,7 @@ func executePublicationPackage(ctx context.Context, plan *Plan, node Node, outpu
 	if err != nil {
 		return err
 	}
-	result, err := delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{Release: metadata, Objects: objects})
+	result, err := delivery.BuildPublicationRoot(ctx, output.Path, delivery.PublicationRequest{OCIRepresentation: publicationOCIRepresentation(plan), Release: metadata, Objects: objects})
 	if err != nil {
 		return err
 	}
@@ -171,9 +171,12 @@ func collectPublicationObjects(ctx context.Context, plan *Plan, output Artifact,
 			}
 			object.Layout, object.SemanticDigest, object.BlobDigest = true, inspected.SemanticDigest, inspected.RootDigest
 		case PackageHelm, PackageBundle:
-			_, payload, err := delivery.ReadArtifact(ctx, input.Path)
+			descriptor, payload, err := delivery.ReadArtifact(ctx, input.Path)
 			if err != nil {
 				return nil, nil, err
+			}
+			if input.Kind == PackageBundle {
+				object.ArtifactType = descriptor.ArtifactType
 			}
 			object.Layout, object.SemanticDigest = true, pipeline.FileDigest(payload)
 			object.BlobDigest, err = digestFactoryPath(ctx, filepath.Join(input.Path, "index.json"))
@@ -279,6 +282,26 @@ func bindPublicationOutputObjects(ctx context.Context, plan *Plan, node Node, ar
 		}
 		objects[i].Output = &delivery.OutputBinding{Repository: output.Name, Format: output.Kind,
 			BuildDigest: output.BuildDigest, Components: output.Components, BuildSubjects: subjects, Disk: output.Disk, ImageIndex: output.ImageIndex.Clone()}
+		if output.Kind == PackageBundle {
+			for _, component := range output.Components {
+				input := artifacts["artifact/"+output.Name+"/"+component]
+				if input.Kind != "oci-layout" {
+					continue
+				}
+				result, err := observeProducerPayload(ctx, plan, input, artifacts)
+				if err != nil {
+					return err
+				}
+				raw, err := readSmallFactoryFile(ctx, filepath.Join(input.Path, "index.json"), "bundle producer index")
+				if err != nil {
+					return err
+				}
+				if pipeline.FileDigest(raw) != result.SHA256 {
+					return e.New(e.CodeVerifyFailed, "bundle producer index changed")
+				}
+				objects[i].Output.Bundle = &delivery.BundleBinding{Component: component, Index: raw}
+			}
+		}
 		if output.Kind == PackageAPT {
 			objects[i].Output.TransportPath = transportPaths[output.Name]
 		}

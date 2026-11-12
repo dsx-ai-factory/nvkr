@@ -69,12 +69,16 @@ func cmdRunPlan() *cli.Command {
 func cmdRunGraph() *cli.Command {
 	return &cli.Command{Name: "graph", Usage: "visualize complete planned producer, artifact, evidence and publication dependencies", Flags: append(append(planViewInputFlags(), commandPresentationFlags()...),
 		&cli.StringFlag{Name: "view", Value: "complete", Usage: "complete, producers, or artifacts"},
-		&cli.StringFlag{Name: "format", Value: "mermaid", Usage: "mermaid, dot, or json"}), Action: func(c *cli.Context) error {
+		&cli.StringFlag{Name: "format", Value: "mermaid", Usage: "mermaid, dot, or json"},
+		&cli.StringFlag{Name: "output", Usage: "focus on one exact required output and its upstream dependencies"}), Action: func(c *cli.Context) error {
 		view, err := selectCommandPresentation(c)
 		if err != nil {
 			return err
 		}
-		options := planview.GraphOptions{View: c.String("view"), Format: c.String("format")}
+		options := planview.GraphOptions{View: c.String("view"), Format: c.String("format"), Output: c.String("output")}
+		if c.IsSet("output") && options.Output == "" {
+			return e.New(e.CodeUsage, "--output requires a value")
+		}
 		if err := options.Validate(); err != nil {
 			return err
 		}
@@ -83,7 +87,7 @@ func cmdRunGraph() *cli.Command {
 			return showCommandResult(c, view, commandDisplay{Title: "Planned dependencies", Note: "Plan admission failed."}, err)
 		}
 		if view.tui {
-			graph, err := document.GraphSnapshot(options.View)
+			graph, err := document.GraphSnapshotFor(options)
 			if err != nil {
 				return showCommandResult(c, view, commandDisplay{Title: "Planned dependencies", Note: "Graph projection failed."}, err)
 			}

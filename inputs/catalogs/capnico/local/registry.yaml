@@ -23,7 +23,9 @@ components:
     - linux/amd64
     - linux/arm64
 sources:
-  capnico:
-    repo: https://github.com/dsx-ai-factory/cluster-api-provider-nico
-    constraint: 0.0.45
-    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+
+imports:
+- sources:
+    capnico: capnico
+  path: "../../shared/capnico.yaml"
+  sha256: 55a1243a2a690110edefd3ae46e025ad869981bbd76be1a05e799c123292ec06

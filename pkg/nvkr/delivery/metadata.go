@@ -42,11 +42,18 @@ func inspectMetadataProgress(ctx context.Context, root string, allowPayloads boo
 	if expectedRoot != "" && digestBytes(raw) != expectedRoot {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "cached metadata root identity differs")
 	}
-	if index.ArtifactType != MediaPublicationRoot || len(index.Manifests) != 1 || index.Manifests[0].ArtifactType != MediaPublicationRoot || index.Manifests[0].MediaType != MediaOCIManifest {
+	if index.artifactType() != MediaPublicationRoot || len(index.Manifests) != 1 || index.Manifests[0].ArtifactType != MediaPublicationRoot || index.Manifests[0].MediaType != MediaOCIManifest {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata release requires one root manifest")
+	}
+	representation, err := inspectOCIRepresentation(index)
+	if err != nil {
+		return Inspection{}, err
 	}
 	manifest, err := readPublicationManifest(ctx, root, index.Manifests[0])
 	if err != nil {
+		return Inspection{}, err
+	}
+	if err := validateRootRepresentation(representation, manifest); err != nil {
 		return Inspection{}, err
 	}
 	config, err := readBlob(ctx, root, manifest.Config, 8<<20)
@@ -57,6 +64,7 @@ func inspectMetadataProgress(ctx context.Context, root string, allowPayloads boo
 	if err := canonical.UnmarshalExact(config, &publication); err != nil {
 		return Inspection{}, e.Wrap(e.CodeVerifyFailed, err, "decode release metadata")
 	}
+	publication.ociRepresentation = representation
 	if err := publication.Validate(); err != nil {
 		return Inspection{}, err
 	}
@@ -251,10 +259,23 @@ func VisitMetadataEvidence(ctx context.Context, root, expectedRootDigest string,
 // BuildMetadataRoot writes descriptions and evidence from independently admitted
 // source roots. It issues no trust receipt and never copies output layers.
 func BuildMetadataRoot(ctx context.Context, out string, root PublicationRoot, sources map[string]string) (Result, error) {
-	return buildMetadataRoot(ctx, out, root, sources, "")
+	return buildMetadataRoot(ctx, out, root, sources, "", "")
 }
 
-func buildMetadataRoot(ctx context.Context, out string, root PublicationRoot, sources map[string]string, expectedRoot string) (Result, error) {
+// BuildMetadataRootWithRepresentation binds an explicit construction choice to
+// a new aggregate bootstrap, without converting any identified member.
+func BuildMetadataRootWithRepresentation(ctx context.Context, out string, root PublicationRoot, sources map[string]string, representation OCIRepresentation) (Result, error) {
+	if err := deliveryContext(ctx); err != nil {
+		return Result{}, err
+	}
+	if err := admitOCIRepresentation(representation); err != nil {
+		return Result{}, err
+	}
+	root.ociRepresentation = representation
+	return buildMetadataRoot(ctx, out, root, sources, "", "")
+}
+
+func buildMetadataRoot(ctx context.Context, out string, root PublicationRoot, sources map[string]string, expectedRoot, bootstrapSource string) (Result, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return Result{}, err
 	}
@@ -317,7 +338,15 @@ func buildMetadataRoot(ctx context.Context, out string, root PublicationRoot, so
 			}
 		}
 	}
-	digest, semantic, err := writer.writePublicationMetadata(root, nil)
+	var digest, semantic string
+	if bootstrapSource == "" {
+		digest, semantic, err = writer.writePublicationMetadata(root, nil)
+	} else {
+		digest, err = writer.copyPublicationBootstrap(ctx, bootstrapSource, expectedRoot)
+		if err == nil {
+			semantic, err = root.Digest()
+		}
+	}
 	if err != nil {
 		return Result{}, err
 	}
@@ -348,6 +377,24 @@ func ExportMetadataWithExpectedRoot(ctx context.Context, source, out, expectedRo
 	return exportMetadata(ctx, source, out, expectedRoot)
 }
 
+// CopyMetadataWithExpectedRoot preserves the exact bootstrap of a metadata-only
+// or full source after bounded metadata inspection and expected-root binding.
+// It copies controls and evidence only, never issuing payload or trust authority.
+func CopyMetadataWithExpectedRoot(ctx context.Context, source, out, expectedRoot string) (Result, error) {
+	if !canonical.IsDigest(expectedRoot) {
+		return Result{}, e.New(e.CodeUsage, "metadata copy requires an exact expected root digest")
+	}
+	inspection, err := inspectMetadataProgress(ctx, source, true, expectedRoot, nil)
+	if err != nil {
+		return Result{}, err
+	}
+	sources := map[string]string{}
+	for _, object := range inspection.Root.Objects {
+		sources[object.Name] = source
+	}
+	return buildMetadataRoot(ctx, out, inspection.Root, sources, expectedRoot, source)
+}
+
 func exportMetadata(ctx context.Context, source, out, expectedRoot string) (Result, error) {
 	inspection, err := Inspect(ctx, source)
 	if err != nil {
@@ -360,7 +407,26 @@ func exportMetadata(ctx context.Context, source, out, expectedRoot string) (Resu
 	for _, o := range inspection.Root.Objects {
 		sources[o.Name] = source
 	}
-	return buildMetadataRoot(ctx, out, inspection.Root, sources, expectedRoot)
+	return buildMetadataRoot(ctx, out, inspection.Root, sources, inspection.RootDigest, source)
+}
+
+// Copy only the pinned, previously inspected release bootstrap, never rebuild
+// identified metadata using the current constructor's serialization defaults.
+func (writer layoutWriter) copyPublicationBootstrap(ctx context.Context, source, expectedRoot string) (string, error) {
+	index, raw, err := readIndex(ctx, source)
+	if err != nil {
+		return "", err
+	}
+	if digestBytes(raw) != expectedRoot || index.artifactType() != MediaPublicationRoot || len(index.Manifests) != 1 {
+		return "", e.New(e.CodeVerifyFailed, "publication bootstrap differs from its inspected root")
+	}
+	if _, err := readPublicationManifest(ctx, source, index.Manifests[0]); err != nil {
+		return "", err
+	}
+	if err := writer.copyClosure(ctx, source, index.Manifests[0]); err != nil {
+		return "", err
+	}
+	return writer.writeIndexBytes(raw)
 }
 
 func metadataManifest(ctx context.Context, root string, object PublishedObject) (ociManifest, error) {
@@ -376,6 +442,11 @@ func metadataManifest(ctx context.Context, root string, object PublishedObject) 
 			return ociManifest{}, err
 		}
 	}
+	if object.ArtifactType == MediaAICRArtifact {
+		if _, err := admitBundleManifest(manifestBytes); err != nil {
+			return ociManifest{}, err
+		}
+	}
 	if types.MediaType(object.ArtifactType).IsImage() {
 		if err := validateImageSchemaNames(manifestBytes, reflect.TypeFor[v1.Manifest]()); err != nil {
 			return ociManifest{}, err
@@ -388,8 +459,16 @@ func metadataManifest(ctx context.Context, root string, object PublishedObject) 
 	if m.SchemaVersion != 2 || m.MediaType != publishedManifestMediaType(object) {
 		return ociManifest{}, e.New(e.CodeVerifyFailed, "metadata member has an invalid manifest schema/media type")
 	}
-	if !types.MediaType(object.ArtifactType).IsImage() && m.ArtifactType != object.ArtifactType {
+	if err := m.validateArtifactConfig(); err != nil {
+		return ociManifest{}, err
+	}
+	if !types.MediaType(object.ArtifactType).IsImage() && m.artifactType() != object.ArtifactType {
 		return ociManifest{}, e.New(e.CodeVerifyFailed, "metadata member artifact type differs from its release binding")
+	}
+	if m.Config.MediaType == MediaOctetStream {
+		if err := verifyPublishedObjectBinding(ctx, root, object, Descriptor{MediaType: m.MediaType, Digest: object.DescriptorDigest, Size: object.Size}, nil); err != nil {
+			return ociManifest{}, err
+		}
 	}
 	return m, nil
 }

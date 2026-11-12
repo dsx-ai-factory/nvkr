@@ -18,7 +18,9 @@ _Avoid_: Factory, FactoryDefinition, cluster definition
 **Environment**:
 Separately selected execution settings, required publication transports and namespace, credential references,
 and signing identity policy. Selecting an unavailable transport fails before work; a supported sibling cannot
-substitute for it. Image access separately declares private and anonymous image roots and
+substitute for it. An explicit OCI representation selects construction before packaging and signing;
+it changes Environment and Plan identity, not logical Build identity or existing publication bytes.
+Image access separately declares private and anonymous image roots and
 an independent reader; publication namespaces grant no pull access. Unclassified GitHub execution images
 fail admission. Exact source/location bindings preserve logical Build identity; measured local images and
 native bundles retain separate source semantics. Prepared-image receipts are process-local runtime
@@ -48,6 +50,8 @@ _Avoid_: Plan, release, proof of qualification
 
 **Artifact**:
 Immutable bytes produced or acquired for delivery, such as an executable, image, chart, or packaged collection.
+An explicit standard Helm profile preserves chart bytes while keeping NVKR membership and evidence in
+separate subject-bound records; omitted representation preserves existing artifact identities.
 _Avoid_: Producer, expected output, release
 
 **OCI bundle**:
@@ -158,6 +162,10 @@ packaging, routes and executable dependencies for a Run. Producer operations ref
 build instruction; observations are recorded separately. There is no authored compiler-handoff document.
 Readable views, linked graph exports and semantic comparisons describe the validated Plan; they do not replace
 its canonical stored bytes or grant execution or evidence authority.
+An opted-in dispatch-frozen Plan records an explicit repository/main allowlist's exact
+commits, trees and source timestamps together with captured authored inputs. Workers,
+retries and qualification reuse that selection; independent dependency and toolchain pins
+remain fixed. The record is descriptive until authenticated through its producing invocation.
 _Avoid_: Authored definition, execution observation
 
 **Generated execution bundle**:
@@ -421,6 +429,8 @@ One release index owns deliverable names/digests and stage-bound SBOM membership
 inside a signed attestation bundle in its owning artifact repository;
 per-build indexes remain internal handoffs. The root signature covers these bytes without making SBOMs new
 authored lifecycle objects or qualified evidence receipts. Run completion remains a separate claim.
+An explicit OCI representation is recorded in the digest-bound root-index annotation; inspecting that
+selection does not authorize rewriting a member or infer registry support.
 _Avoid_: Mutable tag, clearance, separately authored product object
 
 **Lifecycle status**:
@@ -431,6 +441,8 @@ _Avoid_: Build status, local clock, mutable release contents
 
 **Component catalog**:
 Reusable producer, source, tool, and pin declarations from which Definitions select their inputs.
+A registry may select shared, digest-pinned declaration fragments; its lock still owns the complete expanded
+source and artifact key sets. Fragments are authoring inputs, not additional lifecycle objects.
 _Avoid_: Inventory, registry destination
 
 **Component producer**:
@@ -446,8 +458,9 @@ acquisition of the tool. Proposed in [ADR-27](docs/adr/0027-pinned-tool-producer
 [execution](docs/adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed),
 [inputs](docs/adr/0027-pinned-tool-producers.md#4-declared-inputs-are-typed-material-bindings) and
 [outputs](docs/adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout);
-the `file` form is implemented and contract-tested, and the OCI layout form waits for the layout
-import.
+the file form and one layout root with its explicit regular-file material closure are implemented.
+AICR layouts pass a fixed, separately owned post-render integrity check before packaging.
+Execution and acceptance evidence are scoped in the ADR-27 reconciliation.
 _Avoid_: Run-wide pipeline tool, release executable output, build script
 
 **Component catalog overlay**:

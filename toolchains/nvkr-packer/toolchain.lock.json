@@ -1,8 +1,8 @@
 {
   "schemaVersion": "nvkr.dev/packer-toolchain/v1",
-  "ubuntuSnapshot": "20260920T000000Z",
-  "baseImage": "ubuntu@sha256:da6fc2be547864451aa253836dd926da33623312df4a9a243e35dc877c378a78",
-  "downloadImage": "curlimages/curl@sha256:935d9100e9ba842cdb060de42472c7ca90cfe9a7c96e4dacb55e79e560b3ff40",
+  "ubuntuSnapshot": "20261109T000000Z",
+  "baseImage": "ubuntu@sha256:6a06111c3b0a8600feadb270aec771dc239bf407b25625f93f44ab00e11f4d3c",
+  "downloadImage": "curlimages/curl@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93",
   "validatedNVKE": {
     "commit": "726f76944404e1106626b8333d3576bdf67b575b",
     "goVersion": "1.27.1",
@@ -10,84 +10,84 @@
     "requiredBuild": "nke-node-non-fde.qemu.nke-non-fde"
   },
   "packer": {
-    "version": "1.15.4",
+    "version": "1.16.2",
     "license": "BUSL-1.1",
     "archives": {
-      "amd64": "sha256:15f97a6a99645c7d5308c609973b5280837b38e112beac413ccbce80da927cf1",
-      "arm64": "sha256:23e6d2e596dd9e2527e0f7bea9aedd26059729375a0d17c462c2621f1b97b82d"
+      "amd64": "sha256:abbfe0cf74985084112659b53e3565f264f70a20914c3b7c4f789f54f61c2414",
+      "arm64": "sha256:5d7d6de86a49b2d64f3c0eef5766855b580e10a7c45bd6605ba8f1dead7815ea"
     },
     "binaries": {
-      "amd64": "sha256:6f016067b41152b9f49981727eb9f02c8dddc46cbdf5684d6f35f6c02b4958db",
-      "arm64": "sha256:147b17e1088be369f4b7d74fb3a5744edf0162632083c58d63c7c41d5a73fd4e"
+      "amd64": "sha256:6f64a1e9e71be8b3a2f0225ccf0d51b5446fbf79d9ad323e917a0126ab6ee38a",
+      "arm64": "sha256:998b221b5f8a60b528138c1a8a5c2f69b30aaf196e9cabcd7139487a1dc93451"
     }
   },
   "qemuPlugin": {
     "source": "github.com/hashicorp/qemu",
-    "version": "1.1.6",
+    "version": "1.1.8",
     "license": "MPL-2.0",
     "archives": {
-      "amd64": "sha256:3f735539fbdd0368785babda272b85738866f736415dce59d04b4cb550c4db87",
-      "arm64": "sha256:81a91755dfbb50317a51652fe3fa68b0253da864374bdf219e4d32ebbe08af58"
+      "amd64": "sha256:dbdec022f362c9c0c351c860deb1a52a135fdfa71e126048ba45030e12714904",
+      "arm64": "sha256:4177468c555d0998a49019a16cb2236d6840182acfc2edcfe94141d999b5510c"
     },
     "binaries": {
-      "amd64": "sha256:4b336cdddbbc91e30eb54ad6d5ca62f02edcce70c1cf54667104d33c25c1b9b5",
-      "arm64": "sha256:d672c5b820cb4ce54c8eb6bde1f453b04976935a144f5180f836b6457cd2556c"
+      "amd64": "sha256:7093fbbcfe8b2ace01ecb722a49c49a02187929f431c9a48188dc3c8132203d0",
+      "arm64": "sha256:4f030dd47b0cd618f593ad6221b61bf325b128b05dd1f00de4e90f60f534a1c3"
     }
   },
   "go": {
-    "version": "1.27.3",
+    "version": "1.27.4",
     "license": "BSD-3-Clause",
     "archives": {
-      "amd64": "sha256:65efbc80fdc1fa2cd2631cad5b481777a68e8725f34e89f50fc6ac714e379b40",
-      "arm64": "sha256:a06e99309dbcbdca1a8ccd2282c3ee146e55930886e26b4f1193269587165f49"
+      "amd64": "sha256:7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840",
+      "arm64": "sha256:3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaaeac92"
     }
   },
   "helm": {
-    "version": "4.2.4",
+    "version": "4.3.1",
     "license": "Apache-2.0",
     "archives": {
-      "amd64": "sha256:c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3",
-      "arm64": "sha256:564de2191b881e9f71b5606b25345821ea1682f06ab90499d3ab22b530176da1"
+      "amd64": "sha256:0403a88ae20913d11b10a2467b50087721fea7581736da6b9d3992f5357fe54b",
+      "arm64": "sha256:8cf8f66ecbc252ac8f7f06cca68aba88508ddfde3a6a34feb1678ad1694b4f88"
     },
     "binaries": {
-      "amd64": "sha256:92e191314f44aac173711bb0247c38c727f3ddf65ad16a01c0861d509a63a9e1",
-      "arm64": "sha256:0690653ac2aad19150f0c22383ceb8aaf4fd96666fcfabb9d4641fbf757e0490"
+      "amd64": "sha256:b66cb19f2b31f9d427632ea6c4b4a1ff89b74ecaeaee323cd166da41a7af53bd",
+      "arm64": "sha256:d459cbff1331af4326a6f97ea83c547742b4056dac7404f20fc436c084178c43"
     }
   },
   "oras": {
-    "version": "1.3.3",
+    "version": "1.3.6",
     "license": "Apache-2.0",
     "archives": {
-      "amd64": "sha256:9ce999f8d2de03fc03968b29d743077a58783e545e5eaa53917ca177352d0e59",
-      "arm64": "sha256:ac7156f93a21e903f7ad606c792f3560f17e0cd0e36365634701b1e7cc4e4eca"
+      "amd64": "sha256:66fb0ad7206f3f6fa77ed5b552049d364ccf4b50b1684554f731f76302b52ca0",
+      "arm64": "sha256:b84269e78dfc2d5329a4aab373da3200de95e6c138338cf6c66c10c0a3f248c1"
     },
     "binaries": {
-      "amd64": "sha256:a9c7694677a72251c89c176331d41b2198d8e85cbaece038bcbc8da0679e1139",
-      "arm64": "sha256:f4bdc5f948233b03042734bf679d6926323701f4dcc08de25301af82b648d6f3"
+      "amd64": "sha256:2be7e2b668fc32329408ca17f104021bdb93407266537b6410668ed7d05c4611",
+      "arm64": "sha256:e61243d2c862a5aaf6451914edd8cc089ae91df425201fa9ee7659cbed36e7c0"
     }
   },
   "crane": {
-    "version": "0.21.9",
+    "version": "0.22.1",
     "license": "Apache-2.0",
     "archives": {
-      "amd64": "sha256:5c16d8ddb971cb1d5e6ed8b1e743da8224414eeba2c2762d8f1a61b2f095699e",
-      "arm64": "sha256:1f4c647b7bb260ab5435661df5b526cf59950ebf95201790db7183ac189cbcbd"
+      "amd64": "sha256:0ab7a1d6932a213aed964ce97666c3077fe691c8606413674a8b3e0b9ec4cda0",
+      "arm64": "sha256:898c0cff975f898a33e8c4580bdafb0e7c02c7faa33374e946762f97c4ab7110"
     },
     "binaries": {
-      "amd64": "sha256:b0bb9155edd97f42f1f9438860b71e8d68177c5ca11536fe755e6b11aefa5f4d",
-      "arm64": "sha256:db5b5f8ecb141c369f9fa173d9fe1a0477c8d57bd3c1ea48dc05258bb86864b6"
+      "amd64": "sha256:8e75c326adb43b053cfd78b9b987663f8f4fe4557f4d3915905643f25c730992",
+      "arm64": "sha256:1799f559c299f068951822a5efe6689ebab6974f2054d5562e60798fa9db6a55"
     }
   },
   "nfpm": {
-    "version": "2.47.0",
+    "version": "2.48.0",
     "license": "MIT",
     "archives": {
-      "amd64": "sha256:0660ca602b2d2d2ae4781a06c692b3eeb9d437ffea05b831d76e41f4a3188783",
-      "arm64": "sha256:1c0f5f2999b9a974bfb04fdb0cc3306096de530ac5dbb25d739cc5f5219c919c"
+      "amd64": "sha256:6d7f9a28b2f397934403950fcbba83f598b08d02edbe79a0815b3b4897341750",
+      "arm64": "sha256:a9a75213763783b7669719e505474c748c5ad7dc66591a195619deb50f85c2f4"
     },
     "binaries": {
-      "amd64": "sha256:17133a2467ffb7cec851c2d7bae0c6098d09d7ed7d3d101a9605f6a473323936",
-      "arm64": "sha256:4d7ddf169945f7f557ac5373035d373429050d00476925953560e1ac65e16c74"
+      "amd64": "sha256:5377b2b61d5b39fab4adcd0fed263b85eb81da713f06fe08e93b967f36d1763c",
+      "arm64": "sha256:74631f33142d8606096149555817d1f9bbbed8df830dead07cf54b3d7ae5faab"
     }
   },
   "publicationGates": {

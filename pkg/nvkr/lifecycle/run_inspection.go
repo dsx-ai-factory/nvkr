@@ -69,6 +69,24 @@ func InspectRun(ctx context.Context, recordPath string) (RunInspection, error) {
 		return RunInspection{}, err
 	}
 	defer root.Close()
+	view, _, err := inspectRunDirectory(ctx, root)
+	return view, err
+}
+
+// Run record problems name why an attempt directory has no admissible record.
+// They classify a refusal for listing; the refusal itself is the coded error.
+const (
+	runRecordUnavailable = "record-unavailable"
+	runRecordMarkerOnly  = "marker-only"
+	runRecordUnsafe      = "record-unsafe"
+	runRecordInvalid     = "record-invalid"
+	runRecordMismatch    = "attempt-mismatch"
+)
+
+// inspectRunDirectory is InspectRun on an attempt directory descriptor the
+// caller already holds and closes. Besides the coded error it names the record
+// problem, or "" for cancellation and success.
+func inspectRunDirectory(ctx context.Context, root *os.File) (RunInspection, string, error) {
 	view := RunInspection{SchemaVersion: "nvkr.dev/run-inspection/v1", Authority: "description-only", Status: "unavailable",
 		Outputs: []InspectedRunOutput{}}
 	marker, _, markerErr := securepath.OpenChild(root, diskAttemptMarker, false)
@@ -76,45 +94,49 @@ func InspectRun(ctx context.Context, recordPath string) (RunInspection, error) {
 		view.CleanupIncomplete = true
 		_ = marker.Close()
 	} else if !os.IsNotExist(markerErr) {
-		return RunInspection{}, e.New(e.CodeVerifyFailed, "cannot safely inspect the local attempt marker")
+		return RunInspection{}, runRecordUnsafe, e.New(e.CodeVerifyFailed, "cannot safely inspect the local attempt marker")
 	}
 	source, info, err := securepath.OpenChild(root, "lifecycle.json", false)
 	if os.IsNotExist(err) {
 		if canceled := ctx.Err(); canceled != nil {
-			return RunInspection{}, e.Wrap(e.CodeTimeout, canceled, "Run inspection canceled")
+			return RunInspection{}, "", e.Wrap(e.CodeTimeout, canceled, "Run inspection canceled")
 		}
-		return RunInspection{}, e.New(e.CodeVerifyFailed, "Run record is unavailable; owner liveness and interruption are unknown")
+		problem := runRecordUnavailable
+		if view.CleanupIncomplete {
+			problem = runRecordMarkerOnly
+		}
+		return RunInspection{}, problem, e.New(e.CodeVerifyFailed, "Run record is unavailable; owner liveness and interruption are unknown")
 	}
 	if err != nil {
-		return RunInspection{}, e.New(e.CodeVerifyFailed, "Run record must be a regular file without symlinks")
+		return RunInspection{}, runRecordUnsafe, e.New(e.CodeVerifyFailed, "Run record must be a regular file without symlinks")
 	}
 	defer source.Close()
 	if info.Size() <= 0 || info.Size() > MaxRunRecordBytes {
-		return RunInspection{}, e.New(e.CodeVerifyFailed, "Run record exceeds its metadata size bound or is empty")
+		return RunInspection{}, runRecordInvalid, e.New(e.CodeVerifyFailed, "Run record exceeds its metadata size bound or is empty")
 	}
 	held, err := heldfile.FromReaderContext(ctx, io.NewSectionReader(source, 0, info.Size()),
 		heldfile.Options{Label: "run-inspection", MaxBytes: MaxRunRecordBytes})
 	if err != nil {
-		return RunInspection{}, runInspectionReadError(ctx, err)
+		return RunInspection{}, readProblem(ctx), runInspectionReadError(ctx, err)
 	}
 	defer func() { _ = held.Close() }()
 	after, err := source.Stat()
 	if err != nil || !securepath.SameMetadata(info, after) || held.Size() != info.Size() {
-		return RunInspection{}, e.New(e.CodeVerifyFailed, "Run record changed while being inspected")
+		return RunInspection{}, runRecordInvalid, e.New(e.CodeVerifyFailed, "Run record changed while being inspected")
 	}
 	raw, err := held.ReadAllContext(ctx, MaxRunRecordBytes)
 	if err != nil {
-		return RunInspection{}, runInspectionReadError(ctx, err)
+		return RunInspection{}, readProblem(ctx), runInspectionReadError(ctx, err)
 	}
 	var run Run
 	if err := canonical.UnmarshalExact(raw, &run); err != nil {
-		return RunInspection{}, e.New(e.CodeVerifyFailed, "Run record is not exact canonical metadata")
+		return RunInspection{}, runRecordInvalid, e.New(e.CodeVerifyFailed, "Run record is not exact canonical metadata")
 	}
 	if err := validateInspectedRun(&run); err != nil {
-		return RunInspection{}, err
+		return RunInspection{}, runRecordInvalid, err
 	}
 	if run.Attempt != filepath.Base(root.Name()) {
-		return RunInspection{}, e.New(e.CodeVerifyFailed, "Run record does not match its attempt directory")
+		return RunInspection{}, runRecordMismatch, e.New(e.CodeVerifyFailed, "Run record does not match its attempt directory")
 	}
 	// The marker can be created before an immutable record becomes visible. A
 	// second descriptor-relative sample avoids describing that new record without
@@ -124,10 +146,10 @@ func InspectRun(ctx context.Context, recordPath string) (RunInspection, error) {
 		view.CleanupIncomplete = true
 		_ = marker.Close()
 	} else if !os.IsNotExist(markerErr) {
-		return RunInspection{}, e.New(e.CodeVerifyFailed, "cannot safely inspect the local attempt marker")
+		return RunInspection{}, runRecordUnsafe, e.New(e.CodeVerifyFailed, "cannot safely inspect the local attempt marker")
 	}
 	if err := ctx.Err(); err != nil {
-		return RunInspection{}, e.Wrap(e.CodeTimeout, err, "Run inspection canceled")
+		return RunInspection{}, "", e.Wrap(e.CodeTimeout, err, "Run inspection canceled")
 	}
 	view.Attempt, view.PlanDigest, view.Lane, view.Status = run.Attempt, run.PlanDigest, run.Lane, run.Status
 	view.RecordAvailable = true
@@ -145,19 +167,33 @@ func InspectRun(ctx context.Context, recordPath string) (RunInspection, error) {
 		}
 		view.Outputs = append(view.Outputs, output)
 	}
-	return view, nil
+	return view, "", nil
+}
+
+// readProblem is "" for a canceled read, which is not a record problem.
+func readProblem(ctx context.Context) string {
+	if ctx.Err() != nil {
+		return ""
+	}
+	return runRecordInvalid
 }
 
 // openRunInspectionDirectory walks from the filesystem root using no-follow
 // directory descriptors. The caller owns the returned descriptor and must close it.
 func openRunInspectionDirectory(ctx context.Context, path string) (*os.File, error) {
+	return openLabeledDirectory(ctx, path, "Run record directory", "Run record directories")
+}
+
+// openLabeledDirectory is openRunInspectionDirectory naming the directory as
+// label, and its path components as labels, in errors.
+func openLabeledDirectory(ctx context.Context, path, label, labels string) (*os.File, error) {
 	absolute, err := filepath.Abs(path)
 	if err != nil {
-		return nil, e.New(e.CodeUsage, "cannot resolve Run record directory")
+		return nil, e.New(e.CodeUsage, "cannot resolve %s", label)
 	}
 	root, _, err := securepath.OpenDirectory(string(filepath.Separator))
 	if err != nil {
-		return nil, e.New(e.CodeVerifyFailed, "cannot open Run record directory")
+		return nil, e.New(e.CodeVerifyFailed, "cannot open %s", label)
 	}
 	for _, part := range strings.Split(strings.TrimPrefix(absolute, string(filepath.Separator)), string(filepath.Separator)) {
 		if part == "" {
@@ -171,9 +207,9 @@ func openRunInspectionDirectory(ctx context.Context, path string) (*os.File, err
 		_ = root.Close()
 		if openErr != nil {
 			if os.IsNotExist(openErr) {
-				return nil, e.New(e.CodeVerifyFailed, "Run record directory is unavailable")
+				return nil, e.New(e.CodeVerifyFailed, "%s is unavailable", label)
 			}
-			return nil, e.New(e.CodeVerifyFailed, "Run record directories must exist without symlinks")
+			return nil, e.New(e.CodeVerifyFailed, "%s must exist without symlinks", labels)
 		}
 		root = next
 	}

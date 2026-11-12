@@ -41,8 +41,8 @@ The maintained release node-image catalog selects the NVIDIA OVN fork `v2.4.2`
 `nvke-cni-ovn-{charts,images}-2.4.2`, which NVKE `v0.23.0` still requests for its default tenant `cniVersion`.
 The native NVIDIA overlay now leaves the release snapshot unchanged. Dependent overlay predecessor
 digests and generated bundles were regenerated, and the upstream 1.4.0 demo overlays still replace all
-three producers. The release, development, disks, diagnostics and Ubuntu 24 Environments grant the
-fork source access through `NKE_SOURCE_TOKEN`. Catalog validation, Plan generation and contract tests
+three producers. The release, development, disks, diagnostics and Ubuntu 24 Environments fetch the
+public fork anonymously. Catalog validation, Plan generation and contract tests
 cover this selection. No hosted or local disk build, package-index inspection or default-version tenant
 OVN create has exercised it.
 

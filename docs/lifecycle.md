@@ -41,6 +41,30 @@ Output-affecting build tools remain part of build identity.
 A destination or signing-setting change can change the prepared execution and generated workflow while
 preserving build identity. A dry-run signing mode records intended operations and never supplies a signature.
 
+## Start a small executable Definition
+
+`definition init` prints a plain Definition with one executable output named after `--name`, bundling
+catalog components you select explicitly. It adds no Environment, pins, signer, CI files or composite, and
+it never adds a dependency you did not name:
+
+```sh
+bin/nvkr definition init --name my-tools \
+  --catalog inputs/catalogs/tools/operator-arm64 \
+  --platform linux/arm64 --component helm --component kubectl > definition.yaml
+bin/nvkr definition validate --definition definition.yaml
+```
+
+The selection is admitted through the same catalog, platform-route and material-set checks a later run uses,
+and init adds no rule of its own. A missing flag, a missing, duplicate or unknown component, an unsupported
+platform or an incomplete material selection fails with a coded error and prints nothing. Components are sorted, so the same request on the same checkout always prints the same
+bytes.
+
+`--catalog` is written as an absolute path, so the printed file works where it was made. That path is part of the
+Definition digest and the Plan, so the same request prints different bytes and identities on another checkout.
+Captured local runs, hosted runs and composite Definitions refuse an absolute catalog locator. Before you commit
+the file or use it in one of those runs, change `catalog.base` to a path relative to the Definition file's own
+directory, not the directory you ran `definition init` from. This first version covers one executable output and a single platform.
+
 ## Inspect and generate
 
 With `bin/nvkr` built as described in the quickstart, inspect the three-output NVKE example:
@@ -249,6 +273,22 @@ represent executed producers or human usability acceptance.
 ![Wide terminal details](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/wide-details.png)
 
 ![Monochrome presentation](https://raw.githubusercontent.com/dsx-ai-factory/nvkr/93715c6931a35824dd14e1221e2f129cbacc59a9/docs/assets/nvkr-dashboard/monochrome.png)
+
+### List recorded attempts
+
+```sh
+bin/nvkr run list --attempts-root .nvkr/runs
+bin/nvkr run list --attempts-root .nvkr/runs --json
+```
+
+Listing reads the attempt directories directly under one attempts root, ordered by attempt name, through the
+same no-follow, bounded loader as inspection. Each Run shows its lane, stored status, observed and required
+output counts, failure code, any disk-commit marker, and the record path to pass to `run inspect --record`. The
+order is not chronology, and nothing infers liveness, resumes work, opens payloads or descends below an attempt
+directory. An entry without an admissible record (no record, marker only, a symlink, a corrupt or substituted
+record, or a non-directory) is listed as a diagnostic, and the command then fails with a coded verification error
+so a partial inventory is not mistaken for a complete one. None of these is called interrupted. An empty root
+lists nothing; a missing root, or one with more than 1024 entries, fails before any record is read.
 
 ### Inspect a recorded attempt
 

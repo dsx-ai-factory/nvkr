@@ -19,6 +19,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
 const (
@@ -39,7 +40,7 @@ type ociManifest struct {
 	Subject       *Descriptor       `json:"subject,omitempty"`
 	SchemaVersion int               `json:"schemaVersion"`
 	MediaType     string            `json:"mediaType"`
-	ArtifactType  string            `json:"artifactType"`
+	ArtifactType  string            `json:"artifactType,omitempty"`
 	Config        Descriptor        `json:"config"`
 	Layers        []Descriptor      `json:"layers"`
 }
@@ -50,6 +51,53 @@ type ociIndex struct {
 	ArtifactType  string            `json:"artifactType,omitempty"`
 	Manifests     []Descriptor      `json:"manifests"`
 	Annotations   map[string]string `json:"annotations,omitempty"`
+}
+
+// Explicit compatible wrappers retain NVKR's type as an annotation. The exact
+// config and publication records still own payload, membership and evidence
+// validation. Legacy OCI 1.1 wrappers remain readable; conflicting claims fail
+// closed instead of choosing one spelling.
+const artifactTypeAnnotation = "dev.nvkr.artifact.type"
+
+func declaredArtifactType(field string, annotations map[string]string) string {
+	annotation := annotations[artifactTypeAnnotation]
+	if field != "" && annotation != "" && field != annotation {
+		return ""
+	}
+	if field != "" {
+		return field
+	}
+	return annotation
+}
+
+func (manifest ociManifest) artifactType() string {
+	return declaredArtifactType(manifest.ArtifactType, manifest.Annotations)
+}
+
+func (index ociIndex) artifactType() string {
+	return declaredArtifactType(index.ArtifactType, index.Annotations)
+}
+
+func artifactAnnotations(artifactType string, annotations map[string]string) map[string]string {
+	result := make(map[string]string, len(annotations)+1)
+	for key, value := range annotations {
+		result[key] = value
+	}
+	result[artifactTypeAnnotation] = artifactType
+	return result
+}
+
+func (manifest ociManifest) plainConfig() bool {
+	return manifest.Config.MediaType == MediaEmptyConfig || manifest.Config.MediaType == MediaArtifactConfig
+}
+
+// An OCI empty config requires the manifest's artifactType field; an NVKR
+// logical-type annotation alone does not satisfy that OCI envelope rule.
+func (manifest ociManifest) validateArtifactConfig() error {
+	if manifest.Config.MediaType == MediaEmptyConfig && manifest.ArtifactType == "" {
+		return e.New(e.CodeVerifyFailed, "OCI empty config requires a manifest artifact type")
+	}
+	return nil
 }
 
 type objectConfig struct {
@@ -66,6 +114,7 @@ type objectConfig struct {
 // are nested by descriptor and copied as an exact closure; regular files become
 // one-layer OCI artifacts.
 type ObjectInput struct {
+	helmEvidence   bool
 	annotations    map[string]string
 	subject        *Descriptor
 	Output         *OutputBinding
@@ -86,10 +135,11 @@ type ObjectInput struct {
 }
 
 type PublicationRequest struct {
-	Release          *ReleaseMetadata
-	ReleaseSetDigest string
-	InventoryDigest  string
-	Objects          []ObjectInput
+	OCIRepresentation OCIRepresentation
+	Release           *ReleaseMetadata
+	ReleaseSetDigest  string
+	InventoryDigest   string
+	Objects           []ObjectInput
 }
 
 type Result struct {
@@ -106,8 +156,9 @@ type Inspection struct {
 }
 
 type layoutWriter struct {
-	root  string
-	plain bool
+	root       string
+	plain      bool
+	compatible bool
 }
 
 // BuildPublicationRoot creates a diagnostic release-root layout. It intentionally
@@ -115,6 +166,9 @@ type layoutWriter struct {
 // release-publication capability and cannot be replaced by CLI strings.
 func BuildPublicationRoot(ctx context.Context, out string, request PublicationRequest) (Result, error) {
 	if err := deliveryContext(ctx); err != nil {
+		return Result{}, err
+	}
+	if err := admitOCIRepresentation(request.OCIRepresentation); err != nil {
 		return Result{}, err
 	}
 	if len(request.Objects) == 0 || len(request.Objects) > maxDeliveryObjects {
@@ -125,8 +179,9 @@ func BuildPublicationRoot(ctx context.Context, out string, request PublicationRe
 		return Result{}, e.New(e.CodeUnverifiedRef, "publication root input identities are incomplete or malformed")
 	}
 	root := PublicationRoot{SchemaVersion: PublicationRootSchemaFor(request.Release), Qualification: QualificationDiagnostic,
-		Release:          request.Release,
-		ReleaseSetDigest: request.ReleaseSetDigest, InventoryDigest: request.InventoryDigest}
+		ociRepresentation: request.OCIRepresentation,
+		Release:           request.Release,
+		ReleaseSetDigest:  request.ReleaseSetDigest, InventoryDigest: request.InventoryDigest}
 	return buildPublicationRoot(ctx, out, root, request.Objects)
 }
 
@@ -141,6 +196,9 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 	// Admit the disk profile before staging or copying a multi-GiB payload.
 	// This validates descriptions only; factory still owns receipt admission.
 	for _, input := range objects {
+		if (root.ociRepresentation == OCINVKRCompatibleV1 || root.ociRepresentation == OCIHelmStandardV1) && !input.Layout && input.ArtifactType == sbom.BundleMediaType {
+			return Result{}, e.New(e.CodeEngineCapability, "compatible publication requires signed SBOM envelopes from the attestation owner or an exact imported layout")
+		}
 		if input.Kind != "disk-image" {
 			continue
 		}
@@ -184,7 +242,7 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 		return Result{}, err
 	}
 	defer cleanupStage()
-	writer := layoutWriter{root: stage, plain: root.Release != nil}
+	writer := layoutWriter{root: stage, plain: root.Release != nil, compatible: root.ociRepresentation == OCINVKRCompatibleV1}
 	descriptors := make([]Descriptor, 0, len(objects)+1)
 	root.Objects = make([]PublishedObject, 0, len(objects))
 	previous := ""
@@ -202,6 +260,7 @@ func buildPublicationRoot(ctx context.Context, out string, root PublicationRoot,
 				return Result{}, ownerErr
 			}
 			input.subject = &Descriptor{MediaType: publishedManifestMediaType(owner), Digest: owner.DescriptorDigest, Size: owner.Size}
+			input.helmEvidence = root.ociRepresentation == OCIHelmStandardV1 && owner.Output != nil && owner.Output.Format == outputFormatHelm
 		}
 		var descriptor Descriptor
 		var blobDigest string
@@ -280,12 +339,21 @@ func (writer layoutWriter) writePublicationMetadata(root PublicationRoot, descri
 	if err != nil {
 		return "", "", err
 	}
-	config, err := writer.addBlobBytes(rootBytes, MediaPublicationRootConfig)
+	configType := MediaPublicationRootConfig
+	if root.ociRepresentation == OCIHelmStandardV1 {
+		configType = MediaOctetStream
+	}
+	config, err := writer.addBlobBytes(rootBytes, configType)
 	if err != nil {
 		return "", "", err
 	}
+	compatible := root.ociRepresentation == OCINVKRCompatibleV1 || root.ociRepresentation == OCIHelmStandardV1
 	rootManifest := ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest,
 		ArtifactType: MediaPublicationRoot, Config: config, Layers: []Descriptor{}}
+	if compatible {
+		rootManifest.ArtifactType = ""
+		rootManifest.Annotations = artifactAnnotations(MediaPublicationRoot, nil)
+	}
 	rootDescriptor, err := writer.addJSONBlob(rootManifest, MediaOCIManifest)
 	if err != nil {
 		return "", "", err
@@ -301,6 +369,13 @@ func (writer layoutWriter) writePublicationMetadata(root PublicationRoot, descri
 			"dev.nvkr.qualification":   root.Qualification,
 			"dev.nvkr.semantic.digest": rootSemantic,
 		}}
+	if compatible {
+		index.ArtifactType = ""
+		index.Annotations = artifactAnnotations(MediaPublicationRoot, index.Annotations)
+	}
+	if root.ociRepresentation != "" {
+		index.Annotations[ociRepresentationAnnotation] = string(root.ociRepresentation)
+	}
 	rootDigest, err := writer.writeIndex(index)
 	if err != nil {
 		return "", "", err
@@ -354,9 +429,18 @@ func (writer layoutWriter) addHeldObject(ctx context.Context, input ObjectInput,
 		return Descriptor{}, "", err
 	}
 	configType := MediaDeliveryObjectConfig
-	if writer.plain {
+	if input.helmEvidence {
+		// Keep the canonical binding record as an opaque config for registries
+		// that admit Helm but reject unregistered NVKR config media types.
+		configType = MediaOctetStream
+	} else if writer.plain {
 		configBytes = []byte("{}")
 		configType = MediaEmptyConfig
+		// OCI's empty-config media type requires artifactType. A typed config
+		// permits its omission while preserving the same exact empty JSON bytes.
+		if writer.compatible {
+			configType = MediaArtifactConfig
+		}
 	}
 	config, err := writer.addBlobBytes(configBytes, configType)
 	if err != nil {
@@ -364,6 +448,10 @@ func (writer layoutWriter) addHeldObject(ctx context.Context, input ObjectInput,
 	}
 	manifest := ociManifest{SchemaVersion: 2, MediaType: MediaOCIManifest, ArtifactType: input.ArtifactType,
 		Config: config, Layers: []Descriptor{layer}, Subject: input.subject, Annotations: input.annotations}
+	if writer.compatible || input.helmEvidence {
+		manifest.ArtifactType = ""
+		manifest.Annotations = artifactAnnotations(input.ArtifactType, input.annotations)
+	}
 	descriptor, err := writer.addJSONBlob(manifest, MediaOCIManifest)
 	if err != nil {
 		return Descriptor{}, "", err
@@ -377,6 +465,11 @@ func (writer layoutWriter) writeIndex(index ociIndex) (string, error) {
 	if err != nil {
 		return "", e.Wrap(e.CodeInternal, err, "encoding OCI index")
 	}
+	return writer.writeIndexBytes(raw)
+}
+
+// writeIndexBytes preserves a previously checked bootstrap's exact identity.
+func (writer layoutWriter) writeIndexBytes(raw []byte) (string, error) {
 	if err := os.WriteFile(filepath.Join(writer.root, "index.json"), raw, 0o644); err != nil {
 		return "", e.Wrap(e.CodeInternal, err, "writing OCI index")
 	}
@@ -492,7 +585,7 @@ func (writer layoutWriter) importLayout(ctx context.Context, source string) (Des
 	if err != nil {
 		return Descriptor{}, 0, err
 	}
-	indexDescriptor.ArtifactType = inspection.ArtifactType
+	indexDescriptor.ArtifactType = inspection.artifactType()
 	total += int64(len(indexRaw))
 	return indexDescriptor, total, nil
 }

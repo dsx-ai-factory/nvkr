@@ -1,16 +1,17 @@
 # ADR-27 — Producers that run pinned release tools
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
-- **Implementation maturity:** Units T1–T5 and T7 are implemented. The executor runs both output forms, but
-  selecting an `oci-layout` producer fails closed until T6 joins the #285 layout import; see `reconciliation/README.md`.
-- **Acceptance-test maturity:** Contract-tested. Linux executor tests use a fake container runtime. One unrecorded
-  local run executed the AICR v1.2.0-rc1 recipe producer through the executor on Docker; no recorded Run, hosted
-  Run or consumer verification exercises a pinned-tool producer.
+- **Implementation maturity:** Units T1–T7 are implemented, including one `bundle-oci` layout root and its explicit
+  regular-file material closure; see `reconciliation/README.md` for validation and execution evidence.
+- **Acceptance-test maturity:** Contract-tested. Linux subprocess tests use a fake container runtime. A recorded
+  native Linux ARM64 Docker Run exercises the released AICR v1.2.0 recipe, Flux layout, fixed validation and
+  packaging path; see [reconciliation](reconciliation/aicr-deployment-bundles.md). No hosted Run or independent
+  consumer verification exercises the converted path.
 - **Deciders:** Pending; release-engineering, catalog, execution and evidence owners must be named before
   ratification.
 - **Index:** Proposed ADR-27 supplements ADR-01–22 and proposed ADR-23–26; it remains outside the consolidated
   contract set until accepted. It builds on proposed ADR-25, whose generic OCI bundle selection and packaging are
-  implemented, and waits for producer OCI layout import (#285), the remaining T6 dependency.
+  implemented, and uses producer OCI layout import (#285) for T6.
 - **Relates to:** ADR-01 (typed digest families), ADR-02 §3 (logical identity versus transport), ADR-03 (coded
   errors), ADR-09 §5 (production provenance), ADR-10 §1 and source lanes (builder taxonomy, `wrapped-build`),
   ADR-11 §1–§2 (direct selection, explicit closures, declared edges and independent outputs), ADR-12 §1 (concrete
@@ -215,6 +216,23 @@ a selected `file` producer that no other selected producer binds as a material, 
 selected for any format other than `bundle-oci`, fails with `invalid-catalog`. Existing producer staging gives
 no partial output: a failed or nonconforming run publishes no artifact or producer result.
 
+For the admitted AICR artifact type, a fixed post-render validation boundary runs before a producer result
+can reach packaging. Factory imports a private snapshot of the exact observed index/manifest/layer closure;
+the bounded archive owner admits and extracts that held layer. Pipeline then rechecks the acquired executable
+against the producer pin and runs only `aicr verify /nvkr/inputs/bundle`, offline in the same pinned execution
+image, with read-only inputs and a two-minute context. Failure leaves no producer result or package. The
+result describes the exact tool, original index, manifest and layer digests; independent observation rechecks
+those subject bindings. These descriptions are not authenticated execution receipts or qualification.
+This AICR-specific integrity gate introduces neither authored steps nor directory materials, and does not
+change the generic opaque-signature contract in §6. AICR's successful unverified trust level does not establish
+NVKR production authenticity. A signature requiring unavailable network verification fails closed.
+
+Publication retains the original producer index bytes and root component in its signed output binding, so
+consumers can recompute the relation from the root's build subject to the unchanged published manifest.
+Every material retains its own file subject and composition evidence. The layout root carries the bounded
+bundle inventory at its index subject, and packaging carries the inventory at the manifest subject with the
+exact layer inspection digest. No material's digest substitutes for the root or a sibling output.
+
 ### 6. Tool evidence, companions and tool-side signing
 
 The tool is an acquired executable. Its own evidence follows its catalog declaration: `evidence: none` (ADR-13
@@ -318,7 +336,7 @@ Each unit lands with table-driven contract tests that assert the coded error, no
 | T3 Factory dataflow | `pkg/nvkr/factory` | Producer-selected tools compile to the shared `tool/<name>` node; one-pin-per-name; platform agreement; explicit tool and material inputs |
 | T4 Executor | `pkg/nvkr/pipeline` | Held executable re-hash before launch, read-only staging, fixed environment and umask, network `none`, exact output-form admission, no partial output, cancellation join |
 | T5 Provenance and membership | `pkg/nvkr/factory`, `pkg/nvkr/provenance`, `pkg/nvkr/releasemanifest` | `wrapped-build` plan type and member lane; tool transport and `nvkr:tool/<name>` dependencies; finalization rejects a missing or altered tool dependency |
-| T6 Layout handoff | `pkg/nvkr/delivery` (#285) | `oci-layout` results feed the layout import with no NVKR rewrap |
+| T6 Layout handoff | `pkg/nvkr/buildgraph`, `factory`, `delivery` | One layout root and its explicit regular-file closure feed the layout import, observation and publication with no NVKR rewrap |
 | T7 Generation | `pkg/nvkr/factory` GitHub emitter | Pinned-tool nodes render on default hosted routing; `run generate --check` is byte-stable |
 
 ## Consequences
@@ -384,7 +402,7 @@ The design questions left open by the issue were decided on 2026-10-30:
 
 ## Acceptance evidence
 
-Contract suites cover T1–T5 and T7: catalog form and refusals, Build Digest coverage of every §2 logical field,
+Contract suites cover T1–T7: catalog form and refusals, Build Digest coverage of every §2 logical field,
 selection rules, the shared tool acquisition and one-pin-per-name, executor admission, invocation and output form,
 `wrapped-build` provenance with tool dependencies, and byte-stable default hosted generation. The Linux executor
 suite drives a fake container runtime, so it proves executor behavior, not container isolation. A local developer
@@ -393,4 +411,5 @@ bound to the tool executable digest. With that recipe as its material, the `bund
 oci-layout:{{.Output}}` producer wrote one OCI layout at the absent path; its index names the manifest digest AICR
 reported. `catalog pin` resolves the `1.2.x` constraint to stable releases only, so that run's lock record named
 `v1.2.0-rc1` directly. These are not recorded Runs and prove nothing about hosted isolation. No hosted Run or consumer
-verification exists, T6 is unimplemented, and no claim follows from the #239 source-built AICR renders.
+verification exists, and no claim follows from the #239 source-built AICR renders. Current T6 validation and
+local execution are recorded separately in reconciliation.

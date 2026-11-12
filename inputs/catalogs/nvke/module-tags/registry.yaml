@@ -42,34 +42,12 @@ components:
     - linux/amd64
     source: nvke-controller
     writeDir: bin
-  nvkectl:
-    fromSource: true
-    source: nvke
-    cgo: false
-    platforms: [linux/amd64, linux/arm64]
-    outputType: host-package
-    artifactPath: cli/bin/nvkectl
-    writeDir: cli/bin
-    versionStamp:
-      NVKECTL_VERSION: '{{.ModuleTag}}'
-      NVKECTL_COMMIT: '{{.Commit}}'
-      NVKECTL_DATE: '{{.Date}}'
-    buildCommand:
-      - bash
-      - -euc
-      - |
-        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
-        make -C cli build NVKECTL_TREE=clean
 kind: SourceBuildRegistry
 metadata:
   description: NVKE components from the release v0.23.0 at 2cfd00081b468d85a4894ec17e9deac13c9d8169. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
     rootless BuildKit.
   name: nvke-v1
 sources:
-  checkout:
-    constraint: 7.x
-    kind: github-action
-    repo: https://github.com/actions/checkout
   cosign:
     constraint: 3.1.x
     repo: https://github.com/sigstore/cosign
@@ -78,36 +56,10 @@ sources:
       format: raw
       platform: linux/amd64
       url: https://github.com/sigstore/cosign/releases/download/{{.Tag}}/cosign-linux-amd64
-  download-artifact:
-    constraint: 8.x
-    kind: github-action
-    repo: https://github.com/actions/download-artifact
-  nvke:
-    repo: https://github.com/dsx-ai-factory/nvke
-    constraint: v0.23.0
-    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
-    vendorCommand:
-      - bash
-      - -euc
-      - |
-        export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=
-        test ! -e controller/deploy/charts/go.sum
-        pins="$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)"
-        cd cli
-        timeout --kill-after=10s 540s go mod download
-        GOPROXY=off timeout --kill-after=10s 60s go mod verify
-        GOPROXY=off timeout --kill-after=10s 180s go mod vendor
-        cd ..
-        printf '%s\n' "$pins" | sha256sum --quiet -c -
-        test ! -e controller/deploy/charts/go.sum
   nvke-controller:
     constraint: v0.23.0
     repo: https://github.com/dsx-ai-factory/nvke
     toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
-  setup-go:
-    constraint: 7.x
-    kind: github-action
-    repo: https://github.com/actions/setup-go
   syft:
     constraint: 1.51.x
     repo: https://github.com/anchore/syft
@@ -116,7 +68,20 @@ sources:
       format: tar-gzip
       platform: linux/amd64
       url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_amd64.tar.gz
-  upload-artifact:
-    constraint: 7.x
-    kind: github-action
-    repo: https://github.com/actions/upload-artifact
+
+imports:
+- sources:
+    checkout: checkout
+    download-artifact: download-artifact
+    setup-go: setup-go
+    upload-artifact: upload-artifact
+  path: "../../shared/build-actions.yaml"
+  sha256: 89919dde5a129554223e63b23d9ac4f610e9c9a0e369fe8ab188b3f13575723b
+- sources:
+    nvke: nvke-cli
+  components:
+    nvkectl: nvkectl-release
+  sourceNames:
+    nvke-cli: nvke
+  path: "../../shared/nvke.yaml"
+  sha256: 90dbe40c5ce58b88c2722343db8a12f8f2ea4ad7f853fd20a8f69fb908994def

@@ -75,6 +75,12 @@ func generateFiles(ctx context.Context, definitionPath, environmentPath, generat
 		}
 	}
 	if runtimePlan {
+		if len(plan.Environment.GitHubRuntimeSources) != 0 && !check {
+			plan, err = factory.FreezeRuntimeSources(ctx, root, definitionPath, environmentPath, generatorVersion)
+			if err != nil {
+				return "", err
+			}
+		}
 		if err := factory.PrepareGitHubRuntimeBundle(ctx, plan, root, check); err != nil {
 			return "", err
 		}

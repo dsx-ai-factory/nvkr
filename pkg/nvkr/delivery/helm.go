@@ -234,13 +234,23 @@ func validateHelmChartMetadata(config helmChartConfig) error {
 // local OCI Image Layout at out; this function performs no network I/O — the
 // separate delivery Push path (registry.go) is solely responsible for
 // transporting the committed layout to a registry. This is contract-tested
-// against generic OCI-layout readers (go-containerregistry, oras-go); reading
-// the produced layout with an unmodified `helm pull`/`helm show`/`oras pull`
-// binary is not yet externally exercised. artifactType is NVKR's own package
-// identity, carried on the manifest alongside the standard fields; Helm's Pull
-// never reads a manifest-level artifactType, so this addition is inert to it.
+// against generic OCI-layout readers (go-containerregistry, oras-go). The
+// opt-in interoperability fixture logs the installed Helm version and checks
+// registry `show chart` and `pull` with exact archive bytes; it does not read
+// the layout with Helm or run ORAS.
+// Default construction retains NVKR's artifactType. An explicit compatible
+// selection binds that logical type in an annotation and local descriptor.
 func BuildHelmChartArtifact(ctx context.Context, out, artifactType string, chartData []byte) (Result, error) {
+	return BuildHelmChartArtifactWithRepresentation(ctx, out, artifactType, chartData, "")
+}
+
+// BuildHelmChartArtifactWithRepresentation admits an explicit construction
+// choice before reading or staging any artifact. Empty retains artifact-v1.
+func BuildHelmChartArtifactWithRepresentation(ctx context.Context, out, artifactType string, chartData []byte, representation OCIRepresentation) (Result, error) {
 	if err := deliveryContext(ctx); err != nil {
+		return Result{}, err
+	}
+	if err := admitOCIRepresentation(representation); err != nil {
 		return Result{}, err
 	}
 	if artifactType == "" || !validMediaType(artifactType) {
@@ -279,12 +289,24 @@ func BuildHelmChartArtifact(ctx context.Context, out, artifactType string, chart
 		Layers:        []Descriptor{{MediaType: chartDescriptor.MediaType, Digest: chartDescriptor.Digest.String(), Size: chartDescriptor.Size}},
 		Annotations:   helmChartAnnotations(config),
 	}
+	if representation == OCINVKRCompatibleV1 || representation == OCIHelmStandardV1 {
+		manifest.ArtifactType = ""
+		manifest.Annotations = artifactAnnotations(artifactType, manifest.Annotations)
+	}
 	manifestData, err := json.Marshal(manifest)
 	if err != nil {
 		return Result{}, e.Wrap(e.CodeInternal, err, "encoding Helm chart manifest")
 	}
 	if _, err := oras.PushBytes(ctx, store, MediaOCIManifest, manifestData); err != nil {
 		return Result{}, e.Wrap(e.CodeInternal, err, "storing Helm chart manifest")
+	}
+	// ORAS infers a descriptor type from the config when artifactType is absent.
+	// The local handoff retains the caller's NVKR type; it is not a registry wrapper.
+	if representation == OCINVKRCompatibleV1 || representation == OCIHelmStandardV1 {
+		if _, err := (layoutWriter{root: stage}).writeIndex(ociIndex{SchemaVersion: 2, MediaType: MediaOCIIndex,
+			Manifests: []Descriptor{{MediaType: MediaOCIManifest, Digest: digestBytes(manifestData), Size: int64(len(manifestData)), ArtifactType: artifactType}}}); err != nil {
+			return Result{}, err
+		}
 	}
 	// oras-go's OCI store keeps an empty "ingest" staging directory alongside the
 	// committed blobs/index; remove it so the published layout holds only the

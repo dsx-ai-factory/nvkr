@@ -57,3 +57,43 @@ func TestBundleSelectionRequiresOneBuiltArchive(t *testing.T) {
 		})
 	}
 }
+
+func TestBundleLayoutSelectionRequiresExactClosure(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		selected []string
+		mutate   func(*catalog.Catalog)
+		want     e.Code
+	}{
+		{name: "explicit closure", selected: []string{"recipe", "bundle"}},
+		{name: "missing material", selected: []string{"bundle"}, want: e.CodeInvalidCatalog},
+		{name: "unrelated producer", selected: []string{"recipe", "bundle", "consumer"}, want: e.CodeInvalidCatalog},
+		{name: "two roots", selected: []string{"recipe", "bundle", "second"}, mutate: func(c *catalog.Catalog) { c.Components["second"] = c.Components["bundle"] }, want: e.CodeInvalidCatalog},
+		{name: "tool platform mismatch", selected: []string{"recipe", "bundle"}, mutate: func(c *catalog.Catalog) { c.Components["bundle"].ToolExecutable.Platform = "linux/amd64" }, want: e.CodeEngineCapability},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cat := pinnedToolCatalog()
+			c := cat.Components["recipe"]
+			c.OutputType, c.ArtifactPath = catalog.PinnedToolOutputOCILayout, ""
+			c.Materials = map[string]string{"recipe.yaml": "recipe"}
+			c.ToolArgs = []string{"bundle", "--recipe", `{{.Material "recipe.yaml"}}`, "--output", "oci-layout:{{.Output}}"}
+			cat.Components["bundle"] = c
+			if tc.mutate != nil {
+				tc.mutate(cat)
+			}
+			resolved, err := Resolve(cat, Selection{Components: tc.selected, Platform: "linux/arm64", OutputFormat: definition.OutputBundle})
+			if code(err) != tc.want {
+				t.Fatalf("Resolve: %v, want %s", err, tc.want)
+			}
+			if err == nil {
+				root, err := BundleRootName(resolved.Components)
+				if err != nil || root != "bundle" {
+					t.Fatalf("root %q: %v", root, err)
+				}
+				if _, err := Compile(resolved); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
+}

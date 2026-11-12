@@ -552,7 +552,8 @@ proof, nor a measurement of remaining provider-job time. Near the ceiling, slow 
 carrier transfers can exhaust the shared reserves; fifteen minutes is an allowance, not evidence that those
 transfers fit. Runner capacity and transfer headroom require separate operational evidence.
 On failure the sealed Packer sink can emit one exact diagnostic-route description. The generated job uploads
-only that bounded route, with one-day retention and a five-minute upload limit; early admission or failed
+only that bounded route, with one-day retention (14 days for the dispatch-frozen multi-source lane)
+and a five-minute upload limit; early admission or failed
 sealing emits no route. Diagnostic transport grants no artifact, receipt or release authority.
 Current availability is not a capacity reservation. The local runtime observations
 remain unqualified descriptions; the complete hosted finalizer, signing and consumer checks own the production claim.
@@ -1216,7 +1217,10 @@ Development and production have separate generated layouts and concurrency group
 development cancels superseded same-branch Runs and retains helpers/carriers for one day. Signed development,
 like production, is non-canceling and retains helpers/carriers for seven days to cover native disk budgets.
 Final Run records and production qualification handoffs retain seven days and disk diagnostics one day.
-The production qualifier's unsigned qualification outcome (ADR-17 §4) also retains seven days. It is uploaded
+The dispatch-frozen multi-source candidate retains every generated upload for 14 days, including
+helpers, carriers, runtime inputs, Run records, qualification handoffs, outcomes and diagnostics;
+existing production and development retention remains unchanged. The production qualifier's
+unsigned qualification outcome (ADR-17 §4) otherwise retains seven days. It is uploaded
 as `nvkr-qualification-outcome-<run>-<attempt>` for any result except a canceled job (`!cancelled()`), and
 the job output `outcome-written` reports whether the command wrote it. The upload is best effort and never
 fails the job. In a public repository anyone who can read the repository can download the artifact while it
@@ -1497,6 +1501,43 @@ changes frozen Plan data, not the authored catalog files or workflow between sou
 The committed baseline is generation input, not an executable source selection. Ordinary
 input capture and qualification handoff have no replay contract for this lane and reject it;
 published artifact authentication remains separate from downstream runtime acceptance.
+
+Alternatively, `githubRuntimeSources` declares a sorted, unique allowlist of at most
+16 canonical GitHub repositories, each selecting `refs/heads/main`. It is mutually
+exclusive with the single-source dispatch-input policy. The first trusted bootstrap
+admits the complete committed bundle and all selected producers before fetching each
+allowed main ref once. Catalog owns the resulting commit, tree and source timestamp
+and applies exact-source overlays across every matching source-built producer. Commands,
+intentional variants, toolchains, patches and independent acquisitions retain their
+reviewed contracts. Every allowed repository must match a selected source producer.
+
+The frozen Plan binds a compile-input snapshot containing the original member,
+Definition, Environment, catalog, overlay and patch bytes plus the sorted resolution
+record. The existing three-file runtime transport carries that Plan to every partition.
+Additional native bootstraps check the restored inputs, never resolve main. Coordinator
+retries restore the original same-Run runtime-input artifact before generation and do
+not replace it. Missing or expired input transport fails closed; a new dispatch is a new
+selection. Finalization and complete-composite qualification recompile the snapshot,
+authenticate its exact Git commits and metadata, and compare the entire Plan identity.
+Replay does not prove current-main membership and is not bounded by main's later ancestry.
+The trusted producer invocation authenticates the original observation; a caller's
+resolution record alone grants no main-membership or publication authority.
+
+Replay still requires exact upstream source and independently pinned material availability.
+Operators must retain those objects, through authenticated mirrors where necessary, for
+at least the candidate's 14-day retention window. Missing objects fail without selecting replacements.
+The captured snapshot is an input identity and replay recipe, not an offline source archive
+or proof of exact-byte reproduction. Workflow/action bytes, scheduling, input paths and
+Environment identity remain fixed under the runtime-generation check.
+
+The maintained GPU-site floating candidate selects NVKE, OVN Kubernetes, CAPNICO and
+NVIDIA AICR main in this lane, publishes only below
+`ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site`, and has an independent qualifier/smoke
+policy. Its production GPU-site sibling retains its existing pins and namespace.
+The generated producer is manual-only; this decision adds no scheduled dispatch.
+Complete artifact qualification remains `pipeline-attested`, not GPU deployment acceptance
+or the `qualified` evidence lane. Provider configuration and hosted execution evidence
+remain separate requirements.
 
 Native preflight and pinned checkout remain explicit steps in their entry-workflow execution job.
 Operator-authored environment setup, timed producer execution and steps whose outcomes or outputs are
