@@ -169,7 +169,13 @@ func (session *operationSession) dispatch(ctx context.Context, plan *Plan, node 
 		if node.Kind == NodeVerify {
 			err = executeObservation(ctx, plan, node, artifacts)
 		} else {
-			err = executeSBOM(ctx, plan, node, artifacts, session.stdout)
+			if err = validateInternalToolSBOMNode(plan, node); err == nil {
+				if session.placement.launch == nil {
+					err = e.New(e.CodeEngineCapability, "internal tool SBOM requires its selected offline container")
+				} else {
+					err = session.placement.launch(ctx, node)
+				}
+			}
 		}
 		if err != nil {
 			return err

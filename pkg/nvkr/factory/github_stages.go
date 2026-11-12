@@ -107,7 +107,12 @@ func githubDiskStageBudget(plan *Plan, stage githubStage) (time.Duration, int, e
 	members, roots := 0, 0
 	platform := ""
 	for _, node := range stage.Nodes {
-		if node.Kind != NodeBuild && node.Kind != NodeAcquire {
+		internalSBOM := false
+		if plan != nil {
+			_, internal := plan.internalToolForTarget(node.BuildTarget)
+			internalSBOM = internal && node.Kind == NodeSBOM
+		}
+		if node.Kind != NodeBuild && node.Kind != NodeAcquire && !internalSBOM {
 			continue
 		}
 		seconds, err := githubDiskProducerTimeoutSeconds(node)
@@ -118,6 +123,10 @@ func githubDiskStageBudget(plan *Plan, stage githubStage) (time.Duration, int, e
 			return 0, 0, e.New(e.CodeEngineCapability, "GitHub disk stage %q exceeds its job duration bound", stage.ID)
 		}
 		total += seconds
+		if internalSBOM {
+			// Separate scanner budget; not another inspected disk member.
+			continue
+		}
 		members++
 		if node.ExecutionBinding != nil {
 			roots++

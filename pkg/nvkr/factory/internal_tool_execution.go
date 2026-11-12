@@ -181,7 +181,15 @@ func (owner *LocalRunResult) borrowInternalExecutable(ctx context.Context, plan 
 	if result.SHA256 != binding.Digest || result.Size != binding.Size {
 		return nil, e.New(e.CodeVerifyFailed, "internal tool result changed after production")
 	}
-	if err := tool.AuthenticateResultContext(ctx, result); err != nil {
+	// Payload observation relocates acquired-file paths to the current Plan.
+	// Authenticate the original recorded metadata separately: comparing that
+	// projection to the producer receipt would reject a valid acquisition, while
+	// ignoring the recorded path would accept substituted producer metadata.
+	recorded, err := readProducerResult(ctx, artifacts[selected.ResultArtifactID].Path)
+	if err != nil {
+		return nil, err
+	}
+	if err := tool.AuthenticateResultContext(ctx, recorded); err != nil {
 		return nil, err
 	}
 	for _, id := range []string{selected.ObservationArtifactID, selected.SBOMArtifactID} {

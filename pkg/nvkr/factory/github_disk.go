@@ -201,7 +201,9 @@ func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStag
 	owner := &LocalRunResult{SchemaVersion: LocalRunSchemaVersion, Qualification: TierLocalExecution, PlanDigest: digest, Workspace: ".nvkr/factory"}
 	defer func() { returnErr = joinFactoryCleanupError(returnErr, owner.Close(), "close ARC disk owner") }()
 	_, artifacts := planIndex(plan)
-	toolSession := newOperationSession(plan, operationPlacement{runtime: plan.Environment.RuntimeBinary(), jobs: 1, producer: session.ExecNode, owner: owner}, options.Stdout, options.Stderr)
+	toolSession := newOperationSession(plan, operationPlacement{runtime: plan.Environment.RuntimeBinary(), jobs: 1, producer: session.ExecNode, owner: owner,
+		launch: func(ctx context.Context, node Node) error { return launchGitHubUtility(ctx, plan, node, options) },
+	}, options.Stdout, options.Stderr)
 	return executeGitHubDiskNodes(ctx, plan, stage, owner, options, func(nodeCtx context.Context, node Node) error {
 		if _, internal := plan.internalToolForTarget(node.BuildTarget); internal {
 			return toolSession.dispatch(nodeCtx, plan, node)
@@ -277,7 +279,7 @@ func executeGitHubDiskNodes(ctx context.Context, plan *Plan, stage githubStage, 
 		}
 		nodeCtx := ctx
 		stop := func() {}
-		if node.Kind == NodeBuild || node.Kind == NodeAcquire {
+		if node.Kind == NodeBuild || node.Kind == NodeAcquire || (internal && node.Kind == NodeSBOM) {
 			seconds, err := githubDiskProducerTimeoutSeconds(node)
 			if err != nil {
 				return err

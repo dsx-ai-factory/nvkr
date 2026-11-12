@@ -115,11 +115,18 @@ func launchGitHubUtility(ctx context.Context, plan *Plan, node Node, options Git
 	if err != nil {
 		return e.Wrap(e.CodeEngineCapability, err, "resolve GitHub utility workspace")
 	}
+	_, internal := plan.internalToolForTarget(node.BuildTarget)
+	internalSBOM := internal && node.Kind == NodeSBOM
+	if internalSBOM {
+		if err := validateInternalToolSBOMNode(plan, node); err != nil {
+			return err
+		}
+	}
 	developmentContext := plan.Environment.GitHubDevelopment && plan.Environment.Publication != nil
 	location := utilityRunnerLocation{runtime: plan.Environment.RuntimeBinary(), mountSource: root, mountTarget: "/workspace",
 		helper: "/workspace/nvkr-exec", plan: planPath, planDigest: expected,
 		publicationRunContext: developmentContext || (PerOutputPublication(plan) && node.PackageKind == PackageOCI),
-		developmentRunContext: developmentContext}
+		developmentRunContext: developmentContext, internalToolSBOM: internalSBOM}
 	if location.runtime == "docker" {
 		location.user, location.home = localContainerUser(), true
 	}
