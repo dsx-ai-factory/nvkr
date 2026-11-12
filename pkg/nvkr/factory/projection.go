@@ -183,6 +183,9 @@ func projectionLayoutFor(layout generationLayout) projectionLayout {
 // admits it exactly as core admits its own projection, whatever the transport.
 // It never writes files. release is the plugin release the selection requires.
 func renderProjected(ctx context.Context, plan *Plan, engine string, plugin projectionPlugin, release string) (*GeneratedBundle, error) {
+	if ctx == nil {
+		return nil, e.New(e.CodeUsage, "projection requires a context")
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "projection canceled")
 	}

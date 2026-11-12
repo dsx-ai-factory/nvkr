@@ -96,6 +96,33 @@ func assertProjectionDirectoryEmpty(t *testing.T, root string) {
 	}
 }
 
+func TestTektonProjectionRejectsNilContext(t *testing.T) {
+	plan := tektonTestPlan(t)
+	var ctx context.Context
+	t.Run("render", func(t *testing.T) {
+		bundle, err := Render(ctx, plan, EngineTekton)
+		assertFactoryErrorCode(t, err, e.CodeUsage)
+		if bundle != nil {
+			t.Fatal("nil context returned a bundle")
+		}
+	})
+	for _, check := range []bool{false, true} {
+		name := "write"
+		if check {
+			name = "check"
+		}
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			digest, err := Generate(ctx, plan, EngineTekton, root, check)
+			assertFactoryErrorCode(t, err, e.CodeUsage)
+			if digest != "" {
+				t.Fatal("nil context returned a Plan digest")
+			}
+			assertProjectionDirectoryEmpty(t, root)
+		})
+	}
+}
+
 func TestProjectionUnknownEngineAdmittedBeforeIO(t *testing.T) {
 	for _, engine := range []string{"unknown", EngineGitLab, EngineArgo, "local"} {
 		t.Run(engine, func(t *testing.T) {
