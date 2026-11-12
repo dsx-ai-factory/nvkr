@@ -4,17 +4,20 @@
 package factory
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
@@ -142,11 +145,25 @@ func TestInternalToolDispatcherCompletesOwnedEvidence(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("produced executable ownership requires Linux")
 	}
-	self, err := os.Executable()
-	if err != nil {
+	// The test executable may use cgo (or race instrumentation) on CI. Build
+	// an independent static helper instead of inheriting the harness linkage.
+	root := t.TempDir()
+	source, helper := filepath.Join(root, "main.go"), filepath.Join(root, "helper")
+	if err := os.WriteFile(source, []byte("package main\nfunc main() {}\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile(self)
+	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer cancel()
+	command := exec.CommandContext(ctx, "go", "build", "-trimpath", "-buildmode=exe", "-o", helper, source)
+	command.Dir = root
+	command.Env = append(os.Environ(), "CGO_ENABLED=0", "GOTOOLCHAIN=local", "GOWORK=off", "GOFLAGS=-p=2",
+		"GOOS="+runtime.GOOS, "GOARCH="+runtime.GOARCH)
+	var buildLog bytes.Buffer
+	command.Stdout, command.Stderr = &buildLog, &buildLog
+	if err := ownedcmd.Run(ctx, command); err != nil {
+		t.Fatalf("building static acquired helper: %v: %s", err, &buildLog)
+	}
+	raw, err := os.ReadFile(helper)
 	if err != nil {
 		t.Fatal(err)
 	}
