@@ -20,7 +20,7 @@ import (
 )
 
 // The projection pilot is a diagnostic: a top-level generation caller may
-// select the reference GitHub projection plugin through one plugin contract,
+// select the reference projection plugin through one plugin contract,
 // reached in-process or as an out-of-process adapter. Core sends the plugin the
 // complete canonical Plan and admits the returned bundle with the existing
 // exact validator before anything is written. Generated stages never consult
@@ -101,13 +101,13 @@ type projectionPlugin interface {
 }
 
 // plugin resolves the selected transport to the contract implementation.
-func (adapter ProjectionAdapter) plugin() (projectionPlugin, error) {
+func (adapter ProjectionAdapter) plugin(engine string) (projectionPlugin, error) {
 	switch adapter.Transport {
 	case ProjectionInProcess:
 		if adapter.Path != "" || len(adapter.Args) != 0 {
 			return nil, e.New(e.CodeEngineCapability, "the in-process projection transport takes no adapter executable")
 		}
-		return builtinProjection(adapter.Release), nil
+		return builtinProjection(engine, adapter.Release), nil
 	case ProjectionOutOfProcess:
 		return outOfProcessProjection{adapter: adapter}, nil
 	default:
@@ -118,7 +118,9 @@ func (adapter ProjectionAdapter) plugin() (projectionPlugin, error) {
 
 // builtinProjection registers the in-binary reference plugin for the
 // in-process transport. Tests wrap it to count contract calls.
-var builtinProjection = func(release string) projectionPlugin { return referenceProjection{release: release} }
+var builtinProjection = func(engine, release string) projectionPlugin {
+	return referenceProjection{engine: engine, release: release}
+}
 
 // outOfProcessProjection is the contract over one launch per call.
 type outOfProcessProjection struct{ adapter ProjectionAdapter }
@@ -180,12 +182,16 @@ func projectionLayoutFor(layout generationLayout) projectionLayout {
 // renderProjected obtains a candidate bundle from the selected plugin and
 // admits it exactly as core admits its own projection, whatever the transport.
 // It never writes files. release is the plugin release the selection requires.
-func renderProjected(ctx context.Context, plan *Plan, plugin projectionPlugin, release string) (*GeneratedBundle, error) {
+func renderProjected(ctx context.Context, plan *Plan, engine string, plugin projectionPlugin, release string) (*GeneratedBundle, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "projection canceled")
 	}
 	if plan == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "projection requires a plan")
+	}
+	core, err := projectionCoreForEngine(engine)
+	if err != nil {
+		return nil, err
 	}
 	planDigest, err := plan.Digest()
 	if err != nil {
@@ -198,8 +204,8 @@ func renderProjected(ctx context.Context, plan *Plan, plugin projectionPlugin, r
 	if int64(len(planBytes)) > MaxPlanBytes {
 		return nil, e.New(e.CodeEngineCapability, "complete Plan exceeds the %d-byte projection request bound", MaxPlanBytes)
 	}
-	layout := githubLayoutFor(plan)
-	want := projectionDescription{Protocol: projectionProtocol, Release: release, Engine: EngineGitHub,
+	layout := core.layout(plan)
+	want := projectionDescription{Protocol: projectionProtocol, Release: release, Engine: core.engine,
 		PlanSchema: PlanSchemaVersion, GeneratorABI: projectionGeneratorABI}
 	description, err := plugin.describe(ctx)
 	if err != nil {
@@ -218,8 +224,8 @@ func renderProjected(ctx context.Context, plan *Plan, plugin projectionPlugin, r
 	if err != nil {
 		return nil, err
 	}
-	bundle := newGeneratedBundle(EngineGitHub, layout, files, planDigest)
-	if err := ValidateGitHubBundle(ctx, plan, bundle); err != nil {
+	bundle := newGeneratedBundle(core.engine, layout, files, planDigest)
+	if err := core.validate(ctx, plan, bundle); err != nil {
 		if ctx.Err() != nil {
 			return nil, err
 		}
