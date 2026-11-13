@@ -53,6 +53,26 @@ func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	plan, err := factory.LoadPlanContext(t.Context(), filepath.Join("..", "..", factory.FactoryPlanPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := plan.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var sbomNode, otherNode string
+	for _, node := range plan.Graph.Nodes {
+		if node.Kind == factory.NodeSBOM && sbomNode == "" {
+			sbomNode = node.ID
+		}
+		if node.Kind == factory.NodeVerify && otherNode == "" {
+			otherNode = node.ID
+		}
+	}
+	if len(plan.InternalTools) != 0 || sbomNode == "" || otherNode == "" {
+		t.Fatal("refusal fixture requires ordinary SBOM and non-SBOM nodes")
+	}
 	for _, test := range []struct {
 		name string
 		args []string
@@ -66,6 +86,10 @@ func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
 		{"positional arguments", []string{"github", "recover", "--plan", "plan.json", "unexpected"}, e.CodeUsage},
 		{"extra authority flag", []string{"github", "run-node", "--plan", "plan.json", "--node", "unknown", "--workspace", "outside"}, e.CodeUsage},
 		{"substituted plan", []string{"execute-node", "--plan", "plan.json", "--node", "unknown", "--plan-digest", "sha256:" + strings.Repeat("a", 64)}, e.CodePipelineDrift},
+		{"internal SBOM missing expectation", []string{"execute-node", "--internal-tool-sbom", "--plan", "plan.json", "--node", sbomNode}, e.CodeUsage},
+		{"internal SBOM substituted plan", []string{"execute-node", "--internal-tool-sbom", "--plan", "plan.json", "--node", sbomNode, "--plan-digest", "sha256:" + strings.Repeat("a", 64)}, e.CodePipelineDrift},
+		{"internal SBOM ordinary SBOM node", []string{"execute-node", "--internal-tool-sbom", "--plan", "plan.json", "--node", sbomNode, "--plan-digest", digest}, e.CodeEngineCapability},
+		{"internal SBOM non-SBOM node", []string{"execute-node", "--internal-tool-sbom", "--plan", "plan.json", "--node", otherNode, "--plan-digest", digest}, e.CodeEngineCapability},
 		{"source missing expectation", []string{"inspect-source", "--plan", "plan.json", "--node", "unknown"}, e.CodeUsage},
 		{"source substituted plan", []string{"inspect-source", "--plan", "plan.json", "--node", "unknown", "--plan-digest", "sha256:" + strings.Repeat("a", 64)}, e.CodePipelineDrift},
 	} {
@@ -79,6 +103,10 @@ func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
 			}
 			_, err := invokeLifecycleCLI(t, append([]string{"factory"}, test.args...)...)
 			assertLifecycleCommandCode(t, err, test.code)
+			entries, err := os.ReadDir(root)
+			if err != nil || len(entries) != 1 || entries[0].Name() != "plan.json" {
+				t.Fatalf("refused operation wrote output: %v, %v", entries, err)
+			}
 			for _, path := range []string{".nvkr", "summary.md"} {
 				if _, err := os.Stat(path); !os.IsNotExist(err) {
 					t.Fatalf("rejected operation touched %s: %v", path, err)
