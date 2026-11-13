@@ -228,16 +228,28 @@ func TestInternalToolDispatcherCompletesOwnedEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	recorded.Path = "substituted-recorded-path"
-	changed, err := canonical.Marshal(recorded)
-	if err != nil {
-		t.Fatal(err)
+	for _, tc := range []struct {
+		name   string
+		change func(*pipeline.ArtifactResult)
+	}{
+		{"path", func(r *pipeline.ArtifactResult) { r.Path = "substituted-recorded-path" }},
+		{"SHA256", func(r *pipeline.ArtifactResult) { r.SHA256 = "sha256:" + strings.Repeat("a", 64) }},
+		{"component", func(r *pipeline.ArtifactResult) { r.Component = "substituted-component" }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			changed := recorded
+			tc.change(&changed)
+			raw, err := canonical.Marshal(changed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := writeFactoryFile(t.Context(), artifacts[tool.ResultArtifactID].Path, raw, 0o644); err != nil {
+				t.Fatal(err)
+			}
+			_, err = owner.borrowInternalExecutable(t.Context(), plan, tool.Name)
+			assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+		})
 	}
-	if err := writeFactoryFile(t.Context(), artifacts[tool.ResultArtifactID].Path, changed, 0o644); err != nil {
-		t.Fatal(err)
-	}
-	_, err = owner.borrowInternalExecutable(t.Context(), plan, tool.Name)
-	assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
 	if err := owner.Close(); err != nil {
 		t.Fatal(err)
 	}
