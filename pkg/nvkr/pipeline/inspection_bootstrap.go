@@ -100,7 +100,7 @@ func admitInspectionBootstrap(ctx context.Context, runtime packerContainerRuntim
 	}
 	uncertain := true
 	defer func() {
-		cleanup, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
 		defer cancel()
 		returnErr = errors.Join(returnErr, removeDiskInspectionContainer(cleanup, runtime, attempt, uncertain))
 	}()

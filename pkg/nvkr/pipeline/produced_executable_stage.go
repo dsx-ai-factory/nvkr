@@ -5,8 +5,9 @@ package pipeline
 
 import (
 	"context"
-	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"io"
+
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 // writeProducedExecutable streams only the sealed snapshot held by the producer
