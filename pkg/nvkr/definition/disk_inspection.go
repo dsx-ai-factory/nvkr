@@ -16,21 +16,22 @@ import (
 // output's producer/toolchain. The Environment and frozen Plan bind it; changing
 // it does not change the logical source Build identity.
 type DiskInspectionProfile struct {
+	// Bootstrap pins identify the fixed loader program and its in-image interpreter.
+	BootstrapInterpreterDigest string `json:"bootstrapInterpreterDigest,omitempty"`
+	BootstrapProgramDigest     string `json:"bootstrapProgramDigest,omitempty"`
 	// HelperTool selects a required Run artifact. Its executable digest is
 	// authenticated from the producer result at consumption, never authored here.
-	BootstrapInterpreterDigest string                    `json:"bootstrapInterpreterDigest,omitempty"`
-	BootstrapProgramDigest     string                    `json:"bootstrapProgramDigest,omitempty"`
-	HelperTool                 string                    `json:"helperTool,omitempty"`
-	Image                      string                    `json:"image"`
-	InspectorDigest            string                    `json:"inspectorDigest"`
-	CodecDigest                string                    `json:"codecDigest"`
-	GuestfishDigest            string                    `json:"guestfishDigest"`
-	ScannerDigest              string                    `json:"scannerDigest"`
-	PackageReaderDigest        string                    `json:"packageReaderDigest"`
-	Resources                  execution.ResourceRequest `json:"resources"`
-	TimeoutSeconds             uint64                    `json:"timeoutSeconds"`
-	MaxFilesystemBytes         uint64                    `json:"maxFilesystemBytes"`
-	ScratchStorage             string                    `json:"scratchStorage"`
+	HelperTool          string                    `json:"helperTool,omitempty"`
+	Image               string                    `json:"image"`
+	InspectorDigest     string                    `json:"inspectorDigest"`
+	CodecDigest         string                    `json:"codecDigest"`
+	GuestfishDigest     string                    `json:"guestfishDigest"`
+	ScannerDigest       string                    `json:"scannerDigest"`
+	PackageReaderDigest string                    `json:"packageReaderDigest"`
+	Resources           execution.ResourceRequest `json:"resources"`
+	TimeoutSeconds      uint64                    `json:"timeoutSeconds"`
+	MaxFilesystemBytes  uint64                    `json:"maxFilesystemBytes"`
+	ScratchStorage      string                    `json:"scratchStorage"`
 }
 
 // Validate admits only an explicit native host profile and exact closure pins.

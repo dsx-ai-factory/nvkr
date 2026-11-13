@@ -114,8 +114,14 @@ func TestProducedHelperStreamRejectsMutablePaths(t *testing.T) {
 				if err != nil || !bytes.Equal(output.Bytes(), producedExecutableELFFixture()) {
 					t.Fatalf("stream=%x error=%v", output.Bytes(), err)
 				}
-			} else if err == nil || output.Len() != 0 {
-				t.Fatalf("invalid capability streamed bytes: %v", err)
+			} else {
+				want := e.CodeVerifyFailed
+				if variant == "canceled" {
+					want = e.CodeTimeout
+				}
+				if code(err) != want || output.Len() != 0 {
+					t.Fatalf("invalid capability streamed bytes: %v", err)
+				}
 			}
 		})
 	}

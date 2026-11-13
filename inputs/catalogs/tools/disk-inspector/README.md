@@ -27,6 +27,21 @@ producer, terminal observation and SBOM complete. An explicit `sbomTool` resolve
 from this catalog; an omitted selector inherits the Definition's scanner only
 when its native platform matches.
 
+The same profile must set `bootstrapInterpreterDigest` to the exact SHA-256 of
+`/usr/bin/perl` in its selected appliance and `bootstrapProgramDigest` to the
+SHA-256 of `pkg/nvkr/pipeline/inspection_bootstrap.pl` from the executing NVKR
+revision. Both values use the `sha256:` prefix. These observation pins belong to
+the Environment and Plan; they do not change the helper or disk producer's
+logical Build. The compiler rejects a program pin it does not implement.
+
+Before producer work, NVKR checks the interpreter bytes and exercises sealing and
+descriptor execution in the native appliance. Missing support fails admission.
+During inspection, the original owner streams the held helper bytes followed by
+the subject. The bootstrap seals and measures an anonymous executable, then
+executes its descriptor while preserving the subject stream. No host executable
+path is mounted. The appliance digest binds the interpreter's module and library
+closure; the helper's original producer receipt remains required.
+
 Execution currently requires the `native-kvm-v1` hosted disk group and one disk
 inspection consumer per helper selection. The helper remains in the original
 execution owner through inspection. It is required for Run completion and is
