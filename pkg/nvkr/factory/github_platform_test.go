@@ -210,7 +210,7 @@ func TestDeployCLIOutputsUseIndependentNativeBuilds(t *testing.T) {
 	if len(definition.Outputs) != 9 {
 		t.Fatalf("required outputs = %d, want nine", len(definition.Outputs))
 	}
-	base, sourceCommit := controllerCatalogFixture(t, "inputs/catalogs/nvke/release")
+	base, sourceCommit := controllerCatalogFixture(t, "inputs/catalogs/nvke")
 	for _, output := range definition.Outputs {
 		if output.Catalog != nil {
 			t.Fatalf("deploy output %s uses a different source catalog", output.Name)
@@ -378,7 +378,7 @@ func TestM2CLINativeRoutesPreserveDiskGroups(t *testing.T) {
 	armCLI := false
 	for _, output := range definition.Outputs {
 		if output.Name == "nvkectl-linux-arm64" {
-			armCLI = output.Platform == "linux/arm64" && output.Format == authored.OutputExecutable && len(output.Components) == 1 && output.Components[0] == "nvkectl"
+			armCLI = output.Platform == "linux/arm64" && output.Format == authored.OutputExecutable && len(output.Components) == 1 && output.Components[0] == "nvkectl-module-tags"
 		}
 	}
 	if !armCLI {

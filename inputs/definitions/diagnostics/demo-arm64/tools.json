@@ -1,16 +1,24 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "../../../catalogs/tools"
+  },
   "kind": "Definition",
   "metadata": {
-    "name": "nvke-local-installer-tools-arm64",
-    "description": "Compile the staged NVKE installer's five Linux ARM64 tools from pinned upstream Git. Local diagnostic preparation, not hosted execution or deployment acceptance."
+    "description": "Compile the staged NVKE installer's five Linux ARM64 tools from pinned upstream Git. Local diagnostic preparation, not hosted execution or deployment acceptance.",
+    "name": "nvke-local-installer-tools-arm64"
   },
-  "catalog": {"base": "../../../catalogs/tools/installer-local-arm64"},
   "outputs": [
     {
-      "name": "installer-tools-arm64",
-      "components": ["clusterctl", "helm", "kind", "kubectl", "oras"],
+      "components": [
+        "clusterctl-installer-local",
+        "helm-installer-local",
+        "kind-installer-local",
+        "kubectl-installer-local",
+        "oras-installer-local"
+      ],
       "format": "executable",
+      "name": "installer-tools-arm64",
       "platform": "linux/arm64"
     }
   ]

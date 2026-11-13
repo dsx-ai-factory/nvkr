@@ -395,25 +395,25 @@ metadata:
   name: nvke-composite
   description: Release the four independently owned NVKE family Definitions together as one 69-output Release.
 catalog:
-  base: ../../catalogs/nvke/module-tags          # identical in all four members
+  base: ../../catalogs/nvke          # identical in all four members
 sbomTool: syft                                   # identical in all four members
 cosignTool: cosign                               # identical in all four members
 outputs:                                         # 69 outputs, sorted by name
   - name: capi-controller-image                  # from nvke-core; explicit override copied unchanged
     platform: linux/amd64
     catalog:
-      base: ../../catalogs/nvke/release-components
+      base: ../../catalogs/nvke
     format: oci
     components: [capi-controller-image]
   # ...
   - name: nvkectl                                # from nvke-core; member default made explicit
     platform: linux/amd64
     catalog:
-      base: ../../catalogs/nvke/module-tags
+      base: ../../catalogs/nvke
     format: executable
     components: [nvkectl]
   # ... remaining nvke-core, nvke-disks, nvke-services and nvke-telemetry outputs, each copied unchanged;
-  # every output that used its member's default catalog now names ../../catalogs/nvke/module-tags explicitly.
+  # every output that used its member's default catalog now names ../../catalogs/nvke explicitly.
 ```
 
 Every output now carries its own stack, so the effective top-level `catalog` no longer selects any output's
@@ -436,7 +436,7 @@ Negative cases on the same inputs:
   families.
 - Editing `telemetry.yaml` without running `definition pin` fails generation and `run generate --check` with
   `unverified-ref`.
-- Adding a member whose top-level catalog is `../../catalogs/nvke/release` fails with `invalid-catalog`.
+- Adding a member with a different top-level catalog stack fails with `invalid-catalog`.
 
 Decided: once the composite exists, the hand-maintained combined `definition.yaml` becomes redundant, and
 retiring it is planned as a separate cutover (U10). The combined production and qualification paths depend

@@ -26,9 +26,9 @@ smoke:
     linux/amd64: index.docker.io/library/debian@sha256:918311b7b6c4c6f68b232ba516584925f6c78ad82b6fd534b98979df6438e483
     linux/arm64: index.docker.io/library/debian@sha256:a2ca65377c251208de42e1a2722cb949211236c161b634f6f3663754e2d06850
   tools:
-    helm: helm-version
-    kubectl: kubectl-client-version-json
-    nvkectl: nvkectl-version-json
+    helm-operator: helm-version
+    kubectl-operator: kubectl-client-version-json
+    nvkectl-module-tags: nvkectl-version-json
   # These exact OCI outputs are deployment images, outside loose-executable smoke.
   # Their signatures, provenance and membership remain required; any authored embedded metadata is checked strictly.
   # Helm and disk outputs have their own fixed non-tool format rule and are not listed here.

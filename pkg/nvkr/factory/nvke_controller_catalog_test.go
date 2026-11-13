@@ -34,7 +34,7 @@ func controllerCatalogFixture(t *testing.T, directory string) (*catalog.Catalog,
 	// and its chart source are one maintained release cohort and must agree; the
 	// independent nvke-cli role only has to be a complete commit.
 	sourceCommit := lock.Pins["nvke"].Commit
-	for _, name := range []string{"nvke", "nvke-cli", "nvke-helm"} {
+	for _, name := range []string{"nvke", "nvke-cli", "nvke-helm", "nvke-deploy"} {
 		if !fullCommit.MatchString(lock.Pins[name].Commit) {
 			t.Fatalf("authored %s source=%q is not a full commit", name, lock.Pins[name].Commit)
 		}
@@ -85,21 +85,27 @@ func controllerCatalogFixture(t *testing.T, directory string) (*catalog.Catalog,
 	run("add", ".")
 	run("-c", "commit.gpgsign=false", "commit", "-q", "-m", "controller deploy metadata fixture")
 	commit, tree := run("rev-parse", "HEAD"), run("rev-parse", "HEAD^{tree}")
-	for _, name := range []string{"nvke", "nvke-cli", "nvke-helm"} {
+	for _, name := range []string{"nvke", "nvke-cli", "nvke-helm", "nvke-deploy"} {
 		pin := lock.Pins[name]
 		pin.Commit, pin.TreeHash, pin.SourceDateEpoch = commit, tree, 1733939955
 		lock.Pins[name] = pin
 	}
 	for name, pin := range lock.Artifacts {
-		if pin.DerivedFrom != "nvke@"+sourceCommit {
+		if pin.DerivedFrom == "" {
+			continue
+		}
+		owner, original, ok := strings.Cut(pin.DerivedFrom, "@")
+		if !ok || (owner != "nvke" && owner != "nvke-deploy") || original != sourceCommit {
 			t.Fatalf("authored chart %s has unexpected pin-set owner %q", name, pin.DerivedFrom)
 		}
-		pin.DerivedFrom = "nvke@" + commit
+		pin.DerivedFrom = owner + "@" + commit
 		lock.Artifacts[name] = pin
 	}
-	t.Setenv("GIT_CONFIG_COUNT", "1")
+	t.Setenv("GIT_CONFIG_COUNT", "2")
 	t.Setenv("GIT_CONFIG_KEY_0", "url."+repo+".insteadOf")
 	t.Setenv("GIT_CONFIG_VALUE_0", "https://github.com/dsx-ai-factory/nvke")
+	t.Setenv("GIT_CONFIG_KEY_1", "url."+repo+".insteadOf")
+	t.Setenv("GIT_CONFIG_VALUE_1", "https://github.com/dsx-ai-factory/nvke.git")
 	if err := catalog.WriteLockContext(t.Context(), dir, lock); err != nil {
 		t.Fatal(err)
 	}
@@ -114,12 +120,25 @@ func controllerCatalogFixture(t *testing.T, directory string) (*catalog.Catalog,
 // catalog. A registry and lock alone no longer contain its declaration closure.
 func copyMaintainedCatalogFixture(t *testing.T, directory string) string {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), "catalogs")
-	dir := filepath.Join(root, filepath.Base(filepath.Dir(directory)), filepath.Base(directory))
-	if err := os.CopyFS(dir, os.DirFS(directory)); err != nil {
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("locate maintained catalog fixture")
+	}
+	catalogs := filepath.Clean(filepath.Join(filepath.Dir(filename), "../../../inputs/catalogs"))
+	absolute, err := filepath.Abs(directory)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.CopyFS(filepath.Join(root, "shared"), os.DirFS(filepath.Join(directory, "..", "..", "shared"))); err != nil {
+	relative, err := filepath.Rel(catalogs, absolute)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		t.Fatalf("catalog is outside maintained inputs: %s", directory)
+	}
+	root := filepath.Join(t.TempDir(), "catalogs")
+	dir := filepath.Join(root, relative)
+	if err := os.CopyFS(dir, os.DirFS(absolute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.CopyFS(filepath.Join(root, "shared"), os.DirFS(filepath.Join(catalogs, "shared"))); err != nil {
 		t.Fatal(err)
 	}
 	return dir

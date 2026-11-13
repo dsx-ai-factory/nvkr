@@ -1,0 +1,58 @@
+apiVersion: nvkr.dev/lock/v1
+artifacts:
+  busybox-image:
+    digests:
+      arm64: sha256:55c89c6d9404d6668eb237dda92f28a99eb14e640f1c177a55cc9d738c53c303
+    imageParentDigest: sha256:55c89c6d9404d6668eb237dda92f28a99eb14e640f1c177a55cc9d738c53c303
+    tag: 5fe47daaff5fe025215cb257118dc2a0e643e1d6
+  conformance-image:
+    digests:
+      arm64: sha256:a308614b20795ed57586bbe929721909ba4524d7babfe44b70b18b56f5edb375
+    imageParentDigest: sha256:a308614b20795ed57586bbe929721909ba4524d7babfe44b70b18b56f5edb375
+    tag: 5fe47daaff5fe025215cb257118dc2a0e643e1d6
+  conformance-image-1-34:
+    digests:
+      arm64: sha256:6ea19a03ca4da93c406066e56c263a6a8cd0b2a8336170fd531af691712926c1
+    imageParentDigest: sha256:1fd2b8043fab3e2858ec181649161a9acc592eff033f3c9be78856d7b408fc66
+    tag: v1.34.2
+  conformance-image-1-36:
+    digests:
+      arm64: sha256:5f1834bee8c1ebea061b46a567de66975e028cfe4476ca8b9226654c9338a11d
+    imageParentDigest: sha256:5f1834bee8c1ebea061b46a567de66975e028cfe4476ca8b9226654c9338a11d
+    tag: v1.36.3
+kind: PinLock
+pins:
+  hydrophone:
+    commit: 5fe47daaff5fe025215cb257118dc2a0e643e1d6
+    sourceDateEpoch: 1790615809
+    tag: 5fe47daaff5fe025215cb257118dc2a0e643e1d6
+    treeHash: dd63e54638cdc37ab2d5480bce02fb098efa2691
+  hydrophone-suite-selection:
+    commit: 5fe47daaff5fe025215cb257118dc2a0e643e1d6
+    sourceDateEpoch: 1790615809
+    tag: 5fe47daaff5fe025215cb257118dc2a0e643e1d6
+    treeHash: dd63e54638cdc37ab2d5480bce02fb098efa2691
+  kubectl:
+    commit: 0f29094e5b73085e3802ecc1298ecae13866bfe6
+    goVersion: 1.26.5
+    sourceDateEpoch: 1784743658
+    tag: v1.36.3
+    treeHash: 3194a85fa3325c21657eb21aff2a34ede1478c3f
+  kubectl-1-34:
+    commit: 26c89157669bdc7e3657302bc1abde758507095b
+    goVersion: 1.26.5
+    sourceDateEpoch: 1790183310
+    tag: v1.34.12
+    treeHash: 3b5f0393106609c0a9350d58f44c5002e0000575
+  kubernetes-conformance:
+    commit: 8cc511e399b929453cd98ae65b419c3cc227ec79
+    goVersion: 1.24.9
+    sourceDateEpoch: 1762887637
+    tag: v1.34.2
+    treeHash: 3044d97295d24abc46b5c3f8fce9017295e2719f
+  kubernetes-conformance-images-1.36:
+    commit: 0f29094e5b73085e3802ecc1298ecae13866bfe6
+    goVersion: 1.26.5
+    sourceDateEpoch: 1784743658
+    tag: v1.36.3
+    treeHash: 3194a85fa3325c21657eb21aff2a34ede1478c3f

@@ -7,6 +7,7 @@ import (
 	"maps"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
@@ -33,23 +34,39 @@ func TestLocalKVMInputsPreserveSelectedOutputsAndSources(t *testing.T) {
 			// The native NVIDIA selection deliberately moves the NVKE closure
 			// together. Historical TCG inputs retain their original source scope.
 			modern := map[string]definition.Catalog{
-				"cluster-api-provider-provisioned-arm64": {Base: "../../catalogs/nvke/native-site"},
-				"controller-chart":                       {Base: "../../catalogs/nvke/native-site"},
-				"controller-profiles":                    {Base: "../../catalogs/controller-profiles/native-nvidia"},
-				"cwe":                                    {Base: "../../catalogs/nvke/native-site"},
-				"nktp":                                   {Base: "../../catalogs/nvke/native-site"},
-				"nvkectl":                                {Base: "../../catalogs/nvke/native-site"},
-				"nvke-node-image-arm64":                  {Base: "../../catalogs/node-images/release", Overlays: []string{"../../catalogs/node-images/variants/native-nvidia.json", "../../catalogs/node-images/variants/native-local-kvm.json"}},
+				"cluster-api-provider-provisioned-arm64": {Base: "../../catalogs/nvke"},
+				"controller-chart":                       {Base: "../../catalogs/nvke"},
+				"controller-profiles":                    {Base: "../../catalogs/nvke"},
+				"cwe":                                    {Base: "../../catalogs/nvke"},
+				"nktp":                                   {Base: "../../catalogs/nvke"},
+				"nvkectl":                                {Base: "../../catalogs/nvke"},
+				"nvke-node-image-arm64":                  {Base: "../../catalogs/node-images", Overlays: []string{"../../catalogs/node-images/variants/native-nvidia.json", "../../catalogs/node-images/variants/native-local-kvm.json"}},
 			}
 			for _, name := range []string{"postgresql", "spire", "spire-crds", "temporal"} {
-				modern[name] = definition.Catalog{Base: "../../catalogs/nvke/native-site"}
+				modern[name] = definition.Catalog{Base: "../../catalogs/nvke"}
 			}
 			for _, name := range []string{"csi-node-driver-registrar", "postgresql", "spiffe-csi", "spire-agent", "spire-bash", "spire-controller-manager", "spire-oidc", "spire-server", "spire-tpm-server", "temporal-admin-tools", "temporal-server", "temporal-ui"} {
 				modern[name+"-image-arm64"] = definition.Catalog{Base: "../../catalogs/runtime-dependencies"}
 			}
+			// Former catalog-local names now identify each retained recipe explicitly.
+			modernComponents := map[string]string{
+				"cluster-api-provider-provisioned": "cluster-api-provider-provisioned-native-site",
+				"nvke-controller-chart-local-site": "nvke-controller-chart-native-site",
+				"nvke-local-profiles-nvidia":       "nvke-local-profiles",
+				"nvke-controller-local-site":       "nvke-controller-native-site",
+				"nktp-chart":                       "nktp-chart-native-site", "nvkectl-local-site": "nvkectl-native-site",
+				"postgresql-chart": "postgresql-chart-native-site", "spire-chart": "spire-chart-native-site",
+				"spire-crds-chart": "spire-crds-chart-native-site", "temporal-chart": "temporal-chart-native-site",
+			}
 			for i, original := range before.Outputs {
 				selected := after.Outputs[i]
 				if network == "nvidia" {
+					original.Components = slices.Clone(original.Components)
+					for j, name := range original.Components {
+						if replacement, ok := modernComponents[name]; ok {
+							original.Components[j] = replacement
+						}
+					}
 					if expected, changed := modern[original.Name]; changed {
 						if selected.Catalog == nil || !reflect.DeepEqual(*selected.Catalog, expected) {
 							t.Fatalf("%s lost its selected native catalog", original.Name)

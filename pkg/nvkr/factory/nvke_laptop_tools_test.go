@@ -46,7 +46,7 @@ func TestLaptopInstallerToolsContract(t *testing.T) {
 				doc.Outputs[0].Platform = "linux/amd64"
 			}
 			if tc.duplicate {
-				doc.Outputs[0].Components = append(doc.Outputs[0].Components, "helm")
+				doc.Outputs[0].Components = append(doc.Outputs[0].Components, "helm-installer-local")
 			}
 			plan, err := CompileDocuments(t.Context(), path, doc, envPath, env, "tools-contract")
 			if tc.wantCode != "" {
@@ -62,15 +62,15 @@ func TestLaptopInstallerToolsContract(t *testing.T) {
 			if err := plan.Validate(); err != nil {
 				t.Fatal(err)
 			}
-			want := []string{"clusterctl", "helm", "kind", "kubectl", "oras"}
+			want := []string{"clusterctl-installer-local", "helm-installer-local", "kind-installer-local", "kubectl-installer-local", "oras-installer-local"}
 			if len(plan.Builds) != 1 || !slices.Equal(plan.Builds[0].Components, want) ||
 				len(plan.LifecycleOutputs) != 1 || plan.LifecycleOutputs[0].Name != "installer-tools-arm64" {
 				t.Fatal("tools must be one complete five-component executable bundle")
 			}
 			versions := map[string]string{"clusterctl": "v1.13.6", "helm": "v4.2.4", "kind": "v0.32.0", "kubectl": "v1.36.0", "oras": "v1.3.3"}
 			for _, component := range plan.Builds[0].ResolvedComponents {
-				if component.Tag != versions[component.Name] || !component.FromSource || component.Prebuilt != nil ||
-					component.OutputType != "raw" || component.ArtifactPath != "nvkr-output/"+component.Name {
+				if component.Tag != versions[strings.TrimSuffix(component.Name, "-installer-local")] || !component.FromSource || component.Prebuilt != nil ||
+					component.OutputType != "raw" || component.ArtifactPath != "nvkr-output/"+strings.TrimSuffix(component.Name, "-installer-local") {
 					t.Fatalf("%s must compile the exact upstream tool, not acquire a release binary", component.Name)
 				}
 			}
@@ -115,10 +115,10 @@ func TestLaptopInstallerToolsContract(t *testing.T) {
 					if !strings.Contains(command, "GOPROXY=off") || !strings.Contains(command, "-mod=vendor") || strings.Contains(command, "GOFLAGS=") {
 						t.Fatal("offline producers must preserve the compiler's reproducibility GOFLAGS")
 					}
-					if node.Component == "helm" && (!strings.Contains(command, "version.metadata=") || !strings.Contains(command, "version --template")) {
+					if node.Component == "helm-installer-local" && (!strings.Contains(command, "version.metadata=") || !strings.Contains(command, "version --template")) {
 						t.Fatal("Helm must stamp and execute the exact selected version")
 					}
-					if node.Component == "kubectl" && (!strings.Contains(command, "k8s.io/component-base/version.gitVersion=") || !strings.Contains(command, "k8s.io/client-go/pkg/version.gitVersion=")) {
+					if node.Component == "kubectl-installer-local" && (!strings.Contains(command, "k8s.io/component-base/version.gitVersion=") || !strings.Contains(command, "k8s.io/client-go/pkg/version.gitVersion=")) {
 						t.Fatal("kubectl must stamp both upstream version namespaces")
 					}
 				}

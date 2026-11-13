@@ -1,17 +1,17 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
   "catalog": {
-    "base": "../../catalogs/nvke/module-cli-arm64"
+    "base": "../../catalogs/nvke"
   },
   "kind": "Definition",
   "metadata": {
-    "name": "nvke-local-dev-arm64",
-    "description": "One local ARM64 Run selecting 32 outputs for components, providers, OS, installer, tools, simulator, profiles and standalone NVIDIA OVN image/chart; no publication or signing; acquired inputs and the mixed SPIRE-source exception remain explicit."
+    "description": "One local ARM64 Run selecting 32 outputs for components, providers, OS, installer, tools, simulator, profiles and standalone NVIDIA OVN image/chart; no publication or signing; acquired inputs and the mixed SPIRE-source exception remain explicit.",
+    "name": "nvke-local-dev-arm64"
   },
   "outputs": [
     {
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools"
       },
       "components": [
         "native-capi-exec-init-image"
@@ -22,7 +22,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools"
       },
       "components": [
         "native-capi-exec-plugin-image"
@@ -33,7 +33,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/capnico/local"
+        "base": "../../catalogs/capnico"
       },
       "components": [
         "capnico-controller"
@@ -44,7 +44,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "cluster-api-provider-provisioned"
@@ -55,10 +55,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/local-site-arm64"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nvke-controller-chart"
+        "nvke-controller-chart-local-site"
       ],
       "format": "helm-oci",
       "helm": {
@@ -71,10 +71,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/controller-profiles/nvidia-arm64"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nvke-local-profiles"
+        "nvke-local-profiles-nvidia"
       ],
       "format": "oci",
       "name": "controller-profiles",
@@ -93,10 +93,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/local-site-arm64"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nvke-controller"
+        "nvke-controller-local-site"
       ],
       "format": "oci",
       "name": "cwe",
@@ -104,14 +104,14 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/installer-local-arm64"
+        "base": "../../catalogs/tools"
       },
       "components": [
-        "clusterctl",
-        "helm",
-        "kind",
-        "kubectl",
-        "oras"
+        "clusterctl-installer-local",
+        "helm-installer-local",
+        "kind-installer-local",
+        "kubectl-installer-local",
+        "oras-installer-local"
       ],
       "format": "executable",
       "name": "installer-tools-arm64",
@@ -119,7 +119,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools"
       },
       "components": [
         "nico-sim",
@@ -132,7 +132,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/local-site-arm64"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "nktp-chart"
@@ -143,7 +143,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/node-images/release",
+        "base": "../../catalogs/node-images",
         "overlays": [
           "../../catalogs/node-images/variants/nvidia-tcg.json"
         ]
@@ -168,10 +168,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/local-site-arm64"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nvkectl"
+        "nvkectl-local-site"
       ],
       "format": "executable",
       "name": "nvkectl",
@@ -179,11 +179,11 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/operator-arm64"
+        "base": "../../catalogs/tools"
       },
       "components": [
-        "helm",
-        "kubectl"
+        "helm-operator",
+        "kubectl-operator"
       ],
       "format": "executable",
       "name": "operator-tools",
@@ -191,7 +191,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/ovn-nvidia"
+        "base": "../../catalogs/ovn/nvidia"
       },
       "components": [
         "ovn-kubernetes-chart"
@@ -200,11 +200,11 @@
       "helm": {
         "images": {
           "control-plane": "ovn-image-arm64",
-          "node": "ovn-image-arm64",
           "nbdb": "ovn-image-arm64",
-          "sbdb": "ovn-image-arm64",
+          "node": "ovn-image-arm64",
           "northd": "ovn-image-arm64",
-          "ovn-host": "ovn-image-arm64"
+          "ovn-host": "ovn-image-arm64",
+          "sbdb": "ovn-image-arm64"
         }
       },
       "name": "ovn-chart-arm64",
@@ -212,7 +212,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/ovn-nvidia"
+        "base": "../../catalogs/ovn/nvidia"
       },
       "components": [
         "ovn-kube-ubuntu"
@@ -223,7 +223,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "postgresql-chart"
@@ -256,7 +256,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "spire-chart"
@@ -300,7 +300,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "spire-crds-chart"
@@ -344,7 +344,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "temporal-chart"
@@ -388,7 +388,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools"
       },
       "components": [
         "native-workload-image"

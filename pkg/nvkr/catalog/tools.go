@@ -28,7 +28,8 @@ import (
 type ToolSource struct {
 	Format         string   `json:"format"`
 	URL            string   `json:"url"`
-	Platform       string   `json:"platform"`
+	Platform       string   `json:"platform,omitempty"`
+	Platforms      []string `json:"platforms,omitempty"`
 	ExecutablePath string   `json:"executablePath"`
 	Companions     []string `json:"companions,omitempty"`
 }
@@ -70,6 +71,9 @@ func toolArchiveLimits() releaseasset.Limits {
 }
 
 func validateToolSource(tool ToolSource) error {
+	if tool.Platforms != nil {
+		return validatePlatformToolSource(tool)
+	}
 	if tool.Format != "raw" && tool.Format != "tar-gzip" && tool.Format != "zip" {
 		return e.New(e.CodeInvalidCatalog, "unsupported tool format %q", tool.Format)
 	}
@@ -179,10 +183,16 @@ func (pin ToolPin) ArchiveMember(ctx context.Context, archive []byte, member str
 
 func checkToolPin(source *ToolSource, pin Pin) error {
 	if source == nil {
-		if pin.Tool != nil {
+		if pin.Tool != nil || pin.Tools != nil {
 			return e.New(e.CodeInvalidCatalog, "orphan tool pin")
 		}
 		return nil
+	}
+	if source.Platforms != nil {
+		return checkPlatformToolPins(*source, pin)
+	}
+	if pin.Tools != nil {
+		return e.New(e.CodeInvalidCatalog, "single-platform source cannot carry platform tool pins")
 	}
 	if pin.Tool == nil {
 		return e.New(e.CodeUnpinnedSource, "tool source %q requires release asset pinning", pin.Tag)

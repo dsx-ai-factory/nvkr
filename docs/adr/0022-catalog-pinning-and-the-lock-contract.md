@@ -505,11 +505,20 @@ on supported filesystems and publication of a separately versioned catalog-data 
 
 ## Tool release assets
 
-A source may declare `tool` with `format` (`raw` or `tar-gzip`), a version-rendered HTTPS `url`,
-`platform` (`linux/amd64` or `linux/arm64`), `executablePath`, and optional `companions`. Tool names are source names; they do not
-include release versions. The same source constraint and tag-prefix selection used by other sources governs
-`catalog pin` and `catalog bump`. Each declared tool currently selects one platform; multiple platforms use
-distinct source names. No platform fallback is inferred.
+A source may declare `tool` with `format` (`raw`, `tar-gzip` or `zip`), a version-rendered HTTPS `url`,
+`executablePath`, optional `companions`, and exactly one of `platform` or `platforms`. The platform domain is
+`darwin/arm64`, `linux/amd64`, and `linux/arm64`. `platforms` is nonempty, sorted and unique. The legacy
+single-platform declaration retains its meaning and lock bytes. Tool names are source names; the same source
+constraint and tag-prefix selection used by other sources governs `catalog pin` and `catalog bump`.
+
+A multi-platform declaration renders `{{.OS}}` and `{{.Arch}}` in the URL, executable member and companion
+members for each declared platform, alongside the existing version tokens. Format and companion templates
+apply to every platform. Two platforms may not select the same URL and executable member. There is no
+platform fallback or spelling map. Upstreams needing different archive formats retain distinct declarations.
+The source lock uses `tools`, a platform-sorted list of ordinary tool records, exclusive with legacy `tool`.
+Every declared platform must have exactly one record; missing, duplicate or extra platforms fail loading.
+All platform downloads must succeed before the existing atomic lock writer can commit the source update.
+This folds ADR-28 sections 1–2 into the catalog contract; executable index publication remains separate.
 
 Pinning resolves the upstream tag to commit/tree/epoch, downloads the release asset with bounded I/O, checks
 archive structure and computes both archive and selected-executable SHA-256 digests without running the tool.
@@ -523,7 +532,9 @@ requires each selected catalog tool to match the utility execution platform. Mis
 or ambiguous declarations fail before execution. Regenerate the Run bundle after any tool bump.
 
 An acquired `host-package` producer may set `prebuilt.releaseExecutable: true`
-with one matching-platform source tool declaration. The source tool lock owns
+with a source tool declaration covering every component platform. Graph resolution selects the exact native
+record before lowering; the resulting native graph has the same identity as its single-platform declaration.
+The source tool lock owns
 both transport and selected executable pins; a second component artifact lock,
 authored URL/image/chart or resolved executable record is rejected. Raw assets
 retain their bytes. A tar-gzip asset uses the standard-library codecs to select

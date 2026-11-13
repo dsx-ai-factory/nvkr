@@ -152,8 +152,9 @@ A pinned-tool node runs through the shared helper launcher as an ordinary build 
   platform. The image is part of Build identity, so a static executable does not make its execution root
   invisible to identity.
 - **Platforms agree exactly.** The tool pin's platform must equal the producer's target platform and its
-  toolchain platform. There is no emulation, cross-platform fallback or inferred alternative pin. A second
-  platform needs a separate source name with its own tool pin (ADR-22).
+  toolchain platform. There is no emulation, cross-platform fallback or inferred alternative pin. A source
+  may carry the complete per-platform `tools` lock set under ADR-22; each concrete producer selects its exact
+  target entry.
 - **Inputs are exact and read-only.** Only the digest-checked executable and the declared materials are staged,
   read-only, at fixed paths. Other members of the tool archive, including companion files, are never staged
   (§6).

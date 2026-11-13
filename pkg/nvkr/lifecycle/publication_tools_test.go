@@ -70,10 +70,10 @@ func TestCatalogToolsAndDerivedPublication(t *testing.T) {
 
 			found := false
 			for _, node := range plan.Graph.Nodes {
-				if node.ID == "tool/cosign" {
+				if node.ID == "tool/"+d.CosignTool {
 					t.Fatal("dry-run acquired unused signer")
 				}
-				if node.ID == "tool/syft" {
+				if node.ID == "tool/"+d.SBOMTool {
 					found = true
 				}
 			}

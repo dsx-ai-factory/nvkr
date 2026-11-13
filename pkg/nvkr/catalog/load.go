@@ -66,6 +66,12 @@ func load(ctx context.Context, p DataProvider) (*Catalog, error) {
 		if pin.Tool != nil {
 			cat.Tools[name] = pin.Tool.clone()
 		}
+		if pin.Tools != nil {
+			if cat.ToolsByPlatform == nil {
+				cat.ToolsByPlatform = map[string][]ToolPin{}
+			}
+			cat.ToolsByPlatform[name] = cloneTools(pin.Tools)
+		}
 	}
 
 	// Components: resolve source + pin into the concrete Component.
@@ -95,6 +101,7 @@ func load(ctx context.Context, p DataProvider) (*Catalog, error) {
 }
 
 func clonePin(pin Pin) Pin {
+	pin.Tools = cloneTools(pin.Tools)
 	if pin.Tool != nil {
 		tool := pin.Tool.clone()
 		pin.Tool = &tool

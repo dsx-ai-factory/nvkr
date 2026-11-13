@@ -1,15 +1,15 @@
 [
   {
-    "catalog": "nvke-local-site-arm64",
+    "catalog": "nvke",
     "arch": "arm64",
     "from": "sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0",
     "components": [
       "nktp-chart",
-      "nvke-controller-chart"
+      "nvke-controller-chart-local-site"
     ]
   },
   {
-    "catalog": "nvke-m2-os",
+    "catalog": "node-images",
     "arch": "amd64",
     "from": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
     "components": [
@@ -24,7 +24,7 @@
     ]
   },
   {
-    "catalog": "nvke-m2-os",
+    "catalog": "node-images",
     "arch": "arm64",
     "from": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
     "components": [
@@ -43,25 +43,25 @@
     ]
   },
   {
-    "catalog": "nvke-native-site",
+    "catalog": "nvke",
     "arch": "amd64",
     "from": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
     "components": [
-      "nktp-chart",
-      "nvke-controller-chart"
+      "nktp-chart-native-site",
+      "nvke-controller-chart-native-site"
     ]
   },
   {
-    "catalog": "nvke-native-site",
+    "catalog": "nvke",
     "arch": "arm64",
     "from": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
     "components": [
-      "nktp-chart",
-      "nvke-controller-chart"
+      "nktp-chart-native-site",
+      "nvke-controller-chart-native-site"
     ]
   },
   {
-    "catalog": "nvke-native-tools",
+    "catalog": "tools",
     "arch": "amd64",
     "from": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
     "components": [
@@ -71,7 +71,7 @@
     ]
   },
   {
-    "catalog": "nvke-native-tools",
+    "catalog": "tools",
     "arch": "arm64",
     "from": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
     "components": [

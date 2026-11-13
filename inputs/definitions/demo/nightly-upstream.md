@@ -2,15 +2,15 @@
 
 This is the explicit upstream OVN v1.4.0 alternative to `arm64-nvidia-kvm.json`. It retains all 29
 selected components, platforms and Helm image bindings from
-`arm64-upstream-tcg.json`. The root `../../catalogs/nvke/module-tags` supplies only
+`arm64-upstream-tcg.json`. The root `../../catalogs/nvke` supplies only
 the existing pinned GitHub Actions, Syft and cosign tools. It does not replace selected output producers.
 The profiles image uses the public output name `controller-profiles` required by the native NVKE
 deployment renderer; it selects the same upstream OVN profiles catalog and component. The former local
 output name `controller-profiles-upstream-ovn` is not an additional output or a fallback.
 
 The CLI, controller image, controller chart and NKTP chart share the profile-owned
-[nightly site catalog](../../catalogs/nvke/nightly-site-arm64/README.md). `installer-tools-arm64` shares the
-separate [nightly installer-tools catalog](../../catalogs/tools/installer-hosted-arm64/README.md);
+[nightly site catalog](../../catalogs/nvke/notes/nvke-nightly-site-arm64-README.md). `installer-tools-arm64` shares the
+separate [nightly installer-tools catalog](../../catalogs/tools/notes/tools-installer-hosted-arm64-README.md);
 other output catalog selections remain explicit. Four tools
 remain source-built with executable `host-package` output types; clusterctl selects 1.13.6 to
 match the beta installer, while kind, kubectl and ORAS retain their existing pins.

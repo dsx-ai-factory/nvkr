@@ -49,8 +49,8 @@ it never adds a dependency you did not name:
 
 ```sh
 bin/nvkr definition init --name my-tools \
-  --catalog inputs/catalogs/tools/operator-arm64 \
-  --platform linux/arm64 --component helm --component kubectl > definition.yaml
+  --catalog inputs/catalogs/tools \
+  --platform linux/arm64 --component helm-operator --component kubectl-operator > definition.yaml
 bin/nvkr definition validate --definition definition.yaml
 ```
 
@@ -217,7 +217,7 @@ presentation flags.
 ```sh
 bin/nvkr definition inspect --definition docs/examples/nvke-tutorial/definition.yaml --ui=tui
 bin/nvkr run graph --plan .github/nvkr-run/plan.json --ui=tui
-bin/nvkr catalog list --data inputs/catalogs/nvke/module-tags --ui=tui
+bin/nvkr catalog list --data inputs/catalogs/nvke --ui=tui
 ```
 
 Graph and release browsers start with an output overview when their supplied

@@ -24,11 +24,11 @@ func initRepoRoot(t *testing.T) string {
 
 func initOperatorCatalog(t *testing.T) string {
 	t.Helper()
-	return filepath.Join(initRepoRoot(t), "inputs", "catalogs", "tools", "operator-arm64")
+	return filepath.Join(initRepoRoot(t), "inputs", "catalogs", "tools")
 }
 
 func TestInitDefinitionAuthorsOneSortedExecutableOutput(t *testing.T) {
-	request := DefinitionInit{Name: "my-tools", Catalog: initOperatorCatalog(t), Platform: "linux/arm64", Components: []string{"kubectl", "helm"}}
+	request := DefinitionInit{Name: "my-tools", Catalog: initOperatorCatalog(t), Platform: "linux/arm64", Components: []string{"kubectl-operator", "helm-operator"}}
 	got, err := InitDefinition(t.Context(), request)
 	if err != nil {
 		t.Fatal(err)
@@ -37,13 +37,13 @@ func TestInitDefinitionAuthorsOneSortedExecutableOutput(t *testing.T) {
 		t.Fatalf("want one output, got %+v", got.Outputs)
 	}
 	output := got.Outputs[0]
-	if output.Name != "my-tools" || output.Format != OutputExecutable || output.Platform != "linux/arm64" || !reflect.DeepEqual(output.Components, []string{"helm", "kubectl"}) {
+	if output.Name != "my-tools" || output.Format != OutputExecutable || output.Platform != "linux/arm64" || !reflect.DeepEqual(output.Components, []string{"helm-operator", "kubectl-operator"}) {
 		t.Fatalf("unexpected output: %+v", output)
 	}
 	if !filepath.IsAbs(got.Catalog.Base) || got.SBOMTool != "" || got.CosignTool != "" || len(got.Catalog.Overlays) != 0 {
 		t.Fatalf("init added more than the requested selection: %+v", got)
 	}
-	if !reflect.DeepEqual(request.Components, []string{"kubectl", "helm"}) {
+	if !reflect.DeepEqual(request.Components, []string{"kubectl-operator", "helm-operator"}) {
 		t.Fatalf("init reordered the caller's components: %v", request.Components)
 	}
 	first, err := RenderDefinition(got)
@@ -63,7 +63,7 @@ func TestInitDefinitionAuthorsOneSortedExecutableOutput(t *testing.T) {
 func TestInitDefinitionRelativeCatalogBecomesAbsolute(t *testing.T) {
 	want := initOperatorCatalog(t)
 	t.Chdir(initRepoRoot(t))
-	got, err := InitDefinition(t.Context(), DefinitionInit{Name: "my-tools", Catalog: "inputs/catalogs/tools/operator-arm64", Platform: "linux/arm64", Components: []string{"helm"}})
+	got, err := InitDefinition(t.Context(), DefinitionInit{Name: "my-tools", Catalog: "inputs/catalogs/tools", Platform: "linux/arm64", Components: []string{"helm-operator"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +76,7 @@ func TestInitDefinitionRelativeCatalogBecomesAbsolute(t *testing.T) {
 // locator does not depend on where the file is placed.
 func TestInitDefinitionContractPreparesFromAnotherDirectory(t *testing.T) {
 	root := initRepoRoot(t)
-	authored, err := InitDefinition(t.Context(), DefinitionInit{Name: "my-tools", Catalog: initOperatorCatalog(t), Platform: "linux/arm64", Components: []string{"helm", "kubectl"}})
+	authored, err := InitDefinition(t.Context(), DefinitionInit{Name: "my-tools", Catalog: initOperatorCatalog(t), Platform: "linux/arm64", Components: []string{"helm-operator", "kubectl-operator"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,29 +116,29 @@ func TestInitDefinitionContractPreparesFromAnotherDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	expected := prepared.Description().Expected
-	if len(expected) != 1 || expected[0].Name != "my-tools" || !reflect.DeepEqual(expected[0].Components, []string{"helm", "kubectl"}) {
+	if len(expected) != 1 || expected[0].Name != "my-tools" || !reflect.DeepEqual(expected[0].Components, []string{"helm-operator", "kubectl-operator"}) {
 		t.Fatalf("prepared run does not match the request: %+v", expected)
 	}
 }
 
 func TestInitDefinitionRefusesBeforeAuthoring(t *testing.T) {
 	operator := initOperatorCatalog(t)
-	ovn := filepath.Join(initRepoRoot(t), "inputs", "catalogs", "ovn-upstream")
+	ovn := filepath.Join(initRepoRoot(t), "inputs", "catalogs", "ovn", "upstream")
 	for _, tc := range []struct {
 		name    string
 		request DefinitionInit
 		code    e.Code
 	}{
-		{"missing name", DefinitionInit{Catalog: operator, Platform: "linux/arm64", Components: []string{"helm"}}, e.CodeUsage},
-		{"missing catalog", DefinitionInit{Name: "t", Platform: "linux/arm64", Components: []string{"helm"}}, e.CodeUsage},
-		{"missing platform", DefinitionInit{Name: "t", Catalog: operator, Components: []string{"helm"}}, e.CodeUsage},
+		{"missing name", DefinitionInit{Catalog: operator, Platform: "linux/arm64", Components: []string{"helm-operator"}}, e.CodeUsage},
+		{"missing catalog", DefinitionInit{Name: "t", Platform: "linux/arm64", Components: []string{"helm-operator"}}, e.CodeUsage},
+		{"missing platform", DefinitionInit{Name: "t", Catalog: operator, Components: []string{"helm-operator"}}, e.CodeUsage},
 		{"no components", DefinitionInit{Name: "t", Catalog: operator, Platform: "linux/arm64"}, e.CodeUsage},
-		{"duplicate component", DefinitionInit{Name: "t", Catalog: operator, Platform: "linux/arm64", Components: []string{"helm", "helm"}}, e.CodeUsage},
-		{"non-canonical name", DefinitionInit{Name: "My_Tools", Catalog: operator, Platform: "linux/arm64", Components: []string{"helm"}}, e.CodeInvalidCatalog},
+		{"duplicate component", DefinitionInit{Name: "t", Catalog: operator, Platform: "linux/arm64", Components: []string{"helm-operator", "helm-operator"}}, e.CodeUsage},
+		{"non-canonical name", DefinitionInit{Name: "My_Tools", Catalog: operator, Platform: "linux/arm64", Components: []string{"helm-operator"}}, e.CodeInvalidCatalog},
 		{"unknown component", DefinitionInit{Name: "t", Catalog: operator, Platform: "linux/arm64", Components: []string{"nope"}}, e.CodeInvalidCatalog},
-		{"invalid platform", DefinitionInit{Name: "t", Catalog: operator, Platform: "linux/riscv64", Components: []string{"helm"}}, e.CodeInvalidCatalog},
-		{"unsupported platform", DefinitionInit{Name: "t", Catalog: operator, Platform: "linux/amd64", Components: []string{"helm"}}, e.CodeEngineCapability},
-		{"missing catalog directory", DefinitionInit{Name: "t", Catalog: filepath.Join(t.TempDir(), "absent"), Platform: "linux/arm64", Components: []string{"helm"}}, e.CodeInvalidCatalog},
+		{"invalid platform", DefinitionInit{Name: "t", Catalog: operator, Platform: "linux/riscv64", Components: []string{"helm-operator"}}, e.CodeInvalidCatalog},
+		{"unsupported platform", DefinitionInit{Name: "t", Catalog: operator, Platform: "darwin/arm64", Components: []string{"helm-operator"}}, e.CodeEngineCapability},
+		{"missing catalog directory", DefinitionInit{Name: "t", Catalog: filepath.Join(t.TempDir(), "absent"), Platform: "linux/arm64", Components: []string{"helm-operator"}}, e.CodeInvalidCatalog},
 		{"incomplete material selection", DefinitionInit{Name: "t", Catalog: ovn, Platform: "linux/arm64", Components: []string{"nvke-cni-ovn"}}, e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -160,8 +160,8 @@ func TestInitDefinitionAdmitsWhatARunAdmits(t *testing.T) {
 		name, catalog string
 		components    []string
 	}{
-		{"raw", "inputs/catalogs/tools/installer-local-arm64", []string{"clusterctl"}},
-		{"tarball", "inputs/catalogs/nicosim", []string{"nico-sim-runtime-assets"}},
+		{"raw", "inputs/catalogs/tools", []string{"clusterctl-installer-local"}},
+		{"tarball", "inputs/catalogs/tools", []string{"nico-sim-runtime-assets-nicosim"}},
 		{"oci-image", "testdata/examples/layered-catalog", []string{"pause"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

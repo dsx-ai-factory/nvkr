@@ -18,11 +18,11 @@ import (
 )
 
 func TestReleaseExecutableResolvedDependencies(t *testing.T) {
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs", "catalogs", "tools", "operator-amd64")))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs", "catalogs", "tools")))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, component := range []string{"helm", "kubectl"} {
+	for _, component := range []string{"helm-operator", "kubectl-operator"} {
 		t.Run(component, func(t *testing.T) {
 			resolved, err := buildgraph.Resolve(cat, buildgraph.Selection{Components: []string{component}, Platform: "linux/amd64", OutputFormat: definition.OutputExecutable})
 			if err != nil {

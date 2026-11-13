@@ -52,7 +52,7 @@ func tektonCLIEnvironment(t *testing.T, root string) string {
 		APIServer: "https://kubernetes.default.svc", CertificateAuthority: string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})),
 		RunnerImage: env.UtilityContainer, RuntimeImage: env.UtilityContainer, StorageClass: "standard", WorkspaceGiB: 20,
 		PublisherPublicKey: key(), QualifierPublicKey: key(), SmokePublicKey: key(),
-		Smoke: qualificationpolicy.Smoke{Images: map[string]string{"linux/amd64": "index.docker.io/library/" + env.UtilityContainer}, Tools: map[string]string{"nvkectl": "nvkectl-version-json"},
+		Smoke: qualificationpolicy.Smoke{Images: map[string]string{"linux/amd64": "index.docker.io/library/" + env.UtilityContainer}, Tools: map[string]string{"nvkectl-module-tags": "nvkectl-version-json"},
 			NonToolOutputs: []qualificationpolicy.NonToolOutput{{Output: "cwe", Kind: "oci", Components: []string{"cwe"}, Reason: "deployment-image"}}}}
 	env.Signing.Issuer = env.Tekton.APIServer
 	env.Signing.Identity = "^" + regexp.QuoteMeta(env.Tekton.APIServer+"/api/v1/namespaces/nvkr/serviceaccounts/nvkr-publisher") + "$"
@@ -72,7 +72,7 @@ func TestTektonCLIProjectionPilotAndGeneratedCommands(t *testing.T) {
 	t.Setenv("NVKR_WORK_DEADLINE", "")
 	root := t.TempDir()
 	environment := tektonCLIEnvironment(t, root)
-	for _, directory := range []string{"docs/examples/nvke-tutorial", "inputs/catalogs/nvke/module-tags", "inputs/catalogs/shared"} {
+	for _, directory := range []string{"docs/examples/nvke-tutorial", "inputs/catalogs/nvke", "inputs/catalogs/shared"} {
 		if err := os.CopyFS(filepath.Join(root, directory), os.DirFS(directory)); err != nil {
 			t.Fatal(err)
 		}

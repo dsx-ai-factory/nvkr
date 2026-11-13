@@ -147,7 +147,7 @@ func TestOVNLockOnlyPropagation(t *testing.T) {
 	for _, flavor := range []string{"nvidia", "upstream"} {
 		t.Run(flavor, func(t *testing.T) {
 			directory := t.TempDir()
-			original := "../../../inputs/catalogs/ovn-" + flavor
+			original := "../../../inputs/catalogs/ovn/" + flavor
 			registry, err := os.ReadFile(filepath.Join(original, catalog.RegistryFile))
 			if err != nil {
 				t.Fatal(err)

@@ -2,28 +2,28 @@
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: nvkr.dev/definition/v5
+catalog:
+  base: ../../catalogs/node-images
+  overlays:
+  - ../../catalogs/node-images/variants/diagnostic-arm64-kvm.yaml
 kind: Definition
 metadata:
-  name: nvke-os-arm64-kvm
   description: Build the ARM64 non-FDE NVKE node QCOW2 on a native KVM host.
-catalog:
-  base: ../../catalogs/node-images/diagnostic
-  overlays:
-    - ../../catalogs/node-images/variants/diagnostic-arm64-kvm.yaml
+  name: nvke-os-arm64-kvm
 outputs:
-  - name: nvke-node-image-arm64
-    platform: linux/arm64
-    format: disk-image
-    components:
-      - nvke-agent
-      - nvke-cni-calico
-      - nvke-cni-ovn
-      - nvke-doca-ovs
-      - nvke-image-inputs
-      - nvke-kubeadm-distro
-      - nvke-node-image
-      - nvke-patched-installer-iso
-      - nvke-spire-agent
-      - ovn-kube-ubuntu
-      - ovn-kubernetes-chart
-      - ubuntu-installer-iso
+- components:
+  - nvke-agent-diagnostic
+  - nvke-cni-calico-diagnostic
+  - nvke-cni-ovn-diagnostic
+  - nvke-doca-ovs
+  - nvke-image-inputs-diagnostic
+  - nvke-kubeadm-distro-diagnostic
+  - nvke-node-image-diagnostic
+  - nvke-patched-installer-iso
+  - nvke-spire-agent
+  - ovn-kube-ubuntu-diagnostic
+  - ovn-kubernetes-chart-diagnostic
+  - ubuntu-installer-iso
+  format: disk-image
+  name: nvke-node-image-arm64
+  platform: linux/arm64

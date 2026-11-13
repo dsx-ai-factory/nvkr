@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-native-local-kvm",
-  "requiresCatalogDigest": "sha256:cc36d1fc6d09aef5feb8337725018b5ac1514b2dbb8ce1cdfd309e1ba636764e",
+  "requiresCatalogDigest": "sha256:19629d981b60678796380a38663c2da14eba5284f7c1444ba88aaf4f924be803",
   "components": {
     "nvke-agent": {
       "component": {
@@ -32,7 +32,7 @@
         "vendorCommand": [
           "bash",
           "-ec",
-          "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n"
+          "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' \u003e\u00262; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' \u003e\u00262; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' \u003e\u00262; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' \u003e\u00262; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' \u003e\u00262; exit 1;\n}\n"
         ],
         "sourceDateEpoch": 1793236039,
         "versionStamp": {
@@ -60,22 +60,22 @@
         "buildCommand": [
           "bash",
           "-ec",
-          "# Keep DHCP identity stable when NVKE moves L3 to its OVS bridge.\n# Stage authored VM configuration; never modify the pinned source tree.\nreadonly files=/src/nvkr-output/native-image-files\nmkdir -p \"$files\"\ncp -a /src/os-image/files/. \"$files/\"\ncat >\"$files/00-dhcp-all.yaml\" <<'NETPLAN'\nnetwork:\n  version: 2\n  renderer: networkd\n  ethernets:\n    all-en:\n      match:\n        name: \"e*\"\n      dhcp4: true\n      dhcp6: true\n      dhcp-identifier: mac\n      optional: true\nNETPLAN\npython3 /src/os-image/packer/scripts/compose-image-inputs.py \\\n  --architecture {{.Arch}} \\\n  --materials-dir /nvkr/inputs/materials \\\n  --source-files-dir \"$files\" \\\n  --output /src/nvkr-output/image-inputs.tar \\\n  --source-date-epoch \"$SOURCE_DATE_EPOCH\"\n"
+          "# Keep DHCP identity stable when NVKE moves L3 to its OVS bridge.\n# Stage authored VM configuration; never modify the pinned source tree.\nreadonly files=/src/nvkr-output/native-image-files\nmkdir -p \"$files\"\ncp -a /src/os-image/files/. \"$files/\"\ncat \u003e\"$files/00-dhcp-all.yaml\" \u003c\u003c'NETPLAN'\nnetwork:\n  version: 2\n  renderer: networkd\n  ethernets:\n    all-en:\n      match:\n        name: \"e*\"\n      dhcp4: true\n      dhcp6: true\n      dhcp-identifier: mac\n      optional: true\nNETPLAN\npython3 /src/os-image/packer/scripts/compose-image-inputs.py \\\n  --architecture {{.Arch}} \\\n  --materials-dir /nvkr/inputs/materials \\\n  --source-files-dir \"$files\" \\\n  --output /src/nvkr-output/image-inputs.tar \\\n  --source-date-epoch \"$SOURCE_DATE_EPOCH\"\n"
         ],
         "materials": {
           "agent": "nvke-agent",
           "calico": "nvke-cni-calico",
+          "doca-ovs": "nvke-doca-ovs",
           "kubeadm-distro": "nvke-kubeadm-distro",
           "ovn": "nvke-cni-ovn",
-          "spire-agent": "nvke-spire-agent",
-          "doca-ovs": "nvke-doca-ovs"
+          "spire-agent": "nvke-spire-agent"
         },
         "artifactPath": "nvkr-output/image-inputs.tar",
         "writeDir": "nvkr-output",
         "vendorCommand": [
           "bash",
           "-ec",
-          "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n"
+          "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' \u003e\u00262; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' \u003e\u00262; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' \u003e\u00262; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' \u003e\u00262; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' \u003e\u00262; exit 1;\n}\n"
         ],
         "sourceDateEpoch": 1793236039
       }
@@ -156,7 +156,7 @@
         "vendorCommand": [
           "bash",
           "-ec",
-          "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' >&2; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' >&2; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' >&2; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' >&2; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' >&2; exit 1;\n}\n"
+          "cd agent\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum)\"\n# Distinct equivalent URLs avoid Go's per-proxy cached metadata errors.\n# Go owns transport fallback; checksum failures never select another proxy.\n# Keep direct fallback limited to a missing proxy module (404/410).\nproxy=https://proxy.golang.org\nGOPROXY=\"${proxy}|${proxy}/|${proxy}//,direct\" \\\n  timeout --kill-after=10s 540s go mod download || {\n    status=$?; echo 'agent module download failed or exceeded 540s' \u003e\u00262; exit \"$status\";\n  }\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during download' \u003e\u00262; exit 1;\n}\n# Offline verification and vendoring run once, after acquisition succeeds.\nGOPROXY=off timeout --kill-after=10s 60s go mod verify || {\n  status=$?; echo 'agent module cache verification failed or exceeded 60s' \u003e\u00262; exit \"$status\";\n}\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor || {\n  status=$?; echo 'agent offline vendoring failed or exceeded 180s' \u003e\u00262; exit \"$status\";\n}\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c - || {\n  echo 'agent module pins changed during vendoring' \u003e\u00262; exit 1;\n}\n"
         ],
         "sourceDateEpoch": 1793236039
       }

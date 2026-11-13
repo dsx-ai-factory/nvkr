@@ -318,8 +318,8 @@ func TestOSDockerBootstrapUsesPrivateSharedTemporaryDirectory(t *testing.T) {
 				"scripts/nvke-os-local.sh":                                       string(source),
 				"inputs/definitions/diagnostics/os-" + arch + ".yaml":            "fixture",
 				"inputs/environments/local-linux-" + arch + "-kvm.yaml":          "fixture",
-				"inputs/catalogs/node-images/diagnostic/registry.yaml":           "fixture",
-				"inputs/catalogs/node-images/diagnostic/pins.lock.yaml":          "fixture",
+				"inputs/catalogs/node-images/registry.yaml":                      "fixture",
+				"inputs/catalogs/node-images/pins.lock.yaml":                     "fixture",
 				"inputs/catalogs/shared/node-images.yaml":                        "fixture",
 				"inputs/catalogs/node-images/variants/diagnostic-arm64-kvm.yaml": "fixture",
 				"bin/docker":                      "#!/bin/sh\nexit 99\n",
@@ -513,7 +513,11 @@ exec "$NVKR_AUTHORING_TEST_EXE" -test.run='^TestAuthoringLabCLIProcess$' -- "$@"
 				if build.CatalogSnapshot.Components[diskRoot].ToolchainImages[arch] != image {
 					t.Fatal("frozen disk did not bind the observed Packer image")
 				}
-				agent := build.CatalogSnapshot.Components["nvke-agent"].ToolchainImages[arch]
+				agentName := "nvke-agent-diagnostic"
+				if ubuntu == "24.04" {
+					agentName = "nvke-agent"
+				}
+				agent := build.CatalogSnapshot.Components[agentName].ToolchainImages[arch]
 				if ubuntu == "24.04" {
 					if !strings.Contains(build.Name, "ubuntu24") || agent == image || !strings.HasPrefix(agent, "docker.io/library/golang@sha256:") {
 						t.Fatalf("Ubuntu 24 selection lost its compatible agent toolchain: output=%s, agent=%s", build.Name, agent)

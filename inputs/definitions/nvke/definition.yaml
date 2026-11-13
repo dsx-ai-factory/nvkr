@@ -2,516 +2,558 @@
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: nvkr.dev/definition/v5
+catalog:
+  base: ../../catalogs/nvke
+cosignTool: cosign-module-tags
 kind: Definition
 metadata:
+  description: Build the maintained CLI, controller, configurable deployment charts
+    and native non-FDE and public-bootstrap FDE node images for AMD64 and ARM64, and
+    acquire operator tooling plus AMD64 and ARM64 non-test runtime images selected
+    for NVKE v0.23.0 in one Run.
   name: nvke-m2
-  description: Build the maintained CLI, controller, configurable deployment charts and native non-FDE and public-bootstrap FDE node images for AMD64 and ARM64, and acquire operator tooling plus AMD64 and ARM64 non-test runtime images selected for NVKE v0.23.0 in one Run.
-catalog:
-  base: ../../catalogs/nvke/module-tags
-sbomTool: syft
-cosignTool: cosign
 outputs:
-  - name: capi-controller-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [capi-controller-image]
-  - name: capi-controller-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [capi-controller-image]
-  - name: capi-kubeadm-bootstrap-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [capi-kubeadm-bootstrap-image]
-  - name: capi-kubeadm-bootstrap-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [capi-kubeadm-bootstrap-image]
-  - name: capi-kubeadm-control-plane-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [capi-kubeadm-control-plane-image]
-  - name: capi-kubeadm-control-plane-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [capi-kubeadm-control-plane-image]
-  - name: capnico-controller
-    platforms: [linux/amd64, linux/arm64]
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components:
-      - capnico-controller
-  - name: cert-manager-cainjector-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [cert-manager-cainjector-image]
-  - name: cert-manager-cainjector-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [cert-manager-cainjector-image]
-  - name: cert-manager-controller-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [cert-manager-controller-image]
-  - name: cert-manager-controller-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [cert-manager-controller-image]
-  - name: cert-manager-webhook-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [cert-manager-webhook-image]
-  - name: cert-manager-webhook-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [cert-manager-webhook-image]
-  - name: cluster-api-provider-provisioned
-    platforms: [linux/amd64, linux/arm64]
-    catalog:
-      base: ../../catalogs/nvke/release
-    format: oci
-    components:
-      - cluster-api-provider-provisioned
-  - name: controller-chart
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release
-    format: helm-oci
-    components:
-      - nvke-controller-chart
-    helm:
-      images:
-        controller: cwe
-  - name: csi-node-driver-registrar-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - csi-node-driver-registrar-image
-  - name: csi-node-driver-registrar-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - csi-node-driver-registrar-image
-  - name: cwe
-    platforms: [linux/amd64, linux/arm64]
-    catalog:
-      base: ../../catalogs/nvke/release
-    format: oci
-    components:
-      - nvke-controller
-  # Reference test data, not the runnable demo's controller-profiles or fleet configuration.
-  - name: nico-reference-profiles-fixture
-    platforms: [linux/amd64, linux/arm64]
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components:
-      - nvke-nico-reference-profiles
-  - name: nktp
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: helm-oci
-    components:
-      - nktp-chart
-  - name: nktp-collector-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-collector-image]
-  - name: nktp-collector-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-collector-image]
-  - name: nktp-kube-state-metrics-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-kube-state-metrics-image]
-  - name: nktp-kube-state-metrics-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-kube-state-metrics-image]
-  - name: nktp-kubectl-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-kubectl-image]
-  - name: nktp-kubectl-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-kubectl-image]
-  - name: nktp-lgtm-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-lgtm-image]
-  - name: nktp-lgtm-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-lgtm-image]
-  - name: nktp-metrics-server-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-metrics-server-image]
-  - name: nktp-metrics-server-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-metrics-server-image]
-  - name: nktp-node-exporter-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-node-exporter-image]
-  - name: nktp-node-exporter-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-node-exporter-image]
-  - name: nktp-operator-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-operator-image]
-  - name: nktp-operator-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-operator-image]
-  - name: nktp-target-allocator-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-target-allocator-image]
-  - name: nktp-target-allocator-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/nvke/release-components
-    format: oci
-    components: [nktp-target-allocator-image]
-  - name: nvke-node-fde-amd64
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/node-images/release
-      overlays: [../../catalogs/node-images/variants/native-toolchains.yaml]
-    format: disk-image
-    components:
-      - nvke-agent
-      - nvke-cni-calico
-      - nvke-cni-ovn
-      - nvke-doca-ovs
-      - nvke-image-inputs
-      - nvke-kubeadm-distro
-      - nvke-node-fde-amd64
-      - nvke-patched-installer-iso-amd64
-      - nvke-spire-agent
-      - ovn-kube-ubuntu
-      - ovn-kubernetes-chart
-      - ubuntu-installer-iso-amd64
-  - name: nvke-node-fde-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/node-images/release
-      overlays: [../../catalogs/node-images/variants/native-toolchains.yaml]
-    format: disk-image
-    components:
-      - nvke-agent
-      - nvke-cni-calico
-      - nvke-cni-ovn
-      - nvke-doca-ovs
-      - nvke-image-inputs
-      - nvke-kubeadm-distro
-      - nvke-node-fde-arm64
-      - nvke-patched-installer-iso
-      - nvke-spire-agent
-      - ovn-kube-ubuntu
-      - ovn-kubernetes-chart
-      - ubuntu-installer-iso
-  - name: nvke-node-image-amd64
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/node-images/release
-      overlays: [../../catalogs/node-images/variants/native-toolchains.yaml]
-    format: disk-image
-    components:
-      - nvke-agent
-      - nvke-cni-calico
-      - nvke-cni-ovn
-      - nvke-doca-ovs
-      - nvke-image-inputs
-      - nvke-kubeadm-distro
-      - nvke-node-image-amd64
-      - nvke-patched-installer-iso-amd64
-      - nvke-spire-agent
-      - ovn-kube-ubuntu
-      - ovn-kubernetes-chart
-      - ubuntu-installer-iso-amd64
-  - name: nvke-node-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/node-images/release
-      overlays: [../../catalogs/node-images/variants/native-toolchains.yaml]
-    format: disk-image
-    components:
-      - nvke-agent
-      - nvke-cni-calico
-      - nvke-cni-ovn
-      - nvke-doca-ovs
-      - nvke-image-inputs
-      - nvke-kubeadm-distro
-      - nvke-node-image
-      - nvke-patched-installer-iso
-      - nvke-spire-agent
-      - ovn-kube-ubuntu
-      - ovn-kubernetes-chart
-      - ubuntu-installer-iso
-  - name: nvkectl
-    platform: linux/amd64
-    format: executable
-    components:
-      - nvkectl
-  - name: nvkectl-linux-arm64
-    platform: linux/arm64
-    format: executable
-    components:
-      - nvkectl
-  - name: operator-tools
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/tools/operator-amd64
-    format: executable
-    components:
-      - helm
-      - kubectl
-  - name: postgresql
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release
-    format: helm-oci
-    components:
-      - postgresql-chart
-  - name: postgresql-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - postgresql-image
-  - name: postgresql-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - postgresql-image
-  - name: spiffe-csi-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spiffe-csi-image
-  - name: spiffe-csi-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spiffe-csi-image
-  - name: spire
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release
-    format: helm-oci
-    components:
-      - spire-chart
-  - name: spire-agent-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spire-agent-image
-  - name: spire-agent-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spire-agent-image
-  - name: spire-bash-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spire-bash-image
-  - name: spire-bash-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spire-bash-image
-  - name: spire-controller-manager-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spire-controller-manager-image
-  - name: spire-controller-manager-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spire-controller-manager-image
-  - name: spire-crds
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release
-    format: helm-oci
-    components:
-      - spire-crds-chart
-  - name: spire-oidc-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spire-oidc-image
-  - name: spire-oidc-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spire-oidc-image
-  - name: spire-server-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spire-server-image
-  - name: spire-server-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spire-server-image
-  - name: spire-tpm-server-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spire-tpm-server-image
-  - name: spire-tpm-server-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - spire-tpm-server-image
-  - name: temporal
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/nvke/release
-    format: helm-oci
-    components:
-      - temporal-chart
-  - name: temporal-admin-tools-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - temporal-admin-tools-image
-  - name: temporal-admin-tools-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - temporal-admin-tools-image
-  - name: temporal-server-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - temporal-server-image
-  - name: temporal-server-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - temporal-server-image
-  - name: temporal-ui-image
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - temporal-ui-image
-  - name: temporal-ui-image-arm64
-    platform: linux/arm64
-    catalog:
-      base: ../../catalogs/runtime-dependencies
-    format: oci
-    components:
-      - temporal-ui-image
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - capi-controller-image
+  format: oci
+  name: capi-controller-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - capi-controller-image
+  format: oci
+  name: capi-controller-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - capi-kubeadm-bootstrap-image
+  format: oci
+  name: capi-kubeadm-bootstrap-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - capi-kubeadm-bootstrap-image
+  format: oci
+  name: capi-kubeadm-bootstrap-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - capi-kubeadm-control-plane-image
+  format: oci
+  name: capi-kubeadm-control-plane-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - capi-kubeadm-control-plane-image
+  format: oci
+  name: capi-kubeadm-control-plane-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - capnico-controller
+  format: oci
+  name: capnico-controller
+  platforms:
+  - linux/amd64
+  - linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - cert-manager-cainjector-image
+  format: oci
+  name: cert-manager-cainjector-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - cert-manager-cainjector-image
+  format: oci
+  name: cert-manager-cainjector-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - cert-manager-controller-image
+  format: oci
+  name: cert-manager-controller-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - cert-manager-controller-image
+  format: oci
+  name: cert-manager-controller-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - cert-manager-webhook-image
+  format: oci
+  name: cert-manager-webhook-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - cert-manager-webhook-image
+  format: oci
+  name: cert-manager-webhook-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - cluster-api-provider-provisioned
+  format: oci
+  name: cluster-api-provider-provisioned
+  platforms:
+  - linux/amd64
+  - linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nvke-controller-chart
+  format: helm-oci
+  helm:
+    images:
+      controller: cwe
+  name: controller-chart
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - csi-node-driver-registrar-image
+  format: oci
+  name: csi-node-driver-registrar-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - csi-node-driver-registrar-image
+  format: oci
+  name: csi-node-driver-registrar-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nvke-controller
+  format: oci
+  name: cwe
+  platforms:
+  - linux/amd64
+  - linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nvke-nico-reference-profiles
+  format: oci
+  name: nico-reference-profiles-fixture
+  platforms:
+  - linux/amd64
+  - linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-chart-release-components
+  format: helm-oci
+  name: nktp
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-collector-image
+  format: oci
+  name: nktp-collector-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-collector-image
+  format: oci
+  name: nktp-collector-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-kube-state-metrics-image
+  format: oci
+  name: nktp-kube-state-metrics-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-kube-state-metrics-image
+  format: oci
+  name: nktp-kube-state-metrics-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-kubectl-image
+  format: oci
+  name: nktp-kubectl-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-kubectl-image
+  format: oci
+  name: nktp-kubectl-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-lgtm-image
+  format: oci
+  name: nktp-lgtm-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-lgtm-image
+  format: oci
+  name: nktp-lgtm-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-metrics-server-image
+  format: oci
+  name: nktp-metrics-server-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-metrics-server-image
+  format: oci
+  name: nktp-metrics-server-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-node-exporter-image
+  format: oci
+  name: nktp-node-exporter-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-node-exporter-image
+  format: oci
+  name: nktp-node-exporter-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-operator-image
+  format: oci
+  name: nktp-operator-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-operator-image
+  format: oci
+  name: nktp-operator-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-target-allocator-image
+  format: oci
+  name: nktp-target-allocator-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - nktp-target-allocator-image
+  format: oci
+  name: nktp-target-allocator-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/node-images
+    overlays:
+    - ../../catalogs/node-images/variants/native-toolchains.yaml
+  components:
+  - nvke-agent
+  - nvke-cni-calico
+  - nvke-cni-ovn
+  - nvke-doca-ovs
+  - nvke-image-inputs
+  - nvke-kubeadm-distro
+  - nvke-node-fde-amd64
+  - nvke-patched-installer-iso-amd64
+  - nvke-spire-agent
+  - ovn-kube-ubuntu
+  - ovn-kubernetes-chart
+  - ubuntu-installer-iso-amd64
+  format: disk-image
+  name: nvke-node-fde-amd64
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/node-images
+    overlays:
+    - ../../catalogs/node-images/variants/native-toolchains.yaml
+  components:
+  - nvke-agent
+  - nvke-cni-calico
+  - nvke-cni-ovn
+  - nvke-doca-ovs
+  - nvke-image-inputs
+  - nvke-kubeadm-distro
+  - nvke-node-fde-arm64
+  - nvke-patched-installer-iso
+  - nvke-spire-agent
+  - ovn-kube-ubuntu
+  - ovn-kubernetes-chart
+  - ubuntu-installer-iso
+  format: disk-image
+  name: nvke-node-fde-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/node-images
+    overlays:
+    - ../../catalogs/node-images/variants/native-toolchains.yaml
+  components:
+  - nvke-agent
+  - nvke-cni-calico
+  - nvke-cni-ovn
+  - nvke-doca-ovs
+  - nvke-image-inputs
+  - nvke-kubeadm-distro
+  - nvke-node-image-amd64
+  - nvke-patched-installer-iso-amd64
+  - nvke-spire-agent
+  - ovn-kube-ubuntu
+  - ovn-kubernetes-chart
+  - ubuntu-installer-iso-amd64
+  format: disk-image
+  name: nvke-node-image-amd64
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/node-images
+    overlays:
+    - ../../catalogs/node-images/variants/native-toolchains.yaml
+  components:
+  - nvke-agent
+  - nvke-cni-calico
+  - nvke-cni-ovn
+  - nvke-doca-ovs
+  - nvke-image-inputs
+  - nvke-kubeadm-distro
+  - nvke-node-image
+  - nvke-patched-installer-iso
+  - nvke-spire-agent
+  - ovn-kube-ubuntu
+  - ovn-kubernetes-chart
+  - ubuntu-installer-iso
+  format: disk-image
+  name: nvke-node-image-arm64
+  platform: linux/arm64
+- components:
+  - nvkectl-module-tags
+  format: executable
+  name: nvkectl
+  platform: linux/amd64
+- components:
+  - nvkectl-module-tags
+  format: executable
+  name: nvkectl-linux-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/tools
+  components:
+  - helm-operator
+  - kubectl-operator
+  format: executable
+  name: operator-tools
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - postgresql-chart
+  format: helm-oci
+  name: postgresql
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - postgresql-image
+  format: oci
+  name: postgresql-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - postgresql-image
+  format: oci
+  name: postgresql-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spiffe-csi-image
+  format: oci
+  name: spiffe-csi-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spiffe-csi-image
+  format: oci
+  name: spiffe-csi-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - spire-chart
+  format: helm-oci
+  name: spire
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spire-agent-image
+  format: oci
+  name: spire-agent-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spire-agent-image
+  format: oci
+  name: spire-agent-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spire-bash-image
+  format: oci
+  name: spire-bash-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spire-bash-image
+  format: oci
+  name: spire-bash-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spire-controller-manager-image
+  format: oci
+  name: spire-controller-manager-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spire-controller-manager-image
+  format: oci
+  name: spire-controller-manager-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - spire-crds-chart
+  format: helm-oci
+  name: spire-crds
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spire-oidc-image
+  format: oci
+  name: spire-oidc-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spire-oidc-image
+  format: oci
+  name: spire-oidc-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spire-server-image
+  format: oci
+  name: spire-server-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spire-server-image
+  format: oci
+  name: spire-server-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spire-tpm-server-image
+  format: oci
+  name: spire-tpm-server-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - spire-tpm-server-image
+  format: oci
+  name: spire-tpm-server-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/nvke
+  components:
+  - temporal-chart
+  format: helm-oci
+  name: temporal
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - temporal-admin-tools-image
+  format: oci
+  name: temporal-admin-tools-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - temporal-admin-tools-image
+  format: oci
+  name: temporal-admin-tools-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - temporal-server-image
+  format: oci
+  name: temporal-server-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - temporal-server-image
+  format: oci
+  name: temporal-server-image-arm64
+  platform: linux/arm64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - temporal-ui-image
+  format: oci
+  name: temporal-ui-image
+  platform: linux/amd64
+- catalog:
+    base: ../../catalogs/runtime-dependencies
+  components:
+  - temporal-ui-image
+  format: oci
+  name: temporal-ui-image-arm64
+  platform: linux/arm64
+sbomTool: syft-module-tags

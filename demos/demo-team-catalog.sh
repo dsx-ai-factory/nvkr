@@ -78,11 +78,11 @@ cd "$ROOT"
 printf 'cd %q\n' "$ROOT" >"$OUT/commands.txt"
 DEFINITION=docs/examples/nvke-tutorial/definition.yaml
 ENVIRONMENT=docs/examples/nvke-tutorial/environment-github.yaml
-CATALOG=inputs/catalogs/nvke/module-tags
+CATALOG=inputs/catalogs/nvke
 if [ "$DEPLOY" -eq 1 ]; then
   DEFINITION=docs/examples/nvke-deploy/definition.yaml
   ENVIRONMENT=docs/examples/nvke-deploy/environment-github.yaml
-  CATALOG=inputs/catalogs/nvke/release
+  CATALOG=inputs/catalogs/nvke
 fi
 
 heading 'NVKR / From catalog to pipeline'

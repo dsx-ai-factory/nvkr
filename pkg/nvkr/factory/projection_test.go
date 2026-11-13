@@ -280,47 +280,70 @@ func TestProjectionTransportsMatchInBinaryGenerator(t *testing.T) {
 	for _, name := range names {
 		plan := plans[name]
 		t.Run(name, func(t *testing.T) {
-			// One maintained Plan keeps real-product coverage in the default
-			// suite; the whole committed matrix is an extended integration check.
+			if name == "committed/nvkr-run-nvke-gpu-site" {
+				t.Skip("covered by TestMaintainedGPUProjectionTransports in the default suite")
+			}
+			// Telemetry remains in the matrix default; the largest Plan has its
+			// own top-level test so CI can shard its full transport comparison.
 			if strings.HasPrefix(name, "committed/") && name != "committed/nvkr-run-nvke-telemetry" {
 				testutil.RequireExtended(t)
 			}
-			oracle, err := RenderGitHub(t.Context(), plan)
-			if err != nil {
-				t.Fatal(err)
-			}
-			// Describe then Emit: two in-process contract calls or two launches.
-			for _, driver := range []struct {
-				name            string
-				ctx             context.Context
-				launches, calls int
-			}{
-				{"in-binary", t.Context(), 0, 0},
-				{"in-process", WithProjectionAdapter(t.Context(), ProjectionAdapter{Transport: ProjectionInProcess, Release: projectionTestRelease}), 0, 2},
-				{"out-of-process", WithProjectionAdapter(t.Context(), projectionTestAdapter(t, "reference")), 2, 0},
-			} {
-				record := recordProjectionLaunches(t)
-				got, err := Render(driver.ctx, plan, EngineGitHub)
-				if err != nil {
-					t.Fatalf("%s: %v", driver.name, err)
-				}
-				if record.launches != driver.launches || record.calls != driver.calls {
-					t.Fatalf("%s made %d launches and %d in-process calls, want %d and %d",
-						driver.name, record.launches, record.calls, driver.launches, driver.calls)
-				}
-				if !reflect.DeepEqual(got, oracle) {
-					t.Fatalf("%s bundle differs from the in-binary oracle", driver.name)
-				}
-				if _, err := validateGeneratedInputs(t.Context(), plan, got); err != nil {
-					t.Fatalf("%s: %v", driver.name, err)
-				}
-				if strings.HasPrefix(name, "committed/") {
-					if err := CheckGeneratedBundle(t.Context(), repo, got); err != nil {
-						t.Fatalf("%s differs from the committed bundle: %v", driver.name, err)
-					}
-				}
-			}
+			assertProjectionTransportEquivalence(t, repo, name, plan)
 		})
+	}
+}
+
+// Keep the largest maintained Plan in ordinary CI, independently shardable from
+// the aggregate matrix. This exercises the domain snapshot read bound without
+// extending either the projection adapter or CI job deadline.
+func TestMaintainedGPUProjectionTransports(t *testing.T) {
+	repo, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := LoadPlanContext(t.Context(), filepath.Join(repo, ".github/nvkr-run-nvke-gpu-site/plan.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertProjectionTransportEquivalence(t, repo, "committed/nvkr-run-nvke-gpu-site", plan)
+}
+
+func assertProjectionTransportEquivalence(t *testing.T, repo, name string, plan *Plan) {
+	t.Helper()
+	oracle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Describe then Emit: two in-process contract calls or two launches.
+	for _, driver := range []struct {
+		name            string
+		ctx             context.Context
+		launches, calls int
+	}{
+		{"in-binary", t.Context(), 0, 0},
+		{"in-process", WithProjectionAdapter(t.Context(), ProjectionAdapter{Transport: ProjectionInProcess, Release: projectionTestRelease}), 0, 2},
+		{"out-of-process", WithProjectionAdapter(t.Context(), projectionTestAdapter(t, "reference")), 2, 0},
+	} {
+		record := recordProjectionLaunches(t)
+		got, err := Render(driver.ctx, plan, EngineGitHub)
+		if err != nil {
+			t.Fatalf("%s: %v", driver.name, err)
+		}
+		if record.launches != driver.launches || record.calls != driver.calls {
+			t.Fatalf("%s made %d launches and %d in-process calls, want %d and %d",
+				driver.name, record.launches, record.calls, driver.launches, driver.calls)
+		}
+		if !reflect.DeepEqual(got, oracle) {
+			t.Fatalf("%s bundle differs from the in-binary oracle", driver.name)
+		}
+		if _, err := validateGeneratedInputs(t.Context(), plan, got); err != nil {
+			t.Fatalf("%s: %v", driver.name, err)
+		}
+		if strings.HasPrefix(name, "committed/") {
+			if err := CheckGeneratedBundle(t.Context(), repo, got); err != nil {
+				t.Fatalf("%s differs from the committed bundle: %v", driver.name, err)
+			}
+		}
 	}
 }
 

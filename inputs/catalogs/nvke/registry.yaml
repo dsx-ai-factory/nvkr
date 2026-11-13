@@ -1,0 +1,1136 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+components:
+  capi-controller-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: registry.k8s.io/cluster-api/cluster-api-controller:v1.13.6
+    source: capi
+  capi-kubeadm-bootstrap-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.13.6
+    source: capi
+  capi-kubeadm-control-plane-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.13.6
+    source: capi
+  capnico-controller:
+    artifactPath: bin/capnico-controller-{{.Arch}}.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/.
+      --local dockerfile=/src --opt platform=linux/{{.Arch}} --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+      --output type=oci,dest=/src/bin/capnico-controller-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: capnico
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    writeDir: bin
+  cert-manager-cainjector-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: quay.io/jetstack/cert-manager-cainjector:v1.21.1
+    source: cert-manager
+  cert-manager-controller-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: quay.io/jetstack/cert-manager-controller:v1.21.1
+    source: cert-manager
+  cert-manager-webhook-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: quay.io/jetstack/cert-manager-webhook:v1.21.1
+    source: cert-manager
+  cluster-api-provider-provisioned:
+    artifactPath: bin/cluster-api-provider-provisioned-image-{{.Arch}}.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/.
+      --local dockerfile=/src/cluster-api-provider-provisioned --opt platform=linux/{{.Arch}}
+      --opt "build-arg:BUILD_VERSION=$BUILD_VERSION" --output type=oci,dest=/src/bin/cluster-api-provider-provisioned-image-{{.Arch}}.oci.tar,oci-mediatypes=true
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    versionStamp:
+      BUILD_VERSION: '{{.ModuleTag}}'
+    writeDir: bin
+  cluster-api-provider-provisioned-native-site:
+    artifactPath: bin/cluster-api-provider-provisioned-image-{{.Arch}}.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/.
+      --local dockerfile=/src/cluster-api-provider-provisioned --opt platform=linux/{{.Arch}}
+      --opt "build-arg:BUILD_VERSION=$BUILD_VERSION" --output type=oci,dest=/src/bin/cluster-api-provider-provisioned-image-{{.Arch}}.oci.tar,oci-mediatypes=true
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke-controller
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    versionStamp:
+      BUILD_VERSION: git-{{.Commit}}
+    writeDir: bin
+  cwe:
+    artifactPath: bin/cwe.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src --local
+      dockerfile=/src/controller --opt platform=linux/amd64 --opt "build-arg:BUILD_VERSION=$BUILD_VERSION"
+      --opt "build-arg:GIT_VERSION=$GIT_VERSION" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+      --output type=oci,dest=/src/bin/cwe.oci.tar,oci-mediatypes=true
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    source: nvke-controller-module-tags
+    toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
+    versionStamp:
+      BUILD_VERSION: '{{.ModuleTag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: bin
+  nktp-chart:
+    artifactPath: charts/nktp-0.1.0.tgz
+    buildCommand:
+    - sh
+    - -euc
+    - helm package nktp
+      --destination=charts/
+    fromSource: true
+    outputType: tarball
+    platforms:
+    - linux/arm64
+    source: nvke-nktp-helm
+    writeDir: charts
+  nktp-chart-native-site:
+    artifactPath: charts/nktp-0.1.0.tgz
+    buildCommand:
+    - .nvkr-tools/helm
+    - package
+    - nktp
+    - --destination=charts/
+    fromSource: true
+    outputType: tarball
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke-nktp-helm-native-site
+    writeDir: charts
+  nktp-chart-nightly-site:
+    artifactPath: charts/nktp-0.1.0.tgz
+    buildCommand:
+    - sh
+    - -euc
+    - |
+      printf '%s\n' \
+        '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  /src/nvkr-chart-tools/helm' \
+        | sha256sum --quiet -c -
+      exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package nktp --destination=charts/
+    fromSource: true
+    outputType: tarball
+    platforms:
+    - linux/arm64
+    source: nvke-nktp-helm-nightly-site
+    writeDir: charts
+  nktp-chart-release-components:
+    artifactPath: charts/nktp-0.1.0.tgz
+    buildCommand:
+    - sh
+    - -euc
+    - .nvkr-tools/helm package nktp
+      --destination=charts/
+    fromSource: true
+    outputType: tarball
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke-nktp
+    writeDir: charts
+  nktp-collector-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: otel/opentelemetry-collector-k8s:0.164.0
+    source: nvke-nktp
+  nktp-kube-state-metrics-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0
+    source: nvke-nktp
+  nktp-kubectl-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: registry.k8s.io/kubectl:v1.35.10
+    source: nvke-nktp
+  nktp-lgtm-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: grafana/otel-lgtm:0.38.0
+    source: nvke-nktp
+  nktp-metrics-server-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: registry.k8s.io/metrics-server/metrics-server:v0.8.1
+    source: nvke-nktp
+  nktp-node-exporter-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: quay.io/prometheus/node-exporter:v1.12.1
+    source: nvke-nktp
+  nktp-operator-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.161.0
+    source: nvke-nktp
+  nktp-target-allocator-image:
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      evidence:
+        none: true
+      image: ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:0.161.0
+    source: nvke-nktp
+  nvke-controller:
+    artifactPath: bin/nvke-controller-image-{{.Arch}}.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/.
+      --local dockerfile=/src/controller --opt platform=linux/{{.Arch}} --opt "build-arg:BUILD_VERSION=$BUILD_VERSION"
+      --opt "build-arg:GIT_VERSION=$GIT_VERSION" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
+      --output type=oci,dest=/src/bin/nvke-controller-image-{{.Arch}}.oci.tar,oci-mediatypes=true
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    versionStamp:
+      BUILD_VERSION: '{{.ModuleTag}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: bin
+  nvke-controller-chart:
+    artifactPath: charts/nvke-controller-0.23.0.tgz
+    buildCommand:
+    - package
+    - controller/deploy/charts/controller
+    - --version=0.23.0
+    - --app-version=v0.23.0
+    - --destination=charts/
+    fromSource: true
+    helm:
+      chart: .
+      images:
+        controller:
+          values:
+            digest: image.digest
+    outputType: tarball
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke-helm
+    writeDir: charts
+  nvke-controller-chart-local-site:
+    artifactPath: charts/nvke-controller-0.23.0.tgz
+    buildCommand:
+    - sh
+    - -euc
+    - helm package controller/deploy/charts/controller --version=0.23.0 --app-version=v0.23.0
+      --destination=charts/
+    fromSource: true
+    helm:
+      chart: .
+      images:
+        controller:
+          values:
+            digest: image.digest
+    outputType: tarball
+    platforms:
+    - linux/arm64
+    source: nvke-controller-helm
+    writeDir: charts
+  nvke-controller-chart-native-site:
+    artifactPath: charts/nvke-controller-0.0.0.tgz
+    buildCommand:
+    - .nvkr-tools/helm
+    - package
+    - controller/deploy/charts/controller
+    - --destination=charts/
+    fromSource: true
+    helm:
+      chart: .
+      images:
+        controller:
+          values:
+            digest: image.digest
+    outputType: tarball
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke-controller-helm-native-site
+    writeDir: charts
+  nvke-controller-chart-nightly-site:
+    artifactPath: charts/nvke-controller-0.23.0.tgz
+    buildCommand:
+    - sh
+    - -euc
+    - |
+      printf '%s\n' \
+        '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  /src/nvkr-chart-tools/helm' \
+        | sha256sum --quiet -c -
+      exec timeout --kill-after=10s 60s /src/nvkr-chart-tools/helm package controller/deploy/charts/controller --version=0.23.0 --app-version=v0.23.0 --destination=charts/
+    fromSource: true
+    helm:
+      chart: .
+      images:
+        controller:
+          values:
+            digest: image.digest
+    outputType: tarball
+    platforms:
+    - linux/arm64
+    source: nvke-controller-helm-nightly-site
+    writeDir: charts
+  nvke-controller-native-site:
+    artifactPath: bin/nvke-controller-image-{{.Arch}}.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/.
+      --local dockerfile=/src/controller --opt platform=linux/{{.Arch}} --opt build-arg:GOLANG_IMAGE=docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+      --opt "build-arg:BUILD_VERSION=$BUILD_VERSION" --opt "build-arg:GIT_VERSION=$GIT_VERSION"
+      --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" --output type=oci,dest=/src/bin/nvke-controller-image-{{.Arch}}.oci.tar,oci-mediatypes=true
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke-controller
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    versionStamp:
+      BUILD_VERSION: '{{.Commit}}'
+      GIT_VERSION: '{{.Commit}}'
+    writeDir: bin
+  nvke-controller-profiles-image:
+    artifactPath: bin/nvke-controller-profiles-image-{{.Arch}}.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/.
+      --local dockerfile=/src/nvkr-controller-profiles --opt platform=linux/{{.Arch}}
+      --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" --output type=oci,dest=/src/bin/nvke-controller-profiles-image-{{.Arch}}.oci.tar,oci-mediatypes=true
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    patches:
+    - name: patches/profiles-image.patch
+      sha256: sha256:e324612924f15eadeeb02f4ac73eeb9c265ae571fe781e0c741811c291dd9849
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    writeDir: bin
+  nvke-helm:
+    artifactPath: bin/nvke-helm.tar
+    buildCommand:
+    - sh
+    - -ec
+    - tar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 --numeric-owner
+      -C /src/controller/deploy/charts -cf /src/bin/nvke-helm.tar controller
+    fromSource: true
+    helm:
+      chart: .
+      images:
+        controller:
+          values:
+            digest: image.digest
+    outputType: tarball
+    platforms:
+    - linux/amd64
+    source: nvke-controller-module-tags
+    writeDir: bin
+  nvke-local-profiles:
+    artifactPath: bin/nvke-local-profiles-{{.Arch}}.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      : "${SOURCE_DATE_EPOCH:?}"
+      # Exact pinned source bytes keep the named Alpine context exhaustive.
+      # This is blob integrity, not Dockerfile parsing or Release authority.
+      test -f controller/profiles/example/Dockerfile
+      test ! -L controller/profiles/example/Dockerfile
+      printf '%s\n' '789f7ad1e406b82f0f55a52152eff7b08846b4122582145fade588c7d931cc3e  controller/profiles/example/Dockerfile' \
+        | sha256sum -c -
+      mkdir -p bin/profiles-context/profiles/configProfiles
+      cp -R controller/test/fixtures/runbooks bin/profiles-context/
+      cp controller/test/fixtures/profiles/configProfiles/nico-vms-cp.yaml \
+        controller/test/fixtures/profiles/configProfiles/nico-vms-worker.yaml bin/profiles-context/profiles/configProfiles/
+      buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src/bin/profiles-context \
+        --local dockerfile=/src/controller/profiles/example \
+        --opt platform=linux/{{.Arch}} \
+        --opt context:alpine:3.24.1=docker-image://docker.io/library/alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 \
+        --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+        --output type=oci,dest=/src/bin/nvke-local-profiles-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke-profiles
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    writeDir: bin
+  nvke-local-profiles-nvidia:
+    artifactPath: bin/nvke-local-profiles-{{.Arch}}.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      : "${SOURCE_DATE_EPOCH:?}"
+      # Exact pinned source bytes keep the named Alpine context exhaustive.
+      # This is blob integrity, not Dockerfile parsing or Release authority.
+      test -f controller/profiles/example/Dockerfile
+      test ! -L controller/profiles/example/Dockerfile
+      printf '%s\n' '789f7ad1e406b82f0f55a52152eff7b08846b4122582145fade588c7d931cc3e  controller/profiles/example/Dockerfile' \
+        | sha256sum -c -
+      mkdir -p bin/profiles-context/profiles/configProfiles
+      cp -R nvkr-local-profiles/osProfiles bin/profiles-context/profiles/
+      cp -R controller/test/fixtures/runbooks bin/profiles-context/
+      cp controller/test/fixtures/profiles/configProfiles/nico-vms-cp.yaml \
+        controller/test/fixtures/profiles/configProfiles/nico-vms-worker.yaml bin/profiles-context/profiles/configProfiles/
+      buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src/bin/profiles-context \
+        --local dockerfile=/src/controller/profiles/example \
+        --opt platform=linux/{{.Arch}} \
+        --opt context:alpine:3.24.1=docker-image://docker.io/library/alpine@sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d \
+        --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+        --output type=oci,dest=/src/bin/nvke-local-profiles-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    patches:
+    - name: patches/local-profile.patch
+      sha256: sha256:3928811f56ba0a47011afd16dc066c54189be06c238da43d801e92ae3fd02e22
+    platforms:
+    - linux/arm64
+    source: nvke-profiles
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    writeDir: bin
+  nvke-local-profiles-upstream:
+    artifactPath: bin/nvke-local-profiles-{{.Arch}}.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      : "${SOURCE_DATE_EPOCH:?}"
+      # Exact pinned source bytes keep the named Alpine context exhaustive.
+      # This is blob integrity, not Dockerfile parsing or Release authority.
+      test -f controller/profiles/example/Dockerfile
+      test ! -L controller/profiles/example/Dockerfile
+      printf '%s\n' '789f7ad1e406b82f0f55a52152eff7b08846b4122582145fade588c7d931cc3e  controller/profiles/example/Dockerfile' \
+        | sha256sum -c -
+      mkdir -p bin/profiles-context/profiles/configProfiles
+      cp -R nvkr-local-profiles/osProfiles bin/profiles-context/profiles/
+      cp -R controller/test/fixtures/runbooks bin/profiles-context/
+      cp controller/test/fixtures/profiles/configProfiles/nico-vms-cp.yaml \
+        controller/test/fixtures/profiles/configProfiles/nico-vms-worker.yaml bin/profiles-context/profiles/configProfiles/
+      buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src/bin/profiles-context \
+        --local dockerfile=/src/controller/profiles/example \
+        --opt platform=linux/{{.Arch}} \
+        --opt context:alpine:3.24.1=docker-image://docker.io/library/alpine@sha256:260479a1cfaf304c4c20da7f8405d3ce313513dcd534bb743257bdd2fe0f3e2d \
+        --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+        --output type=oci,dest=/src/bin/nvke-local-profiles-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    patches:
+    - name: patches/controller-profiles-upstream-arm64/local-profile.patch
+      sha256: sha256:41af243d2d6fe768bddfdbeebb0d90aee574e6886a3d7f8288a62d052ada3e87
+    platforms:
+    - linux/arm64
+    source: nvke-profiles
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    writeDir: bin
+  nvke-nico-reference-profiles:
+    artifactPath: bin/nico-reference-profiles-fixture-{{.Arch}}.oci.tar
+    buildCommand:
+    - sh
+    - -euc
+    - |
+      mkdir -p bin/profiles-context/profiles/configProfiles
+      cp controller/test/fixtures/profiles/configProfiles/nico-vms-cp.yaml \
+        controller/test/fixtures/profiles/configProfiles/nico-vms-worker.yaml bin/profiles-context/profiles/configProfiles/
+      cp -R controller/test/fixtures/runbooks bin/profiles-context/
+      buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src/bin/profiles-context \
+        --local dockerfile=/src/controller/test/fixtures \
+        --opt 'platform=linux/{{.Arch}}' \
+        --opt context:alpine:3.24.1=docker-image://docker.io/library/alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 \
+        --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+        --output 'type=oci,dest=/src/bin/nico-reference-profiles-fixture-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true'
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke-content
+    toolchainImage: moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4
+    writeDir: bin
+  nvkectl-arm64:
+    artifactPath: cli/bin/nvkectl
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+      make -C cli build NVKECTL_TREE=clean
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    platforms:
+    - linux/arm64
+    source: nvke-cli
+    versionStamp:
+      NVKECTL_COMMIT: '{{.Commit}}'
+      NVKECTL_DATE: '{{.Date}}'
+      NVKECTL_VERSION: '{{.Tag}}'
+    writeDir: cli/bin
+  nvkectl-native-site:
+    artifactPath: cli/bin/nvkectl
+    buildCommand:
+    - bash
+    - -euc
+    - |
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
+      make -C cli build NVKECTL_TREE=clean
+    cgo: false
+    fromSource: true
+    outputType: host-package
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: nvke-cli-local-site
+    versionStamp:
+      NVKECTL_COMMIT: '{{.Commit}}'
+      NVKECTL_DATE: '{{.Date}}'
+      NVKECTL_VERSION: git-{{.Commit}}
+    writeDir: cli/bin
+  postgresql-chart:
+    outputType: raw
+    pinnedBy: nvke
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      chart:
+        name: postgresql
+        repository: oci://registry-1.docker.io/bitnamicharts
+      evidence:
+        none: true
+  postgresql-chart-native-site:
+    outputType: raw
+    pinnedBy: nvke-deploy
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      chart:
+        name: postgresql
+        repository: oci://registry-1.docker.io/bitnamicharts
+      evidence:
+        none: true
+  spire-chart:
+    outputType: raw
+    pinnedBy: nvke
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      chart:
+        name: spire
+        repository: https://spiffe.github.io/helm-charts-hardened/
+      evidence:
+        none: true
+  spire-chart-native-site:
+    outputType: raw
+    pinnedBy: nvke-deploy
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      chart:
+        name: spire
+        repository: https://spiffe.github.io/helm-charts-hardened/
+      evidence:
+        none: true
+  spire-crds-chart:
+    outputType: raw
+    pinnedBy: nvke
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      chart:
+        name: spire-crds
+        repository: https://spiffe.github.io/helm-charts-hardened/
+      evidence:
+        none: true
+  spire-crds-chart-native-site:
+    outputType: raw
+    pinnedBy: nvke-deploy
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      chart:
+        name: spire-crds
+        repository: https://spiffe.github.io/helm-charts-hardened/
+      evidence:
+        none: true
+  temporal-chart:
+    outputType: raw
+    pinnedBy: nvke
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      chart:
+        name: temporal
+        repository: https://go.temporal.io/helm-charts
+      evidence:
+        none: true
+  temporal-chart-native-site:
+    outputType: raw
+    pinnedBy: nvke-deploy
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    prebuilt:
+      chart:
+        name: temporal
+        repository: https://go.temporal.io/helm-charts
+      evidence:
+        none: true
+imports:
+- path: ../shared/build-actions.yaml
+  sha256: 89919dde5a129554223e63b23d9ac4f610e9c9a0e369fe8ab188b3f13575723b
+  sources:
+    checkout: checkout
+    download-artifact: download-artifact
+    setup-go: setup-go
+    upload-artifact: upload-artifact
+- components:
+    nvke-controller-local-site: nvke-controller
+    nvkectl: nvkectl-release
+  path: ../shared/nvke.yaml
+  sha256: 90dbe40c5ce58b88c2722343db8a12f8f2ea4ad7f853fd20a8f69fb908994def
+  sources:
+    nvke-cli: nvke-cli
+    nvke-cli-local-site: nvke-cli-local-site-arm64
+    nvke-controller: nvke-controller
+- path: ../shared/syft.yaml
+  sha256: f52faff48638dde1ee3b2c6ff7e71501739cefbed502fe80ad296b9de370a897
+  sources:
+    syft: syft
+- path: ../shared/controller-profiles.yaml
+  sha256: c6273cedf8c36b19509ec1933d57c680b0651539d21bda3048b1ad1a2e6f146f
+  sources:
+    nvke-profiles: nvke-profiles
+- path: ../shared/capnico.yaml
+  sha256: 55a1243a2a690110edefd3ae46e025ad869981bbd76be1a05e799c123292ec06
+  sources:
+    capnico: capnico
+- components:
+    nvkectl-local-site: nvkectl
+  path: ../shared/nvke.yaml
+  sha256: 90dbe40c5ce58b88c2722343db8a12f8f2ea4ad7f853fd20a8f69fb908994def
+  sourceNames:
+    nvke-cli: nvke-cli-local-site
+- components:
+    nvkectl-module-tags: nvkectl-release
+  path: ../shared/nvke.yaml
+  sha256: 90dbe40c5ce58b88c2722343db8a12f8f2ea4ad7f853fd20a8f69fb908994def
+  sourceNames:
+    nvke-cli: nvke-cli
+kind: SourceBuildRegistry
+metadata:
+  description: Shared nvke domain catalog; explicit producer variants preserve existing
+    build and acquisition contracts.
+  name: nvke
+sources:
+  capi:
+    constraint: 1.13.6
+    repo: https://github.com/kubernetes-sigs/cluster-api
+    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+  cert-manager:
+    constraint: 1.21.1
+    repo: https://github.com/cert-manager/cert-manager
+    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+  cosign:
+    constraint: 3.1.3
+    repo: https://github.com/sigstore/cosign
+    tool:
+      executablePath: cosign-linux-amd64
+      format: raw
+      platform: linux/amd64
+      url: https://github.com/sigstore/cosign/releases/download/{{.Tag}}/cosign-linux-amd64
+  cosign-module-tags:
+    constraint: 3.1.x
+    repo: https://github.com/sigstore/cosign
+    tool:
+      executablePath: cosign-linux-amd64
+      format: raw
+      platform: linux/amd64
+      url: https://github.com/sigstore/cosign/releases/download/{{.Tag}}/cosign-linux-amd64
+  nvke:
+    constraint: v0.23.0
+    pinSet:
+      accounted:
+        capnico:
+          type: manifest
+        controller:
+          chartName: nvke-controller
+          path: ../../controller/deploy/charts/controller
+          type: helm
+        nktp:
+          path: ../../nktp/deploy/charts/nktp
+          type: helm
+        nvke-base-config:
+          type: template
+        spire-oidc-provider-nodeport:
+          type: manifest
+        spire-server-nodeport:
+          type: manifest
+        spire-tpm-pubhashes:
+          type: manifest
+      file: deploy/nico/nvke-deploy.yaml
+      format: nvke-deploy-v1
+      members:
+        postgresql:
+          artifact: postgresql-chart
+        spire:
+          artifact: spire-chart
+        spire-crds:
+          artifact: spire-crds-chart
+        temporal:
+          artifact: temporal-chart
+    repo: https://github.com/dsx-ai-factory/nvke
+    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+  nvke-content:
+    constraint: v0.23.0
+    repo: https://github.com/dsx-ai-factory/nvke
+    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+  nvke-controller-helm:
+    constraint: v0.23.0
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    toolchainImagesByArch:
+      arm64: sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0
+    vendorCommand:
+    - helm
+    - dependency
+    - build
+    - controller/deploy/charts/controller
+  nvke-controller-helm-native-site:
+    constraint: v0.23.0
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    toolchainImagesByArch:
+      amd64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+      arm64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+    vendorCommand:
+    - sh
+    - -euc
+    - |
+      target_arch={{.Arch}}
+      helm_digest() {
+        case "$1" in
+          amd64) printf '%s' c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3 ;;
+          arm64) printf '%s' 564de2191b881e9f71b5606b25345821ea1682f06ab90499d3ab22b530176da1 ;;
+          *) echo 'Unsupported Helm architecture' >&2; exit 1 ;;
+        esac
+      }
+      case "$(uname -m)" in
+        x86_64) arch=amd64 ;;
+        aarch64) arch=arm64 ;;
+        *) echo 'Unsupported Helm execution architecture' >&2; exit 1 ;;
+      esac
+      digest=$(helm_digest "$arch")
+      curl --fail --location --max-time 120 --output /tmp/helm.tar.gz "https://get.helm.sh/helm-v4.2.4-linux-$arch.tar.gz"
+      printf '%s  %s\n' "$digest" /tmp/helm.tar.gz | sha256sum -c -
+      tar --no-same-owner -xzf /tmp/helm.tar.gz -C /tmp "linux-$arch/helm"
+      # The vendor sandbox's /tmp is noexec; only the held source volume executes.
+      host_tools=$(mktemp -d .nvkr-helm-host.XXXXXX)
+      trap 'rm -rf -- "$host_tools"' EXIT
+      cp "/tmp/linux-$arch/helm" "$host_tools/helm"
+      pins="$(sha256sum controller/deploy/charts/controller/Chart.yaml)"
+      timeout --kill-after=10s 120s "$host_tools/helm" dependency build controller/deploy/charts/controller
+      printf '%s\n' "$pins" | sha256sum -c -
+      # The captured source bytes and vendor identity bind the build target,
+      # independently of the utility host used to resolve chart dependencies.
+      if [ "$target_arch" != "$arch" ]; then
+        digest=$(helm_digest "$target_arch")
+        curl --fail --location --max-time 120 --output /tmp/helm-target.tar.gz "https://get.helm.sh/helm-v4.2.4-linux-$target_arch.tar.gz"
+        printf '%s  %s\n' "$digest" /tmp/helm-target.tar.gz | sha256sum -c -
+        tar --no-same-owner -xzf /tmp/helm-target.tar.gz -C /tmp "linux-$target_arch/helm"
+      fi
+      mkdir -p .nvkr-tools
+      cp "/tmp/linux-$target_arch/helm" .nvkr-tools/helm
+  nvke-controller-helm-nightly-site:
+    constraint: v0.23.0
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    toolchainImagesByArch:
+      arm64: docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+    vendorCommand:
+    - sh
+    - -euc
+    - |
+      test ! -e nvkr-chart-tools
+      mkdir -m 0755 nvkr-chart-tools
+      archive=/tmp/nvkr-chart-helm-arm64.tar.gz
+      timeout --kill-after=10s 240s curl --fail --silent --show-error --location \
+        --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 120 \
+        --retry 2 --retry-max-time 180 --max-filesize 268435456 \
+        https://get.helm.sh/helm-v4.1.4-linux-arm64.tar.gz --output "$archive"
+      printf '%s  %s\n' \
+        13d03672be289045d2ff00e4e345d61de1c6f21c1257a45955a30e8ae036d8f1 "$archive" \
+        | sha256sum --quiet -c -
+      tar -xOzf "$archive" linux-arm64/helm > nvkr-chart-tools/helm
+      tar -xOzf "$archive" linux-arm64/LICENSE > nvkr-chart-tools/LICENSE
+      printf '%s\n' \
+        '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  nvkr-chart-tools/helm' \
+        | sha256sum --quiet -c -
+      chmod 0555 nvkr-chart-tools/helm
+      pins="$(sha256sum controller/deploy/charts/controller/Chart.yaml)"
+      timeout --kill-after=10s 120s ./nvkr-chart-tools/helm dependency build controller/deploy/charts/controller
+      printf '%s\n' "$pins" | sha256sum --quiet -c -
+  nvke-controller-module-tags:
+    constraint: v0.23.0
+    repo: https://github.com/dsx-ai-factory/nvke
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+  nvke-deploy:
+    constraint: v0.23.0
+    pinSet:
+      accounted:
+        capnico:
+          type: manifest
+        controller:
+          chartName: nvke-controller
+          path: ../../controller/deploy/charts/controller
+          type: helm
+        nktp:
+          path: ../../nktp/deploy/charts/nktp
+          type: helm
+        nvke-base-config:
+          type: template
+        spire-oidc-provider-nodeport:
+          type: manifest
+        spire-server-nodeport:
+          type: manifest
+        spire-tpm-pubhashes:
+          type: manifest
+      file: deploy/nico/nvke-deploy.yaml
+      format: nvke-deploy-v1
+      members:
+        postgresql:
+          artifact: postgresql-chart-native-site
+        spire:
+          artifact: spire-chart-native-site
+        spire-crds:
+          artifact: spire-crds-chart-native-site
+        temporal:
+          artifact: temporal-chart-native-site
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    toolchainImage: alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+  nvke-helm:
+    constraint: v0.23.0
+    repo: https://github.com/dsx-ai-factory/nvke
+    toolchainImage: alpine/helm@sha256:a6cf54599ccb99d90cf0712b30f03fdb3cab062e6b94e0418cc4db7e8a1464b2
+    vendorCommand:
+    - dependency
+    - build
+    - controller/deploy/charts/controller
+  # NKTP is released from its own repository. Keep these variants aligned with
+  # the NKTP release selected by NVKE's deploy/nico/nktp/values.yaml.
+  nvke-nktp:
+    constraint: 0.1.0
+    tagPrefix: nktp/v
+    repo: https://github.com/dsx-ai-factory/nvke-telemetry-pipeline
+    toolchainImage: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+    vendorCommand:
+    - sh
+    - -euc
+    - |
+      case "$(uname -m)" in
+        x86_64) arch=amd64; digest=c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3 ;;
+        aarch64) arch=arm64; digest=564de2191b881e9f71b5606b25345821ea1682f06ab90499d3ab22b530176da1 ;;
+        *) echo 'Unsupported Helm execution architecture' >&2; exit 1 ;;
+      esac
+      curl --fail --location --max-time 120 --output /tmp/helm.tar.gz "https://get.helm.sh/helm-v4.2.4-linux-$arch.tar.gz"
+      printf '%s  %s\n' "$digest" /tmp/helm.tar.gz | sha256sum -c -
+      tar --no-same-owner -xzf /tmp/helm.tar.gz -C /tmp "linux-$arch/helm"
+      mkdir -p .nvkr-tools
+      cp "/tmp/linux-$arch/helm" .nvkr-tools/helm
+      export HELM_REPOSITORY_CONFIG=/tmp/nktp-repositories.yaml
+      export HELM_REPOSITORY_CACHE=/tmp/nktp-cache
+      pins="$(sha256sum nktp/Chart.yaml nktp/Chart.lock)"
+      timeout --kill-after=10s 120s .nvkr-tools/helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
+      timeout --kill-after=10s 120s .nvkr-tools/helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
+      timeout --kill-after=10s 120s .nvkr-tools/helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
+      timeout --kill-after=10s 120s .nvkr-tools/helm dependency build nktp --skip-refresh
+      printf '%s\n' "$pins" | sha256sum -c -
+      set -- nktp/charts/*.tgz
+      test "$#" -eq 3
+      printf '%s\n' \
+        '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/charts/metrics-server-3.13.1.tgz' \
+        'e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/charts/opentelemetry-kube-stack-0.25.1.tgz' \
+        '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
+        | sha256sum -c -
+  nvke-nktp-helm:
+    constraint: 0.1.0
+    tagPrefix: nktp/v
+    repo: https://github.com/dsx-ai-factory/nvke-telemetry-pipeline.git
+    toolchainImagesByArch:
+      arm64: sha256:8fae65b2d2366fe8370d8e10f34ef5c11c43a8341bb727bb48b2fa2b1035dbf0
+    vendorCommand:
+    - sh
+    - -euc
+    - |
+      export HELM_REPOSITORY_CONFIG=/tmp/nktp-repositories.yaml
+      export HELM_REPOSITORY_CACHE=/tmp/nktp-cache
+      # These are the three exact URLs in the selected source's Chart.yaml.
+      # Helm, not a custom parser, validates Chart.yaml against Chart.lock.
+      pins="$(sha256sum nktp/Chart.yaml nktp/Chart.lock)"
+      helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
+      helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
+      helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
+      helm dependency build nktp --skip-refresh
+      printf '%s\n' "$pins" | sha256sum -c -
+      set -- nktp/charts/*.tgz
+      if [ "$#" -ne 3 ]; then
+        echo 'Expected exactly three pinned NKTP dependency-chart archives.' >&2
+        exit 1
+      fi
+      printf '%s\n' \
+        '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/charts/metrics-server-3.13.1.tgz' \
+        'e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/charts/opentelemetry-kube-stack-0.25.1.tgz' \
+        '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
+        | sha256sum -c -
+  nvke-nktp-helm-native-site:
+    constraint: 0.1.0
+    tagPrefix: nktp/v
+    repo: https://github.com/dsx-ai-factory/nvke-telemetry-pipeline.git
+    toolchainImagesByArch:
+      amd64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+      arm64: golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+    vendorCommand:
+    - sh
+    - -euc
+    - |
+      target_arch={{.Arch}}
+      helm_digest() {
+        case "$1" in
+          amd64) printf '%s' c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3 ;;
+          arm64) printf '%s' 564de2191b881e9f71b5606b25345821ea1682f06ab90499d3ab22b530176da1 ;;
+          *) echo 'Unsupported Helm architecture' >&2; exit 1 ;;
+        esac
+      }
+      case "$(uname -m)" in
+        x86_64) arch=amd64 ;;
+        aarch64) arch=arm64 ;;
+        *) echo 'Unsupported Helm execution architecture' >&2; exit 1 ;;
+      esac
+      digest=$(helm_digest "$arch")
+      curl --fail --location --max-time 120 --output /tmp/helm.tar.gz "https://get.helm.sh/helm-v4.2.4-linux-$arch.tar.gz"
+      printf '%s  %s\n' "$digest" /tmp/helm.tar.gz | sha256sum -c -
+      tar --no-same-owner -xzf /tmp/helm.tar.gz -C /tmp "linux-$arch/helm"
+      # The vendor sandbox's /tmp is noexec; only the held source volume executes.
+      host_tools=$(mktemp -d .nvkr-helm-host.XXXXXX)
+      trap 'rm -rf -- "$host_tools"' EXIT
+      cp "/tmp/linux-$arch/helm" "$host_tools/helm"
+      export HELM_REPOSITORY_CONFIG=/tmp/nktp-repositories.yaml
+      export HELM_REPOSITORY_CACHE=/tmp/nktp-cache
+      # These are the three exact URLs in the selected source's Chart.yaml.
+      # Helm, not a custom parser, validates Chart.yaml against Chart.lock.
+      pins="$(sha256sum nktp/Chart.yaml nktp/Chart.lock)"
+      "$host_tools/helm" repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
+      "$host_tools/helm" repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
+      "$host_tools/helm" repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
+      "$host_tools/helm" dependency build nktp --skip-refresh
+      printf '%s\n' "$pins" | sha256sum -c -
+      # The captured source bytes and vendor identity bind the build target,
+      # independently of the utility host used to resolve chart dependencies.
+      if [ "$target_arch" != "$arch" ]; then
+        digest=$(helm_digest "$target_arch")
+        curl --fail --location --max-time 120 --output /tmp/helm-target.tar.gz "https://get.helm.sh/helm-v4.2.4-linux-$target_arch.tar.gz"
+        printf '%s  %s\n' "$digest" /tmp/helm-target.tar.gz | sha256sum -c -
+        tar --no-same-owner -xzf /tmp/helm-target.tar.gz -C /tmp "linux-$target_arch/helm"
+      fi
+      mkdir -p .nvkr-tools
+      cp "/tmp/linux-$target_arch/helm" .nvkr-tools/helm
+      set -- nktp/charts/*.tgz
+      if [ "$#" -ne 3 ]; then
+        echo 'Expected exactly three pinned NKTP dependency-chart archives.' >&2
+        exit 1
+      fi
+      # The reviewed release and current main both select OTEL chart 0.25.1.
+      # Helm validates Chart.lock; only these independently reviewed archives pass.
+      set -- nktp/charts/opentelemetry-kube-stack-*.tgz
+      if [ "$#" -ne 1 ]; then
+        echo 'Expected exactly one reviewed NKTP OpenTelemetry archive.' >&2
+        exit 1
+      fi
+      case "${1##*/}" in
+        opentelemetry-kube-stack-0.25.1.tgz) otel_digest=e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda ;;
+        *) echo 'Unreviewed NKTP OpenTelemetry dependency archive.' >&2; exit 1 ;;
+      esac
+      printf '%s\n' \
+        '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/charts/metrics-server-3.13.1.tgz' \
+        "$otel_digest  $1" \
+        '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
+        | sha256sum -c -
+  nvke-nktp-helm-nightly-site:
+    constraint: 0.1.0
+    tagPrefix: nktp/v
+    repo: https://github.com/dsx-ai-factory/nvke-telemetry-pipeline.git
+    toolchainImagesByArch:
+      arm64: docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b
+    vendorCommand:
+    - sh
+    - -euc
+    - |
+      test ! -e nvkr-chart-tools
+      mkdir -m 0755 nvkr-chart-tools
+      archive=/tmp/nvkr-chart-helm-arm64.tar.gz
+      timeout --kill-after=10s 240s curl --fail --silent --show-error --location \
+        --proto '=https' --proto-redir '=https' --connect-timeout 15 --max-time 120 \
+        --retry 2 --retry-max-time 180 --max-filesize 268435456 \
+        https://get.helm.sh/helm-v4.1.4-linux-arm64.tar.gz --output "$archive"
+      printf '%s  %s\n' \
+        13d03672be289045d2ff00e4e345d61de1c6f21c1257a45955a30e8ae036d8f1 "$archive" \
+        | sha256sum --quiet -c -
+      tar -xOzf "$archive" linux-arm64/helm > nvkr-chart-tools/helm
+      tar -xOzf "$archive" linux-arm64/LICENSE > nvkr-chart-tools/LICENSE
+      printf '%s\n' \
+        '4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d  nvkr-chart-tools/helm' \
+        | sha256sum --quiet -c -
+      chmod 0555 nvkr-chart-tools/helm
+      export HELM_REPOSITORY_CONFIG=/tmp/nktp-repositories.yaml
+      export HELM_REPOSITORY_CACHE=/tmp/nktp-cache
+      # These are the three exact URLs in the selected source's Chart.yaml.
+      # Helm, not a custom parser, validates Chart.yaml against Chart.lock.
+      pins="$(sha256sum nktp/Chart.yaml nktp/Chart.lock)"
+      timeout --kill-after=10s 60s ./nvkr-chart-tools/helm repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts
+      timeout --kill-after=10s 60s ./nvkr-chart-tools/helm repo add nktp-prometheus https://prometheus-community.github.io/helm-charts
+      timeout --kill-after=10s 60s ./nvkr-chart-tools/helm repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/
+      timeout --kill-after=10s 180s ./nvkr-chart-tools/helm dependency build nktp --skip-refresh
+      printf '%s\n' "$pins" | sha256sum -c -
+      set -- nktp/charts/*.tgz
+      if [ "$#" -ne 3 ]; then
+        echo 'Expected exactly three pinned NKTP dependency-chart archives.' >&2
+        exit 1
+      fi
+      printf '%s\n' \
+        '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/charts/metrics-server-3.13.1.tgz' \
+        'e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda  nktp/charts/opentelemetry-kube-stack-0.25.1.tgz' \
+        '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/charts/prometheus-node-exporter-4.56.1.tgz' \
+        | sha256sum -c -
+  syft-module-tags:
+    constraint: 1.51.x
+    repo: https://github.com/anchore/syft
+    tool:
+      executablePath: syft
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_linux_amd64.tar.gz

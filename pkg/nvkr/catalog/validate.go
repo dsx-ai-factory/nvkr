@@ -6,6 +6,7 @@ package catalog
 import (
 	"crypto/sha256"
 	"fmt"
+	"maps"
 	"net/url"
 	"path"
 	"slices"
@@ -127,6 +128,15 @@ func (cat *Catalog) Validate() error {
 			return err
 		}
 	}
+	for _, name := range slices.Sorted(maps.Keys(cat.ToolsByPlatform)) {
+		pins := cat.ToolsByPlatform[name]
+		if _, exists := cat.Tools[name]; exists || len(pins) == 0 {
+			return e.New(e.CodeInvalidCatalog, "tool %q has ambiguous or empty platform pins", name)
+		}
+		if err := validateToolPins(pins); err != nil {
+			return err
+		}
+	}
 	for _, pin := range cat.Actions {
 		if err := pin.Validate(); err != nil {
 			return err
@@ -216,7 +226,7 @@ func validateComponent(name string, c Component) error {
 	if err := validateHelmProducer(c.Helm, c.FromSource, c.Prebuilt, c.OutputType); err != nil {
 		return err
 	}
-	if err := validateComponentTargets(name, c.Platforms, sourceExecutableTarget(c.FromSource, c.BuilderType, c.OutputType) || !c.FromSource && c.OutputType == "host-package" && c.Prebuilt != nil && c.Prebuilt.Executable != nil); err != nil {
+	if err := validateComponentTargets(name, c.Platforms, sourceExecutableTarget(c.FromSource, c.BuilderType, c.OutputType) || !c.FromSource && c.OutputType == "host-package" && c.Prebuilt != nil && (c.Prebuilt.Executable != nil || c.Prebuilt.Executables != nil)); err != nil {
 		return err
 	}
 	for _, argument := range c.VendorCommand {
@@ -481,6 +491,30 @@ func validateComponent(name string, c Component) error {
 // digests are checked in sorted order so the first error is deterministic.
 func validatePrebuilt(name string, c Component) error {
 	p := c.Prebuilt
+	if p.Executables != nil {
+		if p.ReleaseExecutable || p.Executable != nil || p.URL != "" || p.Image != "" || p.OCIArchive != "" || p.Chart != nil || p.ImageParentDigest != "" || len(p.Digests) != 0 {
+			return e.New(e.CodeInvalidCatalog, "multi-platform release executable %q has competing acquisitions", name)
+		}
+		if err := validateToolPins(p.Executables); err != nil {
+			return err
+		}
+		if len(p.Executables) != len(c.Platforms) {
+			return e.New(e.CodeUnpinnedSource, "release executable %q requires every platform pin", name)
+		}
+		for i, pin := range p.Executables {
+			if pin.Platform != c.Platforms[i] {
+				return e.New(e.CodeInvalidCatalog, "release executable %q has an extra or missing platform", name)
+			}
+			selected, err := c.ForPlatform(pin.Platform)
+			if err != nil {
+				return err
+			}
+			if err := validatePrebuilt(name, selected); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 	if p.ReleaseExecutable {
 		return e.New(e.CodeInvalidCatalog, "unresolved release executable for %q", name)
 	}

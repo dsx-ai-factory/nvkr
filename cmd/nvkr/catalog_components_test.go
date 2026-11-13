@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -71,7 +72,7 @@ func TestCatalogListShowsDirectProducers(t *testing.T) {
 }
 
 func TestCatalogListFiltersAndEmitsJSON(t *testing.T) {
-	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools", "operator-arm64")
+	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools")
 	output, err := runCatalogCommand(t, "catalog", "list", "--data", arm, "--platform", "linux/arm64", "--output-type", "host-package", "--format", "json")
 	if err != nil {
 		t.Fatal(err)
@@ -85,8 +86,20 @@ func TestCatalogListFiltersAndEmitsJSON(t *testing.T) {
 	if err := json.Unmarshal([]byte(output), &got); err != nil {
 		t.Fatalf("not JSON: %v: %s", err, output)
 	}
-	if len(got) != 2 || got[0].Name != "helm" || got[1].Name != "kubectl" || got[0].Platforms[0] != "linux/arm64" || got[0].ProducerMode != "acquired" {
-		t.Fatalf("unexpected projection: %+v", got)
+	found := map[string]bool{}
+	for _, component := range got {
+		if !slices.Contains(component.Platforms, "linux/arm64") || component.OutputType != "host-package" {
+			t.Fatalf("filter admitted incompatible component: %+v", component)
+		}
+		if component.Name == "helm-operator" || component.Name == "kubectl-operator" {
+			if component.ProducerMode != "acquired" {
+				t.Fatalf("operator tool changed acquisition: %+v", component)
+			}
+			found[component.Name] = true
+		}
+	}
+	if len(found) != 2 {
+		t.Fatalf("missing operator tools: %+v", got)
 	}
 
 	plain, err := runCatalogCommand(t, "catalog", "list", "--data", layeredCatalogPath(t), "--output-type", "host-package")
@@ -99,7 +112,7 @@ func TestCatalogListFiltersAndEmitsJSON(t *testing.T) {
 }
 
 func TestCatalogListRejectsBadSelectorsWithoutOutput(t *testing.T) {
-	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools", "operator-arm64")
+	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools")
 	for _, args := range [][]string{
 		{"--platform", "arm64"},
 		{"--output-type", "package"},
@@ -144,9 +157,9 @@ func TestCatalogListFormatsAgreeOnFilteredMembership(t *testing.T) {
 }
 
 func TestCatalogListNoMatchIsNoMatchErrorInEveryFormat(t *testing.T) {
-	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools", "operator-arm64")
+	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools")
 	for _, format := range []string{"text", "json"} {
-		output, err := runCatalogCommand(t, "catalog", "list", "--data", arm, "--output-type", "tarball", "--format", format)
+		output, err := runCatalogCommand(t, "catalog", "list", "--data", arm, "--output-type", "disk-image", "--format", format)
 		assertLifecycleCommandCode(t, err, e.CodeNoMatch)
 		if output != "" {
 			t.Fatalf("%s no-match emitted %q", format, output)
@@ -166,7 +179,7 @@ func TestCatalogListChecksSelectorsBeforeLoadingTheCatalog(t *testing.T) {
 }
 
 func TestCatalogListAdmitsDarwinSelectorAndNoMatchesAbsentPlatform(t *testing.T) {
-	native := filepath.Join("..", "..", "inputs", "catalogs", "tools", "native")
+	native := filepath.Join("..", "..", "inputs", "catalogs", "tools")
 	output, err := runCatalogCommand(t, "catalog", "list", "--data", native, "--platform", "darwin/arm64", "--format", "json")
 	if err != nil {
 		t.Fatal(err)
@@ -177,7 +190,7 @@ func TestCatalogListAdmitsDarwinSelectorAndNoMatchesAbsentPlatform(t *testing.T)
 	if err := json.Unmarshal([]byte(output), &got); err != nil || len(got) == 0 {
 		t.Fatalf("no darwin/arm64 components listed: %v: %s", err, output)
 	}
-	arm := filepath.Join("..", "..", "inputs", "catalogs", "tools", "operator-arm64")
+	arm := filepath.Join("..", "..", "inputs", "catalogs", "nico")
 	_, err = runCatalogCommand(t, "catalog", "list", "--data", arm, "--platform", "darwin/arm64")
 	assertLifecycleCommandCode(t, err, e.CodeNoMatch)
 }

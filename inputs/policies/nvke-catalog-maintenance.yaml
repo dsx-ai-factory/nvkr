@@ -5,7 +5,7 @@ apiVersion: nvkr.dev/catalog-maintenance/v1
 name: nvke-m2
 # The NVKE release and its derived chart pins are the one supported update path.
 # Registry constraints stay authored; this policy never widens them.
-catalog: inputs/catalogs/nvke/release
+catalog: inputs/catalogs/nvke
 sources: [nvke, nvke-helm]
 producerOverlays: inputs/policies/ovn-producer-overlays.json
 sameRelease:

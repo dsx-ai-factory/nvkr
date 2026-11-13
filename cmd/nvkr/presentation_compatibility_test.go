@@ -70,7 +70,8 @@ func TestCIRestrictsAutomaticSelectionOnly(t *testing.T) {
 
 // These fixed bytes were captured with the pre-dashboard base executable at
 // 3558650e986cd7600558e4e38b77da5b89d780f0, not regenerated from this implementation.
-// Only input-dependent identities and relocated catalog paths are adapted below.
+// Only input-dependent identities, relocated catalog paths and renamed producer/tool
+// selectors are adapted below.
 func TestDefaultLeafBytesMatchPreDashboardFixtures(t *testing.T) {
 	lifecycleCommandRepo(t)
 	const maintainedPlan = ".github/nvkr-run/plan.json"
@@ -108,6 +109,9 @@ func TestDefaultLeafBytesMatchPreDashboardFixtures(t *testing.T) {
 						t.Fatal("Definition fixture lost its captured catalog path")
 					}
 					want = bytes.ReplaceAll(want, []byte(capturedCatalog), []byte(fmt.Sprintf(`"base":%q`, definition.Catalog.Base)))
+					want = []byte(strings.NewReplacer(`"cosignTool":"cosign"`, `"cosignTool":"cosign-module-tags"`,
+						`"sbomTool":"syft"`, `"sbomTool":"syft-module-tags"`,
+						`"components":["nvkectl"]`, `"components":["nvkectl-module-tags"]`).Replace(string(want)))
 				}
 			}
 			if test.fixture == "identical-plans.txt" {

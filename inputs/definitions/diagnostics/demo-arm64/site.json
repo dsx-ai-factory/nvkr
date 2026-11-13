@@ -1,60 +1,60 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "../../../catalogs/nvke"
+  },
   "kind": "Definition",
   "metadata": {
-    "name": "nvke-local-site-artifacts-arm64",
-    "description": "Five source-aligned staged-installer artifacts including the native diagnostic profiles image. Build-only candidate; no OS, complete dependency mirror, deployment or signing claim."
-  },
-  "catalog": {
-    "base": "../../../catalogs/nvke/local-site-arm64"
+    "description": "Five source-aligned staged-installer artifacts including the native diagnostic profiles image. Build-only candidate; no OS, complete dependency mirror, deployment or signing claim.",
+    "name": "nvke-local-site-artifacts-arm64"
   },
   "outputs": [
     {
-      "name": "controller-chart",
       "components": [
-        "nvke-controller-chart"
+        "nvke-controller-chart-local-site"
       ],
       "format": "helm-oci",
-      "platform": "linux/arm64",
       "helm": {
         "images": {
           "controller": "cwe"
         }
-      }
-    },
-    {
-      "name": "controller-profiles",
-      "components": [
-        "nvke-local-profiles"
-      ],
-      "format": "oci",
-      "platform": "linux/arm64",
-      "catalog": {
-        "base": "../../../catalogs/controller-profiles/nvidia-arm64"
-      }
-    },
-    {
-      "name": "cwe",
-      "components": [
-        "nvke-controller"
-      ],
-      "format": "oci",
+      },
+      "name": "controller-chart",
       "platform": "linux/arm64"
     },
     {
-      "name": "nktp",
+      "catalog": {
+        "base": "../../../catalogs/nvke"
+      },
+      "components": [
+        "nvke-local-profiles-nvidia"
+      ],
+      "format": "oci",
+      "name": "controller-profiles",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "nvke-controller-local-site"
+      ],
+      "format": "oci",
+      "name": "cwe",
+      "platform": "linux/arm64"
+    },
+    {
       "components": [
         "nktp-chart"
       ],
       "format": "helm-oci",
+      "name": "nktp",
       "platform": "linux/arm64"
     },
     {
-      "name": "nvkectl",
       "components": [
-        "nvkectl"
+        "nvkectl-local-site"
       ],
       "format": "executable",
+      "name": "nvkectl",
       "platform": "linux/arm64"
     }
   ]

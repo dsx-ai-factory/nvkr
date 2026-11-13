@@ -4,10 +4,10 @@
     {
       "name": "nvke-os-arm64-tcg-local",
       "destination": "inputs/catalogs/node-images/variants/nvidia-tcg.json",
-      "base": "inputs/catalogs/node-images/release",
+      "base": "inputs/catalogs/node-images",
       "producers": [
         {
-          "catalog": "inputs/catalogs/ovn-nvidia",
+          "catalog": "inputs/catalogs/ovn/nvidia",
           "components": [
             "nvke-cni-ovn",
             "ovn-kube-ubuntu",
@@ -102,13 +102,13 @@
     {
       "name": "nvke-local-upstream-ovn",
       "destination": "inputs/catalogs/node-images/variants/upstream-tcg.json",
-      "base": "inputs/catalogs/node-images/release",
+      "base": "inputs/catalogs/node-images",
       "predecessors": [
         "inputs/catalogs/node-images/variants/nvidia-tcg.json"
       ],
       "producers": [
         {
-          "catalog": "inputs/catalogs/ovn-upstream",
+          "catalog": "inputs/catalogs/ovn/upstream",
           "components": [
             "nvke-cni-ovn",
             "ovn-kube-ubuntu",
@@ -120,7 +120,7 @@
     {
       "name": "nvke-os-arm64-nvidia-local-kvm",
       "destination": "inputs/catalogs/node-images/variants/nvidia-local-kvm.json",
-      "base": "inputs/catalogs/node-images/release",
+      "base": "inputs/catalogs/node-images",
       "predecessors": [
         "inputs/catalogs/node-images/variants/nvidia-tcg.json"
       ],
@@ -211,7 +211,7 @@
     {
       "name": "nvke-os-arm64-upstream-local-kvm",
       "destination": "inputs/catalogs/node-images/variants/upstream-local-kvm.json",
-      "base": "inputs/catalogs/node-images/release",
+      "base": "inputs/catalogs/node-images",
       "predecessors": [
         "inputs/catalogs/node-images/variants/nvidia-tcg.json",
         "inputs/catalogs/node-images/variants/upstream-tcg.json"
@@ -303,10 +303,10 @@
     {
       "name": "nvke-native-arm64-nvidia",
       "destination": "inputs/catalogs/node-images/variants/native-nvidia.json",
-      "base": "inputs/catalogs/node-images/release",
+      "base": "inputs/catalogs/node-images",
       "producers": [
         {
-          "catalog": "inputs/catalogs/node-images/release",
+          "catalog": "inputs/catalogs/node-images",
           "components": [
             "nvke-cni-ovn",
             "ovn-kube-ubuntu",

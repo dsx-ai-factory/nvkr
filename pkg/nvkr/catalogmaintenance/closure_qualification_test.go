@@ -35,7 +35,7 @@ func qualificationFixture(t *testing.T) (Config, func(string)) {
 	t.Helper()
 	cfg, promote := maintenanceFixture(t)
 	// Borrow the maintained catalog's pinned signing tools; nothing downloads them here.
-	maintained, err := filepath.Abs(filepath.Join(packageDir, "../../../inputs/catalogs/nvke/module-tags"))
+	maintained, err := filepath.Abs(filepath.Join(packageDir, "../../../inputs/catalogs/nvke"))
 	if err != nil {
 		t.Fatal(err)
 	}

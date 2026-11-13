@@ -65,7 +65,7 @@ func TestNativeMacToolsSelectCompatibleVMNetClient(t *testing.T) {
 	if !slices.Contains(members, "vmnet-client") || slices.Contains(members, "vmnet-run") {
 		t.Fatal("NICoSim requires the upstream vmnet-client command and its --unprivileged option")
 	}
-	directory := filepath.Join("..", "..", "inputs", "catalogs", "tools", "native")
+	directory := filepath.Join("..", "..", "inputs", "catalogs", "tools")
 	lock, err := catalog.LoadLockContext(t.Context(), directory)
 	if err != nil {
 		t.Fatal(err)
@@ -90,7 +90,7 @@ func TestNativeMacVMNetReleaseCommandContract(t *testing.T) {
 	if archive == "" {
 		t.Skip("requires the reviewed local upstream vmnet release archive")
 	}
-	lock, err := catalog.LoadLockContext(t.Context(), filepath.Join("..", "..", "inputs", "catalogs", "tools", "native"))
+	lock, err := catalog.LoadLockContext(t.Context(), filepath.Join("..", "..", "inputs", "catalogs", "tools"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -437,28 +437,17 @@ func TestNativeToolDefinitionsMatchHostAndSiteSelections(t *testing.T) {
 			if len(complete.Outputs) != 2 {
 				t.Fatalf("unexpected dependency bundles: %v", complete.Outputs)
 			}
-			if complete.Catalog.Base != "../../../catalogs/tools/native" {
+			if complete.Catalog.Base != "../../../catalogs/tools" {
 				t.Fatal("tools lost their shared catalog owner")
 			}
 			siteBundles := siteStartupToolBundles(platform)
 			if len(siteBundles) != 1 {
 				t.Fatal("native site requires one owner-selected companion bundle")
 			}
-			hostOS, arch, _ := strings.Cut(platform, "/")
+			_, arch, _ := strings.Cut(platform, "/")
 			expected := map[string]definition.DefinitionOutput{
 				hostBundle:                   {Name: hostBundle, Platform: platform, Format: definition.OutputExecutable, Components: slices.Clone(members)},
 				"site-startup-tools-" + arch: {Name: "site-startup-tools-" + arch, Platform: "linux/" + arch, Format: definition.OutputExecutable, Components: slices.Clone(siteBundles[0].members)},
-			}
-			if hostOS == "linux" {
-				suffix := "-linux"
-				if arch != "arm64" {
-					suffix += "-" + arch
-				}
-				for i, member := range expected[hostBundle].Components {
-					if slices.Contains([]string{"clusterctl", "helm", "kind", "kubectl", "oras"}, member) {
-						expected[hostBundle].Components[i] += suffix
-					}
-				}
 			}
 			for _, output := range complete.Outputs {
 				if !reflect.DeepEqual(output, expected[output.Name]) {

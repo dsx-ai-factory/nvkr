@@ -1,17 +1,18 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
   "catalog": {
-    "base": "../../catalogs/nvke/module-tags"
+    "base": "../../catalogs/nvke"
   },
+  "cosignTool": "cosign-module-tags",
   "kind": "Definition",
   "metadata": {
-    "name": "nvke-nightly-upstream-ovn-arm64",
-    "description": "Pipeline-attested ARM64 nightly candidate selecting the complete 29-output local-demo artifact set with explicit upstream OVN v1.4.0, source-built components and explicitly acquired inputs plus the mixed SPIRE-source exception. Required-KVM disk production uses build-provenance-v1; no qualified, runtime compatibility, FIPS/STIG or hardware acceptance claim."
+    "description": "Pipeline-attested ARM64 nightly candidate selecting the complete 29-output local-demo artifact set with explicit upstream OVN v1.4.0, source-built components and explicitly acquired inputs plus the mixed SPIRE-source exception. Required-KVM disk production uses build-provenance-v1; no qualified, runtime compatibility, FIPS/STIG or hardware acceptance claim.",
+    "name": "nvke-nightly-upstream-ovn-arm64"
   },
   "outputs": [
     {
       "catalog": {
-        "base": "../../catalogs/capnico/local"
+        "base": "../../catalogs/capnico"
       },
       "components": [
         "capnico-controller"
@@ -22,7 +23,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "cluster-api-provider-provisioned"
@@ -33,10 +34,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/nightly-site-arm64"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nvke-controller-chart"
+        "nvke-controller-chart-nightly-site"
       ],
       "format": "helm-oci",
       "helm": {
@@ -49,10 +50,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/controller-profiles/upstream-arm64"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nvke-local-profiles"
+        "nvke-local-profiles-upstream"
       ],
       "format": "oci",
       "name": "controller-profiles",
@@ -71,10 +72,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/nightly-site-arm64"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nvke-controller"
+        "nvke-controller-local-site"
       ],
       "format": "oci",
       "name": "cwe",
@@ -82,14 +83,14 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/installer-hosted-arm64"
+        "base": "../../catalogs/tools"
       },
       "components": [
-        "clusterctl",
+        "clusterctl-installer-hosted",
         "helm",
-        "kind",
-        "kubectl",
-        "oras"
+        "kind-installer-hosted",
+        "kubectl-installer-hosted",
+        "oras-installer-hosted"
       ],
       "format": "executable",
       "name": "installer-tools-arm64",
@@ -97,12 +98,12 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nicosim"
+        "base": "../../catalogs/tools"
       },
       "components": [
-        "nico-sim",
-        "nico-sim-runtime-assets",
-        "nico-simctl"
+        "nico-sim-nicosim",
+        "nico-sim-runtime-assets-nicosim",
+        "nico-simctl-nicosim"
       ],
       "format": "executable",
       "name": "nicosim-tools-arm64",
@@ -110,10 +111,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/nightly-site-arm64"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nktp-chart"
+        "nktp-chart-nightly-site"
       ],
       "format": "helm-oci",
       "name": "nktp",
@@ -121,7 +122,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/node-images/release",
+        "base": "../../catalogs/node-images",
         "overlays": [
           "../../catalogs/node-images/variants/nvidia-kvm.json",
           "../../catalogs/node-images/variants/upstream-kvm.json"
@@ -147,10 +148,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/nightly-site-arm64"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nvkectl"
+        "nvkectl-local-site"
       ],
       "format": "executable",
       "name": "nvkectl",
@@ -158,11 +159,11 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/operator-arm64"
+        "base": "../../catalogs/tools"
       },
       "components": [
-        "helm",
-        "kubectl"
+        "helm-operator",
+        "kubectl-operator"
       ],
       "format": "executable",
       "name": "operator-tools",
@@ -170,7 +171,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "postgresql-chart"
@@ -203,7 +204,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "spire-chart"
@@ -247,7 +248,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "spire-crds-chart"
@@ -291,7 +292,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/release"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "temporal-chart"
@@ -335,7 +336,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/ovn-upstream"
+        "base": "../../catalogs/ovn/upstream"
       },
       "components": [
         "ovn-kubernetes-chart"
@@ -351,7 +352,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/ovn-upstream"
+        "base": "../../catalogs/ovn/upstream"
       },
       "components": [
         "ovn-kube-ubuntu"
@@ -361,6 +362,5 @@
       "platform": "linux/arm64"
     }
   ],
-  "sbomTool": "syft",
-  "cosignTool": "cosign"
+  "sbomTool": "syft-module-tags"
 }

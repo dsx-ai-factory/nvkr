@@ -335,7 +335,7 @@ func TestNativeCAPNICoReferenceFollowsSelectedInstaller(t *testing.T) {
 }
 
 func TestNativeInstallerArchiveIncludesSourceOwnedCAPISelection(t *testing.T) {
-	loaded, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "inputs", "catalogs", "tools", "native")))
+	loaded, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "inputs", "catalogs", "tools")))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -36,7 +36,7 @@ import (
 
 func ovnForkPin(t *testing.T) catalog.Pin {
 	t.Helper()
-	lock, err := catalog.LoadLockContext(t.Context(), "../../../inputs/catalogs/ovn-nvidia")
+	lock, err := catalog.LoadLockContext(t.Context(), "../../../inputs/catalogs/ovn/nvidia")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,19 +55,19 @@ const ovnGoBuilder = "quay.io/projectquay/golang@sha256:d5acf07940fb5e6e2d07542a
 
 func TestNVKEOVNBuilderPinBindings(t *testing.T) {
 	for _, tc := range []struct {
-		path     string
-		upstream bool
+		path, component string
+		upstream        bool
 	}{
-		{"../../../inputs/catalogs/ovn-upstream", true},
-		{"../../../inputs/catalogs/node-images/release", false},
-		{"../../../inputs/catalogs/node-images/diagnostic", true},
+		{"../../../inputs/catalogs/ovn/upstream", "ovn-kube-ubuntu", true},
+		{"../../../inputs/catalogs/node-images", "ovn-kube-ubuntu", false},
+		{"../../../inputs/catalogs/node-images", "ovn-kube-ubuntu-diagnostic", true},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(tc.path))
 			if err != nil {
 				t.Fatal(err)
 			}
-			command := strings.Join(cat.Components["ovn-kube-ubuntu"].BuildCommand, "\n")
+			command := strings.Join(cat.Components[tc.component].BuildCommand, "\n")
 			if got := strings.Contains(command, "build-arg:BUILDER_IMAGE="+ovnGoBuilder); got != tc.upstream {
 				t.Fatalf("upstream Go builder override present=%t, want %t", got, tc.upstream)
 			}
@@ -80,7 +80,7 @@ func TestNVKEOVNBuilderPinBindings(t *testing.T) {
 
 func loadOVNForkCatalog(t *testing.T) *catalog.Catalog {
 	t.Helper()
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/ovn-nvidia"))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/ovn/nvidia"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +90,7 @@ func loadOVNForkCatalog(t *testing.T) *catalog.Catalog {
 // The local disk selects the same pinned fork producers as the standalone image
 // and chart outputs, while retaining the source-owned image-inputs handoff.
 func TestNVKEOVNForkLocalDiskSelection(t *testing.T) {
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/node-images/release"))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/node-images"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,12 +126,12 @@ func TestNVKEOVNForkLocalDiskSelection(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	profiles, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/controller-profiles/nvidia-arm64"))
+	profiles, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/nvke"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	profile := profiles.Components["nvke-local-profiles"]
-	raw, err := os.ReadFile("../../../inputs/catalogs/controller-profiles/nvidia-arm64/patches/local-profile.patch")
+	profile := profiles.Components["nvke-local-profiles-nvidia"]
+	raw, err := os.ReadFile("../../../inputs/catalogs/nvke/patches/local-profile.patch")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +220,7 @@ func TestNVKEOVNForkGraphs(t *testing.T) {
 // TestNVKEOVNForkPinBindings retains the reviewed producer behavior while source
 // metadata is supplied through opt-in lock-derived bindings.
 func TestNVKEOVNForkPinBindings(t *testing.T) {
-	lock, err := catalog.LoadLockContext(t.Context(), "../../../inputs/catalogs/ovn-nvidia")
+	lock, err := catalog.LoadLockContext(t.Context(), "../../../inputs/catalogs/ovn/nvidia")
 	if err != nil {
 		t.Fatal(err)
 	}

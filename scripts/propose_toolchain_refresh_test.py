@@ -19,11 +19,11 @@ SPEC.loader.exec_module(MODULE)
 class ProposalTest(unittest.TestCase):
     def test_path_admission(self):
         cases = {
-            "inputs/catalogs/node-images/release/registry.yaml": True,
+            "inputs/catalogs/node-images/registry.yaml": True,
             "inputs/environments/github-release.yaml": True,
             ".github/nvkr-run/plan.json": True,
             ".github/workflows/nvkr-run.yml": True,
-            "inputs/catalogs/node-images/release/pins.lock.yaml": False,
+            "inputs/catalogs/node-images/pins.lock.yaml": False,
             "inputs/policies/toolchain-maintenance/123.json": False,
             "inputs/policies/ovn-producer-overlays.json": True,
             "inputs/policies/other-producer-overlays.json": False,

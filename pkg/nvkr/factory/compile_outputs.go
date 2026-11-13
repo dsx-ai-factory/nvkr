@@ -103,12 +103,9 @@ func selectedTools(definition authored.Definition, environment authored.Environm
 	}
 	tools := make(map[string]catalog.ToolPin, len(names))
 	selectTool := func(name string, selected *catalog.Catalog) error {
-		pin, ok := selected.Tools[name]
-		if !ok {
-			return e.New(e.CodeUnpinnedSource, "selected catalog tool %q has no pin", name)
-		}
-		if pin.Platform != environment.UtilityPlatform {
-			return e.New(e.CodeEngineCapability, "tool %q platform %s does not match utility platform %s", name, pin.Platform, environment.UtilityPlatform)
+		pin, err := selected.ToolForPlatform(name, environment.UtilityPlatform)
+		if err != nil {
+			return err
 		}
 		if previous, exists := tools[name]; exists && !reflect.DeepEqual(previous, pin) {
 			return e.New(e.CodeUnpinnedSource, "selected catalog tool %q has conflicting pins", name)

@@ -1,16 +1,17 @@
 # ADR-28 — Multi-platform executables as OCI image indexes
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
-- **Implementation maturity:** Designed, not implemented. No multi-platform tool declaration, `tools` lock entry,
-  executable `platforms` output, executable-index identity projection or index packaging exists; see
-  `reconciliation/README.md`.
-- **Acceptance-test maturity:** None. The implementation units below name the contract suites that must pass;
-  no contract test, generated bundle, hosted Run or consumer verification exercises an executable index.
+- **Implementation maturity:** Multi-platform tool declarations, complete `tools` locks, native utility selection
+  and release-executable graph projection are implemented under ADR-22. Executable `platforms` outputs,
+  executable-index identity, packaging and publication remain unimplemented.
+- **Acceptance-test maturity:** Catalog and buildgraph contract tests cover declaration and lock admission,
+  all-platform acquisition failure, exact platform selection and native graph equivalence. No hosted Run or
+  consumer verification exercises an executable index.
 - **Deciders:** Pending; catalog, release-engineering, delivery and evidence owners must be named before
   ratification.
 - **Index:** Proposed ADR-28 supplements ADR-01–22 and proposed ADR-23/24/26/27; it remains outside the
-  consolidated contract set until accepted. It builds on the tool companion contract proposed in #286 (PR #294),
-  which is not on `main`. Implementation is tracked in #296 and the retrofit in #297.
+  consolidated contract set until accepted. The tool companion and native multi-platform catalog contracts are implemented under ADR-22.
+  Executable-index implementation is tracked in #296 and the remaining retrofit in #297.
 - **Relates to:** ADR-01 (`nvkr.build` schemas), ADR-02 §2 (aggregate logical projection), ADR-03 (coded errors),
   ADR-04 (signing), ADR-11 §1–§2 (direct selection, no sibling reuse), ADR-12 §1 (concrete targets and the
   executable-aggregate exclusion this decision lifts), ADR-13 (SBOMs, `evidence: none`), ADR-16 (artifact check
@@ -23,14 +24,12 @@
 ## Context
 
 One upstream tool release usually ships an asset per platform, at a URL that differs only in OS and
-architecture. NVKR cannot express that in one declaration.
+architecture. ADR-22 now expresses those assets in one declaration; executable aggregation remains separate.
 
-- **Tool pins are single-platform.** An ADR-22 `tool` declaration has one `platform` and one URL; a second
-  platform needs a second source name. The maintained catalogs therefore repeat each tool. `tools/operator-amd64`
-  and `tools/operator-arm64` pin the same Helm and kubectl releases twice, `tools/native` declares Helm three
-  times (`helm`, `helm-linux`, `helm-linux-amd64`), `nvsentinel` declares `syft-amd64` and `syft-arm64`, and
-  PR #294 adds `tools/aicr-arm64` because the AICR source can carry only one URL. Each copy is pinned and bumped
-  on its own, and nothing checks that the copies stay on one version.
+- **Tool pins were single-platform.** A declaration previously had one `platform` and a lock had one `tool`
+  record. Native, operator and scanner assets therefore required separate source names. ADR-22 now admits one
+  source with a complete per-platform `tools` lock set. The domain catalogs consolidate equal-version assets;
+  different versions, build recipes and packaging contracts remain explicit variants.
 - **Executable outputs are single-platform.** ADR-12 §1 states that "the image-index contract does not create
   an executable aggregate". The NVKE Definitions publish `nvkectl` and `nvkectl-linux-arm64` as two outputs, and
   NVSentinel publishes 19 executables twice, from two Definitions.
@@ -39,7 +38,7 @@ architecture. NVKR cannot express that in one declaration.
   expects an image config, and Kubernetes guarantees image volumes only for the types the container image
   field accepts; the Binary Bundle's NVKR media types fall outside both. Consumers choose a platform by output
   name.
-- **Companions ride beside the executable.** PR #294 delivers `aicr-attestation.sigstore.json` beside `aicr` at
+- **Companions ride beside the executable.** The AICR release executable delivers `aicr-attestation.sigstore.json` beside `aicr` at
   mode 0644, because `aicr bundle --attest` reads it from beside `os.Executable()`.
 
 The catalog already has the per-platform pieces this needs. Prebuilt artifact URLs render `{{.Arch}}`, and the
@@ -263,7 +262,7 @@ Verification Policy.
 
 - Existing `platform` tool declarations, `tool` lock records, single-platform executable outputs and Binary
   Bundles keep their bytes, Build Digests and meaning. Nothing migrates implicitly.
-- **AICR is the first migration.** Rename PR #294's `tools/aicr-arm64` to `tools/aicr`, declare
+- **AICR is the first index migration.** The acquired CLI now belongs to the `aicr` domain. Declare
   `platforms: [linux/amd64, linux/arm64]`, and pin v1.1.2 for both. Then change the nvke-core `aicr` output to
   `platforms: [linux/amd64, linux/arm64]`. The ARM64 producer keeps its Build Digest (§3), and a contract test
   must assert that. The output's identity becomes the new aggregate Build Digest, and consumers move from the
@@ -274,22 +273,22 @@ Verification Policy.
 
 ### 10. Retrofit inventory
 
-Every executable delivery in the maintained catalogs and Definitions, its current form and its migration.
-#297 tracks this list. Each row is its own reviewed change after the units it needs land.
+The catalog consolidation implements the native selection part of this inventory. #297 tracks the remaining
+output and consumer migrations; those require the index units below before changing existing Definitions.
 
-| Delivery | Current form | Migration |
+| Delivery | Current form | Remaining migration |
 |---|---|---|
-| AICR CLI | `tools/aicr-arm64` (PR #294): one ARM64 tool source and `releaseExecutable` component with a companion; nvke-core output `aicr`, ARM64 Binary Bundle | First slice (§9): one source with both platforms; `aicr` output with `platforms` |
-| `nvkectl` | From-source component for both platforms in `nvke/release`, `nvke/module-tags` and `nvke/native-site`; ARM64-only copies in `nvke/module-cli-arm64` (as `nvkectl-arm64`), `nvke/local-site-arm64` and `nvke/nightly-site-arm64`; outputs `nvkectl` (AMD64) and `nvkectl-linux-arm64` in `nvke/core.yaml` and `nvke/definition.yaml` | One `nvkectl` output with `platforms` in both Definitions. The catalog needs no change. The combined Definition's qualification requires native smoke for each executable member, so this waits for unit E7 |
-| Operator tools (Helm, kubectl) | `tools/operator-amd64` and `tools/operator-arm64` pin the same releases twice; `operator-tools` is AMD64 in the NVKE Definitions and ARM64 in demo and diagnostic Definitions | Merge into `tools/operator` with multi-platform sources (Helm's member becomes `linux-{{.Arch}}/helm`). The NVKE `operator-tools` output takes `platforms` |
-| Installer tools | `tools/installer-hosted-arm64` (Helm release asset; clusterctl, kind, kubectl and ORAS from source) and `tools/installer-local-arm64`; `installer-tools-arm64` outputs in demo and diagnostic Definitions | ARM64 only today. Move Helm to the multi-platform source form; add `platforms` when a consumer needs AMD64 |
-| Native demo tools | `tools/native` pins Helm, kubectl, kind, clusterctl and ORAS three times each (`<tool>` Darwin, `<tool>-linux` ARM64, `<tool>-linux-amd64`), Packer and its QEMU plugin twice, and vmnet-helper and vmnet-client for Darwin only; also from-source nerdctl, NICoSim, nvkectl and the site-identity helper. Outputs `native-tools-<platform>`, `installer-tools-amd64`, `site-startup-tools-<arch>` and `nicosim-tools-<arch>` in `demo/tools/*.json` and the demo site Definitions | Collapse each tool to one source whose `platforms` include `darwin/arm64`. Component renames move Build Digests (§3), and the native demo adapter that maps per-platform IDs to command names changes with them. These Definitions run on one host, so their outputs may stay single-platform; Darwin outputs must stay single-platform |
-| SBOM scanner (Syft) | Run-wide tool, not an output: AMD64 `syft` in `nvke/release` and `nvke/module-tags`, ARM64 `tools/sbom-arm64` (with a `releaseExecutable` component), `syft-amd64` and `syft-arm64` in `nvsentinel`; Definitions select `syft`, `syft-amd64` or `syft-arm64` | One `syft` source with both platforms; each Run uses its utility platform's entry (§2). Retires `tools/sbom-arm64` and the per-architecture names |
-| Signer (cosign) | Run-wide AMD64 tool in `nvke/release` and `nvke/module-tags` | No change until an ARM64 utility platform signs; then add `platforms` |
-| NVSentinel binaries | 19 from-source components for both platforms; 19 outputs each in `nvsentinel/binaries-amd64.yaml` and `binaries-arm64.yaml` | One Definition with 19 `platforms` outputs; retire the per-architecture Definitions after consumers move |
-| Kubernetes conformance tools | Hydrophone (Darwin, AMD64, ARM64) and kubectl (`kubectl`, `kubectl-1.34`; Darwin, ARM64) from source; outputs `hydrophone-arm64`, `kubectl-arm64` and Darwin variants | ARM64-only Linux use today; add `platforms` when AMD64 conformance needs it. Darwin outputs stay single-platform |
-| NICo simulator | From source in `nicosim` (ARM64) and `tools/native`; outputs `nicosim-tools-<arch>` | Demo use; as for native demo tools |
-| Examples and quickstart | `docs/examples/authoring-lab`, `docs/examples/nvke-tutorial` (per-architecture Definitions), `docs/examples/nvke-deploy`, `demos/quickstart` | Show the index form once implemented, and keep one single-platform example |
+| AICR CLI | `aicr` domain, ARM64 acquired release executable with companion | Add a separately verified AMD64 pin, then the index output (§9) |
+| `nvkectl` | `nvke` domain, explicit release, module and site variants with their original native platforms | Aggregate matching native outputs only after qualification supports each child (E7) |
+| Operator tools | `tools` domain, `helm-operator` and `kubectl-operator` each use one two-platform source and lock set | Aggregate the existing native operator outputs |
+| Installer tools | `tools` domain, explicit hosted/local recipes and packaging variants | Add platforms only when corresponding pins and consumers exist; do not conflate source builds with acquired releases |
+| Native demo tools | `tools` domain, shared release sources across their declared platforms; Darwin-only tools remain native | Host-specific outputs stay concrete; Darwin index children remain deferred |
+| SBOM scanner | NVKE and tools retain their independently pinned cohorts; NVSentinel selects native Syft from one multi-platform source | No executable index needed for Run-wide utilities |
+| Signer | Run-wide AMD64 cosign pin in `nvke` | Add another platform only with an admitted utility platform and its exact pin |
+| NVSentinel binaries | 19 from-source components, native outputs in the existing per-platform Definitions | One Definition with executable `platforms` outputs after index support and consumer migration |
+| Kubernetes conformance | One domain with explicit Kubernetes-version producers and native platforms | Add aggregate Linux outputs only when their consumers need them; Darwin stays concrete |
+| NICo simulator | `tools` domain, explicit patched and native producer variants | Preserve recipe distinctions; aggregate only compatible native deliveries |
+| Examples and quickstart | Existing concrete executable outputs | Show index form after implementation while retaining a single-platform example |
 
 Not in scope: toolchain images and helper pins under `toolchains/` (the execution helper, Packer, disk
 inspection and NVSentinel Debian toolchains, the quickstart Go SDK checksums and the govulncheck module) are
@@ -400,12 +399,12 @@ Each unit lands with table-driven contract tests that assert the coded error, no
 ## Follow-ups
 
 - **ADR-12 §1:** on acceptance, admit `platforms` for executable outputs and remove the exclusion sentence.
-- **ADR-22:** on acceptance, move §1–§2 into "Tool release assets" and lock v1. Per-platform `companions`
-  depend on #286 (PR #294) landing first.
+- **ADR-22:** native declarations, exact per-platform locks and selection from §1–§2 are implemented there;
+  executable-index publication remains governed by this proposal.
 - **ADR-01/02:** add `nvkr.dev/executable-index-build/v1` beside the image-index projection.
 - **ADR-20:** add the executable index publication form, its metadata binding and its `release pull` projection.
 - **ADR-13:** child SBOM referrers; verified upstream evidence referrers once #287 lands.
-- **ADR-27 §3:** replace the separate-source rule with per-platform lock entries.
+- **ADR-27 §3:** concrete pinned-tool producers select the exact native entry from the ADR-22 lock set.
 - **Retrofit:** #297 tracks §10.
 
 ## Acceptance evidence

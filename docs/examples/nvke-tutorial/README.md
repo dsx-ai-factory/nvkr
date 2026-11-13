@@ -14,8 +14,8 @@ Native artifact builds have been exercised on Apple Silicon macOS and Ubuntu ARM
 Intel Mac input selection and SDK checksums are present, but native Intel Mac execution remains unverified.
 
 Both selections use the existing NVKE producers and source pins from
-[`inputs/catalogs/nvke/release`](../../../inputs/catalogs/nvke/release). The ARM64 selection uses the
-[native ARM64 scanner](../../../inputs/catalogs/tools/sbom-arm64/README.md) at the same Syft version.
+[`inputs/catalogs/nvke`](../../../inputs/catalogs/nvke). The ARM64 selection uses the
+[native ARM64 scanner](../../../inputs/catalogs/tools/notes/tools-sbom-arm64-README.md) at the same Syft version.
 Each Environment runs utility helpers on its matching architecture. No catalog edits or NVKE source
 checkout are required. The host NVKR CLI runs directly on macOS or Linux; Docker runs the build tools.
 
@@ -67,8 +67,8 @@ a hosted run of these updated inputs. A complete publication using this source c
 | `environment-local.yaml` | Local Docker execution, optional registry destination and dry-run signing settings. |
 | `environment-github.yaml` | Hosted GitHub destination and signing settings. |
 | `environment-github-dev.yaml` | Build-only branch dispatch with one-day output retention and no signing or publication. |
-| `../../../inputs/catalogs/nvke/module-tags/registry.yaml` | Catalog-owned NVKE components, platforms, and source declarations. |
-| `../../../inputs/catalogs/nvke/module-tags/pins.lock.yaml` | Machine-managed exact source pins. |
+| `../../../inputs/catalogs/nvke/registry.yaml` | Catalog-owned NVKE components, platforms, and source declarations. |
+| `../../../inputs/catalogs/nvke/pins.lock.yaml` | Machine-managed exact source pins. |
 
 ## Inspect and run
 
@@ -196,8 +196,8 @@ source chart's existing digest support. Each source role has its own lock entry;
 update both for a shared NVKE release:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v0.23.0 nvke
-bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v0.23.0 nvke-controller
+bin/nvkr catalog pin --dir inputs/catalogs/nvke --tag v0.23.0 nvke
+bin/nvkr catalog pin --dir inputs/catalogs/nvke --tag v0.23.0 nvke-controller
 ```
 
 Repin only through `nvkr catalog pin`; never hand-edit the lock. Regenerate CI after changing pins.
@@ -220,11 +220,11 @@ use the existing command-scoped mirror override described above.
 ## Catalog tools and publication
 
 `sbomTool: syft` and `cosignTool: cosign` select catalog sources. Their release declarations live in
-`../../../inputs/catalogs/nvke/module-tags/registry.yaml`; `../../../inputs/catalogs/nvke/module-tags/pins.lock.yaml` binds source and executable bytes. Update through:
+`../../../inputs/catalogs/nvke/registry.yaml`; `../../../inputs/catalogs/nvke/pins.lock.yaml` binds source and executable bytes. Update through:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v1.51.1 syft
-bin/nvkr catalog bump --dir inputs/catalogs/nvke/module-tags syft cosign
+bin/nvkr catalog pin --dir inputs/catalogs/nvke --tag v1.51.1 syft
+bin/nvkr catalog bump --dir inputs/catalogs/nvke syft cosign
 ```
 
 Regenerate the workflow after changing the lock. Each Environment configures one
@@ -237,8 +237,8 @@ Workflow dependencies are catalog sources with `kind: github-action`. Their cons
 release lines; their exact commits are in the same lock as NVKE and tool pins.
 
 ```sh
-bin/nvkr catalog bump --dir inputs/catalogs/nvke/module-tags --check checkout download-artifact setup-go upload-artifact
-bin/nvkr catalog bump --dir inputs/catalogs/nvke/module-tags checkout download-artifact setup-go upload-artifact
+bin/nvkr catalog bump --dir inputs/catalogs/nvke --check checkout download-artifact setup-go upload-artifact
+bin/nvkr catalog bump --dir inputs/catalogs/nvke checkout download-artifact setup-go upload-artifact
 ```
 
 Regenerate the Run workflow after applying an update. No generator rebuild is needed. The adapter rejects

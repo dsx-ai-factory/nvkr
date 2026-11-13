@@ -28,7 +28,7 @@ func TestOSAgentAcquisitionUsesGoTransportFallback(t *testing.T) {
 		t.Skipf("authored module-pin checks require sha256sum: %v", err)
 	}
 	root := filepath.Dir(filepath.Dir(demoScript(t, "nvke-os-local.sh")))
-	sources, err := catalog.ReadSourcesContext(t.Context(), catalog.Dir(filepath.Join(root, "inputs/catalogs/node-images/diagnostic")))
+	sources, err := catalog.ReadSourcesContext(t.Context(), catalog.Dir(filepath.Join(root, "inputs/catalogs/node-images")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -40,7 +40,7 @@ func TestOSAgentAcquisitionUsesGoTransportFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	producer := overlay.Components["nvke-node-image"].Component
+	producer := overlay.Components["nvke-node-image-diagnostic"].Component
 	if producer == nil || !slices.Equal(producer.VendorCommand, command) {
 		t.Fatal("ARM64 KVM producer must retain the same tested acquisition command")
 	}

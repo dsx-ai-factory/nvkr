@@ -25,7 +25,7 @@ func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
 			code       e.Code
 		}{
 			{"complete", "", ""},
-			{"missing scanner", "tool/syft", e.CodeEngineCapability},
+			{"missing scanner", "tool/syft-module-tags", e.CodeEngineCapability},
 			{"missing payload", "artifact/cwe/" + platform + "/nvke-controller", e.CodeProvenanceMissing},
 		} {
 			t.Run(platform+"/"+tc.name, func(t *testing.T) {
@@ -33,7 +33,7 @@ func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if plan.Definition.SBOMTool != "syft" {
+				if plan.Definition.SBOMTool != "syft-module-tags" {
 					t.Fatal("maintained workflow does not request dependency inspection")
 				}
 				found, removed := false, false

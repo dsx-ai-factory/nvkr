@@ -18,20 +18,27 @@ const demoSmokeImage = "index.docker.io/library/debian@sha256:a2ca65377c251208de
 // This authored demo scope is independent of candidate artifacts. Never infer
 // exemptions or executable profiles from a candidate's observed output set.
 func demoQualificationPolicy(plan *factory.Plan, network string, keys [3]string) (lifecycle.LocalQualificationPolicy, error) {
+	mode, err := normalizeNetwork(network)
+	if err != nil {
+		return lifecycle.LocalQualificationPolicy{}, err
+	}
+	cli := "nvkectl-native-site"
+	if mode == "upstream-ovn" {
+		cli = "nvkectl-local-site"
+	}
 	p := lifecycle.LocalQualificationPolicy{
 		SchemaVersion: lifecycle.LocalQualificationPolicySchema, Lane: "unqualified-local-execution",
 		Platform: "linux/arm64", CosignDigest: demoCosignDigest,
 		BuilderKey: keys[0], SmokeKey: keys[1], QualifierKey: keys[2],
 		Smoke: lifecycle.QualificationSmokePolicy{
 			Images:         map[string]string{"linux/arm64": demoSmokeImage},
-			Tools:          map[string]string{"clusterctl": "clusterctl-version-json", "helm": "helm-version", "kind": "kind-version", "kubectl": "kubectl-client-version-json", "nico-sim": "nicosim-patched-version-json", "nico-simctl": "nicosim-patched-version-json", "nvkectl": "nvkectl-version-json", "oras": "oras-version"},
+			Tools:          map[string]string{"clusterctl-installer-local": "clusterctl-version-json", "helm-installer-local": "helm-version", "kind-installer-local": "kind-version", "kubectl-installer-local": "kubectl-client-version-json", "nico-sim": "nicosim-patched-version-json", "nico-simctl": "nicosim-patched-version-json", cli: "nvkectl-version-json", "oras-installer-local": "oras-version", "helm-operator": "helm-version", "kubectl-operator": "kubectl-client-version-json"},
 			NonToolMembers: []lifecycle.QualificationNonToolMember{{Output: "nicosim-tools-arm64", Member: "nico-sim-runtime-assets", Reason: "runtime-assets-archive"}},
 		},
 	}
 	if err := bindDemoQualificationScope(&p, plan, network); err != nil {
 		return p, err
 	}
-	var err error
 	p.PlanDigest, err = plan.Digest()
 	if err != nil {
 		return p, err
@@ -51,23 +58,29 @@ func bindDemoQualificationScope(p *lifecycle.LocalQualificationPolicy, plan *fac
 		return err
 	}
 	images := map[string]string{
-		"capnico-controller-arm64": "capnico-controller", "cluster-api-provider-provisioned-arm64": "cluster-api-provider-provisioned",
+		"capnico-controller-arm64": "capnico-controller", "cluster-api-provider-provisioned-arm64": "cluster-api-provider-provisioned-native-site",
 		"capi-exec-init-image-arm64": "native-capi-exec-init-image", "capi-exec-plugin-image-arm64": "native-capi-exec-plugin-image",
 		"workload-image-arm64": "native-workload-image",
 		"controller-profiles":  "nvke-local-profiles", "csi-node-driver-registrar-image-arm64": "csi-node-driver-registrar-image",
-		"cwe": "nvke-controller", "ovn-image-arm64": "ovn-kube-ubuntu", "postgresql-image-arm64": "postgresql-image",
+		"cwe": "nvke-controller-native-site", "ovn-image-arm64": "ovn-kube-ubuntu", "postgresql-image-arm64": "postgresql-image",
 		"spiffe-csi-image-arm64": "spiffe-csi-image", "spire-agent-image-arm64": "spire-agent-image", "spire-bash-image-arm64": "spire-bash-image",
 		"spire-controller-manager-image-arm64": "spire-controller-manager-image", "spire-oidc-image-arm64": "spire-oidc-image",
 		"spire-server-image-arm64": "spire-server-image", "spire-tpm-server-image-arm64": "spire-tpm-server-image",
 		"temporal-admin-tools-image-arm64": "temporal-admin-tools-image", "temporal-server-image-arm64": "temporal-server-image", "temporal-ui-image-arm64": "temporal-ui-image",
 	}
-	charts := map[string]string{"controller-chart": "nvke-controller-chart", "nktp": "nktp-chart", "ovn-chart-arm64": "ovn-kubernetes-chart", "postgresql": "postgresql-chart", "spire": "spire-chart", "spire-crds": "spire-crds-chart", "temporal": "temporal-chart"}
+	charts := map[string]string{"controller-chart": "nvke-controller-chart-native-site", "nktp": "nktp-chart-native-site", "ovn-chart-arm64": "ovn-kubernetes-chart", "postgresql": "postgresql-chart-native-site", "spire": "spire-chart-native-site", "spire-crds": "spire-crds-chart-native-site", "temporal": "temporal-chart-native-site"}
+	cli := "nvkectl-native-site"
 	disk := "nvke-node-image-arm64"
 	if mode == "upstream-ovn" {
 		delete(images, "ovn-image-arm64")
 		delete(images, "controller-profiles")
 		delete(charts, "ovn-chart-arm64")
-		images["controller-profiles-upstream-ovn"] = "nvke-local-profiles"
+		images["controller-profiles-upstream-ovn"] = "nvke-local-profiles-upstream"
+		images["cluster-api-provider-provisioned-arm64"] = "cluster-api-provider-provisioned"
+		images["cwe"] = "nvke-controller-local-site"
+		charts["controller-chart"], charts["nktp"] = "nvke-controller-chart-local-site", "nktp-chart"
+		charts["postgresql"], charts["spire"], charts["spire-crds"], charts["temporal"] = "postgresql-chart", "spire-chart", "spire-crds-chart", "temporal-chart"
+		cli = "nvkectl-local-site"
 		images["upstream-ovn-image-arm64"] = "ovn-kube-ubuntu"
 		charts["upstream-ovn-chart-arm64"], disk = "ovn-kubernetes-chart", "nvke-node-image-upstream-ovn-arm64"
 	}
@@ -80,9 +93,9 @@ func bindDemoQualificationScope(p *lifecycle.LocalQualificationPolicy, plan *fac
 		expected[name] = factory.LifecycleOutputPlan{Name: name, Kind: "helm-oci", Components: []string{component}}
 	}
 	for name, components := range map[string][]string{
-		"installer-tools-arm64": {"clusterctl", "helm", "kind", "kubectl", "oras"},
+		"installer-tools-arm64": {"clusterctl-installer-local", "helm-installer-local", "kind-installer-local", "kubectl-installer-local", "oras-installer-local"},
 		"nicosim-tools-arm64":   {"nico-sim", "nico-sim-runtime-assets", "nico-simctl"},
-		"nvkectl":               {"nvkectl"}, "operator-tools": {"helm", "kubectl"},
+		"nvkectl":               {cli}, "operator-tools": {"helm-operator", "kubectl-operator"},
 	} {
 		expected[name] = factory.LifecycleOutputPlan{Name: name, Kind: "executable", Components: components}
 	}

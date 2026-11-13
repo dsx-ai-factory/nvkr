@@ -121,7 +121,13 @@ func resolveSourceRevisionWithGit(ctx context.Context, src Source, tag, commit s
 		}
 		pin.ToolchainImage = dig
 	}
-	if src.Tool != nil {
+	if src.Tool != nil && src.Tool.Platforms != nil {
+		tools, err := resolvePlatformTools(ctx, *src.Tool, pin, nil)
+		if err != nil {
+			return Pin{}, err
+		}
+		pin.Tools = tools
+	} else if src.Tool != nil {
 		tool, err := resolveToolPin(ctx, *src.Tool, pin)
 		if err != nil {
 			return Pin{}, err

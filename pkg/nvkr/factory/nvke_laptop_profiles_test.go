@@ -24,17 +24,17 @@ import (
 // Apply the authenticated patch with Git, not a second patch interpreter.
 // The overlay adds local profile data without modifying upstream NVKE files.
 func laptopProfilesPatchedFixture(t *testing.T) string {
-	return laptopProfilesPatchedFixtureCatalog(t, "nvidia-arm64")
+	return laptopProfilesPatchedFixtureCatalog(t, "nvke-local-profiles-nvidia")
 }
 
 func laptopProfilesPatchedFixtureCatalog(t *testing.T, catalogName string) string {
 	t.Helper()
 	root := t.TempDir()
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs/catalogs/controller-profiles", catalogName)))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs/catalogs/nvke")))
 	if err != nil {
 		t.Fatal(err)
 	}
-	patches := cat.Components["nvke-local-profiles"].Patches
+	patches := cat.Components[catalogName].Patches
 	if len(patches) != 1 {
 		t.Fatal("expected one authenticated profile patch")
 	}
@@ -200,7 +200,7 @@ func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
 			commands = append(commands, strings.TrimPrefix(line, "  - "))
 		}
 	}
-	ovn, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/ovn-nvidia"))
+	ovn, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/ovn/nvidia"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -253,7 +253,7 @@ func TestLaptopProfilesLocalAPTProjection(t *testing.T) {
 }
 
 func TestLaptopProfilesRejectTamperedPatch(t *testing.T) {
-	source := filepath.Join("..", "..", "..", "inputs/catalogs/controller-profiles/nvidia-arm64")
+	source := filepath.Join("..", "..", "..", "inputs/catalogs/nvke")
 	dir := copyMaintainedCatalogFixture(t, source)
 	patch := filepath.Join(dir, "patches/local-profile.patch")
 	data, err := os.ReadFile(patch)
@@ -269,7 +269,7 @@ func TestLaptopProfilesRejectTamperedPatch(t *testing.T) {
 
 // Execute the authored staging command; BuildKit itself is an external gate.
 func TestLaptopProfilesImageContext(t *testing.T) {
-	for _, catalogName := range []string{"nvidia-arm64", "upstream-arm64"} {
+	for _, catalogName := range []string{"nvke-local-profiles-nvidia", "nvke-local-profiles-upstream"} {
 		t.Run(catalogName, func(t *testing.T) { testLaptopProfilesImageContext(t, catalogName) })
 	}
 }
@@ -290,11 +290,11 @@ COPY runbooks/ /profiles/runbooks/
 
 func testLaptopProfilesImageContext(t *testing.T, catalogName string) {
 	t.Helper()
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs/catalogs/controller-profiles", catalogName)))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs/catalogs/nvke")))
 	if err != nil {
 		t.Fatal(err)
 	}
-	command := cat.Components["nvke-local-profiles"].BuildCommand
+	command := cat.Components[catalogName].BuildCommand
 	for _, tc := range []struct {
 		name          string
 		missing       string
@@ -422,13 +422,14 @@ func TestLaptopProfilesDockerfileAdmissionChangesBuildIdentity(t *testing.T) {
 	t.Chdir(root)
 	path := filepath.Join("inputs", "definitions", "diagnostics", "demo-arm64", "profiles.json")
 	envPath := "inputs/environments/local-arm64-tcg.json"
-	for _, catalogName := range []string{"nvidia-arm64", "upstream-arm64"} {
+	for _, catalogName := range []string{"nvke-local-profiles-nvidia", "nvke-local-profiles-upstream"} {
 		t.Run(catalogName, func(t *testing.T) {
 			doc, err := definition.LoadDefinition(t.Context(), path)
 			if err != nil {
 				t.Fatal(err)
 			}
-			doc.Catalog.Base = "../../../catalogs/controller-profiles/" + catalogName
+			doc.Catalog.Base = "../../../catalogs/nvke"
+			doc.Outputs[0].Components = []string{catalogName}
 			env, err := definition.LoadEnvironment(t.Context(), envPath)
 			if err != nil {
 				t.Fatal(err)
