@@ -49,7 +49,7 @@ sources:
     - bash
     - "-ec"
     - |
-      make -C os-image/packages/cni-calico bundle nfpm \
+      CNI_DOCKERHUB_MIRROR=mirror.gcr.io make -C os-image/packages/cni-calico bundle nfpm \
         ARCH={{.Arch}} BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm
   nvke-kubeadm-distro-source:
     repo: https://github.com/dsx-ai-factory/nvke.git

@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nvke-os-arm64-native-kvm
-requiresCatalogDigest: sha256:7d49e3496037e5d7d301eb9c96e9336dbdd2fab783e45f891b467eba4aa412b8
+requiresCatalogDigest: sha256:36bb7e57a9fca8f46c897b5879007a9916e5952718dfc1bbc38c9312255fe525
 components:
   nvke-node-image:
     component:
