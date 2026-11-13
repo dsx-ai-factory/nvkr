@@ -17,6 +17,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/bundlearchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/diskinspect"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
@@ -28,13 +29,9 @@ const maxScannerOutput = 32 << 20
 // deliberately excluded from the dependency SBOM owner's admitted methods.
 const debianArchiveMetadataMethod = "syft-debian-archive-metadata/v1"
 
-type Scanner struct{ Path, Digest string }
+type Scanner = diskinspect.Scanner
 
-type DependencyInventory struct {
-	Components    []Component
-	Method        string
-	ScannerDigest string
-}
+type DependencyInventory = diskinspect.DependencyInventory
 
 // DependencyScanReceipt is issued only after the owning scanner has read the
 // exact held input. It authenticates that scan, not complete disk coverage or a

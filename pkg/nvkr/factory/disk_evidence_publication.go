@@ -123,6 +123,24 @@ func validateReconciledDiskDocument(plan *Plan, output, component, subject strin
 	for _, property := range bom.Metadata.Props {
 		properties[property.Name] = property.Value
 	}
+	if profile.HelperTool != "" {
+		var helper InternalToolPlan
+		for _, tool := range plan.InternalTools {
+			if tool.Name == profile.HelperTool {
+				helper = tool
+			}
+		}
+		if helper.Name == "" || properties["nvkr:diskInspectionHelperBuildDigest"] != helper.BuildDigest ||
+			properties["nvkr:diskInspectionHelperComponent"] != helper.Component || !canonical.IsDigest(properties["nvkr:diskInspectionHelperDigest"]) {
+			return e.New(e.CodeVerifyFailed, "disk evidence differs from its selected internal helper")
+		}
+	} else {
+		for _, name := range []string{"nvkr:diskInspectionHelperBuildDigest", "nvkr:diskInspectionHelperComponent", "nvkr:diskInspectionHelperDigest"} {
+			if _, exists := properties[name]; exists {
+				return e.New(e.CodeVerifyFailed, "disk evidence contains an undeclared internal helper")
+			}
+		}
+	}
 	method := "disk-content/v1"
 	if component == root.Component {
 		method = "disk-reconciled/v1"

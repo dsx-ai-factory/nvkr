@@ -95,6 +95,18 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	if githubDiskInspectionRequired(plan) {
 		images = append(images, profile.Image)
 	}
+	for _, node := range stage.Nodes {
+		if _, internal := plan.internalToolForTarget(node.BuildTarget); !internal || node.Kind != NodeBuild {
+			continue
+		}
+		_, producer, err := plan.producerInstruction(node)
+		if err != nil {
+			return err
+		}
+		if producer.Toolchain != "" {
+			images = append(images, producer.Toolchain)
+		}
+	}
 	for _, image := range uniqueSorted(images) {
 		if githubPrivateToolchain(plan, image) {
 			// The isolated preparation step pulled this exact reference. Held
@@ -110,20 +122,41 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 		}
 	}
 	var inspector *sbom.DiskInspectionRuntime
+	var probeHelper func(context.Context) (func() error, error)
 	if githubDiskInspectionRequired(plan) {
-		inspector, err = openDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace, inspectionLog)
+		if profile.HelperTool == "" {
+			inspector, err = openDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace, inspectionLog)
+			if err != nil {
+				return err
+			}
+			defer func() { returnErr = joinFactoryCleanupError(returnErr, inspector.Close(), "close ARC inspector") }()
+		} else {
+			// Admit the appliance and held runtime before production. This check
+			// grants no Plan-bound inspector: the exact helper does not exist yet.
+			selection := diskEvidenceRuntimeSelection(plan, profile, root.Platform, plan.Environment.RuntimeBinary(), workspace, inspectionLog, nil)
+			selection.ToolName = ""
+			probeHelper = func(ctx context.Context) (func() error, error) {
+				probe, err := sbom.OpenDiskInspectionRuntime(ctx, selection)
+				if err != nil {
+					return nil, err
+				}
+				return probe.Close, nil
+			}
+		}
+	}
+	produce := func(ctx context.Context) error {
+		diagnostics, err := pipeline.NewPackerDiagnosticSink(ctx, workspace)
 		if err != nil {
 			return err
 		}
-		defer func() { returnErr = joinFactoryCleanupError(returnErr, inspector.Close(), "close ARC inspector") }()
+		return coordinateGitHubDiskExecution(ctx, diagnostics, func(ctx context.Context) error {
+			return executeAdmittedGitHubDisk(ctx, plan, stage, root, admission, workspace, inspector, inspectionLog, diagnostics, options)
+		})
 	}
-	diagnostics, err := pipeline.NewPackerDiagnosticSink(ctx, workspace)
-	if err != nil {
-		return err
+	if probeHelper != nil {
+		return probeGitHubDiskHelper(ctx, probeHelper, produce)
 	}
-	return coordinateGitHubDiskExecution(ctx, diagnostics, func(ctx context.Context) (returnErr error) {
-		return executeAdmittedGitHubDisk(ctx, plan, stage, root, admission, inspector, inspectionLog, diagnostics, options)
-	})
+	return produce(ctx)
 }
 
 // The dispatcher is private and entered only after complete Plan, credentials,
@@ -146,7 +179,7 @@ func coordinateGitHubDiskExecution(ctx context.Context, diagnostics *pipeline.Pa
 }
 
 func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStage, root Node,
-	admission vmAdmission, inspector *sbom.DiskInspectionRuntime, inspectionLog *diskdiagnostic.Collector, diagnostics *pipeline.PackerDiagnosticSink,
+	admission vmAdmission, workspace *os.File, inspector *sbom.DiskInspectionRuntime, inspectionLog *diskdiagnostic.Collector, diagnostics *pipeline.PackerDiagnosticSink,
 	options GitHubStepOptions,
 ) (returnErr error) {
 	session, err := pipeline.NewNodeSession(ctx)
@@ -168,7 +201,13 @@ func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStag
 	owner := &LocalRunResult{SchemaVersion: LocalRunSchemaVersion, Qualification: TierLocalExecution, PlanDigest: digest, Workspace: ".nvkr/factory"}
 	defer func() { returnErr = joinFactoryCleanupError(returnErr, owner.Close(), "close ARC disk owner") }()
 	_, artifacts := planIndex(plan)
+	toolSession := newOperationSession(plan, operationPlacement{runtime: plan.Environment.RuntimeBinary(), jobs: 1, producer: session.ExecNode, owner: owner,
+		launch: func(ctx context.Context, node Node) error { return launchGitHubUtility(ctx, plan, node, options) },
+	}, options.Stdout, options.Stderr)
 	return executeGitHubDiskNodes(ctx, plan, stage, owner, options, func(nodeCtx context.Context, node Node) error {
+		if _, internal := plan.internalToolForTarget(node.BuildTarget); internal {
+			return toolSession.dispatch(nodeCtx, plan, node)
+		}
 		switch {
 		case node.ID == root.ID:
 			return populateDiskProducerCompletion(nodeCtx, plan, node.ID, owner, func(ctx context.Context, selected Node, _ ir.Node) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
@@ -182,28 +221,65 @@ func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStag
 			return e.New(e.CodeEngineCapability, "unsupported grouped disk operation")
 		}
 	}, func(ctx context.Context) error {
-		for _, expected := range plan.LifecycleOutputs {
-			if expected.Name == stage.DiskOutput {
-				if GitHubDiskBuildOnly(plan) {
-					return completeGitHubDiskBuild(ctx, plan, expected, owner)
+		complete := func(ctx context.Context) error {
+			for _, expected := range plan.LifecycleOutputs {
+				if expected.Name == stage.DiskOutput {
+					if GitHubDiskBuildOnly(plan) {
+						return completeGitHubDiskBuild(ctx, plan, expected, owner)
+					}
+					return completeGitHubDiskPublication(ctx, plan, expected, owner, inspector, inspectionLog, options)
 				}
-				return completeGitHubDiskPublication(ctx, plan, expected, owner, inspector, inspectionLog, options)
 			}
+			return e.New(e.CodePipelineDrift, "ARC output has no lifecycle binding")
 		}
-		return e.New(e.CodePipelineDrift, "ARC output has no lifecycle binding")
+		if inspector == nil && githubDiskInspectionRequired(plan) {
+			return completeGitHubDiskWithHelper(ctx, func(ctx context.Context) (func() error, error) {
+				inspector, err = owner.openDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace, inspectionLog)
+				if err != nil {
+					return nil, err
+				}
+				return inspector.Close, nil
+			}, complete)
+		}
+		return complete(ctx)
 	})
+}
+
+// These private coordinators govern lifetime ordering only. Their production
+// callers open concrete runtimes; neither callback issues or restores authority.
+func probeGitHubDiskHelper(ctx context.Context, open func(context.Context) (func() error, error), produce func(context.Context) error) error {
+	closeProbe, err := open(ctx)
+	if err != nil {
+		return err
+	}
+	if err := closeProbe(); err != nil {
+		return joinFactoryCleanupError(nil, err, "close ARC inspector probe")
+	}
+	return produce(ctx)
+}
+
+func completeGitHubDiskWithHelper(ctx context.Context, open func(context.Context) (func() error, error), complete func(context.Context) error) (returnErr error) {
+	closeInspector, err := open(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		returnErr = joinFactoryCleanupError(returnErr, closeInspector(), "close produced-helper inspector")
+	}()
+	return complete(ctx)
 }
 
 func executeGitHubDiskNodes(ctx context.Context, plan *Plan, stage githubStage, owner *LocalRunResult,
 	options GitHubStepOptions, dispatch func(context.Context, Node) error, complete func(context.Context) error,
 ) error {
 	for _, node := range stage.Nodes {
-		if node.Kind == NodeSBOM || node.Kind == NodePackage {
+		_, internal := plan.internalToolForTarget(node.BuildTarget)
+		if node.Kind == NodeSBOM && !internal || node.Kind == NodePackage {
 			continue
 		}
 		nodeCtx := ctx
 		stop := func() {}
-		if node.Kind == NodeBuild || node.Kind == NodeAcquire {
+		if node.Kind == NodeBuild || node.Kind == NodeAcquire || (internal && node.Kind == NodeSBOM) {
 			seconds, err := githubDiskProducerTimeoutSeconds(node)
 			if err != nil {
 				return err

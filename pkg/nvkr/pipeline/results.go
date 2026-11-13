@@ -105,6 +105,10 @@ func AuthenticateResultForConsumption(ctx context.Context, node ir.Node, payload
 	if err != nil {
 		return ArtifactResult{}, err
 	}
+	return authenticateConsumedResultMetadata(node, result)
+}
+
+func authenticateConsumedResultMetadata(node ir.Node, result ArtifactResult) (ArtifactResult, error) {
 	switch node.Kind {
 	case ir.KindBuild:
 		if !canonical.IsDigest(result.InputDigest) {

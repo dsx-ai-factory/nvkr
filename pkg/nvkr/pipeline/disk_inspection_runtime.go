@@ -22,6 +22,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/diskdiagnostic"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/diskinspect"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
@@ -35,23 +36,33 @@ import (
 // caller-owned and must remain open until Close.
 // This development capability does not grant publication or qualification.
 type DiskInspectionSelection struct {
-	PodmanStorageDriver definition.PodmanStorageDriver
-	RuntimeExecutable   string
-	Image               string
-	Platform            string
-	InspectorDigest     string
-	CodecDigest         string
-	GuestfishDigest     string
-	ScannerDigest       string
-	PackageReaderDigest string
-	MaxFilesystemBytes  uint64
-	ScratchStorage      string
-	compositionKind     string
-	consumerPlatform    string
-	scratchVolume       string
-	Resources           execution.ResourceRequest
-	TimeoutSeconds      uint64
-	Workspace           *os.File
+	// Tool is borrowed from its producing Run and must remain open through
+	// inspection. ToolName is descriptive; the factory authenticates its use.
+	Tool                       *ProducedExecutable
+	ToolName                   string
+	streamBinding              ProducedExecutableBinding
+	bootstrapProbe             bool
+	bootstrapCommand           string
+	BootstrapInterpreterDigest string
+	BootstrapProgramDigest     string
+	helperBytes                int64
+	PodmanStorageDriver        definition.PodmanStorageDriver
+	RuntimeExecutable          string
+	Image                      string
+	Platform                   string
+	InspectorDigest            string
+	CodecDigest                string
+	GuestfishDigest            string
+	ScannerDigest              string
+	PackageReaderDigest        string
+	MaxFilesystemBytes         uint64
+	ScratchStorage             string
+	compositionKind            string
+	consumerPlatform           string
+	scratchVolume              string
+	Resources                  execution.ResourceRequest
+	TimeoutSeconds             uint64
+	Workspace                  *os.File
 	// Diagnostics receives sanitized phase records only. It is not part of
 	// the authenticated observation profile and never grants evidence authority.
 	Diagnostics *diskdiagnostic.Collector
@@ -70,6 +81,7 @@ type DiskInspectionContainer struct {
 	runtime         *heldRuntimeExecutable
 	selection       DiskInspectionSelection
 	imageID         string
+	helperBinding   ProducedExecutableBinding
 	observeHost     func(context.Context, *os.File) (execution.ObservedHostFacts, error)
 	waitForCapacity func(context.Context) error
 }
@@ -78,12 +90,12 @@ const (
 	diskInspectionPIDsLimit    uint64 = 256
 	diskInspectionApplianceMiB uint64 = 2048
 	// MaxDiagnosticDiskBytes bounds the held diagnostic subject and its copies.
-	MaxDiagnosticDiskBytes = 8 << 30
+	MaxDiagnosticDiskBytes = diskinspect.MaxDiagnosticDiskBytes
 	// MaxDiskInspectionReportBytes bounds helper reports and runtime diagnostics.
-	MaxDiskInspectionReportBytes = 8 << 20
+	MaxDiskInspectionReportBytes = diskinspect.MaxPackageReportBytes
 	// Composition reports carry complete file inventories. Diagnostics and
 	// installed-package-only reports retain their independent smaller bound.
-	MaxDiskContentReportBytes = 16 << 20
+	MaxDiskContentReportBytes = diskinspect.MaxContentReportBytes
 	// Buffer, returned report, observation copy and decoder input may overlap.
 	diskContentReportMemoryMiB = 4 * (MaxDiskContentReportBytes - MaxDiskInspectionReportBytes) >> 20
 	// MaxDiskInspectionTimeout bounds the complete operation, including revalidation.
@@ -153,7 +165,8 @@ func (reservation *diskInspectionReservation) inspectContent(ctx context.Context
 }
 
 // OpenDiskInspectionContainer admits the selected native Linux runtime without
-// starting a container or pulling code. Both supported architectures use the
+// pulling code. A produced helper additionally probes sealed execution in a
+// confined container before producer work. Both supported architectures use the
 // same restrictive launcher; cross-architecture emulation is not admitted.
 func OpenDiskInspectionContainer(ctx context.Context, selection DiskInspectionSelection) (*DiskInspectionContainer, error) {
 	if err := requireRunContext(ctx, "disk inspection runtime admission"); err != nil {
@@ -164,6 +177,17 @@ func OpenDiskInspectionContainer(ctx context.Context, selection DiskInspectionSe
 	}
 	if runtime.GOOS != "linux" || selection.Platform != "linux/"+runtime.GOARCH {
 		return nil, e.New(e.CodeEngineCapability, "disk inspection requires its native Linux host architecture")
+	}
+	selection.helperBytes = 0
+	if selection.Tool != nil {
+		binding, err := selection.Tool.BindingContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if binding.Platform != selection.Platform {
+			return nil, e.New(e.CodeEngineCapability, "inspection helper differs from native runtime architecture")
+		}
+		selection.helperBytes = binding.Size
 	}
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
@@ -186,10 +210,20 @@ func OpenDiskInspectionContainer(ctx context.Context, selection DiskInspectionSe
 		_ = held.close()
 		return nil, err
 	}
+	if err := admitInspectionBootstrap(ctx, heldPackerContainerRuntime{runtime: held}, selection, container.imageID); err != nil {
+		_ = held.close()
+		return nil, err
+	}
 	return container, nil
 }
 
 func validateDiskInspectionSelection(selection DiskInspectionSelection) error {
+	if err := validateInspectionBootstrap(selection); err != nil {
+		return err
+	}
+	if (selection.Tool == nil) != (selection.ToolName == "") {
+		return e.New(e.CodeEngineCapability, "inspection helper requires its named produced-tool capability")
+	}
 	if err := selection.PodmanStorageDriver.Validate(filepath.Base(selection.RuntimeExecutable)); err != nil {
 		return err
 	}
@@ -227,6 +261,16 @@ func validateDiskInspectionSelection(selection DiskInspectionSelection) error {
 func (container *DiskInspectionContainer) observeBinding(ctx context.Context) error {
 	if container == nil || container.runtime == nil {
 		return e.New(e.CodeEngineCapability, "disk inspection runtime is closed")
+	}
+	if container.selection.Tool != nil {
+		binding, err := container.selection.Tool.BindingContext(ctx)
+		if err != nil {
+			return err
+		}
+		if binding.Platform != container.selection.Platform || binding.Size != container.selection.helperBytes || (container.helperBinding != (ProducedExecutableBinding{}) && binding != container.helperBinding) {
+			return e.New(e.CodeVerifyFailed, "inspection helper changed after admission")
+		}
+		container.helperBinding = binding
 	}
 	adapter := heldPackerContainerRuntime{runtime: container.runtime}
 	if err := observePackerRuntimeFreshness(ctx, adapter); err != nil {
@@ -435,11 +479,22 @@ func (container *DiskInspectionContainer) reserveSubject(ctx context.Context, si
 // command has completed and the held subject/runtime have been revalidated.
 // Description methods do not mint another observation.
 type DiskInspectionObservation struct {
+	helperName                                               string
+	helper                                                   ProducedExecutableBinding
 	report                                                   []byte
 	subject, image, inspector, codec                         string
 	size                                                     int64
 	contentKind, guestfish, scanner, packageReader, platform string
 	maxFilesystemBytes                                       uint64
+}
+
+// ToolBinding describes the exact helper used in this observation. Empty values
+// identify the compatibility path whose helper remains inside the pinned image.
+func (observation *DiskInspectionObservation) ToolBinding() (string, ProducedExecutableBinding) {
+	if observation == nil {
+		return "", ProducedExecutableBinding{}
+	}
+	return observation.helperName, observation.helper
 }
 
 func (observation *DiskInspectionObservation) Report() []byte {
@@ -521,6 +576,7 @@ func (container *DiskInspectionContainer) inspectHeldMode(ctx context.Context, s
 		return nil, err
 	}
 	return &DiskInspectionObservation{report: report, subject: subject.Digest(), size: subject.Size(), image: container.imageID, inspector: container.selection.InspectorDigest, codec: container.selection.CodecDigest,
+		helperName: container.selection.ToolName, helper: container.helperBinding,
 		contentKind: kind, guestfish: selection.GuestfishDigest, scanner: selection.ScannerDigest, packageReader: selection.PackageReaderDigest, platform: selection.consumerPlatform, maxFilesystemBytes: selection.MaxFilesystemBytes}, nil
 }
 
@@ -539,6 +595,15 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 		return nil, e.Wrap(e.CodeInternal, err, "allocating disk inspection attempt identity")
 	}
 	name := "nvkr-inspect-" + attempt
+	if selection.Tool != nil {
+		if err := validateInspectionBootstrap(selection); err != nil {
+			return nil, err
+		}
+		selection.streamBinding, err = selection.Tool.BindingContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+	}
 	if selection.compositionKind != "" && selection.ScratchStorage == "private-volume" {
 		scratch, err := openDiskInspectionScratch(ctx, runtime, selection, imageID, attempt)
 		if err != nil {
@@ -567,7 +632,11 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 	if selection.compositionKind != "" {
 		report.limit = MaxDiskContentReportBytes
 	}
-	if err := runtime.Run(ctx, nil, &created, &createDiagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), diskInspectionCreateArgs(selection, selection.Image, name, attempt, subject)...)...); err != nil {
+	createArgs := diskInspectionCreateArgs(selection, selection.Image, name, attempt, subject)
+	if selection.Tool != nil {
+		selection.bootstrapCommand = strings.Join(diskInspectionHelperArgs(selection, subject), "\x00")
+	}
+	if err := runtime.Run(ctx, nil, &created, &createDiagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), createArgs...)...); err != nil {
 		return nil, runtimeCommandError(ctx, err, diskInspectionDiagnostic(createDiagnostic.Bytes()), e.CodeEngineCapability, "creating disk inspection container")
 	}
 	creationUncertain = false
@@ -585,7 +654,17 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 	}
 	reader, writer := io.Pipe()
 	done := make(chan error, 1)
-	go func() { _, err := subject.WriteToContext(ctx, writer); _ = writer.CloseWithError(err); done <- err }()
+	go func() {
+		var err error
+		if selection.Tool != nil {
+			err = writeProducedExecutable(ctx, selection.Tool, selection.streamBinding, writer)
+		}
+		if err == nil {
+			_, err = subject.WriteToContext(ctx, writer)
+		}
+		_ = writer.CloseWithError(err)
+		done <- err
+	}()
 	err = runtime.Run(ctx, reader, &report, diagnostic, diskInspectionCommandArgs(runtime.RuntimeName(), "start", "--attach", "--interactive", ids[0])...)
 	diagnostic.Finish()
 	_ = reader.Close()
@@ -597,6 +676,15 @@ func runDiskInspectionContainerWithCleanupTimeout(ctx context.Context, runtime p
 	}
 	if diagnostic.Unexpected() || report.Len() == 0 {
 		return nil, e.New(e.CodeEnvelopeDecode, "disk inspection returned diagnostics or no report")
+	}
+	if selection.Tool != nil {
+		current, err := selection.Tool.BindingContext(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if current != selection.streamBinding {
+			return nil, e.New(e.CodeVerifyFailed, "inspection helper changed after execution")
+		}
 	}
 	return bytes.Clone(report.Bytes()), nil
 }
@@ -619,6 +707,11 @@ func observeDiskInspectionImage(ctx context.Context, runtime packerContainerRunt
 	}
 	if !canonical.IsDigest(image) || observed.ID != id || !toolSmokeImageMatches(observed, ToolSmokeSelection{Image: selection.Image, Platform: selection.Platform}, image) {
 		return e.New(e.CodeVerifyFailed, "created disk inspection container differs from admitted native image")
+	}
+	if selection.BootstrapInterpreterDigest != "" {
+		if err := verifyInspectionBootstrapContainer(selection, observed); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -690,15 +783,22 @@ func (container *DiskInspectionContainer) hostFacts(ctx context.Context) (execut
 
 func validateDiskInspectionResources(selection DiskInspectionSelection, facts execution.ObservedHostFacts, size int64, beforeSnapshot bool) error {
 	request := selection.Resources
+	if selection.helperBytes < 0 || selection.helperBytes > maxPinnedToolBytes {
+		return e.New(e.CodeEngineCapability, "inspection helper has an invalid size bound")
+	}
+	helperMiB := uint64((selection.helperBytes + (1 << 20) - 1) >> 20)
+	if request.EphemeralStorageMiB < helperMiB {
+		return e.New(e.CodeEngineCapability, "inspection helper exceeds declared staging capacity")
+	}
 	workspaceMiB := request.EphemeralStorageMiB
 	snapshotMiB := uint64((size + (1 << 20) - 1) >> 20)
-	needMemory := 2*snapshotMiB + diskInspectionApplianceMiB
+	needMemory := 2*snapshotMiB + diskInspectionApplianceMiB + helperMiB
 	if selection.MaxFilesystemBytes != 0 {
 		needMemory += diskContentReportMemoryMiB
 		filesystemMiB := (selection.MaxFilesystemBytes + (1 << 20) - 1) / (1 << 20)
 		if selection.ScratchStorage == "private-volume" {
 			// Linux heldfile snapshots are sealed memfds, accounted in RAM
-			// below. No subject or helper scratch is written to Workspace:
+			// below. No subject or scanning scratch is written to Workspace:
 			// the attempt-private daemon volume is admitted separately before
 			// streaming. Do not demand that same scratch on two filesystems.
 			workspaceMiB = 0
@@ -711,7 +811,14 @@ func validateDiskInspectionResources(selection DiskInspectionSelection, facts ex
 			needMemory += 12*filesystemMiB + 2048
 		}
 	}
-	hostMemory := request.MemoryMiB
+	// The helper memfd inside the container is included in needMemory above.
+	// Retain the existing conservative external helper reserve for the held
+	// producer snapshot and acquisition carrier; no host executable is mounted.
+	if workspaceMiB > math.MaxUint64-helperMiB || request.MemoryMiB > math.MaxUint64-2*helperMiB {
+		return e.New(e.CodeEngineCapability, "inspection helper resource accounting exceeds supported capacity")
+	}
+	workspaceMiB += helperMiB
+	hostMemory := request.MemoryMiB + 2*helperMiB
 	if beforeSnapshot {
 		if hostMemory > math.MaxUint64-snapshotMiB {
 			return e.New(e.CodeEngineCapability, "inspection host memory requirement overflows: declared=%dMiB snapshot=%dMiB", request.MemoryMiB, snapshotMiB)
@@ -753,15 +860,29 @@ func diskInspectionCreateArgs(selection DiskInspectionSelection, image, containe
 	} else {
 		args = append(args, "--tmpfs", "/tmp:rw,nosuid,nodev,size="+strconv.FormatUint(selection.Resources.MemoryMiB, 10)+"m,mode=1777")
 	}
-	args = append(args,
-		"--env", "PATH=/usr/bin:/bin", "--env", "HOME=/tmp", "--env", "LC_ALL=C", "--env", "TZ=UTC",
-		"--entrypoint=/usr/local/bin/nvkr-disk-inspect", image,
-		selection.InspectorDigest, selection.CodecDigest, subject.Digest(), strconv.FormatInt(subject.Size(), 10))
+	entrypoint := "/usr/local/bin/nvkr-disk-inspect"
+	if selection.Tool != nil || selection.bootstrapProbe {
+		entrypoint = inspectionBootstrapInterpreter
+	}
+	args = append(args, "--env", "PATH=/usr/bin:/bin", "--env", "HOME=/tmp", "--env", "LC_ALL=C", "--env", "TZ=UTC",
+		"--env", "PERL5OPT=", "--env", "PERL5LIB=", "--env", "PERLLIB=",
+		"--entrypoint="+entrypoint, image)
+	return append(args, diskInspectionHelperArgs(selection, subject)...)
+}
+
+func diskInspectionHelperArgs(selection DiskInspectionSelection, subject *heldfile.File) []string {
+	var args []string
+	if selection.Tool != nil || selection.bootstrapProbe {
+		args = inspectionBootstrapArgs(selection)
+	}
+	if selection.bootstrapProbe {
+		return args
+	}
+	args = append(args, selection.InspectorDigest, selection.CodecDigest, subject.Digest(), strconv.FormatInt(subject.Size(), 10))
 	if selection.compositionKind != "" {
 		args = append(args, "composition", selection.compositionKind, selection.GuestfishDigest, selection.ScannerDigest, selection.PackageReaderDigest, strconv.FormatUint(selection.MaxFilesystemBytes, 10), selection.consumerPlatform)
 	}
-	args = append(args, strconv.FormatUint(selection.Resources.CPUMillis, 10), strconv.FormatUint(selection.Resources.MemoryMiB, 10), strconv.FormatUint(diskInspectionPIDsLimit, 10))
-	return args
+	return append(args, strconv.FormatUint(selection.Resources.CPUMillis, 10), strconv.FormatUint(selection.Resources.MemoryMiB, 10), strconv.FormatUint(diskInspectionPIDsLimit, 10))
 }
 
 const diskInspectionCPUPeriodArg = "--cpu-period=100000"

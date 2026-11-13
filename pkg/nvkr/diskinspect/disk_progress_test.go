@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package sbom
+package diskinspect
 
 import (
 	"archive/tar"
@@ -29,7 +29,7 @@ import (
 // member's start record.
 // ISO inspection can perform one outer pass plus every admitted installer member.
 func TestDiagnosticParsingBudgetCoversInspectionEmissions(t *testing.T) {
-	maximum := 6 + (1+maxDiskInstallerMembers)*(14+8*(maxDiskInstalledPackages+1)+2*(maxDiskInstalledPackages+1)+4*maxDiskNestedImages)
+	maximum := 6 + (1+maxDiskInstallerMembers)*(14+8*(MaxInstalledPackages+1)+2*(MaxInstalledPackages+1)+4*maxDiskNestedImages)
 	if diskdiagnostic.MaxParsedRecords != maximum {
 		t.Fatalf("diagnostic parsing ceiling %d differs from inspection emission bound %d", diskdiagnostic.MaxParsedRecords, maximum)
 	}

@@ -29,6 +29,7 @@ type utilityRunnerLocation struct {
 	home                     bool
 	publicationRunContext    bool
 	developmentRunContext    bool
+	internalToolSBOM         bool
 }
 
 // executeUtilityNode is shared by local orchestration and hosted helper steps.
@@ -69,6 +70,9 @@ func executeUtilityNode(ctx context.Context, node Node, location utilityRunnerLo
 	}
 	args = append(args, "-v", location.mountSource+":"+location.mountTarget, "-w", "/workspace",
 		node.Container, location.helper, "factory", "execute-node", "--plan", location.plan, "--node", node.ID, "--workspace", ".nvkr/factory")
+	if location.internalToolSBOM {
+		args = append(args, "--internal-tool-sbom")
+	}
 	if location.planDigest != "" {
 		args = append(args, "--plan-digest", location.planDigest)
 	}

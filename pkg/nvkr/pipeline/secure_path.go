@@ -5,24 +5,15 @@ package pipeline
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/ociclosure"
 	"golang.org/x/sys/unix"
 )
-
-const pipelineCopyBufferSize = 128 << 10
-
-var pipelineCopyBufferPool = sync.Pool{New: func() any {
-	buffer := make([]byte, pipelineCopyBufferSize)
-	return &buffer
-}}
 
 // openRegularBeneath resolves every untrusted path component relative to an
 // already-open directory descriptor. O_NOFOLLOW on each hop prevents a producer
@@ -76,32 +67,7 @@ func openRegularBeneath(root, relative string) (*os.File, os.FileInfo, error) {
 }
 
 func hashOpenRegularContext(ctx context.Context, f *os.File, before os.FileInfo) (string, int64, os.FileInfo, error) {
-	if ctx == nil {
-		return "", 0, nil, fmt.Errorf("hashing a regular file requires a non-nil context")
-	}
-	if err := ctx.Err(); err != nil {
-		return "", 0, nil, err
-	}
-	if f == nil || before == nil || !before.Mode().IsRegular() {
-		return "", 0, nil, fmt.Errorf("cannot hash a non-regular file")
-	}
-	h := sha256.New()
-	size, copyErr := copyPipelineContext(ctx, h, f)
-	after, statErr := f.Stat()
-	if copyErr != nil {
-		return "", 0, nil, copyErr
-	}
-	if statErr != nil {
-		return "", 0, nil, statErr
-	}
-	if !os.SameFile(before, after) || size != before.Size() || after.Size() != before.Size() ||
-		!after.ModTime().Equal(before.ModTime()) || after.Mode() != before.Mode() {
-		return "", 0, nil, fmt.Errorf("file changed while hashing")
-	}
-	if err := ctx.Err(); err != nil {
-		return "", 0, nil, err
-	}
-	return "sha256:" + hex.EncodeToString(h.Sum(nil)), size, after, nil
+	return ociclosure.HashOpenRegularContext(ctx, f, before)
 }
 
 func hashRegularBeneathContext(ctx context.Context, root, relative string) (string, int64, os.FileInfo, error) {
@@ -131,23 +97,14 @@ type pipelineContextReader struct {
 	source io.Reader
 }
 
-func copyPipelineContext(ctx context.Context, destination io.Writer, source io.Reader) (int64, error) {
-	if ctx == nil {
-		return 0, fmt.Errorf("copy requires a non-nil context")
-	}
-	if err := ctx.Err(); err != nil {
-		return 0, err
-	}
-	buffer := pipelineCopyBufferPool.Get().(*[]byte)
-	defer pipelineCopyBufferPool.Put(buffer)
-	return io.CopyBuffer(destination, pipelineContextReader{ctx: ctx, source: source}, *buffer)
-}
-
-func (reader pipelineContextReader) Read(buffer []byte) (int, error) {
+func (reader pipelineContextReader) Read(raw []byte) (int, error) {
 	if err := reader.ctx.Err(); err != nil {
 		return 0, err
 	}
-	return reader.source.Read(buffer)
+	return reader.source.Read(raw)
+}
+func copyPipelineContext(ctx context.Context, destination io.Writer, source io.Reader) (int64, error) {
+	return ociclosure.CopyContext(ctx, destination, source)
 }
 
 func relativeBeneath(root, target string) (string, error) {

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package sbom
+package diskinspect
 
 import (
 	"archive/tar"
@@ -152,7 +152,7 @@ func TestDirectOCIMaterialAuthenticatesClosureBeforeScanner(t *testing.T) {
 				}
 				for _, component := range components {
 					class, err := diskComponentClass(component)
-					if err != nil || class != diskClassContainer {
+					if err != nil || class != ClassContainer {
 						t.Fatalf("OCI observation class=%q error=%v", class, err)
 					}
 				}
@@ -226,7 +226,7 @@ func TestDirectOCIMaterialPhaseCancellation(t *testing.T) {
 		name, phase, message string
 		occurrence           int
 	}{
-		{"copy admission", "subject-copy", "building verified SBOM evidence", 1},
+		{"copy admission", "subject-copy", "disk inspection canceled", 1},
 		{"marker", "subject-revalidation", "compressed material marker scan canceled", 1},
 		{"extraction", "filesystem-extraction", "extracting nested OCI layout canceled", 1},
 		{"per-image sealing", "scanner-transport", "sealing nested OCI scan transport canceled", 1},

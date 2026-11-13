@@ -134,6 +134,9 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
+	if err := admitInternalToolExecution(plan); err != nil {
+		return nil, err
+	}
 	if err := rejectUnjoinedDebianPlan(plan, "GitHub generation"); err != nil {
 		return nil, err
 	}

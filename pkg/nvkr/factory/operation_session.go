@@ -149,6 +149,9 @@ func admitOperation(ctx context.Context, plan *Plan, nodeID string) (Node, error
 func (session *operationSession) dispatch(ctx context.Context, plan *Plan, node Node) error {
 	if node.IRNode != "" {
 		var owner *LocalRunResult
+		if _, internal := plan.internalToolForTarget(node.BuildTarget); internal {
+			owner = session.placement.owner
+		}
 		for _, output := range plan.LifecycleOutputs {
 			if output.Name == node.BuildTarget && output.Kind == authored.OutputDiskImage {
 				owner = session.placement.owner
@@ -158,6 +161,27 @@ func (session *operationSession) dispatch(ctx context.Context, plan *Plan, node 
 			session.stdout, session.stderr, session.placement.producer, owner)
 	}
 	_, artifacts := planIndex(plan)
+	if _, internal := plan.internalToolForTarget(node.BuildTarget); internal && (node.Kind == NodeVerify || node.Kind == NodeSBOM) {
+		if err := session.placement.owner.admitInternalToolEvidence(ctx, plan, node); err != nil {
+			return err
+		}
+		var err error
+		if node.Kind == NodeVerify {
+			err = executeObservation(ctx, plan, node, artifacts)
+		} else {
+			if err = validateInternalToolSBOMNode(plan, node); err == nil {
+				if session.placement.launch == nil {
+					err = e.New(e.CodeEngineCapability, "internal tool SBOM requires its selected offline container")
+				} else {
+					err = session.placement.launch(ctx, node)
+				}
+			}
+		}
+		if err != nil {
+			return err
+		}
+		return session.placement.owner.recordInternalToolEvidence(ctx, plan, node)
+	}
 	switch node.Kind {
 	case NodeAcquire:
 		return executeToolAcquire(ctx, node, artifacts[node.Outputs[0]], session.stdout)

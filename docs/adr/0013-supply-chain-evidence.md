@@ -219,6 +219,29 @@ filesystem expansion bound and wall-time limit. Changing this observation profil
 than the logical producer Build. The pinned tools own disk/filesystem, package and OCI grammars;
 NVKR projects their observations and does not execute guest programs or package installation scripts.
 
+ADR-19's internal-tool contract permits the inspection helper to be an ordinary catalog producer
+required within the Run, without becoming a Release member. Its authenticated result must be joined
+to the exact appliance and inspected subject in the observation receipt. This is an observation-only
+dependency and preserves the logical-Build distinction above. The native hosted disk group retains
+the produced static executable and its completed evidence through inspection. Component SBOMs bind
+the helper's Build, component and exact byte digest; attempt-specific terminal bindings belong only
+to Run evidence. The package transaction records the original tool use beside the SBOM set, and
+Run completion joins it to the exact producer, evidence, appliance and disk subject. This record is
+not a delivered artifact and cannot restore an execution capability. General internal-tool consumers
+and cross-job capability transport remain deferred; extraction or generation tests alone are not
+evidence of a complete native disk Run.
+
+Produced-helper profiles also pin the appliance's Perl interpreter and the exact embedded sealed-exec
+bootstrap program. These pins change Environment/Plan and tool-use evidence identities, not the
+logical helper or disk Build. Before producer work, a confined probe measures the interpreter and
+exercises anonymous executable creation, write/grow/shrink/seal protection and descriptor execution
+in the selected native appliance. Missing interpreter support or syscall availability fails admission.
+The helper's held snapshot is streamed with its exact size and digest, followed by the subject. The
+bootstrap seals the anonymous file, verifies its sealed bytes, then executes the descriptor with the
+subject stream still on stdin. No mutable host executable path is mounted into the container.
+The immutable appliance binds the interpreter's modules and dynamic dependencies. This bootstrap
+does not extend platform support or establish native execution evidence on an emulated host.
+
 The original held Packer artifact retains its declared acquisition carrier before producer cleanup.
 The runtime owns capacity admission, snapshot creation, bounded offline content scanning, snapshot
 closure and permit release as one registered operation. Factory retains the original Run permit

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package sbom
+package diskinspect
 
 import (
 	"archive/tar"
@@ -83,7 +83,7 @@ func (inspection *FilesystemInspection) Files() []DiskFile {
 func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, platform, guestfishDigest, packageReaderDigest string,
 	scanner Scanner, codec *assemble.QemuImgCodec, maxBytes int64,
 ) (*FilesystemInspection, error) {
-	if err := validateSBOMContext(ctx); err != nil {
+	if err := validateContext(ctx); err != nil {
 		return nil, err
 	}
 	depth, _ := ctx.Value(diskScanDepthKey{}).(int)
@@ -110,7 +110,7 @@ func inspectFilesystem(ctx context.Context, subject inspectionArchive, format, p
 	}
 	defer func() { _ = guestfish.Close() }()
 	image, err := elf.NewFile(guestfish)
-	if err != nil || !diskInspectorELF(image) {
+	if err != nil || !NativeELF(image) {
 		return nil, e.New(e.CodeEngineCapability, "filesystem exporter is not native Linux ELF")
 	}
 	workspace, err := os.MkdirTemp("/tmp", "nvkr-fs-*")
@@ -506,13 +506,13 @@ func filesystemDependenciesFromJSON(raw []byte, scannerDigest string) (Dependenc
 	// Syft v1.51.1 and v1.57.1 retain the same package identity projection.
 	// v1.57.1 adds fullPath for archive coordinates, admitted below. Retain the
 	// older schema for committed images; other schemas need an explicit review.
-	if (report.Schema.Version != "16.1.10" && report.Schema.Version != "16.1.13") || len(report.Artifacts) > maxDiskInstalledPackages {
+	if (report.Schema.Version != "16.1.10" && report.Schema.Version != "16.1.13") || len(report.Artifacts) > MaxInstalledPackages {
 		return DependencyInventory{}, e.New(e.CodeProvenanceMissing, "filesystem scanner returned no bounded package inventory")
 	}
 	result := DependencyInventory{Method: "syft-cyclonedx/v1", ScannerDigest: scannerDigest}
 	for _, artifact := range report.Artifacts {
 		component := Component{Type: "library", Name: artifact.Name, Version: artifact.Version, PURL: artifact.PURL,
-			Properties: []Property{{Name: diskPackageFormatProperty, Value: artifact.Type}}}
+			Properties: []Property{{Name: PackageFormatProperty, Value: artifact.Type}}}
 		if artifact.Type == "deb" {
 			// Syft's dpkg-db-cataloger deliberately searches **/lib/dpkg.
 			// A nested database has no independently held filesystem/image owner
@@ -545,10 +545,10 @@ func filesystemDependenciesFromJSON(raw []byte, scannerDigest string) (Dependenc
 			if artifact.Metadata.Architecture == "" || artifact.Version == "" {
 				return DependencyInventory{}, e.New(e.CodeProvenanceMissing, "Debian filesystem package lacks exact version or architecture")
 			}
-			component.Properties = append(component.Properties, Property{Name: diskPackageArchitectureProperty, Value: artifact.Metadata.Architecture})
+			component.Properties = append(component.Properties, Property{Name: PackageArchitectureProperty, Value: artifact.Metadata.Architecture})
 			slices.SortFunc(component.Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
 		}
-		if err := validateSBOMComponent("filesystem dependency", component); err != nil {
+		if err := ValidateComponent("filesystem dependency", component); err != nil {
 			return DependencyInventory{}, err
 		}
 		result.Components = append(result.Components, component)
