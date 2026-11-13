@@ -286,6 +286,8 @@ registry writes, inventory publication, workflow changes or component bindings o
 The output is JSON-form YAML using AICR's `aicr.run/v1beta1` ArtifactInventory contract, pinned to
 [upstream types](https://github.com/NVIDIA/aicr/blob/dc78e354f2a55985782cfe0d9d6b8f1591e75dd5/pkg/artifact/types.go)
 and [upstream validation](https://github.com/NVIDIA/aicr/blob/dc78e354f2a55985782cfe0d9d6b8f1591e75dd5/pkg/artifact/parse.go).
+Registry hosts must fit that upstream contract: FQDNs and `localhost`, with optional numeric ports,
+are supported; IPv6 literals, underscores and trailing dots are refused with `NVKR-E-ENGINE-CAPABILITY`.
 Charts retain separate OCI manifest and compressed archive digests; their config version uses Helm's
 `+` to `_` tag encoding. Abbreviated chart versions are refused rather than normalized into a different tag. Image `version: nvkr-run-<producer-run-id>` is a descriptive label from the
 signed source invocation, **not a claim that a registry tag exists**. Images are consumed by digest.

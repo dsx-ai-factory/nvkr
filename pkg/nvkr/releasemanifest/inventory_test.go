@@ -303,3 +303,202 @@ func TestInventoryCanceledAndNoncanonicalInputs(t *testing.T) {
 		})
 	}
 }
+
+func TestInventoryRegistryHostCompatibility(t *testing.T) {
+	for _, tc := range []struct {
+		host     string
+		accepted bool
+	}{
+		{"registry.example.test", true}, {"registry.example.test:5000", true},
+		{"localhost", true}, {"localhost:5000", true},
+		{"[::1]:5000", false}, {"registry_name.example.test", false}, {"registry.example.test.", false},
+	} {
+		t.Run(tc.host, func(t *testing.T) {
+			output := inventoryShape(t)[6]
+			output.Reference = tc.host + "/image@" + output.Digest
+			if err := delivery.ValidatePublicationReference(output.Reference); err != nil {
+				t.Fatal("fixture must be NVKR-admitted", err)
+			}
+			raw, err := projectInventory(manifestFixture(t), []delivery.PublicationOutput{output}, "")
+			if tc.accepted {
+				if err != nil || len(raw) == 0 {
+					t.Fatalf("accepted host: %v", err)
+				}
+			} else {
+				requireCode(t, err, e.CodeEngineCapability)
+				if len(raw) != 0 {
+					t.Fatal("partial inventory")
+				}
+			}
+		})
+	}
+}
+
+func TestInventoryIndexPlatformExclusion(t *testing.T) {
+	outputs := inventoryShape(t)
+	index := outputs[58]
+	index.ImageIndex.RequiredPlatforms = index.ImageIndex.RequiredPlatforms[:1]
+	index.ImageIndex.Children = index.ImageIndex.Children[:1]
+	child := index.ImageIndex.Children[0]
+	var err error
+	index.BuildDigest, err = ir.ImageIndexBuildDigest(index.ImageIndex.RequiredPlatforms, []ir.ImageIndexBuildChild{{Platform: child.Platform, BuildDigest: child.BuildDigest, Component: child.Component}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, empty := range []bool{false, true} {
+		t.Run(fmt.Sprintf("empty=%t", empty), func(t *testing.T) {
+			selection := []delivery.PublicationOutput{index}
+			if !empty {
+				selection = append(selection, outputs[7])
+			}
+			raw, err := projectInventory(manifestFixture(t), selection, "linux/arm64")
+			if empty {
+				requireCode(t, err, e.CodeReleaseIncomplete)
+				if len(raw) != 0 {
+					t.Fatal("partial inventory")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var doc struct {
+				Artifacts []inventoryIdentity `json:"artifacts"`
+			}
+			if err := json.Unmarshal(raw, &doc); err != nil {
+				t.Fatal(err)
+			}
+			if len(doc.Artifacts) != 1 || doc.Artifacts[0].Name != outputs[7].Name {
+				t.Fatalf("index was not excluded: %s", raw)
+			}
+		})
+	}
+}
+
+func TestInventoryConstructorAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name, host string
+		change     func(*InventoryOptions)
+		code       e.Code
+	}{
+		{"negative timeout", "linux", func(o *InventoryOptions) { o.Consumer.Timeout = -time.Second }, e.CodeUsage},
+		{"unsupported host", "windows", func(*InventoryOptions) {}, e.CodeEngineCapability},
+		{"Darwin admitted inputs", "darwin", func(*InventoryOptions) {}, e.CodeEngineCapability},
+		{"missing pin", "linux", func(o *InventoryOptions) { o.Consumer.CosignDigest = "" }, e.CodeUnpinnedInput},
+		{"non-authenticity publisher", "linux", func(o *InventoryOptions) { o.Publisher.Scope = lifecycle.ScopeRelease }, e.CodeEngineCapability},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			manifest := manifestFixture(t)
+			options := InventoryOptions{Consumer: lifecycle.ConsumerOptions{Timeout: time.Minute, CosignBinary: "/must-not-execute", CosignDigest: fixtureDigest}, Publisher: lifecycle.VerificationPolicy{Lane: lifecycle.LanePipeline, Scope: lifecycle.ScopeAuthenticity, IdentityRegexp: "publisher", Issuer: "issuer"}, Qualifier: Policy{QualificationIdentity: manifest.Qualification.Invocation.BuilderID, QualificationPolicyDigest: manifest.Qualification.PolicyDigest}}
+			tc.change(&options)
+			exporter, err := newInventoryExporter(manifest.Release.Reference, options, tc.host)
+			requireCode(t, err, tc.code)
+			if exporter != nil {
+				t.Fatal("refused admission returned exporter")
+			}
+		})
+	}
+}
+
+// This integration contract uses the public Consumer to issue real receipts;
+// no test-only receipt factory or verifier injection is exposed by lifecycle.
+// The config is JSON with ManifestPath, Reference and Options fields.
+func TestInventoryAuthenticatedExport(t *testing.T) {
+	path := os.Getenv("NVKR_INVENTORY_EXPORT_TEST_CONFIG")
+	if path == "" {
+		t.Skip("set NVKR_INVENTORY_EXPORT_TEST_CONFIG for Linux authenticated registry contract")
+	}
+	var config struct {
+		ManifestPath, Reference string
+		Options                 InventoryOptions
+	}
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = json.Unmarshal(raw, &config); err != nil {
+		t.Fatal(err)
+	}
+	original, err := os.ReadFile(config.ManifestPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := Decode(original)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, missing := range []bool{false, true} {
+		t.Run(fmt.Sprintf("missing-filtered-member=%t", missing), func(t *testing.T) {
+			candidate := manifest
+			candidate.Members = append([]Member(nil), manifest.Members...)
+			if missing {
+				found := false
+				for i, member := range candidate.Members {
+					if member.Platform == "linux/arm64" {
+						candidate.Members = append(candidate.Members[:i], candidate.Members[i+1:]...)
+						found = true
+						break
+					}
+				}
+				if !found {
+					t.Fatal("fixture needs filtered-out arm64 member")
+				}
+			}
+			input, err := candidate.Canonical()
+			if err != nil {
+				t.Fatal(err)
+			}
+			options := config.Options
+			options.Platform = "linux/amd64"
+			exporter, err := NewInventoryExporter(config.Reference, options)
+			if err != nil {
+				t.Fatal(err)
+			}
+			authenticate := exporter.authenticate
+			var accepted *lifecycle.AuthenticatedRelease
+			exporter.authenticate = func(ctx context.Context, ref string, policy lifecycle.VerificationPolicy) (*lifecycle.AuthenticatedRelease, error) {
+				var err error
+				accepted, err = authenticate(ctx, ref, policy)
+				return accepted, err
+			}
+			verified := false
+			exporter.verifyManifest = func(_ context.Context, subject sign.Subject, raw []byte) error {
+				if subject.Ref != config.Reference || subject.Digest != manifest.Release.Digest || !bytes.Equal(raw, input) {
+					t.Fatal("lost exact manifest binding")
+				}
+				verified = true
+				return nil
+			}
+			output, err := exporter.Export(t.Context(), input)
+			if missing {
+				requireCode(t, err, e.CodeReleaseIncomplete)
+				if len(output) != 0 {
+					t.Fatal("partial inventory")
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				var doc struct {
+					Artifacts []inventoryIdentity `json:"artifacts"`
+				}
+				if err = json.Unmarshal(output, &doc); err != nil {
+					t.Fatal(err)
+				}
+				if len(doc.Artifacts) == 0 {
+					t.Fatal("empty inventory")
+				}
+				for _, item := range doc.Artifacts {
+					if item.Platform != nil && item.Platform.Architecture != "amd64" {
+						t.Fatal("unfiltered inventory")
+					}
+				}
+			}
+			if !verified || accepted == nil {
+				t.Fatal("authentication not exercised")
+			}
+			_, err = accepted.MetadataDescription()
+			requireCode(t, err, e.CodeGateUnmet)
+		})
+	}
+}

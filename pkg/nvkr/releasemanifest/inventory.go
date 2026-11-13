@@ -6,6 +6,7 @@ package releasemanifest
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"regexp"
 	"runtime"
 	"slices"
@@ -41,6 +42,10 @@ type InventoryExporter struct {
 // NewInventoryExporter admits trust, platform and executable capabilities before
 // the caller opens the manifest file or starts registry work.
 func NewInventoryExporter(reference string, options InventoryOptions) (*InventoryExporter, error) {
+	return newInventoryExporter(reference, options, runtime.GOOS)
+}
+
+func newInventoryExporter(reference string, options InventoryOptions, hostOS string) (*InventoryExporter, error) {
 	if err := delivery.ValidatePublicationReference(reference); err != nil {
 		return nil, err
 	}
@@ -66,7 +71,7 @@ func NewInventoryExporter(reference string, options InventoryOptions) (*Inventor
 	if err := options.Consumer.Registry.Validate(); err != nil {
 		return nil, err
 	}
-	if runtime.GOOS != "linux" {
+	if hostOS != "linux" {
 		return nil, e.New(e.CodeEngineCapability, "authenticated inventory export requires Linux pinned cosign execution")
 	}
 	if options.Consumer.CosignBinary == "" || !canonical.IsDigest(options.Consumer.CosignDigest) {
@@ -212,6 +217,9 @@ type inventoryNativePlatform struct {
 	Architecture string `json:"architecture"`
 }
 
+// Match the pinned AICR registry-host grammar, which is narrower than OCI.
+var inventoryHostPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?$`)
+
 func projectInventory(manifest Manifest, outputs []delivery.PublicationOutput, platform string) ([]byte, error) {
 	if err := inventoryPlatform(platform); err != nil {
 		return nil, err
@@ -238,6 +246,10 @@ func projectInventory(manifest Manifest, outputs []delivery.PublicationOutput, p
 			return nil, e.New(e.CodeEngineCapability, "output %q exceeds AICR identity projection limits", output.Name)
 		}
 		item := inventoryIdentity{Name: output.Name, Reference: "oci://" + strings.Split(output.Reference, "@")[0], ManifestDigest: output.Digest, Version: version, Type: "image"}
+		parsed, err := url.Parse(item.Reference)
+		if err != nil || !inventoryHostPattern.MatchString(parsed.Host) || (parsed.Host != "localhost" && !strings.ContainsAny(parsed.Host, ".:")) {
+			return nil, e.New(e.CodeEngineCapability, "output %q requires an AICR-compatible registry host", output.Name)
+		}
 		if output.Kind == lifecycle.OutputHelm {
 			if output.ChartVersion == "" || !canonical.IsDigest(output.ChartArchiveDigest) {
 				return nil, e.New(e.CodeVerifyFailed, "chart %q lacks version or archive binding", output.Name)
