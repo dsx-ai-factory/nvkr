@@ -116,7 +116,17 @@ and the deferred qualified `EvidenceReceipt`. Its fields have these required mea
 | `coverage` | Explicit requested and observed package/inventory scopes, omissions and unsupported scopes, with their canonical coverage digest; completeness applies only to the declared scope. |
 | `result` | `complete` or `incomplete`, with stable failure reasons when incomplete; digests of raw unsuppressed result bytes and the deterministic semantic result when available. Missing results remain explicitly absent, never an empty successful result. |
 
-Structured semantic results use the canonical codec and an existing typed evidence digest family (ADR-01/05).
+Incomplete reports distinguish known requested pins from identities actually observed and verified. If
+inventory collection, executable verification or DB acquisition fails, the corresponding observed identity
+is explicitly unavailable with a failure reason; requested pins must not fill those observed fields.
+A complete report requires all applicable observed bindings above.
+
+Structured semantic results use the canonical codec (ADR-01/05). The later adapter/schema decision must
+select and document an active typed digest family before minting semantic-result identities; the old
+`nvkr.vuln-report` domain remains reserved and nonminting. The complete statement identity binds its
+version/lane, all output, subject, inventory, tool, DB, policy and coverage bindings, completion state and
+raw/semantic result references. The narrower semantic-result identity covers only the deterministic result
+projection; equal semantic results do not establish equal statements or authorize reuse of their bindings.
 Raw-result and archive SHA-256 values establish exact blob integrity only. The semantic result preserves
 package/advisory matches, severity and fixed/unfixed information in deterministic order without scan time,
 random identifiers or temporary paths. It never suppresses raw matches. Raw scanner JSON may contain
@@ -599,8 +609,8 @@ Curated/embedded aggregates use dependency edges from aggregate to members (ADR-
   and makes scanner, DB, policy and coverage inputs auditable.
 
 **Negative / costs**
-- Vuln-report determinism requires provisioning and mirroring a pinned scanner DB/policy — an infra dependency
-  for air-gap.
+- Future design cost: vulnerability-report determinism requires provisioning and mirroring a pinned scanner
+  DB/policy, including infrastructure for air-gapped matching.
 - External-evidence conventions vary per upstream; some references degrade to `evidence: none`.
 - Signed upstream evidence depends on a pinned cosign and online access to the public-good Sigstore trust root.
 - Persisted and cross-boundary receipt issuers and waiver approvers require explicit trust-policy roles and
