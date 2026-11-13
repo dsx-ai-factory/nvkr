@@ -76,7 +76,7 @@ jobs:
 
   check-paths:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     # `pull-requests: read` is required by dorny/paths-filter: on a
     # pull_request event it lists changed files via
     # GET /repos/{owner}/{repo}/pulls/{n}/files. On a public repository that
@@ -222,6 +222,34 @@ jobs:
               - 'Makefile'
               - '.github/workflows/merge-gate.yaml'
 
+      - name: Dependency changes (report-only)
+        id: dependency-review
+        timeout-minutes: 1
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          comment-summary-in-pr: never
+          warn-only: true
+          license-check: false
+          show-openssf-scorecard: false
+
+      - name: Dependency graph coverage
+        if: always()
+        env:
+          REVIEW_OUTCOME: ${{ steps.dependency-review.outcome }}
+          HAS_DEPENDENCY_REPORT: ${{ steps.dependency-review.outputs.dependency-changes != '' }}
+        run: |
+          {
+            echo '## Dependency review coverage (report-only)'
+            if [ "$REVIEW_OUTCOME" != success ] || [ "$HAS_DEPENDENCY_REPORT" != true ]; then
+              echo 'INCOMPLETE: dependency review unavailable, failed, skipped, or returned no report. See action diagnostics for unsupported/disabled dependency graph or missing snapshots.'
+            else
+              echo 'GitHub returned a dependency-change report; consult its findings and snapshot warnings above.'
+            fi
+            echo 'Coverage is limited to changes GitHub recognizes. Missing/unsupported manifests and snapshots remain unverified, including nested tool modules and non-manifest artifact dependencies. An empty diff does not establish complete graph coverage; snapshot warnings mean incomplete coverage.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
   # Repository checks — the same gates `make check` runs locally, plus build.
   # `make ci-check` runs these and every other locally reproducible job below.
 
@@ -315,7 +343,7 @@ jobs:
     needs: [check-paths]
     if: needs.check-paths.outputs.code == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -328,6 +356,27 @@ jobs:
 
       - name: Go vulnerability check
         run: make vulncheck
+
+      - name: Nested Go tool vulnerabilities (report-only)
+        id: tool-vulnerabilities
+        if: always()
+        timeout-minutes: 3
+        continue-on-error: true
+        run: make vulncheck-tools
+
+      - name: Nested tool coverage
+        if: always()
+        env:
+          SCAN_OUTCOME: ${{ steps.tool-vulnerabilities.outcome }}
+        run: |
+          {
+            echo '## Nested Go tool coverage (report-only)'
+            if [ "$SCAN_OUTCOME" = success ]; then
+              echo 'Both enumerated tool entry points scanned; see logs for findings and per-module results.'
+            else
+              echo 'INCOMPLETE: nested tool scanning failed or was skipped. See logs; no clean result is implied.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
   tests:
     needs: [check-paths]
