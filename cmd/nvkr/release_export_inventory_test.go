@@ -7,16 +7,17 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualification"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/releasemanifest"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
-	"os"
-	"path/filepath"
-	"strings"
-	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
