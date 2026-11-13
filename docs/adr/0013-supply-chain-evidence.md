@@ -12,7 +12,8 @@
 - **Satisfies:** FR-15 (deterministic SBOM), SEC-18 (vulnerability reporting).
 
 - **Scope:** SBOM generation applies to both lanes. Qualified release receipts, evidence waivers and
-  vulnerability scanning remain deferred. V1 acquisition and scanning limits are stated in §6.
+  vulnerability clearance remain deferred. Optional pipeline-attested vulnerability reports have the design
+  contract in §3; executable scanning and publication are deferred. V1 acquisition limits are stated in §6.
 
 ## Context
 
@@ -93,19 +94,72 @@ explicit, authenticated waiver naming the exact artifact digest, missing evidenc
 digest, reason, approver identity, and expiry. The waiver is policy evidence; it does not masquerade as an SBOM
 or provenance receipt. Waiver issuance and release evaluation are not implemented.
 
-### 3. Vulnerability-report determinism
+### 3. Optional pipeline-attested vulnerability reports — design contract
 
-A **shelled** Apache-2.0 scanner (grype/trivy — subprocess, never linked) produces a report naming the **scanned
-artifact, the pinned scanner DB/policy version, and the build identity**, with **scan-time omitted**. The
-DB/policy version is an **explicit pinned input**: a "deterministic" report only holds if the moving DB is
-captured as a pin. A missing scanner **fails closed**, or is print-only under an explicit flag. A de-risking
-spike covers this (below).
+The initial route is opt-in and report-only. Findings do not block merging or publication and confer no
+clearance, waiver or qualified receipt. Existing gates retain their requirements. Omission means not scanned;
+a requested scan with tool, collection or input failures is **incomplete**, never a clean result. A complete
+report with no matches means only that the pinned matcher found none within its declared coverage.
+
+The versioned statement contract is `nvkr.dev/vulnerability-scan/v1`, distinct from CycloneDX composition
+and the deferred qualified `EvidenceReceipt`. Its fields have these required meanings:
+
+| Field | Binding |
+|---|---|
+| `schemaVersion`, `lane` | Exact statement version above and `pipeline-attested`; unknown versions or lanes are rejected. |
+| `output`, `buildDigest` | Exact named output and its logical Build identity; equal Build Digests do not authorize sibling-output reuse. |
+| `stage`, `subject` | Observed production or final packaging stage; exact subject kind, digest and platform. OCI children also bind the parent index digest and verified child membership. |
+| `inventory` | Exact input document digest, format/schema and inspection method, bound to the held subject bytes; declaration-only inventories cannot imply inspected package coverage. |
+| `scanner` | Scanner name/version, native platform, release archive SHA-256 and verified executable digest. |
+| `database` | Compatible DB schema, build identifier and exact snapshot archive SHA-256; a version label or retrieval URL alone is insufficient. |
+| `policy` | Digests of exact matcher configuration and report policy bytes, including the report-only disposition. |
+| `coverage` | Explicit requested and observed package/inventory scopes, omissions and unsupported scopes, with their canonical coverage digest; completeness applies only to the declared scope. |
+| `result` | `complete` or `incomplete`, with stable failure reasons when incomplete; digests of raw unsuppressed result bytes and the deterministic semantic result when available. Missing results remain explicitly absent, never an empty successful result. |
+
+Structured semantic results use the canonical codec and an existing typed evidence digest family (ADR-01/05).
+Raw-result and archive SHA-256 values establish exact blob integrity only. The semantic result preserves
+package/advisory matches, severity and fixed/unfixed information in deterministic order without scan time,
+random identifiers or temporary paths. It never suppresses raw matches. Raw scanner JSON may contain
+operational metadata, so its digest and the enclosing statement need not repeat across scans even when the
+semantic result does. Start/end time, duration and observed DB age belong to Run diagnostics outside logical
+Build identity; refreshing scan inputs changes scan evidence, not the identity of unchanged produced bytes.
+DB build identity remains a pinned input even when it includes the upstream snapshot's build time.
+
+The tool-input contract selects Grype 0.121.3 as a bounded subprocess beside the existing Syft inventory
+handling; it does not link a scanner library. The approved release archive pins are:
+
+| Platform | Grype archive SHA-256 |
+|---|---|
+| Linux AMD64 | `e9da18cc1429e786722e32161288103600efffd8e483c90761f90485bd1bec85` |
+| Linux ARM64 | `b7815598d48da78bfd16f5b98ef28e1bb09c03d34fc8c3e350f99b6ccb3c7cba` |
+| Darwin ARM64 (local diagnostics only) | `54336f2cd8cdee8b3d8ea83462561ff7fa9293498054c7c53a193db44bfea4c8` |
+
+Archive bytes must be verified before execution; acquisition separately freezes the executable digest.
+The adapter slice must select a literal compatible DB snapshot pin and prove it with fixtures before its
+executable path can merge. Matching uses that separately acquired snapshot with updates and external lookups
+disabled and hash-bound configuration. Each admitted inventory format requires comparison of normalized
+CycloneDX matching with controlled direct scans. Wrong pins, unsupported inventories, malformed output,
+cancellation and collection failures cannot yield complete results.
+
+Coverage initially targets observed binary inventories and every selected native OCI child, including acquired
+upstream artifacts. Parent index membership does not substitute for scanning a child. Toolchain images require
+their own exact subject/platform reports. Chart misconfiguration and disk installed-content coverage are
+separate scopes; producer-only disk evidence cannot supply an installed-content vulnerability inventory.
+
+Publishing these reports requires a later versioned optional membership extension and its consumer verifier
+together in the existing signing/publication path. Consumers must support that version or explicitly reject
+it; scan JSON must never enter the CycloneDX decoder. Authentication establishes report membership and
+subject bindings, not vulnerability clearance. No new release-authorization or waiver subsystem is introduced.
+A later enforcement decision must specify coverage, severities, fixed/unfixed treatment, maximum DB age and
+triage ownership. Once required, missing reports, failed scans, stale required inputs and unsupported required
+coverage fail the named pipeline or promotion check; report-only must never be interpreted as clean.
 
 ### 4. Advisory → affected-build boundary
 
-Advisory generation and vulnerability scanning are outside the current product scope. The unused advisory,
-scanner-argv and release-only vulnerability receipt implementations are removed. Pinned Syft composition
-inspection in §6 remains implemented; it does not evaluate vulnerabilities or grant release clearance.
+NVKR may produce the optional reports in §3 without maintaining a fleet advisory service or determining
+whether downstream deployments are safe. The unused advisory, scanner-argv and release-only vulnerability
+receipt implementations remain removed. Pinned Syft composition inspection in §6 does not evaluate
+vulnerabilities or grant release clearance. The optional report contract does not restore those removed APIs.
 
 ### 5. Qualified release evidence receipts — deferred
 
@@ -529,7 +583,8 @@ SBOMs remain `static-unqualified` in dry-run. Generation alone is no signature o
 does not retrieve or verify upstream evidence. Acquired components retain `evidence: none` unless pinned upstream
 evidence is declared. Evidence intake verifies declared upstream evidence as §2 states, including Sigstore provenance
 signatures through the pinned cosign verifier when a signer policy is declared;
-air-gapped signature verification is not yet supported. Vulnerability scanning stays outside v1.
+air-gapped signature verification is not yet supported. Optional vulnerability reports follow §3;
+this SBOM path supplies no vulnerability verdict.
 Curated/embedded aggregates use dependency edges from aggregate to members (ADR-10/22).
 
 ## Consequences
@@ -540,7 +595,8 @@ Curated/embedded aggregates use dependency edges from aggregate to members (ADR-
   from-source XOR prebuilt XOR exclusion trichotomy.
 - Promotion distinguishes present evidence, absent evidence, and an explicitly authorized waiver without
   converting absence into success.
-- Vulnerability results are reproducible when the DB/policy is pinned, and consumable by stock scanners.
+- The optional vulnerability contract separates reproducible semantic matches from exact raw-result bytes
+  and makes scanner, DB, policy and coverage inputs auditable.
 
 **Negative / costs**
 - Vuln-report determinism requires provisioning and mirroring a pinned scanner DB/policy — an infra dependency
@@ -563,8 +619,8 @@ Curated/embedded aggregates use dependency edges from aggregate to members (ADR-
 
 ## De-risking spikes
 
-1. **Vuln-report determinism** — two runs over a fixture SBOM plus a pinned DB snapshot are byte-identical,
-   offline.
+1. **Vuln-report determinism** — two offline runs over the same fixture inventory, pinned scanner, DB and
+   policy must produce byte-identical semantic results; raw-result digests separately bind each observation.
 
 ## Follow-ups
 
