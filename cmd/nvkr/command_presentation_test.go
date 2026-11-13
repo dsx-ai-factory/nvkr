@@ -44,8 +44,8 @@ func TestPublicCommandPresentationCoverage(t *testing.T) {
 					flags[name] = true
 				}
 			}
-			if name == "run check-artifacts" || name == "run qualify" || name == "run qualify-local" || name == "validate" || name == "release export-inventory" {
-				// Diagnostics and inventory export retain their machine-readable contracts.
+			if name == "run check-artifacts" || name == "run qualify" || name == "run qualify-local" || name == "validate" {
+				// Qualification and validation diagnostics retain their canonical JSON contracts.
 				canonicalDiagnostics++
 				if flags["ui"] || flags["no-color"] {
 					t.Errorf("canonical diagnostic command %s unexpectedly offers presentation flags", name)
@@ -56,7 +56,7 @@ func TestPublicCommandPresentationCoverage(t *testing.T) {
 		}
 	}
 	visit(newApp().Commands, "")
-	if len(leaves) != 34 || canonicalDiagnostics != 5 {
+	if len(leaves) != 33 || canonicalDiagnostics != 4 {
 		t.Fatalf("public coverage changed: %d leaves, %d canonical diagnostic commands: %v", len(leaves), canonicalDiagnostics, leaves)
 	}
 }

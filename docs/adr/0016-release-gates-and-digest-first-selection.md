@@ -384,15 +384,6 @@ canonical manifest (ADR-01) to the publication root under the qualification iden
 attached bytes again. The receipt is rechecked and cancellation is observed between every step. Issuance uses
 M2's existing bytes and never rebuilds, repacks or relabels a member.
 
-The read-only AICR inventory consumer accepts an explicit canonical manifest and digest-pinned publication.
-It authenticates the exact manifest attachment through the existing signature adapter under independently
-selected GitHub qualifier identity and qualification-policy digest. It then authenticates the complete
-publication with the existing authenticity consumer and matches root, source invocation, input identities,
-composition and exact named member references, digests, Build identities, platforms and build subjects.
-Projection may filter native platforms only after those complete-set checks. This trusts the qualifier
-attestation; it does not rerun qualification, authenticate lifecycle status or grant full-release/qualified
-acceptance. Artifact payload integrity remains unchecked. Tekton inventory consumption is deferred.
-
 The production adapter derives that independent manifest policy from the one loaded qualification-policy
 snapshot: its repository, qualification workflow and default branch select the exact expected certificate
 identity, and its typed policy digest selects the evidence contract. The generated production qualifier

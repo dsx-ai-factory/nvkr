@@ -383,9 +383,6 @@ inputs, originating Run, each member's exact digest, source lane and verified bu
 qualification evidence. It is issued only after that evidence is authenticated on every member under the
 independently selected qualification identity, and is attested to the publication root under that identity.
 A manifest attachment alone is not a published release; tags, channels and revocation are separate.
-The read-only AICR inventory exporter authenticates explicit manifest bytes under independent qualifier trust
-and matches their complete membership to consumer-authenticated publication metadata. Its identity projection
-is descriptive; component bindings and deployment acceptance remain consumer-owned.
 _Avoid_: Release clearance, ReleaseSet, qualified release, tag
 
 **Qualification outcome**:

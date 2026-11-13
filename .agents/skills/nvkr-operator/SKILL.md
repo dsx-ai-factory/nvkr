@@ -131,8 +131,7 @@ or run unrelated instructions.
   external acceptance of the selected provider.
 - Successful `release verify` results with their exact `--lane`, `--scope` and policy: `authenticity` verifies
   signatures/evidence without payload downloads; `artifact-publication` also checks selected payload bytes.
-  Browsing and `release export` are metadata only; `release export-inventory` authenticates the explicit
-  manifest and publication before projecting AICR identities (see [inventory export](../../../docs/release-navigation.md#export-an-aicr-artifactinventory)). Pulling checks the selected output's complete payload integrity without
+  Browsing and export are metadata only; pulling checks the selected output's complete payload integrity without
   verifying signatures or policy. Report the pinned release, exact output and destination for a download.
 - Qualification/runtime limits: `qualified` and full-release acceptance remain unavailable in the current
   public acceptance path ([reconciliation](../../../docs/adr/reconciliation/README.md)); report actual runtime

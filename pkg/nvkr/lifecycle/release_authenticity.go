@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"sync"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
@@ -42,7 +41,6 @@ type authenticatedReleaseState struct {
 	valid        bool
 	description  AuthenticityDescription
 	invocationID string
-	metadataJSON string
 }
 
 func (authenticated *AuthenticatedRelease) Description() (AuthenticityDescription, error) {
@@ -70,7 +68,6 @@ func (authenticated *AuthenticatedRelease) Close() error {
 	state.valid = false
 	state.description = AuthenticityDescription{}
 	state.invocationID = ""
-	state.metadataJSON = ""
 	return nil
 }
 
@@ -146,11 +143,7 @@ func (consumer *Consumer) Authenticate(ctx context.Context, reference string, po
 	if err := authenticityContext(ctx); err != nil {
 		return nil, err
 	}
-	raw, err := canonical.Marshal(metadata)
-	if err != nil {
-		return nil, err
-	}
-	return &AuthenticatedRelease{state: &authenticatedReleaseState{valid: true, metadataJSON: string(raw), invocationID: metadata.Metadata.InvocationID, description: AuthenticityDescription{
+	return &AuthenticatedRelease{state: &authenticatedReleaseState{valid: true, invocationID: metadata.Metadata.InvocationID, description: AuthenticityDescription{
 		SchemaVersion: AuthenticitySchemaVersion, Subject: reference, Lane: policy.Lane, Scope: policy.Scope,
 		Artifacts: cloneArtifacts(artifacts), ContentSubject: metadata.Metadata.ContentSubject, PolicyDigest: policyDigest,
 		PayloadIntegrityVerified: false,
@@ -220,24 +213,4 @@ func (authenticated *AuthenticatedRelease) sourceInvocation(ctx context.Context)
 		return "", e.New(e.CodeProvenanceMissing, "authenticated publication root omits its source invocation")
 	}
 	return state.invocationID, nil
-}
-
-// MetadataDescription returns an independent copy of the complete metadata checked
-// during authentication. It is descriptive, cannot restore this capability, and
-// makes no payload-integrity or qualification claim.
-func (authenticated *AuthenticatedRelease) MetadataDescription() (delivery.PublicationDescription, error) {
-	if authenticated == nil || authenticated.state == nil {
-		return delivery.PublicationDescription{}, e.New(e.CodeGateUnmet, "release authenticity result was not issued")
-	}
-	state := authenticated.state
-	state.mu.RLock()
-	defer state.mu.RUnlock()
-	if !state.valid || state.metadataJSON == "" {
-		return delivery.PublicationDescription{}, e.New(e.CodeGateUnmet, "release authenticity metadata is unavailable")
-	}
-	var result delivery.PublicationDescription
-	if err := canonical.UnmarshalExact([]byte(state.metadataJSON), &result); err != nil {
-		return delivery.PublicationDescription{}, e.Wrap(e.CodeInternal, err, "decoding retained authenticity metadata")
-	}
-	return result, nil
 }

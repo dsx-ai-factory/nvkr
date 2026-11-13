@@ -251,7 +251,7 @@ native-image and exact evidence memberships stay consistent. Explicit JSON or Me
 presentation in auto mode and conflicts with explicit terminal presentation before acquisition.
 
 Normal commands are `validate`, `definition init|validate|inspect|pin`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify|qualify-local`,
-and `release verify|inspect|browse|diff|export|export-inventory|pull`. Producer operations select authored inputs with `--definition` and
+and `release verify|inspect|browse|diff|export|pull`. Producer operations select authored inputs with `--definition` and
 `--environment`; artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
 and exact component/platform diagnostics remain available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
@@ -311,14 +311,6 @@ is retained, including aggregate image-index children and exact evidence/source 
 roles, source compatibility and installation requirements remain outside this interface. The CLI writes the
 complete description after admission and metadata validation. Export creates no identity, Run completion,
 payload or signature acceptance, or publication authority. Unpublished workspace export is not an interface.
-
-`release export-inventory` is a separate read-only adapter under `releasemanifest`. It admits an explicit
-digest reference, canonical manifest bytes, independent qualifier identity/policy digest and publisher
-Verification Policy. Existing sign verification authenticates the exact manifest; `Consumer.Authenticate`
-authenticates the complete publication. A defensive metadata projection from that live capability supports
-exact input and named-member matching before AICR chart/image serialization. The pinned upstream AICR
-contract owns the output shape. No new schema parser, verifier, lifecycle input or qualified claim is added.
-The command emits machine-readable JSON-form YAML only; bindings and publication remain consumer-owned.
 
 `lifecycle.PullReleaseOutput`, exposed as `release pull`, is a diagnostic use case for one exact named output
 under a pinned registry Release reference. Lifecycle owns the overall deadline and delegates to `delivery.PullOutput`.
