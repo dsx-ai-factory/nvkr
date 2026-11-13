@@ -210,12 +210,18 @@ manifest; it does not replace or reinterpret the producer Plan bundle.
 Top-level regeneration and generated-stage admission take separate routes. Only `run generate` writes,
 qualification generation and catalog maintenance render through the `factory.Render` generation seam. A
 top-level `run generate --check` also takes it, but only when the hidden diagnostic `--projection-pilot`
-flag selects the reference projection plugin, reached in-process or out-of-process through one contract.
+flag selects the GitHub or Tekton reference projection plugin, reached in-process or out-of-process through
+one Describe/Emit contract. Core binds the selected engine to its implementation, layout and exact validator;
+it refuses an engine, release, Plan-schema or generator-ABI mismatch before sending Plan bytes to the plugin.
+Tekton's default built-in generation uses that same contract. The Go selector can invoke a separately compiled
+trusted executable; the hidden CLI selects this NVKR binary with an explicit engine. Unknown engines fail
+before plugin launch or output work. This adds no discovery, acquisition or supported third-party ecosystem.
 Generated bootstraps and stages run `run generate --check`, runtime Plan preparation, runtime input
-installation and checking, and action description. These re-emit only through the core's in-binary GitHub
-projection, never that seam, so a generator selected at top-level generation cannot run inside a generated
-stage. A seam and adapter-launcher trap over every stage owner, a selector trap on the bootstrap check
-invocation and an inventory of every committed generated closure contract-test this boundary. The pilot is
+installation and checking, and action description. These re-emit only through the core's in-binary engine
+projection, never that seam. Tekton's core bundle check and native task admission independently render the
+complete Plan; neither consults plugin selection. A seam and adapter-launcher trap over stage owners,
+including native Tekton task admission, a selector trap on bootstrap checks and actual generated Tekton CLI
+arguments, and an inventory of committed generated closures contract-test this boundary. The pilot is
 diagnostic only: runtime Plan refresh refuses its selection, and core admits the plugin's bundle with the
 exact validator before any write, whichever transport carried it.
 

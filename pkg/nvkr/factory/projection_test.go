@@ -25,10 +25,9 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// The projection pilot: the default in-binary Render and the reference plugin
-// reached in-process and out-of-process behind the same seam share the
-// RenderGitHub oracle, and core refuses every misbehaving plugin with a coded
-// error on either transport.
+// The projection pilot shares the engine's core oracle across in-process and
+// out-of-process transports. Core refuses every misbehaving GitHub or Tekton
+// plugin with a coded error before generated files are written.
 
 const (
 	projectionTestAdapterArg = "nvkr-projection-test-adapter"
@@ -38,34 +37,52 @@ const (
 // TestMain lets this test binary serve as the reference adapter process. The
 // host launches it with an empty environment, so argv selects the mode.
 func TestMain(m *testing.M) {
-	if len(os.Args) == 3 && os.Args[1] == projectionTestAdapterArg {
-		os.Exit(serveProjectionTestAdapter(os.Args[2]))
+	if (len(os.Args) == 3 || len(os.Args) == 4) && os.Args[1] == projectionTestAdapterArg {
+		engine := EngineGitHub
+		if len(os.Args) == 4 {
+			engine = os.Args[3]
+		}
+		os.Exit(serveProjectionTestAdapter(os.Args[2], engine))
 	}
 	os.Exit(m.Run())
 }
 
-func projectionTestAdapter(t *testing.T, fault string) ProjectionAdapter {
+func projectionTestAdapter(t *testing.T, fault string, engines ...string) ProjectionAdapter {
 	t.Helper()
 	self, err := os.Executable()
 	if err != nil {
 		t.Fatal(err)
 	}
+	engine := EngineGitHub
+	if len(engines) != 0 {
+		engine = engines[0]
+	}
 	return ProjectionAdapter{Transport: ProjectionOutOfProcess, Path: self,
-		Args: []string{projectionTestAdapterArg, fault}, Release: projectionTestRelease}
+		Args: []string{projectionTestAdapterArg, fault, engine}, Release: projectionTestRelease}
 }
 
 // faultyProjection is the reference plugin with one contract fault applied to
 // its results. Both transports serve it, so core's admission is shown to be
 // transport-neutral. emits counts the Plans it received in-process.
 type faultyProjection struct {
-	fault string
-	emits *int
+	engine string
+	fault  string
+	emits  *int
 }
 
 func (plugin faultyProjection) describe(ctx context.Context) (projectionDescription, error) {
-	description, err := referenceProjection{release: projectionTestRelease}.describe(ctx)
-	if plugin.fault == "wrong-release" {
+	description, err := referenceProjection{engine: plugin.engine, release: projectionTestRelease}.describe(ctx)
+	switch plugin.fault {
+	case "wrong-release":
 		description.Release = "another adapter release"
+	case "wrong-engine":
+		description.Engine = "unknown"
+	case "wrong-schema":
+		description.PlanSchema = "unknown"
+	case "wrong-abi":
+		description.GeneratorABI = "unknown"
+	case "wrong-protocol":
+		description.Protocol = "unknown"
 	}
 	return description, err
 }
@@ -74,7 +91,7 @@ func (plugin faultyProjection) emit(ctx context.Context, request projectionEmitR
 	if plugin.emits != nil {
 		*plugin.emits++
 	}
-	emission, err := referenceProjection{}.emit(ctx, request)
+	emission, err := referenceProjection{engine: plugin.engine}.emit(ctx, request)
 	if err != nil {
 		return emission, err
 	}
@@ -113,7 +130,7 @@ func (plugin faultyProjection) emit(ctx context.Context, request projectionEmitR
 
 // serveProjectionTestAdapter serves faultyProjection out of process and then
 // applies one process or framing fault.
-func serveProjectionTestAdapter(fault string) int {
+func serveProjectionTestAdapter(fault, engine string) int {
 	// The host owes every launch an empty environment and a private empty
 	// working directory; anything else fails the launch.
 	wd, err := os.Getwd()
@@ -155,7 +172,7 @@ func serveProjectionTestAdapter(fault string) int {
 		return 1
 	}
 	var out bytes.Buffer
-	if err := serveProjection(context.Background(), faultyProjection{fault: fault}, bytes.NewReader(raw), &out); err != nil {
+	if err := serveProjection(context.Background(), faultyProjection{engine: engine, fault: fault}, bytes.NewReader(raw), &out); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
@@ -210,8 +227,8 @@ func recordProjectionLaunches(t *testing.T) *projectionLaunches {
 	t.Helper()
 	previous, record := launchProjectionAdapter, &projectionLaunches{}
 	previousBuiltin := builtinProjection
-	builtinProjection = func(release string) projectionPlugin {
-		return countedProjection{plugin: previousBuiltin(release), record: record}
+	builtinProjection = func(engine, release string) projectionPlugin {
+		return countedProjection{plugin: previousBuiltin(engine, release), record: record}
 	}
 	launchProjectionAdapter = func(ctx context.Context, adapter ProjectionAdapter, request []byte, limit int) ([]byte, error) {
 		record.launches++
@@ -353,7 +370,18 @@ func TestProjectionAdapterOutputIgnoresHostEnvironment(t *testing.T) {
 // Contract faults run on both transports; process and framing faults exist
 // only out of process. Every refusal is coded and returns no bundle.
 func TestProjectionHostRefusesMisbehavingPlugins(t *testing.T) {
-	plan := githubTestPlan(t)
+	for _, engine := range []string{EngineGitHub, EngineTekton} {
+		t.Run(engine, func(t *testing.T) {
+			plan := githubTestPlan(t)
+			if engine == EngineTekton {
+				plan = tektonTestPlan(t)
+			}
+			testProjectionHostRefusals(t, engine, plan)
+		})
+	}
+}
+
+func testProjectionHostRefusals(t *testing.T, engine string, plan *Plan) {
 	for _, test := range []struct {
 		fault    string
 		want     e.Code
@@ -361,6 +389,10 @@ func TestProjectionHostRefusesMisbehavingPlugins(t *testing.T) {
 		contract bool
 	}{
 		{"wrong-release", e.CodeEngineCapability, 0, true},
+		{"wrong-engine", e.CodeEngineCapability, 0, true},
+		{"wrong-schema", e.CodeEngineCapability, 0, true},
+		{"wrong-abi", e.CodeEngineCapability, 0, true},
+		{"wrong-protocol", e.CodeEngineCapability, 0, true},
 		{"refuse", e.CodeEngineCapability, 0, false},
 		{"oversized-frame", e.CodePipelineDrift, 0, false},
 		{"hang", e.CodeTimeout, 0, false},
@@ -378,16 +410,18 @@ func TestProjectionHostRefusesMisbehavingPlugins(t *testing.T) {
 	} {
 		t.Run(test.fault+"/out-of-process", func(t *testing.T) {
 			record := recordProjectionLaunches(t)
-			adapter := projectionTestAdapter(t, test.fault)
+			adapter := projectionTestAdapter(t, test.fault, engine)
 			if test.fault == "hang" {
 				adapter.Timeout = 300 * time.Millisecond
 			}
 			started := time.Now()
-			bundle, err := Render(WithProjectionAdapter(t.Context(), adapter), plan, EngineGitHub)
+			root := t.TempDir()
+			digest, err := Generate(WithProjectionAdapter(t.Context(), adapter), plan, engine, root, false)
 			assertFactoryErrorCode(t, err, test.want)
-			if bundle != nil {
-				t.Fatal("refused projection returned a bundle")
+			if digest != "" {
+				t.Fatal("refused generation returned a digest")
 			}
+			assertProjectionDirectoryEmpty(t, root)
 			if record.plans != test.plans {
 				t.Fatalf("adapter received %d Plans, want %d", record.plans, test.plans)
 			}
@@ -400,7 +434,7 @@ func TestProjectionHostRefusesMisbehavingPlugins(t *testing.T) {
 		}
 		t.Run(test.fault+"/in-process", func(t *testing.T) {
 			record, emits := recordProjectionLaunches(t), 0
-			bundle, err := renderProjected(t.Context(), plan, faultyProjection{fault: test.fault, emits: &emits}, projectionTestRelease)
+			bundle, err := renderProjected(t.Context(), plan, engine, faultyProjection{engine: engine, fault: test.fault, emits: &emits}, projectionTestRelease)
 			assertFactoryErrorCode(t, err, test.want)
 			if bundle != nil {
 				t.Fatal("refused projection returned a bundle")
@@ -434,14 +468,26 @@ func TestProjectionHostSeparatesRefusalFromLaunchFailure(t *testing.T) {
 }
 
 func TestProjectionHostStopsAdapterOnCancellation(t *testing.T) {
-	plan, record := githubTestPlan(t), recordProjectionLaunches(t)
+	for _, engine := range []string{EngineGitHub, EngineTekton} {
+		t.Run(engine, func(t *testing.T) {
+			plan := githubTestPlan(t)
+			if engine == EngineTekton {
+				plan = tektonTestPlan(t)
+			}
+			testProjectionCancellation(t, engine, plan)
+		})
+	}
+}
+
+func testProjectionCancellation(t *testing.T, engine string, plan *Plan) {
+	record := recordProjectionLaunches(t)
 	ready := filepath.Join(t.TempDir(), "ready")
-	adapter := projectionTestAdapter(t, "hang:"+ready)
+	adapter := projectionTestAdapter(t, "hang:"+ready, engine)
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	result := make(chan error, 1)
 	go func() {
-		_, err := Render(WithProjectionAdapter(ctx, adapter), plan, EngineGitHub)
+		_, err := Render(WithProjectionAdapter(ctx, adapter), plan, engine)
 		result <- err
 	}()
 	var pid int
@@ -641,7 +687,7 @@ func TestProjectionAdmissionRefusesMalformedEmissions(t *testing.T) {
 	plan := githubTestPlan(t)
 	layout, planDigest := githubLayoutFor(plan), mustPlanDigest(t, plan)
 	request := projectionEmitRequest{Plan: mustCanonicalPlan(t, plan), GeneratorVersion: plan.GeneratorVersion, Layout: projectionLayoutFor(layout)}
-	valid, err := referenceProjection{}.emit(t.Context(), request)
+	valid, err := referenceProjection{engine: EngineGitHub}.emit(t.Context(), request)
 	if err != nil {
 		t.Fatal(err)
 	}
