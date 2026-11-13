@@ -222,8 +222,10 @@ type inventoryNativePlatform struct {
 	Architecture string `json:"architecture"`
 }
 
-// Match the pinned AICR registry-host grammar, which is narrower than OCI.
+// Match the pinned AICR reference grammar, which is narrower than OCI.
 var inventoryHostPattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?$`)
+
+var inventoryRepositoryPattern = regexp.MustCompile(`^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$`)
 
 func projectInventory(manifest Manifest, outputs []delivery.PublicationOutput, platform string) ([]byte, error) {
 	if err := inventoryPlatform(platform); err != nil {
@@ -254,6 +256,9 @@ func projectInventory(manifest Manifest, outputs []delivery.PublicationOutput, p
 		parsed, err := url.Parse(item.Reference)
 		if err != nil || !inventoryHostPattern.MatchString(parsed.Host) || (parsed.Host != "localhost" && !strings.ContainsAny(parsed.Host, ".:")) {
 			return nil, e.New(e.CodeEngineCapability, "output %q requires an AICR-compatible registry host", output.Name)
+		}
+		if !inventoryRepositoryPattern.MatchString(strings.TrimPrefix(parsed.Path, "/")) {
+			return nil, e.New(e.CodeEngineCapability, "output %q requires an AICR-compatible repository path", output.Name)
 		}
 		if output.Kind == lifecycle.OutputHelm {
 			if output.ChartVersion == "" || !canonical.IsDigest(output.ChartArchiveDigest) {

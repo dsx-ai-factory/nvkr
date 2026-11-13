@@ -551,3 +551,32 @@ func TestInventoryManifestSignerOptions(t *testing.T) {
 		})
 	}
 }
+
+func TestInventoryRepositoryCompatibility(t *testing.T) {
+	for _, tc := range []struct {
+		repository string
+		accepted   bool
+	}{
+		{"image..name/chart", false}, {"namespace/chart", true},
+		{"image.name/chart", true}, {"image__name/chart", true}, {"image--name/chart", true},
+	} {
+		t.Run(tc.repository, func(t *testing.T) {
+			output := inventoryShape(t)[0]
+			output.Reference = "registry.example.test/" + tc.repository + "@" + output.Digest
+			if err := delivery.ValidatePublicationReference(output.Reference); err != nil {
+				t.Fatal("fixture must be NVKR-admitted", err)
+			}
+			raw, err := projectInventory(manifestFixture(t), []delivery.PublicationOutput{output}, "")
+			if tc.accepted {
+				if err != nil || len(raw) == 0 {
+					t.Fatalf("accepted repository: %v", err)
+				}
+			} else {
+				requireCode(t, err, e.CodeEngineCapability)
+				if len(raw) != 0 {
+					t.Fatal("partial inventory")
+				}
+			}
+		})
+	}
+}

@@ -17,6 +17,19 @@ import (
 )
 
 func releaseExportInventoryCmd() *cli.Command {
+	return releaseExportInventoryCmdWithFactory(func(reference string, options releasemanifest.InventoryOptions) (releaseInventoryOperation, error) {
+		exporter, err := releasemanifest.NewInventoryExporter(reference, options)
+		if err != nil {
+			return nil, err
+		}
+		return exporter.Export, nil
+	})
+}
+
+type releaseInventoryOperation func(context.Context, []byte) ([]byte, error)
+type releaseInventoryFactory func(string, releasemanifest.InventoryOptions) (releaseInventoryOperation, error)
+
+func releaseExportInventoryCmdWithFactory(admit releaseInventoryFactory) *cli.Command {
 	return &cli.Command{
 		Name: "export-inventory", Usage: "authenticate an explicit release manifest and export AICR chart/image identities (Linux)",
 		Flags: []cli.Flag{
@@ -42,7 +55,7 @@ func releaseExportInventoryCmd() *cli.Command {
 				Publisher: lifecycle.VerificationPolicy{Lane: lifecycle.LanePipeline, Scope: lifecycle.ScopeAuthenticity, IdentityRegexp: c.String("identity"), Issuer: c.String("issuer"), MinimumDiskEvidence: lifecycle.DiskEvidenceRequirement(c.String("minimum-disk-evidence"))},
 				Qualifier: releasemanifest.Policy{QualificationIdentity: c.String("qualifier-identity"), QualificationPolicyDigest: c.String("qualification-policy-digest")}, Platform: c.String("platform"),
 			}
-			exporter, err := releasemanifest.NewInventoryExporter(c.String("reference"), options)
+			export, err := admit(c.String("reference"), options)
 			if err != nil {
 				return err
 			}
@@ -52,7 +65,7 @@ func releaseExportInventoryCmd() *cli.Command {
 			if err := readCanonicalJSONContext(ctx, c.String("manifest"), &manifest); err != nil {
 				return err
 			}
-			raw, err := exporter.Export(ctx, manifest)
+			raw, err := export(ctx, manifest)
 			if err != nil {
 				return err
 			}

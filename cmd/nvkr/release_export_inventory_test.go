@@ -5,12 +5,16 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/urfave/cli/v2"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -51,7 +55,8 @@ func TestReleaseInventoryAdmissionBeforeManifestIO(t *testing.T) {
 	}
 }
 
-func TestReleaseInventoryCanonicalManifestReader(t *testing.T) {
+func inventoryCommandManifest(t *testing.T) []byte {
+	t.Helper()
 	digest := "sha256:" + strings.Repeat("a", 64)
 	source := qualificationorigin.Description{Repository: "example/nvkr", RunID: "12", Attempt: "1", Commit: strings.Repeat("c", 40), Workflow: ".github/workflows/build.yml", DefaultBranch: "main", Ref: "refs/heads/main", InvocationID: "https://github.com/example/nvkr/actions/runs/12/attempts/1", BuilderID: "https://github.com/example/nvkr/.github/workflows/build.yml@refs/heads/main"}
 	qualifier := source
@@ -68,6 +73,12 @@ func TestReleaseInventoryCanonicalManifestReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	return raw
+}
+
+func TestReleaseInventoryCanonicalManifestReader(t *testing.T) {
+	raw := inventoryCommandManifest(t)
+	var err error
 	path := filepath.Join(t.TempDir(), "release-manifest.json")
 	if err = os.WriteFile(path, raw, 0600); err != nil {
 		t.Fatal(err)
@@ -81,5 +92,72 @@ func TestReleaseInventoryCanonicalManifestReader(t *testing.T) {
 	}
 	if _, err = releasemanifest.Decode(received); err != nil {
 		t.Fatal(err)
+	}
+}
+
+type inventoryWriterFunc func([]byte) (int, error)
+
+func (write inventoryWriterFunc) Write(raw []byte) (int, error) { return write(raw) }
+
+func TestReleaseInventoryOutputContract(t *testing.T) {
+	manifest := inventoryCommandManifest(t)
+	path := filepath.Join(t.TempDir(), "release-manifest.json")
+	if err := os.WriteFile(path, manifest, 0600); err != nil {
+		t.Fatal(err)
+	}
+	expected := []byte("{\n  \"kind\": \"ArtifactInventory\"\n}\n")
+	failure := errors.New("fixture writer failure")
+	for _, tc := range []struct {
+		name    string
+		failure error
+		short   bool
+	}{
+		{"exact stdout", nil, false}, {"writer error", failure, false}, {"short write", nil, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			calls := 0
+			command := releaseExportInventoryCmdWithFactory(func(_ string, _ releasemanifest.InventoryOptions) (releaseInventoryOperation, error) {
+				return func(_ context.Context, raw []byte) ([]byte, error) {
+					calls++
+					if !bytes.Equal(raw, manifest) {
+						t.Fatal("manifest bytes changed")
+					}
+					return expected, nil
+				}, nil
+			})
+			var stdout, stderr bytes.Buffer
+			var writer io.Writer = &stdout
+			if tc.failure != nil || tc.short {
+				writer = inventoryWriterFunc(func(raw []byte) (int, error) {
+					if !bytes.Equal(raw, expected) {
+						t.Fatal("output bytes changed")
+					}
+					if tc.short {
+						return len(raw) - 1, nil
+					}
+					return 0, tc.failure
+				})
+			}
+			app := &cli.App{Commands: []*cli.Command{command}, Writer: writer, ErrWriter: &stderr}
+			digest := "sha256:" + strings.Repeat("a", 64)
+			err := app.RunContext(t.Context(), []string{"nvkr", "export-inventory", "--reference", "registry.example.test/releases@" + digest, "--manifest", path, "--identity", "publisher", "--issuer", "issuer", "--qualifier-identity", "qualifier", "--qualification-policy-digest", digest, "--cosign", "/must-not-execute", "--cosign-digest", digest})
+			if tc.failure != nil || tc.short {
+				if cliErrorCode(err) != e.CodeUnavailable {
+					t.Fatalf("writer error code: %v", err)
+				}
+				cause := tc.failure
+				if tc.short {
+					cause = io.ErrShortWrite
+				}
+				if !errors.Is(err, cause) {
+					t.Fatalf("lost writer cause: %v", err)
+				}
+			} else if err != nil || !bytes.Equal(stdout.Bytes(), expected) {
+				t.Fatalf("output=%q error=%v", stdout.String(), err)
+			}
+			if calls != 1 || stderr.Len() != 0 {
+				t.Fatalf("calls=%d stderr=%q", calls, stderr.String())
+			}
+		})
 	}
 }
