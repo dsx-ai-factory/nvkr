@@ -116,7 +116,8 @@ def report(root, output):
             raise ValueError(f"zizmor tool/collection failure (exit {result.returncode})")
         count, text = summarize((attempt / "findings.json").read_text())
         (attempt / "findings.txt").write_text(text + "\n")
-        if re.search(r"\b(WARN|ERROR)\b", (attempt / "stderr.txt").read_text()):
+        if re.search(r"^[ \t]*(?:WARN|ERROR)[ \t]+",
+                     (attempt / "stderr.txt").read_text(), re.MULTILINE):
             raise ValueError("zizmor emitted audit warnings/errors; see stderr.txt and partial findings")
         status = "FINDINGS" if count else "NO FINDINGS"
         detail = f"{count} findings (including ignored entries); {len(inputs)} inputs"

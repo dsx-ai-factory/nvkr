@@ -23,20 +23,50 @@ import (
 )
 
 type mergeGateStep struct {
+	TimeoutMinutes int `json:"timeout-minutes"`
 	storageWorkflowStep
 	ID    string `json:"id"`
 	Shell string `json:"shell"`
 }
 
 type mergeGateJob struct {
-	If       string            `json:"if"`
-	Needs    []string          `json:"needs"`
-	Outputs  map[string]string `json:"outputs"`
-	Steps    []mergeGateStep   `json:"steps"`
-	Strategy struct {
+	TimeoutMinutes int               `json:"timeout-minutes"`
+	If             string            `json:"if"`
+	Needs          []string          `json:"needs"`
+	Outputs        map[string]string `json:"outputs"`
+	Steps          []mergeGateStep   `json:"steps"`
+	Strategy       struct {
 		FailFast *bool  `json:"fail-fast"`
 		Matrix   string `json:"matrix"`
 	} `json:"strategy"`
+}
+
+func TestZizmorDiagnosticTimeoutBudget(t *testing.T) {
+	job := readMergeGateJobs(t)["actionlint"]
+	budget := 5 // Original required-check budget must remain available.
+	for name, timeout := range map[string]int{
+		"zizmor report (offline)":             3,
+		"Retain zizmor diagnostics":           1,
+		"Report incomplete zizmor collection": 1,
+	} {
+		found := false
+		for _, step := range job.Steps {
+			if step.Name != name {
+				continue
+			}
+			found = true
+			if step.TimeoutMinutes != timeout || step.ContinueOnError != true {
+				t.Fatalf("%s must have a %d-minute non-blocking timeout", name, timeout)
+			}
+			budget += timeout
+		}
+		if !found {
+			t.Fatalf("missing diagnostic step %s", name)
+		}
+	}
+	if job.TimeoutMinutes <= budget {
+		t.Fatalf("job timeout %d must exceed required and diagnostic budgets %d", job.TimeoutMinutes, budget)
+	}
 }
 
 func readMergeGateJobs(t *testing.T) map[string]mergeGateJob {

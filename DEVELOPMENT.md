@@ -53,8 +53,16 @@ under `.nvkr/zizmor-report/`; set `ZIZMOR_REPORT_DIR` to relocate them. Findings
 download, integrity, collection, execution, malformed-output and audit-warning failures return
 nonzero and are labeled **INCOMPLETE**, with partial diagnostics retained. CI reports these
 failures without blocking merging. Review the report status, not the green job alone.
+The scan, upload and incomplete-status steps have separate non-blocking timeouts; the job
+budget reserves the original five minutes for required checks plus these diagnostic steps.
 Actionlint and shellcheck remain required and unchanged. Finding remediation and enforcement
 are separate follow-up changes.
+
+Local tool archives and binaries are retained in the `nvkr-zizmor-*` temporary directory
+printed in each summary. After reviewing an attempt, archive any needed diagnostics and
+remove that attempt’s tool scratch within seven days; keep at most the latest two attempts
+for routine local troubleshooting. Cleanup is manual: only remove paths recorded by completed
+attempts, never an active scan’s scratch. CI runner scratch is ephemeral.
 
 `make help` lists targets. The full release-blocking verification includes:
 
