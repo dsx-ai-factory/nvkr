@@ -885,7 +885,7 @@ independently loaded qualification policy selects the expected signer and policy
 qualification-only. The production qualifier also writes an unsigned qualification outcome with `--out` for
 each attempt it qualifies and uploads it, failed and errored attempts included; it points at the
 evidence and manifest by digest and grants no authority. A separate helper, `nvkr-results-publish`, selects and
-publishes outcomes to the proposed ADR-31 TestGrid results index; no generated job runs it yet. Issuance has contract coverage only; hosted acceptance remains unproved. A failing,
+publishes outcomes to the proposed ADR-31 TestGrid results index; the release qualify workflow generates the job that runs it (see its [reconciliation row](adr/reconciliation/adr-31.md)). Issuance has contract coverage only; hosted acceptance remains unproved. A failing,
 incomplete or wrong-signer verdict prevents issuance. The immutable definition/commit tag remains proposed, and the mutable channel tag is
 deferred beyond the MVP.
 

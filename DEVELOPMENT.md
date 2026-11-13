@@ -255,6 +255,23 @@ smaller scratch-generation example. It uses one-day transfers, automatic cancell
 It does not supply the committed full-development bundle. Hosted execution, credential/pool setup and
 actual registry deletion still need a recorded external Run; local contract tests establish none of those.
 
+## Publish job failed
+
+The release qualify workflow's **Publish qualification outcomes** job sends the Run's qualification outcomes
+to the results index (ADR-31). It continues on error, so its failure never fails the Run, and it never changes
+the qualification verdict, which stays the qualify job's.
+
+To retry, re-run only the **Publish qualification outcomes** job itself within 24 hours; the index shows an
+unfinished build as running until then. It has no dependent jobs, so nothing else runs, and the qualify job
+keeps its result and report. Don't use **Re-run all jobs** or **Re-run failed jobs** only to publish: the first
+always qualifies again, and the second does when smoke or qualify failed. A re-run publishes the outcomes
+already uploaded and completes a partly published attempt. If the qualify job's outcome was lost, only running
+the qualify job again recovers it. If a re-run fails the same way, open an issue with the Run link; the job log
+names no bucket or identity.
+
+The job runs in the `nvkr-results` GitHub Environment, which holds the bucket, identity-provider and
+service-account secrets named by `qualificationResults` in `inputs/environments/github-release.yaml`.
+
 ## Generated and handwritten GitHub files
 
 The generator owns `.github/workflows/nvkr-run.yml` and every manifest member beneath `.github/nvkr-run/`,

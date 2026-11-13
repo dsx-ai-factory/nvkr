@@ -391,7 +391,8 @@ issuance, or errored, with the source and qualifier Runs, attempt times, per-out
 text. It points at the qualification evidence and release manifest by digest and grants no qualification,
 manifest, release or publication authority. An errored outcome's source Run comes from the unauthenticated
 triggering event and says so. `run qualify --issue-manifest --out` writes one for each attempt it qualifies.
-The proposed qualification results index (ADR-31) publishes outcomes for TestGrid; no generated job runs it yet.
+The proposed qualification results index (ADR-31) publishes outcomes for TestGrid from a generated job of the
+release qualify workflow.
 _Avoid_: Qualification record, qualification evidence, test result
 
 **Inventory**:
