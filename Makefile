@@ -111,6 +111,14 @@ actionlint: go-version-check ## Lint GitHub workflows with the actionlint pinned
 	GOBIN="$(CURDIR)/bin" go -C toolchains/actionlint install tool
 	"$(CURDIR)/bin/actionlint"
 
+# Optional diagnostic, not an admission gate. A failed collection returns nonzero.
+ZIZMOR_REPORT_DIR ?= $(CURDIR)/.nvkr/zizmor-report
+export ZIZMOR_REPORT_DIR
+
+.PHONY: zizmor-report
+zizmor-report: ## Report offline workflow security findings with checksum-pinned zizmor (Python 3.12+, curl).
+	python3 -B scripts/zizmor-report.py
+
 .PHONY: test-workflow-scripts
 test-workflow-scripts: ## Test the triage and PR-metadata workflow scripts (needs node and npm).
 	@command -v node >/dev/null 2>&1 || { echo "node not installed — https://nodejs.org/" >&2; exit 1; }

@@ -41,6 +41,9 @@ var (
 		{"docs", "Install Fern CLI"},
 		{"lint", "Install checksum-pinned golangci-lint"},
 		{"tests", "Summarize test timings"},
+		// Z1 is an optional diagnostic, not a local or hosted admission gate.
+		{"actionlint", "zizmor report (offline)"},
+		{"actionlint", "Report incomplete zizmor collection"},
 	}
 	// Hosted targets that run a slice of a local target.
 	hostedSlices = map[string]string{"test-shard": "test"}
