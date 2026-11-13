@@ -33,6 +33,9 @@ func TestDiskInspectionInternalHelperSelection(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			p := inspectionProfileFixture()
 			p.HelperTool = tc.helper
+			if tc.helper != "" {
+				p.BootstrapInterpreterDigest, p.BootstrapProgramDigest = p.CodecDigest, p.CodecDigest
+			}
 			if !tc.authoredDigest {
 				p.InspectorDigest = ""
 			}

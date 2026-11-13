@@ -65,7 +65,9 @@ func TestInternalToolUseCompletionJoinsExactDescriptions(t *testing.T) {
 	}
 	_, appliance, _ := strings.Cut(plan.Environment.DiskInspectionProfiles[node.Platform].Image, "@")
 	record := internalToolUseRecord{SchemaVersion: "nvkr.dev/internal-tool-use/v1", PlanDigest: identity,
-		Consumer: node.ID, Purpose: "disk-inspection", Tool: tool.Name, SubjectDigest: subjectDigest, SubjectSize: 22,
+		BootstrapInterpreterDigest: plan.Environment.DiskInspectionProfiles[node.Platform].BootstrapInterpreterDigest,
+		BootstrapProgramDigest:     plan.Environment.DiskInspectionProfiles[node.Platform].BootstrapProgramDigest,
+		Consumer:                   node.ID, Purpose: "disk-inspection", Tool: tool.Name, SubjectDigest: subjectDigest, SubjectSize: 22,
 		Appliance: appliance, Observation: observation, SBOM: evidence,
 		Binding: pipeline.ProducedExecutableBinding{BuildDigest: tool.BuildDigest, Platform: tool.Platform, Component: tool.Component,
 			Digest: helperDigest, Size: 11, TerminalDigest: "sha256:" + strings.Repeat("c", 64)}}
@@ -87,6 +89,8 @@ func TestInternalToolUseCompletionJoinsExactDescriptions(t *testing.T) {
 		{"changed helper", func(r *internalToolUseRecord) { r.Binding.Digest = subjectDigest }},
 		{"changed subject", func(r *internalToolUseRecord) { r.SubjectDigest = helperDigest }},
 		{"changed appliance", func(r *internalToolUseRecord) { r.Appliance = helperDigest }},
+		{"changed bootstrap interpreter", func(r *internalToolUseRecord) { r.BootstrapInterpreterDigest = subjectDigest }},
+		{"changed bootstrap program", func(r *internalToolUseRecord) { r.BootstrapProgramDigest = subjectDigest }},
 		{"changed evidence", func(r *internalToolUseRecord) { r.SBOM = helperDigest }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

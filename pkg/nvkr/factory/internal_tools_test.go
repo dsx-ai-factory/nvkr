@@ -12,6 +12,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 func TestInternalToolRunGraphExcludesDeliveryMembership(t *testing.T) {
@@ -183,6 +184,7 @@ func internalToolPlanFixture(t *testing.T) (*Plan, *Plan) {
 	env := base.Environment.Clone()
 	profile := env.DiskInspectionProfiles["linux/amd64"]
 	profile.HelperTool = "inspector"
+	profile.BootstrapInterpreterDigest, profile.BootstrapProgramDigest = testInspectionBootstrapPins()
 	env.DiskInspectionProfiles["linux/amd64"] = profile
 	c := base.CatalogSnapshot.Components["image"]
 	c.BuilderType, c.OutputType, c.Disk, c.Packer = catalog.BuilderOCIHermetic, "host-package", nil, nil
@@ -238,6 +240,7 @@ func TestInternalToolMissingAndUnusedSelection(t *testing.T) {
 		{"unused", func(_ *authored.Definition, env *authored.Environment) {
 			p := env.DiskInspectionProfiles["linux/amd64"]
 			p.HelperTool = ""
+			p.BootstrapInterpreterDigest, p.BootstrapProgramDigest = "", ""
 			env.DiskInspectionProfiles["linux/amd64"] = p
 		}, e.CodeInvalidCatalog},
 	} {
@@ -313,4 +316,8 @@ func TestInternalToolPublicationTransportsProducerEvidence(t *testing.T) {
 		node.Inputs = slices.DeleteFunc(node.Inputs, func(id string) bool { return id == tool.ObservationArtifactID })
 	}
 	assertFactoryErrorCode(t, plan.validatePublicationEvidence(), e.CodeProvenanceMissing)
+}
+
+func testInspectionBootstrapPins() (string, string) {
+	return "sha256:" + strings.Repeat("a", 64), pipeline.InspectionBootstrapProgramDigest()
 }

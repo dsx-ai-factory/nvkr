@@ -46,7 +46,9 @@ func (container *DiskInspectionContainer) SelectionContext(ctx context.Context) 
 	selection.Workspace = nil
 	selection.Diagnostics = nil
 	selection.Tool = nil
-	selection.toolStage = nil
+	selection.streamBinding = ProducedExecutableBinding{}
+	selection.bootstrapCommand = ""
+	selection.bootstrapProbe = false
 	selection.RuntimeExecutable = container.runtime.name
 	selection.compositionKind, selection.consumerPlatform, selection.scratchVolume = "", "", ""
 	return selection, nil

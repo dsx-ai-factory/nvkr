@@ -23,17 +23,19 @@ const internalToolUseFile = "internal-tools.json"
 // below is the only production writer. Attempt-specific terminal bindings stay
 // here rather than contaminating reproducible component SBOMs.
 type internalToolUseRecord struct {
-	SchemaVersion string                             `json:"schemaVersion"`
-	PlanDigest    string                             `json:"planDigest"`
-	Consumer      string                             `json:"consumer"`
-	Purpose       string                             `json:"purpose"`
-	Tool          string                             `json:"tool"`
-	Binding       pipeline.ProducedExecutableBinding `json:"binding"`
-	SubjectDigest string                             `json:"subjectDigest"`
-	SubjectSize   int64                              `json:"subjectSize"`
-	Appliance     string                             `json:"appliance"`
-	Observation   string                             `json:"observation"`
-	SBOM          string                             `json:"sbom"`
+	BootstrapInterpreterDigest string                             `json:"bootstrapInterpreterDigest"`
+	BootstrapProgramDigest     string                             `json:"bootstrapProgramDigest"`
+	SchemaVersion              string                             `json:"schemaVersion"`
+	PlanDigest                 string                             `json:"planDigest"`
+	Consumer                   string                             `json:"consumer"`
+	Purpose                    string                             `json:"purpose"`
+	Tool                       string                             `json:"tool"`
+	Binding                    pipeline.ProducedExecutableBinding `json:"binding"`
+	SubjectDigest              string                             `json:"subjectDigest"`
+	SubjectSize                int64                              `json:"subjectSize"`
+	Appliance                  string                             `json:"appliance"`
+	Observation                string                             `json:"observation"`
+	SBOM                       string                             `json:"sbom"`
 }
 
 // validateInternalToolUseEvidence checks descriptions inside already-admitted
@@ -74,7 +76,8 @@ func validateInternalToolUseEvidence(ctx context.Context, plan *Plan, node Node,
 	_, pinned, _ := strings.Cut(profile.Image, "@")
 	if selected.Name == "" || record.PlanDigest != identity || record.Consumer != node.ID || record.Tool != selected.Name ||
 		record.Binding.BuildDigest != selected.BuildDigest || record.Binding.Platform != selected.Platform ||
-		record.Binding.Component != selected.Component || record.Appliance != pinned || profile.HelperTool != selected.Name {
+		record.Binding.Component != selected.Component || record.Appliance != pinned || profile.HelperTool != selected.Name ||
+		record.BootstrapInterpreterDigest != profile.BootstrapInterpreterDigest || record.BootstrapProgramDigest != profile.BootstrapProgramDigest {
 		return e.New(e.CodeVerifyFailed, "internal tool use differs from its exact planned consumer")
 	}
 	for _, evidence := range []struct{ id, digest string }{{selected.ObservationArtifactID, record.Observation}, {selected.SBOMArtifactID, record.SBOM}} {
@@ -145,7 +148,7 @@ func (record internalToolUseRecord) validate() error {
 		return e.New(e.CodeVerifyFailed, "internal tool use lacks its bounded exact identity")
 	}
 	for _, digest := range []string{record.PlanDigest, record.Binding.BuildDigest, record.Binding.Digest, record.Binding.TerminalDigest,
-		record.SubjectDigest, record.Appliance, record.Observation, record.SBOM} {
+		record.SubjectDigest, record.Appliance, record.Observation, record.SBOM, record.BootstrapInterpreterDigest, record.BootstrapProgramDigest} {
 		if !canonical.IsDigest(digest) {
 			return e.New(e.CodeVerifyFailed, "internal tool use has an invalid exact-byte binding")
 		}
@@ -186,6 +189,7 @@ func (owner *LocalRunResult) recordDiskInternalToolUse(ctx context.Context, plan
 	sbom := owner.internalToolEvidence[profile.HelperTool][NodeSBOM]
 	owner.diskMu.Unlock()
 	record := internalToolUseRecord{SchemaVersion: "nvkr.dev/internal-tool-use/v1", PlanDigest: owner.PlanDigest,
+		BootstrapInterpreterDigest: profile.BootstrapInterpreterDigest, BootstrapProgramDigest: profile.BootstrapProgramDigest,
 		Consumer: expected.Name + "/sbom", Purpose: "disk-inspection", Tool: profile.HelperTool, Binding: binding,
 		SubjectDigest: digest, SubjectSize: size, Appliance: appliance, Observation: observation, SBOM: sbom}
 	if err := record.validate(); err != nil {

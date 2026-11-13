@@ -231,6 +231,17 @@ not a delivered artifact and cannot restore an execution capability. General int
 and cross-job capability transport remain deferred; extraction or generation tests alone are not
 evidence of a complete native disk Run.
 
+Produced-helper profiles also pin the appliance's Perl interpreter and the exact embedded sealed-exec
+bootstrap program. These pins change Environment/Plan and tool-use evidence identities, not the
+logical helper or disk Build. Before producer work, a confined probe measures the interpreter and
+exercises anonymous executable creation, write/grow/shrink/seal protection and descriptor execution
+in the selected native appliance. Missing interpreter support or syscall availability fails admission.
+The helper's held snapshot is streamed with its exact size and digest, followed by the subject. The
+bootstrap seals the anonymous file, verifies its sealed bytes, then executes the descriptor with the
+subject stream still on stdin. No mutable host executable path is mounted into the container.
+The immutable appliance binds the interpreter's modules and dynamic dependencies. This bootstrap
+does not extend platform support or establish native execution evidence on an emulated host.
+
 The original held Packer artifact retains its declared acquisition carrier before producer cleanup.
 The runtime owns capacity admission, snapshot creation, bounded offline content scanning, snapshot
 closure and permit release as one registered operation. Factory retains the original Run permit

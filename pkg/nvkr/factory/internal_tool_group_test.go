@@ -97,6 +97,7 @@ func TestInternalToolNativeHostedPlanGeneration(t *testing.T) {
 				Format: authored.OutputExecutable, Components: []string{"helper"}, Result: "helper", SBOMTool: "helper-scanner"}}
 			profile := environment.DiskInspectionProfiles[platform]
 			profile.HelperTool = "inspector"
+			profile.BootstrapInterpreterDigest, profile.BootstrapProgramDigest = testInspectionBootstrapPins()
 			environment.DiskInspectionProfiles[platform] = profile
 			scanner := base.CatalogSnapshot.Tools["cosign"]
 			scanner.Platform, scanner.ExecutablePath, scanner.ExecutableDigest = platform, "syft", profile.ScannerDigest

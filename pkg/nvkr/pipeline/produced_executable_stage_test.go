@@ -4,6 +4,8 @@
 package pipeline
 
 import (
+	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -16,7 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
-func producedToolStageFixture(t *testing.T) (*ProducedExecutable, *stagedProducedExecutable) {
+func producedToolStreamFixture(t *testing.T) (*ProducedExecutable, string) {
 	t.Helper()
 	if runtime.GOOS != "linux" {
 		t.Skip("held executable staging requires Linux")
@@ -38,146 +40,111 @@ func producedToolStageFixture(t *testing.T) (*ProducedExecutable, *stagedProduce
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = tool.Close() })
-	workspace, err := os.Open(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = workspace.Close() })
-	stage, err := stageProducedExecutable(t.Context(), tool, workspace)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = stage.close() })
-	return tool, stage
+	return tool, payload
 }
 
-func TestProducedToolStageRejectsMutablePaths(t *testing.T) {
-	for _, variant := range []string{"valid", "changed bytes", "replaced inode", "writable", "revoked", "replaced directory"} {
+// The mutation occurs after the held-byte writer has begun, so admission cannot
+// detect it in advance. Restoring the path afterward cannot turn hostile bytes
+// into the bytes executed by the container.
+type swappingHelperWriter struct {
+	output  bytes.Buffer
+	path    string
+	swapped bool
+	t       *testing.T
+}
+
+func (w *swappingHelperWriter) Write(p []byte) (int, error) {
+	if !w.swapped {
+		w.swapped = true
+		if err := os.Rename(w.path, w.path+"-original"); err != nil {
+			w.t.Fatal(err)
+		}
+		if err := os.WriteFile(w.path, []byte("hostile executable"), 0o700); err != nil {
+			w.t.Fatal(err)
+		}
+	}
+	return w.output.Write(p)
+}
+func TestProducedHelperStreamRejectsMutablePaths(t *testing.T) {
+	for _, variant := range []string{"exact", "swapped during stream", "changed digest", "changed size", "revoked", "canceled"} {
 		t.Run(variant, func(t *testing.T) {
-			tool, stage := producedToolStageFixture(t)
-			file := filepath.Join(stage.root, producedToolFilename)
+			tool, path := producedToolStreamFixture(t)
+			binding, err := tool.BindingContext(t.Context())
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx := t.Context()
 			switch variant {
-			case "changed bytes":
-				if err := os.Chmod(file, 0o600); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(file, []byte("changed"), 0o600); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.Chmod(file, 0o555); err != nil {
-					t.Fatal(err)
-				}
-			case "replaced inode":
-				if err := os.Chmod(stage.root, 0o700); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.Rename(file, file+"-original"); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.WriteFile(file, producedExecutableELFFixture(), 0o555); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.Chmod(stage.root, 0o555); err != nil {
-					t.Fatal(err)
-				}
-			case "writable":
-				if err := os.Chmod(file, 0o755); err != nil {
-					t.Fatal(err)
-				}
+			case "changed digest":
+				binding.Digest = FileDigest([]byte("other"))
+			case "changed size":
+				binding.Size++
 			case "revoked":
 				if err := tool.Close(); err != nil {
 					t.Fatal(err)
 				}
-			case "replaced directory":
-				if err := os.Rename(stage.root, stage.root+"-original"); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.Mkdir(stage.root, 0o555); err != nil {
-					t.Fatal(err)
-				}
+			case "canceled":
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithCancel(ctx)
+				cancel()
 			}
-			err := stage.verify(t.Context())
-			if variant == "valid" {
+			var output bytes.Buffer
+			if variant == "swapped during stream" {
+				writer := &swappingHelperWriter{path: path, t: t}
+				err = writeProducedExecutable(ctx, tool, binding, writer)
 				if err != nil {
+					t.Fatal(err)
+				}
+				if !writer.swapped || !bytes.Equal(writer.output.Bytes(), producedExecutableELFFixture()) {
+					t.Fatal("mutable host bytes reached stream")
+				}
+				if err := os.Rename(path, path+"-hostile"); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Rename(path+"-original", path); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := tool.BindingContext(ctx); err != nil {
 					t.Fatal(err)
 				}
 				return
 			}
-			if code(err) != e.CodeVerifyFailed {
-				t.Fatalf("mutation error=%v", err)
-			}
-			if variant == "replaced directory" {
-				if code(stage.close()) != e.CodeVerifyFailed {
-					t.Fatal("cleanup accepted a substituted directory")
+			err = writeProducedExecutable(ctx, tool, binding, &output)
+			if variant == "exact" {
+				if err != nil || !bytes.Equal(output.Bytes(), producedExecutableELFFixture()) {
+					t.Fatalf("stream=%x error=%v", output.Bytes(), err)
 				}
-				if err := os.Rename(stage.root, stage.root+"-replacement"); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.Rename(stage.root+"-original", stage.root); err != nil {
-					t.Fatal(err)
-				}
+			} else if err == nil || output.Len() != 0 {
+				t.Fatalf("invalid capability streamed bytes: %v", err)
 			}
 		})
 	}
 }
-
-func TestProducedHelperMountAdmission(t *testing.T) {
-	for _, variant := range []string{"valid", "missing", "changed source", "writable", "entrypoint", "extra mount"} {
-		t.Run(variant, func(t *testing.T) {
-			tool, stage := producedToolStageFixture(t)
-			selection := DiskInspectionSelection{Tool: tool, ToolName: "helper", toolStage: stage}
-			var observed toolSmokeInspection
-			observed.Config.Entrypoint = []string{producedToolContainerDirectory + "/" + producedToolFilename}
-			observed.Mounts = append(observed.Mounts, struct {
-				Type, Source, Destination string
-				RW                        bool
-			}{
-				Type: "bind", Source: stage.root, Destination: producedToolContainerDirectory})
-			switch variant {
-			case "missing":
-				observed.Mounts = nil
-			case "changed source":
-				observed.Mounts[0].Source += "-other"
-			case "writable":
-				observed.Mounts[0].RW = true
-			case "entrypoint":
-				observed.Config.Entrypoint[0] = "/bin/sh"
-			case "extra mount":
-				observed.Mounts = append(observed.Mounts, observed.Mounts[0])
-			}
-			err := verifyProducedHelperMount(t.Context(), selection, observed)
-			if variant == "valid" {
-				if err != nil {
-					t.Fatal(err)
-				}
-				return
-			}
-			if code(err) != e.CodeVerifyFailed {
-				t.Fatalf("mount substitution error=%v", err)
-			}
-		})
-	}
-}
-
 func TestProducedHelperArgumentsPreserveContainment(t *testing.T) {
-	tool, stage := producedToolStageFixture(t)
+	tool, _ := producedToolStreamFixture(t)
 	selection := testDiskInspectionSelection(t)
-	selection.Tool, selection.ToolName, selection.toolStage = tool, "helper", stage
+	selection.Tool, selection.ToolName = tool, "helper"
+	selection.BootstrapInterpreterDigest, selection.BootstrapProgramDigest = selection.CodecDigest, InspectionBootstrapProgramDigest()
+	var err error
+	selection.streamBinding, err = tool.BindingContext(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
 	subject, err := heldfile.FromBytesContext(t.Context(), []byte("subject"), heldfile.Options{Label: "fixture", MaxBytes: 64})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer subject.Close()
 	args := diskInspectionCreateArgs(selection, selection.Image, "container", "attempt", subject)
-	for _, want := range []string{"--network=none", "--read-only", "--user=65534:65534", "--cap-drop=ALL", "--security-opt=no-new-privileges",
-		"--entrypoint=" + producedToolContainerDirectory + "/" + producedToolFilename,
-		"type=bind,source=" + stage.root + ",target=" + producedToolContainerDirectory + ",readonly", subject.Digest()} {
+	for _, want := range []string{"--network=none", "--read-only", "--user=65534:65534", "--cap-drop=ALL", "--security-opt=no-new-privileges", "--entrypoint=/usr/bin/perl", inspectionBootstrapProgram, selection.streamBinding.Digest, subject.Digest()} {
 		if !slices.Contains(args, want) {
-			t.Fatalf("missing containment argument %q", want)
+			t.Fatalf("missing argument %q", want)
 		}
 	}
+	if slices.Contains(args, "--mount") || slices.Contains(args, "--volume") {
+		t.Fatal("helper selected a host mount")
+	}
 }
-
 func TestProducedHelperResourceAccounting(t *testing.T) {
 	for _, variant := range []string{"exact", "host memory", "workspace", "container memory", "declared storage"} {
 		t.Run(variant, func(t *testing.T) {

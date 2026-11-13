@@ -113,6 +113,7 @@ func openDiskEvidenceRuntimeWithTool(ctx context.Context, plan *Plan, runtimeExe
 func diskEvidenceRuntimeSelection(plan *Plan, profile definition.DiskInspectionProfile, platform, runtimeExecutable string, workspace *os.File, diagnostics *diskdiagnostic.Collector, tool *pipeline.ProducedExecutable) pipeline.DiskInspectionSelection {
 	return pipeline.DiskInspectionSelection{RuntimeExecutable: runtimeExecutable, Workspace: workspace,
 		Tool: tool, ToolName: profile.HelperTool,
+		BootstrapInterpreterDigest: profile.BootstrapInterpreterDigest, BootstrapProgramDigest: profile.BootstrapProgramDigest,
 		PodmanStorageDriver: plan.Environment.Runtime.PodmanStorageDriver,
 		Image:               profile.Image, Platform: platform, InspectorDigest: profile.InspectorDigest, CodecDigest: profile.CodecDigest,
 		GuestfishDigest: profile.GuestfishDigest, ScannerDigest: profile.ScannerDigest, PackageReaderDigest: profile.PackageReaderDigest,
@@ -150,7 +151,8 @@ func diskEvidenceProfile(ctx context.Context, plan *Plan, inspection *sbom.DiskI
 
 func diskProfileFromSelection(selection pipeline.DiskInspectionSelection) definition.DiskInspectionProfile {
 	return definition.DiskInspectionProfile{Image: selection.Image, InspectorDigest: selection.InspectorDigest, CodecDigest: selection.CodecDigest,
-		HelperTool:      selection.ToolName,
+		HelperTool:                 selection.ToolName,
+		BootstrapInterpreterDigest: selection.BootstrapInterpreterDigest, BootstrapProgramDigest: selection.BootstrapProgramDigest,
 		GuestfishDigest: selection.GuestfishDigest, ScannerDigest: selection.ScannerDigest, PackageReaderDigest: selection.PackageReaderDigest,
 		Resources: selection.Resources, TimeoutSeconds: selection.TimeoutSeconds, MaxFilesystemBytes: selection.MaxFilesystemBytes, ScratchStorage: selection.ScratchStorage}
 }

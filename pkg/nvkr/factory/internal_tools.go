@@ -123,6 +123,9 @@ func bindInternalToolUses(plan Plan, nodes map[string]Node, artifacts map[string
 		if profile.HelperTool == "" {
 			continue
 		}
+		if profile.BootstrapProgramDigest != pipeline.InspectionBootstrapProgramDigest() {
+			return e.New(e.CodeEngineCapability, "inspection bootstrap program is not supported by this generator")
+		}
 		tool, ok := tools[profile.HelperTool]
 		if !ok || tool.Format != authored.OutputExecutable || tool.Platform != node.Platform {
 			return e.New(e.CodeEngineCapability, "inspection node %q lacks its exact native executable helper selection", id)

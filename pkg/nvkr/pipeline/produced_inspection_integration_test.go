@@ -56,6 +56,7 @@ func TestProducedInspectorInjectionReal(t *testing.T) {
 	defer workspace.Close()
 	selection := DiskInspectionSelection{
 		RuntimeExecutable: os.Getenv("NVKR_TEST_DISK_INSPECT_RUNTIME"), Workspace: workspace,
+		BootstrapInterpreterDigest: os.Getenv("NVKR_TEST_BOOTSTRAP_INTERPRETER_SHA256"), BootstrapProgramDigest: InspectionBootstrapProgramDigest(),
 		Image: os.Getenv("NVKR_TEST_DISK_INSPECT_IMAGE"), Platform: "linux/" + runtime.GOARCH,
 		InspectorDigest: os.Getenv("NVKR_TEST_DISK_INSPECTOR_SHA256"), CodecDigest: os.Getenv("NVKR_TEST_DISK_CODEC_SHA256"),
 		GuestfishDigest: os.Getenv("NVKR_TEST_DISK_GUESTFISH_SHA256"), ScannerDigest: os.Getenv("NVKR_TEST_DISK_SCANNER_SHA256"),
@@ -88,7 +89,7 @@ func TestProducedInspectorInjectionReal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if description.Tool != nil || description.Workspace != nil || description.toolStage != nil {
+	if description.Tool != nil || description.Workspace != nil || description.bootstrapCommand != "" {
 		t.Fatal("description leaked borrowed authority")
 	}
 	var archive bytes.Buffer
@@ -155,7 +156,7 @@ func TestProducedInspectorInjectionReal(t *testing.T) {
 // Inventory-only QCOW2 inspection needs the runtime, appliance, inspector and
 // codec. Archive content inspection additionally authenticates all content tools.
 func missingProducedInspectorVariables(getenv func(string) string, qcow bool) []string {
-	required := []string{"NVKR_TEST_DISK_INSPECT_RUNTIME", "NVKR_TEST_DISK_INSPECT_IMAGE",
+	required := []string{"NVKR_TEST_BOOTSTRAP_INTERPRETER_SHA256", "NVKR_TEST_DISK_INSPECT_RUNTIME", "NVKR_TEST_DISK_INSPECT_IMAGE",
 		"NVKR_TEST_DISK_INSPECTOR_SHA256", "NVKR_TEST_DISK_CODEC_SHA256"}
 	if !qcow {
 		required = append(required, "NVKR_TEST_DISK_GUESTFISH_SHA256", "NVKR_TEST_DISK_SCANNER_SHA256", "NVKR_TEST_DISK_PACKAGE_READER_SHA256")
@@ -177,11 +178,11 @@ func TestProducedInspectorVariablePreflight(t *testing.T) {
 		values  map[string]string
 		missing []string
 	}{
-		{"archive missing all", false, nil, []string{"NVKR_TEST_DISK_CODEC_SHA256", "NVKR_TEST_DISK_GUESTFISH_SHA256", "NVKR_TEST_DISK_INSPECTOR_SHA256", "NVKR_TEST_DISK_INSPECT_IMAGE", "NVKR_TEST_DISK_INSPECT_RUNTIME", "NVKR_TEST_DISK_PACKAGE_READER_SHA256", "NVKR_TEST_DISK_SCANNER_SHA256"}},
-		{"qcow missing all", true, nil, []string{"NVKR_TEST_DISK_CODEC_SHA256", "NVKR_TEST_DISK_INSPECTOR_SHA256", "NVKR_TEST_DISK_INSPECT_IMAGE", "NVKR_TEST_DISK_INSPECT_RUNTIME"}},
-		{"qcow needs no content tools", true, map[string]string{"NVKR_TEST_DISK_INSPECT_RUNTIME": "docker", "NVKR_TEST_DISK_INSPECT_IMAGE": "image", "NVKR_TEST_DISK_INSPECTOR_SHA256": "inspector", "NVKR_TEST_DISK_CODEC_SHA256": "codec"}, nil},
-		{"archive incomplete content tools", false, map[string]string{"NVKR_TEST_DISK_INSPECT_RUNTIME": "docker", "NVKR_TEST_DISK_INSPECT_IMAGE": "image", "NVKR_TEST_DISK_INSPECTOR_SHA256": "inspector", "NVKR_TEST_DISK_CODEC_SHA256": "codec", "NVKR_TEST_DISK_GUESTFISH_SHA256": "guestfish", "NVKR_TEST_DISK_SCANNER_SHA256": " "}, []string{"NVKR_TEST_DISK_PACKAGE_READER_SHA256", "NVKR_TEST_DISK_SCANNER_SHA256"}},
-		{"archive complete", false, map[string]string{"NVKR_TEST_DISK_INSPECT_RUNTIME": "docker", "NVKR_TEST_DISK_INSPECT_IMAGE": "image", "NVKR_TEST_DISK_INSPECTOR_SHA256": "inspector", "NVKR_TEST_DISK_CODEC_SHA256": "codec", "NVKR_TEST_DISK_GUESTFISH_SHA256": "guestfish", "NVKR_TEST_DISK_SCANNER_SHA256": "scanner", "NVKR_TEST_DISK_PACKAGE_READER_SHA256": "reader"}, nil},
+		{"archive missing all", false, nil, []string{"NVKR_TEST_BOOTSTRAP_INTERPRETER_SHA256", "NVKR_TEST_DISK_CODEC_SHA256", "NVKR_TEST_DISK_GUESTFISH_SHA256", "NVKR_TEST_DISK_INSPECTOR_SHA256", "NVKR_TEST_DISK_INSPECT_IMAGE", "NVKR_TEST_DISK_INSPECT_RUNTIME", "NVKR_TEST_DISK_PACKAGE_READER_SHA256", "NVKR_TEST_DISK_SCANNER_SHA256"}},
+		{"qcow missing all", true, nil, []string{"NVKR_TEST_BOOTSTRAP_INTERPRETER_SHA256", "NVKR_TEST_DISK_CODEC_SHA256", "NVKR_TEST_DISK_INSPECTOR_SHA256", "NVKR_TEST_DISK_INSPECT_IMAGE", "NVKR_TEST_DISK_INSPECT_RUNTIME"}},
+		{"qcow needs no content tools", true, map[string]string{"NVKR_TEST_BOOTSTRAP_INTERPRETER_SHA256": "bootstrap", "NVKR_TEST_DISK_INSPECT_RUNTIME": "docker", "NVKR_TEST_DISK_INSPECT_IMAGE": "image", "NVKR_TEST_DISK_INSPECTOR_SHA256": "inspector", "NVKR_TEST_DISK_CODEC_SHA256": "codec"}, nil},
+		{"archive incomplete content tools", false, map[string]string{"NVKR_TEST_BOOTSTRAP_INTERPRETER_SHA256": "bootstrap", "NVKR_TEST_DISK_INSPECT_RUNTIME": "docker", "NVKR_TEST_DISK_INSPECT_IMAGE": "image", "NVKR_TEST_DISK_INSPECTOR_SHA256": "inspector", "NVKR_TEST_DISK_CODEC_SHA256": "codec", "NVKR_TEST_DISK_GUESTFISH_SHA256": "guestfish", "NVKR_TEST_DISK_SCANNER_SHA256": " "}, []string{"NVKR_TEST_DISK_PACKAGE_READER_SHA256", "NVKR_TEST_DISK_SCANNER_SHA256"}},
+		{"archive complete", false, map[string]string{"NVKR_TEST_BOOTSTRAP_INTERPRETER_SHA256": "bootstrap", "NVKR_TEST_DISK_INSPECT_RUNTIME": "docker", "NVKR_TEST_DISK_INSPECT_IMAGE": "image", "NVKR_TEST_DISK_INSPECTOR_SHA256": "inspector", "NVKR_TEST_DISK_CODEC_SHA256": "codec", "NVKR_TEST_DISK_GUESTFISH_SHA256": "guestfish", "NVKR_TEST_DISK_SCANNER_SHA256": "scanner", "NVKR_TEST_DISK_PACKAGE_READER_SHA256": "reader"}, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := missingProducedInspectorVariables(func(name string) string { return tc.values[name] }, tc.qcow)

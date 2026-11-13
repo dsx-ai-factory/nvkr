@@ -18,22 +18,31 @@ import (
 type DiskInspectionProfile struct {
 	// HelperTool selects a required Run artifact. Its executable digest is
 	// authenticated from the producer result at consumption, never authored here.
-	HelperTool          string                    `json:"helperTool,omitempty"`
-	Image               string                    `json:"image"`
-	InspectorDigest     string                    `json:"inspectorDigest"`
-	CodecDigest         string                    `json:"codecDigest"`
-	GuestfishDigest     string                    `json:"guestfishDigest"`
-	ScannerDigest       string                    `json:"scannerDigest"`
-	PackageReaderDigest string                    `json:"packageReaderDigest"`
-	Resources           execution.ResourceRequest `json:"resources"`
-	TimeoutSeconds      uint64                    `json:"timeoutSeconds"`
-	MaxFilesystemBytes  uint64                    `json:"maxFilesystemBytes"`
-	ScratchStorage      string                    `json:"scratchStorage"`
+	BootstrapInterpreterDigest string                    `json:"bootstrapInterpreterDigest,omitempty"`
+	BootstrapProgramDigest     string                    `json:"bootstrapProgramDigest,omitempty"`
+	HelperTool                 string                    `json:"helperTool,omitempty"`
+	Image                      string                    `json:"image"`
+	InspectorDigest            string                    `json:"inspectorDigest"`
+	CodecDigest                string                    `json:"codecDigest"`
+	GuestfishDigest            string                    `json:"guestfishDigest"`
+	ScannerDigest              string                    `json:"scannerDigest"`
+	PackageReaderDigest        string                    `json:"packageReaderDigest"`
+	Resources                  execution.ResourceRequest `json:"resources"`
+	TimeoutSeconds             uint64                    `json:"timeoutSeconds"`
+	MaxFilesystemBytes         uint64                    `json:"maxFilesystemBytes"`
+	ScratchStorage             string                    `json:"scratchStorage"`
 }
 
 // Validate admits only an explicit native host profile and exact closure pins.
 // The adapter separately authenticates image/runtime/tool bytes and capacity.
 func (profile DiskInspectionProfile) Validate(platform string) error {
+	if profile.HelperTool != "" {
+		if !canonical.IsDigest(profile.BootstrapInterpreterDigest) || !canonical.IsDigest(profile.BootstrapProgramDigest) {
+			return e.New(e.CodeUnpinnedInput, "produced inspection helper requires exact bootstrap interpreter and program pins")
+		}
+	} else if profile.BootstrapInterpreterDigest != "" || profile.BootstrapProgramDigest != "" {
+		return e.New(e.CodeInvalidCatalog, "inspection bootstrap pins require a produced helper")
+	}
 	if profile.HelperTool != "" && !namePattern.MatchString(profile.HelperTool) {
 		return e.New(e.CodeInvalidCatalog, "disk inspection helper must name an internal tool selection")
 	}

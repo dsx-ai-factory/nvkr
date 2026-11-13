@@ -34,6 +34,7 @@ func acquiredInternalToolPlan(t *testing.T, platform, url, digest string) *Plan 
 	env := base.Environment.Clone()
 	profile := env.DiskInspectionProfiles[platform]
 	profile.HelperTool = "inspector"
+	profile.BootstrapInterpreterDigest, profile.BootstrapProgramDigest = testInspectionBootstrapPins()
 	env.DiskInspectionProfiles[platform] = profile
 	base.CatalogSnapshot.Components["helper"] = catalog.Component{Platforms: []string{platform}, Tag: "1.0.0", SourceDate: 1,
 		OutputType: "host-package", ArtifactPath: "helper", Prebuilt: &catalog.Prebuilt{URL: url,
