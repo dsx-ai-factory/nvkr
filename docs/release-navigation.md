@@ -264,6 +264,51 @@ Consumers own role mapping, target selection, deployment topology, compatibility
 dependency inventories. JSON export does not create a new lifecycle input or canonical identity, and a
 description cannot restore a held verification capability.
 
+## Export an AICR ArtifactInventory
+
+On Linux, authenticate an explicit release manifest and its complete publication before exporting
+chart/image identities. Supply the exact canonical manifest **predicate**, not a Sigstore bundle or statement.
+Select publisher trust, the exact qualifier certificate identity and the qualification-policy digest
+independently of that downloaded document:
+
+```sh
+bin/nvkr release export-inventory --reference "$RELEASE_REF" --manifest release-manifest.json \
+  --identity "$PUBLISHER_IDENTITY_REGEXP" --issuer "$PUBLISHER_OIDC_ISSUER" \
+  --qualifier-identity "$QUALIFIER_IDENTITY" --qualification-policy-digest "$QUALIFICATION_POLICY_DIGEST" \
+  --cosign "$COSIGN_BINARY" --cosign-digest "$COSIGN_EXECUTABLE_DIGEST" > inventory.yaml
+```
+
+The qualifier uses the GitHub OIDC issuer. The command reuses consumer authenticity checks for the whole
+publication, including required SBOMs and the disk-evidence policy floor. `--timeout` bounds the operation;
+`--anonymous`, `--plain-http` and `--no-cache` follow consumer transport rules. No latest-pointer discovery,
+registry writes, inventory publication, workflow changes or component bindings occur.
+
+The output is JSON-form YAML using AICR's `aicr.run/v1beta1` ArtifactInventory contract, pinned to
+[upstream types](https://github.com/NVIDIA/aicr/blob/dc78e354f2a55985782cfe0d9d6b8f1591e75dd5/pkg/artifact/types.go)
+and [upstream validation](https://github.com/NVIDIA/aicr/blob/dc78e354f2a55985782cfe0d9d6b8f1591e75dd5/pkg/artifact/parse.go).
+Charts retain separate OCI manifest and compressed archive digests; their config version uses Helm's
+`+` to `_` tag encoding. Abbreviated chart versions are refused rather than normalized into a different tag. Image `version: nvkr-run-<producer-run-id>` is a descriptive label from the
+signed source invocation, **not a claim that a registry tag exists**. Images are consumed by digest.
+Each native image carries one platform; admitted image indexes omit a single-platform assertion and retain
+the index digest. `--platform linux/amd64` or `--platform linux/arm64` filters native alternatives and
+indexes that do not contain the requested platform; charts remain. Omitting the flag retains all distinct
+entries. Bind only the chosen native alternative, or an admitted index, to a consumer values target.
+
+The exporter trusts the qualifier's exact manifest attestation and authenticates matching publisher metadata.
+It does not replay qualification or establish payload integrity, revocation, qualified status, deployment
+compatibility or runtime image completeness. Other artifact kinds are omitted from the inventory after
+complete authentication. AICR component bindings stay in the consumer catalog.
+
+With an AICR CLI built from the pinned revision above:
+
+```sh
+aicr recipe validate inventory.yaml --format json
+NVKR_AICR_TEST_BINARY=/absolute/path/to/aicr go test ./pkg/nvkr/releasemanifest -run '^TestInventoryAICRCLI$' -count=1
+```
+
+The optional test projects a synthetic six-chart, 52-native-image, four-index fixture matching the scout's
+62-entry shape. It validates interoperability only, not the historical release's cryptographic acceptance.
+
 ## Export a filtered view or diagram
 
 ```sh

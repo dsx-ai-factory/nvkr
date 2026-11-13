@@ -151,6 +151,7 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 			releaseBrowseCmd(),
 			releaseDiffCmd(),
 			releaseExportCmd(),
+			releaseExportInventoryCmd(),
 			releasePullCmd(),
 			{
 				Name: "inspect", Usage: "inspect an exact local OCI release layout without granting authority",

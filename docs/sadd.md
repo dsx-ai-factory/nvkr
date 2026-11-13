@@ -411,6 +411,12 @@ workspace, new identity or serialized verification capability is introduced. Con
 source compatibility, installation formats and offline completeness. Unpublished packages remain Run
 artifacts; this interface describes publications and does not assemble a release from a local workspace.
 
+The separate `release export-inventory` authenticates explicit canonical release-manifest bytes and the
+complete publication under independently selected qualifier and publisher policies. The release-manifest owner
+checks their exact input and member bindings before projecting chart/image identities into the pinned AICR
+ArtifactInventory format. Native entries retain a single platform; admitted indexes retain their index identity.
+It adds no payload-integrity, qualified, revocation, deployment or inventory-publication authority.
+
 Diagnostic output pulling reuses that complete metadata/evidence validation, then retrieves and checks only
 one exact named output's complete payload closure into a new caller-selected directory. Executables retain
 their recorded filenames and modes, disks and charts retain their exact payload bytes (including declared

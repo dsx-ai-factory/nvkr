@@ -29,7 +29,7 @@ nonzero outcome; no surviving attachment is reported as a completed release. CLI
 contracts cover terminal failure reporting, receipt lifetime and lane isolation; generation contracts
 require issuance only in the production final signer. These are local contract tests, not hosted acceptance.
 No hosted Run, OIDC manifest attestation, registry read-back or independent consumer verification is
-recorded. The tag rule, tag creation, publisher exclusion, consumer verification instructions and
+recorded. The tag rule, tag creation, publisher exclusion, full-release consumer verification instructions and
 interruption demonstrations remain M4-D.
 
 `run qualify --issue-manifest --out` also writes an unsigned qualification outcome for each attempt it
@@ -52,3 +52,15 @@ in-memory and local-directory stores and, through the SDK, for a local fake of t
 object-store client's retries and error classes, token-exchange failures through the auth library, error text
 free of the bucket name, the SDK boundary and the clock and host scan. No generated job runs the helper, and no
 outcome has been published.
+
+
+`release export-inventory` adds a bounded read-only consumer in `releasemanifest`, using existing
+canonical decoding and exact manifest signature verification. It requires an explicit publication digest,
+manifest predicate, independent qualifier identity/policy digest and publisher authenticity policy.
+Complete authenticated publication inputs and membership must agree before chart/image projection.
+Native platform filtering follows complete authentication; indexes retain their admitted identity.
+`inventory_test.go` covers digest/signer/policy/authentication refusal, member substitution, platform
+selection, version labels and the scout's six-chart/52-native/four-index shape. The optional upstream CLI
+validation test and reproduction command are in [release navigation](../../release-navigation.md#export-an-aicr-artifactinventory).
+These are contract tests; no live historical release authentication or new signing-service acceptance is
+claimed. Full-release, qualified, revocation and deployment acceptance remain unavailable through this path.
