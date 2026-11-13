@@ -81,17 +81,22 @@ func newInventoryExporter(reference string, options InventoryOptions, hostOS str
 	if err != nil {
 		return nil, err
 	}
-	signerOptions := sign.CosignOCIOptions{Binary: options.Consumer.CosignBinary, BinaryDigest: options.Consumer.CosignDigest,
-		Identity: "^" + regexp.QuoteMeta(identity) + "$", Issuer: qualificationIssuer,
-		Credential: options.Consumer.Credential, PlainHTTP: options.Consumer.Registry.PlainHTTP}
-	if options.Consumer.Credential == (sign.Credential{}) {
-		signerOptions.Keychain = options.Consumer.Registry.AmbientKeychain()
-	}
-	verifier, err := sign.NewCosignOCISigner(signerOptions)
+	verifier, err := sign.NewCosignOCISigner(inventoryManifestSignerOptions(options))
 	if err != nil {
 		return nil, err
 	}
 	return &InventoryExporter{reference: reference, options: options, authenticate: consumer.Authenticate, verifyManifest: verifier.VerifyReleaseManifest}, nil
+}
+
+// inventoryManifestSignerOptions maps admitted trust and transport without I/O.
+func inventoryManifestSignerOptions(options InventoryOptions) sign.CosignOCIOptions {
+	signerOptions := sign.CosignOCIOptions{Binary: options.Consumer.CosignBinary, BinaryDigest: options.Consumer.CosignDigest,
+		Identity: "^" + regexp.QuoteMeta(options.Qualifier.QualificationIdentity) + "$", Issuer: qualificationIssuer,
+		Credential: options.Consumer.Credential, PlainHTTP: options.Consumer.Registry.PlainHTTP}
+	if options.Consumer.Credential == (sign.Credential{}) {
+		signerOptions.Keychain = options.Consumer.Registry.AmbientKeychain()
+	}
+	return signerOptions
 }
 
 // Export authenticates exact manifest bytes, then the complete publication under

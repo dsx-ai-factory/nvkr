@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -499,6 +500,54 @@ func TestInventoryAuthenticatedExport(t *testing.T) {
 			}
 			_, err = accepted.MetadataDescription()
 			requireCode(t, err, e.CodeGateUnmet)
+		})
+	}
+}
+
+func TestInventoryManifestSignerOptions(t *testing.T) {
+	identity := "https://github.com/example/nvkr/.github/workflows/qualify[1]+.yml@refs/heads/main"
+	credential := sign.Credential{Registry: "registry.example.test", Username: "fixture-user", Password: "fixture-password"}
+	for _, tc := range []struct {
+		name       string
+		credential sign.Credential
+		registry   delivery.RegistryOptions
+		ambient    bool
+	}{
+		{"ambient", sign.Credential{}, delivery.RegistryOptions{}, true},
+		{"ambient plain HTTP", sign.Credential{}, delivery.RegistryOptions{PlainHTTP: true}, true},
+		{"explicit credential", credential, delivery.RegistryOptions{}, false},
+		{"anonymous", sign.Credential{}, delivery.RegistryOptions{Anonymous: true}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			options := InventoryOptions{Consumer: lifecycle.ConsumerOptions{CosignBinary: "/must-not-execute", CosignDigest: fixtureDigest, Credential: tc.credential, Registry: tc.registry}, Qualifier: Policy{QualificationIdentity: identity}, Publisher: lifecycle.VerificationPolicy{IdentityRegexp: "other-publisher", Issuer: "other-issuer"}}
+			got := inventoryManifestSignerOptions(options)
+			matcher, err := regexp.Compile(got.Identity)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !matcher.MatchString(identity) {
+				t.Fatal("literal qualifier identity did not match")
+			}
+			for _, other := range []string{"prefix" + identity, identity + "suffix", strings.ReplaceAll(identity, "qualify[1]+.yml", "qualify1Xyml")} {
+				if matcher.MatchString(other) {
+					t.Fatalf("qualifier identity widened to %q", other)
+				}
+			}
+			if got.Issuer != "https://token.actions.githubusercontent.com" {
+				t.Fatal("qualifier issuer lost")
+			}
+			if got.Credential != tc.credential || (got.Keychain != nil) != tc.ambient {
+				t.Fatal("credential/keychain mapping changed")
+			}
+			if tc.ambient && got.Keychain != tc.registry.AmbientKeychain() {
+				t.Fatal("wrong ambient keychain")
+			}
+			if got.Binary != options.Consumer.CosignBinary || got.BinaryDigest != fixtureDigest || got.PlainHTTP != tc.registry.PlainHTTP || got.Runner != nil {
+				t.Fatal("pinned executable or transport mapping changed")
+			}
+			if _, err := sign.NewCosignOCISigner(got); err != nil {
+				t.Fatal(err)
+			}
 		})
 	}
 }
