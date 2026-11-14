@@ -181,9 +181,19 @@ func assertGitHubPartitionMembership(t *testing.T, plan *Plan, entry []byte, wor
 			t.Fatal(err)
 		}
 		name := githubYAMLValue(job, "name")
-		prefix := "p" + strings.TrimPrefix(id, "nvkr-partition-") + " "
-		if !strings.HasPrefix(name, prefix) || name != githubYAMLValue(worker.Content[0], "name") {
-			t.Fatalf("partition %s caller/worker display names differ or lack index: %q", id, name)
+		workerJobs := githubYAMLField(worker.Content[0], "jobs")
+		var members []string
+		for n := 0; n < len(workerJobs.Content); n += 2 {
+			if member := workerJobs.Content[n].Value; member != githubPartitionReporter {
+				members = append(members, member)
+			}
+		}
+		partition := githubExecutionPartition{Jobs: members}
+		if id != "w-"+slices.Min(members) || !strings.HasSuffix(githubYAMLValue(job, "uses"), "__"+id+".yml") {
+			t.Fatalf("partition %s caller and path do not use the lowest member key", id)
+		}
+		if name != githubPartitionName(partition, workerJobs) || name != githubYAMLValue(worker.Content[0], "name") {
+			t.Fatalf("partition %s caller/worker display names differ from member summary: %q", id, name)
 		}
 	}
 	inline := 0

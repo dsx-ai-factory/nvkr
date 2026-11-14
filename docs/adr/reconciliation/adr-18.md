@@ -47,3 +47,9 @@ including runtime inputs, handoffs, outcomes and diagnostics. Contract coverage
 is local only; full-candidate live-source freeze/replay remains unverified, and no hosted
 floating-composite Run or publication is recorded. Registry access, protected
 environments, signer admission and source/material retention remain maintainer configuration.
+
+Stable worker naming and local finish-gap splitting have local contract coverage. Workers, caller jobs
+and cross-worker exports use the lowest member job ID; capacity remains 64 jobs and 50 workers.
+`TestGitHubPartitionRootAdditionChurn` renders the maintained Plan before and after inserting one root
+and bounds the changed worker files to two. Split-boundary, namespace, exact bundle and inline-signer
+contracts remain local evidence; the renamed worker topology has no recorded hosted execution.

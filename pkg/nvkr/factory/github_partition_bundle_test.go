@@ -48,7 +48,7 @@ func TestGitHubPartitionBundleAuthenticatesAllMembers(t *testing.T) {
 	}{
 		{"missing worker", e.CodePipelineDrift, func(files map[string][]byte) { delete(files, workers[0]) }},
 		{"extra worker", e.CodePipelineDrift, func(files map[string][]byte) {
-			files[strings.TrimSuffix(bundle.WorkflowPath, ".yml")+"__partition-49.yml"] = files[workers[0]]
+			files[strings.TrimSuffix(bundle.WorkflowPath, ".yml")+"__w-extra.yml"] = files[workers[0]]
 		}},
 		{"changed worker command", e.CodeEngineCapability, func(files map[string][]byte) {
 			files[workers[0]] = bytes.Replace(files[workers[0]], []byte("run: ':'"), []byte("run: exit 0"), 1)
@@ -164,6 +164,43 @@ func TestGitHubPartitionBundleModes(t *testing.T) {
 				}
 			}
 			assertGitHubPartitionMembership(t, plan, bundle.Files[bundle.WorkflowPath], workers)
+		})
+	}
+}
+
+func TestGitHubPartitionBundleRetiresNumberedWorkers(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		plan func(*testing.T) *Plan
+	}{
+		{"main", githubPartitionTestPlan},
+		{"development", githubDevelopmentTestPlan},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan := test.plan(t)
+			plan.Environment.GitHubExecutionPartitions = true
+			var err error
+			plan.EnvironmentDigest, err = plan.Environment.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundle, err := RenderGitHub(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			root := t.TempDir()
+			legacy := strings.TrimSuffix(bundle.WorkflowPath, ".yml") + "__partition-00.yml"
+			seedLegacyWorkflow(t, root, bundle, legacy)
+			assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), root, bundle), e.CodePipelineDrift)
+			if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(root, legacy)); !os.IsNotExist(err) {
+				t.Fatalf("legacy worker remains: %v", err)
+			}
+			if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
+				t.Fatal(err)
+			}
 		})
 	}
 }
