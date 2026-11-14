@@ -9,7 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	yamlv3 "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
 )
 
@@ -192,6 +194,30 @@ func TestGitHubReleaseJobScopesCredentialsToSteps(t *testing.T) {
 	}
 }
 
+// A release step's exact credential keys select its execution interface. Any
+// other set has none, so lowering refuses it.
+func TestGitHubReleaseFamilySelectsExactCredentialKeys(t *testing.T) {
+	for _, test := range []struct {
+		keys []string
+		want string
+	}{
+		{[]string{"NVKR_CREDENTIAL", "NVKR_REGISTRY_USER"}, "execute-registry"},
+		{[]string{"NVKR_CREDENTIAL", "NVKR_REGISTRY_USER", githubRepositoryTokenEnv}, "execute-publication"},
+		{[]string{githubRepositoryTokenEnv}, "execute-repository"},
+		{[]string{"NVKR_CREDENTIAL"}, ""},
+		{[]string{"NVKR_CREDENTIAL", "NVKR_REGISTRY_USER", "NVKR_OTHER"}, ""},
+		{nil, ""},
+	} {
+		env := &yamlv3.Node{Kind: yamlv3.MappingNode}
+		for _, key := range test.keys {
+			githubYAMLSet(env, key, githubYAMLString("x"))
+		}
+		if got := githubReleaseFamily(env); got != test.want {
+			t.Errorf("credential keys %v select %q, want %q", test.keys, got, test.want)
+		}
+	}
+}
+
 // Bundle validation, not only generation, owns the authority boundary.
 func TestGitHubValidationRejectsAuthorityTampering(t *testing.T) {
 	plan := referenceTestPlan(t)
@@ -312,6 +338,15 @@ func TestGitHubWorkflowOverflowsOnlyOnPerFileLimits(t *testing.T) {
 			if got := githubWorkflowOverflows([]byte(test.raw)); got != test.overflow {
 				t.Fatalf("overflow = %t, want %t", got, test.overflow)
 			}
+			// The production predicate alone drives engagement, and only where
+			// the Environment permits the fallback.
+			permitted := &Plan{Environment: definition.Environment{GitHubExecutionPartitions: true}}
+			if got := githubPartitionsEngaged(permitted, []byte(test.raw)); got != test.overflow {
+				t.Fatalf("permitted fallback engaged = %t, want %t", got, test.overflow)
+			}
+			if githubPartitionsEngaged(&Plan{}, []byte(test.raw)) {
+				t.Fatal("an Environment without the setting engaged the fallback")
+			}
 			if err := validateGitHubWorkflowSize([]byte(test.raw)); (err == nil) != test.admitted {
 				t.Fatalf("admission error = %v, want admitted %t", err, test.admitted)
 			}
@@ -319,12 +354,13 @@ func TestGitHubWorkflowOverflowsOnlyOnPerFileLimits(t *testing.T) {
 	}
 }
 
-// engageGitHubPartitions treats every flat workflow as oversized for the rest
-// of one test, so small partition-permitted fixtures exercise the fallback.
-// Plans that do not permit partitions are unaffected.
+// engageGitHubPartitions forces the permitted fallback for the rest of one
+// test, so small partition-permitted fixtures exercise it. The force only adds
+// engagement; the production limits are never replaced. Plans that do not
+// permit partitions are unaffected.
 func engageGitHubPartitions(t testing.TB) {
 	t.Helper()
-	overflows := githubFlatWorkflowOverflows
-	githubFlatWorkflowOverflows = func([]byte) bool { return true }
-	t.Cleanup(func() { githubFlatWorkflowOverflows = overflows })
+	previous := githubForcePartitionFallback
+	githubForcePartitionFallback = true
+	t.Cleanup(func() { githubForcePartitionFallback = previous })
 }

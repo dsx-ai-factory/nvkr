@@ -125,17 +125,17 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	return bundle, nil
 }
 
-// githubFlatWorkflowOverflows reports whether a flat workflow exceeds the
-// provider's file-size ceiling or parser event cap. Partition-fallback tests
-// substitute it so small fixtures exercise the fallback; it never relaxes a
-// real limit.
-var githubFlatWorkflowOverflows = githubWorkflowOverflows
+// githubForcePartitionFallback lets partition-fallback tests engage the
+// fallback on small fixtures. It only adds engagement: the production limits
+// still decide every real overflow.
+var githubForcePartitionFallback bool
 
 // Partitioned execution is a fallback. The admitted Environment permits it, and
-// it engages only when the flat workflow exceeds one of those two per-file
-// limits. GitHub's 256-job limit is for matrix expansion and is not a trigger.
+// it engages only when the flat workflow exceeds the provider's file-size
+// ceiling or parser event cap. GitHub's 256-job limit is for matrix expansion
+// and is not a trigger.
 func githubPartitionsEngaged(plan *Plan, flat []byte) bool {
-	return plan.Environment.GitHubExecutionPartitions && githubFlatWorkflowOverflows(flat)
+	return plan.Environment.GitHubExecutionPartitions && (githubForcePartitionFallback || githubWorkflowOverflows(flat))
 }
 
 // The flat rendering is the semantic reference for exact partition projection.

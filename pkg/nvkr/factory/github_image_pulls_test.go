@@ -243,6 +243,8 @@ func TestMaintainedPrivateToolchainPreparation(t *testing.T) {
 				t.Fatal(err)
 			}
 			assertImageUsePreparation(t, plan, bundle)
+			// Every maintained bundle, not only the default, keeps its margin.
+			assertGitHubFlatWorkflowHeadroom(t, bundle)
 		})
 	}
 }

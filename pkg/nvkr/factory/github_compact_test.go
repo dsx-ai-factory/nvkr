@@ -412,18 +412,8 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 				if err := CheckGeneratedBundle(t.Context(), "../../..", bundle); err != nil {
 					t.Fatalf("default namespace changed committed Plan/workflow/manifest bytes: %v", err)
 				}
-				raw := bundle.Files[bundle.WorkflowPath]
-				if len(raw) > maxGitHubWorkflowBytes*95/100 {
-					t.Fatalf("maintained workflow has less than 5%% headroom (%d of %d bytes); compact semantic calls before expanding membership", len(raw), maxGitHubWorkflowBytes)
-				}
-				nodes, err := countGitHubWorkflowYAMLNodes(raw)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if nodes > maxGitHubWorkflowYAMLNodes*95/100 {
-					t.Fatalf("maintained workflow has less than 5%% YAML parsing headroom (%d of %d events); compact semantic calls before expanding membership", nodes, maxGitHubWorkflowYAMLNodes)
-				}
 			}
+			assertGitHubFlatWorkflowHeadroom(t, bundle)
 			if selected.privateDiskProducers >= 0 {
 				flatReference := githubFlatReference(t, plan, bundle)
 				assertGitHubPrivateImageCredentialBoundary(t, plan, flatReference, selected.privateDiskProducers)
@@ -506,6 +496,28 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 			}
 			t.Logf("one entry: %d bytes, %d execution/result jobs", len(bundle.Files[bundle.WorkflowPath]), len(workflow.Jobs))
 		})
+	}
+}
+
+// assertGitHubFlatWorkflowHeadroom holds a maintained bundle to one flat
+// workflow with five percent to spare under both per-file limits. The fallback
+// engages at exactly 100%, and the event cap is a local approximation of an
+// undocumented runner limit, so the margin is what keeps a layout stable.
+func assertGitHubFlatWorkflowHeadroom(t *testing.T, bundle *GeneratedBundle) {
+	t.Helper()
+	if githubBundlePartitioned(bundle) {
+		t.Fatal("maintained bundle engaged the partition fallback")
+	}
+	raw := bundle.Files[bundle.WorkflowPath]
+	if len(raw) > maxGitHubWorkflowBytes*95/100 {
+		t.Fatalf("maintained workflow has less than 5%% headroom (%d of %d bytes); compact semantic calls before expanding membership", len(raw), maxGitHubWorkflowBytes)
+	}
+	nodes, err := countGitHubWorkflowYAMLNodes(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if nodes > maxGitHubWorkflowYAMLNodes*95/100 {
+		t.Fatalf("maintained workflow has less than 5%% YAML parsing headroom (%d of %d events); compact semantic calls before expanding membership", nodes, maxGitHubWorkflowYAMLNodes)
 	}
 }
 
