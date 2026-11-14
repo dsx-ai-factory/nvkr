@@ -83,7 +83,7 @@ For old references to the monolithic ADR ledger, find the current owner through
 the [reconciliation index](adr/reconciliation/README.md) and cite the per-ADR or
 topic file. Check stale prerequisite statements against current PR merge state
 and owning code. Propose corrections in the owning ledger file while preserving
-dated evidence and pending ratification; a merged prerequisite alone does not
+dated evidence and decision status; a merged prerequisite alone does not
 prove downstream acceptance.
 
 The [nvkr-triage skill](../.agents/skills/nvkr-triage/SKILL.md) supports this review

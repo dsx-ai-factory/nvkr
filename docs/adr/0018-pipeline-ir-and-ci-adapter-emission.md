@@ -573,7 +573,7 @@ yet project that setting. Empty preserves the runtime's existing store selection
 
 The observed Podman identity includes UID/GID mappings, remote-service status and OCI runtime name in
 addition to the existing host, storage, security and version fields. Adding these fields changes the
-`nvkr.runtime-identity/v1` preimage; this pre-ratification implementation does not translate older identities
+`nvkr.runtime-identity/v1` preimage; this implementation does not translate older identities
 or prove compatibility with previously recorded qualification profiles.
 
 For native multi-architecture pipeline-attested Runs, `Environment.githubRunners` maps each explicit

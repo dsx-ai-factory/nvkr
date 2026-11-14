@@ -7,8 +7,8 @@
 - **Acceptance-test maturity:** None. The implementation units below name the contract suites that must pass;
   no contract test, generated bundle, hosted Run or consumer verification exercises an executable index.
 - **Deciders:** njhensley
-- **Index:** ADR-28 in the consolidated NVKR ADR set. It builds on the tool companion contract proposed in #286 (PR #294),
-  which is not on `main`. Implementation is tracked in #296 and the retrofit in #297.
+- **Index:** ADR-28 in the consolidated NVKR ADR set. It builds on the tool companion contract proposed in
+  #286 (PR #294), which is not on `main`. Implementation is tracked in #296 and the retrofit in #297.
 - **Relates to:** ADR-01 (`nvkr.build` schemas), ADR-02 §2 (aggregate logical projection), ADR-03 (coded errors),
   ADR-04 (signing), ADR-11 §1–§2 (direct selection, no sibling reuse), ADR-12 §1 (concrete targets and the
   executable-aggregate exclusion this decision lifts), ADR-13 (SBOMs, `evidence: none`), ADR-16 (artifact check

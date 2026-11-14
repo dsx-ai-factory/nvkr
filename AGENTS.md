@@ -42,7 +42,8 @@ paths; macOS builds and runs tests and diagnostics.
 ## Authority order
 
 1. Current ADR-01–31 contain the engineering contracts directly, accepted by njhensley on 2026-11-14.
-   Each section states its lane and any deferred capability; acceptance is on his own behalf, not organizational acceptance.
+   Each section states its lane and any deferred capability; this is one maintainer's acceptance, not an
+   organizational one.
 2. `docs/adr/reconciliation/` (index: `README.md`) owns current implementation, evidence and disabled-path status.
 3. Code and tests establish implementation; unit tests do not prove external services or production workflows.
 

@@ -2,7 +2,7 @@
 
 - **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Design only; the standalone collection route is not implemented.
-- **Acceptance-test maturity:** No live acceptance for this proposal.
+- **Acceptance-test maturity:** No live acceptance for this decision.
 - **Deciders:** njhensley
 - **Index:** ADR-29 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-13 (build evidence), ADR-16/17 (observation ownership), ADR-18 §3

@@ -6,7 +6,7 @@
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; local contracts and rendering do not
   establish hosted publication, deployment compatibility or hardware acceptance.
 - **Deciders:** njhensley
-- **Index:** ADR-25, extending the consolidated NVKR ADR set.
+- **Index:** ADR-25 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-01/02 (identity), ADR-11/12 (selection and targets), ADR-13 (evidence), ADR-17/19
   (lifecycle and downstream ownership), ADR-20 (publication).
 - **Scope:** Unqualified local execution and the existing pipeline-attested GitHub publication lane.

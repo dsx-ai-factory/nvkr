@@ -455,7 +455,8 @@ item 6. Artifact expansion and hosted integration have separate acceptance; neit
    shared local/CI adapter semantics and generator-owned workflow changes. Hosted credentials, runner allocation,
    triggers and transport require their own acceptance; no workflow capability follows from merging this ADR.
 
-Named owners must ratify the schemas, adapter protocols and migration before maintained adoption. Reconciliation
+The validation, artifact-production and upstream interface owners, not yet named, must approve the schemas,
+adapter protocols and migration before maintained adoption. Reconciliation
 records implementation, contract tests and external execution separately. Any future authenticated evidence
 integration must resolve exact Run/output membership and independent conformance ownership in the governing
 ADRs before admitting results; catalog adoption alone does not close those decisions.

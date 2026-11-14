@@ -62,8 +62,8 @@ New source files carry the two-line SPDX header; run `make license` to add it. G
 
 ## The invariants your change must respect
 
-These are load-bearing. The proposed decisions in [`docs/adr/`](docs/adr/) are the maintained engineering
-baseline pending ratification, and [`docs/adr/reconciliation/`](docs/adr/reconciliation/README.md) records the
+These are load-bearing. The accepted decisions in [`docs/adr/`](docs/adr/) are the maintained engineering
+baseline, and [`docs/adr/reconciliation/`](docs/adr/reconciliation/README.md) records the
 current implementation boundary:
 
 - **Fail closed.** An unpinned source ref, a tag-pinned toolchain, an unknown component or unsupported target platform must error with a coded, distinct exit status — never a silent default.

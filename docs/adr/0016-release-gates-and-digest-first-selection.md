@@ -659,14 +659,14 @@ are deferred outside the current artifact model (ADR-19); they cannot authorize 
 The repository's separately authored NVKE E2E adapter is downstream CI test infrastructure,
 outside the NVKR product lifecycle and v1 qualification acceptance. ADR-18 §3 records its
 runner and trust constraints. It uses artifact-consumer APIs and issues no conformance receipt;
-it does not change this passive product boundary or establish named-decider ratification.
+it does not change this passive product boundary or establish organizational ratification.
 
 The separate user-invoked `validate` command runs explicit named diagnostic checks in lane **none
 (descriptive)**. `validation` owns profile admission and dispatch; `conformance` implements the
 `kube-conformance` / `hydrophone` adapter. `testresults` owns descriptions and serialization, not
 execution or interpretation. The [operator reference](../external-test-output-contract.md) owns
 configuration, prerequisites and field limits. This is an implemented diagnostic path under this
-proposed contract, not organizational ratification or production cluster qualification.
+contract, not organizational ratification or production cluster qualification.
 
 The profile independently selects product and tools publication roots and qualification-policy documents.
 Lifecycle authenticates each root and its exact producing Run, retains live receipts, and exports selected
@@ -724,7 +724,7 @@ delivered-tool smoke workers. Passive external conformance admission remains def
 - The boundary is load-bearing: NVKR consumes a conformance result and emits a clearance or verification result.
   Qualification consumes independently produced external conformance evidence; §6's explicit diagnostic
   execution grants no qualification authority. NVKR performs no infrastructure rollback or fleet lifecycle management.
-  The unqualified artifact diagnostics proposed in ADR-23 do not cross this qualification boundary.
+  The unqualified artifact diagnostics defined in ADR-23 do not cross this qualification boundary.
 
 ## Alternatives considered
 

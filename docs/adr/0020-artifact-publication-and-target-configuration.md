@@ -329,7 +329,7 @@ The byte transport requires no new artifact parser or signer. New artifact forma
 EFI/iPXE extraction, clean boot URLs, Secure Boot, installation and runtime qualification retain their owning
 contracts and independent acceptance. Publication tests establish transport and ownership behavior; live
 provider, generated-workflow and downstream boot/install evidence are recorded separately in reconciliation.
-Named-decider ratification is separate from implementation and these operational observations.
+Organizational ratification is separate from implementation and these operational observations.
 
 ### 3. The emitted publish phase
 

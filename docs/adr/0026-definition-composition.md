@@ -210,10 +210,10 @@ In this decision every composite Run builds every output. No member Release, fam
 supplies a composite output, and no authored field selects one. A future authored reuse selection fails with
 `engine-capability` before work until the conditions below are implemented.
 
-Reuse of a member's published outputs must go through the authenticated result-reuse decision being drafted as
-backlog item 4, never through a composite-specific shortcut. That draft keys reuse on the exact named output,
+Reuse of a member's published outputs must go through the authenticated result-reuse decision,
+ADR-30 (backlog item 4), never through a composite-specific shortcut. ADR-30 keys reuse on the exact named output,
 binds the publication repository, workflow identity and signer policy into the key, and issues an owner-held
-acceptance receipt only after re-authenticating the complete payload and evidence closure. As drafted, a family
+acceptance receipt only after re-authenticating the complete payload and evidence closure. Under ADR-30, a family
 Release is therefore **incompatible** with a composite Run: its workflow, signer identity and namespace differ.
 Composite reuse requires that decision to admit an explicit, authored cross-workflow origin, and it must keep:
 

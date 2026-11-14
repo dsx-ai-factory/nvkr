@@ -1,13 +1,13 @@
 # NVKR (NVIDIA Kubernetes Recipes) — Software Architecture & Design Document
 
 - **Revision:** 2026-10-07 — current lifecycle, native disk route and evidence boundaries
-- **Status:** Draft; ADR-01 through ADR-22 pending named-decider ratification
+- **Status:** Draft; ADR-01 through ADR-31 accepted by njhensley on 2026-11-14
 - **Review scope:** shared definition architecture, v1 artifact delivery, and the separate qualified release contract
 
 > [!NOTE]
 > This document explains the system and the reasons for its boundaries. The [ADRs](adr/) govern design;
-> [reconciliation](adr/reconciliation/README.md) records implementation and evidence. Proposed ADRs are the engineering
-> baseline pending ratification, not organizational approval.
+> [reconciliation](adr/reconciliation/README.md) records implementation and evidence. The accepted ADRs are the engineering
+> baseline; this is one maintainer's acceptance, not organizational approval.
 > Public lifecycle ownership is defined in [ADR-17](adr/0017-cli-sdk-foundation-and-package-topology.md).
 > The current ADRs state the qualified and pipeline-attested contracts directly; [milestones](milestones.md)
 > define v1 acceptance. Registration and full v1 release automation remain deferred; deployment topology and cluster qualification are outside NVKR.
@@ -67,14 +67,14 @@ uploaded. The ARM64 dispatch-and-consume nightly is retired. These trusted-code
 integration results remain outside product lifecycle and v1 qualification
 acceptance (ADR-16/18).
 
-Proposed [ADR-24](adr/0024-imported-validator-catalog.md) separates imported-validator discovery from upstream
+[ADR-24](adr/0024-imported-validator-catalog.md) separates imported-validator discovery from upstream
 test ownership and binds named artifact roles through explicit diagnostic profiles. The provisional CLI
 slice implements strict loading/discovery and frozen local-plan dispatch through the existing execution
 owners; native upstream catalog execution remains unexercised. Shared schema stabilization, published
 adapters and controller/chart integration are deferred. Existing CLI and legacy validation diagnostics
 retain their separate admission and result contracts; catalog registration grants no qualification authority.
 
-Proposed [ADR-26](adr/0026-definition-composition.md) designs composite Definitions, which release the outputs of
+[ADR-26](adr/0026-definition-composition.md) designs composite Definitions, which release the outputs of
 several digest-pinned member Definitions through one Plan, Run and Release. Its
 [merge rules](adr/0026-definition-composition.md#3-merge-rules-exact-union-never-precedence) own membership,
 and [member Release reuse](adr/0026-definition-composition.md#6-reusing-already-published-member-releases-only-through-authenticated-acceptance-a-planned-follow-up)
@@ -86,7 +86,7 @@ evidence and the production manifest; explicit policies select production/develo
 applicability without deployment claims. Member Release reuse and local composite qualification rehearsal remain
 deferred and refused; no hosted composite acceptance is recorded.
 
-Proposed [ADR-27](adr/0027-pinned-tool-producers.md) designs pinned-tool producers: catalog components that run
+[ADR-27](adr/0027-pinned-tool-producers.md) designs pinned-tool producers: catalog components that run
 one released, digest-pinned executable in the `wrapped-build` lane. AICR bundles are the first use. ADR-27 owns
 their [logical identity](adr/0027-pinned-tool-producers.md#2-logical-identity-covers-the-tool-its-arguments-and-its-inputs),
 [execution](adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed),
@@ -95,14 +95,14 @@ their [logical identity](adr/0027-pinned-tool-producers.md#2-logical-identity-co
 The file form and one layout root with an explicit regular-file material closure are implemented. The AICR
 path uses a fixed post-render integrity gate before packaging; current evidence is recorded in ADR-27 reconciliation.
 
-Proposed [ADR-28](adr/0028-multi-platform-executable-indexes.md) designs multi-platform executables. ADR-28 owns
+[ADR-28](adr/0028-multi-platform-executable-indexes.md) designs multi-platform executables. ADR-28 owns
 when [one tool source covers several platforms](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform),
 how an [executable output declares a platform set](adr/0028-multi-platform-executable-indexes.md#4-an-executable-output-may-declare-a-platform-set),
 its [aggregate identity](adr/0028-multi-platform-executable-indexes.md#5-aggregate-identity) and its
 [image-index publication](adr/0028-multi-platform-executable-indexes.md#6-publication-a-standard-image-index-over-minimal-per-platform-images).
 Nothing is implemented.
 
-Proposed [ADR-29](adr/0029-cluster-observation-and-artifact-attribution.md) separates collected cluster
+[ADR-29](adr/0029-cluster-observation-and-artifact-attribution.md) separates collected cluster
 facts from their optional comparison with selected artifacts. Its [design](cluster-observation-and-artifact-attribution.md)
 proposes an `observation` owner using AICR Go APIs and sharing NVKR's OCI identity rules. These
 remain unsigned descriptive diagnostics with explicit access and coverage limits. No standalone collector,
@@ -885,7 +885,7 @@ independently loaded qualification policy selects the expected signer and policy
 qualification-only. The production qualifier also writes an unsigned qualification outcome with `--out` for
 each attempt it qualifies and uploads it, failed and errored attempts included; it points at the
 evidence and manifest by digest and grants no authority. A separate helper, `nvkr-results-publish`, selects and
-publishes outcomes to the proposed ADR-31 TestGrid results index; no generated job runs it yet. Issuance has contract coverage only; hosted acceptance remains unproved. A failing,
+publishes outcomes to the ADR-31 TestGrid results index; no generated job runs it yet. Issuance has contract coverage only; hosted acceptance remains unproved. A failing,
 incomplete or wrong-signer verdict prevents issuance. The immutable definition/commit tag remains proposed, and the mutable channel tag is
 deferred beyond the MVP.
 
@@ -1262,7 +1262,7 @@ identities rather than rebuilding those members merely to describe the compositi
 Incremental equality identifies candidates for reuse. Required named outputs remain independent even when their
 Build Digests match; no cross-output execution or evidence reuse is authorized by digest equality. Qualified
 reuse requires prior authenticated evidence rebound to the current policy and member; unused incremental and
-rollback helpers are removed and those workflows remain deferred (ADR-16). Proposed ADR-30 designs
+rollback helpers are removed and those workflows remain deferred (ADR-16). ADR-30 designs
 pipeline-attested cross-Run reuse of complete named outputs: a Plan-derived key binding output, build inputs,
 toolchain profile, platform, evidence set, lane, origin and signer policy; untrusted discovery; owner-issued
 acceptance; and a `reused` Run origin that retains original provenance instead of claiming current execution.
@@ -1293,7 +1293,7 @@ already obtained.
 
 | Decision or acceptance gap | Responsible role | Blocks |
 |---|---|---|
-| Named-decider ratification of the ADR set | Architecture owners (unassigned) | Organizational acceptance of the proposed engineering baseline |
+| Organizational ratification of the ADR set | Architecture owners (unassigned) | Organizational acceptance of the engineering baseline |
 | Default-branch production/PR trigger exercises, source access and protected-environment policy | CI/release engineering and NVKE source owners | Remaining M1 acceptance beyond recorded manual candidate runs |
 | Transparency disclosure approval, Fulcio/Rekor operations and deletion protection | Product security and service owners | Organizational approval and sustainable consumer verification |
 | Native route approval, measured capacity envelope and independent full-payload disk consumption | NVKE build owner and CI engineering | M2 acceptance beyond the scoped candidate delivery |
@@ -1304,9 +1304,9 @@ already obtained.
 | Qualified helper-image admission | Execution/trust owners | Exact executable/runtime receipt protocol; image pin alone is insufficient |
 | Deferred release registration transport | Registry/integration owners | Optional downstream discovery |
 | Hosted acceptance of ADR-26 composite qualification; local rehearsal and member Release reuse | Release-engineering, catalog, qualification and result-reuse owners | Governed composite cutover and optional member Release reuse |
-| Proposed ADR-27 pinned-tool producers, then AICR layout output (NVIDIA/aicr#3534) and layout import | Catalog, execution, evidence and release-engineering owners | Outputs rendered by released tools, starting with AICR bundles, without rebuilding the tool from source |
-| Proposed ADR-28 multi-platform executables, then the AICR migration and the per-platform retrofits | Catalog, release-engineering, delivery and evidence owners | One tool source per release where [ADR-28 §1](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform) admits it, and one image-index output per executable, consumable by standard OCI clients |
-| Proposed ADR-29 observation owner and AICR import exception, bounded access/log/field controls, host/package provider and downstream installation/boot records | NVKR observation, AICR and downstream deployment owners; named deciders unassigned | Standalone descriptive collection and supported exact chart/disk/package comparisons |
+| ADR-27 pinned-tool producers, then AICR layout output (NVIDIA/aicr#3534) and layout import | Catalog, execution, evidence and release-engineering owners | Outputs rendered by released tools, starting with AICR bundles, without rebuilding the tool from source |
+| ADR-28 multi-platform executables, then the AICR migration and the per-platform retrofits | Catalog, release-engineering, delivery and evidence owners | One tool source per release where [ADR-28 §1](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform) admits it, and one image-index output per executable, consumable by standard OCI clients |
+| ADR-29 observation owner and AICR import exception, bounded access/log/field controls, host/package provider and downstream installation/boot records | NVKR observation, AICR and downstream deployment owners; named deciders unassigned | Standalone descriptive collection and supported exact chart/disk/package comparisons |
 
 Qualified helper-image use remains unavailable until it satisfies ADR-07/18's executable/runtime admission.
 Source bootstrap records only the identities that actually participated; delivery by image cannot imply

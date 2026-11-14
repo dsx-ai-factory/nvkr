@@ -1,8 +1,9 @@
 # Architecture implementation and evidence
 
 This ledger carries no global review date: each row is current as of the change that last edited it.
-ADR-01–31 own the lane-specific engineering contracts, accepted by njhensley on 2026-11-14 on his own
-behalf. This acceptance does not resolve operational owner questions or unpause the S3 work (#383–#385).
+ADR-01–31 own the lane-specific engineering contracts, accepted by njhensley on 2026-11-14
+on the maintainer's own behalf. This acceptance does not resolve operational owner questions or unpause
+the S3 work (#383–#385).
 This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.

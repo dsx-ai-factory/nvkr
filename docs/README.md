@@ -93,35 +93,35 @@ pilot, historical graph-capacity measurements, shared catalog ownership and rela
 The [input instructions](../inputs/definitions/nvke/README.md#family-pilot) own generation and checking;
 the combined candidate remains available pending consumer and qualification cutover.
 
-Proposed [ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
+[ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
 adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.
 The provisional local-plan CLI slice implements catalog discovery and versioned-profile execution;
 broader adapter and profile support remains deferred.
 
-Proposed [ADR-26: Definition composition](adr/0026-definition-composition.md) designs composite Definitions
+[ADR-26: Definition composition](adr/0026-definition-composition.md) designs composite Definitions
 that release several digest-pinned Definitions as one Release, with a worked NVKE four-family example and
 implementation units. Units U1–U7 are implemented and contract-tested only; no hosted composite Run, publication or
 consumer verification has been exercised or recorded, and qualification and member Release reuse remain deferred.
 
-Proposed [ADR-27: Pinned-tool producers](adr/0027-pinned-tool-producers.md) designs producers that run one
+[ADR-27: Pinned-tool producers](adr/0027-pinned-tool-producers.md) designs producers that run one
 released, digest-pinned tool offline with fixed arguments and typed inputs, with AICR bundles as the first use.
 It is design only.
 
-Proposed [ADR-28: Multi-platform executables](adr/0028-multi-platform-executable-indexes.md) designs one tool
+[ADR-28: Multi-platform executables](adr/0028-multi-platform-executable-indexes.md) designs one tool
 source for every platform of a release, where the platforms share a format, companions and admitted URL
 spellings, and executable outputs published as standard OCI image indexes. The AICR CLI is the first
 migration, and the ADR inventories existing executables to retrofit. It is design only.
 
-Proposed [ADR-29: Cluster observation and artifact attribution](adr/0029-cluster-observation-and-artifact-attribution.md)
+[ADR-29: Cluster observation and artifact attribution](adr/0029-cluster-observation-and-artifact-attribution.md)
 and its [feature design](cluster-observation-and-artifact-attribution.md) describe gathering cluster facts
 and optionally comparing them with selected NVKR artifacts. The design names AICR Go APIs, reuse of NVKR's
 existing OCI identity rules, access boundaries and missing measurements. It adds no standalone collector or
 test, signing or qualification capability.
 
-Proposed [ADR-30: authenticated result reuse](adr/0030-authenticated-result-reuse.md) designs cross-Run reuse
+[ADR-30: authenticated result reuse](adr/0030-authenticated-result-reuse.md) designs cross-Run reuse
 of complete named outputs and the test matrix for implementing it; reuse is not implemented.
 
-Proposed [ADR-31: Qualification results index](adr/0031-qualification-results-index.md) publishes each production
+[ADR-31: Qualification results index](adr/0031-qualification-results-index.md) publishes each production
 qualification attempt, failures included, as an unsigned outcome and a TestGrid build. The selection, projection
 and separate publisher helper are implemented and contract-tested only; the generated publish job is not
 implemented, and nothing has been published.
