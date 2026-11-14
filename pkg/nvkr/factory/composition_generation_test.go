@@ -122,6 +122,9 @@ func TestCompositeProductionBundles(t *testing.T) {
 		partitions bool
 	}{{"flat", false}, {"partitioned", true}} {
 		t.Run(tc.name, func(t *testing.T) {
+			if tc.partitions {
+				engageGitHubPartitions(t)
+			}
 			root, _ := compositeFactoryFixture(t, nil)
 			plan, bundle := renderComposite(t, root, compositeEnvironment(t, func(environment *authored.Environment) {
 				environment.GitHubBundle, environment.GitHubExecutionPartitions = "product", tc.partitions

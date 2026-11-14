@@ -58,8 +58,9 @@ explicitly labeled; only a successful operation prints `Produced` for its output
 
 The corresponding named step retains child-process output and the helper's original error. Stable execution
 step IDs still bind the exact Plan operation. Grouped offline processing jobs list the packaged outputs in
-the job name and mention Helm image binding when applicable. Builds, fetches, publication and signing retain
-separate jobs and their existing isolation, credentials and permissions.
+the job name and mention Helm image binding when applicable. A producer job is named for its Build target
+and a release job for its publication route. Each operation keeps its own named step, isolation and
+credentials; producer operations never share a job with release authority.
 
 Descriptions exclude raw recipe arguments, environment values, credentials, source/destination URLs and file
 contents. Raw arguments can contain literal authentication values; the canonical Plan retains those exact

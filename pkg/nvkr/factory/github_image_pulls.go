@@ -50,6 +50,20 @@ func githubStagePrivateImages(plan *Plan, stage githubStage) []string {
 	return uniqueSorted(images)
 }
 
+// githubStageImagePlatform is the platform of a job's private images. A job
+// has one native runner, so its first private container names that platform;
+// a source fetch that leads the job names none.
+func githubStageImagePlatform(plan *Plan, stage githubStage) string {
+	if stage.DiskOutput == "" {
+		for _, node := range stage.Nodes {
+			if githubPrivateToolchain(plan, node.Container) {
+				return node.Platform
+			}
+		}
+	}
+	return stage.Nodes[0].Platform
+}
+
 func githubImageEnvironment(plan *Plan) map[string]string {
 	// Optional composite roles retain their fixed input interface even when
 	// absent; no secret reference is synthesized for an undeclared reader.
@@ -72,7 +86,7 @@ func PrepareGitHubImages(ctx context.Context, plan *Plan, stageID string, option
 		return err
 	}
 	stage, ok := byNodeForJob(stages, stageID)
-	if !ok || len(githubStagePrivateImages(plan, stage)) == 0 || runtime.GOOS != "linux" || stage.Nodes[0].Platform != "linux/"+runtime.GOARCH {
+	if !ok || len(githubStagePrivateImages(plan, stage)) == 0 || runtime.GOOS != "linux" || githubStageImagePlatform(plan, stage) != "linux/"+runtime.GOARCH {
 		return e.New(e.CodeEngineCapability, "private toolchain preparation requires an admitted native stage")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
@@ -104,7 +118,7 @@ func PrepareGitHubImages(ctx context.Context, plan *Plan, stageID string, option
 			}
 		}
 	}
-	return pullGitHubImages(ctx, githubStagePrivateImages(plan, stage), stage.Nodes[0].Platform,
+	return pullGitHubImages(ctx, githubStagePrivateImages(plan, stage), githubStageImagePlatform(plan, stage),
 		os.Getenv(githubImageUser), os.Getenv(githubImageToken), func(ctx context.Context, config, platform, image string) error {
 			command := githubImagePullCommand(ctx, config, platform, image)
 			command.Stdout, command.Stderr = options.Stdout, options.Stderr

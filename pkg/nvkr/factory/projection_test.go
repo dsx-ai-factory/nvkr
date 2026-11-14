@@ -243,7 +243,7 @@ func recordProjectionLaunches(t *testing.T) *projectionLaunches {
 }
 
 // projectionEquivalencePlans are every committed maintained Plan plus the
-// flat, partitioned, development, native ARC and runtime render fixtures.
+// flat, partition-permitted, development, native ARC and runtime render fixtures.
 // Committed Plans load first: some fixtures change the working directory.
 func projectionEquivalencePlans(t *testing.T, repo string) map[string]*Plan {
 	t.Helper()
@@ -260,7 +260,7 @@ func projectionEquivalencePlans(t *testing.T, repo string) map[string]*Plan {
 		plans["committed/"+filepath.Base(filepath.Dir(path))] = plan
 	}
 	plans["fixture/flat"] = githubTestPlan(t)
-	plans["fixture/partitioned"] = githubPartitionTestPlan(t)
+	plans["fixture/partitions-permitted"] = githubPartitionTestPlan(t)
 	plans["fixture/development"] = githubDevelopmentTestPlan(t)
 	plans["fixture/arc-amd64"] = arcTestPlan(t, "linux/amd64")
 	plans["fixture/arc-arm64"] = arcTestPlan(t, "linux/arm64")

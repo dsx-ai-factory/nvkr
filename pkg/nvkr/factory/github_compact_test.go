@@ -428,14 +428,15 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 				flatReference := githubFlatReference(t, plan, bundle)
 				assertGitHubPrivateImageCredentialBoundary(t, plan, flatReference, selected.privateDiskProducers)
 			}
-			workers := map[string][]byte{}
-			for name, raw := range bundle.Files {
+			// Authority grouping keeps every maintained Plan inside the provider's
+			// size limits, so none engages the permitted partition fallback.
+			for name := range bundle.Files {
 				if strings.HasPrefix(name, ".github/workflows/") && name != bundle.WorkflowPath {
-					if !plan.Environment.GitHubExecutionPartitions || !githubPartitionWorkflowSuffix.MatchString(name) {
-						t.Fatalf("producer bundle emitted an unexpected additional workflow %s", name)
-					}
-					workers[name] = raw
+					t.Fatalf("producer bundle emitted an unexpected additional workflow %s", name)
 				}
+			}
+			if err := validateGitHubWorkflowSize(bundle.Files[bundle.WorkflowPath]); err != nil {
+				t.Fatalf("maintained flat workflow fails provider size admission: %v", err)
 			}
 			var document yamlv3.Node
 			if err := yamlv3.Unmarshal(bundle.Files[bundle.WorkflowPath], &document); err != nil {
@@ -445,17 +446,17 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 			if githubYAMLField(triggers, "workflow_dispatch") == nil || githubYAMLLength(triggers) != 2 {
 				t.Fatal("producer entry must expose only its manual dispatch trigger")
 			}
-			if plan.Environment.GitHubExecutionPartitions {
-				if len(workers) == 0 {
-					t.Fatal("partitioned producer bundle omitted its workers")
-				}
-				assertGitHubPartitionMembership(t, plan, bundle.Files[bundle.WorkflowPath], workers)
-				emitted := githubEmittedWorkflows(t, plan, bundle)
-				if planPath == FactoryPlanPath {
-					// The default suite checks the combined bundle's emitted pin and
-					// source credential scope; the extended suite covers the others.
-					assertMaintainedPinSetCredentialScope(t, plan, emitted, false)
-					// Exercise private-source guards with an explicit test credential.
+			emitted := githubEmittedWorkflows(t, plan, bundle)
+			if planPath == FactoryPlanPath {
+				// The default suite checks the combined bundle's emitted pin and
+				// source credential scope; the extended suite covers the others.
+				assertMaintainedPinSetCredentialScope(t, plan, emitted, false)
+				// The fallback still projects the real product exactly when its
+				// flat workflow is refused.
+				t.Run("partition fallback", func(t *testing.T) {
+					engageGitHubPartitions(t)
+					// Exercise the caller and worker private-source guards with
+					// an explicit test credential.
 					credentialPlan := *plan
 					addTestSourceCredential(t, &credentialPlan)
 					credentialBundle, err := RenderGitHub(t.Context(), &credentialPlan)
@@ -463,18 +464,32 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 						t.Fatal(err)
 					}
 					assertGitHubEmittedCredentialRefusals(t, &credentialPlan, credentialBundle, githubEmittedWorkflows(t, &credentialPlan, credentialBundle))
-				}
-				if selected.privateDiskProducers >= 0 {
-					// The emitted workers, not only their flat reference, keep each
-					// image credential in its read-only preparation step.
-					emittedJobs := map[string]githubJob{}
-					for _, name := range slices.Sorted(maps.Keys(emitted)) {
-						maps.Copy(emittedJobs, emitted[name].Jobs)
+					partitioned, err := RenderGitHub(t.Context(), plan)
+					if err != nil {
+						t.Fatal(err)
 					}
-					assertGitHubPrivateImageJobs(t, emittedJobs, selected.privateDiskProducers)
+					workers := map[string][]byte{}
+					for name, raw := range partitioned.Files {
+						if githubPartitionWorkflowSuffix.MatchString(name) {
+							workers[name] = raw
+						}
+					}
+					if len(workers) == 0 {
+						t.Fatal("partitioned producer bundle omitted its workers")
+					}
+					assertGitHubPartitionMembership(t, plan, partitioned.Files[partitioned.WorkflowPath], workers)
+					githubEmittedWorkflows(t, plan, partitioned)
+					t.Logf("one entry: %d bytes, %d workers with exact original membership", len(partitioned.Files[partitioned.WorkflowPath]), len(workers))
+				})
+			}
+			if selected.privateDiskProducers >= 0 {
+				// The emitted jobs, not only their logical reference, keep each
+				// image credential in its read-only preparation step.
+				emittedJobs := map[string]githubJob{}
+				for _, name := range slices.Sorted(maps.Keys(emitted)) {
+					maps.Copy(emittedJobs, emitted[name].Jobs)
 				}
-				t.Logf("one entry: %d bytes, %d workers with exact original membership", len(bundle.Files[bundle.WorkflowPath]), len(workers))
-				return
+				assertGitHubPrivateImageJobs(t, emittedJobs, selected.privateDiskProducers)
 			}
 			workflow := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath])
 			projection, err := githubNeedsForPlan(t.Context(), plan)
@@ -494,6 +509,17 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 	}
 }
 
+// githubBundlePartitioned reports whether a rendered bundle engaged the
+// partition fallback and so emitted worker workflows beside its entry.
+func githubBundlePartitioned(bundle *GeneratedBundle) bool {
+	for name := range bundle.Files {
+		if githubPartitionWorkflowSuffix.MatchString(name) {
+			return true
+		}
+	}
+	return false
+}
+
 // githubEmittedWorkflows decodes each workflow file a bundle emits, the entry
 // and any partition workers, with its local actions expanded. An entry's
 // worker-calling jobs have no steps; their bodies are the worker documents.
@@ -505,7 +531,7 @@ func githubEmittedWorkflows(t *testing.T, plan *Plan, bundle *GeneratedBundle) m
 			continue
 		}
 		raw := bundle.Files[name]
-		if name == bundle.WorkflowPath && plan.Environment.GitHubExecutionPartitions {
+		if name == bundle.WorkflowPath && githubBundlePartitioned(bundle) {
 			var document yamlv3.Node
 			if err := yamlv3.Unmarshal(raw, &document); err != nil {
 				t.Fatal(err)
@@ -535,7 +561,7 @@ func githubEmittedWorkflows(t *testing.T, plan *Plan, bundle *GeneratedBundle) m
 // partitioned bundle's workers project exactly; a flat bundle is its own.
 func githubFlatReference(t *testing.T, plan *Plan, bundle *GeneratedBundle) *GeneratedBundle {
 	t.Helper()
-	if !plan.Environment.GitHubExecutionPartitions {
+	if !githubBundlePartitioned(bundle) {
 		return bundle
 	}
 	flat, err := renderGitHubFlat(t.Context(), plan, false)

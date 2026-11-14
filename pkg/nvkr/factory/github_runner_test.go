@@ -313,7 +313,7 @@ func TestGitHubStepExitCodeKeepsPublicMapping(t *testing.T) {
 	}
 }
 
-func TestGitHubUtilityContextUsesStageBoundAndEarlierDeadline(t *testing.T) {
+func TestGitHubUtilityContextUsesOperationBoundAndEarlierDeadline(t *testing.T) {
 	plan := githubTestPlan(t)
 	var node Node
 	for _, candidate := range plan.Graph.Nodes {
@@ -343,12 +343,12 @@ func TestGitHubUtilityContextUsesStageBoundAndEarlierDeadline(t *testing.T) {
 			if earlier {
 				want, _ := parent.Deadline()
 				if !deadline.Equal(want) {
-					t.Fatal("stage bound extended caller deadline")
+					t.Fatal("operation bound extended caller deadline")
 				}
 				<-child.Done()
 				assertFactoryErrorCode(t, githubUtilityError(child, child.Err()), e.CodeTimeout)
 			} else if delta := deadline.Sub(start); delta < 59*time.Minute || delta > 60*time.Minute+time.Second {
-				t.Fatalf("unexpected stage bound: %s", delta)
+				t.Fatalf("unexpected operation bound: %s", delta)
 			}
 		})
 	}

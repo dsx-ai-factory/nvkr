@@ -83,6 +83,7 @@ func TestGitHubPartitionActionlint(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	engageGitHubPartitions(t)
 	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
 	if err != nil {
 		t.Fatal(err)
@@ -310,7 +311,10 @@ func TestGitHubPartitionDependenciesCrossSigningBoundary(t *testing.T) {
 			}
 		}
 	}
-	if toSigner == 0 || fromSigner == 0 {
-		t.Fatal("fixture did not exercise both directions of the signing boundary")
+	// One release job holds a route's whole attest-publish-sign-verify chain,
+	// so producers feed signers but no worker waits on one in a maintained
+	// Plan. The worker-side wiring above is still checked wherever it occurs.
+	if toSigner == 0 {
+		t.Fatalf("fixture did not exercise the worker-to-signer boundary (signer-to-worker edges: %d)", fromSigner)
 	}
 }

@@ -27,6 +27,7 @@ func githubPartitionTestPlan(t *testing.T) *Plan {
 }
 
 func TestGitHubPartitionBundleAuthenticatesAllMembers(t *testing.T) {
+	engageGitHubPartitions(t)
 	plan := githubPartitionTestPlan(t)
 	bundle, err := RenderGitHub(t.Context(), plan)
 	if err != nil {
@@ -97,6 +98,7 @@ func TestGitHubPartitionBundleAuthenticatesAllMembers(t *testing.T) {
 }
 
 func TestGitHubPartitionBundleMaintainsDefinitionAndBuildIdentities(t *testing.T) {
+	engageGitHubPartitions(t)
 	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
 	if err != nil {
 		t.Fatal(err)
@@ -143,6 +145,7 @@ func TestGitHubPartitionBundleModes(t *testing.T) {
 		{"build only", func(t *testing.T) *Plan { return buildOnlyPlan(t, "ubuntu-24.04") }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
+			engageGitHubPartitions(t)
 			plan := test.plan(t)
 			plan.Environment.GitHubExecutionPartitions = true
 			var err error

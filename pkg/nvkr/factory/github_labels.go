@@ -114,6 +114,40 @@ func githubStageLabel(plan *Plan, nodes []Node) string {
 	return "Verify artifacts and generate SBOMs: " + strings.Join(uniqueSorted(builds), ", ")
 }
 
+// githubAuthorityStageLabel names one authority-grouped job by what it does
+// for its Build target or publication route.
+func githubAuthorityStageLabel(plan *Plan, nodes []Node) string {
+	if len(nodes) == 1 {
+		return githubNodeLabel(plan, nodes[0])
+	}
+	if nodes[0].Kind == NodePublish || signFamilyNode(nodes[0].Kind) {
+		verbs := map[string]string{NodeAssembleRelease: "assemble", NodeAttestEvidence: "attest", NodePublish: "publish",
+			NodeSign: "sign", NodeVerifyPublication: "verify"}
+		var steps []string
+		for _, node := range nodes {
+			steps = append(steps, verbs[node.Kind])
+		}
+		label := strings.Join(steps[:len(steps)-1], ", ") + " and " + steps[len(steps)-1] + " " + nodes[0].Target
+		return strings.ToUpper(label[:1]) + label[1:]
+	}
+	target, kinds := "", map[string]bool{}
+	for _, node := range nodes {
+		kinds[node.Kind] = true
+		if target == "" {
+			target = node.BuildTarget
+		}
+	}
+	switch {
+	case target == "" || nodes[0].Kind == NodeVerify || nodes[0].Kind == NodeSBOM || nodes[0].Kind == NodePackage:
+		return githubStageLabel(plan, nodes)
+	case kinds[NodeBuild]:
+		return "Build and prepare " + target
+	case kinds[NodeAcquire]:
+		return "Acquire and prepare " + target
+	}
+	return "Fetch pinned sources for " + target
+}
+
 func githubArtifactLabel(plan *Plan, artifact Artifact) string {
 	switch artifact.Kind {
 	case "source-closure", "source-receipt":

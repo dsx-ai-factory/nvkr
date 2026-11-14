@@ -70,11 +70,17 @@ func TestReferenceReleaseGraphHasNoAggregatePayloadEdges(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// One job prepares at most one output's publication payload, so grouping
+	// cannot recreate an all-output payload download.
 	for _, stage := range stages {
+		publications := 0
 		for _, node := range stage.Nodes {
-			if node.PackageKind == PackageOCI && len(stage.Nodes) != 1 {
-				t.Fatal("publication payloads regrouped")
+			if node.PackageKind == PackageOCI {
+				publications++
 			}
+		}
+		if publications > 1 {
+			t.Fatalf("job %s prepares %d outputs' publication payloads", stage.ID, publications)
 		}
 	}
 	bundle, err := RenderGitHub(t.Context(), plan)

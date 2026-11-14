@@ -46,8 +46,10 @@ func githubExecutionModel(ctx context.Context, plan *Plan, projection *githubNee
 	return graph, layout, err
 }
 
+// A job that starts with its own source or producer runs after success. A
+// terminal observation that is not in its producer's job stays unconditional.
 func (stage githubStage) executionCondition() executionCondition {
-	if stage.DiskOutput != "" || githubProducerStage(stage) {
+	if stage.DiskOutput != "" || githubProducerStage(stage) || stage.Nodes[0].Kind == NodeFetch {
 		return executionAfterSuccess
 	}
 	for _, node := range stage.Nodes {

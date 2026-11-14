@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -87,7 +88,13 @@ func TestGitHubContractedStagesRejectIntroducedCycle(t *testing.T) {
 	}
 }
 
-func TestGitHubStagesGroupOnlyTargetObservationAndSBOM(t *testing.T) {
+// Tekton keeps the v1 grouping, so these two contracts select it explicitly.
+// GitHub's authority grouping has its own contracts in github_stage_authority_test.go.
+func v1ExecutionStages(plan *Plan) ([]githubStage, map[string]string, error) {
+	return projectExecutionStages(plan, plan.GitHubExecutionFor, false)
+}
+
+func TestV1StagesGroupOnlyTargetObservationAndSBOM(t *testing.T) {
 	base := Node{
 		ID:          "observe",
 		Kind:        NodeVerify,
@@ -125,7 +132,7 @@ func TestGitHubStagesGroupOnlyTargetObservationAndSBOM(t *testing.T) {
 			if test.mutate != nil {
 				test.mutate(&first, &second)
 			}
-			stages, jobs, err := githubStages(&Plan{Graph: ArtifactGraph{Nodes: []Node{first, second},
+			stages, jobs, err := v1ExecutionStages(&Plan{Graph: ArtifactGraph{Nodes: []Node{first, second},
 				Artifacts: []Artifact{{ID: "observation", Producer: first.ID}}}})
 			if err != nil {
 				t.Fatal(err)
@@ -140,7 +147,7 @@ func TestGitHubStagesGroupOnlyTargetObservationAndSBOM(t *testing.T) {
 	}
 }
 
-func TestGitHubObservationPairIgnoresUnrelatedInterleaving(t *testing.T) {
+func TestV1ObservationPairIgnoresUnrelatedInterleaving(t *testing.T) {
 	for _, extraInput := range []bool{false, true} {
 		name := "independent insertion"
 		if extraInput {
@@ -160,7 +167,7 @@ func TestGitHubObservationPairIgnoresUnrelatedInterleaving(t *testing.T) {
 				Nodes:     []Node{observe, {ID: "middle", Kind: NodeAcquire, Outputs: []string{"unrelated"}}, sbom},
 				Artifacts: []Artifact{{ID: "observation", Producer: observe.ID}, {ID: "unrelated", Producer: "middle"}},
 			}}
-			stages, jobs, err := githubStages(plan)
+			stages, jobs, err := v1ExecutionStages(plan)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -204,9 +211,13 @@ func TestRenderGitHubGroupedStagePreservesExecutionAndTransport(t *testing.T) {
 	wantExecuted := make([]string, 0, len(stage.Nodes))
 	for _, node := range stage.Nodes {
 		wantExecuted = append(wantExecuted, githubJobID(node.ID))
+		// A carrier leaves the job exactly when another job or the finalizer
+		// needs it; a payload used only inside the job stays local.
+		carried := githubCarrierOutputs(plan, node, artifacts, nodeJobs)
 		for _, output := range node.Outputs {
-			if !testActionRefs(t, plan).stepUploads(job.Steps, githubArtifactName(output), carrierPath(output)) {
-				t.Errorf("logical output %q is not uploaded from grouped stage %q", output, stage.ID)
+			uploaded := testActionRefs(t, plan).stepUploads(job.Steps, githubArtifactName(output), carrierPath(output))
+			if uploaded != slices.Contains(carried, output) {
+				t.Errorf("logical output %q upload=%t from grouped stage %q, want %t", output, uploaded, stage.ID, !uploaded)
 			}
 		}
 	}
@@ -440,10 +451,12 @@ func decodeGitHubWorkflow(t *testing.T, raw []byte) githubWorkflowDocument {
 	return document
 }
 
+// requireGroupedGitHubStage returns a job that both restores inputs from
+// another job and passes results between its own operations.
 func requireGroupedGitHubStage(t *testing.T, stages []githubStage) githubStage {
 	t.Helper()
 	for _, stage := range stages {
-		if len(stage.Nodes) > 1 {
+		if len(stage.Nodes) > 1 && len(stage.Nodes[0].Inputs) > 0 {
 			return stage
 		}
 	}

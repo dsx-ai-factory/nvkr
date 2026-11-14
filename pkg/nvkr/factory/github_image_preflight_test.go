@@ -18,6 +18,7 @@ func TestGitHubImagePreflightGatesProducerFanout(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			plan := privateImageTestPlan(t, ProductionRegistryWriteCredential)
 			if mode != "flat" {
+				engageGitHubPartitions(t)
 				plan.Environment.GitHubExecutionPartitions = true
 			}
 			if mode == "runtime-partitioned" {

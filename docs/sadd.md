@@ -244,8 +244,8 @@ flowchart TB
     Build --> Workspace["Produced bytes and run records"]
     Workspace --> Transport["Declared inter-job artifact transport"]
     Transport --> Package["Package and evidence jobs"]
-    Package --> Publish["Publication and signing jobs"]
-    PullBack["Pull-back verification job"]
+    Package --> Publish["Publication and signing steps"]
+    PullBack["Pull-back verification step"]
   end
   Publish --> OCI["Persistent OCI registry"]
   Identity["CI identity / Fulcio / Rekor"] --> Publish
@@ -256,8 +256,10 @@ flowchart TB
 The graph describes logical dependencies; it does not require one job per logical node in every lane. Ordinary
 factory nodes exchange declared artifacts through provider transport. The native ARC disk group keeps the
 original producer and held disk open through disk-evidence packaging. Declared carriers then transport the
-package and evidence to separate generic hosted publication, signing and verification jobs, each with its own
-credential boundary (ADR-18/20). Fused large-output wrapped publication and verification remain deferred (ADR-10).
+package and evidence to one generic hosted release job per output, where attestation, publication, signing
+and verification run as steps, each with its own step-scoped credential (ADR-18/20). On GitHub a job is one
+authority class on one runner: producer operations never share a job with release authority.
+Fused large-output wrapped publication and verification remain deferred (ADR-10).
 
 | Boundary | Data and responsibility | Trust or persistence rule |
 |---|---|---|
@@ -683,7 +685,7 @@ nightly candidate uses this route; hosted execution and provider configuration r
 separate acceptance work (ADR-18/26).
 GitHub keeps named jobs, prerequisite closure and conditions visible, and every job retains its runner,
 permissions and time bounds. [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold)
-owns which bundle workflow carries each job, including the opt-in partition workers described below. Manifest-owned composite actions expose fixed interfaces
+owns which bundle workflow carries each job, including the fallback partition workers described below. Manifest-owned composite actions expose fixed interfaces
 for node/source execution, preparation, output collection and transport. Grouped jobs reuse the node interface; optional slots and
 individual transfer calls preserve arbitrary admitted output counts without new action variants. One canonical
 invocation-data member holds parameters with named operation roles. The runtime descriptor operation
@@ -697,7 +699,7 @@ sets mode 0666 and requires a successful open afterward. Failed mutation or acce
 rejection. Full helper-owned capacity and held KVM API admission remain required before work.
 [ADR-18 §8](adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
 owns which jobs, including finalization and the final Run upload used by the closing summary, stay in the
-entry workflow under opt-in partitioning; shared recovery precedes finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
+entry workflow under fallback partitioning; shared recovery precedes finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
 reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
 while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
 complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
@@ -739,7 +741,8 @@ prerequisite closure preserved; authored setup, runtime variables, images or ser
 direct dependency context retain the original lists.
 Large finalizers receive exact original job results through fixed, bounded collectors. A collector must
 succeed and report its complete Plan-derived membership before recovery; its aggregate status never replaces
-individual producer outcomes. Opt-in execution partitioning moves jobs into same-commit callable workers
+individual producer outcomes. Execution partitioning, a fallback the Environment permits and the generator
+engages only when the flat workflow exceeds a provider size limit, moves jobs into same-commit callable workers
 within one complete Plan, finalizer, Run and Release.
 [ADR-18 §8](adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
 owns the grouping, the jobs that stay in the entry workflow, result forwarding and the proposed signer
