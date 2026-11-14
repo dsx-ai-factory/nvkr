@@ -1648,10 +1648,20 @@ successful diagnostic dispatches.
 
 The Environment setting `githubExecutionPartitions: true` permits generated same-commit `workflow_call`
 workers as a fallback. The generator renders the flat workflow first and projects producer jobs into
-workers only when that workflow fails provider size admission below: more than 500,000 bytes, more than
-50,000 parser events, or an oversized expression. An Environment without the setting fails closed on an
-oversized flat workflow. No maintained bundle currently engages the fallback. GitHub's documented 256-job
-limit applies to matrix expansion and is not a trigger; reconciliation records a 580-job flat Run.
+workers only when that workflow exceeds one of the two per-file limits below: 500,000 bytes or 50,000
+parser events. An oversized expression or script is not relieved by splitting a file, so it stays an
+ordinary admission error. An Environment without the setting fails closed on an oversized flat workflow.
+No maintained bundle currently engages the fallback; it remains for Definitions large enough to exceed a
+per-file limit.
+
+Job count is not a trigger. GitHub's [limits page](https://docs.github.com/en/actions/reference/limits),
+as read on 2026-11-14, states a job-count limit only for matrices ("A job matrix can generate a maximum of
+256 jobs per workflow run") and one per-file limit, size ("Each workflow file in the `.github/workflows`
+directory must be 500 KB or smaller to trigger a run"). It states no limit on explicitly listed jobs, on
+`needs` or on reusable-workflow calls. The generator emits no matrix.
+[Run 39673173322](https://github.com/dsx-ai-factory/nvkr/actions/runs/39673173322) of the flat production
+workflow completed on the default branch with 580 explicitly listed jobs in one file.
+
 A partitioned Run is one Definition, complete Plan, provider Run and final Release;
 workers do not publish independent family Releases. Local generation contracts are implemented. A minimal
 hosted diagnostic at commit `902f3febd10cd61abecb82571f66283857169851` exercised the earlier member-by-member

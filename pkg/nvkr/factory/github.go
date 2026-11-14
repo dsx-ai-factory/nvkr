@@ -98,8 +98,10 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err != nil {
 		return nil, err
 	}
-	if githubPartitionsEngaged(plan, bundle.Files[bundle.WorkflowPath]) {
-		entry, workers, err := lowerGitHubPartitions(ctx, plan, bundle.Files[bundle.WorkflowPath])
+	flat := bundle.Files[bundle.WorkflowPath]
+	switch {
+	case githubPartitionsEngaged(plan, flat):
+		entry, workers, err := lowerGitHubPartitions(ctx, plan, flat)
 		if err != nil {
 			return nil, err
 		}
@@ -108,6 +110,12 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		}
 		bundle.Files[bundle.WorkflowPath] = entry
 		bundle = newGeneratedBundle(EngineGitHub, githubLayoutFor(plan), bundle.Files, bundle.PlanDigest)
+	case plan.Environment.GitHubExecutionPartitions:
+		// A permitted fallback that does not engage leaves the flat workflow
+		// subject to every admission bound, as without the setting.
+		if err := validateGitHubWorkflowSize(flat); err != nil {
+			return nil, err
+		}
 	}
 	if validate {
 		if err := ValidateGitHubBundle(ctx, plan, bundle); err != nil {
@@ -117,13 +125,15 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	return bundle, nil
 }
 
-// githubFlatWorkflowOverflows reports whether a flat workflow fails the
-// provider's size admission. Partition-fallback tests substitute it so small
-// fixtures exercise the fallback; it never relaxes a real limit.
-var githubFlatWorkflowOverflows = func(flat []byte) bool { return validateGitHubWorkflowSize(flat) != nil }
+// githubFlatWorkflowOverflows reports whether a flat workflow exceeds the
+// provider's file-size ceiling or parser event cap. Partition-fallback tests
+// substitute it so small fixtures exercise the fallback; it never relaxes a
+// real limit.
+var githubFlatWorkflowOverflows = githubWorkflowOverflows
 
 // Partitioned execution is a fallback. The admitted Environment permits it, and
-// it engages only when the flat workflow fails the provider's size admission.
+// it engages only when the flat workflow exceeds one of those two per-file
+// limits. GitHub's 256-job limit is for matrix expansion and is not a trigger.
 func githubPartitionsEngaged(plan *Plan, flat []byte) bool {
 	return plan.Environment.GitHubExecutionPartitions && githubFlatWorkflowOverflows(flat)
 }

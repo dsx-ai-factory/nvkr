@@ -292,6 +292,33 @@ func TestGitHubPartitionsEngageOnlyOnOverflow(t *testing.T) {
 	}
 }
 
+// Only the two per-file limits engage the fallback. An oversized expression
+// fails admission, but splitting the file would not fix it.
+func TestGitHubWorkflowOverflowsOnlyOnPerFileLimits(t *testing.T) {
+	expression := "run: ${{ '" + strings.Repeat("x", maxGitHubExpressionBytes+1) + "' }}\n"
+	for _, test := range []struct {
+		name     string
+		raw      string
+		overflow bool
+		admitted bool
+	}{
+		{"within every limit", "jobs: {}\n", false, true},
+		{"file size ceiling", "a: " + strings.Repeat("x", maxGitHubWorkflowBytes) + "\n", true, false},
+		{"parser event cap", strings.Repeat("- x\n", maxGitHubWorkflowYAMLNodes), true, false},
+		{"oversized expression", expression, false, false},
+		{"malformed YAML", "jobs: [\n", false, false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := githubWorkflowOverflows([]byte(test.raw)); got != test.overflow {
+				t.Fatalf("overflow = %t, want %t", got, test.overflow)
+			}
+			if err := validateGitHubWorkflowSize([]byte(test.raw)); (err == nil) != test.admitted {
+				t.Fatalf("admission error = %v, want admitted %t", err, test.admitted)
+			}
+		})
+	}
+}
+
 // engageGitHubPartitions treats every flat workflow as oversized for the rest
 // of one test, so small partition-permitted fixtures exercise the fallback.
 // Plans that do not permit partitions are unaffected.
