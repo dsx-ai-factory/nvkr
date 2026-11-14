@@ -1,9 +1,10 @@
 # Documentation
 
-Start with the [quickstart](quickstart.md): copy one block to build NVKR from source and produce
+Start with the [hello demo](../demos/hello/README.md), then the [quickstart](quickstart.md): copy one block to build NVKR from source and produce
 the NVKE CLI, controller image, Helm chart and dependency SBOMs locally on macOS or Linux.
 The guide shows the resulting files and links to larger builds, publication and deployment.
 For a preview without Docker, see the [tutorial inputs](examples/nvke-tutorial/README.md#preview-the-native-build).
+[What is NVKR?](overview/what-is-nvkr.md) introduces the lifecycle.
 The [34-concept reference](user-concepts.md) explains the vocabulary and connects each concept to a worked example.
 
 ## User tasks
@@ -11,7 +12,7 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | I want to… | Read |
 |---|---|
 | Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Use NVKR with Your AI Agent](use-with-agents.md), [operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
-| Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
+| Understand NVKR and try my first local artifact | [Hello demo](../demos/hello/README.md), then [Quickstart](quickstart.md) |
 | Build only the CLI for planning and inspection | [CLI setup](quickstart.md#build-only-the-cli) |
 | Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../inputs/definitions/demo/README.md) |

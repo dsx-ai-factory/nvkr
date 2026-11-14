@@ -17,8 +17,8 @@ Create a canonical Plan, then read its output list and build instructions:
 ```sh
 NVKR_PIPELINE_DIR=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-pipeline.XXXXXX")
 bin/nvkr run plan \
-  --definition docs/examples/nvke-tutorial/definition.yaml \
-  --environment docs/examples/nvke-tutorial/environment-github.yaml \
+  --definition docs/examples/nvke-module-tags/definition.yaml \
+  --environment docs/examples/nvke-module-tags/environment-github.yaml \
   --json > "$NVKR_PIPELINE_DIR/plan.json"
 bin/nvkr run plan --plan "$NVKR_PIPELINE_DIR/plan.json"
 ```
@@ -54,12 +54,12 @@ development Run; hosted release execution, including failure and cancellation re
 ```sh
 mkdir "$NVKR_PIPELINE_DIR/generated"
 bin/nvkr run generate \
-  --definition docs/examples/nvke-tutorial/definition.yaml \
-  --environment docs/examples/nvke-tutorial/environment-github.yaml \
+  --definition docs/examples/nvke-module-tags/definition.yaml \
+  --environment docs/examples/nvke-module-tags/environment-github.yaml \
   --engine github --root "$NVKR_PIPELINE_DIR/generated"
 bin/nvkr run generate \
-  --definition docs/examples/nvke-tutorial/definition.yaml \
-  --environment docs/examples/nvke-tutorial/environment-github.yaml \
+  --definition docs/examples/nvke-module-tags/definition.yaml \
+  --environment docs/examples/nvke-module-tags/environment-github.yaml \
   --engine github --root "$NVKR_PIPELINE_DIR/generated" --check
 ```
 

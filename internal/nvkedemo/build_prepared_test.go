@@ -34,7 +34,7 @@ func TestPreparedBuildRecompilesBeforeProducers(t *testing.T) {
 		SBOMTool: "syft", CosignTool: "cosign",
 		Outputs: []definition.DefinitionOutput{{Name: "nvkectl", Platform: "linux/arm64", Format: definition.OutputExecutable, Components: []string{"nvkectl"}}},
 	}
-	environment, err := definition.LoadEnvironment(t.Context(), "../../docs/examples/nvke-tutorial/environment-github.yaml")
+	environment, err := definition.LoadEnvironment(t.Context(), "../../docs/examples/nvke-module-tags/environment-github.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

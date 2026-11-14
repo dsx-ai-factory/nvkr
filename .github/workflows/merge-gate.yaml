@@ -379,6 +379,22 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  hello:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Build and verify hello
+        run: make demo-hello
+
   check-skip:
     needs: [check-paths]
     if: needs.check-paths.outputs.code != 'true'
@@ -701,6 +717,7 @@ jobs:
       - lint
       - vulnerabilities
       - tests
+      - hello
       - check-skip
       - actionlint
       - actionlint-skip
@@ -761,7 +778,7 @@ jobs:
             | flag($fork_pull_request; "fork status") as $fork_pull_request
             | flag($pull_request; "pull request status") as $pull_request
             | [
-                {skip: "check-skip", jobs: ["check", "lint", "vulnerabilities", "tests"],
+                {skip: "check-skip", jobs: ["check", "lint", "vulnerabilities", "tests", "hello"],
                  run: flag($paths.code; "code classification")},
                 {skip: "actionlint-skip", jobs: ["actionlint"],
                  run: flag($paths.actions; "actions classification")},

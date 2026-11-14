@@ -25,8 +25,11 @@ invokes full-payload verification nor promotes authenticated metadata to payload
 verification. Controlled CLI contracts cover scope selection, admission before
 owner work, safe projection, owning error codes and unchanged plain JSON bytes.
 
-Non-interactive and explicitly plain output retain existing bytes and owning
-failure/diff codes. Interactive `run local` defaults to auto and captures a shared
+Machine-readable output retains existing bytes and owning failure/diff codes.
+Plain local execution labels steps by output and operation; `--verbose` retains
+exact node IDs. Ten-second heartbeats report helper compilation and active steps,
+including vendoring and source snapshot preparation. These display strings do not
+change the Plan or Run record. Interactive `run local` defaults to auto and captures a shared
 128 KiB memory tail instead of streaming successful producer output. Nonempty
 `CI` keeps auto plain; explicit terminal mode is available. Failed sessions restore
 and join before printing the safe summary and private tail. Recovered panic

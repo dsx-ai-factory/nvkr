@@ -11,6 +11,7 @@ GO=${GO_BIN:-go}
 OUT=
 VERSION=1.0.0
 INTERACTIVE=0
+SETUP_ARGS=(--build-only)
 GREEN='' BOLD='' RESET=''
 if [ -t 1 ] && [ -z "${NO_COLOR+x}" ] && [ "${TERM:-dumb}" != dumb ]; then
   GREEN=$'\033[38;5;112m'; BOLD=$'\033[1m'; RESET=$'\033[0m'
@@ -18,13 +19,13 @@ fi
 
 usage() {
   cat <<'EOF'
-Usage: bash demos/demo-local.sh [--out NEW_DIR] [--version 1.0.0|1.1.0] [--pause]
+Usage: bash demos/demo-local.sh [--out NEW_DIR] [--version 1.0.0|1.1.0] [--pause] [--install-go]
 
 Build and run a tiny greeting application through NVKR:
   pin source -> choose an output -> inspect the Plan -> execute -> use the artifact
 
-Requires Docker, Git, Python 3, the Go version in .go-version and a built nvkr
-(make build). NVKR_BIN and GO_BIN may select existing executables. The first
+Requires Docker and Git. The launcher builds NVKR and offers the pinned Go SDK
+(--install-go consents without a prompt). NVKR_BIN and GO_BIN may select existing executables. The first
 run may download the small pinned Alpine image and Go dependencies. No registry
 credentials are needed. The source is an isolated local Git repository.
 
@@ -67,18 +68,30 @@ while [ "$#" -gt 0 ]; do
     --out) [ "$#" -ge 2 ] && [ -n "$2" ] || die 'missing --out value'; OUT=$2; shift 2 ;;
     --version) [ "$#" -ge 2 ] || die 'missing --version value'; VERSION=$2; shift 2 ;;
     --pause) INTERACTIVE=1; shift ;;
+    --install-go) SETUP_ARGS+=(--install-go); shift ;;
     --non-interactive) INTERACTIVE=0; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown option: $1" ;;
   esac
 done
 case "$VERSION" in 1.0.0|1.1.0) ;; *) die '--version must be 1.0.0 or 1.1.0' ;; esac
-[ -x "$NVKR" ] || die 'build nvkr first with make build, or set NVKR_BIN'
+case "$(uname -s)" in
+  Darwin) host_os=darwin ;; Linux) host_os=linux ;; *) die 'requires macOS or Linux' ;;
+esac
+case "$(uname -m)" in
+  arm64|aarch64) arch=arm64 ;; x86_64|amd64) arch=amd64 ;; *) die 'requires AMD64 or ARM64' ;;
+esac
+if [ -z "${NVKR_BIN:-}" ]; then
+  GO_BIN="${GO_BIN:-}" bash "$ROOT/scripts/nvkr-quickstart.sh" "${SETUP_ARGS[@]}"
+fi
+[ -x "$NVKR" ] || die 'NVKR_BIN must select an executable'
+required_go=$(tr -d '[:space:]' <"$ROOT/.go-version")
+sdk="$ROOT/.nvkr/quickstart-sdk/go${required_go}.${host_os}-${arch}/go/bin/go"
+if [ -z "${GO_BIN:-}" ] && [ -x "$sdk" ]; then GO=$sdk; fi
 NVKR=$(cd "$(dirname "$NVKR")" && printf '%s/%s\n' "$PWD" "$(basename "$NVKR")")
-for tool in git docker python3 "$GO"; do command -v "$tool" >/dev/null || die "missing command: $tool"; done
+for tool in git docker "$GO"; do command -v "$tool" >/dev/null || die "missing command: $tool"; done
 GO=$(command -v "$GO")
 GO=$(cd "$(dirname "$GO")" && printf '%s/%s\n' "$PWD" "$(basename "$GO")")
-required_go=$(tr -d '[:space:]' <"$ROOT/.go-version")
 [ "$(GOTOOLCHAIN=local "$GO" env GOVERSION)" = "go$required_go" ] || die "use Go $required_go (set GO_BIN or PATH)"
 export GOTOOLCHAIN=local
 docker info >/dev/null 2>&1 || die 'start Docker before running this demo'
@@ -91,8 +104,12 @@ else
   OUT=$(mktemp -d "$ROOT/.nvkr/demo-local.XXXXXX")
 fi
 OUT=$(cd "$OUT" && pwd -P)
-cp -R "$DEMO_DIR/quickstart/catalog" "$DEMO_DIR/quickstart/source" "$OUT/"
-cp "$DEMO_DIR/quickstart/definition.yaml" "$DEMO_DIR/quickstart/environment.yaml" "$OUT/"
+cp -R "$DEMO_DIR/hello/catalog" "$DEMO_DIR/hello/source" "$OUT/"
+cp "$DEMO_DIR/hello/definition.yaml" "$DEMO_DIR/hello/environment.yaml" "$OUT/"
+for input in definition.yaml environment.yaml catalog/registry.yaml; do
+  sed "s@linux/amd64@linux/$arch@g" "$OUT/$input" >"$OUT/$input.native"
+  mv "$OUT/$input.native" "$OUT/$input"
+done
 cd "$OUT"
 mkdir logs
 started=$SECONDS
@@ -115,11 +132,11 @@ fixture_git init -q --template= --object-format=sha1 --initial-branch=main
 fixture_git add hello.sh
 fixture_git commit -q -m 'hello v1.0.0'
 fixture_git tag v1.0.0
-python3 - <<'PY'
-from pathlib import Path
-p = Path('source/hello.sh')
-p.write_text(p.read_text().replace('Hello, %s!', 'Welcome, %s!'))
-PY
+sed 's/Hello, %s!/Welcome, %s!/' source/hello.sh >source/hello.next
+cat source/hello.next >source/hello.sh
+# Retain the editing scratch outside the source closure.
+mv source/hello.next logs/hello-v1.1.0.sh
+
 fixture_git add hello.sh
 fixture_git commit -q -m 'hello v1.1.0'
 fixture_git tag v1.1.0
@@ -140,45 +157,29 @@ fi
 if ! "$NVKR" run graph --plan plan.json --format mermaid >plan.mermaid 2>logs/graph.log; then
   cat logs/graph.log >&2; die 'graph export failed'
 fi
-python3 - <<'PY'
-import json
-p = json.load(open('plan.json'))
-print('\n  Source -> build hello -> observe bytes')
-print('  From those bytes: executable package + composition SBOM')
-print('  Build digest: ' + p['builds'][0]['buildDigest'])
-print('  Full Plan and graph: plan.json | plan.mermaid')
-PY
+"$NVKR" run plan --definition definition.yaml --environment environment.yaml
+printf '  Full Plan and graph: plan.json | plan.mermaid\n'
 
 step '3 / 4' 'Run it'
 command_line run local --definition definition.yaml --environment environment.yaml --attempt demo --runner-source "$ROOT" --go "$GO"
-printf '  Building in the pinned Alpine container… full output goes to logs/run.log\n'
+printf '  Building in the pinned Alpine container… output is retained in logs/run.log\n'
 run_started=$SECONDS
-logged run "$NVKR" run local --definition definition.yaml --environment environment.yaml \
-  --attempt demo --runner-source "$ROOT" --go "$GO"
+if ! "$NVKR" run local --definition definition.yaml --environment environment.yaml \
+  --attempt demo --runner-source "$ROOT" --go "$GO" --ui plain 2>&1 | tee logs/run.log; then
+  die "Run failed; full log: $OUT/logs/run.log"
+fi
 run_seconds=$((SECONDS - run_started))
 
 step '4 / 4' 'Check the result and use it'
 artifact=.nvkr/runs/demo/hello/out/hello/hello
-python3 - "$artifact" <<'PY'
-import hashlib, json, sys
-from pathlib import Path
-r = json.load(open('.nvkr/runs/demo/lifecycle.json'))
-def require(condition, message):
-    if not condition:
-        raise SystemExit(message)
-require(r['status'] == 'complete', 'Run did not complete')
-require(r['lane'] == 'unqualified-local-execution', 'unexpected execution lane')
-require(len(r['observed']) == 1 and r['observed'][0]['name'] == 'hello', 'expected exactly hello')
-artifact = Path(sys.argv[1])
-digest = 'sha256:' + hashlib.sha256(artifact.read_bytes()).hexdigest()
-index = json.load(open('.nvkr/runs/demo/hello/sbom/index.json'))
-require(len(index['entries']) == 1 and index['entries'][0]['artifactSha256'] == digest, 'artifact/SBOM subject mismatch')
-print('  Run: complete | output: hello | lane: unqualified-local-execution')
-print('  Artifact bytes match the recorded SBOM subject.')
-print('  Artifact digest: ' + digest)
-PY
+"$NVKR" run inspect --record .nvkr/runs/demo/lifecycle.json
+"$GO" run "$DEMO_DIR/hello/verify.go" "$artifact"
 printf '\n  $ %s team\n' "$artifact"
-"$artifact" team
+greeting=$("$artifact" team)
+expected="Hello, team! This is hello v1.0.0, built by NVKR."
+if [ "$VERSION" = 1.1.0 ]; then expected="Welcome, team! This is hello v1.1.0, built by NVKR."; fi
+[ "$greeting" = "$expected" ] || die "unexpected greeting: $greeting"
+printf '%s\n' "$greeting"
 printf '\n%sComplete%s  Run: %ss | total: %ss\n' "$GREEN" "$RESET" "$run_seconds" "$((SECONDS - started))"
 printf 'Real local build; no signing, publication, or qualified reproduction claim.\n'
 printf 'Inspect the inputs, Plan, Run record and artifact in:\n  %s\n' "$OUT"

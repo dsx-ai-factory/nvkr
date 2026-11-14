@@ -214,6 +214,7 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			&cli.StringFlag{Name: "capture-inputs-root", Usage: "retain compiler inputs beneath this root; definition and environment paths must be repository-relative"},
 			&cli.IntFlag{Name: "jobs", Aliases: []string{"j"}, Value: 1}, &cli.StringFlag{Name: "runtime", Value: "docker"},
 			&cli.StringFlag{Name: "go", Value: "go"}, &cli.BoolFlag{Name: "publish"}, &cli.BoolFlag{Name: "dry-run"},
+			&cli.BoolFlag{Name: "verbose", Usage: "include exact operation IDs in local build output"},
 			&cli.IntFlag{Name: "build-activity-fd", Hidden: true, Value: -1},
 			&cli.StringFlag{Name: "ui", Value: "auto", Usage: "auto, plain, or tui presentation"},
 			&cli.BoolFlag{Name: "json", Usage: "emit one safe descriptive local Run result"},

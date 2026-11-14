@@ -150,7 +150,7 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 	var result *lifecycle.Run
 	work := func(ctx context.Context) error {
 		var workErr error
-		result, workErr = execute(ctx, prepared, lifecycle.LocalOptions{AttemptsRoot: c.String("attempts-root"), RunnerSource: c.String("runner-source"), Jobs: c.Int("jobs"), Runtime: c.String("runtime"), Go: c.String("go"), Publish: c.Bool("publish"), DryRun: c.Bool("dry-run"), Stdout: stdout, Stderr: stderr, Activity: activity, Progress: monitor})
+		result, workErr = execute(ctx, prepared, lifecycle.LocalOptions{AttemptsRoot: c.String("attempts-root"), RunnerSource: c.String("runner-source"), Jobs: c.Int("jobs"), Runtime: c.String("runtime"), Go: c.String("go"), Publish: c.Bool("publish"), DryRun: c.Bool("dry-run"), Verbose: c.Bool("verbose"), Stdout: stdout, Stderr: stderr, Activity: activity, Progress: monitor})
 		if result == nil && workErr == nil {
 			workErr = e.New(e.CodeInternal, "local execution returned no Run result")
 		}

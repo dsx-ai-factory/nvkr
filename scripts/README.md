@@ -9,11 +9,15 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 `bash scripts/nvkr-quickstart.sh` checks Git, Go and Docker before starting. Make is not required.
 A missing or mismatched Go compiler can be installed inside the checkout after confirmation, or with explicit
 `--install-go` consent. Matching installed Go is reused; implicit toolchain downloads are disabled.
-The SDK is verified against [official download checksums](../toolchains/quickstart/README.md).
+The SDK is verified against [official download checksums](../toolchains/hello/README.md).
 Git must already be installed. Supported Docker package installs are shown for approval; they are never performed without consent.
 It selects the checkout's required Go compiler, compiles a native NVKR CLI, then builds
 the three [quickstart](../docs/quickstart.md) artifacts and dependency SBOMs.
-Each invocation retains a fresh attempt and prints its output path.
+Each invocation prints the Definition and Plan, retains a fresh attempt, and prints
+its output path plus inspection commands. `--build-only` stops after compiling NVKR;
+the [hello demo](../demos/hello/README.md) uses this setup and reuses its Go SDK.
+An inherited non-redirect Git configuration is refused before compilation with
+instructions to unset `GIT_CONFIG_COUNT`.
 The launcher runs in a child shell, so failure does not change the caller's SSH shell settings.
 
 ## Repository CI tests
@@ -106,7 +110,7 @@ a [full source-built distribution](../docs/full-nvke-source-build.md).
 
 ```sh
 # Plan only: validates and creates no attempt storage.
-nvkr run plan --definition docs/examples/nvke-tutorial/definition.yaml --environment docs/examples/nvke-tutorial/environment-local.yaml
+nvkr run plan --definition docs/examples/nvke-module-tags/definition.yaml --environment docs/examples/nvke-module-tags/environment-local.yaml
 
 # Local execution; Docker, Go and acquisition/build network access are required.
 # Despite its historical name, the M1 script executes CLI + CWE + Helm.

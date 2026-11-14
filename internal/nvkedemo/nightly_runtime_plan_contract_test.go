@@ -57,7 +57,7 @@ func nightlyRuntimeCompiledFixture(t *testing.T, profile NightlyProfile, build N
 	for _, role := range []struct{ name, component string }{{"controller-chart", "nvke-controller-chart"}, {"cwe", "nvke-controller"}, {"nktp", "nktp-chart"}, {"nvkectl", "nvkectl"}} {
 		declared.Outputs = append(declared.Outputs, definition.DefinitionOutput{Name: role.name, Platform: "linux/arm64", Format: definition.OutputExecutable, Components: []string{role.component}})
 	}
-	environment, err := definition.LoadEnvironment(t.Context(), "../../docs/examples/nvke-tutorial/environment-github.yaml")
+	environment, err := definition.LoadEnvironment(t.Context(), "../../docs/examples/nvke-module-tags/environment-github.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
