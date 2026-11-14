@@ -593,8 +593,9 @@ pipeline artifact-publication evidence, not qualified receipts, vulnerability cl
 SBOMs remain `static-unqualified` in dry-run. Generation alone is no signature or reproduction proof, and dry-run
 does not retrieve or verify upstream evidence. Acquired components retain `evidence: none` unless pinned upstream
 evidence is declared. Evidence intake verifies declared upstream evidence as §2 states, including Sigstore provenance
-signatures through the pinned cosign verifier when a signer policy is declared;
-air-gapped signature verification is not yet supported. Optional vulnerability reports follow §3;
+signatures through the pinned cosign verifier when a signer policy is declared, as a package contract;
+no command invokes it since the legacy `sbom` and `attest` commands were removed.
+Air-gapped signature verification is not yet supported. Optional vulnerability reports follow §3;
 this SBOM path supplies no vulnerability verdict.
 Curated/embedded aggregates use dependency edges from aggregate to members (ADR-10/22).
 

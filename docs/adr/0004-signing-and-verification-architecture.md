@@ -324,11 +324,10 @@ Release scope or qualification. Existing evidence minimums remain enforced.
 ## Acceptance evidence
 
 Current contract evidence lives in `pkg/nvkr/internal/heldfile`, `pkg/nvkr/sign/signer_test.go`,
-`pkg/nvkr/sign/signer_linux_test.go`, `pkg/nvkr/sign/qualified_test.go`, `pkg/nvkr/trust/document_test.go`,
-`cmd/nvkr/qualified_lifecycle_test.go`, and `cmd/nvkr/verify_test.go`. It covers exact-byte signing, private
+`pkg/nvkr/sign/signer_linux_test.go`, `pkg/nvkr/sign/qualified_test.go`, and `pkg/nvkr/trust/document_test.go`. It covers exact-byte signing, private
 snapshots of diagnostic subject/output bytes, anonymous held production signing outputs, strict role/schema
 dispatch, offline inclusion-proof arguments, actual certificate identity/issuer extraction, mutation and
-insecure-option rejection, and a stock measure-only verifier that refuses to rebuild. It also covers rejection
+insecure-option rejection. It also covers rejection
 of ambient or unpinned verifier execution, wrong binary and trusted-root pins, sealed Linux descriptor
 execution, stdin subject signing and verification, inherited material and output descriptors, loader plus
 cosign/Sigstore/TUF verification-authority environment scrubbing, no publication before successful signing,

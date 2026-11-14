@@ -27,8 +27,8 @@ of NVKR run where, the objects they exchange, the trust boundaries they enforce,
 work fails. Shared structure comes first; the v1 and qualified contracts are then described separately.
 Implementation status is summarized once under Current support boundary.
 
-NVKR supports two different evidence contracts. They share resolution and identity primitives, but require
-separate acceptance decisions:
+NVKR defines two evidence contracts. The maintained lifecycle uses `pipeline-attested`; the `qualified`
+column records deferred design. They share resolution and identity primitives but require separate acceptance decisions:
 
 | Concern | v1 delivery — `pipeline-attested` | Qualified release — `qualified` |
 |---|---|---|
@@ -890,9 +890,8 @@ deferred beyond the MVP.
 
 #### Qualified reproduction and release
 
-This is a deferred architecture, not a second maintained lifecycle. The unused authorization, gate receipts,
-qualified publisher and release-specific trusted-time implementation have been removed. Current diagnostics
-can authenticate their retained documents and status checkpoints without authorizing release.
+This is a deferred architecture, not a second maintained lifecycle. The qualified commands and their attest,
+release, status and profile implementations are retired.
 
 The publisher creates a signed ValidationVector of expected identities. The operator admits the signed builder
 profile, materializes exact inputs, executes through authenticated runtime boundaries, and independently compares
