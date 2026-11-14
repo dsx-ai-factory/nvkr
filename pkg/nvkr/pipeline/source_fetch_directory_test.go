@@ -409,9 +409,9 @@ func TestSourceFetchHeldWorkspaceRejectsUnsafeRelativePathsBeforeCreation(t *tes
 }
 
 func TestSourceFetchHeldWorkspaceMisuseFailsBeforeWork(t *testing.T) {
-	for _, misuse := range []string{"build", "not launched", "qualified", "whole graph", "environment-only whole graph", "environment without workspace"} {
+	for _, misuse := range []string{"build", "not launched", "environment without workspace"} {
 		t.Run(misuse, func(t *testing.T) {
-			issued := misuse == "build" || misuse == "not launched" || misuse == "qualified"
+			issued := misuse == "build" || misuse == "not launched"
 			if issued && runtime.GOOS != "linux" {
 				t.Skip("misuse of an issued source workspace requires Linux")
 			}
@@ -433,20 +433,14 @@ func TestSourceFetchHeldWorkspaceMisuseFailsBeforeWork(t *testing.T) {
 				node = completeTestBuild(ir.Node{ID: "build-source", Kind: ir.KindBuild, Component: "source"}, node)
 			case "not launched":
 				opts.Launch = false
-			case "qualified":
-				opts.Qualification = &QualifiedExecution{}
-			case "environment without workspace", "environment-only whole graph":
+			case "environment without workspace":
 				opts.SourceWorkspace = nil
 				opts.SourceGitEnvironment = []string{"LC_ALL=C"}
 			}
 			if err := node.Validate(); err != nil {
 				t.Fatalf("misuse fixture must otherwise be a valid producer: %v", err)
 			}
-			if misuse == "whole graph" || misuse == "environment-only whole graph" {
-				_, err = (Local{}).Run(nil, "", opts)
-			} else {
-				_, err = (Local{}).ExecNode(node, opts)
-			}
+			_, err = (Local{}).ExecNode(node, opts)
 			if code(err) != e.CodeEngineCapability {
 				t.Fatalf("held capability misuse admitted: %v", err)
 			}

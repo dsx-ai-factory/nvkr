@@ -33,32 +33,6 @@ const LocalContainerSandboxMode = "oci-runtime/network=none+source=ro+private-ou
 
 const qualifiedRuntimeEndpoint = "unix:///var/run/docker.sock"
 
-// ExecutionObservationRequest contains only independently measurable execution
-// inputs. Expected profile values are intentionally absent, so a production observer
-// cannot accidentally turn a declaration into an observation.
-type ExecutionObservationRequest struct {
-	RuntimeExecutable string
-	BuildNodes        []ir.Node
-	runnerExecutable  *heldfile.File // sealed snapshot of the mapped runner; local adapter only
-	runtimeExecutable *heldRuntimeExecutable
-}
-
-// ExecutionObserver is the stage-two I/O seam. Implementations inspect the actual
-// runner, runtime, toolchain images, and sandbox that will execute selected nodes.
-// profile.VerifyExecution remains the sole comparison/receipt authority.
-type ExecutionObserver interface {
-	ObserveExecution(context.Context, ExecutionObservationRequest) (profile.ExecutionObservation, error)
-}
-
-// QualifiedExecution requests ADR-07 stage two. A nil request means an explicitly
-// unqualified development run; it can produce diagnostics but never a qualified
-// report or validation vector.
-type QualifiedExecution struct {
-	Profile     profile.BuilderProfile
-	HostReceipt profile.HostPreflightReceipt
-	Observer    ExecutionObserver
-}
-
 type verifiedExecution struct {
 	profile        profile.BuilderProfile
 	receipt        profile.ExecutionReceipt
@@ -157,90 +131,6 @@ func (execution *verifiedExecution) cleanupRuntime() {
 		execution.runtimeCleanup()
 		execution.runtimeCleanup = nil
 	}
-}
-
-// LocalExecutionObserver measures the local container adapter. It hashes the exact
-// running executable and resolved runtime binary, asks the runtime for its actual
-// implementation/version document, materializes each digest-pinned image, inspects
-// its repository digest and native platform, and probes Nix inside the selected image when required.
-//
-// It never receives the expected builder profile; comparisons happen later in the
-// profile module. Missing runtime evidence therefore fails rather than being filled
-// from a declaration.
-type LocalExecutionObserver struct{}
-
-// localMappedRunnerObserver is intentionally private: only the stock local adapter
-// may ask the orchestrator for a held snapshot of this process's mapped executable.
-// Provider observers must measure their own runner rather than consume a pathname
-// supplied by the caller.
-type localMappedRunnerObserver interface{ requiresMappedRunnerSnapshot() }
-
-func (LocalExecutionObserver) requiresMappedRunnerSnapshot() {}
-
-func (LocalExecutionObserver) ObserveExecution(ctx context.Context, request ExecutionObservationRequest) (profile.ExecutionObservation, error) {
-	if ctx == nil {
-		return profile.ExecutionObservation{}, e.New(e.CodeUsage, "local execution observation requires a non-nil context")
-	}
-	if err := ctx.Err(); err != nil {
-		return profile.ExecutionObservation{}, e.Wrap(e.CodeTimeout, err, "local execution observation canceled")
-	}
-	if len(request.BuildNodes) == 0 {
-		return profile.ExecutionObservation{}, e.New(e.CodePreflightFailed, "local execution observation requires selected build nodes")
-	}
-	if request.runnerExecutable == nil {
-		return profile.ExecutionObservation{}, e.New(e.CodeEngineCapability,
-			"local execution observation has no held snapshot of the mapped runner executable")
-	}
-	if err := request.runnerExecutable.AssertUnchangedContext(ctx); err != nil {
-		return profile.ExecutionObservation{}, mapCancellation(ctx,
-			e.Wrap(e.CodeEngineCapability, err, "validating sealed mapped runner snapshot"),
-			"validating sealed mapped runner snapshot")
-	}
-	runnerDigest := request.runnerExecutable.Digest()
-	if request.runtimeExecutable == nil {
-		return profile.ExecutionObservation{}, e.New(e.CodeEngineCapability,
-			"local execution observation has no held container-runtime capability")
-	}
-	runtimeDigest, err := observeHeldRuntimeIdentity(ctx, request.runtimeExecutable)
-	if err != nil {
-		return profile.ExecutionObservation{}, err
-	}
-	request.runtimeExecutable.identity = runtimeDigest
-	observation := profile.ExecutionObservation{
-		RunnerDigest: runnerDigest, RunnerOrigin: profile.RunnerPreexisting,
-		RuntimeIdentity: runtimeDigest,
-	}
-	nodes := append([]ir.Node(nil), request.BuildNodes...)
-	sort.Slice(nodes, func(i, j int) bool { return nodes[i].ID < nodes[j].ID })
-	for _, node := range nodes {
-		if err := ctx.Err(); err != nil {
-			return profile.ExecutionObservation{}, e.Wrap(e.CodeTimeout, err, "local execution observation canceled")
-		}
-		toolchainDigest, err := observeHeldContainerImage(ctx, request.runtimeExecutable, node)
-		if err != nil {
-			return profile.ExecutionObservation{}, err
-		}
-		identity := profile.NodeExecutionObservation{
-			NodeID: node.ID, ToolchainDigest: toolchainDigest,
-			SandboxMode: LocalContainerSandboxMode,
-		}
-		switch node.BuilderType {
-		case "", ir.BuilderOCIHermetic:
-			identity.EngineClass = ir.EngineOCIHermetic
-		case ir.BuilderNix:
-			// The current local adapter can inspect the Nix image and executable, but it
-			// cannot yet prove that the declared flake.lock closure was realized and is
-			// the exact offline closure the command will consume. Copying
-			// node.FlakeLockDigest here would turn an expectation into evidence.
-			return profile.ExecutionObservation{}, e.New(e.CodeEngineCapability,
-				"qualified Nix node %q requires a realized-closure observation adapter; local execution cannot yet measure it", node.ID)
-		default:
-			return profile.ExecutionObservation{}, e.New(e.CodeBuilderNotProvided,
-				"local execution observer cannot measure builder %q for node %q", node.BuilderType, node.ID)
-		}
-		observation.Nodes = append(observation.Nodes, identity)
-	}
-	return observation, nil
 }
 
 type runtimeIdentityDocument struct {
@@ -468,79 +358,6 @@ func resolveExecutionRuntime(runtimeBinary string) (runtimePath string, err erro
 		return "", e.Wrap(e.CodeEngineCapability, resolveErr, "resolving container runtime %s", runtimeBinary)
 	}
 	return resolved, nil
-}
-
-func qualifySelectedExecution(ctx context.Context, request *QualifiedExecution, runtimeBinary string, nodes []ir.Node, executeLocally bool) (*verifiedExecution, string, error) {
-	if request == nil {
-		return nil, runtimeBinary, nil
-	}
-	if request.Observer == nil {
-		return nil, runtimeBinary, e.New(e.CodePreflightFailed, "qualified execution requires an execution observer")
-	}
-	profileSnapshot := cloneProfile(request.Profile)
-	nodeSnapshot := cloneBuildNodes(nodes)
-	if err := profile.ValidateExecutionPlan(ctx, profileSnapshot, nodeSnapshot); err != nil {
-		return nil, runtimeBinary, err
-	}
-	runtimePath, err := resolveExecutionRuntime(runtimeBinary)
-	if err != nil {
-		return nil, runtimeBinary, err
-	}
-	var runtimeSnapshot *heldRuntimeExecutable
-	runtimeCleanup := func() {}
-	_, localObserver := request.Observer.(localMappedRunnerObserver)
-	if executeLocally || localObserver {
-		runtimeSnapshot, err = snapshotRuntimeExecutableContext(ctx, runtimePath) //nolint:staticcheck // Linux implementation is runtime-dependent.
-		// On unsupported hosts the build-tagged implementation always refuses;
-		// Linux returns a capability or a runtime-dependent error.
-		//nolint:staticcheck
-		if err != nil {
-			return nil, runtimeBinary, err
-		}
-		runtimeCleanup = func() { _ = runtimeSnapshot.close() }
-	}
-	var (
-		runnerSnapshot *heldfile.File
-		runnerCleanup  = func() {}
-	)
-	if localObserver {
-		runnerSnapshot, runnerCleanup, err = snapshotMappedRunnerExecutableContext(ctx) //nolint:staticcheck // Linux implementation is runtime-dependent.
-		// On unsupported hosts the build-tagged implementation always refuses;
-		// Linux returns a capability or a runtime-dependent error.
-		//nolint:staticcheck
-		if err != nil {
-			runtimeCleanup()
-			return nil, runtimeBinary, err
-		}
-	}
-	cleanup := func() {
-		runnerCleanup()
-		runtimeCleanup()
-	}
-	observed, err := request.Observer.ObserveExecution(ctx, ExecutionObservationRequest{
-		RuntimeExecutable: runtimePath, BuildNodes: cloneBuildNodes(nodeSnapshot),
-		runnerExecutable: runnerSnapshot, runtimeExecutable: runtimeSnapshot,
-	})
-	if err != nil {
-		cleanup()
-		return nil, runtimeBinary, err
-	}
-	receipt, err := profile.VerifyExecution(ctx, request.HostReceipt, profileSnapshot, nodeSnapshot, observed)
-	if err != nil {
-		cleanup()
-		return nil, runtimeBinary, err
-	}
-	if err := receipt.RequireFor(ctx, profileSnapshot, nodeSnapshot); err != nil {
-		cleanup()
-		return nil, runtimeBinary, err
-	}
-	if runtimeSnapshot != nil {
-		runtimeSnapshot.identity = observed.RuntimeIdentity
-	}
-	return &verifiedExecution{
-		profile: profileSnapshot, receipt: receipt, nodes: nodeSnapshot,
-		runtime: runtimeSnapshot, runtimeCleanup: cleanup,
-	}, runtimePath, nil
 }
 
 func cloneProfile(in profile.BuilderProfile) profile.BuilderProfile {

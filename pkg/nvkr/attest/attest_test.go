@@ -14,13 +14,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/profile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/provenance"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/trust"
@@ -29,10 +26,6 @@ import (
 type acquisitionFixture struct {
 	component string
 	contents  []byte
-}
-
-type attestSourceExecutionObserver struct {
-	observation profile.ExecutionObservation
 }
 
 type attestDocumentVerifier struct{}
@@ -45,12 +38,6 @@ func (attestDocumentVerifier) VerifyDocument(context.Context,
 		OIDCIssuer:            "https://issuer.example.test",
 		CertificateSHA256:     attestDigest('c'),
 	}, nil
-}
-
-func (observer attestSourceExecutionObserver) ObserveExecution(context.Context,
-	pipeline.ExecutionObservationRequest,
-) (profile.ExecutionObservation, error) {
-	return observer.observation, nil
 }
 
 func qualifiedAcquisitionReport(t *testing.T, fixtures []acquisitionFixture) *pipeline.Report {
@@ -107,106 +94,6 @@ func writePipelineResult(t *testing.T, dir, nodeID string, result pipeline.Artif
 	if err := os.WriteFile(filepath.Join(dir, nodeID+".json"), payload, 0o600); err != nil {
 		t.Fatal(err)
 	}
-}
-
-func qualifiedSourceEvidenceFixture(t *testing.T, repo, toolchain string) (*buildgraph.Resolved,
-	*ir.Graph, *pipeline.Report,
-) {
-	t.Helper()
-	resolved := &buildgraph.Resolved{
-		Platform: "linux/amd64",
-		Components: []catalog.NamedComponent{{
-			Name: "agent",
-			Component: catalog.Component{Platforms: []string{"linux/amd64"},
-				FromSource: true, Repo: repo, Tag: "v1.0.0",
-				Commit: strings.Repeat("d", 40), TreeHash: strings.Repeat("e", 40),
-				ToolchainImage: toolchain, OutputType: "raw",
-				BuildCommand: []string{"true"}, ArtifactPath: "out/agent", WriteDir: "out",
-				SourceDate: 1,
-			},
-		}},
-	}
-	graph, err := buildgraph.Compile(resolved)
-	if err != nil {
-		t.Fatal(err)
-	}
-	buildDigest, err := graph.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var build ir.Node
-	for _, node := range graph.Nodes {
-		if node.Kind == ir.KindBuild {
-			build = node
-		}
-	}
-	if build.ID == "" {
-		t.Fatal("source fixture compiled no build node")
-	}
-
-	runnerDigest := attestDigest('a')
-	runtimeDigest := attestDigest('b')
-	toolchainDigest := toolchain[strings.LastIndex(toolchain, "@")+1:]
-	builderProfile := profile.BuilderProfile{
-		SchemaVersion: profile.SchemaVersion, Identity: "publisher-source-fixture", Version: "1",
-		HostControlClass: profile.OperatorControlled, Provides: []string{ir.BuilderOCIHermetic},
-		Fields: []profile.Field{
-			{Name: profile.FieldTargetArch, Value: "amd64", HardFail: true, MeasurementStage: profile.MeasurementHost},
-			{Name: profile.FieldRunnerDigest, Value: runnerDigest, HardFail: true, MeasurementStage: profile.MeasurementExecution},
-			{Name: profile.FieldRuntimeIdentity, Value: runtimeDigest, HardFail: true, MeasurementStage: profile.MeasurementExecution},
-			{Name: profile.FieldOCISandboxMode, Value: "fixture-sandbox", HardFail: true, MeasurementStage: profile.MeasurementExecution},
-		},
-	}
-	host, divergences, err := builderProfile.VerifyHost(context.Background(),
-		map[string]string{profile.FieldTargetArch: "amd64"})
-	if err != nil || len(divergences) != 0 {
-		t.Fatalf("source fixture host preflight: %v %+v", err, divergences)
-	}
-	observation := profile.ExecutionObservation{
-		RunnerDigest: runnerDigest, RunnerOrigin: profile.RunnerPreexisting,
-		RuntimeIdentity: runtimeDigest,
-		Nodes: []profile.NodeExecutionObservation{{
-			NodeID: build.ID, EngineClass: ir.EngineOCIHermetic,
-			ToolchainDigest: toolchainDigest, SandboxMode: "fixture-sandbox",
-		}},
-	}
-	execution, err := profile.VerifyExecution(context.Background(), host, builderProfile,
-		[]ir.Node{build}, observation)
-	if err != nil {
-		t.Fatal(err)
-	}
-	work := filepath.Join(t.TempDir(), "work")
-	options := pipeline.RunOptions{
-		Ctx: context.Background(), SourceRoot: filepath.Join(work, "src"), Runtime: os.Args[0],
-		Qualification: &pipeline.QualifiedExecution{
-			Profile: builderProfile, HostReceipt: host,
-			Observer: attestSourceExecutionObserver{observation: observation},
-		},
-	}
-	artifactPath := pipeline.ArtifactPath(options, build)
-	payload := []byte("mirror-invariant-built-artifact")
-	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(artifactPath, payload, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	sum := sha256.Sum256(payload)
-	result := pipeline.ArtifactResult{
-		Component: build.Component, OutputType: build.OutputType, Toolchain: build.Toolchain,
-		Qualification: pipeline.ArtifactQualifiedExecution,
-		InputDigest:   attestDigest('f'), BuilderType: build.BuilderType,
-		EngineClass: ir.EngineOCIHermetic, ProfileDigest: execution.ProfileDigest(),
-		ExecutionBinding: execution.ExecutionBinding(), Path: build.ArtifactPath,
-		SHA256: "sha256:" + hex.EncodeToString(sum[:]), Size: int64(len(payload)),
-	}
-	resultsDir := filepath.Join(filepath.Dir(options.SourceRoot), "results")
-	writePipelineResult(t, resultsDir, build.ID, result)
-	report, err := (pipeline.Local{}).VerifyResults(graph, buildDigest, resultsDir, options)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return resolved, graph, report
 }
 
 func attestDigest(ch byte) string {
@@ -340,57 +227,6 @@ func TestAuthenticatedPublishedVectorRejectsLegacyOperatorEvidenceFields(t *test
 				t.Fatalf("authenticated vector retained legacy operator evidence authority: %v", err)
 			}
 		})
-	}
-}
-
-func TestPublisherEvidenceIsMirrorInvariant(t *testing.T) {
-	toolchainDigest := attestDigest('c')
-	onlineResolved, onlineGraph, onlineReport := qualifiedSourceEvidenceFixture(t,
-		"https://source.online.example/agent.git",
-		"registry.online.example/toolchain@"+toolchainDigest)
-	mirrorResolved, mirrorGraph, mirrorReport := qualifiedSourceEvidenceFixture(t,
-		"https://source.airgap.example/mirror/agent.git",
-		"registry.airgap.example/mirror/toolchain@"+toolchainDigest)
-	if onlineReport.BuildDigest != mirrorReport.BuildDigest {
-		t.Fatalf("transport relocation changed build identity: %s != %s",
-			onlineReport.BuildDigest, mirrorReport.BuildDigest)
-	}
-
-	buildEvidence := func(resolved *buildgraph.Resolved, graph *ir.Graph,
-		report *pipeline.Report,
-	) *PublisherEvidence {
-		verifiedSBOMs, err := sbom.BuildVerifiedFromReport(context.Background(), resolved, report, nil, nil)
-		if err != nil {
-			t.Fatal(err)
-		}
-		qualifiedProvenance, err := provenance.BuildQualifiedFromReport(context.Background(), report, graph)
-		if err != nil {
-			t.Fatal(err)
-		}
-		evidence, err := QualifyPublisherEvidence(context.Background(), verifiedSBOMs, qualifiedProvenance)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return evidence
-	}
-	online := buildEvidence(onlineResolved, onlineGraph, onlineReport)
-	mirror := buildEvidence(mirrorResolved, mirrorGraph, mirrorReport)
-	onlineBinding, err := online.Binding()
-	if err != nil {
-		t.Fatal(err)
-	}
-	mirrorBinding, err := mirror.Binding()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if onlineBinding.BuildDigest != mirrorBinding.BuildDigest ||
-		onlineBinding.SBOMIndexDigest != mirrorBinding.SBOMIndexDigest ||
-		onlineBinding.ProvenanceIndexDigest != mirrorBinding.ProvenanceIndexDigest ||
-		onlineBinding.EvidenceDigest != mirrorBinding.EvidenceDigest ||
-		len(onlineBinding.Artifacts) != 1 || len(mirrorBinding.Artifacts) != 1 ||
-		onlineBinding.Artifacts[0] != mirrorBinding.Artifacts[0] {
-		t.Fatalf("online/mirror transports changed publisher evidence:\nonline=%+v\nmirror=%+v",
-			onlineBinding, mirrorBinding)
 	}
 }
 

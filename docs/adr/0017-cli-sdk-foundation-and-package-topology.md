@@ -335,8 +335,10 @@ Its result describes integrity-checked bytes and confers no signature, policy or
 authenticated consumption remains the explicit verification use case.
 
 The SDK exposes document loading, Run preparation/execution/generation and scoped Release verification.
-`ResolveBuild` and `Run` remain for exact producer diagnostics; optional `AtomicOutput` commits a diagnostic
-graph export. It does not expose a second publication workflow or qualified-evidence orchestration. The unused
+`ResolveBuild` remains for exact producer resolution; optional `AtomicOutput` commits a diagnostic
+graph export. `Client.Run`, `RunRequest` and `WithRunner` are retired with `pipeline.Local.Run` and
+`QualifiedExecution`. They had no production callers outside the SDK. Supported local execution uses
+`ExecuteLifecycleRun` → `lifecycle.ExecuteLocal` → `factory.RunLocal`. It does not expose a second publication workflow or qualified-evidence orchestration. The unused
 SDK validation-vector/profile authentication, qualified rebuild, vector creation, release authorization and
 publication methods and their injected authority options are removed. Existing diagnostic commands use the
 owning trust, profile, attest and release modules directly; their receipt checks and capability
@@ -345,10 +347,8 @@ publication remains unavailable until its authenticated commit protocol exists.
 
 ### 2. Context threading + subprocess cleanup-on-cancel
 
-`ctx` is the **first argument** on every facade method. The deep `pipeline.Runner` is the documented
-low-level runner convention: its method carries context in `RunOptions.Ctx`, and every public local
-execution or terminal-verification entry point rejects a nil value at admission, before validation or I/O. A
-future breaking runner-interface revision should move it to the first argument.
+`ctx` is the **first argument** on every facade method. The low-level producer executor carries context
+in `RunOptions.Ctx` and rejects a nil value at admission, before validation or I/O.
 
 Every subprocess MUST use context-aware execution with bounded **SIGTERM→SIGKILL reaping**. The scheduler MUST
 keep an owned cleanup registry and force-remove started containers on cancel or exit, without holding its

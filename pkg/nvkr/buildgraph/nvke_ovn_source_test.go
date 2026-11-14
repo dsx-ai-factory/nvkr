@@ -526,30 +526,20 @@ func buildOVNTestHelm(t *testing.T, containerRuntime string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	digest, err := graph.Digest()
+	_, err = graph.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
 	defer cancel()
-	report, err := (pipeline.Local{}).Run(graph, digest, pipeline.RunOptions{
+	artifacts := executeSourceFixture(t, graph, pipeline.RunOptions{
 		Ctx: ctx, Runtime: containerRuntime, SourceRoot: filepath.Join(t.TempDir(), "helm"),
 		Stdout: os.Stdout, Stderr: os.Stderr,
 	})
-	if report != nil {
-		t.Cleanup(func() {
-			if err := report.Close(); err != nil {
-				t.Error(err)
-			}
-		})
-	}
-	if err != nil {
-		t.Fatal(err)
-	}
-	if report == nil || len(report.Artifacts) != 1 || report.Artifacts[0].Component != "helm-3-20-2" {
+	if len(artifacts) != 1 || artifacts[0].Component != "helm-3-20-2" {
 		t.Fatal("missing source-built Helm test tool")
 	}
-	return report.Artifacts[0].AbsPath
+	return artifacts[0].AbsPath
 }
 
 // YAML decoding is delegated to the existing library. This is a regression

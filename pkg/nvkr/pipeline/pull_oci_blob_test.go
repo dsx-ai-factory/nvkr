@@ -141,17 +141,13 @@ func TestPullOCIArchiveAnonymousBearerAndTerminalVerification(t *testing.T) {
 	}))
 	defer server.Close()
 	node := ociBlobPullNode(strings.TrimPrefix(server.URL, "http://"), digest)
-	graph := &ir.Graph{SchemaVersion: ir.SchemaVersion, Platform: node.Platform, Nodes: []ir.Node{
-		node, {ID: "verify", Kind: ir.KindVerify, Needs: []string{node.ID}},
-	}}
-	report, err := (Local{}).Run(graph, mustGraphDigest(t, graph), RunOptions{Ctx: t.Context(), SourceRoot: filepath.Join(t.TempDir(), "src")})
+	artifact, err := (Local{}).ExecNode(node, RunOptions{Ctx: t.Context(), SourceRoot: filepath.Join(t.TempDir(), "src")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tokenRequests.Load() == 0 || blobRequests.Load() != 1 || len(report.Artifacts) != 1 {
-		t.Fatalf("unexpected acquisitions: tokens=%d blobs=%d artifacts=%d", tokenRequests.Load(), blobRequests.Load(), len(report.Artifacts))
+	if tokenRequests.Load() == 0 || blobRequests.Load() != 1 || artifact == nil {
+		t.Fatalf("unexpected acquisitions: tokens=%d blobs=%d artifact=%+v", tokenRequests.Load(), blobRequests.Load(), artifact)
 	}
-	artifact := report.Artifacts[0]
 	actual, err := os.ReadFile(artifact.AbsPath)
 	if err != nil || !bytes.Equal(actual, body) || artifact.SHA256 != digest || artifact.Size != int64(len(body)) || artifact.OutputType != "raw" || artifact.EngineClass != ir.EnginePrebuiltAcquire || artifact.Packaged {
 		t.Fatalf("archive transformed or misclassified: %+v, bytes=%d, err=%v", artifact, len(actual), err)

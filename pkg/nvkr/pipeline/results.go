@@ -150,7 +150,7 @@ func AuthenticateResultForConsumption(ctx context.Context, node ir.Node, payload
 // VerifyResults is the terminal CI seam. It accepts only one strict result document
 // for every graph producer, reconstructs storage locations from the graph and current
 // workspace (never from producer-controlled absolute paths), and invokes the same
-// authoritative byte verifier as Local.Run.
+// authoritative byte verifier used by the retained prebuilt report consumers.
 func (l Local) VerifyResults(g *ir.Graph, buildDigest, resultsDir string, opts RunOptions) (*Report, error) {
 	if err := requireRunContext(opts.Ctx, "terminal result verification"); err != nil {
 		return &Report{}, err
@@ -187,18 +187,7 @@ func (l Local) VerifyResults(g *ir.Graph, buildDigest, resultsDir string, opts R
 		}
 	}
 	if len(buildNodes) > 0 {
-		if opts.Qualification == nil {
-			return rep, e.New(e.CodePreflightFailed,
-				"terminal CI verification contains from-source results but no execution-attestation authority")
-		}
-		verified, runtimePath, qualifyErr := qualifySelectedExecution(
-			opts.ctx(), opts.Qualification, opts.Runtime, buildNodes, false,
-		)
-		if qualifyErr != nil {
-			return rep, qualifyErr
-		}
-		opts.execution, opts.Runtime = verified, runtimePath
-		defer verified.cleanupRuntime()
+		return rep, e.New(e.CodeEngineCapability, "qualified source result verification has been retired")
 	}
 	ids := make([]string, 0, len(producers))
 	expectedFiles := make(map[string]bool, len(producers))

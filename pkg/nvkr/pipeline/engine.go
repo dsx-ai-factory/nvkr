@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package pipeline executes exact producer instructions and observes their results.
-// Local.Run executes a build graph; ExecNode executes one referenced instruction.
+// ExecNode executes one referenced instruction.
 // This package owns source snapshots, process lifetimes, and terminal artifact
 // receipts. Whole-Run scheduling and hosted generation belong to factory.
 package pipeline
@@ -15,23 +15,14 @@ import (
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
-
-// Runner executes the IR in the operator's own environment. Context is carried in
-// RunOptions; implementations MUST reject a nil RunOptions.Ctx at admission, before
-// validation or I/O.
-type Runner interface {
-	Name() string
-	Run(g *ir.Graph, buildDigest string, opts RunOptions) (*Report, error)
-}
 
 // RunOptions parameterize a local run.
 type RunOptions struct {
 	// Ctx carries cancellation into every subprocess (ADR-17 §2). Subprocesses get
 	// bounded SIGTERM→SIGKILL reaping, and the cleanup registry makes a separately
 	// bounded force-removal attempt for every possibly-live container. It is required
-	// by the public Run, VerifyResults, and ExecNode entry points; nil fails admission.
+	// by the public VerifyResults and ExecNode entry points; nil fails admission.
 	Ctx        context.Context
 	reap       *reaper // cleanup registry (set by Run; force-removes started containers on cancel)
 	SourceRoot string  // where fetch nodes check out sources (default .nvkr/work/src)
@@ -50,7 +41,7 @@ type RunOptions struct {
 	// Launch selects ADR-18 §8 for a single exec-node: instead of running the
 	// build DIRECTLY (assuming the engine placed the job inside the toolchain container),
 	// the helper ORCHESTRATES the pinned toolchain container itself — the same code path as
-	// Local.Run — so a generic CI runner needs only a container runtime plus this helper.
+	// the local factory executor — so a generic CI runner needs only a container runtime plus this helper.
 	Launch     bool
 	KeepGoing  bool   // continue after a failed build node instead of failing closed
 	Package    bool   // assemble each artifact into its outputType (oci-image/.deb) and record that digest
@@ -88,13 +79,8 @@ type RunOptions struct {
 	ToolExecutable string
 	// NativeGo is a process-local receipt over installed SDK/compiler bytes.
 	// It admits only explicitly declared local native-go producers.
-	NativeGo *NativeGoToolchain
-	// Qualification is required for a from-source run whose report may back a signed
-	// validation vector or a Reproduced/ValidatedVariant claim. Nil permits an
-	// unqualified from-source development run or a profile-free, terminally verified
-	// prebuilt acquisition; the latter still yields authority and requires Ctx.
-	Qualification *QualifiedExecution
-	execution     *verifiedExecution
+	NativeGo  *NativeGoToolchain
+	execution *verifiedExecution
 }
 
 func requireRunContext(ctx context.Context, operation string) error {

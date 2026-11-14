@@ -56,9 +56,6 @@ func (handle *NodeSession) ExecNode(node ir.Node, options RunOptions) (*Artifact
 	if !options.Launch {
 		return nil, e.New(e.CodeEngineCapability, "node execution session requires launched producers")
 	}
-	if options.Qualification != nil {
-		return nil, e.New(e.CodeEngineCapability, "qualified execution requires the complete Run admission protocol")
-	}
 	options = withDefaults(options)
 	session := handle.state
 	root, err := filepath.Abs(options.SourceRoot)

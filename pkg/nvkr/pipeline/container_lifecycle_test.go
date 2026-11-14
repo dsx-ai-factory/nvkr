@@ -51,42 +51,6 @@ func TestReaperContextCancellationStopsWaiter(t *testing.T) {
 	reaper.close()
 }
 
-func TestLocalRunAlwaysClosesReaperWithoutCancelingCallerContext(t *testing.T) {
-	for _, test := range []struct {
-		name      string
-		badDigest bool
-	}{
-		{name: "success"},
-		{name: "early-error", badDigest: true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-			reaper := newReaper(ctx, "unused-runtime")
-			graph := sampleGraph()
-			digest := mustGraphDigest(t, graph)
-			if test.badDigest {
-				digest = "sha256:" + repeatHex("f")
-			}
-
-			_, err := (Local{}).Run(graph, digest, RunOptions{
-				Ctx: ctx, DryRun: true, reap: reaper,
-			})
-			if test.badDigest && err == nil {
-				t.Fatal("invalid graph identity unexpectedly succeeded")
-			}
-			if !test.badDigest && err != nil {
-				t.Fatal(err)
-			}
-			select {
-			case <-reaper.done:
-			default:
-				t.Fatal("Local.Run returned while its reaper waiter was still live")
-			}
-		})
-	}
-}
-
 func TestReaperCleanupIsBoundedAndDoesNotHoldRegistryLock(t *testing.T) {
 	reaper := newReaper(context.Background(), "unused-runtime")
 	reaper.cleanupTimeout = 200 * time.Millisecond

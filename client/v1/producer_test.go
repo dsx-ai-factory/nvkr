@@ -16,8 +16,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 func errorCode(err error) nvkrerr.Code {
@@ -110,56 +108,6 @@ func TestResolveBuildCancellationPreventsCatalogIO(t *testing.T) {
 	}
 }
 
-type cancelRunner struct {
-	started chan context.Context
-	calls   int
-}
-
-func (runner *cancelRunner) Name() string { return "cancel-runner" }
-
-func (runner *cancelRunner) Run(_ *ir.Graph, _ string, options pipeline.RunOptions) (*pipeline.Report, error) {
-	runner.calls++
-	runner.started <- options.Ctx
-	<-options.Ctx.Done()
-	return nil, options.Ctx.Err()
-}
-
-func TestRunPropagatesCancellationToRunner(t *testing.T) {
-	graph := &ir.Graph{
-		SchemaVersion: ir.SchemaVersion, Platform: "linux/amd64",
-		Nodes: []ir.Node{
-			{ID: "pull-test", Kind: ir.KindPull, Component: "test", Artifact: "https://example.test/test",
-				Digest: "sha256:" + strings.Repeat("a", 64), Platform: "linux/amd64", Network: ir.NetworkDefault,
-				OutputType: "raw", ArtifactPath: "test", Version: "1.0.0"},
-			{ID: "verify", Kind: ir.KindVerify, Needs: []string{"pull-test"}},
-		},
-	}
-	digest, err := graph.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	runner := &cancelRunner{started: make(chan context.Context, 1)}
-	c := client.New(client.WithRunner(runner))
-	ctx, cancel := context.WithCancel(context.Background())
-	result := make(chan error, 1)
-	go func() {
-		_, runErr := c.Run(ctx, client.RunRequest{Graph: graph, BuildDigest: digest})
-		result <- runErr
-	}()
-
-	passedContext := <-runner.started
-	if passedContext != ctx {
-		t.Fatal("Run did not pass its exact context to pipeline.RunOptions")
-	}
-	cancel()
-	if err := <-result; errorCode(err) != nvkrerr.CodeTimeout {
-		t.Fatalf("runner cancellation must be normalized to CodeTimeout, got %v", err)
-	}
-	if runner.calls != 1 {
-		t.Fatalf("runner called %d times, want once", runner.calls)
-	}
-}
-
 type recordingOutput struct {
 	committed map[string][]byte
 	commit    func(context.Context, string, []byte) error
@@ -171,50 +119,6 @@ func (output *recordingOutput) Commit(ctx context.Context, name string, canonica
 	}
 	output.committed[name] = append([]byte(nil), canonicalBytes...)
 	return nil
-}
-
-type fixedRunner struct{ calls int }
-
-func (runner *fixedRunner) Name() string { return "fixed" }
-func (runner *fixedRunner) Run(graph *ir.Graph, digest string, _ pipeline.RunOptions) (*pipeline.Report, error) {
-	runner.calls++
-	return &pipeline.Report{BuildDigest: digest}, nil
-}
-
-func TestRunRejectsUnsafeCallerGraphBeforeInjectedRunner(t *testing.T) {
-	resolution, err := client.New(client.WithData(filepath.Join("..", "..", "testdata", "catalogs", "kubernetes-layered"))).ResolveBuild(context.Background(), client.ResolveRequest{
-		Components: sdkFixtureComponents(), Platform: "linux/amd64",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for name, mutate := range map[string]func(*ir.Node){
-		"tagged toolchain": func(node *ir.Node) { node.Toolchain = "ubuntu:latest" },
-		"networked build":  func(node *ir.Node) { node.Network = ir.NetworkDefault },
-	} {
-		t.Run(name, func(t *testing.T) {
-			graph := *resolution.Graph
-			graph.Nodes = append([]ir.Node(nil), resolution.Graph.Nodes...)
-			found := false
-			for i := range graph.Nodes {
-				if graph.Nodes[i].Kind == ir.KindBuild {
-					mutate(&graph.Nodes[i])
-					found = true
-					break
-				}
-			}
-			if !found {
-				t.Fatal("fixture has no source build")
-			}
-			runner := &fixedRunner{}
-			_, err := client.New(client.WithRunner(runner)).Run(context.Background(), client.RunRequest{
-				Graph: &graph, BuildDigest: resolution.BuildDigest,
-			})
-			if err == nil || runner.calls != 0 {
-				t.Fatalf("unsafe graph reached injected runner: calls=%d err=%v", runner.calls, err)
-			}
-		})
-	}
 }
 
 func sdkFixtureComponents() []string {
