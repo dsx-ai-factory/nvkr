@@ -1,13 +1,12 @@
 # ADR-29 — Cluster observation and artifact attribution
 
-- **Decision status:** Proposed; pending named-owner review and ratification.
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Design only; the standalone collection route is not implemented.
 - **Acceptance-test maturity:** No live acceptance for this proposal.
-- **Deciders:** Pending; NVKR observation and downstream deployment owners must be named.
-- **Index:** Proposed ADR-29 supplements ADR-01–22 and proposed ADR-28; it remains outside the
-  consolidated contract set until accepted.
+- **Deciders:** njhensley
+- **Index:** ADR-29 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-13 (build evidence), ADR-16/17 (observation ownership), ADR-18 §3
-  (operator-host execution), ADR-19 (deployment mapping), proposed ADR-27/28 (released tools).
+  (operator-host execution), ADR-19 (deployment mapping), ADR-27/28 (released tools).
 - **Scope:** Gather cluster information and optionally correlate it with selected NVKR artifacts.
   Outputs are unsigned, descriptive diagnostics, lane none. Test execution, test verdicts, signing,
   publication, qualification and release gates are outside this decision.

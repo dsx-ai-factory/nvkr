@@ -1,16 +1,14 @@
 # ADR-26 — Definition composition
 
-- **Decision status:** Proposed (design only; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** U1–U8 implemented; U9 waits on the result-reuse decision and U10
   on a hosted composite Run. `reconciliation/README.md` records the implemented scope.
 - **Acceptance-test maturity:** Contract suites for U1–U8, including an opt-in extended identity-invariance
   contract over the four NVKE families. No hosted Run, composite publication or consumer verification
   exercises a composite.
-- **Deciders:** Pending; release-engineering, publication, catalog and qualification owners must be named before
-  ratification.
-- **Index:** Proposed ADR-26 supplements ADR-01–22 and proposed ADR-23/24; it remains outside the consolidated
-  contract set until accepted. It coordinates with the separately drafted authenticated result-reuse decision,
-  proposed [ADR-30](0030-authenticated-result-reuse.md) (backlog item 4).
+- **Deciders:** njhensley
+- **Index:** ADR-26 in the consolidated NVKR ADR set. It coordinates with the authenticated result-reuse decision,
+  [ADR-30](0030-authenticated-result-reuse.md) (backlog item 4).
 - **Relates to:** ADR-01 (canonical codec and digest families), ADR-03 (coded errors), ADR-04 §5 (consumer
   verification), ADR-09 (production provenance), ADR-11 §1–§2 (direct selection, independent output uses),
   ADR-12 (target platforms), ADR-16 §5 (evidence lanes and qualification), ADR-17 §1 and §6 (public lifecycle,

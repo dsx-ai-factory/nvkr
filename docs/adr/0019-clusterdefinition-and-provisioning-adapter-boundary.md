@@ -1,11 +1,11 @@
 # ADR-19 — Artifact membership and downstream deployment ownership
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-19 in the consolidated NVKR ADR set (artifact membership and downstream ownership).
 - **Relates to:** ADR-05 (ReleaseSet / Inventory), ADR-12 (targets), ADR-16
   (release gates), ADR-14 (delivery), ADR-18 (build pipeline).
@@ -25,7 +25,7 @@ A Definition selects named outputs, their exact producers, concrete target platf
 byte-changing packaging relationships. There is no authored cluster view, tenant/operator type, node role,
 role affinity, deployment category, cluster context, CNI declaration or cluster validation-requirement list.
 Different deliverable sets can use separate Definitions. No replacement grouping object is introduced.
-Proposed [ADR-26](0026-definition-composition.md) designs a composite Definition, implemented and contract-tested only,
+[ADR-26](0026-definition-composition.md) designs a composite Definition, implemented and contract-tested only,
 whose Release membership is the exact union of complete member Definitions' named outputs; it selects,
 overrides and deduplicates nothing.
 

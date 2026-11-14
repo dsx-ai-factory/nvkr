@@ -15,7 +15,7 @@ emits no automatic association file or parent Release. Consumers independently v
 references and own any required association or compatibility decision. See the
 [pilot inputs](../../../inputs/definitions/nvke/README.md#family-pilot) and
 [partitioning strategy](../../definition-partitioning-strategy.md) for scope and historical measurements.
-Proposed [ADR-26](../0026-definition-composition.md) designs a composite of these families as one Release;
+[ADR-26](../0026-definition-composition.md) designs a composite of these families as one Release;
 units U1–U7 are implemented and contract-tested only. The authored
 [GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite) pins the five families
 and the GB200 AICR Definition, which inherits their `sbomTool`, declares the eight components the Ubuntu 24.04 overlay replaces as variants of the two disk families, and has

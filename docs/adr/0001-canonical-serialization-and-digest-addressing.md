@@ -1,11 +1,11 @@
 # ADR-01 — Canonical serialization & digest-addressing
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-01 in the consolidated NVKR ADR set.
 - **Relates to:** every digest-addressed object — the Build Digest (ADR-02), the trust objects (ADR-05),
   provenance and SBOM (ADR-09, ADR-13), publication and status (ADR-06). ADR-03 defines the error contract for
@@ -123,14 +123,14 @@ changed shapes are:
 | Object | Schema |
 |---|---|
 | Definition | `nvkr.dev/definition/v5` |
-| Composite Definition (proposed ADR-26) | `nvkr.dev/composite-definition/v1`, identity family `nvkr.composite-definition` |
+| Composite Definition (ADR-26) | `nvkr.dev/composite-definition/v1`, identity family `nvkr.composite-definition` |
 | Component catalog and snapshot | `nvkr.dev/catalog/v3`, `nvkr.dev/catalog-snapshot/v3` |
 | Component catalog overlay | `nvkr.dev/catalog-overlay/v3` |
 | Executable and logical build graph | `nvkr.dev/ir/v4` |
 | Run plan and artifact graph | `nvkr.dev/run-plan/v5`, `nvkr.dev/artifact-graph/v5` |
-| Composite Run plan (proposed ADR-26) | `nvkr.dev/run-plan/v6`, carrying the composition record; plain Plans stay v5 |
+| Composite Run plan (ADR-26) | `nvkr.dev/run-plan/v6`, carrying the composition record; plain Plans stay v5 |
 | Run and Release views | `nvkr.dev/run/v4`, `nvkr.dev/release/v4` |
-| Composite Run record and publication root (proposed ADR-26) | `nvkr.dev/run/v5`, `nvkr.dev/publication-root/v5`, each carrying the composition record; plain records stay v4 and OCI media types are unchanged |
+| Composite Run record and publication root (ADR-26) | `nvkr.dev/run/v5`, `nvkr.dev/publication-root/v5`, each carrying the composition record; plain records stay v4 and OCI media types are unchanged |
 
 Definition v5 retains removal of cluster views and adds an explicit required platform set for an aggregate OCI image. Catalog v3 removes delivery categories and node-role affinities. IR v4
 binds typed VM disk, producer, selected toolchain-host platform,
@@ -147,7 +147,7 @@ The logical image-index build projection uses `nvkr.dev/image-index-build/v1` in
 `nvkr.build` family: sorted `requiredPlatforms` plus sorted children containing only `platform`, `buildDigest`
 and `component`. It is distinct from native IR v4 and from OCI manifest observations. Native IR bytes and
 binary-bundle v1 remain unchanged. Plain publication-root metadata and media use v4 (ADR-20); composite roots
-use v5 metadata with unchanged media types (proposed ADR-26). Definition v4, Plan/artifact-graph v4 and
+use v5 metadata with unchanged media types (ADR-26). Definition v4, Plan/artifact-graph v4 and
 Run/Release v3 are rejected rather than reinterpreted with aggregate membership.
 
 Production SLSA build-type URIs use `/v2` for the replacement of compiler-handoff parameters by the original

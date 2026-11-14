@@ -1,11 +1,11 @@
 # ADR-22 — Catalog pinning & the lock contract (declare vs. resolve)
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-22 in the consolidated NVKR ADR set (added to give the pin/lock model a decided home).
 - **Relates to:** ADR-02 (what enters `buildDigest`), ADR-10 (toolchain / builder pins), ADR-11 (the catalog
   the lock feeds resolution), ADR-12 (the output/composition shape a curated set takes), ADR-13 (the aggregate

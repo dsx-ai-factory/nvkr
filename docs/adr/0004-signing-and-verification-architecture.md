@@ -1,11 +1,11 @@
 # ADR-04 — Signing & verification architecture
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-04 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-03 (trust-failure codes), ADR-05 (trust objects), ADR-07 (builder-profile signing), ADR-06
   (publication signing), ADR-16 / air-gap (offline verify).

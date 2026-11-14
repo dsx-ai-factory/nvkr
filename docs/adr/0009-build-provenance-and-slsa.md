@@ -1,11 +1,11 @@
 # ADR-09 — Build provenance & SLSA
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-09 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-02 (tier boundary), ADR-05 (evidence bundle / ValidationVector), ADR-07 (observed engine
   class), ADR-13 (external evidence for prebuilt), ADR-01 (canonical codec / serialization profile).

@@ -1,15 +1,14 @@
 # ADR-31 — Qualification results index
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** The qualification outcome (ADR-17 §4), the selection of what a Run publishes and
   the publisher below are implemented and contract-tested. The generated publish job and its Environment
   declaration are not implemented, so nothing publishes yet; see `reconciliation/README.md`.
 - **Acceptance-test maturity:** Contract tests only, against in-memory and local-directory stores, a scripted
   object-store client, and the SDK against a local fake of the object store and its token exchange. No hosted
   Run has published an outcome, and no TestGrid view has read one.
-- **Deciders:** Pending; release-engineering and qualification owners must be named before ratification.
-- **Index:** Proposed ADR-31 supplements ADR-01–22; it remains outside the consolidated contract set until
-  accepted. It is tracked in #279.
+- **Deciders:** njhensley
+- **Index:** ADR-31 in the consolidated NVKR ADR set. It is tracked in #279.
 - **Relates to:** ADR-01 (canonical codec), ADR-03 (coded errors and exit codes), ADR-16 §5 (the qualification
   evidence and release manifest an outcome points at), ADR-17 §4 (package ownership), ADR-18 (generated jobs),
   ADR-20 §6 (pipeline-attested publication, which this is not), ADR-21 (regeneration).

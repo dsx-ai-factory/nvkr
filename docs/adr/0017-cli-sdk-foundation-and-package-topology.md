@@ -1,11 +1,11 @@
 # ADR-17 — CLI/SDK foundation, seams & package topology
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-17 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-03 (exit codes), ADR-18 (runner / ctx), ADR-20 (publish seams), ADR-01 (canonical codec).
 - **Satisfies:** FR-21 (standard, replaceable interfaces); supports FR-20 (coded errors — owned by ADR-03).
@@ -69,7 +69,7 @@ strict inventory hardening, M3 qualification acceptance and organizational accep
 
 Definition v5, Run/Release v4, and compiled Run Plan/artifact graph v5 records reject the
 retired cluster, role, category and composition fields. Signer policy roles remain a distinct security concept.
-Proposed [ADR-26](0026-definition-composition.md) designs a separate composite Definition form that joins
+[ADR-26](0026-definition-composition.md) designs a separate composite Definition form that joins
 complete, digest-pinned Definitions into one Plan, Run and Release. Its units U1–U7 are implemented and contract-tested
 only (see reconciliation); it adds no Recipe,
 selection group or inheritance, and does not reintroduce those retired fields.
@@ -395,7 +395,7 @@ is a leaf that directly imports only the canonical codec, coded errors and held 
 the pipeline-attested M4 release manifest (ADR-16 §5); it also admits an outcome's inputs before qualification
 and classifies its own result into an outcome. An outcome
 points at qualification evidence and the release manifest by digest; it adds no public lifecycle object,
-receipt or authority. `resultspublish` owns the proposed ADR-31 results index: the bucket layout, the TestGrid
+receipt or authority. `resultspublish` owns the ADR-31 results index: the bucket layout, the TestGrid
 projection and the create-only publishing protocol, in the same lane. It writes through a store interface, holds
 no credential and links no cloud SDK; the separate `cmd/nvkr-results-publish` helper supplies the store and is not
 part of the release CLI.

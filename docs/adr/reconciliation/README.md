@@ -1,37 +1,38 @@
 # Architecture implementation and evidence
 
 This ledger carries no global review date: each row is current as of the change that last edited it.
-ADR-01–22 own the lane-specific engineering contracts pending named-decider
-ratification. This ledger owns current implementation and remaining acceptance. Code and contract tests,
+ADR-01–31 own the lane-specific engineering contracts, accepted by njhensley on 2026-11-14 on his own
+behalf. This acceptance does not resolve operational owner questions or unpause the S3 work (#383–#385).
+This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.
 
-[ADR-23](../0023-upstream-artifact-behavioral-validation.md) additionally proposes upstream artifact
-test interfaces outside that consolidated set until acceptance. Implementation and local CLI proof
-are tracked below; governance, CI and broader acceptance remain pending.
+[ADR-23](../0023-upstream-artifact-behavioral-validation.md) defines upstream artifact
+test interfaces in the consolidated set. Implementation and local CLI proof
+are tracked below; organizational approval, CI and broader acceptance remain pending.
 
-[ADR-24](../0024-imported-validator-catalog.md) proposes an imported-validator catalog, explicit artifact-role
-bindings and versioned diagnostic profiles outside the consolidated set. The provisional CLI catalog implements loading, discovery and frozen local-plan dispatch, with contract tests but no new
+[ADR-24](../0024-imported-validator-catalog.md) defines an imported-validator catalog, explicit artifact-role
+bindings and versioned diagnostic profiles in the consolidated set. The provisional CLI catalog implements loading, discovery and frozen local-plan dispatch, with contract tests but no new
 actual upstream catalog execution. `validators` (hidden, in development) is the sole NVKR interface for these suites. Published-profile migration and controller/chart adapters remain deferred.
 
 [ADR-25](../0025-generic-oci-bundles-and-aicr-producers.md) additionally admits generic OCI bundles and
 ordinary pinned AICR producers. Its contract and rendering evidence remain distinct from hosted delivery
 and hardware acceptance, as recorded below.
 
-[ADR-26](../0026-definition-composition.md) proposes composite Definitions: complete member Definitions pinned by
+[ADR-26](../0026-definition-composition.md) defines composite Definitions: complete member Definitions pinned by
 `nvkr.definition` digest, joined into one effective Definition, one Plan, one Run and one Release whose
 membership is the exact union of member outputs. Implemented, contract-tested units are listed in its row
 below, including named composite development bundles (U5); no hosted composite Run, composite publication or
 consumer verification has been exercised or recorded. Hosted complete-composite qualification binds composition and every output through handoff, checks, smoke,
 qualification evidence and the production manifest. GPU-site production/development pairs select explicit
 policies, including artifact-only bundle archive validation. Local composite qualification rehearsal and member
-Release reuse remain deferred and fail closed; reuse follows the separately drafted result-reuse decision.
+Release reuse remain deferred and fail closed; reuse follows the result-reuse decision.
 Contract coverage includes `TestQualificationAuthenticatesCompleteComposition` and
 `TestGPUCompositeQualificationPairs`; these do not establish external service or hosted acceptance.
 Retiring the combined NVKE Definition is a separate cutover gated on a hosted composite Run and consumer
 verification.
 
-[ADR-27](../0027-pinned-tool-producers.md) proposes pinned-tool producers: catalog components that run one released,
+[ADR-27](../0027-pinned-tool-producers.md) defines pinned-tool producers: catalog components that run one released,
 digest-pinned executable offline in a pinned container, with no shell, a fixed argument vector and typed material
 inputs, emitting one file or a producer-written OCI layout. Units T1–T7 include the
 layout-import handoff for one root with its complete explicit regular-file material closure. The AICR-specific
@@ -40,23 +41,23 @@ execution evidence are recorded in [ADR-27](adr-27.md) and [AICR deployment bund
 hosted Run and consumer verification remain unexercised. AICR v1.2.0-rc1 ships the local OCI layout output (NVIDIA/aicr#3538) that AICR
 bundles need.
 
-[ADR-28](../0028-multi-platform-executable-indexes.md) proposes multi-platform executables: one tool source and
+[ADR-28](../0028-multi-platform-executable-indexes.md) defines multi-platform executables: one tool source and
 one lock transaction cover every platform of a release, and an executable output may declare a `platforms` set
 published as a standard OCI image index over minimal per-platform images. It is designed, not implemented: tool
 declarations, tool pins and executable outputs remain single-platform, and executables publish only as Binary
 Bundles. It also inventories the existing per-platform executable deliveries to retrofit.
 
-[ADR-29](../0029-cluster-observation-and-artifact-attribution.md) proposes cluster information gathering and
+[ADR-29](../0029-cluster-observation-and-artifact-attribution.md) defines cluster information gathering and
 optional descriptive comparison with selected NVKR artifacts. It is design only. The proposed observation
 owner, shared in-process Kubernetes reader and AICR Go integration remain unimplemented and subject to
 dependency admission. Existing conformance execution retains its separate strict admission and checks.
 
-[ADR-30](../0030-authenticated-result-reuse.md) proposes pipeline-attested cross-Run reuse of complete named
+[ADR-30](../0030-authenticated-result-reuse.md) defines pipeline-attested cross-Run reuse of complete named
 outputs: a Plan-derived reuse key, untrusted discovery, owner-issued acceptance receipts, typed refusals and a
 `reused` Run origin. It is designed, not implemented: no code, contract test, hosted Run or qualification
 exercises reuse, and every Run still executes every required output.
 
-[ADR-31](../0031-qualification-results-index.md) proposes a qualification results index: each production
+[ADR-31](../0031-qualification-results-index.md) defines a qualification results index: each production
 qualifier attempt's unsigned outcome, and an errored outcome for a failed producer Run, published create-only
 as a canonical record and a TestGrid build. Selection, projection, the publishing protocol and the
 `nvkr-results-publish` helper are implemented and contract-tested. The generated publish job is not, so no Run

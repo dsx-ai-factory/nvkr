@@ -1,11 +1,11 @@
 # ADR-16 — Release gates & digest-first selection
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-16 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-05 (ReleaseSet / Inventory), ADR-06 (status / selection), ADR-04 (verify / signing),
   ADR-19 (deployment-scope boundary).
@@ -132,7 +132,7 @@ ReleaseSet selection and tag resolution remain deferred; no standalone selector 
   trusted-time checks are always fresh. That authenticated cache protocol is not implemented, and the unused
   declaration-diff helper is removed. Equal Build Digests across named
   outputs likewise grant no execution/evidence reuse: every frozen output use must independently complete.
-  Proposed ADR-30 designs pipeline-attested cross-Run output reuse; it is not implemented and adds no
+  ADR-30 designs pipeline-attested cross-Run output reuse; it is not implemented and adds no
   qualified reuse or clearance shortcut.
 - **Rollback (UC-15, deferred).** A future rollback adapter must make a **previously verified set re-selectable
   and re-verifiable by immutable digest** and re-run the clearance path using a fresh opaque
@@ -408,7 +408,7 @@ reported as a failed issuance. The release tag rule, tag creation, publisher exc
 verification and interruption handling belong to the separate M4 publication step; a manifest attachment alone
 does not establish a release.
 
-Proposed ADR-31 indexes each production qualification attempt, failures included, as an unsigned outcome that
+ADR-31 indexes each production qualification attempt, failures included, as an unsigned outcome that
 points at this evidence and manifest by digest. The index grants no qualification, manifest or release authority.
 
 Full disk inspection/material reconciliation, waivers, offline pull-request qualification, a dedicated

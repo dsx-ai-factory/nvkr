@@ -1,11 +1,11 @@
 # ADR-20 — Artifact publication & target-registry configuration
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-20 in the consolidated NVKR ADR set (added to close the publish-targets gap).
 - **Relates to:** ADR-17 (external-interface seams), ADR-18 (pipeline emission), ADR-06 (publication / referrers),
   ADR-16 (promotion), ADR-04 (signing).
@@ -576,7 +576,7 @@ verification record. Resolution and closure retrieval use the same admitted cred
 NVIDIA's hosted workflow publishes signed artifact bytes to its configured OCI registry. ADR-04 owns keyless
 signature/attestation storage and ADR-16 owns evidence tiers and full release acceptance. The compiler generates
 one release index from named outputs; normal authors do not wire payload → root → route.
-Proposed ADR-31's qualification results index is not artifact publication: it writes unsigned descriptions of
+ADR-31's qualification results index is not artifact publication: it writes unsigned descriptions of
 qualification attempts, never artifact bytes, to a separate object store whose target is not part of `publication`.
 
 GitHub-hosted GHCR publication admits the exact destination packages before payload upload. The target
