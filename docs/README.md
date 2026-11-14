@@ -94,7 +94,7 @@ The [input instructions](../inputs/definitions/nvke/README.md#family-pilot) own 
 the combined candidate remains available pending consumer and qualification cutover.
 
 Proposed [ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
-adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.
+container-command execution and Run bindings across repositories, including its diagnostic and evidence limits.
 The provisional local-plan CLI slice implements catalog discovery and versioned-profile execution;
 broader adapter and profile support remains deferred.
 

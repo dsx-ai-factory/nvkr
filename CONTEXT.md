@@ -277,11 +277,11 @@ Outputs remain descriptive and cannot authorize qualification or promotion.
 _Avoid_: Recipe, test dispatcher framework, verification policy
 
 **Validator catalog (proposed)**:
-An explicit index of reusable diagnostic validator entries, organized by project, artifact and suite.
-Proposed [ADR-24](docs/adr/0024-imported-validator-catalog.md) separates entries from profiles selecting named
-instances and artifact-role bindings. The provisional CLI slice implements strict discovery, local-plan
-admission and frozen dispatch for the existing process-contract and mixed CLI suites. Shared schemas remain
-provisional; published adapters, controller/chart checks and broader migration are deferred. Existing legacy
+Reusable diagnostic suite registrations at `{project}/{artifact}/{suite}.yaml`, run by a versioned container
+executor against named outputs of a completed Run in a selected TestEnvironment, per proposed
+[ADR-24](docs/adr/0024-imported-validator-catalog.md). A TestEnvironment is diagnostic execution
+configuration, not the lifecycle Environment. The implemented provisional slice is the earlier
+index/adapter/local-plan-profile route for the CLI suites; migration to the amended design is pending. Existing legacy
 validation routes retain their separate admission and capture contracts.
 _Avoid_: Producer catalog, upstream test implementation, executable plugin, qualification policy
 

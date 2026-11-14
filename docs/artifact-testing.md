@@ -96,7 +96,8 @@ adapter-configuration extension. Unknown fields, versions, duplicate keys/IDs/in
 missing or extra roles, unknown outputs, unsupported adapters or requirements fail
 without executable work or fallback. YAML aliases, merge keys, multi-document streams,
 symlink traversal and escaping index paths are forbidden. YAML and JSON use the same
-strict typed model. See ADR-24 for document, catalog and instance limits.
+strict typed model. Documents are capped at 1 MiB (16 MiB per catalog), with at most
+1,024 entry files, 64 check instances per profile and 64 input roles per entry. This provisional slice predates ADR-24's amended design.
 
 `timeout` in an entry bounds its test container and cannot exceed the adapter's
 30-minute maximum. Dependency acquisition has its own fixed 30-minute bound; source
