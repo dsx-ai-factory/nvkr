@@ -1,6 +1,6 @@
 ## Consumer acceptance scopes
 
-Current publication-root v4 binds the exact Definition, Environment and Plan identities. Optional consumer
+Current publication-root v4 and composite v5 bind the exact Definition, Environment and Plan identities. Optional consumer
 expectations are checked before external work; the lifecycle owner authenticates the complete output match
 and issues a policy/publication-bound opaque receipt. Current readers reject historical v3 roots, including
 the Run 37533806963 demo release. That browsing record does not establish current-schema external acceptance.
