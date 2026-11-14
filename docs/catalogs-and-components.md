@@ -28,6 +28,20 @@ the native NICoSim catalog retains Linux's static Make build and selects Go comp
 not duplicate source pins, material declarations or deployment orchestration. Unknown targets and empty
 overrides fail validation; command overrides are unavailable to Packer, Nix and acquired producers.
 
+Any operand in `buildCommand`, `buildCommandByPlatform` or a source's `vendorCommand` can reference
+a file instead of an inline string:
+
+```yaml
+buildCommand: [bash, -ec, {file: scripts/build.sh}]
+```
+
+The loader substitutes the file's exact UTF-8 bytes, preserving trailing newlines. Paths resolve beneath
+the declaring registry or fragment directory; absolute paths, `..` segments, symlinks and non-regular
+files are rejected. The existing limits are 4 MiB per file and 32 MiB across a catalog load. Captured
+compile inputs retain the script bytes for replay. Moving an identical inline body into a file preserves
+Build and VendorSpec identities; changing its bytes changes the applicable identity. Keep the interpreter
+and flags in the argv array. This does not add a shell mode or execute a file during catalog loading.
+
 A source can serve several components. A pin set can derive several source or acquired-artifact versions
 from one upstream release's version file. Update those members through their owning source. Use
 `catalog bump --check` to preview changes without writing the lock; pending changes return `NVKR-E-DIFF`.

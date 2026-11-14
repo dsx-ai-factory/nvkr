@@ -82,6 +82,20 @@ providers allow explicit sibling references; compile snapshot providers addition
 the captured repository root. Captures include fragment bytes, and replay has no filesystem fallback. Missing,
 changed or unsupported inputs fail closed before a catalog is returned.
 
+**File-backed command operands (both evidence lanes).** An element of `buildCommand`,
+`buildCommandByPlatform` or source `vendorCommand` may be `{file: scripts/build.sh}`.
+Catalog loading substitutes the exact UTF-8 file bytes, including trailing newlines, into that argv
+element. There is no new shell mode or command field. Paths are canonical relative paths beneath the
+declaring registry or fragment directory: absolute paths, any `..` segment, symlink parents/leaves,
+non-regular files and invalid UTF-8 fail closed. The fragment import's sibling-path permission does
+not apply to operands. Context-bound providers enforce the existing per-file and aggregate limits;
+captured compile inputs include the script bytes and replay never consults working script files.
+The fragment hash still binds only the fragment document; scripts are additional captured inputs.
+Resolved catalog, Build and VendorSpec identities bind expanded argv bytes, excluding operand paths.
+Moving identical inline bytes into a file therefore preserves those identities. Authored input snapshots
+can differ in transport identity; they must be authenticated by their existing consuming boundary.
+This authoring form establishes no execution or release acceptance.
+
 Multiple components may share one source and therefore **bump atomically** (e.g. the Kubernetes-core binaries
 move together on a single lock entry).
 
