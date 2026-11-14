@@ -18,8 +18,7 @@ usage() {
 Usage: scripts/demo-tamper-detection.sh [options]
 
 Create small local fixtures and demonstrate fail-closed behavior for:
-  - changed artifact digests in a local diagnostic OCI publication;
-  - rejection of extraction from that damaged publication;
+  - changed payload bytes in a local diagnostic OCI publication, rejected before extraction;
   - corrupt transport archives, destination overwrite, and escaping symlinks.
 
 Options:

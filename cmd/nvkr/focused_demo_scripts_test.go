@@ -130,7 +130,7 @@ func TestMaintainedDemoScriptsAdvertiseRunnableHonestJourneys(t *testing.T) {
 		want []string
 	}{
 		{"demo-catalog-change.sh", []string{"local Git", "preview bump", "UNQUALIFIED"}},
-		{"demo-tamper-detection.sh", []string{"changed artifact digests", "escaping symlinks", "UNQUALIFIED"}},
+		{"demo-tamper-detection.sh", []string{"changed payload bytes", "escaping symlinks", "UNQUALIFIED"}},
 		{"demo-release-consumer.sh", []string{"digest-pinned lifecycle publication", "Verification Policy", "Release capability"}},
 	}
 	for _, test := range tests {

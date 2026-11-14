@@ -142,7 +142,7 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 			{
 				Name: "verify", Usage: "verify one pinned reference under an explicit Verification Policy scope",
 				Flags: append([]cli.Flag{
-					&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "lane", Required: true, Usage: "pipeline-attested", Action: func(_ *cli.Context, value string) error {
+					&cli.StringFlag{Name: "reference", Required: true}, &cli.StringFlag{Name: "lane", Required: true, Usage: "evidence lane; only pipeline-attested is supported", Action: func(_ *cli.Context, value string) error {
 						if value != lifecycle.LanePipeline {
 							return e.New(e.CodeUsage, "unsupported lane %q; use pipeline-attested", value)
 						}

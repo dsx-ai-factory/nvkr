@@ -30,7 +30,7 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 		return nil, err
 	}
 	if opts.SourceWorkspace != nil && (n.Kind != ir.KindFetch || !opts.Launch) {
-		return nil, e.New(e.CodeEngineCapability, "held source workspace requires launched, unqualified source fetching")
+		return nil, e.New(e.CodeEngineCapability, "held source workspace requires launched source fetching")
 	}
 	if opts.SourceGitEnvironment != nil && opts.SourceWorkspace == nil {
 		return nil, e.New(e.CodeEngineCapability, "source Git environment requires its held source workspace")
@@ -42,7 +42,7 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 		return nil, e.New(e.CodeEngineCapability, "pinned-tool build %q requires launched execution", n.ID)
 	}
 	if n.BuilderType == ir.BuilderBuildKit && (!opts.Launch || opts.Package) {
-		return nil, e.New(e.CodeEngineCapability, "rootless BuildKit requires launched, unqualified OCI export execution")
+		return nil, e.New(e.CodeEngineCapability, "rootless BuildKit requires launched OCI export execution")
 	}
 	opts = withDefaults(opts)
 	if err := opts.ctx().Err(); err != nil {

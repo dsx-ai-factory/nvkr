@@ -526,10 +526,6 @@ func buildOVNTestHelm(t *testing.T, containerRuntime string) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = graph.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
 	defer cancel()
 	artifacts := executeSourceFixture(t, graph, pipeline.RunOptions{

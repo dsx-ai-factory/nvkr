@@ -12,13 +12,27 @@ import (
 )
 
 func TestPublishRejectsRetiredReleaseMetadataBeforeIO(t *testing.T) {
-	for _, flag := range []string{"--inventory", "--release-set"} {
-		t.Run(flag, func(t *testing.T) {
-			root := filepath.Join(t.TempDir(), "publication")
-			_, err := invokeLifecycleCLI(t, "publish", "root", flag, "missing.json", "--out", root)
+	for _, test := range []struct {
+		command string
+		flag    string
+		inputs  []string
+	}{
+		{"root", "--inventory", []string{"--bundle", "demo=missing"}},
+		{"root", "--release-set", []string{"--bundle", "demo=missing"}},
+		{"bundle", "--inventory-digest", []string{"--file", "demo=missing", "--arch", "amd64"}},
+		{"bundle", "--release-set-digest", []string{"--file", "demo=missing", "--arch", "amd64"}},
+		{"apt", "--inventory-digest", []string{"--package", "missing.deb"}},
+		{"apt", "--release-set-digest", []string{"--package", "missing.deb"}},
+	} {
+		t.Run(test.command+test.flag, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+			args := []string{"publish", test.command, test.flag, "retired", "--out", filepath.Join(root, "publication")}
+			_, err := invokeLifecycleCLI(t, append(args, test.inputs...)...)
 			assertLifecycleCommandCode(t, err, e.CodeUsage)
-			if _, err := os.Stat(root); !os.IsNotExist(err) {
-				t.Fatalf("rejected metadata created publication: %v", err)
+			entries, err := os.ReadDir(root)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("rejected metadata created output: %v, %v", entries, err)
 			}
 		})
 	}

@@ -73,8 +73,6 @@ func publishBundleCmd() *cli.Command {
 			&cli.StringFlag{Name: "arch", Required: true},
 			&cli.StringFlag{Name: "purpose", Value: "operator-tools"},
 			&cli.Int64Flag{Name: "epoch", Value: 0, Usage: "deterministic tar timestamp"},
-			&cli.StringFlag{Name: "release-set-digest"},
-			&cli.StringFlag{Name: "inventory-digest"},
 			&cli.StringFlag{Name: "out", Required: true, Usage: "new OCI layout directory"},
 		},
 		Action: func(c *cli.Context) error {
@@ -100,7 +98,7 @@ func publishBundleCmd() *cli.Command {
 			}
 			result, err := delivery.BuildBinaryBundle(c.Context, c.String("out"), delivery.BinaryBundleRequest{
 				OS: c.String("os"), Arch: c.String("arch"), Purpose: c.String("purpose"), Epoch: c.Int64("epoch"),
-				ReleaseSetDigest: c.String("release-set-digest"), InventoryDigest: c.String("inventory-digest"), Files: inputs,
+				Files: inputs,
 			})
 			if err != nil {
 				return err
@@ -267,15 +265,14 @@ func publishAPTCmd() *cli.Command {
 	return &cli.Command{Name: "apt", Usage: "project exact .deb files into a deterministic local APT repository",
 		Flags: []cli.Flag{&cli.StringSliceFlag{Name: "package", Required: true}, &cli.StringFlag{Name: "distribution", Value: "stable"},
 			&cli.StringFlag{Name: "component", Value: "main"}, &cli.Int64Flag{Name: "epoch", Value: 0},
-			&cli.StringFlag{Name: "release-set-digest"}, &cli.StringFlag{Name: "inventory-digest"}, &cli.StringFlag{Name: "out", Required: true}},
+			&cli.StringFlag{Name: "out", Required: true}},
 		Action: func(c *cli.Context) error {
 			packages := make([]delivery.DebianPackageInput, 0, len(c.StringSlice("package")))
 			for _, path := range c.StringSlice("package") {
 				packages = append(packages, delivery.DebianPackageInput{Path: path})
 			}
 			result, err := delivery.BuildAPTRepository(c.Context, c.String("out"), delivery.APTRequest{Distribution: c.String("distribution"),
-				Component: c.String("component"), Epoch: c.Int64("epoch"), ReleaseSetDigest: c.String("release-set-digest"),
-				InventoryDigest: c.String("inventory-digest"), Packages: packages})
+				Component: c.String("component"), Epoch: c.Int64("epoch"), Packages: packages})
 			if err != nil {
 				return err
 			}

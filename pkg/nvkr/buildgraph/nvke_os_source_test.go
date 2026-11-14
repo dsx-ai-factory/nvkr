@@ -173,10 +173,6 @@ func TestNVKEOSPublicSourcesLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = graph.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
 	ctx, cancel := context.WithTimeout(t.Context(), 70*time.Minute)
 	defer cancel()
 	t.Log("UNQUALIFIED SOURCE BUILD TEST: no OS-image, package-installation, TPM-attestation or release-acceptance claim")
