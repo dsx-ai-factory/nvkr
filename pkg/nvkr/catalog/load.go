@@ -129,6 +129,10 @@ func readRegistry(p DataProvider) (*registryDoc, error) {
 }
 
 func decodeRegistry(raw []byte, where string, providers ...DataProvider) (*registryDoc, error) {
+	raw, err := expandCommandFiles(raw, RegistryFile, providers)
+	if err != nil {
+		return nil, err
+	}
 	var reg registryDoc
 	// Strict decode: an unknown or misplaced field is a coded error, never silently
 	// dropped. Removed authoring fields and misspelled producer fields fail closed.

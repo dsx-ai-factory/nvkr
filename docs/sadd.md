@@ -52,6 +52,8 @@ The tool and its catalogs are separate products: the tool owns resolution and ve
 provide reusable component producers and pins, including tool releases and GitHub actions.
 Explicit digest-pinned fragments share authored declarations before resolution; each catalog retains its own
 complete lock. Snapshot capture includes those fragment bytes and replay remains confined to captured inputs.
+File-backed build/vendor argv operands expand to exact bytes during catalog loading and join that captured
+closure; their paths do not enter resolved command identities (ADR-22).
 [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies) owns how generated
 Runs bind action commits from the catalog lock. Definitions declare named deliverable outputs once.
 NVKR does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source
