@@ -25,13 +25,19 @@ func TestQuickstartSetupAndFailureHandling(t *testing.T) {
 		compilerUsed bool
 		sdk          string
 		wantMessage  string
+		gitKey       string
+		buildOnly    bool
 	}{
+		{name: "inherited hooks", stage: "git-config", gitKey: "core.hooksPath", status: 1, wantMessage: "unset GIT_CONFIG_COUNT"},
+		{name: "inherited credential helper", stage: "git-config", gitKey: "credential.helper", status: 1, wantMessage: "unset GIT_CONFIG_COUNT"},
+		{name: "local redirect", stage: "matching", gitKey: "url./tmp/source.insteadOf", compilerUsed: true},
 		{name: "docker unavailable", stage: "docker", status: 1},
 		{name: "old git", stage: "git", status: 1},
 		{name: "compiler failure", stage: "compiler", status: 66, compilerUsed: true},
 		{name: "nvkr failure", stage: "nvkr", status: 73, compilerUsed: true},
-		{name: "mismatched compiler needs consent", stage: "consent", status: 1, compilerUsed: true},
+		{name: "mismatched compiler needs consent", stage: "consent", status: 1, compilerUsed: true, wantMessage: "rerun with --install-go"},
 		{name: "checksum failure never activates SDK", stage: "checksum", args: []string{"--install-go"}, status: 74, download: true, compilerUsed: true},
+		{name: "build only", stage: "matching", args: []string{"--build-only"}, compilerUsed: true, buildOnly: true},
 		{name: "matching compiler", stage: "matching", compilerUsed: true},
 		{name: "install consent reuses matching compiler", stage: "matching", args: []string{"--install-go"}, compilerUsed: true},
 		{name: "cached SDK overrides mismatched system Go", stage: "cached", sdk: "cached", compilerUsed: true},
@@ -57,6 +63,7 @@ func TestQuickstartSetupAndFailureHandling(t *testing.T) {
 			}
 			for name, source := range map[string]string{
 				"scripts/nvkr-quickstart.sh": "nvkr-quickstart.sh",
+				"scripts/with-heartbeat.sh":  "with-heartbeat.sh",
 				".go-version":                "../.go-version",
 			} {
 				body, err := os.ReadFile(source)
@@ -65,6 +72,7 @@ func TestQuickstartSetupAndFailureHandling(t *testing.T) {
 				}
 				write(name, body, 0o700)
 			}
+			write("docs/examples/nvke-tutorial/definition-"+runtime.GOARCH+".yaml", []byte("outputs: synthetic\n"), 0o600)
 			version, err := os.ReadFile(filepath.Join(root, ".go-version"))
 			if err != nil {
 				t.Fatal(err)
@@ -128,6 +136,7 @@ cat > bin/nvkr <<'NVKR'
 #!/bin/sh
 if [ "$1" = --version ]; then echo synthetic-version; exit 0; fi
 if [ "$FAIL_STAGE" = nvkr ]; then exit 73; fi
+if [ "$2" = plan ]; then echo "Plan summary: synthetic"; exit 0; fi
 while [ "$#" -gt 0 ]; do
   if [ "$1" = --attempt ]; then shift; attempt="$1"; fi
   shift
@@ -162,7 +171,10 @@ printf 'synthetic-version\n'
 				"GO_LOG="+filepath.Join(root, "go.log"), "DOCKER_LOG="+filepath.Join(root, "docker.log"),
 				"SDK_FIXTURE="+filepath.Join(root, "download-fixture"),
 				"SDK_ARCHIVE=go"+strings.TrimSpace(string(version))+"."+runtime.GOOS+"-"+runtime.GOARCH+".tar.gz",
-				"GOTOOLCHAIN=auto")
+				"GOTOOLCHAIN=auto", "GO_BIN=", "GIT_CONFIG_COUNT=0")
+			if tc.gitKey != "" {
+				cmd.Env = append(cmd.Env, "GIT_CONFIG_COUNT=1", "GIT_CONFIG_KEY_0="+tc.gitKey, "GIT_CONFIG_VALUE_0=https://example.invalid/source")
+			}
 			out, err := cmd.CombinedOutput()
 			status := 0
 			if err != nil {
@@ -175,8 +187,15 @@ printf 'synthetic-version\n'
 			if status != tc.status {
 				t.Fatalf("exit %d, want %d: %v\n%s", status, tc.status, err, out)
 			}
-			if strings.Contains(string(out), "Build complete.") != (tc.status == 0) {
+			if strings.Contains(string(out), "Build complete.") != (tc.status == 0 && !tc.buildOnly) {
 				t.Fatalf("incorrect completion message:\n%s", out)
+			}
+			if tc.status == 0 && !tc.buildOnly {
+				for _, want := range []string{"Definition:", "Plan summary:", "run inspect --record", "--output nvke-controller-chart", "catalog show --data inputs/catalogs/nvke/release nvkectl"} {
+					if !strings.Contains(string(out), want) {
+						t.Fatalf("missing teaching output %q: %s", want, out)
+					}
+				}
 			}
 			if tc.wantMessage != "" && !strings.Contains(string(out), tc.wantMessage) {
 				t.Fatalf("missing diagnostic %q:\n%s", tc.wantMessage, out)
@@ -185,7 +204,7 @@ printf 'synthetic-version\n'
 				t.Fatalf("mismatched compiler bypassed consent:\n%s", out)
 			}
 			dockerLog, err := os.ReadFile(filepath.Join(root, "docker.log"))
-			if err != nil && tc.stage != "git" {
+			if err != nil && tc.stage != "git" && tc.stage != "git-config" {
 				t.Fatal(err)
 			}
 			if strings.Contains(string(dockerLog), "run ") != tc.download {

@@ -64,7 +64,7 @@ var mergeGatePairs = []struct {
 	forkExempt      bool
 	pullRequestOnly bool
 }{
-	{"check-skip", "code", []string{"check", "lint", "vulnerabilities", "tests"}, false, false},
+	{"check-skip", "code", []string{"check", "lint", "vulnerabilities", "tests", "hello"}, false, false},
 	{"actionlint-skip", "actions", []string{"actionlint"}, false, false},
 	{"workflows-regen-skip", "pipeline", []string{"workflows-regen"}, true, false},
 	{"notices-regen-skip", "notices", []string{"notices-regen"}, false, false},

@@ -22,7 +22,11 @@ func TestPreparedFilesDryRunPreservesFrozenRequirements(t *testing.T) {
 	t.Chdir(repo)
 	for _, suffix := range []string{"", "-amd64", "-arm64"} {
 		t.Run("tutorial"+suffix, func(t *testing.T) {
-			prepared, err := PrepareFiles(t.Context(), "docs/examples/nvke-tutorial/definition"+suffix+".yaml", "docs/examples/nvke-tutorial/environment-local"+suffix+".yaml", "test", "attempt")
+			directory := "docs/examples/nvke-tutorial/"
+			if suffix == "" {
+				directory = "docs/examples/nvke-module-tags/"
+			}
+			prepared, err := PrepareFiles(t.Context(), directory+"definition"+suffix+".yaml", directory+"environment-local"+suffix+".yaml", "test", "attempt")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -61,9 +65,9 @@ func TestPrepareFilesRejectsInputsWithoutIssuingCapability(t *testing.T) {
 	}
 	t.Chdir(repo)
 	for _, tc := range []struct{ name, definition, environment, attempt string }{
-		{"missing definition", "missing.yaml", "docs/examples/nvke-tutorial/environment-local.yaml", "attempt"},
-		{"missing environment", "docs/examples/nvke-tutorial/definition.yaml", "missing.yaml", "attempt"},
-		{"invalid attempt", "docs/examples/nvke-tutorial/definition.yaml", "docs/examples/nvke-tutorial/environment-local.yaml", "../escape"},
+		{"missing definition", "missing.yaml", "docs/examples/nvke-module-tags/environment-local.yaml", "attempt"},
+		{"missing environment", "docs/examples/nvke-module-tags/definition.yaml", "missing.yaml", "attempt"},
+		{"invalid attempt", "docs/examples/nvke-module-tags/definition.yaml", "docs/examples/nvke-module-tags/environment-local.yaml", "../escape"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			prepared, err := PrepareFiles(t.Context(), tc.definition, tc.environment, "test", tc.attempt)

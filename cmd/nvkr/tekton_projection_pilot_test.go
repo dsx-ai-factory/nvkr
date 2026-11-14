@@ -29,7 +29,7 @@ import (
 
 func tektonCLIEnvironment(t *testing.T, root string) string {
 	t.Helper()
-	env, err := definition.LoadEnvironment(t.Context(), "docs/examples/nvke-tutorial/environment-github.yaml")
+	env, err := definition.LoadEnvironment(t.Context(), "docs/examples/nvke-module-tags/environment-github.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -72,13 +72,13 @@ func TestTektonCLIProjectionPilotAndGeneratedCommands(t *testing.T) {
 	t.Setenv("NVKR_WORK_DEADLINE", "")
 	root := t.TempDir()
 	environment := tektonCLIEnvironment(t, root)
-	for _, directory := range []string{"docs/examples/nvke-tutorial", "inputs/catalogs/nvke/module-tags", "inputs/catalogs/shared"} {
+	for _, directory := range []string{"docs/examples/nvke-module-tags", "inputs/catalogs/nvke/module-tags", "inputs/catalogs/shared"} {
 		if err := os.CopyFS(filepath.Join(root, directory), os.DirFS(directory)); err != nil {
 			t.Fatal(err)
 		}
 	}
 	t.Chdir(root)
-	generate := []string{"run", "generate", "--engine", "tekton", "--definition", "docs/examples/nvke-tutorial/definition.yaml", "--environment", environment}
+	generate := []string{"run", "generate", "--engine", "tekton", "--definition", "docs/examples/nvke-module-tags/definition.yaml", "--environment", environment}
 	baseline := t.TempDir()
 	if _, err := invokeLifecycleCLI(t, append(generate, "--root", baseline)...); err != nil {
 		t.Fatal(err)

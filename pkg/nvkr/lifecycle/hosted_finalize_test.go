@@ -84,12 +84,12 @@ func TestFinalizeGeneratedRecordsFailedAttemptWhenPlannedEvidenceIsMissing(t *te
 	_ = os.RemoveAll(caseRoot)
 	defer func() { _ = os.RemoveAll(caseRoot) }()
 	ctx := context.Background()
-	definitionPath := "docs/examples/nvke-tutorial/definition.yaml"
+	definitionPath := "docs/examples/nvke-module-tags/definition.yaml"
 	definition, err := LoadDefinition(ctx, definitionPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	environment, err := LoadEnvironment(ctx, "docs/examples/nvke-tutorial/environment-github.yaml")
+	environment, err := LoadEnvironment(ctx, "docs/examples/nvke-module-tags/environment-github.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

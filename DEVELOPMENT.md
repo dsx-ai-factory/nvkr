@@ -250,7 +250,7 @@ The cleanup report records candidates and API-confirmed deletions, including par
 failure. Its CI artifact retains seven days. A timed-out deletion has an unknown outcome and is not retried
 within the command. Inspect the next preview before retrying.
 
-The three-output unsigned Environment in `docs/examples/nvke-tutorial/environment-github-dev.yaml` remains a
+The three-output unsigned Environment in `docs/examples/nvke-module-tags/environment-github-dev.yaml` remains a
 smaller scratch-generation example. It uses one-day transfers, automatic cancellation and no publication.
 It does not supply the committed full-development bundle. Hosted execution, credential/pool setup and
 actual registry deletion still need a recorded external Run; local contract tests establish none of those.

@@ -1,18 +1,19 @@
-# Build your first artifact
+# Hello: build your first artifact
 
 This demo turns a tiny greeting script into a versioned executable through a real NVKR Run.
 It takes one source, one catalog component, and one requested output. Docker performs the build;
 NVKR pins the inputs, plans the work, checks the produced bytes, and records the result.
 
-From the repository root, with Docker running and the Go version in [`.go-version`](../../.go-version)
-on your `PATH`:
+Start here before the [NVKE quickstart](../../docs/quickstart.md).
+From the repository root, with Git and Docker running:
 
 ```sh
-make build
 bash demos/demo-local.sh --pause
 ```
 
-Git and Python 3 are also required. Omit `--pause` to run straight through. The first invocation
+The launcher builds NVKR, reuses its local Go SDK, or asks to install the pinned
+compiler. Pass `--install-go` to consent without a terminal. Make and Python are
+not required. Omit `--pause` to run straight through. The first invocation
 may download the small digest-pinned Alpine image and Go dependencies. Rehearse once before presenting.
 `NVKR_BIN` and `GO_BIN` can select already installed executables.
 
@@ -23,7 +24,10 @@ The script prints four short steps and keeps complete logs. Expect:
 2 / 4  Choose the output and see the plan
 3 / 4  Run it
 4 / 4  Check the result and use it
-  Run: complete | output: hello | lane: unqualified-local-execution
+lane: unqualified-local-execution
+status: complete
+...
+output: "hello" (executable): observed
   Artifact bytes match the recorded SBOM subject.
 Hello, team! This is hello v1.0.0, built by NVKR.
 ```
@@ -41,7 +45,8 @@ The script creates a small local Git repository with two tags, then runs `catalo
 `catalog/pins.lock.yaml`. Its `demo.example.invalid` source URL is redirected to that local repository
 for this process only. No GitHub account, registry credentials, or NVKE checkout is needed.
 
-The target is `linux/amd64`; Docker Desktop on Apple Silicon uses its Linux emulation support.
+The script selects `linux/amd64` or `linux/arm64` to match the host.
+Docker must supply that native platform; emulation is not used.
 The resulting application is a portable shell script, so the demo also runs it directly on the host.
 
 ## See what changed

@@ -16,6 +16,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
 	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
@@ -52,6 +53,7 @@ type LocalRunOptions struct {
 	Go            string
 	Publish       bool
 	DryRun        bool
+	Verbose       bool // Include exact node IDs in human-readable output.
 	Stdout        io.Writer
 	Stderr        io.Writer
 	Activity      *buildactivity.Sink // Optional descriptive log metadata only.
@@ -380,7 +382,16 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 			return nil, err
 		}
 	}
-	runners, err := deps.prepareRunner(ctx, plan, options, platforms)
+	runners, err := func() (map[string]string, error) {
+		label := "prepare execution helper"
+		if requiresLocalRunnerCompilation(platforms) {
+			label = "compile execution helper"
+		}
+		fmt.Fprintf(options.Stdout, "[start] %s\n", label)
+		stopCompile := startLocalHeartbeat(ctx, options.Stdout, label, 10*time.Second)
+		defer stopCompile()
+		return deps.prepareRunner(ctx, plan, options, platforms)
+	}()
 	if err != nil {
 		return nil, err
 	}
@@ -534,6 +545,7 @@ func runLocalNode(ctx context.Context, plan *Plan, node Node, options LocalRunOp
 	owner *LocalRunResult, deps localRunDeps,
 ) (result LocalNodeResult, returnErr error) {
 	result = LocalNodeResult{ID: node.ID, Kind: node.Kind}
+	label := localNodeLabel(plan, node, options.Verbose)
 	defer func() {
 		state, code := "completed", ""
 		if returnErr != nil {
@@ -569,7 +581,7 @@ func runLocalNode(ctx context.Context, plan *Plan, node Node, options LocalRunOp
 	}
 	if cached {
 		result.Status = "cached"
-		fmt.Fprintf(options.Stdout, "[cached] %s\n", node.ID)
+		fmt.Fprintf(options.Stdout, "[cached] %s\n", label)
 		return result, nil
 	}
 	// Producer operations own safe replacement and reusable source receipts.
@@ -578,8 +590,10 @@ func runLocalNode(ctx context.Context, plan *Plan, node Node, options LocalRunOp
 			return result, err
 		}
 	}
-	fmt.Fprintf(options.Stdout, "[start] %s (%s)\n", node.ID, node.Kind)
+	fmt.Fprintf(options.Stdout, "[start] %s\n", label)
 	options.Progress.SetOperation(node.ID, "running", "")
+	stopHeartbeat := startLocalHeartbeat(ctx, options.Stdout, label, 10*time.Second)
+	defer stopHeartbeat()
 	if directPacker {
 		err = populateDiskProducerCompletion(ctx, plan, node.ID, owner, deps.executeDisk)
 	} else if node.Kind == NodeVerify {
@@ -612,7 +626,8 @@ func runLocalNode(ctx context.Context, plan *Plan, node Node, options LocalRunOp
 		return result, e.Wrap(code, err, "factory node %s", node.ID)
 	}
 	result.Status = "ok"
-	fmt.Fprintf(options.Stdout, "[done] %s\n", node.ID)
+	stopHeartbeat()
+	fmt.Fprintf(options.Stdout, "[done] %s\n", label)
 	return result, nil
 }
 

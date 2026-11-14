@@ -26,7 +26,7 @@ func TestLocalCommandCapturedPreparation(t *testing.T) {
 			execute := func(_ context.Context, prepared *lifecycle.PreparedRun, _ lifecycle.LocalOptions) (*lifecycle.Run, error) {
 				called = true
 				want, err := lifecycle.PrepareCapturedFiles(t.Context(), tc.root,
-					"docs/examples/nvke-tutorial/definition.yaml", "docs/examples/nvke-tutorial/environment-local.yaml",
+					"docs/examples/nvke-module-tags/definition.yaml", "docs/examples/nvke-module-tags/environment-local.yaml",
 					factoryGeneratorVersion(), "presenter-test")
 				if err != nil || prepared.Description().PlanDigest != want.Description().PlanDigest {
 					t.Fatalf("CLI did not delegate captured preparation: %v", err)

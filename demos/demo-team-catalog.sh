@@ -76,8 +76,8 @@ if [ "$NON_INTERACTIVE" -eq 0 ] && [ ! -t 0 ]; then die 'use --non-interactive w
 if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-team-catalog.XXXXXX"); fi
 cd "$ROOT"
 printf 'cd %q\n' "$ROOT" >"$OUT/commands.txt"
-DEFINITION=docs/examples/nvke-tutorial/definition.yaml
-ENVIRONMENT=docs/examples/nvke-tutorial/environment-github.yaml
+DEFINITION=docs/examples/nvke-module-tags/definition.yaml
+ENVIRONMENT=docs/examples/nvke-module-tags/environment-github.yaml
 CATALOG=inputs/catalogs/nvke/module-tags
 if [ "$DEPLOY" -eq 1 ]; then
   DEFINITION=docs/examples/nvke-deploy/definition.yaml

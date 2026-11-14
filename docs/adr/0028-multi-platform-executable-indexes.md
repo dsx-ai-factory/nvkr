@@ -289,7 +289,7 @@ Every executable delivery in the maintained catalogs and Definitions, its curren
 | NVSentinel binaries | 19 from-source components for both platforms; 19 outputs each in `nvsentinel/binaries-amd64.yaml` and `binaries-arm64.yaml` | One Definition with 19 `platforms` outputs; retire the per-architecture Definitions after consumers move |
 | Kubernetes conformance tools | Hydrophone (Darwin, AMD64, ARM64) and kubectl (`kubectl`, `kubectl-1.34`; Darwin, ARM64) from source; outputs `hydrophone-arm64`, `kubectl-arm64` and Darwin variants | ARM64-only Linux use today; add `platforms` when AMD64 conformance needs it. Darwin outputs stay single-platform |
 | NICo simulator | From source in `nicosim` (ARM64) and `tools/native`; outputs `nicosim-tools-<arch>` | Demo use; as for native demo tools |
-| Examples and quickstart | `docs/examples/authoring-lab`, `docs/examples/nvke-tutorial` (per-architecture Definitions), `docs/examples/nvke-deploy`, `demos/quickstart` | Show the index form once implemented, and keep one single-platform example |
+| Examples and quickstart | `docs/examples/authoring-lab`, `docs/examples/nvke-tutorial` (per-architecture Definitions), `docs/examples/nvke-deploy`, `demos/hello` | Show the index form once implemented, and keep one single-platform example |
 
 Not in scope: toolchain images and helper pins under `toolchains/` (the execution helper, Packer, disk
 inspection and NVSentinel Debian toolchains, the quickstart Go SDK checksums and the govulncheck module) are

@@ -80,11 +80,11 @@ func TestLifecycleOutputsCompileOnlySelectedProducers(t *testing.T) {
 }
 
 func TestDefinitionAndEnvironmentHaveIndependentIdentity(t *testing.T) {
-	definitionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "docs/examples/nvke-tutorial/definition.yaml"))
+	definitionPath, err := filepath.Abs(filepath.Join("..", "..", "..", "docs/examples/nvke-module-tags/definition.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	environmentPath, err := filepath.Abs(filepath.Join("..", "..", "..", "docs/examples/nvke-tutorial/environment-local.yaml"))
+	environmentPath, err := filepath.Abs(filepath.Join("..", "..", "..", "docs/examples/nvke-module-tags/environment-local.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}

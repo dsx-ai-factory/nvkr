@@ -28,6 +28,7 @@ type LocalOptions struct {
 	Go           string
 	Publish      bool
 	DryRun       bool
+	Verbose      bool
 	Stdout       io.Writer
 	Stderr       io.Writer
 	// Activity is optional descriptive telemetry, never an execution receipt.
@@ -127,7 +128,7 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	factoryOptions := factory.LocalRunOptions{Workspace: workspace, RunnerSource: options.RunnerSource,
 		CompileInputs: prepared.inputs,
 		Jobs:          options.Jobs, Runtime: options.Runtime, Go: options.Go, Publish: options.Publish,
-		DryRun: options.DryRun, Stdout: options.Stdout, Stderr: options.Stderr, Activity: options.Activity, Progress: options.Progress}
+		DryRun: options.DryRun, Verbose: options.Verbose, Stdout: options.Stdout, Stderr: options.Stderr, Activity: options.Activity, Progress: options.Progress}
 	// Workspace-independent admission always precedes immutable attempt
 	// reservation. RunLocal owns only the later held-workspace, capacity, and
 	// KVM admission for disk plans.

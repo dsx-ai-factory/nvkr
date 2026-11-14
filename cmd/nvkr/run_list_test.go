@@ -23,7 +23,7 @@ import (
 // observation for every required output, or failed with a build failure.
 func recordedAttempt(t *testing.T, root, attempt, status string) {
 	t.Helper()
-	prepared, err := lifecycle.PrepareFiles(t.Context(), "docs/examples/nvke-tutorial/definition.yaml", "docs/examples/nvke-tutorial/environment-local.yaml", "test", attempt)
+	prepared, err := lifecycle.PrepareFiles(t.Context(), "docs/examples/nvke-module-tags/definition.yaml", "docs/examples/nvke-module-tags/environment-local.yaml", "test", attempt)
 	if err != nil {
 		t.Fatal(err)
 	}

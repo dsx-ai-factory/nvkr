@@ -238,7 +238,7 @@ Typed names, identity fields, counts and navigation links are descriptions; they
 exclude transport locations, private paths and raw error/value text. Closing a
 result view neither repeats nor reverses the operation, and owning status codes
 remain authoritative; Ctrl+C closes a read-only viewer and cancels only live work.
-Existing non-interactive and explicitly plain output bytes, including exact Plan
+Machine-readable output bytes, including exact Plan
 JSON, are preserved. Interactive `run local` defaults to the dashboard and does
 not replay successful producer output. Nonempty `CI` keeps auto plain; explicit
 terminal mode remains available. Hidden CI/execution helpers retain their existing interface.
