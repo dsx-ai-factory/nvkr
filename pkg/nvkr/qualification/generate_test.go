@@ -195,7 +195,7 @@ func TestQualificationGenerationOutcomeUpload(t *testing.T) {
 				}
 				return
 			}
-			if !reflect.DeepEqual(qualify.Outputs, map[string]string{"outcome-written": "${{ steps.outcome.outputs.written }}"}) {
+			if !reflect.DeepEqual(qualify.Outputs, map[string]string{"outcome-written": "${{ steps.outcome.outputs.written }}", "qualify-attempt": "${{ steps.outcome.outputs.attempt }}"}) {
 				t.Fatalf("qualify job outputs are %v", qualify.Outputs)
 			}
 			owner := -1
@@ -213,7 +213,8 @@ func TestQualificationGenerationOutcomeUpload(t *testing.T) {
 			}
 			presence, upload := qualify.Steps[owner+1], qualify.Steps[owner+2]
 			if presence.ID != "outcome" || presence.If != "${{ !cancelled() }}" || presence.Uses != "" || presence.Timeout != 1 || len(presence.Env) != 0 || //nolint:misspell // GitHub status function uses this exact spelling.
-				!strings.Contains(presence.Run, `if [ -f "`+file+`" ]; then written=true; fi`) || !strings.Contains(presence.Run, `printf 'written=%s\n' "$written" >> "$GITHUB_OUTPUT"`) {
+				!strings.Contains(presence.Run, `if [ -f "`+file+`" ]; then written=true; fi`) || !strings.Contains(presence.Run, `printf 'written=%s\n' "$written" >> "$GITHUB_OUTPUT"`) ||
+				!strings.Contains(presence.Run, `printf 'attempt=%s\n' "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"`) {
 				t.Fatalf("presence step is %#v", presence)
 			}
 			actions, err := pipeline.ResolveGitHubActions(plan.Actions)
@@ -235,6 +236,8 @@ func TestQualificationGenerationOutcomeUpload(t *testing.T) {
 
 func TestQualificationGenerationWorkflowContract(t *testing.T) {
 	plan, policy := generationFixture(t)
+	// The publish job has its own contract (publish_job_test.go).
+	withoutQualificationResults(t, plan)
 	bundle, err := RenderWorkflows(t.Context(), plan, policy, "qualification.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -560,6 +563,8 @@ func generationOperatorToolsFixture(t *testing.T, publicationMode string) (*fact
 	environment.Publication.Mode = publicationMode
 	// This selected fixture only acquires prebuilt tools, so no source fetch credential is applicable.
 	environment.SourceAccess = nil
+	// Compiled without a Definition path, so it has no results coordinates to publish under.
+	environment.QualificationResults = nil
 	plan, err := factory.Compile(t.Context(), inputs, environment, stack, maintained.GeneratorVersion)
 	if err != nil {
 		t.Fatal(err)

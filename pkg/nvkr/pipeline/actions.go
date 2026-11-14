@@ -39,3 +39,20 @@ func ResolveGitHubActions(pins map[string]catalog.ActionPin) (GitHubActionRefs, 
 	}
 	return refs, nil
 }
+
+// ResolveGitHubAuthAction admits the cloud authentication action that only the
+// generated qualification publish job uses (ADR-31 §7). Like the actions above,
+// only its repository and major version live in code.
+func ResolveGitHubAuthAction(pins map[string]catalog.ActionPin) (string, error) {
+	pin, ok := pins["google-auth"]
+	if !ok {
+		return "", e.New(e.CodeUnpinnedSource, "catalog is missing GitHub action %q", "google-auth")
+	}
+	if err := pin.Validate(); err != nil {
+		return "", err
+	}
+	if pin.Repo != "google-github-actions/auth" || !strings.HasPrefix(pin.Version, "v3.") {
+		return "", e.New(e.CodeEngineCapability, "GitHub adapter requires google-github-actions/auth major 3; got %s %s", pin.Repo, pin.Version)
+	}
+	return pin.Uses(), nil
+}

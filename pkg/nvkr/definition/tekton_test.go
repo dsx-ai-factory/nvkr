@@ -65,6 +65,7 @@ func TestTektonEnvironmentAdmission(t *testing.T) {
 		{"explicit cluster policy", func(*Environment) {}, ""},
 		{"GitHub placement", func(e *Environment) { e.RunsOn = "ubuntu-latest" }, e.CodeEngineCapability},
 		{"GitHub runtime", func(e *Environment) { e.GitHubRuntimePlan = true }, e.CodeEngineCapability},
+		{"GitHub results target", func(e *Environment) { e.QualificationResults = validQualificationResults() }, e.CodeEngineCapability},
 		{"platform mismatch", func(e *Environment) { e.Tekton.Platform = "linux/arm64" }, e.CodeEngineCapability},
 		{"no platform", func(e *Environment) { e.Tekton.Platform = "" }, e.CodeEngineCapability},
 		{"unbounded storage", func(e *Environment) { e.Tekton.WorkspaceGiB = 0 }, e.CodeEngineCapability},

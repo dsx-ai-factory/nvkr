@@ -179,7 +179,7 @@ imports:
     setup-go: setup-go
     upload-artifact: upload-artifact
   path: "../../shared/build-actions.yaml"
-  sha256: 89919dde5a129554223e63b23d9ac4f610e9c9a0e369fe8ab188b3f13575723b
+  sha256: 9b03582303c0ee5f475c61f8e8fd2c755e1c1e70bba3434160bc412b832fbd51
 - sources:
     nvke-cli: nvke-cli
   components:

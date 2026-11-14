@@ -7,7 +7,7 @@ for each consumer and `make workflows-check` after changing a shared declaration
 
 | Owner | Declarations | Consumers |
 |---|---|---|
-| [build-actions](build-actions.yaml) | `checkout`, `download-artifact`, `setup-go`, `upload-artifact` | `nvke/module-tags`, `nvke/release` |
+| [build-actions](build-actions.yaml) | `checkout`, `download-artifact`, `google-auth`, `setup-go`, `upload-artifact` | `nvke/module-tags`, `nvke/release` |
 | [capnico](capnico.yaml) | `capnico` | `capnico/local`, `nvke/release-components` |
 | [controller-profiles](controller-profiles.yaml) | `nvke-profiles` | `controller-profiles/native-nvidia`, `controller-profiles/nvidia-arm64`, `controller-profiles/upstream-arm64` |
 | [installer-tools](installer-tools.yaml) | `clusterctl`, `helm-linux` (source and component), `kind`, `kubectl`, `oras` | `tools/installer-hosted-arm64`, `tools/installer-local-arm64`, `tools/native`, `tools/operator-arm64` |
@@ -32,7 +32,7 @@ For example, a registry two directories below `catalogs/` can select the shared 
 ```yaml
 imports:
   - path: ../../shared/build-actions.yaml
-    sha256: 89919dde5a129554223e63b23d9ac4f610e9c9a0e369fe8ab188b3f13575723b
+    sha256: 9b03582303c0ee5f475c61f8e8fd2c755e1c1e70bba3434160bc412b832fbd51
     sources:
       checkout: checkout
 ```

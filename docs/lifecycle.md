@@ -661,8 +661,9 @@ failed setup step or an empty source credential), that the command refuses befor
 command times out before writing it (a caller's work deadline, or the runner stopping the step at its
 timeout), or whose record cannot be written; `outcome-written` is then `false`. A canceled job writes none
 either, and its `outcome-written` is empty because the presence step does not run. An outcome is a
-description: it grants no qualification, manifest or release authority. The `nvkr-results-publish` helper
-publishes outcomes to the results index of proposed ADR-31, but no generated job runs it yet.
+description: it grants no qualification, manifest or release authority. When the Environment declares
+`qualificationResults`, the qualify job also reports its attempt as `qualify-attempt`, and a generated publish
+job runs the `nvkr-results-publish` helper to publish the Run's outcomes to the results index of proposed ADR-31.
 
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub

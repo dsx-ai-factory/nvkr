@@ -1,9 +1,9 @@
 # ADR-31 — Qualification results index
 
 - **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
-- **Implementation maturity:** The qualification outcome (ADR-17 §4), the selection of what a Run publishes and
-  the publisher below are implemented and contract-tested. The generated publish job and its Environment
-  declaration are not implemented, so nothing publishes yet; see `reconciliation/README.md`.
+- **Implementation maturity:** The qualification outcome (ADR-17 §4), the selection of what a Run publishes,
+  the publisher below, the generated publish job and its Environment declaration are implemented and
+  contract-tested. No hosted Run has run the job yet; see `reconciliation/README.md`.
 - **Acceptance-test maturity:** Contract tests only, against in-memory and local-directory stores, a scripted
   object-store client, and the SDK against a local fake of the object store and its token exchange. No hosted
   Run has published an outcome, and no TestGrid view has read one.
@@ -51,7 +51,7 @@ Run that failed, timed out or failed to start publishes one errored outcome, bui
 marked as unauthenticated.
 
 The publish job passes on the qualify job's result and its report: the run attempt it last ran in and whether
-that attempt wrote an outcome. Re-running only failed jobs keeps a successful qualify job's result and report,
+that attempt wrote an outcome. Re-running jobs other than the qualify job keeps its result and report,
 so the attempt says which outcome they are about. When a failed attempt wrote nothing, the publisher builds one
 errored outcome for it, whose error says the job wrote no outcome. The outcome of a passed attempt, or of one
 that reports writing it, is a record: when it cannot be found it was lost, and publishing fails instead. A
@@ -118,8 +118,16 @@ directory with the same report. `publish` repeats `select`'s admission and plan,
 outcome is missing, so a re-run publishes the same record instead of building another. A publish failure never
 changes the qualification verdict.
 
-The target is declared in the Environment, outside `publication` (ADR-20). This job is not implemented; its
-trigger allowlist and whether its failure turns the Run red are decided with it.
+The target is declared in the Environment, outside `publication` (ADR-20), as `qualificationResults`: the
+GitHub Environment the job runs in and the names of its secrets for the bucket, the identity provider and the
+service account. That Environment is never a qualify job's, which holds the registry credential. The job is
+defined in the release qualify workflow itself, not in a workflow it calls, because the store identity trusts
+only jobs defined there.
+
+The job runs for a producer Run on the default branch of this repository, from that producer workflow,
+triggered by `push` or `workflow_dispatch`, that succeeded, failed, failed to start or timed out: the same
+events and conclusions `select` admits. It does not wait for the qualify job to succeed. Its failure never
+fails the Run: the job continues on error, and the verdict stays the qualify job's.
 
 ## Onboarding
 
@@ -129,16 +137,16 @@ report a problem with the index, open an issue in this repository.
 
 ## Known gaps
 
-- A build without `finished.json` shows as running for 24 hours, then freezes as failed. Re-running the failed
-  jobs within 24 hours completes a partial publish.
+- A build without `finished.json` shows as running for 24 hours, then freezes as failed. Re-running the publish
+  job within 24 hours completes a partial publish.
 - A build published after TestGrid has read a newer one can stay hidden.
 - A Definition with no qualification for longer than the dashboard's tab age drops off the dashboard until its
   next Run; its records remain under `results/`.
 - If a built outcome's artifact is gone when a later attempt publishes, it is built again and differs: a rebuilt
   qualify record finishes at a new time and conflicts with any of its objects already written, so that publish
   fails, while a rebuilt producer record names the new attempt and is published as a second build.
-- Re-running only the failed jobs cannot recover a lost qualify outcome, because a successful qualify job is not
-  re-run; publishing fails until the qualify job itself runs again.
+- Re-running the publish job cannot recover a lost qualify outcome; publishing fails until the qualify job
+  itself runs again.
 - An outcome is built only for the qualify job's latest attempt. An earlier failed attempt that wrote nothing,
   and whose built outcome never reached an artifact, is not indexed.
 - The object-store SDK reopens a read whose response body breaks off, without backoff, inside one store attempt;
@@ -153,7 +161,8 @@ report a problem with the index, open an issue in this repository.
   notices cover the helper.
 - The bucket layout and the TestGrid header keys are a public contract: renaming a group, a Definition or its
   input directory moves its index.
-- Re-running failed jobs is the recovery for every transient publish failure.
+- Re-running the publish job alone is the recovery for every transient publish failure. Its failure leaves the
+  Run successful, and re-running failed jobs after a failed smoke or qualify job would qualify again.
 
 ## Alternatives considered
 
@@ -170,6 +179,5 @@ report a problem with the index, open an issue in this repository.
 
 ## Follow-ups
 
-- The generated publish job, its Environment declaration and the catalog admission of its auth action (#279).
 - A monitor for publishes that never run.
 - A cross-Definition qualification matrix.

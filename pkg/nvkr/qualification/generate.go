@@ -260,7 +260,19 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 		fmt.Fprint(out, qualificationGeneratedHeader)
 		fmt.Fprintf(out, "# policyDigest: %s\n", policyDigest)
 	}
-	condition := ""
+	publishing := publishesQualificationResults(plan, policy)
+	auth := ""
+	if publishing {
+		if auth, err = pipeline.ResolveGitHubAuthAction(plan.Actions); err != nil {
+			return nil, err
+		}
+		if _, _, err := resultsCoordinates(plan); err != nil {
+			return nil, err
+		}
+	}
+	// safety admits the trusted producer Run whatever its conclusion; the smoke and
+	// qualify jobs also require it to have succeeded, and publishing does not.
+	condition, safety := "", ""
 	if policy.Source.Development {
 		fmt.Fprintf(&top, "name: %s\n'on':\n  workflow_dispatch:\n    inputs:\n      source_run_url:\n        description: Exact successful development Run URL including /attempts/N\n        required: true\n        type: string\n", qualificationYAML("nvkr-dev-qualify-"+plan.Name))
 		fmt.Fprint(&top, "permissions:\n  contents: read\nconcurrency:\n  group: nvkr-development-qualification-${{ github.run_id }}\n  cancel-in-progress: false\njobs:\n  native-smoke:\n    name: native-smoke\n")
@@ -268,7 +280,10 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	} else {
 		fmt.Fprintf(&top, "name: %s\n'on':\n  workflow_run:\n    workflows: [%s]\n    types: [completed]\n    branches: [%s]\n", qualificationYAML("nvkr-qualify-"+plan.Name), qualificationYAML(producerName), qualificationYAML(policy.Source.DefaultBranch))
 		fmt.Fprint(&top, "permissions:\n  contents: read\nconcurrency:\n  group: nvkr-qualification-${{ github.workflow }}-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}\n  cancel-in-progress: false\njobs:\n  native-smoke:\n    name: native-smoke\n")
-		condition = "github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.repository == " + qualificationExpression(policy.Source.Repository) + " && github.event.workflow_run.head_branch == " + qualificationExpression(policy.Source.DefaultBranch) + " && github.event.workflow_run.repository.full_name == github.repository && github.event.workflow_run.head_repository.full_name == github.repository"
+		const eventGuard = "github.event_name == 'workflow_run'"
+		trusted := "github.repository == " + qualificationExpression(policy.Source.Repository) + " && github.event.workflow_run.head_branch == " + qualificationExpression(policy.Source.DefaultBranch) + " && github.event.workflow_run.repository.full_name == github.repository && github.event.workflow_run.head_repository.full_name == github.repository"
+		condition = eventGuard + " && github.event.workflow_run.conclusion == 'success' && " + trusted
+		safety = eventGuard + " && " + trusted
 
 	}
 	fmt.Fprintf(&top, "    if: ${{ %s }}\n    uses: ./%s\n", condition, policy.Smoke.Workflow)
@@ -284,6 +299,9 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	} else {
 		fmt.Fprint(&top, "    environment: nvkr-release\n")
 		fmt.Fprintf(&top, "    outputs:\n      %s: ${{ steps.outcome.outputs.written }}\n", qualificationOutcomeWrittenOutput)
+		if publishing {
+			fmt.Fprintf(&top, "      %s: ${{ steps.outcome.outputs.attempt }}\n", qualificationAttemptOutput)
+		}
 	}
 	fmt.Fprint(&top, "    steps:\n")
 	qualificationBootstrap(&top, plan, actions, linker, policy, "amd64")
@@ -304,7 +322,12 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 	}
 	fmt.Fprintf(&top, "        run: |\n          set -euo pipefail\n%s          exec ./nvkr-exec run qualify --policy %s%s\n", sourceAuth.requireTokens(), qualificationShell(policyPath), manifestFlag)
 	if !policy.Source.Development {
-		qualificationOutcomeUpload(&top, plan, actions)
+		qualificationOutcomeUpload(&top, plan, actions, publishing)
+	}
+	if publishing {
+		if err := qualificationPublishJob(&top, plan, policy, actions, auth, safety); err != nil {
+			return nil, err
+		}
 	}
 	fmt.Fprintf(&worker, "name: %s\n'on':\n  workflow_call:\n", qualificationYAML("nvkr-smoke-"+plan.Name))
 	sourceAuth.writeCallContract(&worker)
@@ -361,9 +384,14 @@ func RenderWorkflows(ctx context.Context, plan *factory.Plan, policy lifecycle.Q
 // interrupted write's temporary file, can reach the artifact. The outcome grants
 // no authority, so the upload is best effort: its failure never fails a job whose
 // qualification passed. It follows the Plan's qualification-handoff retention (ADR-18 §8).
-func qualificationOutcomeUpload(out *bytes.Buffer, plan *factory.Plan, actions pipeline.GitHubActionRefs) {
+func qualificationOutcomeUpload(out *bytes.Buffer, plan *factory.Plan, actions pipeline.GitHubActionRefs, reportAttempt bool) {
 	const notCanceled = "${{ !cancelled() }}" //nolint:misspell // GitHub status function uses this exact spelling.
 	fmt.Fprintf(out, "      - name: Record whether the qualification outcome was written\n        id: outcome\n        if: %s\n        timeout-minutes: 1\n        run: |\n          set -euo pipefail\n          written=false\n          if [ -f \"%s\" ]; then written=true; fi\n          printf 'written=%%s\\n' \"$written\" >> \"$GITHUB_OUTPUT\"\n", notCanceled, qualificationOutcomeFile)
+	if reportAttempt {
+		// The publish job reads the attempt with written, so a re-run that keeps
+		// this job's report still says which attempt it describes.
+		out.WriteString("          printf 'attempt=%s\\n' \"$GITHUB_RUN_ATTEMPT\" >> \"$GITHUB_OUTPUT\"\n")
+	}
 	fmt.Fprintf(out, "      - name: Upload the qualification outcome\n        if: %s\n        uses: %s # %s\n        timeout-minutes: 5\n        continue-on-error: true\n        with:\n          name: %s${{ github.run_id }}-${{ github.run_attempt }}\n          path: %s/%s\n          include-hidden-files: true\n          if-no-files-found: warn\n          retention-days: %d\n", notCanceled, actions.Upload, plan.Actions["upload-artifact"].Version, qualificationoutcome.ArtifactPrefix, qualificationoutcome.Directory, qualificationoutcome.FileName("${{ github.run_attempt }}"), plan.GitHubArtifactRetentionDays())
 }
 
@@ -407,9 +435,16 @@ func admitQualificationRegistry(plan *factory.Plan, policy lifecycle.Qualificati
 	return nil
 }
 
-func qualificationBootstrap(out *bytes.Buffer, plan *factory.Plan, actions pipeline.GitHubActionRefs, linker string, policy lifecycle.QualificationPolicy, arch string) {
+// trustedQualifierCommit admits the same-commit workflow, checks out that commit
+// and sets up its pinned Go, for a job that then builds a trusted helper from it.
+func trustedQualifierCommit(out *bytes.Buffer, plan *factory.Plan, actions pipeline.GitHubActionRefs) {
 	out.WriteString("      - name: Admit trusted same-commit workflow\n        timeout-minutes: 1\n        run: |\n          set -euo pipefail\n          test -n \"$GITHUB_SHA\"\n          test \"$GITHUB_WORKFLOW_SHA\" = \"$GITHUB_SHA\"\n")
-	fmt.Fprintf(out, "      - name: Check out trusted qualifier commit\n        uses: %s # %s\n        with:\n          ref: ${{ github.workflow_sha }}\n          persist-credentials: false\n      - name: Set up pinned Go\n        uses: %s # %s\n        with:\n          go-version-file: .go-version\n          cache: false\n      - name: Build trusted qualifier\n        timeout-minutes: 5\n        env:\n          GOTOOLCHAIN: local\n          CGO_ENABLED: '0'\n        run: go build -trimpath -ldflags %s -o nvkr-exec ./cmd/nvkr\n", actions.Checkout, plan.Actions["checkout"].Version, actions.SetupGo, plan.Actions["setup-go"].Version, qualificationShell(linker))
+	fmt.Fprintf(out, "      - name: Check out trusted qualifier commit\n        uses: %s # %s\n        with:\n          ref: ${{ github.workflow_sha }}\n          persist-credentials: false\n      - name: Set up pinned Go\n        uses: %s # %s\n        with:\n          go-version-file: .go-version\n          cache: false\n", actions.Checkout, plan.Actions["checkout"].Version, actions.SetupGo, plan.Actions["setup-go"].Version)
+}
+
+func qualificationBootstrap(out *bytes.Buffer, plan *factory.Plan, actions pipeline.GitHubActionRefs, linker string, policy lifecycle.QualificationPolicy, arch string) {
+	trustedQualifierCommit(out, plan, actions)
+	fmt.Fprintf(out, "      - name: Build trusted qualifier\n        timeout-minutes: 5\n        env:\n          GOTOOLCHAIN: local\n          CGO_ENABLED: '0'\n        run: go build -trimpath -ldflags %s -o nvkr-exec ./cmd/nvkr\n", qualificationShell(linker))
 	digest := policy.Cosign.PlatformDigests["linux/"+arch]
 	if arch == "" {
 		arch = "${{ matrix.arch }}"

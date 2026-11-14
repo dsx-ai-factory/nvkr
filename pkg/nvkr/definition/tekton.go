@@ -42,7 +42,8 @@ func (environment Environment) validateTekton() error {
 	if environment.GitHubBundle != "" || environment.GitHubRuntimePlan || environment.GitHubExecutionPartitions ||
 		environment.GitHubRuntimeSource != nil || environment.GitHubDevelopment || environment.GitHubARC != "" ||
 		len(environment.GitHubDispatchBranches) != 0 || len(environment.GitHubRunners) != 0 || environment.RunsOn != "" ||
-		len(environment.ExecutionClasses) != 0 || len(environment.DiskInspectionProfiles) != 0 || environment.DiskEvidence != "" {
+		len(environment.ExecutionClasses) != 0 || len(environment.DiskInspectionProfiles) != 0 || environment.DiskEvidence != "" ||
+		environment.QualificationResults != nil {
 		return e.New(e.CodeEngineCapability, "Tekton cannot select GitHub runner, identity or disk policies")
 	}
 	if !tektonNamePattern.MatchString(settings.Namespace) || !tektonNamePattern.MatchString(settings.StorageClass) ||

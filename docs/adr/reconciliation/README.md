@@ -59,8 +59,8 @@ exercises reuse, and every Run still executes every required output.
 [ADR-31](../0031-qualification-results-index.md) proposes a qualification results index: each production
 qualifier attempt's unsigned outcome, and an errored outcome for a failed producer Run, published create-only
 as a canonical record and a TestGrid build. Selection, projection, the publishing protocol and the
-`nvkr-results-publish` helper are implemented and contract-tested. The generated publish job is not, so no Run
-publishes and no TestGrid view has read an outcome.
+`nvkr-results-publish` helper and the generated publish job are implemented and contract-tested. No hosted Run
+has published, and no TestGrid view has read an outcome.
 
 ## Ledger files
 

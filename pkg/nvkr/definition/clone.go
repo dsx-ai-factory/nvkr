@@ -58,6 +58,10 @@ func (input Environment) Clone() Environment {
 		value := *input.GitHubRuntimeSource
 		input.GitHubRuntimeSource = &value
 	}
+	if input.QualificationResults != nil {
+		value := *input.QualificationResults
+		input.QualificationResults = &value
+	}
 	input.GitHubRunners = maps.Clone(input.GitHubRunners)
 	input.GitHubDispatchBranches = append([]string(nil), input.GitHubDispatchBranches...)
 	input.ExecutionClasses = execution.CloneClasses(input.ExecutionClasses)

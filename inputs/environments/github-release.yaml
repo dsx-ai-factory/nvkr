@@ -80,6 +80,14 @@ publication:
   mode: per-output-v1
   credentialRef: github:NVKR_REGISTRY_WRITE
   repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate
+# The release qualifier publishes its outcomes to the qualification results index
+# (ADR-31). Every reference is a secret of the nvkr-results GitHub Environment.
+qualificationResults:
+  mode: testgrid-gcs
+  githubEnvironment: nvkr-results
+  bucketRef: github:NVKR_RESULTS_BUCKET
+  workloadIdentityProviderRef: github:NVKR_RESULTS_WIF_PROVIDER
+  serviceAccountRef: github:NVKR_RESULTS_SERVICE_ACCOUNT
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared

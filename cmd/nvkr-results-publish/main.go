@@ -34,8 +34,9 @@ import (
 // secret, so the name appears in neither the generated workflow nor its log.
 const bucketEnv = "NVKR_RESULTS_BUCKET"
 
-// verdictNote ends every error: publishing never changes the qualification.
-const verdictNote = "Qualification verdict unaffected. Re-run failed jobs within 24 hours; if it persists, open an issue."
+// verdictNote ends every error: publishing never changes the qualification. It names
+// the publish job alone, because re-running failed jobs can qualify again.
+const verdictNote = "Qualification verdict unaffected. Re-run this publish job alone within 24 hours; if it persists, open an issue."
 
 // selectionRequired are the flags select and publish both require.
 var selectionRequired = []string{"outcomes", "event", "source-workflow", "source-branch", "qualify-workflow", "qualify-result"}
