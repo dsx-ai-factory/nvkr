@@ -179,7 +179,8 @@ The [GPU site composite](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs
 publishes every family output under one reference; `qcow-imager.efi` and the GPU stack still come
 separately, as in the steps below. The [historical hosted publication](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
 records 83 outputs and their exact root. It covers that candidate only. Current-candidate execution,
-independent consumer verification, published-disk guest boots and site installation remain unproved.
+independent consumer verification, [published-disk guest boots](https://github.com/dsx-ai-factory/nvkr/issues/342)
+and site installation remain unproved.
 [#342](https://github.com/dsx-ai-factory/nvkr/issues/342) tracks the fresh publication proof;
 [#352](https://github.com/dsx-ai-factory/nvkr/issues/352) tracks independent verification.
 
