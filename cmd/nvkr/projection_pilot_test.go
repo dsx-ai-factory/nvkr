@@ -15,18 +15,6 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// TestMain lets this test binary serve the hidden adapter command that
-// --projection-pilot launches from os.Executable with an empty environment.
-func TestMain(m *testing.M) {
-	if len(os.Args) >= 2 && os.Args[1] == projectionAdapterCommand {
-		main()
-		os.Exit(0)
-	}
-	os.Exit(m.Run())
-}
-
-// The same reference plugin, selected in-process and out-of-process, writes
-// and checks exactly the in-binary bundle.
 func TestRunGenerateProjectionPilotMatchesInBinaryGeneration(t *testing.T) {
 	lifecycleCommandRepo(t)
 	previous, selected := selectProjectionPilot, []string{}
@@ -50,7 +38,7 @@ func TestRunGenerateProjectionPilotMatchesInBinaryGeneration(t *testing.T) {
 		t.Fatalf("unflagged generation selected projection transports %v", selected)
 	}
 	want := generatedTree(t, inBinary)
-	for _, transport := range []string{"in-process", "out-of-process"} {
+	for _, transport := range []string{"in-process"} {
 		t.Run(transport, func(t *testing.T) {
 			pilot, selector := t.TempDir(), "--projection-pilot="+transport
 			selected = selected[:0]

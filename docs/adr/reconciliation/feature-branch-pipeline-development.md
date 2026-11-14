@@ -189,7 +189,8 @@ seven days; disk diagnostics retain one day. Full signed development is non-canc
 
 The development cleanup module inventories only internal packages in that reserved attempt namespace.
 It authenticates account, package and exact completed workflow-attempt metadata; package, version and
-original and latest attempt timestamps must all be at least 24 hours old. It rechecks before whole-package deletion, fails
+original and latest attempt timestamps must all be at least 24 hours old. After complete namespace inventory and package-metadata checks, each invocation admits at most 25 eligible
+packages in name order, including preview. Later invocations drain the remainder. It rechecks before whole-package deletion, fails
 closed on unknown/ambiguous/API state, and records confirmed partial progress without retrying ambiguous
 mutation. Preview is the default. The separate daily cleanup workflow executes only default-branch code
 with a cleanup-only credential; it never loads branch executables or downloaded artifacts. Production and
@@ -202,4 +203,10 @@ and deletion recheck, eligibility, authentication errors, pagination, races and 
 workflow contracts enforce default-branch scheduling and secret scope. The dispatch helper retains its
 clean/current pushed-commit preflight. These tests do not establish live GitHub execution, actual credential
 scope, ephemeral runner isolation, successful keyless services, GHCR deletion or physical storage reclaim.
+[Cleanup Run 43551025428](https://github.com/dsx-ai-factory/nvkr/actions/runs/43551025428)
+expired exactly ten minutes after cleanup started, with no candidates or deletions reported. A read-only
+November 14 package inventory found thousands of development packages. The previous implementation
+performed package-version and original/latest run reads for every eligible package before the first deletion.
+A deterministic request-budget fixture reproduces deadline exhaustion without progress and passes with
+the bounded batch. This is local regression evidence; hosted recovery and actual deletion remain unverified.
 No new external Run or deleted package is claimed. ADR-04/18/20/21 own the contracts.

@@ -958,7 +958,11 @@ Private, public, missing/empty and unknown visibility are rejected during invent
 Internal visibility permits enterprise-wide reading; deletion still requires package-admin authority.
 The reserved namespace policy plus authenticated provider account, package and attempt checks determine
 cleanup scope. Ambiguous names, malformed/unknown run records, incomplete inventories or API errors fail
-closed. An active or young latest attempt retains all original packages of that run. All candidate admission precedes deletion; each candidate's
+closed. An active or young latest attempt retains all original packages of that run. After the complete
+namespace inventory and package-metadata checks, cleanup admits at most 25 eligible packages in name order
+per invocation. This bounds the expensive candidate work so a backlog can make progress within the operation
+deadline. Preview reports that same batch; later invocations drain the remainder. All selected candidate
+admission precedes deletion; each candidate's
 package/version metadata and run eligibility are rechecked immediately before deleting that whole package.
 
 The handwritten repository cleanup workflow uses only default-branch code, a separate protected

@@ -165,7 +165,7 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			&cli.BoolFlag{Name: "runtime", Usage: "refresh named production Plan data within its reviewed workflow contract"},
 			&cli.StringFlag{Name: "source-commit", Usage: "freeze one exact source commit under the authored GitHub runtime source policy (requires --runtime)"},
 			&cli.BoolFlag{Name: "check", Usage: "write nothing; fail on generated drift"},
-			&cli.StringFlag{Name: "projection-pilot", Hidden: true, Usage: "diagnostic: render through the reference projection plugin over `TRANSPORT` (in-process or out-of-process)"}), Action: func(c *cli.Context) error {
+			&cli.StringFlag{Name: "projection-pilot", Hidden: true, Usage: "diagnostic: render through the reference projection plugin over `TRANSPORT` (in-process)"}), Action: func(c *cli.Context) error {
 			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err

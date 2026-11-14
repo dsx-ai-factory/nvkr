@@ -24,6 +24,7 @@ const (
 	cleanupBodyLimit          = 8 << 20
 	cleanupPageLimit          = 100
 	cleanupPageSize           = 100
+	cleanupBatchSize          = 25
 	cleanupCanceledConclusion = "cancelled" //nolint:misspell // Exact GitHub API conclusion spelling.
 )
 
@@ -41,6 +42,7 @@ type CleanupReport struct {
 // nvkr-dev.yml attempts. Credentials are explicit and never read from ambient
 // GitHub or Docker configuration. The namespace is reserved for these attempts;
 // a later attempt must publish into its own namespace, never recreate an old one.
+// Each call selects at most 25 eligible packages; later calls drain the backlog.
 // A failed call may return a report of deletions already acknowledged by GitHub.
 func Cleanup(ctx context.Context, repository, token string, apply bool) (CleanupReport, error) {
 	client := &http.Client{
@@ -137,8 +139,10 @@ func (api *cleanupAPI) cleanup(ctx context.Context, repository, token string, ap
 	if err != nil {
 		return report, err
 	}
-	// Fully inventory and validate every candidate before the first mutation.
-	var candidates []cleanupCandidate
+	// Inventory the complete namespace before selecting a bounded batch.
+	// Otherwise a backlog can exhaust the deadline before any deletion, leaving
+	// the same backlog for every subsequent scheduled invocation.
+	var inventory []cleanupCandidate
 	packagePrefix := strings.TrimPrefix(namespace.Prefix(), "ghcr.io/"+owner+"/") + "/"
 	for _, pkg := range packages {
 		if !strings.HasPrefix(pkg.Name, packagePrefix) {
@@ -149,15 +153,25 @@ func (api *cleanupAPI) cleanup(ctx context.Context, repository, token string, ap
 			return report, err
 		}
 		candidate := cleanupCandidate{metadata: pkg, reference: ref, path: accountPath + "/container/" + url.PathEscape(pkg.Name)}
+		if _, err := api.packageOldEnough(repo, candidate, pkg); err != nil {
+			return report, err
+		}
+		inventory = append(inventory, candidate)
+	}
+	sort.Slice(inventory, func(i, j int) bool { return inventory[i].metadata.Name < inventory[j].metadata.Name })
+	var candidates []cleanupCandidate
+	for _, candidate := range inventory {
 		eligible, err := api.eligible(ctx, token, repo, candidate, false)
 		if err != nil {
 			return report, err
 		}
 		if eligible {
 			candidates = append(candidates, candidate)
+			if len(candidates) == cleanupBatchSize {
+				break
+			}
 		}
 	}
-	sort.Slice(candidates, func(i, j int) bool { return candidates[i].metadata.Name < candidates[j].metadata.Name })
 	for _, candidate := range candidates {
 		report.Candidates = append(report.Candidates, candidate.reference.String())
 	}
@@ -215,11 +229,7 @@ func (api *cleanupAPI) eligible(ctx context.Context, token string, repo cleanupR
 	} else {
 		pkg = candidate.metadata
 	}
-	if pkg.ID != candidate.metadata.ID || pkg.Name != candidate.metadata.Name || pkg.Type != "container" || pkg.Visibility != "internal" ||
-		pkg.Owner.ID != repo.Owner.ID || !strings.EqualFold(pkg.Owner.Login, repo.Owner.Login) || pkg.Owner.Type != repo.Owner.Type {
-		return false, e.New(e.CodeVerifyFailed, "development package ownership, internal visibility or identity does not match its admitted namespace")
-	}
-	old, err := api.oldEnough(pkg.CreatedAt, pkg.UpdatedAt)
+	old, err := api.packageOldEnough(repo, candidate, pkg)
 	if err != nil || !old {
 		return false, err
 	}
@@ -252,6 +262,14 @@ func (api *cleanupAPI) eligible(ctx context.Context, token string, repo cleanupR
 		return false, e.New(e.CodeVerifyFailed, "development cleanup latest run differs from the original owner")
 	}
 	return api.runOldEnough(latest)
+}
+
+func (api *cleanupAPI) packageOldEnough(repo cleanupRepository, candidate cleanupCandidate, pkg cleanupPackage) (bool, error) {
+	if pkg.ID != candidate.metadata.ID || pkg.Name != candidate.metadata.Name || pkg.Type != "container" || pkg.Visibility != "internal" ||
+		pkg.Owner.ID != repo.Owner.ID || !strings.EqualFold(pkg.Owner.Login, repo.Owner.Login) || pkg.Owner.Type != repo.Owner.Type {
+		return false, e.New(e.CodeVerifyFailed, "development package ownership, internal visibility or identity does not match its admitted namespace")
+	}
+	return api.oldEnough(pkg.CreatedAt, pkg.UpdatedAt)
 }
 
 func (api *cleanupAPI) runOldEnough(run cleanupRun) (bool, error) {

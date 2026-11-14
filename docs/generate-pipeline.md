@@ -365,30 +365,12 @@ See [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/r
 
 ## Diagnostic projection pilot
 
-GitHub and Tekton generation can exercise the trusted projection pilot. Add
-`--projection-pilot=in-process` or `--projection-pilot=out-of-process` to a top-level
-`run generate` invocation, including `--check`, with the same `--engine`, Definition and Environment.
-The hidden CLI path uses the current NVKR binary's reference adapter. Both transports must emit the exact
-core bundle; a different engine, release, Plan schema or generator ABI is rejected before the executable
-receives Plan bytes. Malformed or altered output is rejected before generated files are written.
-
-Go callers can select a separately compiled trusted command through `factory.WithProjectionAdapter`:
-
-```go
-ctx = factory.WithProjectionAdapter(ctx, factory.ProjectionAdapter{
-    Transport: factory.ProjectionOutOfProcess,
-    Path: "/absolute/path/to/trusted-adapter",
-    Args: []string{"--engine", "tekton", "--release", "trial-1"},
-    Release: "trial-1",
-})
-bundle, err := factory.Render(ctx, plan, factory.EngineTekton)
-```
-
-The command owns its argument syntax. A command using the reference implementation calls
-`factory.ServeProjectionAdapterForEngine(ctx, "tekton", "trial-1", os.Stdin, os.Stdout)` once and exits.
-The existing `ServeProjectionAdapter` helper remains the GitHub wrapper. The host owns process lifetime
-and bounds each exchange, using an empty environment and a private working directory. It does not sandbox
-the command's filesystem or network access: select only an executable you trust.
+GitHub and Tekton generation can exercise the in-process reference projection pilot. Add
+`--projection-pilot=in-process` to a top-level `run generate` invocation, including `--check`,
+with the same `--engine`, Definition and Environment. The pilot must emit the exact core bundle;
+a different engine, release, Plan schema or generator ABI is rejected before Plan delivery.
+Malformed or altered output is rejected before generated files are written. The out-of-process
+transport and serving command are removed.
 
 This is a diagnostic trial, not a supported third-party adapter ecosystem. There is no discovery, acquisition,
 registry or authored plugin selection. Generated jobs never run the selected adapter; core bundle checks and

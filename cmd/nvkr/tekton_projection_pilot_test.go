@@ -84,7 +84,7 @@ func TestTektonCLIProjectionPilotAndGeneratedCommands(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := generatedTree(t, baseline)
-	for _, transport := range []string{"in-process", "out-of-process"} {
+	for _, transport := range []string{"in-process"} {
 		t.Run(transport, func(t *testing.T) {
 			root := t.TempDir()
 			for _, check := range []bool{false, true} {
@@ -104,7 +104,7 @@ func TestTektonCLIProjectionPilotAndGeneratedCommands(t *testing.T) {
 	// Parse the actual generated invocation for every task, including finally.
 	// Cancellation reaches the runtime owner after CLI parsing and before I/O.
 	// A leaked selection and a selector trap prove these commands do not select
-	// the generation plugin. Factory tests additionally trap its launch seam.
+	// the generation plugin. Factory tests additionally trap the generation seam.
 	previous := selectProjectionPilot
 	selectProjectionPilot = func(context.Context, string, string) (context.Context, error) {
 		t.Error("generated task selected a projection plugin")
@@ -149,7 +149,7 @@ func TestTektonCLIProjectionPilotAndGeneratedCommands(t *testing.T) {
 			}
 			seen[step.Args[2]] = true
 			ctx, cancel := context.WithCancel(factory.WithProjectionAdapter(t.Context(), factory.ProjectionAdapter{
-				Transport: factory.ProjectionOutOfProcess, Path: "/nonexistent/projection-adapter", Release: "trap"}))
+				Transport: "unsupported-transport", Release: "trap"}))
 			cancel()
 			app := newApp()
 			app.Writer, app.ErrWriter = io.Discard, io.Discard

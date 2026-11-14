@@ -43,8 +43,6 @@ import (
 // objects share a tag, so the anti-collision guarantee is by construction, not by
 // luck.
 const (
-	// KindLegacyRecipe is reserved; active builds use KindBuild.
-	KindLegacyRecipe            = "nvkr.recipe"
 	KindBuild                   = "nvkr.build"                    // the compiled IR / buildDigest (ADR-02)
 	KindBuilderProfile          = "nvkr.builder-profile"          // the signed builder profile (ADR-07)
 	KindValidationVector        = "nvkr.validation-vector"        // the expected-digests manifest (ADR-05)
@@ -52,41 +50,25 @@ const (
 	KindPublisherEvidence       = "nvkr.publisher-evidence"       // publisher SBOM/provenance core (ADR-05)
 	KindReproductionObservation = "nvkr.reproduction-observation" // later operator comparison record (ADR-05)
 	KindPromotionPolicy         = "nvkr.promotion-policy"         // authenticated release-governance policy (ADR-16)
-	KindReproductionResult      = "nvkr.reproduction-result"      // retired release reproduction receipt, reserved
-	KindCompatibilityResult     = "nvkr.compatibility-result"     // retired compatibility receipt, reserved
-	KindConformanceResult       = "nvkr.conformance-result"       // retired conformance receipt, reserved
-	KindEvidenceWaiver          = "nvkr.evidence-waiver"          // retired evidence-gap waiver, reserved
 	KindProvenance              = "nvkr.provenance"               // the SLSA provenance index (ADR-09)
 	KindProvenanceStatement     = "nvkr.provenance-statement"     // one artifact-scoped SLSA statement (ADR-09)
 	KindSBOM                    = "nvkr.sbom"                     // a per-artifact / aggregate CycloneDX SBOM (ADR-13)
 	KindSBOMIndex               = "nvkr.sbom-index"               // the per-artifact SBOM index (ADR-13 §1)
-	KindVulnReport              = "nvkr.vuln-report"              // retired vulnerability report, reserved
-	KindBundle                  = "nvkr.bundle"                   // retired qualified CI bundle family, reserved
 	KindInventory               = "nvkr.inventory"                // the release inventory (ADR-05 §2)
 	KindReleaseSet              = "nvkr.release-set"              // the atomic release set (ADR-05/16)
-	KindClearance               = "nvkr.clearance"                // retired release clearance, reserved
 	KindStatus                  = "nvkr.status"                   // a status declaration (ADR-06 §2)
 	KindStatusCheckpoint        = "nvkr.status-checkpoint"        // authenticated lifecycle checkpoint (ADR-06 §3)
-	KindTrustedTime             = "nvkr.status-trusted-time/v1"   // retired release freshness receipt, reserved
-	KindPublication             = "nvkr.publication"              // retired qualified publication identity, reserved
-	KindPublicationManifest     = "nvkr.publication-manifest"     // retired qualified transport closure, reserved
 	KindPublicationRoot         = "nvkr.publication-root"         // OCI bootstrap object for one delivery closure
 	KindBinaryBundle            = "nvkr.binary-bundle"            // exact installable loose-binary projection
 	KindAPTRepository           = "nvkr.apt-repository"           // exact Debian repository projection
-	KindClusterDefinition       = "nvkr.cluster-definition"       // retired cluster-definition family, reserved
-	KindClusterComposition      = "nvkr.cluster-composition"      // retired cluster-composition family, reserved
 	KindDiskManifest            = "nvkr.disk-manifest"            // the unified canonical-disk manifest (ADR-14 §1)
-	KindStagingManifest         = "nvkr.staging-manifest"         // retired staging-manifest family, reserved
 	KindSourceClosure           = "nvkr.source-closure"           // fetched/vendor-resolved source bytes
 	KindVendorSpec              = "nvkr.vendor-spec"              // dependency materialization argv + image content identity
 	KindSourceInput             = "nvkr.source-input"             // commit/tree/vendor content identity used by IR lowering
 	KindResolvedInput           = "nvkr.resolved-input"           // per-build source closure after ordered patches
-	KindAICRBundle              = "nvkr.aicr-bundle"              // retired AICR bundle-tree family, reserved (ADR-12)
 	KindCatalogSnapshot         = "nvkr.catalog-snapshot/v1"      // one fully resolved catalog state
 	KindCatalogOverlay          = "nvkr.catalog-overlay/v1"       // one ordered component-level catalog overlay
 	KindArtifactGraph           = "nvkr.artifact-graph/v1"        // typed build/package/delivery dataflow
-	KindExecutionSettings       = "nvkr.execution-settings/v1"    // retired copied execution settings, reserved
-	KindCompileSpec             = "nvkr.compile-spec/v1"          // retired compiler handoff, reserved
 	KindRunPlan                 = "nvkr.run-plan/v1"              // static lowered execution plan
 	KindFactoryObservation      = "nvkr.factory-observation/v1"   // unqualified terminal byte observation
 	KindDefinition              = "nvkr.definition"               // simplified authored product definition (ADR-17 §6)
@@ -98,8 +80,6 @@ const (
 	KindToolSmokeWorker         = "nvkr.tool-smoke-worker"        // authenticated native worker observations
 	KindQualificationEvidence   = "nvkr.qualification-evidence"   // independent pipeline artifact checks (ADR-16)
 	KindReleaseManifest         = "nvkr.release-manifest"         // qualification-backed release membership (ADR-16 §5)
-	KindClusterRealization      = "nvkr.cluster-realization/v1"   // retired cluster-realization family, reserved
-	KindLifecycleBinding        = "nvkr.lifecycle-binding/v1"     // retired redundant publication binding, reserved
 	// Internal capability bindings are registered too. They are not wire schemas,
 	// but their domain tags are just as security-sensitive as object identities:
 	// a typo must fail instead of silently minting a different receipt family.
@@ -120,17 +100,17 @@ const (
 // inputs. It is separate from the retired final-artifact staging manifest family.
 const KindBuildMaterialManifest = "nvkr.build-material-manifest/v1"
 
-// registeredKinds permanently records allocated families, including retired ones.
-// Digest admits only active families; historical descriptions may retain their kind.
+// registeredKinds lists the active digest families. Unknown and retired kinds
+// cannot mint identities.
 var registeredKinds = [...]string{
-	KindLegacyRecipe, KindBuild, KindBuilderProfile, KindValidationVector, KindEvidence, KindPublisherEvidence, KindReproductionObservation, KindPromotionPolicy,
-	KindReproductionResult, KindCompatibilityResult, KindConformanceResult, KindEvidenceWaiver, KindProvenance, KindProvenanceStatement,
-	KindSBOM, KindSBOMIndex, KindVulnReport, KindBundle, KindInventory,
-	KindReleaseSet, KindClearance, KindStatus, KindStatusCheckpoint, KindTrustedTime, KindPublication, KindPublicationManifest, KindPublicationRoot, KindBinaryBundle, KindAPTRepository, KindClusterDefinition, KindClusterComposition,
-	KindDiskManifest, KindStagingManifest, KindBuildMaterialManifest,
-	KindSourceClosure, KindVendorSpec, KindSourceInput, KindResolvedInput, KindAICRBundle,
-	KindCatalogSnapshot, KindCatalogOverlay, KindArtifactGraph, KindExecutionSettings, KindCompileSpec, KindRunPlan, KindFactoryObservation,
-	KindDefinition, KindCompositeDefinition, KindEnvironment, KindVerificationPolicy, KindReleaseContent, KindQualificationEvidence, KindReleaseManifest, KindQualificationPolicy, KindToolSmokeWorker, KindClusterRealization, KindLifecycleBinding,
+	KindBuild, KindBuilderProfile, KindValidationVector, KindEvidence, KindPublisherEvidence, KindReproductionObservation, KindPromotionPolicy,
+	KindProvenance, KindProvenanceStatement,
+	KindSBOM, KindSBOMIndex, KindInventory,
+	KindReleaseSet, KindStatus, KindStatusCheckpoint, KindPublicationRoot, KindBinaryBundle, KindAPTRepository,
+	KindDiskManifest, KindBuildMaterialManifest,
+	KindSourceClosure, KindVendorSpec, KindSourceInput, KindResolvedInput,
+	KindCatalogSnapshot, KindCatalogOverlay, KindArtifactGraph, KindRunPlan, KindFactoryObservation,
+	KindDefinition, KindCompositeDefinition, KindEnvironment, KindVerificationPolicy, KindReleaseContent, KindQualificationEvidence, KindReleaseManifest, KindQualificationPolicy, KindToolSmokeWorker,
 	KindQualifiedReport, KindTerminalVerification, KindTerminalTree, KindNativeGoToolchain,
 	KindStatusCheckpointPolicy, KindQualifiedObservation, KindQualifiedPublication,
 	KindHostObservation, KindExecutionSelection, KindExecutionObservation, KindRuntimeIdentity,
@@ -476,14 +456,6 @@ func requireEOF(dec *json.Decoder) error {
 // Digest returns the domain-separated content digest of v as "sha256:"+hex:
 // sha256(kind ∥ 0x00 ∥ canonical-bytes) (ADR-01 §3).
 func Digest(kind string, v any) (string, error) {
-	switch kind {
-	case KindCompileSpec, KindExecutionSettings, KindLifecycleBinding, KindLegacyRecipe,
-		KindClusterDefinition, KindClusterComposition, KindClusterRealization, KindStagingManifest, KindBundle,
-		KindReproductionResult, KindCompatibilityResult, KindConformanceResult, KindEvidenceWaiver,
-		KindClearance, KindTrustedTime, KindPublication, KindPublicationManifest, KindVulnReport, KindAICRBundle:
-		return "", e.New(e.CodeUnsupported,
-			"canonical: digest domain %q is retired and cannot mint identities", kind)
-	}
 	if !registeredKind(kind) {
 		return "", e.New(e.CodeInternal,
 			"canonical: unregistered digest domain %q", kind)

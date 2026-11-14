@@ -20,6 +20,9 @@ in `main` or double-author types.
 
 ### 1. A `client/v1` SDK facade; deep modules remain authoritative
 
+`client/v1` is experimental; its exported API is not a stable compatibility promise while the public
+boundary is refined. The domain modules continue to own authority.
+
 The six public objects are **Definition, Environment, Run, Artifact, Release, and Verification Policy**.
 The main lifecycle is **Definition → Run → Release**. Bundles are Artifact formats. Deployment topology
 belongs to the downstream deployment owner and is not part of the Definition or Release schema. Plans, graphs, inventories, vectors, release
