@@ -41,8 +41,9 @@ paths; macOS builds and runs tests and diagnostics.
 
 ## Authority order
 
-1. Current ADR-01–22 contain the engineering contracts directly, pending named-decider ratification.
-   Each section states its lane and any deferred capability; proposed design is not organizational acceptance.
+1. Current ADR-01–31 contain the engineering contracts directly, accepted by njhensley on 2026-11-14.
+   Each section states its lane and any deferred capability; this is one maintainer's acceptance, not an
+   organizational one.
 2. `docs/adr/reconciliation/` (index: `README.md`) owns current implementation, evidence and disabled-path status.
 3. Code and tests establish implementation; unit tests do not prove external services or production workflows.
 
@@ -192,7 +193,7 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
   Keep raw Run records and logs with CI or release artifacts; summarize deliverables in chat.
 - ADRs follow the header template in `docs/adr/0001-*.md`. Update the current owning decision directly; create
   a new ADR only for a distinct decision. Update reconciliation and preserve lane-specific authority. Avoid
-  amendment/addendum histories while the design is pre-ratification.
+  amendment/addendum histories when updating an accepted design.
 - Product specs and epics (`docs/epics-v1-spec.md`) describe production behavior in product terms. No repo
   paths, `nvkr` commands, code identifiers, or POC tactics.
 - Use auto-generated heading anchors; no tables of contents or explicit anchor markup, except where a document

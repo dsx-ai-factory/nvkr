@@ -1,9 +1,9 @@
 # ADR-15 — Air-gap & mirror model
 
-- **Decision status:** Deferred outside the current product scope; no implementation retained.
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Removed. The former mirror package and CLI were disconnected from the maintained lifecycle.
 - **Acceptance-test maturity:** No current air-gap acceptance claim.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-15 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-04 (offline signature verification), ADR-06 (status), ADR-20 (publication).
 

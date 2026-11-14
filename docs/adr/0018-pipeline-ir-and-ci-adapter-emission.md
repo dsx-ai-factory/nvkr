@@ -1,11 +1,11 @@
 # ADR-18 — Pipeline IR & CI-adapter emission (hermetic execution)
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-18 in the consolidated NVKR ADR set (added to close the Definition→realized-pipeline gap).
 - **Relates to:** ADR-02 (IR), ADR-10 (builder types), ADR-07 (builder profile / runner-digest pin), ADR-04
   (verify), ADR-19 (deployment ownership boundary).
@@ -573,7 +573,7 @@ yet project that setting. Empty preserves the runtime's existing store selection
 
 The observed Podman identity includes UID/GID mappings, remote-service status and OCI runtime name in
 addition to the existing host, storage, security and version fields. Adding these fields changes the
-`nvkr.runtime-identity/v1` preimage; this pre-ratification implementation does not translate older identities
+`nvkr.runtime-identity/v1` preimage; this implementation does not translate older identities
 or prove compatibility with previously recorded qualification profiles.
 
 For native multi-architecture pipeline-attested Runs, `Environment.githubRunners` maps each explicit
@@ -1023,7 +1023,7 @@ Every admitted Run retains component operations and an **unconditional terminal 
 same failure behavior before it is admitted. Equal logical build identities do not collapse named output executions
 or their evidence slots. The current Definition path performs no general reuse of prior builds or verification;
 any future reuse needs an authenticated prior result bound to the exact output, members, policy, status and time.
-Proposed ADR-30 designs that pipeline-attested contract, including a distinct `reused` execution outcome and one
+ADR-30 designs that pipeline-attested contract, including a distinct `reused` execution outcome and one
 frozen reuse decision set shared by every partition; it is not implemented.
 
 The terminal signature verifier is itself an authenticated execution input. An emitted qualified pipeline must

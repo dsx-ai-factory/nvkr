@@ -1,13 +1,12 @@
 # ADR-24 — Imported validator catalog and artifact bindings
 
-- **Decision status:** Proposed (pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Initial provisional CLI catalog, strict loading/discovery and local-plan profile dispatch
   are implemented. Broader migration, published adapters and stabilization remain deferred; see `reconciliation/README.md`.
 - **Acceptance-test maturity:** Initial discovery/admission/snapshot and mocked CLI dispatch contracts are tested.
   No new actual upstream catalog execution or native-platform catalog acceptance is claimed.
-- **Deciders:** Pending; validation, artifact-production and upstream interface owners must be named before ratification.
-- **Index:** Proposed ADR-24 supplements ADR-01–22 and proposed ADR-23; it remains outside the consolidated
-  contract set until accepted.
+- **Deciders:** njhensley
+- **Index:** ADR-24 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-01 (canonical records), ADR-03 (coded errors), ADR-16 (diagnostic and conformance boundaries),
   ADR-17 (package ownership and resource lifetimes), ADR-18 (execution admission), ADR-19 (downstream ownership),
   ADR-20 (artifact subjects), ADR-21 (generated workflows), ADR-22 (source and tool pins),
@@ -390,7 +389,7 @@ failure, suite failure and timeout. This ADR allocates no new exit codes.
 | Maintained pin readiness | Producer catalog owners refresh explicit pins and regenerate Plans | An entry cannot patch a checkout or substitute a convenient test revision |
 | Suite completeness | Upstream owns an inventory/completion protocol; the adapter validates it | Package presence, test counts and process exit zero cannot establish exhaustive coverage |
 | Run/output membership | Artifact owners authenticate exact attempt, output, platform and bytes | A supplied Plan plus matching checksum is still a trusted-input diagnostic |
-| Installed identity | Existing conformance owns strict test-bound OCI observations; proposed ADR-29 assigns standalone collection/comparison to the observation owner, with deployment owners supplying installation records | Image/chart test adapters consume the applicable observations; catalog entries, requested references and rendering do not establish installed identity |
+| Installed identity | Existing conformance owns strict test-bound OCI observations; ADR-29 assigns standalone collection/comparison to the observation owner, with deployment owners supplying installation records | Image/chart test adapters consume the applicable observations; catalog entries, requested references and rendering do not establish installed identity |
 | Infrastructure | Execution/downstream owners admit tools, networking, privileges, leases and cleanup | A declared requirement is not available capacity or environment authority |
 | Report validity and verdict | Adapter-specific parsers and completeness checks | A report format label or complete capture is not a passing result |
 | CI policy | Workflow generator and downstream coordinators own transport, triggers and credentials | Catalog files do not authorize workflow generation, scheduling or runner changes |
@@ -456,7 +455,8 @@ item 6. Artifact expansion and hosted integration have separate acceptance; neit
    shared local/CI adapter semantics and generator-owned workflow changes. Hosted credentials, runner allocation,
    triggers and transport require their own acceptance; no workflow capability follows from merging this ADR.
 
-Named owners must ratify the schemas, adapter protocols and migration before maintained adoption. Reconciliation
+The validation, artifact-production and upstream interface owners, not yet named, must approve the schemas,
+adapter protocols and migration before maintained adoption. Reconciliation
 records implementation, contract tests and external execution separately. Any future authenticated evidence
 integration must resolve exact Run/output membership and independent conformance ownership in the governing
 ADRs before admitting results; catalog adoption alone does not close those decisions.

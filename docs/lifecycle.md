@@ -78,7 +78,7 @@ bin/nvkr run plan \
   --environment docs/examples/nvke-tutorial/environment-local.yaml
 ```
 
-A composite Definition (proposed ADR-26) pins complete member
+A composite Definition (ADR-26) pins complete member
 Definitions by their exact `nvkr.definition` digest. `--definition` accepts either kind; a composite path
 and every member and catalog it reaches must lie beneath the working directory. `definition inspect`
 describes the composite, its members, its declared variants and the derived effective Definition. Members
@@ -662,7 +662,7 @@ command times out before writing it (a caller's work deadline, or the runner sto
 timeout), or whose record cannot be written; `outcome-written` is then `false`. A canceled job writes none
 either, and its `outcome-written` is empty because the presence step does not run. An outcome is a
 description: it grants no qualification, manifest or release authority. The `nvkr-results-publish` helper
-publishes outcomes to the results index of proposed ADR-31, but no generated job runs it yet.
+publishes outcomes to the results index of ADR-31, but no generated job runs it yet.
 
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub

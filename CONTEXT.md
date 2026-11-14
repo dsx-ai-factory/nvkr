@@ -83,9 +83,9 @@ _Avoid_: Signing configuration, verification result, producer assertion
 
 ## Definition and production relationships
 
-**Composite Definition (proposed)**:
+**Composite Definition**:
 A Definition form that names complete member Definitions by locator and exact `nvkr.definition` digest and
-releases their named outputs through one Plan, Run and Release. Proposed
+releases their named outputs through one Plan, Run and Release.
 [ADR-26](docs/adr/0026-definition-composition.md) designs it and owns its
 [merge rules](docs/adr/0026-definition-composition.md#3-merge-rules-exact-union-never-precedence) and
 [member Release reuse](docs/adr/0026-definition-composition.md#6-reusing-already-published-member-releases-only-through-authenticated-acceptance-a-planned-follow-up);
@@ -94,15 +94,15 @@ and contract-tested only, with no hosted composite Run, publication or consumer
 verification yet.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
-**Effective Definition (proposed)**:
+**Effective Definition**:
 The derived ordinary Definition that composite admission produces by merging its members, with every output's
 catalog stack made explicit. It is an internal record, recorded by digest in the composite's Plan; it is never
 authored or selected as input.
 _Avoid_: Flattened file, combined candidate, authored Definition
 
-**Declared variant (proposed)**:
+**Declared variant**:
 A composite Definition's explicit permission for named members to select different effective producers of
-one component. Proposed ADR-26 binds it into the composite identity and composition record; any cross-member
+one component. ADR-26 binds it into the composite identity and composition record; any cross-member
 producer divergence it does not cover fails compilation.
 _Avoid_: Override, pin exception, allowlist
 
@@ -132,10 +132,10 @@ A frozen requirement established from resolved intent before execution and later
 bytes for the exact named output and target. A successful sibling cannot satisfy it through digest equality.
 _Avoid_: Successful output, observed inventory
 
-**Result reuse (proposed)**:
+**Result reuse**:
 Satisfying a required output slot with a complete, previously published output of the same name after the owning
 module authenticates it under the current policy. Discovery only finds candidates; an acceptance receipt binds
-the output into the current Run as reused, with its original origin and provenance. Proposed
+the output into the current Run as reused, with its original origin and provenance.
 [ADR-30](docs/adr/0030-authenticated-result-reuse.md) designs the pipeline-attested contract; it is not implemented.
 _Avoid_: Cache hit, Build Digest match, skipped job, sibling reuse
 
@@ -238,9 +238,9 @@ _Avoid_: Release publication root, native image manifest, qualification receipt
 An Artifact format containing exact executable files and their installation metadata.
 _Avoid_: Release, arbitrary archive
 
-**Executable image index (proposed)**:
+**Executable image index**:
 An Artifact format for an executable output that declares a `platforms` set: a standard OCI image index over
-minimal per-platform images. Proposed in [ADR-28](docs/adr/0028-multi-platform-executable-indexes.md), which
+minimal per-platform images. Defined in [ADR-28](docs/adr/0028-multi-platform-executable-indexes.md), which
 owns its [aggregate identity](docs/adr/0028-multi-platform-executable-indexes.md#5-aggregate-identity) and
 [child image contents](docs/adr/0028-multi-platform-executable-indexes.md#6-publication-a-standard-image-index-over-minimal-per-platform-images);
 not implemented.
@@ -276,27 +276,27 @@ Top-level `validate` runs diagnostics, whereas `definition validate` checks stat
 Outputs remain descriptive and cannot authorize qualification or promotion.
 _Avoid_: Recipe, test dispatcher framework, verification policy
 
-**Validator catalog (proposed)**:
+**Validator catalog**:
 An explicit index of reusable diagnostic validator entries, organized by project, artifact and suite.
-Proposed [ADR-24](docs/adr/0024-imported-validator-catalog.md) separates entries from profiles selecting named
+[ADR-24](docs/adr/0024-imported-validator-catalog.md) separates entries from profiles selecting named
 instances and artifact-role bindings. The provisional CLI slice implements strict discovery, local-plan
 admission and frozen dispatch for the existing process-contract and mixed CLI suites. Shared schemas remain
 provisional; published adapters, controller/chart checks and broader migration are deferred. Existing legacy
 validation routes retain their separate admission and capture contracts.
 _Avoid_: Producer catalog, upstream test implementation, executable plugin, qualification policy
 
-**Cluster observation (proposed)**:
+**Cluster observation**:
 A scoped, time-bounded record of discovered cluster facts, their sources and collection gaps. Raw AICR
 Snapshot inputs are distinct from this NVKR observation. Information gathering does not require a build
-baseline or test run. Lane none: unsigned and descriptive. Proposed in
+baseline or test run. Lane none: unsigned and descriptive. Defined in
 [ADR-29](docs/adr/0029-cluster-observation-and-artifact-attribution.md); the standalone route is not implemented.
 _Avoid_: Artifact comparison, authored lifecycle object, complete host attestation, test verdict
 
-**Artifact comparison (proposed)**:
+**Artifact comparison**:
 A descriptive comparison of a cluster observation with selected NVKR outputs and their evidence, under
 an explicit scope and comparison profile, distinct from the public Verification Policy. Reports produced/acquired
 identity, installation attribution and measured contents separately. Missing baselines or unsupported joins remain unverified; observations can
-still be useful without a comparison. Proposed in ADR-29; no qualification, signing or release authority.
+still be useful without a comparison. Defined in ADR-29; no qualification, signing or release authority.
 _Avoid_: Cluster observation, verified installation from a version label, qualification receipt
 
 **Release authenticity**:
@@ -453,7 +453,7 @@ _Avoid_: Named output, artifact, authored build group
 **Pinned-tool producer**:
 A component producer that runs one released, digest-pinned executable inside a digest-pinned container. Its
 builder type is `pinned-tool` and it belongs to the existing `wrapped-build` source lane; it is not an
-acquisition of the tool. Proposed in [ADR-27](docs/adr/0027-pinned-tool-producers.md), which owns its
+acquisition of the tool. Defined in [ADR-27](docs/adr/0027-pinned-tool-producers.md), which owns its
 [Build identity](docs/adr/0027-pinned-tool-producers.md#2-logical-identity-covers-the-tool-its-arguments-and-its-inputs),
 [execution](docs/adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed),
 [inputs](docs/adr/0027-pinned-tool-producers.md#4-declared-inputs-are-typed-material-bindings) and

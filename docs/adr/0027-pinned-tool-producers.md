@@ -1,17 +1,15 @@
 # ADR-27 — Producers that run pinned release tools
 
-- **Decision status:** Proposed (design only; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Units T1–T7 are implemented, including one `bundle-oci` layout root and its explicit
   regular-file material closure; see `reconciliation/README.md` for validation and execution evidence.
 - **Acceptance-test maturity:** Contract-tested. Linux subprocess tests use a fake container runtime. A recorded
   native Linux ARM64 Docker Run exercises the released AICR v1.2.0 recipe, Flux layout, fixed validation and
   packaging path; see [reconciliation](reconciliation/aicr-deployment-bundles.md). No hosted Run or independent
   consumer verification exercises the converted path.
-- **Deciders:** Pending; release-engineering, catalog, execution and evidence owners must be named before
-  ratification.
-- **Index:** Proposed ADR-27 supplements ADR-01–22 and proposed ADR-23–26; it remains outside the consolidated
-  contract set until accepted. It builds on proposed ADR-25, whose generic OCI bundle selection and packaging are
-  implemented, and uses producer OCI layout import (#285) for T6.
+- **Deciders:** njhensley
+- **Index:** ADR-27 in the consolidated NVKR ADR set. It builds on ADR-25, whose generic OCI bundle selection
+  and packaging are implemented, and uses producer OCI layout import (#285) for T6.
 - **Relates to:** ADR-01 (typed digest families), ADR-02 §3 (logical identity versus transport), ADR-03 (coded
   errors), ADR-09 §5 (production provenance), ADR-10 §1 and source lanes (builder taxonomy, `wrapped-build`),
   ADR-11 §1–§2 (direct selection, explicit closures, declared edges and independent outputs), ADR-12 §1 (concrete

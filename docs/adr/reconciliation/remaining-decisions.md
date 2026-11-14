@@ -1,6 +1,6 @@
 ## Remaining decisions
 
-Named-decider ratification and organizational toolchain/source/identity approval remain separate from candidate
+Organizational ratification and toolchain/source/identity approval remain separate from candidate
 execution. Owners must supply registry retention, release-tag concurrency/collision and interrupted-publication
 protocols, source access and protected-environment policy, native runner-pool isolation, transparency approval,
 main-only execution and independent consumer evidence. The M3 MVP needs the separate qualification identity,

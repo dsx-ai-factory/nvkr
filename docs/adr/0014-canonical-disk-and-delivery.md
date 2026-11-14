@@ -1,11 +1,11 @@
 # ADR-14 — Canonical disk & delivery
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-14 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-02 (identity/purity), ADR-05 (evidence / disk manifest), ADR-12 (targets and rendering), ADR-19 (artifact membership), ADR-04 (verify).
 - **Satisfies:** FR-13 (canonical disk boundary), FR-14 (deterministic assembly).

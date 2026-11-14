@@ -66,4 +66,4 @@ externally unverified. Existing validation-vector v3 and qualification-evidence 
 [ADR-16 §6](../0016-release-gates-and-digest-first-selection.md#6-passive-external-qualification-handoff--deferred-producer-protocol)
 owns diagnostic execution and passive external qualification; [ADR-18 §3](../0018-pipeline-ir-and-ci-adapter-emission.md#3-helper-owned-isolation-and-narrowly-admitted-native-arc-disks)
 owns the host isolation posture. The [operator reference](../../external-test-output-contract.md)
-owns prerequisites, selection and capture limits. These proposed contracts establish no organizational ratification.
+owns prerequisites, selection and capture limits. These contracts establish no organizational ratification.
