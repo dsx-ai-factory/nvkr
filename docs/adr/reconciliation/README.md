@@ -1,7 +1,7 @@
 # Architecture implementation and evidence
 
 This ledger carries no global review date: each row is current as of the change that last edited it.
-ADR-01–22 own the lane-specific engineering contracts pending named-decider
+ADR-01–31 own the lane-specific engineering contracts pending named-decider
 ratification. This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.

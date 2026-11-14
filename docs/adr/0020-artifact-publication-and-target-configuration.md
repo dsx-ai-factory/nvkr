@@ -966,7 +966,7 @@ admission precedes deletion; each candidate's
 package/version metadata and run eligibility are rechecked immediately before deleting that whole package.
 
 The handwritten repository cleanup workflow uses only default-branch code, a separate protected
-`nvkr-dev-cleanup` Environment and dedicated `NVKR_DEV_REGISTRY_CLEANUP` credential. Its daily schedule
+`nvkr-dev-cleanup` Environment and dedicated `NVKR_DEV_REGISTRY_CLEANUP` credential. Its hourly schedule
 applies cleanup; manual dispatch defaults to preview. It never executes producer artifacts or feature-branch
 code. Whole-package deletion removes its versions and referrers without guessing reachability from tags.
 A report records candidates and API-confirmed deletions even on partial failure. Mutation is not retried

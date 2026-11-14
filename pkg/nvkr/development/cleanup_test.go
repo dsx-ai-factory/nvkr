@@ -464,6 +464,8 @@ func TestCleanupBacklogMakesBoundedProgress(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// One repository read + one inventory page + 25 * (3 selection reads +
+		// 4 recheck reads + 1 delete) = 202 requests; 220 leaves a small margin.
 		if fixture.requests >= 220 {
 			cancel()
 			return

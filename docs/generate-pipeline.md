@@ -369,8 +369,7 @@ GitHub and Tekton generation can exercise the in-process reference projection pi
 `--projection-pilot=in-process` to a top-level `run generate` invocation, including `--check`,
 with the same `--engine`, Definition and Environment. The pilot must emit the exact core bundle;
 a different engine, release, Plan schema or generator ABI is rejected before Plan delivery.
-Malformed or altered output is rejected before generated files are written. The out-of-process
-transport and serving command are removed.
+Malformed or altered output is rejected before generated files are written.
 
 This is a diagnostic trial, not a supported third-party adapter ecosystem. There is no discovery, acquisition,
 registry or authored plugin selection. Generated jobs never run the selected adapter; core bundle checks and
