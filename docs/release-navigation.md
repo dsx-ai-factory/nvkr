@@ -7,6 +7,8 @@ or reading artifact payload layers. They can read a registry or an existing loca
 macOS as well as Linux. Metadata inspection does not verify payload bytes, signatures or consumer policy;
 use `release verify` for authenticated consumption.
 
+Use `nvkr release export --reference "$RELEASE_REF" --format aicr-inventory` for AICR chart/image identities (metadata only); image versions are `sha256-<digest>` labels, not published tags.
+
 ## Start with the publication root
 
 Use the release index reference emitted by publication, including its `@sha256:…` digest. Supply the full
