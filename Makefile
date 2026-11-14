@@ -104,6 +104,24 @@ vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinn
 	GOBIN="$(CURDIR)/bin" go -C toolchains/govulncheck install tool
 	"$(CURDIR)/bin/govulncheck" ./...
 
+# Tool modules have no local packages: scan their explicit tool entry points,
+# not ./... (which would match nothing). Keep the root vulncheck gate unchanged.
+.PHONY: vulncheck-tools
+vulncheck-tools: go-version-check ## Report nested Go tool vulnerabilities; errors mean incomplete coverage.
+	GOBIN="$(CURDIR)/bin" go -C toolchains/govulncheck install tool
+	@incomplete=0; \
+	for scope in toolchains/actionlint:github.com/rhysd/actionlint/cmd/actionlint toolchains/govulncheck:golang.org/x/vuln/cmd/govulncheck; do \
+	  module=$${scope%%:*}; package=$${scope#*:}; status=0; \
+	  echo "Scanning $$module ($$package)"; \
+	  "$(CURDIR)/bin/govulncheck" -C "$$module" "$$package" || status=$$?; \
+	  case $$status in \
+	    0) echo "$$module: complete, no reachable findings" ;; \
+	    3) echo "$$module: findings (report-only)" ;; \
+	    *) echo "$$module: INCOMPLETE (scanner exit $$status)"; incomplete=1 ;; \
+	  esac; \
+	done; \
+	exit $$incomplete
+
 .PHONY: actionlint
 actionlint: go-version-check ## Lint GitHub workflows with the actionlint pinned in toolchains/actionlint.
 	@# actionlint silently skips its run-script checks when shellcheck is absent.
