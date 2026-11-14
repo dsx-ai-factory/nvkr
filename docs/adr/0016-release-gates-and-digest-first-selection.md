@@ -12,9 +12,9 @@
 - **Satisfies:** FR-18 (atomic promotion), FR-24 (incremental validation), SEC-08 (independent gates), SEC-13
   (registry integrity), SEC-17 (downstream verification). Advances UC-05/08/10/14/15/16.
 
-- **Scope:** Sections 1–4 specify deferred qualified release authorization. Current implementation retains
-  strict Inventory, ReleaseSet and PromotionPolicy documents, required-member/artifact completeness, and
-  authenticated ReleaseSet/policy diagnostics. Section 5 governs evidence tiers and deferred v1 full-release acceptance.
+- **Scope:** Sections 1–4 retain deferred qualified release design. The qualified lane and its
+  Inventory, ReleaseSet, PromotionPolicy and status implementations are retired. Section 5 governs
+  pipeline-attested evidence tiers and deferred v1 full-release acceptance.
 
 ## Context
 
@@ -745,14 +745,8 @@ delivered-tool smoke workers. Passive external conformance admission remains def
 
 ## Acceptance evidence
 
-Current module evidence in `pkg/nvkr/release/*_test.go`, `pkg/nvkr/status/checkpoint_test.go`, and
-`pkg/nvkr/trust/document_test.go` covers exact authenticated ReleaseSet and promotion-policy documents, strict
-schemas and artifact-kind rules, canonical ordering, required-member/artifact completeness, role rejection,
-cancellation and diagnostic checkpoint rollback rejection. Command tests separately cover durable status
-high-water CAS. These tests do not establish release authorization, evidence-waiver evaluation, trusted-time
-freshness, qualified receipt issuance or a downstream clearance round trip.
-
-Acceptance additionally requires a full fixture that starts with exact artifact bytes and canonical evidence,
+The retired ReleaseSet, promotion-policy and status tests are available in Git history.
+[Reconciliation](reconciliation/adr-16.md) records the current boundary. Future acceptance would require a full fixture that starts with exact artifact bytes and canonical evidence,
 authenticates all typed receipts under distinct trust roles, promotes one complete compatible set, and verifies
 the resulting clearance. Negative variants must cover a caller-forged boolean, missing `evidence:none` waiver,
 receipt replay to a different artifact/vector/policy, unauthorized signer, expired conformance receipt,

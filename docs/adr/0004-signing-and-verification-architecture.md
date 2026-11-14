@@ -227,7 +227,8 @@ substitute for one another. Consumer instructions publish both identities and us
 independently verifiable with `verify-blob-attestation` and an independently selected digest. An NVKR reader is
 a convenience, never a mandatory trust service. Event and credential admission are owned by ADR-18.
 
-A Verification Policy explicitly selects lane and acceptance scope:
+A Verification Policy explicitly selects lane and acceptance scope. The qualified lane is retired; its
+row below records deferred design, and the CLI rejects `--lane qualified` during flag parsing:
 
 | Lane / scope | Required acceptance |
 |---|---|

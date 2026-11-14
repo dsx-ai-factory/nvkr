@@ -34,9 +34,6 @@ func admitPinnedTool(n ir.Node, opts RunOptions) error {
 	if n.Kind != ir.KindBuild || n.BuilderType != ir.BuilderPinnedTool {
 		return nil
 	}
-	if opts.execution != nil {
-		return e.New(e.CodeEngineCapability, "pinned-tool build %q has no qualified execution lane", n.ID)
-	}
 	if opts.Package {
 		return e.New(e.CodeEngineCapability, "pinned-tool build %q has no packaging lane", n.ID)
 	}

@@ -149,22 +149,3 @@ func (reader pipelineContextReader) Read(buffer []byte) (int, error) {
 	}
 	return reader.source.Read(buffer)
 }
-
-func relativeBeneath(root, target string) (string, error) {
-	absRoot, err := filepath.Abs(root)
-	if err != nil {
-		return "", err
-	}
-	absTarget, err := filepath.Abs(target)
-	if err != nil {
-		return "", err
-	}
-	relative, err := filepath.Rel(absRoot, absTarget)
-	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("artifact path %q is not beneath trusted root %q", target, root)
-	}
-	if filepath.Clean(relative) != relative {
-		return "", fmt.Errorf("artifact path %q is not canonical beneath trusted root", target)
-	}
-	return relative, nil
-}

@@ -5,7 +5,6 @@ package main
 
 import (
 	client "github.com/dsx-ai-factory/nvkr/client/v1"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/urfave/cli/v2"
@@ -35,16 +34,6 @@ func resolveBuildResult(c *cli.Context) (*client.Resolution, error) {
 	return client.New(client.WithProvider(providerFor(c))).ResolveBuild(c.Context, client.ResolveRequest{
 		Components: c.StringSlice("component"), Platform: c.String("platform"),
 	})
-}
-
-// resolveBuild projects the producer description and identity for callers that
-// do not consume the compiled graph, including the qualified verifier seam.
-func resolveBuild(c *cli.Context) (*buildgraph.Resolved, string, error) {
-	resolution, err := resolveBuildResult(c)
-	if err != nil {
-		return nil, "", err
-	}
-	return resolution.Resolved, resolution.BuildDigest, nil
 }
 
 func orNone(s string) string {

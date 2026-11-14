@@ -109,7 +109,7 @@ func TestBuildVerifiedReadsAndHashesExternalEvidence(t *testing.T) {
 		t.Fatalf("verified bindings missing from SBOM: %+v", properties)
 	}
 
-	declared := fromBuild(resolved, buildDigest, map[string]string{"prebuilt": artifactDigest}, false)
+	declared := fromBuild(resolved, buildDigest, map[string]string{"prebuilt": artifactDigest})
 	declaredProperties := map[string]string{}
 	for _, property := range declared.Components[0].Properties {
 		declaredProperties[property.Name] = property.Value
@@ -248,9 +248,6 @@ func TestBuildDiagnosticSelectedScopesCallerObservationWithoutMintingAuthority(t
 	if len(aggregate.Components) != 1 || aggregate.Components[0].Name != "beta" {
 		t.Fatalf("diagnostic SBOM leaked the unobserved build members: %+v", aggregate.Components)
 	}
-	if _, err := set.LocalReceipts(); sbomCode(err) != nvkrerr.CodePreflightFailed {
-		t.Fatalf("diagnostic subset minted publisher authority: %v", err)
-	}
 	if _, err := BuildVerified(context.Background(), resolved, buildDigest, hashes, nil, nil); sbomCode(err) != nvkrerr.CodeProvenanceMissing {
 		t.Fatalf("exhaustive BuildVerified silently accepted a subset: %v", err)
 	}
@@ -375,8 +372,5 @@ func TestBuildVerifiedSeparatesExternalVerificationFromPublisherAuthority(t *tes
 	}
 	if gaps, err := set.EvidenceGaps(); err != nil || len(gaps) != 0 {
 		t.Fatalf("caller-hash path lost independently verified external evidence: %+v, %v", gaps, err)
-	}
-	if _, err := set.LocalReceipts(); sbomCode(err) != nvkrerr.CodePreflightFailed {
-		t.Fatalf("caller artifact hashes minted publisher SBOM authority: %v", err)
 	}
 }

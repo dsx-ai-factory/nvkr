@@ -12,7 +12,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -23,26 +22,12 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/profile"
 )
-
-// LocalContainerSandboxMode is the exact isolation contract exercised by Local's
-// container adapter. It is deliberately distinct from ExecutionSandboxMode, which
-// is the runner-owned Landlock/seccomp policy used by direct exec-node builds.
-const LocalContainerSandboxMode = "oci-runtime/network=none+source=ro+private-output=rw/v1"
 
 const qualifiedRuntimeEndpoint = "unix:///var/run/docker.sock"
 
-type verifiedExecution struct {
-	profile        profile.BuilderProfile
-	receipt        profile.ExecutionReceipt
-	nodes          []ir.Node
-	runtime        *heldRuntimeExecutable
-	runtimeCleanup func()
-}
-
 // heldRuntimeExecutable is an executable capability, not a pathname. On Linux it
-// owns a sealed anonymous file descriptor and every qualified runtime subprocess is
+// owns a sealed anonymous file descriptor and every admitted runtime subprocess is
 // execve'd through an inherited descriptor referring to that exact inode.
 type heldRuntimeExecutable struct {
 	capability        *heldfile.File
@@ -124,13 +109,6 @@ func (runtime *heldRuntimeExecutable) runCleanup(ctx context.Context, terminatio
 		Env:              append([]string(nil), runtime.environment...),
 		TerminationGrace: terminationGrace,
 	})
-}
-
-func (execution *verifiedExecution) cleanupRuntime() {
-	if execution != nil && execution.runtimeCleanup != nil {
-		execution.runtimeCleanup()
-		execution.runtimeCleanup = nil
-	}
 }
 
 type runtimeIdentityDocument struct {
@@ -271,21 +249,6 @@ func observeContainerImage(ctx context.Context, runtimePath string, node ir.Node
 	return receipt.digest, nil
 }
 
-func observeHeldContainerImage(ctx context.Context, runtime *heldRuntimeExecutable, node ir.Node, routes ...ImageAccess) (string, error) {
-	access := ImagePreparedOnly
-	if len(routes) > 1 {
-		return "", e.New(e.CodeEngineCapability, "image admission requires one access route")
-	}
-	if len(routes) == 1 {
-		access = routes[0]
-	}
-	receipt, err := prepareHeldContainerImage(ctx, runtime, node, access)
-	if err != nil {
-		return "", err
-	}
-	return receipt.digest, nil
-}
-
 func prepareHeldContainerImage(ctx context.Context, runtime *heldRuntimeExecutable, node ir.Node, access ImageAccess) (receipt *PreparedImage, returnErr error) {
 	if err := requireRunContext(ctx, "held image admission"); err != nil {
 		return nil, err
@@ -358,37 +321,4 @@ func resolveExecutionRuntime(runtimeBinary string) (runtimePath string, err erro
 		return "", e.Wrap(e.CodeEngineCapability, resolveErr, "resolving container runtime %s", runtimeBinary)
 	}
 	return resolved, nil
-}
-
-func cloneProfile(in profile.BuilderProfile) profile.BuilderProfile {
-	out := in
-	out.Provides = append([]string(nil), in.Provides...)
-	out.Fields = append([]profile.Field(nil), in.Fields...)
-	return out
-}
-
-func cloneBuildNodes(in []ir.Node) []ir.Node {
-	out := make([]ir.Node, len(in))
-	for i, node := range in {
-		out[i] = node
-		out[i].Needs = append([]string(nil), node.Needs...)
-		out[i].VendorCmd = append([]string(nil), node.VendorCmd...)
-		out[i].Env = append([]ir.EnvVar(nil), node.Env...)
-		out[i].Patches = append([]ir.PatchRef(nil), node.Patches...)
-		out[i].Command = append([]string(nil), node.Command...)
-	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
-	return out
-}
-
-func observedNodeIdentity(execution *verifiedExecution, nodeID string) (profile.VerifiedNodeIdentity, bool) {
-	if execution == nil {
-		return profile.VerifiedNodeIdentity{}, false
-	}
-	for _, identity := range execution.receipt.NodeIdentities() {
-		if identity.NodeID == nodeID {
-			return identity, true
-		}
-	}
-	return profile.VerifiedNodeIdentity{}, false
 }

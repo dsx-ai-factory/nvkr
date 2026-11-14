@@ -6,12 +6,13 @@ package main
 import (
 	"context"
 	"errors"
-	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"golang.org/x/sys/unix"
 	"net/http"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"golang.org/x/sys/unix"
 )
 
 func verifyTestDigest(ch byte) string { return "sha256:" + strings.Repeat(string(ch), 64) }

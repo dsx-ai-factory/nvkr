@@ -10,7 +10,8 @@
 - **Relates to:** ADR-07 (reproduction identity & builder profile), ADR-10 (pluggable builder types), ADR-05
   (trust objects / evidence bundle), ADR-04 (signing).
 
-- **Scope:** This is the qualified reproduction discipline. V1 production scope is explicit in §6.
+- **Scope:** This retains the deferred qualified reproduction discipline. The lane and bake-off command
+  are retired. V1 production scope is explicit in §6.
 
 ## Context
 
@@ -131,8 +132,8 @@ agreement, boot success, and dependency identity are not alternate reproduction 
 
 ## Acceptance evidence
 
-Current tests cover deterministic comparison, diagnosable per-component divergence, profile binding, and
-qualified versus diagnostic output. They do not establish the defining two-independent-machine claim.
+The retired comparison and profile tests are available in Git history. See
+[reconciliation](reconciliation/adr-07-08.md) for the current boundary.
 
 Acceptance requires a recorded publisher qualification across two deliberately different machines for every
 release builder class, including identical authenticated input-closure receipts and artifact bytes. Any proposed

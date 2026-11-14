@@ -24,10 +24,9 @@ and defines the digest-authentication chain.
 
 ## Decision
 
-The retained implementation supports document authoring/authentication, qualified reproduction diagnostics and
-required membership checks. Qualified release authorization and its receipt assembly are deferred: their
-unused implementation has been removed. The chain described below remains the proposed acceptance contract,
-not a claim that a maintained command or SDK can clear or publish a qualified release.
+The qualified lane, including its vector, membership and release implementations, is retired. The chain
+described below remains deferred design; shared trust and canonical identity owners remain in use by the
+pipeline-attested lifecycle. Git history retains the removed implementation.
 
 ### 1. The ValidationVector *is* the expected-digests manifest
 
@@ -179,12 +178,7 @@ vector and require a separately specified subject and policy before any future a
 
 ## Acceptance evidence
 
-Current contract evidence in `pkg/nvkr/attest/*_test.go`, `pkg/nvkr/trust/document_test.go`,
-`pkg/nvkr/release/*_test.go`, and `client/v1/*_test.go` covers exact authenticated ValidationVector/ReleaseSet
-bytes, profile-free versus source-profile binding, publisher-evidence derivation, mutation/substitution
-rejection, required-set completeness, and the distinction between a reference vector and a later qualified
-observation.
-
-End-to-end acceptance requires detached signing and reloading the complete publisher-evidence → ValidationVector
+The retired vector, publisher-evidence and ReleaseSet tests are available in Git history.
+[Reconciliation](reconciliation/adr-05.md) records the current boundary. Future acceptance would require detached signing and reloading the complete publisher-evidence → ValidationVector
 → ReleaseSet → Authorization (clearance) chain across process boundaries, then proving that a side-loaded digest,
 a swapped evidence row, a self-comparison observation, or a different Inventory cannot satisfy any link.

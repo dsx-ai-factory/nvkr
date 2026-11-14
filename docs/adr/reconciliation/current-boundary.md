@@ -23,7 +23,10 @@ bytes, signatures or consumer policy. Pulling checks the selected output's integ
 policy verification. Neither supported verification scope satisfies full v1 release or qualified acceptance; unsupported stronger
 scopes fail before work. The legacy qualified command stack and disabled release subcommands are removed;
 `release verify --lane qualified` now fails flag admission with `usage`. Diagnostic `publish` retains
-binary bundles and transport without legacy Inventory/ReleaseSet attachments.
+binary bundles and transport without legacy Inventory/ReleaseSet attachments. `pipeline.Local.Run`,
+`QualifiedExecution`, the old SDK graph runner and the attest/release/status/profile packages are removed.
+The supported SDK execution route remains `ExecuteLifecycleRun` → `lifecycle.ExecuteLocal` → `factory.RunLocal`;
+shared producer execution, trust and signing remain in place. No Plan schema or identity changed.
 
 Ordinary local non-disk terminal observation reopens and hashes producer bytes in the host process, using the
 same filesystem view as collection after bounded BuildKit output transport. It executes no producer code or

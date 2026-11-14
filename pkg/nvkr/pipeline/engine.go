@@ -3,8 +3,8 @@
 
 // Package pipeline executes exact producer instructions and observes their results.
 // ExecNode executes one referenced instruction.
-// This package owns source snapshots, process lifetimes, and terminal artifact
-// receipts. Whole-Run scheduling and hosted generation belong to factory.
+// This package owns source snapshots, process lifetimes, and producer observations.
+// Whole-Run scheduling and hosted generation belong to factory.
 package pipeline
 
 import (
@@ -12,7 +12,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -22,9 +21,9 @@ type RunOptions struct {
 	// Ctx carries cancellation into every subprocess (ADR-17 §2). Subprocesses get
 	// bounded SIGTERM→SIGKILL reaping, and the cleanup registry makes a separately
 	// bounded force-removal attempt for every possibly-live container. It is required
-	// by the public VerifyResults and ExecNode entry points; nil fails admission.
+	// by the public ExecNode entry point; nil fails admission.
 	Ctx        context.Context
-	reap       *reaper // cleanup registry (set by Run; force-removes started containers on cancel)
+	reap       *reaper // cleanup registry (set by producer execution; force-removes started containers on cancel)
 	SourceRoot string  // where fetch nodes check out sources (default .nvkr/work/src)
 	// SourceWorkspace grants descriptor-relative access for a source-only fetch.
 	// HoldSourceWorkspace issues the handle; Close cancels and joins its fetches.
@@ -35,15 +34,13 @@ type RunOptions struct {
 	// environment. It is used only with SourceWorkspace; nil selects the fixed
 	// public-source baseline, never the ambient process environment.
 	SourceGitEnvironment []string
-	Only                 []string // if set, build only these component names
-	Jobs                 int      // max concurrent local work slots across fetch/source/build nodes
-	DryRun               bool     // print the docker invocations instead of executing
+	Jobs                 int  // number of concurrent producers sharing the host CPU budget
+	DryRun               bool // print the docker invocations instead of executing
 	// Launch selects ADR-18 §8 for a single exec-node: instead of running the
 	// build DIRECTLY (assuming the engine placed the job inside the toolchain container),
 	// the helper ORCHESTRATES the pinned toolchain container itself — the same code path as
 	// the local factory executor — so a generic CI runner needs only a container runtime plus this helper.
 	Launch     bool
-	KeepGoing  bool   // continue after a failed build node instead of failing closed
 	Package    bool   // assemble each artifact into its outputType (oci-image/.deb) and record that digest
 	PackageDir string // where packaged artifacts are written (default .nvkr/work/packages)
 	Runtime    string // container runtime binary (default "docker"; e.g. docker | podman)
@@ -79,8 +76,7 @@ type RunOptions struct {
 	ToolExecutable string
 	// NativeGo is a process-local receipt over installed SDK/compiler bytes.
 	// It admits only explicitly declared local native-go producers.
-	NativeGo  *NativeGoToolchain
-	execution *verifiedExecution
+	NativeGo *NativeGoToolchain
 }
 
 func requireRunContext(ctx context.Context, operation string) error {
@@ -91,9 +87,8 @@ func requireRunContext(ctx context.Context, operation string) error {
 }
 
 // ArtifactQualification is an explicit producer-side authority label. It is not
-// itself trusted: terminal verification still rechecks the opaque execution receipt
-// and artifact bytes. Its purpose is to ensure an exec-node result that could not
-// observe its provider-selected execution never looks accidentally authoritative.
+// itself trusted: consumers recheck metadata and artifact bytes. The reserved
+// qualified-execution value is rejected by current consumption boundaries.
 type ArtifactQualification string
 
 const (
@@ -122,9 +117,8 @@ type ArtifactResult struct {
 	// a different build, not a sanctioned variant (ADR-07 §1).
 	BuilderType string `json:"builderType,omitempty"`
 	EngineClass string `json:"engineClass,omitempty"`
-	// ProfileDigest and ExecutionBinding are present only when this producer ran
-	// after a valid, exact-node stage-two receipt. Terminal CI verification rejects
-	// from-source results that omit or change either binding.
+	// ProfileDigest and ExecutionBinding are reserved legacy wire fields. Current
+	// consumers reject these unauthenticated execution claims.
 	ProfileDigest    string `json:"profileDigest,omitempty"`
 	ExecutionBinding string `json:"executionBinding,omitempty"`
 	Path             string `json:"path"`
@@ -144,21 +138,4 @@ type ArtifactResult struct {
 	// the OCI manifest blob), used by verify to re-check. Not serialized. Empty for a
 	// pulled image (use Ref instead).
 	AbsPath string `json:"-"`
-}
-
-// NodeResult records the outcome of one DAG node.
-type NodeResult struct {
-	ID       string        `json:"id"`
-	Kind     string        `json:"kind"`
-	Status   string        `json:"status"` // ok | failed | skipped | dry-run
-	Duration time.Duration `json:"duration"`
-	Detail   string        `json:"detail,omitempty"`
-}
-
-// Report is the result of a local run.
-type Report struct {
-	BuildDigest   string           `json:"buildDigest"`
-	Nodes         []NodeResult     `json:"nodes"`
-	Artifacts     []ArtifactResult `json:"artifacts"`
-	qualification reportQualification
 }

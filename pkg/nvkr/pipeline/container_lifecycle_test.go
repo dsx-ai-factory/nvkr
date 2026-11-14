@@ -60,7 +60,7 @@ func TestReaperCleanupIsBoundedAndDoesNotHoldRegistryLock(t *testing.T) {
 	}
 	cleanupEntered := make(chan cleanupCall, 2)
 	reaper.cleanupCommand = func(ctx context.Context, grace time.Duration, _ string,
-		_ *heldRuntimeExecutable, names []string,
+		names []string,
 	) error {
 		cleanupEntered <- cleanupCall{started: time.Now(), names: append([]string(nil), names...)}
 		<-ctx.Done()

@@ -188,12 +188,9 @@ This separate local lane accepts no hosted invocation and supplies no hosted qua
 ADR-16 owns verdict and publication rules, and reconciliation records the separate A/B/C implementation and
 acceptance boundaries.
 
-`status.AcceptDiagnosticCheckpoint` owns protected minimum reads, exact document authentication, checkpoint
-verification and receipt-derived byte-CAS persistence before interpreting withdrawal. Its caller-supplied epoch
-and returned decision remain diagnostic; this operation adds no trusted-time or release authority.
 `catalog.UpdateSourcePins` and `UpdateArtifactPins` own selection, resolution, change detection and the existing
 lock transaction. Commands map flags, select bounded contexts and present structured change summaries; they do
-not own the persisted status schema or reconstruct pin-update transactions. `catalogmaintenance` composes
+not reconstruct pin-update transactions. `catalogmaintenance` composes
 that pin owner with normal lifecycle compilation/generation for review-only candidates and renders the
 explicitly configured maintenance workflow. `catalog refresh` and `catalog update-ci` remain thin adapters;
 these maintenance descriptions cannot grant execution or release authority.
@@ -340,9 +337,8 @@ graph export. `Client.Run`, `RunRequest` and `WithRunner` are retired with `pipe
 `QualifiedExecution`. They had no production callers outside the SDK. Supported local execution uses
 `ExecuteLifecycleRun` → `lifecycle.ExecuteLocal` → `factory.RunLocal`. It does not expose a second publication workflow or qualified-evidence orchestration. The unused
 SDK validation-vector/profile authentication, qualified rebuild, vector creation, release authorization and
-publication methods and their injected authority options are removed. Existing diagnostic commands use the
-owning trust, profile, attest and release modules directly; their receipt checks and capability
-gates remain. The unreachable qualified transport package and publication helper are removed. Qualified
+publication methods and their injected authority options are removed. The legacy qualified commands and their attest, release, status and profile modules are retired.
+Trust and signing remain shared owners for the supported lifecycle. The unreachable qualified transport package and publication helper are removed. Qualified
 publication remains unavailable until its authenticated commit protocol exists.
 
 ### 2. Context threading + subprocess cleanup-on-cancel
@@ -379,7 +375,7 @@ future qualified publication needs an authenticated commit protocol before expos
 ### 4. Package topology and single-owner rule
 
 - A documented **single-owner package map** — `definition`, `lifecycle`, `factory`, `delivery`, `canonical`, `catalog`, `buildgraph`, `target`,
-  `execution`, `ir`, `pipeline`, `attest`, `release`, `status`, `provenance`, `sbom`, `vuln`, `trust`,
+  `execution`, `ir`, `pipeline`, `provenance`, `sbom`, `vuln`, `trust`,
   `qualificationorigin`, `qualificationoutcome`, `releasemanifest`, `resultspublish`, `testresults`, `validation`, `conformance`, and the separate M3-C `qualification` publisher.
   Catalog owns producer admission and snapshots; buildgraph owns exact selection and graph compilation;
   target owns concrete supported target platforms. Each owns its schema, returns typed coded
@@ -492,7 +488,7 @@ record; absence of a record proves neither success nor absence of remote effects
 
 **Positive**
 - Downstream integrators embed the SDK to prepare and execute Runs or verify Releases, branching on coded failures.
-- ctx and cancellation are explicit on every public operation; the options-carried deep-runner context
+- ctx and cancellation are explicit on every public operation; the options-carried producer context
   remains visible migration debt and fails closed when omitted.
 - Swappable transports keep NVKR integrating only via standard interfaces, while missing authority adapters fail
   honestly instead of falling back to declarations.
@@ -524,19 +520,15 @@ record; absence of a record proves neither success nor absence of remote effects
 Current contract evidence in `client/v1/*_test.go`, `cmd/nvkr/*_test.go`, `pkg/nvkr/pipeline/local*_test.go`,
 `pkg/nvkr/pipeline/container_lifecycle_test.go`, and
 `pkg/nvkr/internal/heldfile` covers context-first facade calls, authoritative-module equivalence, injected
-catalog/runner/consumer seams, local cancellation propagation, an explicitly stopped and joined container-reaper
+catalog/consumer seams, local cancellation propagation, an explicitly stopped and joined container-reaper
 waiter, bounded lock-free cleanup I/O, held-child SIGTERM→SIGKILL escalation, atomic output, exact-byte
 receipt checks in the owning modules, rejection of unauthenticated inputs, and absence of implicit publication I/O.
-Public diagnostic values cannot be promoted into authority by the facade. Qualified reports and evidence receipts
-retain explicit close lifetimes in their owning modules; they are not separate SDK workflows. Direct runner entry points also reject a nil `RunOptions.Ctx` before inspecting their graph, node, or
-results path. The stock measure-only verifier rejects a missing producer-results source before trust, profile, or
-catalog I/O; the independent disk-envelope decode lane does not require producer results. Catalog and SDK tests
-additionally prove pre-canceled/no-I/O admission, legacy-provider rejection, no-follow regular-file reads,
+Public diagnostic values cannot be promoted into authority by the facade. The producer executor rejects a nil
+`RunOptions.Ctx` before inspecting its node. Catalog and SDK tests additionally prove pre-canceled/no-I/O admission, legacy-provider rejection, no-follow regular-file reads,
 file/aggregate byte ceilings, deterministic directory count/depth ceilings, and context-aware lock
 snapshot/update behavior.
 
-Status operation and state contracts cover commit-before-withdrawal, authentication and CAS failures, replay,
-protected reads and kernel-released locks. Catalog maintenance contracts cover no-op bytes, source check mode,
+Catalog maintenance contracts cover no-op bytes, source check mode,
 whole-update CAS and artifact selection before upstream calls. Lifecycle binary observation now requires its
 complete Plan and retained raw producer bytes, including exact IR/result metadata; packaged bytes alone are
 insufficient. The owning package tests and [reconciliation](reconciliation/README.md) record these current

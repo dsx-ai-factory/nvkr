@@ -11,8 +11,8 @@
   (air-gap / mirror).
 - **Satisfies:** SEC-16 (immutable publication), UC-11 (supersede / deprecate / withdraw).
 
-- **Scope:** Sections 1–5 specify the qualified status protocol; its publication and trusted-time integration
-  remain deferred. Signed-document diagnostics and checkpoint/high-water validation are implemented.
+- **Scope:** Sections 1–5 retain the deferred qualified status design. The qualified lane and its
+  signed-document diagnostics and checkpoint/high-water implementation are retired.
   Section 6 governs the deferred v1 tag/revocation lifecycle.
 
 ## Context
@@ -101,14 +101,8 @@ fail closed in strict lifecycle mode.
 The deferred release protocol requires freshness from a policy-owned time authority, never a request scalar.
 The policy must pin that authority, and the verifier must bind its authenticated epoch and observation identity
 to the accepted checkpoint and clearance. The unused time-authority capability and release-checkpoint adapter
-are removed; their canonical time family remains reserved and nonminting. Current checkpoint diagnostics use an
-explicit `asOfEpoch` and do not grant release authority. No production trusted-time adapter is implemented.
-
-The implemented diagnostic operation is owned by `status.AcceptDiagnosticCheckpoint`. Status owns the private
-high-water schema, protected reads, kernel-released locking, byte-CAS and directory fsync. It authenticates the
-complete checkpoint and commits state derived from the verified receipt before interpreting withdrawal, so
-`CodeWithdrawn` cannot leave the previous minimum available for replay. The CLI supplies document locations,
-policy and the explicit diagnostic epoch, then presents the decision; it does not construct accepted state.
+are removed; their canonical time family remains reserved and nonminting. The diagnostic checkpoint and
+high-water implementation is also retired with the qualified lane; Git history retains its contracts.
 
 The configured time source is part of local trust policy. It may be an authenticated wall-clock service, a
 hardware-backed clock, or a separately authenticated monotonic policy epoch, but the deployment must document
@@ -188,13 +182,8 @@ mark, or freshness window. These v1 lifecycle operations remain unimplemented.
 
 ## Acceptance evidence
 
-Current contract evidence in `pkg/nvkr/status/*_test.go` and `cmd/nvkr/qualified_lifecycle_test.go` covers exact
-authenticated checkpoint/declaration bytes, signer policy, validity at an explicit diagnostic epoch,
-lower-sequence replay, same-sequence equivocation, predecessor and complete-declaration binding, withdrawal,
-and durable high-water locking, crash recovery and CAS. It does not establish trusted-time release authority,
-registry discovery, mirror interoperability or a qualified clearance path.
-
-End-to-end acceptance still requires publishing two successive checkpoints as OCI referrers, replaying the first
+The retired checkpoint and durable-state tests are available in Git history.
+[Reconciliation](reconciliation/adr-06.md) records the current boundary. Future acceptance would require publishing two successive checkpoints as OCI referrers, replaying the first
 through the registry discovery adapter, proving a consumer that observed the second fails closed,
 rotating the authorized signer set without resetting the authority sequence, and exercising the chosen time
 authority's epoch mapping, skew, outage, and rollback policy. A fresh installation must also prove that a pinned

@@ -466,11 +466,10 @@ in reconciliation; a facade alone does not discharge that debt.
 | Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction; observe typed payloads against exact planned producers |
 | Diagnostic checks | `validation`, `conformance`, `testresults` | Explicit profile dispatch, local suite/harness capture and descriptive outputs; no qualification authority (ADR-16 §6) |
 | Plan inspection | `planview` | Validate through factory, retain immutable descriptive snapshots, render linked graphs and compare named Plan fields without granting execution or evidence authority |
-| Producer execution and qualified graph protocols | `pipeline` | Shared producer launcher, graph admission, runtime observations, terminal receipts, and provider transport |
-| Trust and signing | `trust`, `sign`, `profile` | Authenticate documents, tools, signer policies, and execution profiles |
-| Evidence | `attest`, `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
+| Producer execution | `pipeline` | Shared producer launcher, source snapshots, runtime observations, artifact-byte verification and provider transport |
+| Trust and signing | `trust`, `sign` | Authenticate documents, tools and signer policies |
+| Evidence | `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
 | Packaging and transport | `assemble`, `delivery` | Artifact representation and OCI publication/closure |
-| Release authority and durable status | `release`, `status` | Status owns diagnostic checkpoint acceptance and high-water persistence; qualified release authorization, trusted time and publication remain deferred |
 | Public adaptation | `errors`; `client/v1` and `cmd/nvkr` outside this tree | Stable error mapping, read surfaces, SDK and CLI |
 
 The purity guard lives in `internal/architecture` as a repository test, not a domain module.
