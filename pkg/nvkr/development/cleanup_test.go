@@ -450,3 +450,80 @@ func cleanupErrorCode(err error) e.Code {
 	}
 	return ""
 }
+
+// A backlog must permit confirmed progress within a finite request budget.
+// Cancel at the budget instead of sleeping for the production ten-minute bound.
+func TestCleanupBacklogMakesBoundedProgress(t *testing.T) {
+	fixture := newCleanupFixture()
+	for i := 1; i < 80; i++ {
+		pkg := fixture.packages[0]
+		pkg.ID += uint64(i)
+		pkg.Name = fmt.Sprintf("project/development/runs/100/attempts/1/output-%03d", i)
+		fixture.packages = append(fixture.packages, pkg)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// One repository read + one inventory page + 25 * (3 selection reads +
+		// 4 recheck reads + 1 delete) = 202 requests; 220 leaves a small margin.
+		if fixture.requests >= 220 {
+			cancel()
+			return
+		}
+		fixture.serve(t, w, r)
+	}))
+	defer server.Close()
+	api := cleanupAPI{client: server.Client(), baseURL: server.URL, now: func() time.Time { return fixture.now }}
+	report, err := api.cleanup(ctx, "example/project", "fixture-secret", true)
+	if err != nil || len(report.Deleted) == 0 {
+		t.Fatalf("backlog made no bounded progress: report=%+v error=%v requests=%d", report, err, fixture.requests)
+	}
+	if len(report.Deleted) != len(report.Candidates) || len(report.Deleted) >= len(fixture.packages) {
+		t.Fatalf("expected a fully admitted bounded batch: %+v", report)
+	}
+}
+
+func TestCleanupBatchSelectionAndInventoryAdmission(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		malformed bool
+	}{
+		{"preview and subsequent batches", false},
+		{"invalid package beyond batch", true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := newCleanupFixture()
+			original := fixture.packages[0]
+			fixture.packages = nil
+			// Reverse provider order; selection must still use package names.
+			for i := 29; i >= 0; i-- {
+				pkg := original
+				pkg.ID += uint64(i)
+				pkg.Name = fmt.Sprintf("project/development/runs/100/attempts/1/output-%03d", i)
+				fixture.packages = append(fixture.packages, pkg)
+			}
+			if test.malformed {
+				fixture.packages[0].Visibility = "public"
+				_, err := fixture.execute(t, t.Context(), true)
+				if cleanupErrorCode(err) != e.CodeVerifyFailed || len(fixture.deletes) != 0 {
+					t.Fatalf("late invalid inventory allowed deletion: error=%v deletes=%v", err, fixture.deletes)
+				}
+				return
+			}
+			preview, err := fixture.execute(t, t.Context(), false)
+			if err != nil || len(preview.Candidates) != 25 || len(fixture.deletes) != 0 {
+				t.Fatalf("preview=%+v error=%v deletes=%v", preview, err, fixture.deletes)
+			}
+			applied, err := fixture.execute(t, t.Context(), true)
+			if err != nil || strings.Join(preview.Candidates, "\n") != strings.Join(applied.Deleted, "\n") {
+				t.Fatalf("preview/apply differ: preview=%+v applied=%+v error=%v", preview, applied, err)
+			}
+			// The provider's next inventory omits confirmed deletions.
+			fixture.packages = fixture.packages[:5]
+			remaining, err := fixture.execute(t, t.Context(), true)
+			if err != nil || len(remaining.Deleted) != 5 || !strings.HasSuffix(remaining.Deleted[0], "output-025") {
+				t.Fatalf("remaining batch=%+v error=%v", remaining, err)
+			}
+		})
+	}
+}

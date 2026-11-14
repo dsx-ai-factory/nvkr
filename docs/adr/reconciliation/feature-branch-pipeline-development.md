@@ -189,9 +189,10 @@ seven days; disk diagnostics retain one day. Full signed development is non-canc
 
 The development cleanup module inventories only internal packages in that reserved attempt namespace.
 It authenticates account, package and exact completed workflow-attempt metadata; package, version and
-original and latest attempt timestamps must all be at least 24 hours old. It rechecks before whole-package deletion, fails
+original and latest attempt timestamps must all be at least 24 hours old. After complete namespace inventory and package-metadata checks, each invocation admits at most 25 eligible
+packages in name order, including preview. Later invocations drain the remainder. It rechecks before whole-package deletion, fails
 closed on unknown/ambiguous/API state, and records confirmed partial progress without retrying ambiguous
-mutation. Preview is the default. The separate daily cleanup workflow executes only default-branch code
+mutation. Preview is the default. The separate hourly cleanup workflow executes only default-branch code
 with a cleanup-only credential; it never loads branch executables or downloaded artifacts. Production and
 older unscoped packages remain outside this protocol.
 
@@ -202,4 +203,6 @@ and deletion recheck, eligibility, authentication errors, pagination, races and 
 workflow contracts enforce default-branch scheduling and secret scope. The dispatch helper retains its
 clean/current pushed-commit preflight. These tests do not establish live GitHub execution, actual credential
 scope, ephemeral runner isolation, successful keyless services, GHCR deletion or physical storage reclaim.
-No new external Run or deleted package is claimed. ADR-04/18/20/21 own the contracts.
+[Cleanup Run 43551025428](https://github.com/dsx-ai-factory/nvkr/actions/runs/43551025428)
+timed out at the ten-minute deadline with no deletions; the bounded batch has local regression coverage only.
+ADR-04/18/20/21 own the contracts.

@@ -22,8 +22,7 @@ import (
 // describes committed bytes through the core projection alone, and committed
 // generated closures invoke NVKR only through core stage commands.
 
-// forbidGenerationSeam traps Render's projection and the projection adapter
-// launcher, and fails the test if any caller reaches either.
+// forbidGenerationSeam traps Render's projection and fails if any caller reaches it.
 func forbidGenerationSeam(t *testing.T) {
 	t.Helper()
 	previous, reached := renderSelected, 0
@@ -31,23 +30,18 @@ func forbidGenerationSeam(t *testing.T) {
 		reached++
 		return nil, e.New(e.CodeEngineCapability, "generated stage reached the generation seam")
 	}
-	previousLaunch, launched := launchProjectionAdapter, 0
-	launchProjectionAdapter = func(context.Context, ProjectionAdapter, []byte, int) ([]byte, error) {
-		launched++
-		return nil, e.New(e.CodeEngineCapability, "generated stage launched the projection adapter")
-	}
 	t.Cleanup(func() {
-		renderSelected, launchProjectionAdapter = previous, previousLaunch
-		if reached != 0 || launched != 0 {
-			t.Errorf("generation seam reached %d times; projection adapter launched %d times", reached, launched)
+		renderSelected = previous
+		if reached != 0 {
+			t.Errorf("generation seam reached %d times", reached)
 		}
 	})
 }
 
-// leakedProjectionSelection selects an adapter that does not exist, so a
+// leakedProjectionSelection selects an unsupported transport, so a
 // stage owner that consulted the selection would fail instead of passing.
 func leakedProjectionSelection(ctx context.Context) context.Context {
-	return WithProjectionAdapter(ctx, ProjectionAdapter{Transport: ProjectionOutOfProcess, Path: "/nonexistent/nvkr-projection-adapter", Release: "trap"})
+	return WithProjectionAdapter(ctx, ProjectionAdapter{Transport: "unsupported-transport", Release: "trap"})
 }
 
 func TestRenderIsTheGenerationSeam(t *testing.T) {

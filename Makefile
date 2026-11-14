@@ -279,7 +279,7 @@ workflow-generator: go-version-check
 		-ldflags '-X main.version=dev -X main.commit=unknown' \
 		-o bin/nvkr-exec ./cmd/nvkr
 
-# Diagnostic: `make workflows-check PROJECTION_PILOT=in-process` or `=out-of-process` checks the
+# Diagnostic: `make workflows-check PROJECTION_PILOT=in-process` checks the
 # production, development and NVKE family producer bundles through the reference projection
 # plugin over that transport. Qualification workflows and runtime bundles stay core-only.
 PROJECTION_PILOT ?=
