@@ -158,6 +158,13 @@ jobs:
             actions:
               - '.github/actionlint.yaml'
               - '.github/workflows/**'
+              - '.github/**/action.yml'
+              - '.github/**/action.yaml'
+              - 'scripts/zizmor*'
+              - 'zizmor.yml'
+              - 'zizmor.yaml'
+              - '.github/zizmor.yml'
+              - '.github/zizmor.yaml'
               - '.github/actions/**'
               - '.github/scripts/**'
               # The pinned linter and its make recipe.
@@ -397,7 +404,8 @@ jobs:
     needs: [check-paths]
     if: needs.check-paths.outputs.actions == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Preserve five minutes for required checks, plus bounded diagnostics and margin.
+    timeout-minutes: 11
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -421,6 +429,36 @@ jobs:
       # Workflow scripts required by triage, title lint and label guard.
       - name: test-workflow-scripts
         run: make test-workflow-scripts
+
+      # Z1 diagnostics only: findings and incomplete scans do not block merging.
+      - name: zizmor report (offline)
+        id: zizmor
+        timeout-minutes: 3
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          ZIZMOR_REPORT_DIR: ${{ runner.temp }}/zizmor-report
+        run: make zizmor-report
+
+      - name: Retain zizmor diagnostics
+        id: zizmor-artifact
+        timeout-minutes: 1
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zizmor-report
+          path: ${{ runner.temp }}/zizmor-report/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Report incomplete zizmor collection
+        timeout-minutes: 1
+        continue-on-error: true
+        if: ${{ !cancelled() && (steps.zizmor.outcome != 'success' || steps.zizmor-artifact.outcome != 'success') }}
+        run: |
+          echo '::warning::zizmor report or artifact collection INCOMPLETE; inspect retained diagnostics (not a clean scan).'
+          echo 'zizmor: INCOMPLETE — report-only; inspect diagnostics.' >> "$GITHUB_STEP_SUMMARY"
 
   actionlint-skip:
     needs: [check-paths]
