@@ -63,7 +63,8 @@ to accommodate a selected workflow filename. Operators must select the matching 
 Producer generation emits independent bundles whose entrypoints support manual dispatch, with no cron or
 callable trigger. By default every producer job remains in its bundle's entry workflow. The opt-in
 `githubExecutionPartitions` projection also owns up to 50 same-commit sibling workers named
-`<entry-stem>__partition-00.yml` through `<entry-stem>__partition-49.yml`. Only those exact sibling names
+`<entry-stem>__w-<lowest member job id>.yml`, with a template portion of at most 64 characters.
+Only those exact Plan-derived sibling names
 belong to this entry's current manifest; arbitrary reusable workflows and another owner's siblings remain
 outside its namespace. Every worker receives the same per-file size and parsing bounds as the entry.
 The root manifest binds every worker's exact bytes. Regeneration checks and retirement cover the complete
@@ -133,7 +134,7 @@ it is not a substitute for validating the complete manifest-owned execution clos
 The producer entry workflow is bounded to 500,000 UTF-8 bytes before output work. Shared action interfaces
 and descriptive YAML aliases compact repeated operations without introducing callable producer workflows.
 The default flat projection rejects producer child workflows. A current manifest may own only the opt-in
-`<entry-stem>__partition-NN.yml` workers described above. Any other file in the entry workflow's
+`<entry-stem>__w-<lowest member job id>.yml` workers described above. Any other file in the entry workflow's
 reserved `<entry-stem>__*.yml` namespace is admitted only from a prior v1 manifest, for migration.
 Regeneration retires prior-owned files only after checking their exact prior bytes and modes. Changed or unowned siblings fail closed and are preserved;
 other bundle namespaces and handwritten workflows retain their separate ownership.
@@ -191,7 +192,12 @@ are diagnostic accounting, not execution groups: fixed buckets do not move exist
 complete membership is derived from the current Plan. Crossing the direct-result threshold changes finalizer
 accounting only. ADR-18 §8 owns collector bounds, exact result normalization and authored-context preservation.
 Producer matrices and general callable producer interfaces remain deferred; the opt-in partition workers
-above are generated scheduling structure, not an authored callable interface.
+above are generated scheduling structure, not an authored callable interface. Worker filenames, caller
+IDs and cross-worker outputs use `w-<lowest member job id>`, derived only from current Plan membership.
+The local 30-minute finish-gap split (ADR-18 §8) avoids rebalancing other depths when a root is added.
+Changing the lowest member, capacity chunks or finish gaps can still change affected workers. Legacy
+`__partition-NN.yml` files are accepted only from the prior ownership manifest for authenticated retirement;
+new bundles emit only the stable worker names.
 
 ### 2. Drift detection is a fail-closed `--check` twin, run by a separate generated gate
 

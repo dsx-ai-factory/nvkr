@@ -6,6 +6,7 @@ package factory
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -14,7 +15,11 @@ import (
 
 const githubMaximumExecutionPartitions = 50
 
-func githubPartitionID(index int) string { return fmt.Sprintf("nvkr-partition-%02d", index) }
+// githubPartitionID is shared by the worker path, caller and result exports.
+// Membership is nonempty after partition admission; naming never reorders it.
+func githubPartitionID(partition githubExecutionPartition) string {
+	return "w-" + slices.Min(partition.Jobs)
+}
 
 // lowerGitHubPartitions changes only provider scheduling. The original result
 // collectors and single finalizer retain their Plan-derived membership.
@@ -63,8 +68,8 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 	if len(partitions) > githubMaximumExecutionPartitions {
 		return nil, nil, e.New(e.CodeEngineCapability, "GitHub Run exceeds %d reusable execution partitions", githubMaximumExecutionPartitions)
 	}
-	for index, partition := range partitions {
-		id := githubPartitionID(index)
+	for _, partition := range partitions {
+		id := githubPartitionID(partition)
 		if githubYAMLField(jobs, id) != nil {
 			return nil, nil, e.New(e.CodeEngineCapability, "GitHub partition name collides with original job")
 		}
@@ -90,7 +95,7 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 			parents = append(parents, dependencies[jobID]...)
 		}
 		partitionParents[index] = uniqueSorted(parents)
-		consumers = append(consumers, githubPartitionExport{Name: githubPartitionID(index), Members: partitionParents[index]})
+		consumers = append(consumers, githubPartitionExport{Name: githubPartitionID(partition), Members: partitionParents[index]})
 	}
 	for _, id := range sortedKeys(projection.Collectors) {
 		consumers = append(consumers, githubPartitionExport{Name: id, Members: projection.Collectors[id], Statuses: true})
@@ -101,13 +106,13 @@ func lowerGitHubPartitions(ctx context.Context, plan *Plan, raw []byte) ([]byte,
 	files := map[string][]byte{}
 	callerJobs := githubYAMLMap()
 	for index, partition := range partitions {
-		id := githubPartitionID(index)
-		name := githubPartitionName(index, partition, jobs)
+		id := githubPartitionID(partition)
+		name := githubPartitionName(partition, jobs)
 		child, err := renderGitHubPartition(ctx, plan, raw, partition, model, githubPartitionExports(id, consumers, owners), name)
 		if err != nil {
 			return nil, nil, err
 		}
-		path := strings.TrimSuffix(githubLayoutFor(plan).workflowPath, ".yml") + fmt.Sprintf("__partition-%02d.yml", index)
+		path := strings.TrimSuffix(githubLayoutFor(plan).workflowPath, ".yml") + "__" + id + ".yml"
 		files[path] = child
 		var childDocument yamlv3.Node
 		if err := yamlv3.Unmarshal(child, &childDocument); err != nil {

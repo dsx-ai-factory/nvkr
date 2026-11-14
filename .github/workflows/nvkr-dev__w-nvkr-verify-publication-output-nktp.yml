@@ -1,0 +1,119 @@
+name: Verify release nktp +1
+'on':
+  workflow_call:
+    inputs:
+      dependencies:
+        type: string
+        required: true
+    outputs:
+      results:
+        value: ${{ jobs.nvkr-partition-results.outputs.results }}
+      statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.statuses }}
+      w-nvkr-package-release:
+        value: ${{ jobs.nvkr-partition-results.outputs.w-nvkr-package-release }}
+      nvkr-results-01:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01 }}
+      nvkr-results-01-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-01-statuses }}
+      nvkr-results-07:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07 }}
+      nvkr-results-07-statuses:
+        value: ${{ jobs.nvkr-partition-results.outputs.nvkr-results-07-statuses }}
+    secrets:
+      NVKR_CI_STORAGE_READ_TOKEN:
+        required: true
+      NVKR_CI_STORAGE_WRITE_TOKEN:
+        required: true
+      NVKR_DEV_REGISTRY_READ:
+        required: true
+permissions:
+  contents: read
+jobs:
+  nvkr-verify-publication-output-nktp:
+    name: 'Verify release and deliverable signatures: output-nktp'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    environment: 'nvkr-dev-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_READ_USER }}'
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-sign-output-nktp'].result == 'success' }}
+  nvkr-verify-publication-output-nvkectl:
+    name: 'Verify release and deliverable signatures: output-nvkectl'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    environment: 'nvkr-dev-release'
+    permissions:
+      actions: read
+      contents: read
+    env:
+      NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_READ }}'
+      NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_READ_USER }}'
+    steps:
+      - name: Check native runner platform
+        run: |
+          set -eu
+          if [ "$(uname -s)/$(uname -m)" != Linux/x86_64 ]; then printf 'NVKR-E-ENGINE-CAPABILITY: expected native linux/amd64 runner\n' >&2; exit 29; fi
+      - name: Check out workflow source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: 'false'
+      - name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-dev/actions/shared/prepare-stage
+        with:
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: execute node part-1
+        uses: ./.github/nvkr-dev/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') && fromJSON(inputs.dependencies)['nvkr-sign-output-nvkectl'].result == 'success' }}
+  nvkr-partition-results:
+    name: 'Collect provider results: nvkr-partition-results'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs: [nvkr-verify-publication-output-nktp, nvkr-verify-publication-output-nvkectl]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
+    permissions: {}
+    outputs:
+      results: ${{ toJSON(needs) }}
+      statuses: ${{ join(needs.*.result, ' ') }}
+      w-nvkr-package-release: ${{ format('"nvkr-verify-publication-output-nktp":{0},"nvkr-verify-publication-output-nvkectl":{1}', toJSON(needs['nvkr-verify-publication-output-nktp']), toJSON(needs['nvkr-verify-publication-output-nvkectl'])) }}
+      nvkr-results-01: ${{ format('"nvkr-verify-publication-output-nvkectl":{0}', toJSON(needs['nvkr-verify-publication-output-nvkectl'])) }}
+      nvkr-results-01-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-nvkectl'].result) }}
+      nvkr-results-07: ${{ format('"nvkr-verify-publication-output-nktp":{0}', toJSON(needs['nvkr-verify-publication-output-nktp'])) }}
+      nvkr-results-07-statuses: ${{ format('{0}', needs['nvkr-verify-publication-output-nktp'].result) }}
+    steps:
+      - name: Forward provider results
+        run: ':'
+env:
+  NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
+  NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}

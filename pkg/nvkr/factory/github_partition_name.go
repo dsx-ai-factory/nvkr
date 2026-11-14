@@ -13,26 +13,26 @@ import (
 // githubPartitionName summarizes an admitted, nonempty partition using its first
 // job in ID order. The count is additional jobs, not additional distinct outputs:
 // partitions can mix build, acquisition and publication operations.
-func githubPartitionName(index int, partition githubExecutionPartition, jobs *yamlv3.Node) string {
+func githubPartitionName(partition githubExecutionPartition, jobs *yamlv3.Node) string {
 	ids := uniqueSorted(partition.Jobs)
 	label := githubYAMLValue(githubYAMLField(jobs, ids[0]), "name")
 	if label == "" {
 		label = ids[0]
 	}
 	label = githubPartitionJobSummary(label)
-	prefix, suffix := fmt.Sprintf("p%02d ", index), ""
+	suffix := ""
 	if len(ids) > 1 {
 		suffix = fmt.Sprintf(" +%d", len(ids)-1)
 	}
 	// Preserve the end of long labels, where platform qualifiers usually live.
 	const maxName = 60
-	budget := maxName - len(prefix) - len(suffix)
+	budget := maxName - len(suffix)
 	runes := []rune(label)
 	if len(runes) > budget {
 		const tail = 16
 		label = string(runes[:budget-tail-3]) + "..." + string(runes[len(runes)-tail:])
 	}
-	return prefix + label + suffix
+	return label + suffix
 }
 
 func githubPartitionJobSummary(label string) string {

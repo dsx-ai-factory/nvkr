@@ -5,15 +5,15 @@ package factory
 
 import "context"
 
-// Leave reusable-workflow headroom below the provider limit for later growth.
-const githubTargetExecutionPartitions = 30
+// Split locally when adjacent bounded finish times differ by at least 30 minutes.
+const githubExecutionPartitionGapMinutes = 30
 
 // githubExecutionModel binds scheduling to typed stages before YAML rendering.
 // Provider support operations share accounting but do not become build nodes.
 // Each operation's declared job timeout bounds its partition placement.
 func githubExecutionModel(ctx context.Context, plan *Plan, projection *githubNeedsProjection) (*executionGraph, executionPartitioning, error) {
 	layout := executionPartitioning{Bounds: map[string]int{}, Pinned: map[string]bool{},
-		MaxJobs: githubMaximumResultInputs, Target: githubTargetExecutionPartitions}
+		MaxJobs: githubMaximumResultInputs, Gap: githubExecutionPartitionGapMinutes}
 	stages, _, err := githubStages(plan)
 	if err != nil {
 		return nil, layout, err
