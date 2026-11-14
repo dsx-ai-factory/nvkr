@@ -6,17 +6,13 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
-	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 func acquisitionCatalogFixture(t *testing.T, url, digest string) string {
@@ -48,47 +44,6 @@ artifacts:
 		}
 	}
 	return root
-}
-
-func TestLocalAcquisitionCommandsUsePinnedPrebuiltBytes(t *testing.T) {
-	const payload = "fixture executable bytes"
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(payload)) }))
-	defer server.Close()
-	originalTransport := http.DefaultTransport
-	http.DefaultTransport = server.Client().Transport
-	t.Cleanup(func() { http.DefaultTransport = originalTransport })
-	digest := pipeline.FileDigest([]byte(payload))
-	catalog := acquisitionCatalogFixture(t, server.URL+"/tool", digest)
-	for _, tc := range []struct {
-		name string
-		args []string
-		want string
-		code e.Code
-	}{
-		{"fetch", []string{"fetch"}, digest, ""},
-		{"fetch explicit", []string{"fetch", "--only", "tool"}, digest, ""},
-		{"fetch dry run", []string{"fetch", "--dry-run"}, "dry-run", ""},
-		{"build", []string{"build"}, digest, ""},
-		{"build dry run", []string{"build", "--dry-run"}, "dry-run", ""},
-		{"build explicit", []string{"build", "--only", "tool"}, digest, ""},
-		{"unknown fetch component", []string{"fetch", "--only", "absent"}, "", e.CodeUnsupported},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			args := append([]string{"nvkr"}, tc.args...)
-			args = append(args, "--data", catalog, "--component", "tool", "--platform", "linux/amd64", "--source-root", filepath.Join(t.TempDir(), "src"))
-			out, err := runCLIWithCapturedStdout(t, newApp(), args...)
-			if tc.code != "" {
-				assertLifecycleCommandCode(t, err, tc.code)
-				return
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !strings.Contains(string(out), tc.want) {
-				t.Fatalf("output omitted %q:\n%s", tc.want, out)
-			}
-		})
-	}
 }
 
 func TestResolveOutputFormsShareBuildIdentity(t *testing.T) {

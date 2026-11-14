@@ -9,122 +9,12 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
-
-func TestLocalRunMaterializesSharedSourceOnce(t *testing.T) {
-	work := t.TempDir()
-	sourceRoot := filepath.Join(work, "src")
-	destination := "shared-source"
-	repository := filepath.Join(sourceRoot, destination)
-	if err := os.MkdirAll(repository, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	for _, args := range [][]string{
-		{"init", "-q"},
-		{"config", "user.name", "NVKR Test"},
-		{"config", "user.email", "nvkr@example.test"},
-	} {
-		if output, err := exec.Command("git", append([]string{"-C", repository}, args...)...).CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v: %s", args, err, output)
-		}
-	}
-	if err := os.WriteFile(filepath.Join(repository, "input.txt"), []byte("shared pinned input\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	for _, args := range [][]string{{"add", "input.txt"}, {"-c", "commit.gpgsign=false", "commit", "-qm", "fixture"}} {
-		if output, err := exec.Command("git", append([]string{"-C", repository}, args...)...).CombinedOutput(); err != nil {
-			t.Fatalf("git %v: %v: %s", args, err, output)
-		}
-	}
-	commit, err := gitOut(context.Background(), repository, "rev-parse", "HEAD")
-	if err != nil {
-		t.Fatal(err)
-	}
-	tree, err := gitOut(context.Background(), repository, "rev-parse", "HEAD^{tree}")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	toolchain := "registry.example/toolchain@sha256:" + repeatHex("c")
-	fetch := testFetchNode("fetch-shared", repository, commit, tree, destination, toolchain, "")
-	buildA := completeTestBuild(ir.Node{ID: "build-a", Kind: ir.KindBuild, Component: "a", Toolchain: toolchain}, fetch)
-	buildB := completeTestBuild(ir.Node{ID: "build-b", Kind: ir.KindBuild, Component: "b", Toolchain: toolchain}, fetch)
-	// build-c shares the checkout but needs a different writable mountpoint, so it
-	// must get a distinct prepared snapshot. With two work slots, it should prepare
-	// alongside a/b instead of losing a slot to b waiting on a's single-flight key.
-	buildC := completeTestBuild(ir.Node{
-		ID: "build-c", Kind: ir.KindBuild, Component: "c", Toolchain: toolchain,
-		WriteDir: "alternate", ArtifactPath: "alternate/c",
-	}, fetch)
-	graph := testSourceGraph(fetch, buildA, buildB, buildC)
-
-	runtimePath := filepath.Join(work, "fake-runtime")
-	if err := os.WriteFile(runtimePath, []byte(`#!/usr/bin/env bash
-set -eu
-name=
-out=
-while [ "$#" -gt 0 ]; do
-  case "$1" in
-    --name) name=$2; shift 2 ;;
-    -v)
-      case "$2" in
-        *:/src:ro) ;;
-        *:/src/*) out=${2%%:*} ;;
-      esac
-      shift 2
-      ;;
-    *) shift ;;
-  esac
-done
-[ -n "$name" ] && [ -n "$out" ]
-component=${name##*build-}
-mkdir -p "$out"
-printf 'built %s\n' "$component" > "$out/$component"
-`), 0o755); err != nil {
-		t.Fatal(err)
-	}
-
-	var progress bytes.Buffer
-	if _, err := (Local{}).Run(graph, mustGraphDigest(t, graph), RunOptions{
-		Ctx: context.Background(), SourceRoot: sourceRoot, Runtime: runtimePath,
-		Jobs: 2, Stdout: &progress, Stderr: &progress,
-	}); err != nil {
-		t.Fatalf("shared-source run failed: %v\n%s", err, progress.String())
-	}
-	for _, phase := range []string{
-		"checkout closure re-hash verified in ",
-		"private normalized snapshot copied in ",
-		"private snapshot re-hash verified in ",
-		"no patches; verified snapshot digest is the final input digest",
-	} {
-		if got := strings.Count(progress.String(), phase); got != 2 {
-			t.Errorf("three builds with two exact source keys ran phase %q %d times, want twice:\n%s", phase, got, progress.String())
-		}
-	}
-	if strings.Contains(progress.String(), "final patched-input hash computed in ") {
-		t.Fatalf("patch-free shared source performed a redundant final hash:\n%s", progress.String())
-	}
-	log := progress.String()
-	startA := strings.Index(log, "[start] source "+destination+" for a ")
-	startB := strings.Index(log, "[start] source "+destination+" for b ")
-	startC := strings.Index(log, "[start] source "+destination+" for c ")
-	firstDone := strings.Index(log, "[done] source ")
-	if startA < 0 || startC < 0 || startB >= 0 || firstDone < 0 || startA > firstDone || startC > firstDone {
-		t.Fatalf("scheduler did not fill both slots with distinct source keys before a shared-key waiter:\n%s", log)
-	}
-	if got := strings.Count(log, "reused the run's exact verified private snapshot"); got != 3 {
-		t.Fatalf("prepared source cache served %d builds, want three:\n%s", got, log)
-	}
-	if entries, err := os.ReadDir(filepath.Join(work, "snapshots")); err != nil || len(entries) != 0 {
-		t.Fatalf("run-owned prepared snapshots were not reclaimed: entries=%v err=%v", entries, err)
-	}
-}
 
 func BenchmarkPreparedSourceReuse(b *testing.B) {
 	root := filepath.Join(b.TempDir(), "work", "src")

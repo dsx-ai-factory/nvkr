@@ -5,7 +5,6 @@ package pipeline
 
 import (
 	"strings"
-	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
@@ -85,29 +84,6 @@ func completeTestBuild(node ir.Node, fetch ir.Node) ir.Node {
 		node.Version = "1.0.0"
 	}
 	return node
-}
-
-func testSourceGraph(fetch ir.Node, builds ...ir.Node) *ir.Graph {
-	graph := &ir.Graph{
-		SchemaVersion: ir.SchemaVersion, Platform: "linux/amd64",
-	}
-	verify := ir.Node{ID: "verify", Kind: ir.KindVerify}
-	for _, build := range builds {
-		graph.Nodes = append(graph.Nodes, build)
-		verify.Needs = append(verify.Needs, build.ID)
-	}
-	graph.Nodes = append(graph.Nodes, fetch, verify)
-	graph.Normalize()
-	return graph
-}
-
-func mustGraphDigest(t *testing.T, graph *ir.Graph) string {
-	t.Helper()
-	digest, err := graph.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return digest
 }
 
 func sampleGraph() *ir.Graph {

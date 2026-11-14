@@ -374,7 +374,6 @@ func TestNodeSessionRejectsUnavailableExecutionBeforeWork(t *testing.T) {
 		{name: "zero handle", change: func(s *NodeSession, _ *RunOptions) { *s = NodeSession{} }, want: e.CodeEngineCapability},
 		{name: "missing context", change: func(_ *NodeSession, o *RunOptions) { o.Ctx = nil }, want: e.CodeUsage},
 		{name: "direct execution", change: func(_ *NodeSession, o *RunOptions) { o.Launch = false }, want: e.CodeEngineCapability},
-		{name: "qualified execution", change: func(_ *NodeSession, o *RunOptions) { o.Qualification = &QualifiedExecution{} }, want: e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			session, err := NewNodeSession(t.Context())

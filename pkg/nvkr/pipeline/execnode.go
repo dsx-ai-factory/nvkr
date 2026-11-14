@@ -16,7 +16,7 @@ import (
 )
 
 // ExecNode executes one validated producer instruction. Launch selects the same
-// pinned-container mechanics used by Local.Run; otherwise the instruction runs in
+// pinned-container mechanics used by the factory executor; otherwise the instruction runs in
 // the current environment. Shared execution code does not establish qualification:
 // runtime observations and terminal artifact receipts remain separate gates.
 func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
@@ -29,8 +29,8 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	if err := admitNativeGo(n, opts); err != nil {
 		return nil, err
 	}
-	if opts.SourceWorkspace != nil && (n.Kind != ir.KindFetch || !opts.Launch || opts.Qualification != nil) {
-		return nil, e.New(e.CodeEngineCapability, "held source workspace requires launched, unqualified source fetching")
+	if opts.SourceWorkspace != nil && (n.Kind != ir.KindFetch || !opts.Launch) {
+		return nil, e.New(e.CodeEngineCapability, "held source workspace requires launched source fetching")
 	}
 	if opts.SourceGitEnvironment != nil && opts.SourceWorkspace == nil {
 		return nil, e.New(e.CodeEngineCapability, "source Git environment requires its held source workspace")
@@ -41,8 +41,8 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	if n.BuilderType == ir.BuilderPinnedTool && !opts.Launch {
 		return nil, e.New(e.CodeEngineCapability, "pinned-tool build %q requires launched execution", n.ID)
 	}
-	if n.BuilderType == ir.BuilderBuildKit && (!opts.Launch || opts.Qualification != nil || opts.Package) {
-		return nil, e.New(e.CodeEngineCapability, "rootless BuildKit requires launched, unqualified OCI export execution")
+	if n.BuilderType == ir.BuilderBuildKit && (!opts.Launch || opts.Package) {
+		return nil, e.New(e.CodeEngineCapability, "rootless BuildKit requires launched OCI export execution")
 	}
 	opts = withDefaults(opts)
 	if err := opts.ctx().Err(); err != nil {
@@ -73,7 +73,7 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 // execNodeLaunch is the ADR-18 §8 execution: rather than running the node's work
 // directly and trusting an ambient engine-provided container, the helper launches the
 // pinned toolchain container itself (fetch/vendor with network; build with
-// --network=none) via the SAME Local.Run code paths (l.fetch/l.build/l.pull). It owns a
+// --network=none) through l.fetch/l.build/l.pull. It owns a
 // container-cleanup reaper for the duration so a canceled job leaves no live containers.
 // Isolation is enforced by the flag the verified helper passes, portable to any generic
 // runner — no engine-native container block, no bespoke network-none runner tag.

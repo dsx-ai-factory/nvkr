@@ -24,9 +24,9 @@ make ci-check      # every merge-gate check that runs locally
   **`make test-race`** adds race detection and coverage; **`make test-full`** also
   enables expensive capacity and full-product integration fixtures. Direct
   `go test ./...` uses the fast default too.
-- Active local **development producer** paths such as `build` (and the build phase of an applicable `attest` or
-  `bake-off`) need **Docker + git** and network for their fetch step. The ordinary `build` path is unqualified.
-  The OS-image build owns the worker payload. Removed package/rootfs producer commands are not a development path.
+- Local development Runs use `run local` with an explicit Definition and Environment. Container
+  producers need **Docker + git** and network for their fetch step; native producers have their own
+  capability admission. Local execution does not establish qualified reproduction.
 - **Lint** uses `golangci-lint` (config in [`.golangci.yml`](.golangci.yml)) and warning-or-higher
   `shellcheck` for executable scripts; both gates are deliberately focused.
 
@@ -89,7 +89,7 @@ current implementation boundary:
 Adding a component is a **declarative** change in the selected Definition’s catalog under `inputs/catalogs/`.
 Select it directly in an output with a concrete platform, with every source, toolchain, vendor closure, or acquired artifact pinned by exact
 content identity. A qualified prebuilt entry must also declare digest-pinned typed evidence or an exact authenticated
-waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nvkr definition validate --definition <path>`. A source bake-off is useful contract evidence, but
+waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nvkr definition validate --definition <path>`. The source bake-off command is retired;
 release qualification also requires the authenticated producer, terminal, evidence, policy, and status chain
 described in the ADR reconciliation. Operators may ship an entirely separate catalog via `--data` (see
 `testdata/examples/operator-catalog/`).

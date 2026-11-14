@@ -14,7 +14,7 @@ import (
 
 // TestExecNodeLaunchOrchestratesContainer proves helper-orchestrated dispatch: with
 // --launch, exec-node orchestrates the pinned toolchain container itself with
-// --network=none (the Local.Run path), whereas the default runs the build directly in an
+// --network=none; the default runs the build directly in an
 // assumed engine-provided container. Uses dry-run so no container is actually started.
 func TestExecNodeLaunchOrchestratesContainer(t *testing.T) {
 	build := sampleGraph().Nodes[0]

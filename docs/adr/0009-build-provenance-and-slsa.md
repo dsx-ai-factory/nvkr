@@ -10,7 +10,8 @@
 - **Relates to:** ADR-02 (tier boundary), ADR-05 (evidence bundle / ValidationVector), ADR-07 (observed engine
   class), ADR-13 (external evidence for prebuilt), ADR-01 (canonical codec / serialization profile).
 
-- **Scope:** Sections 1–4 describe reproduction/acquisition evidence; §5 defines the distinct production predicate.
+- **Scope:** Sections 1–4 retain the deferred reproduction/acquisition evidence design; qualified report
+  issuance is retired. Section 5 defines the supported production predicate.
 
 ## Context
 

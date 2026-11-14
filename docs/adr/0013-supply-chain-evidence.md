@@ -11,7 +11,8 @@
   profile), ADR-19 (fleet boundary).
 - **Satisfies:** FR-15 (deterministic SBOM), SEC-18 (vulnerability reporting).
 
-- **Scope:** SBOM generation applies to both lanes. Qualified release receipts, evidence waivers and
+- **Scope:** SBOM generation supports pipeline-attested execution and local diagnostics. The qualified
+  report-to-evidence adapter is retired. Qualified release receipts, evidence waivers and
   vulnerability clearance remain deferred. Optional pipeline-attested vulnerability reports have the design
   contract in §3; executable scanning and publication are deferred. V1 acquisition limits are stated in §6.
 
@@ -592,8 +593,9 @@ pipeline artifact-publication evidence, not qualified receipts, vulnerability cl
 SBOMs remain `static-unqualified` in dry-run. Generation alone is no signature or reproduction proof, and dry-run
 does not retrieve or verify upstream evidence. Acquired components retain `evidence: none` unless pinned upstream
 evidence is declared. Evidence intake verifies declared upstream evidence as §2 states, including Sigstore provenance
-signatures through the pinned cosign verifier when a signer policy is declared;
-air-gapped signature verification is not yet supported. Optional vulnerability reports follow §3;
+signatures through the pinned cosign verifier when a signer policy is declared, as a package contract;
+no command invokes it since the legacy `sbom` and `attest` commands were removed.
+Air-gapped signature verification is not yet supported. Optional vulnerability reports follow §3;
 this SBOM path supplies no vulnerability verdict.
 Curated/embedded aggregates use dependency edges from aggregate to members (ADR-10/22).
 
@@ -644,13 +646,9 @@ Curated/embedded aggregates use dependency edges from aggregate to members (ADR-
 
 ## Acceptance evidence
 
-Current module evidence in `pkg/nvkr/sbom/*_test.go`, `pkg/nvkr/attest/*_test.go`, and
-`pkg/nvkr/catalog/prebuilt_test.go` covers deterministic documents, prebuilt declarations, publisher evidence
-equality across online/mirror transport relocation, same-process exact-byte qualification, HTTPS-reference byte
-and subject verification, and mutation rejection. It does not prove vulnerability scanning, waiver evaluation,
-release clearance or signed cross-process receipt publication.
-
-Acceptance additionally requires a boundary fixture that promotes same-process capabilities into canonical
+The qualified publisher-evidence adapter and its tests are retired; Git history retains them.
+[Reconciliation](reconciliation/adr-13.md) records the retained SBOM and external-evidence boundary.
+Future qualified acceptance would require a boundary fixture that promotes same-process capabilities into canonical
 signed receipts, publishes and reloads them, recomputes the exact artifact/evidence bytes, rejects receipt-type
 and signer-role confusion, rejects replay to another artifact or policy, proves `evidence: none` fails an
 evidence-required promotion, and proves only an exact unexpired waiver signed by the configured waiver authority

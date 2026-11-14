@@ -14,8 +14,8 @@ func admitBuildKit(node ir.Node, opts RunOptions) error {
 	if node.BuilderType != ir.BuilderBuildKit {
 		return nil
 	}
-	if opts.Qualification != nil || opts.execution != nil || opts.Package {
-		return e.New(e.CodeEngineCapability, "rootless BuildKit produces wrapped OCI exports, not qualified or legacy-packaged builds")
+	if opts.Package {
+		return e.New(e.CodeEngineCapability, "rootless BuildKit does not support legacy packaging")
 	}
 	if !node.SourceReadOnly || node.WriteDir == "" || len(node.Materials) != 0 {
 		return e.New(e.CodeEngineCapability, "rootless BuildKit requires isolated source/output and does not support material inputs")

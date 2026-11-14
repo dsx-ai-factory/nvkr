@@ -134,7 +134,7 @@ func TestDiskMethodsRequirePerArtifactSubjectOnSerializedAggregate(t *testing.T)
 	for _, method := range []string{"disk-content/v1", "disk-reconciled/v1"} {
 		t.Run(method, func(t *testing.T) {
 			resolved, digest := resolveCP(t)
-			bom := fromBuild(resolved, digest, nil, false)
+			bom := fromBuild(resolved, digest, nil)
 			if err := bom.Validate(); err != nil {
 				t.Fatalf("aggregate fixture is invalid before assigning a method: %v", err)
 			}
