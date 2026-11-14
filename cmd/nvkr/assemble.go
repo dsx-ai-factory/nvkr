@@ -8,179 +8,15 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/assemble"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/attest"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/release"
 	"github.com/urfave/cli/v2"
 )
 
-// emitDiskManifest builds the unified DiskManifest for a canonical RAW/ISO stream (ADR-14
-// §1): the logical digest + per-block manifest, optionally verifying a derived envelope
-// decodes to the same logical digest and recording it as provenance. Fail-closed on
-// encrypted input (ADR-14 §3).
-func emitDiskManifest(c *cli.Context) error {
-	raw := c.String("from-raw")
-	format := c.String("format")
-	envelope := c.String("envelope")
-	diskKind := assemble.DiskKindRAW
-	switch format {
-	case "raw":
-		if envelope != "" {
-			return e.New(e.CodeUsage, "assemble --format raw cannot carry --envelope; select its actual derived format")
-		}
-	case "iso":
-		if envelope != "" {
-			return e.New(e.CodeUsage, "assemble --format iso cannot carry a decoded RAW envelope")
-		}
-		diskKind = assemble.DiskKindISO
-	case "qcow2":
-		if envelope == "" {
-			return e.New(e.CodeUsage, "assemble --format qcow2 --from-raw requires --envelope <qcow2>")
-		}
-	default:
-		return e.New(e.CodeUnsupported,
-			"assemble --from-raw supports canonical raw/iso manifests and qualified qcow2 envelope verification, not format %q", format)
-	}
-	m, err := assemble.NewDiskManifestContext(c.Context, diskKind, raw, c.Int("block-size"))
-	if err != nil {
-		return err
-	}
-	if env := envelope; env != "" {
-		codec, err := assemble.OpenQemuImgCodec(c.Context, c.String("qemu-img"), c.String("qemu-img-digest"))
-		if err != nil {
-			return err
-		}
-		defer func() { _ = codec.Close() }()
-		if err := m.AddEnvelope(c.Context, codec, c.String("format"), env); err != nil {
-			return err
-		}
-	}
-	dg, err := m.Digest()
-	if err != nil {
-		return err
-	}
-	if out := c.String("manifest-out"); out != "" {
-		b, err := m.Marshal()
-		if err != nil {
-			return err
-		}
-		if err := writeAtomic(c.Context, out, b, 0o644); err != nil {
-			return err
-		}
-	}
-	fmt.Printf("DiskManifest %s (%s, %d bytes, logical %s)\n", dg, m.DiskKind, m.VirtualSizeBytes, m.LogicalDigest)
-	return nil
-}
-
-// verifyDecode is the `verify --decode` body (ADR-14 §2): decode a derived disk
-// envelope to its canonical RAW logical stream via a shelled qemu-img and compare THAT
-// digest to the expected manifest — never the container-file bytes. It fails closed if
-// the envelope is encrypted (ciphertext is never a reproduction), on any decode error,
-// and on a digest mismatch, naming the divergence. No rebuild happens.
-func verifyDecode(c *cli.Context, want *attest.Manifest, envelope string) error {
-	// Choose the expected RAW logical digest: an explicit --decode-component, else the
-	// sole disk component (outputType raw/qcow2/iso/disk), else fail closed.
-	var expected, name string
-	if cn := c.String("decode-component"); cn != "" {
-		for _, comp := range want.Components {
-			if comp.Name == cn {
-				expected, name = comp.SHA256, comp.Name
-				break
-			}
-		}
-		if expected == "" {
-			return e.New(e.CodeVerifyFailed, "--decode-component %q not found in the manifest", cn)
-		}
-	} else {
-		disk := map[string]bool{"raw": true, "qcow2": true, "iso": true, "disk": true}
-		matches := 0
-		for _, comp := range want.Components {
-			if disk[comp.OutputType] {
-				expected, name = comp.SHA256, comp.Name
-				matches++
-			}
-		}
-		if matches == 0 {
-			return e.New(e.CodeVerifyFailed, "no disk component in the manifest to compare; pass --decode-component <name>")
-		}
-		if matches > 1 {
-			return e.New(e.CodeUsage, "manifest has multiple disk components; disambiguate with --decode-component <name>")
-		}
-	}
-	codec, err := assemble.OpenQemuImgCodec(c.Context, c.String("qemu-img"), c.String("qemu-img-digest"))
-	if err != nil {
-		return err
-	}
-	defer func() { _ = codec.Close() }()
-	got, size, err := codec.EnvelopeLogicalDigest(c.Context, c.String("decode-format"), envelope)
-	if err != nil {
-		return err
-	}
-	if got != expected {
-		return e.New(e.CodeVerifyFailed,
-			"envelope %s decodes to logical digest %s, expected %s (component %q) — the derived envelope is NOT a faithful encoding of the reproduced RAW",
-			envelope, got, expected, name)
-	}
-	fmt.Printf("VERIFIED: %s decodes to the expected RAW logical digest %s (component %q, %d bytes) — envelope faithful (ADR-14 §2)\n", envelope, got, name, size)
-	return nil
-}
-
-// cmdAssemble retains the planned delivery surface while failing every unqualified
-// producer lane before I/O. Its currently supported operation measures existing
-// RAW/ISO bytes and, on Linux, verifies a derived qcow2 through the held codec seam.
-func cmdAssemble() *cli.Command {
-	flags := []cli.Flag{
-		&cli.StringFlag{Name: "format", Required: true, Usage: "raw | iso | qcow2 for existing-byte measurement; producer formats currently fail closed"},
-		&cli.BoolFlag{Name: "boot", Usage: "reserved; fails closed until a qualified boot-observation adapter exists"},
-		&cli.IntFlag{Name: "boot-timeout", Value: 900},
-		&cli.BoolFlag{Name: "encrypt", Usage: "reserved; fails closed until a qualified post-attestation encryption adapter exists"},
-		&cli.StringFlag{Name: "from", Usage: "reserved input for the disabled --encrypt adapter"},
-		&cli.StringFlag{Name: "from-raw", Usage: "emit a unified DiskManifest for this canonical RAW/ISO stream (ADR-14 §1)"},
-		&cli.StringFlag{Name: "envelope", Usage: "with --from-raw: also verify this derived envelope decodes to the canonical logical digest and record it as provenance"},
-		&cli.IntFlag{Name: "block-size", Value: 1 << 20,
-			Usage: fmt.Sprintf("with --from-raw (raw): per-block manifest size in bytes (%d..%d; at most %d blocks)",
-				assemble.MinDiskBlockSizeBytes, assemble.MaxDiskBlockSizeBytes, assemble.MaxDiskManifestBlocks)},
-		&cli.StringFlag{Name: "manifest-out", Usage: "with --from-raw: write the DiskManifest here"},
-		&cli.StringFlag{Name: "qemu-img", Value: assemble.QemuImgDefault, Usage: "with --envelope: the qemu-img binary (shelled)"},
-		&cli.StringFlag{Name: "qemu-img-digest", Usage: "with --envelope: exact sha256 digest of the qemu-img executable"},
-	}
-	return &cli.Command{
-		Name:  "assemble",
-		Usage: "measure existing canonical disk bytes; qualified delivery producers are disabled",
-		Flags: flags,
-		Action: func(c *cli.Context) error {
-			// These flags name producer/observer workflows whose authority protocols are
-			// not implemented. Reject them before --from-raw, catalog resolution, path
-			// inspection, output creation, or subprocess execution.
-			if c.Bool("encrypt") {
-				return e.New(e.CodeEngineCapability,
-					"assemble --encrypt is disabled until a qualified post-attestation encryption adapter can return a bound non-reproduction receipt")
-			}
-			if c.Bool("boot") {
-				return e.New(e.CodeEngineCapability,
-					"assemble --boot is disabled until a qualified boot observer can return authenticated execution evidence")
-			}
-			// Existing canonical RAW/ISO bytes may still be measured into the typed
-			// DiskManifest; this is the supported non-producer path.
-			if c.String("from-raw") != "" {
-				return emitDiskManifest(c)
-			}
-			switch f := c.String("format"); f {
-			case "raw", "qcow2", "iso":
-				return runDisk(c)
-			default:
-				return e.New(e.CodeUnsupported, "assemble --format %q not supported (raw|qcow2|iso)", f)
-			}
-		},
-	}
-}
-
 // cmdPublish owns the operator-facing delivery representation. The subcommands
 // create and move exact OCI/APT layouts; none converts diagnostic inputs into
-// release authority. Qualified publication remains an SDK capability boundary.
+// release authority.
 func cmdPublish() *cli.Command {
 	return &cli.Command{
 		Name:            "publish",
@@ -280,8 +116,6 @@ func publishRootCmd() *cli.Command {
 		Name: "root", Usage: "build an UNQUALIFIED diagnostic OCI publication root",
 		Flags: []cli.Flag{
 			&cli.StringSliceFlag{Name: "bundle", Usage: "NAME=OCI_LAYOUT (repeatable)"},
-			&cli.StringFlag{Name: "inventory", Usage: "canonical Inventory JSON"},
-			&cli.StringFlag{Name: "release-set", Usage: "canonical ReleaseSet JSON"},
 			&cli.StringFlag{Name: "out", Required: true, Usage: "new OCI layout directory"},
 		},
 		Action: func(c *cli.Context) error {
@@ -297,38 +131,6 @@ func publishRootCmd() *cli.Command {
 				}
 				request.Objects = append(request.Objects, delivery.ObjectInput{Name: name, Kind: "binary-bundle", Path: path,
 					ArtifactType: delivery.MediaBinaryBundle, SemanticDigest: result.SemanticDigest, Layout: true})
-			}
-			if (c.String("inventory") == "") != (c.String("release-set") == "") {
-				return e.New(e.CodeUsage, "--inventory and --release-set must be supplied together")
-			}
-			if path := c.String("inventory"); path != "" {
-				var inventory release.Inventory
-				if err := readCanonicalJSONContext(c.Context, path, &inventory); err != nil {
-					return err
-				}
-				digest, err := inventory.Digest()
-				if err != nil {
-					return err
-				}
-				request.InventoryDigest = digest
-				request.Objects = append(request.Objects, delivery.ObjectInput{Name: "inventory", Kind: "inventory", Path: path,
-					ArtifactType: delivery.MediaInventory, LayerMediaType: delivery.MediaInventory, SemanticDigest: digest})
-			}
-			if path := c.String("release-set"); path != "" {
-				var set release.ReleaseSet
-				if err := readCanonicalJSONContext(c.Context, path, &set); err != nil {
-					return err
-				}
-				digest, err := set.Digest()
-				if err != nil {
-					return err
-				}
-				if set.InventoryRef != request.InventoryDigest {
-					return e.New(e.CodeInventoryUnpinned, "ReleaseSet inventoryRef does not match --inventory")
-				}
-				request.ReleaseSetDigest = digest
-				request.Objects = append(request.Objects, delivery.ObjectInput{Name: "release-set", Kind: "release-set", Path: path,
-					ArtifactType: delivery.MediaReleaseSet, LayerMediaType: delivery.MediaReleaseSet, SemanticDigest: digest})
 			}
 			result, err := delivery.BuildPublicationRoot(c.Context, c.String("out"), request)
 			if err != nil {

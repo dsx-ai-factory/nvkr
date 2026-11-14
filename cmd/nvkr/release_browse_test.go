@@ -55,7 +55,7 @@ func TestReleaseVerifyExposesAndValidatesDiskEvidencePolicy(t *testing.T) {
 	if err != nil || !strings.Contains(out.String(), "minimum-disk-evidence") || !strings.Contains(out.String(), "build-provenance-v1") {
 		t.Fatalf("release verify help omitted disk evidence policy: err=%v output=%q", err, out.String())
 	}
-	if !strings.Contains(out.String(), "build-provenance-v1 for pipeline-attested; strict for qualified") {
+	if !strings.Contains(out.String(), "default: build-provenance-v1") {
 		t.Fatalf("release verify help omitted lane-specific defaults: %q", out.String())
 	}
 
@@ -63,7 +63,7 @@ func TestReleaseVerifyExposesAndValidatesDiskEvidencePolicy(t *testing.T) {
 	app = &cli.App{Commands: []*cli.Command{cmdRelease()}, Writer: &out}
 	err = app.RunContext(t.Context(), []string{"nvkr", "release", "verify", "--reference", "registry.example.test/product@sha256:" + strings.Repeat("a", 64),
 		"--lane", "qualified", "--scope", "release", "--minimum-disk-evidence", "build-provenance-v1"})
-	if cliErrorCode(err) != e.CodeTrustPolicyMissing || out.Len() != 0 {
+	if cliErrorCode(err) != e.CodeUsage || out.Len() != 0 {
 		t.Fatalf("qualified producer-only policy was not rejected before adapters: err=%v output=%q", err, out.String())
 	}
 
@@ -71,7 +71,7 @@ func TestReleaseVerifyExposesAndValidatesDiskEvidencePolicy(t *testing.T) {
 	app = &cli.App{Commands: []*cli.Command{cmdRelease()}, Writer: &out}
 	err = app.RunContext(t.Context(), []string{"nvkr", "release", "verify", "--reference", "registry.example.test/product@sha256:" + strings.Repeat("a", 64),
 		"--lane", "qualified", "--scope", "release"})
-	if cliErrorCode(err) != e.CodeEngineCapability || out.Len() != 0 {
+	if cliErrorCode(err) != e.CodeUsage || out.Len() != 0 {
 		t.Fatalf("qualified default was weakened or reached an adapter: err=%v output=%q", err, out.String())
 	}
 }
@@ -116,7 +116,11 @@ func TestReleaseVerifyReportsUnsupportedExactInputPolicy(t *testing.T) {
 			}
 			app := &cli.App{Commands: []*cli.Command{cmdRelease()}}
 			err := app.RunContext(t.Context(), append(args, test.flags...))
-			if cliErrorCode(err) != e.CodeEngineCapability {
+			wantCode := e.CodeEngineCapability
+			if test.name == "qualified release" {
+				wantCode = e.CodeUsage
+			}
+			if cliErrorCode(err) != wantCode {
 				t.Fatalf("unsupported exact-input policy returned %v", err)
 			}
 		})

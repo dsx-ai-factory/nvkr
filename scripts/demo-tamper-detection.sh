@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # CUJ: a security reviewer changes bytes at several public boundaries and observes
-# exact-scope, immutable-publication, and archive-shape failures.
+# digest-integrity, immutable-publication, and archive-shape failures.
 
 set -euo pipefail
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -18,8 +18,8 @@ usage() {
 Usage: scripts/demo-tamper-detection.sh [options]
 
 Create small local fixtures and demonstrate fail-closed behavior for:
-  - changed artifact digests in exact-scope diagnostic observations;
-  - diagnostic observations presented to a qualified SBOM consumer;
+  - changed artifact digests in a local diagnostic OCI publication;
+  - rejection of extraction from that damaged publication;
   - corrupt transport archives, destination overwrite, and escaping symlinks.
 
 Options:
@@ -43,42 +43,39 @@ done
 demo_prepare_nvkr
 demo_need_command cmp
 demo_need_command dd
+demo_need_command python3
 WORK=$(demo_absolute_path "$WORK")
 demo_prepare_work "$WORK" "tamper-detection" "$(demo_absolute_path .nvkr/demo-tamper-detection)"
-QUERY=(--data testdata/catalogs/kubernetes-layered --component kubectl --platform linux/amd64)
-BUILD_DIGEST=$("$NVKR" resolve "${QUERY[@]}" -o digest)
-
-write_observation() {
-  local path=$1 digest=$2
-  printf '%s' "{\"buildDigest\":\"$BUILD_DIGEST\",\"components\":[{\"engineClass\":\"prebuilt-acquire\",\"name\":\"demo-artifact\",\"outputType\":\"host-package\",\"sha256\":\"$digest\"}],\"schemaVersion\":\"nvkr.dev/validation-vector/v3\"}" > "$path"
-}
-
-demo_section "1/4  Detect changed artifact bytes through exact observation comparison"
+demo_section "1/4  Inspect and extract an intact diagnostic publication"
 mkdir -p "$WORK/artifacts"
 ARTIFACT="$WORK/artifacts/demo-artifact"
 printf 'original artifact bytes\n' > "$ARTIFACT"
-ORIGINAL_DIGEST="sha256:$(demo_sha256 "$ARTIFACT")"
-OBSERVED_A="$WORK/observed-original.json"
-OBSERVED_EQUAL="$WORK/observed-equal.json"
-OBSERVED_TAMPERED="$WORK/observed-tampered.json"
-write_observation "$OBSERVED_A" "$ORIGINAL_DIGEST"
-cp "$OBSERVED_A" "$OBSERVED_EQUAL"
-"$NVKR" build --bake-off --compare "$OBSERVED_A" --compare "$OBSERVED_EQUAL"
+BUNDLE="$WORK/bundle"
+LAYOUT="$WORK/publication"
+"$NVKR" publish bundle --file "demo-artifact=$ARTIFACT" --arch amd64 --out "$BUNDLE"
+"$NVKR" publish root --bundle "demo=$BUNDLE" --out "$LAYOUT"
+"$NVKR" publish inspect --layout "$LAYOUT"
+"$NVKR" publish extract --layout "$LAYOUT" --bundle demo --out "$WORK/intact"
+cmp "$ARTIFACT" "$WORK/intact/demo-artifact"
 
-printf 'tampered artifact bytes\n' > "$ARTIFACT"
-TAMPERED_DIGEST="sha256:$(demo_sha256 "$ARTIFACT")"
-write_observation "$OBSERVED_TAMPERED" "$TAMPERED_DIGEST"
-if "$NVKR" build --bake-off --compare "$OBSERVED_A" --compare "$OBSERVED_TAMPERED" > "$WORK/artifact-tamper.out" 2>&1; then
-  demo_die "changed artifact digest unexpectedly compared equal"
+demo_section "2/4  Reject changed artifact bytes before extraction"
+PAYLOAD_DIGEST=$(python3 - "$BUNDLE" <<'PYTHON'
+import json
+import pathlib
+import sys
+root = pathlib.Path(sys.argv[1])
+index = json.loads((root / "index.json").read_text())
+manifest_digest = index["manifests"][0]["digest"].split(":", 1)[1]
+manifest = json.loads((root / "blobs" / "sha256" / manifest_digest).read_text())
+print(manifest["layers"][0]["digest"].split(":", 1)[1])
+PYTHON
+)
+printf 'tampered artifact bytes\n' >> "$LAYOUT/blobs/sha256/$PAYLOAD_DIGEST"
+if "$NVKR" publish extract --layout "$LAYOUT" --bundle demo --out "$WORK/forbidden" > "$WORK/artifact-tamper.out" 2>&1; then
+  demo_die "changed artifact bytes unexpectedly extracted"
 fi
+[ ! -e "$WORK/forbidden" ] || demo_die "damaged publication created an extraction destination"
 cat "$WORK/artifact-tamper.out"
-
-demo_section "2/4  Keep diagnostic observations out of qualified consumers"
-if "$NVKR" sbom "${QUERY[@]}" --expected-digests "$OBSERVED_A" --out "$WORK/forbidden-sbom.json" > "$WORK/authority-boundary.out" 2>&1; then
-  demo_die "diagnostic observation unexpectedly entered the qualified SBOM path"
-fi
-[ ! -e "$WORK/forbidden-sbom.json" ] || demo_die "rejected diagnostic input published an SBOM"
-cat "$WORK/authority-boundary.out"
 
 demo_section "3/4  Exercise exact, immutable transport publication"
 PRODUCER="$WORK/producer"
@@ -117,12 +114,12 @@ cat "$WORK/symlink.out"
 cat <<EOF
 
 UNQUALIFIED TAMPER-DETECTION JOURNEY COMPLETE
-  original observation: $OBSERVED_A
-  tampered observation: $OBSERVED_TAMPERED
-  valid carrier:        $ARCHIVE
+  damaged publication: $LAYOUT
+  intact extraction:   $WORK/intact
+  valid carrier:       $ARCHIVE
 
-Changed diagnostic bytes were detected, diagnostic data could not enter
-the qualified SBOM path, and unsafe carrier publication failed without replacing or
-partially publishing declared roots. Transport itself is not content authority; real
-consumers must still authenticate and re-hash the transported artifacts.
+Changed publication bytes were rejected before extraction, and unsafe carrier
+publication failed without replacing or partially publishing declared roots.
+These local fixtures do not establish signatures or Release authority. Consumers
+must still authenticate and re-hash transported artifacts under their policy.
 EOF

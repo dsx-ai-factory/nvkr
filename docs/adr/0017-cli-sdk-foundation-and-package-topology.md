@@ -278,6 +278,10 @@ operation through `release verify --scope authenticity`; exact-input flags are r
 Transport locators are excluded from
 the content subject and bound by the release metadata. A second published lifecycle-binding object is not retained. An external SDK test proves embedding
 without `main`. Low-level command orchestration must serve a current diagnostic or execution use case, not preserve an obsolete workflow.
+The legacy `build`, `fetch`, `assemble`, `attest`, `verify`, `profile`, `bake-off`, `sbom` and `disk`
+commands and qualified ReleaseSet/status/promotion commands are removed. Diagnostic `publish` remains
+for local OCI layouts and transport; it no longer attaches legacy Inventory or ReleaseSet documents.
+`release verify --lane` accepts only `pipeline-attested` and rejects other values during flag admission.
 
 `lifecycle.InspectRelease` is the bounded, context-first read-only entry point for registry or local release
 navigation. Delivery validates the bounded metadata and evidence closure before projecting declared output

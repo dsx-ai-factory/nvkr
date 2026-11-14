@@ -21,7 +21,9 @@ Local immutable attempts and Linux `pipeline-attested` consumers for `authentici
 payload downloads; artifact-publication retains payload integrity checks. Browsing does not verify payload
 bytes, signatures or consumer policy. Pulling checks the selected output's integrity without signature or
 policy verification. Neither supported verification scope satisfies full v1 release or qualified acceptance; unsupported stronger
-scopes fail before work.
+scopes fail before work. The legacy qualified command stack and disabled release subcommands are removed;
+`release verify --lane qualified` now fails flag admission with `usage`. Diagnostic `publish` retains
+binary bundles and transport without legacy Inventory/ReleaseSet attachments.
 
 Ordinary local non-disk terminal observation reopens and hashes producer bytes in the host process, using the
 same filesystem view as collection after bounded BuildKit output transport. It executes no producer code or
