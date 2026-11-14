@@ -660,7 +660,7 @@ After the existing full-byte/privacy/push gate, the publisher exports separate b
 whose root must equal the digest-pinned publication reference before the metadata is committed. This is a
 pre-sign description, distinct from the remote verifier's authenticated output handoff. The signer checks
 its exact route, named output, Plan, Definition, Environment and invocation bindings, re-derives all signing
-subjects, and verifies required SBOM bundles before signing. The subsequent independent remote verifier
+subjects, and verifies required SBOM bundles before signing. The subsequent remote verification step
 still retrieves and authenticates the complete served payload closure. Signing metadata cannot issue a
 full-payload receipt, bypass remote readback, or authorize finalization by itself. Legacy and aggregate
 routes retain their existing contracts. This reduces repeated transport within the pipeline-attested lane;

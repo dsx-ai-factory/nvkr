@@ -1371,10 +1371,12 @@ publish/sign/verify route. The attestation operation binds and verifies each Cyc
 release identity is derived. In `per-output-v1`, that operation reads and returns only bounded controls and
 evidence. The original payload preparation goes directly to the publisher, which verifies and combines
 the signed evidence with its unchanged payload files under ADR-20 §6's exclusive ownership contract.
-The publisher retains full-byte checks and exports exact-root-bound metadata for the independent signer;
-the signer re-derives subjects and verifies SBOMs without downloading payloads. The independent remote
-verifier still reads the complete published payload. Legacy full-layout attestation retains its existing
-ownership and retry contract. These handoffs are internal transfers, not additional deliverables.
+The publisher retains full-byte checks and exports exact-root-bound metadata for the signer; the signer
+re-derives subjects and verifies SBOMs without downloading payloads. The remote verifier still reads the
+complete published payload. Signer and verifier take their own inputs and credentials on their own steps of
+the output's release job, under the job boundaries above; they are not separate machines. Legacy
+full-layout attestation retains its existing ownership and retry contract. These handoffs are internal
+transfers, not additional deliverables.
 
 Generated steps invoke `factory github run-node`, `restore-inputs`, `pack-outputs`, or `recover` against
 the complete canonical Plan and an exact node or derived stage selector. The factory module admits the
