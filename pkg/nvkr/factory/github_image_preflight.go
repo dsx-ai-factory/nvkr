@@ -53,6 +53,12 @@ func githubPreflightSubjects(plan *Plan) (map[string][]imagepreflight.Subject, e
 	}
 	for _, stage := range stages {
 		for _, node := range stage.Nodes {
+			// An ARC disk job runs its utility operations in process. It pulls
+			// their container only in preparation, which covers private images;
+			// the public pin is for the utility platform and is never pulled.
+			if stage.DiskOutput != "" && node.IRNode == "" && !githubPrivateToolchain(plan, node.Container) {
+				continue
+			}
 			if err := add(node.Container, node.Platform, node.RunsOn, false); err != nil {
 				return nil, err
 			}
