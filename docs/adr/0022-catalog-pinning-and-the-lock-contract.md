@@ -508,8 +508,14 @@ on supported filesystems and publication of a separately versioned catalog-data 
 A source may declare `tool` with `format` (`raw` or `tar-gzip`), a version-rendered HTTPS `url`,
 `platform` (`linux/amd64` or `linux/arm64`), `executablePath`, and optional `companions`. Tool names are source names; they do not
 include release versions. The same source constraint and tag-prefix selection used by other sources governs
-`catalog pin` and `catalog bump`. Each declared tool currently selects one platform; multiple platforms use
-distinct source names. No platform fallback is inferred.
+`catalog pin` and `catalog bump`. A tool may instead declare nonempty sorted unique `platforms`,
+exclusive with `platform`, using the existing Linux AMD64/ARM64 and Darwin ARM64 executable domain.
+The multi-platform form expands `{{.OS}}` and `{{.Arch}}` in URL, executable member and companion paths.
+Each platform must select a distinct URL/member pair; unknown tokens fail admission. The lock uses a
+sorted `tools` list, exclusive with `tool`, with exactly one complete pin per declared platform.
+Missing entries are `unpinned-source`; extra, duplicate or competing forms are `invalid-catalog`.
+Pinning resolves one source release and acquires every platform before its single lock CAS write.
+Single-platform declarations and locks retain their canonical bytes. No platform fallback is inferred.
 
 Pinning resolves the upstream tag to commit/tree/epoch, downloads the release asset with bounded I/O, checks
 archive structure and computes both archive and selected-executable SHA-256 digests without running the tool.
@@ -519,7 +525,9 @@ lock snapshot/CAS writer, including `--check` no-write behavior; a failed downlo
 These hashes pin acquired bytes; they do not establish an upstream signature or reproducible build.
 
 The resolved catalog snapshot includes tool pins. Definition selects tools by purpose, and compilation
-requires each selected catalog tool to match the utility execution platform. Missing pins, invalid formats
+selects the exact tool pin matching each utility operation platform, failing `engine-capability` when absent.
+The optional resolved `toolPlatforms` snapshot field binds the complete per-source platform list.
+The original `tools` single-pin map remains unchanged for legacy catalogs. Missing pins, invalid formats
 or ambiguous declarations fail before execution. Regenerate the Run bundle after any tool bump.
 
 An acquired `host-package` producer may set `prebuilt.releaseExecutable: true`

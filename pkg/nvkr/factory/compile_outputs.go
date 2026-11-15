@@ -22,12 +22,20 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 		return err
 	}
 	for _, output := range definition.Outputs {
+		for _, target := range nativeOutputSelections(output) {
+			if _, _, err := environment.OutputUtility(target.Platform); err != nil {
+				return err
+			}
+		}
 		debianPublication := output.Format == authored.OutputDebianPackage && environment.Publication != nil
 		if output.Format == authored.OutputDebianPackage && !debianPublication && environment.Signing != nil {
 			return e.New(e.CodeEngineCapability, "Debian publication/signing requires final-byte archive evidence joins")
 		}
 
 		if output.Format == authored.OutputDebianPackage && definition.SBOMTool != "" {
+			if environment.UtilityContainers != nil && output.Platform != environment.UtilityPlatform {
+				return e.New(e.CodeEngineCapability, "native Debian inspection requires a matching admitted reader profile")
+			}
 			if !debianPublication {
 				return e.New(e.CodeEngineCapability, "Debian dependency inspection is not supported for local raw package outputs")
 			}
@@ -88,36 +96,47 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 }
 
 // Run-wide tools use the Definition catalog; each generator uses its output's
-// catalog. One tool name identifies one acquisition, so all selected pins must agree.
+// catalog. Utility acquisitions bind one exact pin per selected execution platform.
 func selectedTools(definition authored.Definition, environment authored.Environment, source *catalog.Catalog,
 ) (map[string]catalog.ToolPin, error) {
 	if source == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "tool selection requires a resolved catalog")
 	}
-	names := []string{}
-	if definition.SBOMTool != "" {
-		names = append(names, definition.SBOMTool)
-	}
-	if environment.Signing != nil && environment.Signing.Mode == SigningModeCosign {
-		names = append(names, definition.CosignTool)
-	}
-	tools := make(map[string]catalog.ToolPin, len(names))
-	selectTool := func(name string, selected *catalog.Catalog) error {
-		pin, ok := selected.Tools[name]
-		if !ok {
-			return e.New(e.CodeUnpinnedSource, "selected catalog tool %q has no pin", name)
+	tools := map[string]catalog.ToolPin{}
+	selectTool := func(name, platform string) error {
+		pin, err := source.SelectTool(name, platform)
+		if err != nil {
+			return err
 		}
-		if pin.Platform != environment.UtilityPlatform {
-			return e.New(e.CodeEngineCapability, "tool %q platform %s does not match utility platform %s", name, pin.Platform, environment.UtilityPlatform)
+		key := utilityToolName(environment, name, platform)
+		if previous, exists := tools[key]; exists && !reflect.DeepEqual(previous, pin) {
+			return e.New(e.CodeUnpinnedSource, "selected catalog tool %q has conflicting pins", key)
 		}
-		if previous, exists := tools[name]; exists && !reflect.DeepEqual(previous, pin) {
-			return e.New(e.CodeUnpinnedSource, "selected catalog tool %q has conflicting pins", name)
-		}
-		tools[name] = pin
+		tools[key] = pin
 		return nil
 	}
-	for _, name := range uniqueSorted(names) {
-		if err := selectTool(name, source); err != nil {
+	if definition.SBOMTool != "" {
+		platforms := map[string]bool{}
+		if environment.UtilityContainers == nil {
+			platforms[environment.UtilityPlatform] = true
+		}
+		for _, output := range definition.Outputs {
+			for _, target := range nativeOutputSelections(output) {
+				_, platform, err := environment.OutputUtility(target.Platform)
+				if err != nil {
+					return nil, err
+				}
+				platforms[platform] = true
+			}
+		}
+		for _, platform := range sortedKeys(platforms) {
+			if err := selectTool(definition.SBOMTool, platform); err != nil {
+				return nil, err
+			}
+		}
+	}
+	if environment.Signing != nil && environment.Signing.Mode == SigningModeCosign {
+		if err := selectTool(definition.CosignTool, environment.UtilityPlatform); err != nil {
 			return nil, err
 		}
 	}

@@ -119,6 +119,9 @@ func validateRegistryDeclarations(reg *registryDoc) error {
 // Validate enforces the resolved-catalog invariants. It is deterministic:
 // components and profiles are checked in sorted order so the first error is stable.
 func (cat *Catalog) Validate() error {
+	if err := cat.validatePlatformTools(); err != nil {
+		return err
+	}
 	if cat == nil {
 		return e.New(e.CodeInvalidCatalog, "catalog is nil")
 	}

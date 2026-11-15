@@ -230,14 +230,20 @@ func TestGitHubPartitionMaintainedCapacity(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertGitHubPartitionMembership(t, plan, entry, workers)
+	if err := validateGitHubWorkflowSize(entry); err != nil {
+		t.Fatal(err)
+	}
 	maxBytes := len(entry)
-	for _, child := range workers {
+	for name, child := range workers {
+		if err := validateGitHubWorkflowSize(child); err != nil {
+			t.Fatalf("worker %s: %v", name, err)
+		}
 		maxBytes = max(maxBytes, len(child))
 	}
-	t.Logf("single Run: entry %d bytes, %d workers, largest file %d bytes", len(entry), len(workers), maxBytes)
-	if maxBytes >= len(raw) {
-		t.Fatal("partitioning did not reduce maximum workflow size")
-	}
+	// Native utility grouping can make the flat file smaller than a forced
+	// partition. The fallback must preserve membership and fit provider limits;
+	// it need not shrink a flat workflow that already fits those limits.
+	t.Logf("single Run: flat %d bytes, entry %d bytes, %d workers, largest file %d bytes", len(raw), len(entry), len(workers), maxBytes)
 }
 
 func TestGitHubPartitionDependenciesCrossSigningBoundary(t *testing.T) {

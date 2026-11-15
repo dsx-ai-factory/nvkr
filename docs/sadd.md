@@ -259,6 +259,11 @@ original producer and held disk open through disk-evidence packaging. Declared c
 package and evidence to one generic hosted release job per output, where attestation, publication, signing
 and verification run as steps, each with its own step-scoped credential (ADR-18/20). On GitHub a job is one
 authority class on one runner: producer operations never share a job with release authority.
+An explicit per-platform utility-container map keeps output observation, SBOM generation and packaging
+on the native producer platform. Catalog tools can pin both architectures under one name; the compiler
+selects and authenticates the matching scanner acquisition. Release operations retain the default
+utility platform. This changes Environment/catalog/Plan identity and the scanner digest in ARM64 SBOMs,
+without changing logical producer Build identity.
 Fused large-output wrapped publication and verification remain deferred (ADR-10).
 
 | Boundary | Data and responsibility | Trust or persistence rule |

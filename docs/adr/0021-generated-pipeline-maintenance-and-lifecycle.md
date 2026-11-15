@@ -193,6 +193,12 @@ accounting only. ADR-18 §8 owns collector bounds, exact result normalization an
 Producer matrices and general callable producer interfaces remain deferred; the opt-in partition workers
 above are generated scheduling structure, not an authored callable interface.
 
+Native output utility placement is compiled from the Environment utility-container map and per-platform
+catalog tool pins. Changing that selection requires regenerating every consuming Plan and bundle,
+including runtime-Plan baselines; rendered workflows are never patched to move a step independently
+of its authenticated platform and container. Root scanner acquisitions remain separate jobs, while
+output utilities join their native producer subject when authority, prerequisites and limits permit.
+
 ### 2. Drift detection is a fail-closed `--check` twin, run by a separate generated gate
 
 `run generate --check` re-emits in memory using the recorded Definition/Environment selection and compares

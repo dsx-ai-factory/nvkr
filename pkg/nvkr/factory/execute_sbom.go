@@ -76,7 +76,7 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	if len(boms) == 0 {
 		return e.New(e.CodePipelineDrift, "factory sbom node %q produced no per-artifact SBOM", node.ID)
 	}
-	if tool := plan.Definition.SBOMTool; tool != "" || plan.hasBundleTarget(node.BuildTarget) {
+	if tool := sbomToolName(plan, node); tool != "" || plan.hasBundleTarget(node.BuildTarget) {
 		if tool != "" && (!containsString(node.Inputs, "tool/"+tool) || artifacts["tool/"+tool].Kind != "pipeline-tool") {
 			return e.New(e.CodeProvenanceMissing, "SBOM node omits pinned scanner input")
 		}
@@ -176,12 +176,6 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 func (plan *Plan) validateSBOMGraph() error {
 	tool := plan.Definition.SBOMTool
 	nodes, artifacts := planIndex(plan)
-	if tool != "" {
-		scanner, ok := nodes["tool/"+tool]
-		if !ok || scanner.Kind != NodeAcquire || !canonical.IsDigest(scanner.ExecutableDigest) || artifacts["tool/"+tool].Kind != "pipeline-tool" {
-			return e.New(e.CodeProvenanceMissing, "SBOM inspection requires a pinned acquired scanner")
-		}
-	}
 	for _, artifact := range artifacts {
 		if artifact.Kind != "producer-result" {
 			continue
@@ -224,6 +218,13 @@ func (plan *Plan) validateSBOMGraph() error {
 				return e.New(e.CodeEngineCapability, "disk SBOM requires its exact offline Plan-selected inspection profile")
 			}
 			continue
+		}
+		tool := sbomToolName(plan, node)
+		if tool != "" {
+			scanner, ok := nodes["tool/"+tool]
+			if !ok || scanner.Kind != NodeAcquire || !canonical.IsDigest(scanner.ExecutableDigest) || artifacts["tool/"+tool].Kind != "pipeline-tool" {
+				return e.New(e.CodeProvenanceMissing, "SBOM inspection requires a pinned acquired scanner")
+			}
 		}
 		if plan.debianPublicationTarget(node.BuildTarget) && tool != "" {
 			profile, err := debianPublicationInspectionProfile(plan)

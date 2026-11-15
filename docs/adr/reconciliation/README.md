@@ -42,9 +42,10 @@ bundles need.
 
 [ADR-28](../0028-multi-platform-executable-indexes.md) proposes multi-platform executables: one tool source and
 one lock transaction cover every platform of a release, and an executable output may declare a `platforms` set
-published as a standard OCI image index over minimal per-platform images. It is designed, not implemented: tool
-declarations, tool pins and executable outputs remain single-platform, and executables publish only as Binary
-Bundles. It also inventories the existing per-platform executable deliveries to retrofit.
+published as a standard OCI image index over minimal per-platform images. Per-platform tool declarations,
+pin lists and native utility selection are implemented; executable index outputs remain designed, not
+implemented, and executables publish only as Binary Bundles. It also inventories the existing per-platform
+executable deliveries to retrofit.
 
 [ADR-29](../0029-cluster-observation-and-artifact-attribution.md) proposes cluster information gathering and
 optional descriptive comparison with selected NVKR artifacts. It is design only. The proposed observation

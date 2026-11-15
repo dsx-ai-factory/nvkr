@@ -170,10 +170,10 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 					}
 					matches = scanner == profile.ScannerDigest && reader == profile.PackageReaderDigest && sbom.ValidateDebianPayloadEvidence(&bom, platform, entry.ArtifactSHA) == nil
 				} else {
-					matches = method == "syft-cyclonedx/v1" && scanner == toolExecutableDigest(plan, plan.Definition.SBOMTool)
+					matches = method == "syft-cyclonedx/v1" && scanner == toolExecutableDigest(plan, sbomToolName(plan, node))
 				}
 			case "oci-image":
-				matches = method == "syft-cyclonedx/v1" && scanner == toolExecutableDigest(plan, plan.Definition.SBOMTool)
+				matches = method == "syft-cyclonedx/v1" && scanner == toolExecutableDigest(plan, sbomToolName(plan, node))
 			}
 			if !matches {
 				return nil, e.New(e.CodeVerifyFailed, "hosted SBOM inspection does not match the planned scanner")
