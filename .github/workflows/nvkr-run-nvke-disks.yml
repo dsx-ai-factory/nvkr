@@ -722,7 +722,7 @@ jobs:
     timeout-minutes: 60
     needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: &steps-ubuntu-24-04-node
+    steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
@@ -855,35 +855,6 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-tool-syft:
-    name: 'Acquire pinned syft'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
-    permissions:
-      actions: read
-      contents: read
-  nvkr-tool-syft-linux-arm64:
-    name: 'Acquire pinned syft/linux/arm64'
-    runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps:
-      - *check-native-linux-arm64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - name: execute node part-1
-        uses: ./.github/nvkr-run-nvke-disks/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
   nvkr-process-package-release-publish-rele-e70edb401cae:
     name: 'Assemble, publish, sign and verify release'
     runs-on: 'ubuntu-24.04'
@@ -914,7 +885,7 @@ jobs:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-disk-nvke-node-fde-amd64, nvkr-disk-nvke-node-fde-arm64, nvkr-disk-nvke-node-image-amd64, nvkr-disk-nvke-node-image-arm64, nvkr-process-attest-sboms-output-nvke-nod-1e0439c01f2c, nvkr-process-attest-sboms-output-nvke-nod-c77e5f67a080, nvkr-process-attest-sboms-output-nvke-nod-d860882864cf, nvkr-process-attest-sboms-output-nvke-nod-f91992abc2a0, nvkr-process-nvke-node-fde-amd64-fetch-nv-f8c224795476, nvkr-process-nvke-node-fde-amd64-fetch-ov-9b482bbb2e2f, nvkr-process-nvke-node-fde-arm64-fetch-nv-64dff97482f1, nvkr-process-nvke-node-fde-arm64-fetch-ov-464ac8f0f11b, nvkr-process-nvke-node-image-amd64-fetch-a0e20b2b6193, nvkr-process-nvke-node-image-amd64-fetch-da60ac6eb51c, nvkr-process-nvke-node-image-arm64-fetch-9eb6f62464bb, nvkr-process-nvke-node-image-arm64-fetch-d7223cad4f91, nvkr-process-package-release-publish-rele-e70edb401cae, nvkr-tool-cosign, nvkr-tool-syft, nvkr-tool-syft-linux-arm64, preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-disk-nvke-node-fde-amd64, nvkr-disk-nvke-node-fde-arm64, nvkr-disk-nvke-node-image-amd64, nvkr-disk-nvke-node-image-arm64, nvkr-process-attest-sboms-output-nvke-nod-1e0439c01f2c, nvkr-process-attest-sboms-output-nvke-nod-c77e5f67a080, nvkr-process-attest-sboms-output-nvke-nod-d860882864cf, nvkr-process-attest-sboms-output-nvke-nod-f91992abc2a0, nvkr-process-nvke-node-fde-amd64-fetch-nv-f8c224795476, nvkr-process-nvke-node-fde-amd64-fetch-ov-9b482bbb2e2f, nvkr-process-nvke-node-fde-arm64-fetch-nv-64dff97482f1, nvkr-process-nvke-node-fde-arm64-fetch-ov-464ac8f0f11b, nvkr-process-nvke-node-image-amd64-fetch-a0e20b2b6193, nvkr-process-nvke-node-image-amd64-fetch-da60ac6eb51c, nvkr-process-nvke-node-image-arm64-fetch-9eb6f62464bb, nvkr-process-nvke-node-image-arm64-fetch-d7223cad4f91, nvkr-process-package-release-publish-rele-e70edb401cae, nvkr-tool-cosign, preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     env:
@@ -1002,7 +973,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 28 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 26 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {

@@ -64,11 +64,7 @@ func bindEvidenceAttestation(plan *Plan) error {
 			plan.Graph.Nodes[i].Outputs = []string{prepared.ID}
 			stage.RunsOn = node.RunsOn
 			if plan.Environment.UtilityContainers != nil {
-				stage.RunsOn = plan.Environment.RunsOn
-				if stage.RunsOn == "" {
-					stage.RunsOn = DefaultRunsOn
-				}
-				stage.RunsOn = nativeUtilityRunner(plan.Environment, plan.Environment.UtilityPlatform, stage.RunsOn)
+				stage.RunsOn = defaultUtilityRunner(plan.Environment)
 			}
 			found = true
 		}

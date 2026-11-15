@@ -117,7 +117,7 @@ func resolvePinnedTool(name string, raw rawComponent, sources map[string]Source,
 		return c, e.Wrap(e.CodeUnpinnedSource, err, "pinned-tool component %q tool %q", name, raw.Tool)
 	}
 	if len(raw.Platforms) != 1 {
-		return c, e.New(e.CodeEngineCapability, "pinned-tool component requires one platform")
+		return c, e.New(e.CodeEngineCapability, "pinned-tool component %q requires one platform", name)
 	}
 	tool, err := selectToolPin(pin, raw.Platforms[0])
 	if err != nil {

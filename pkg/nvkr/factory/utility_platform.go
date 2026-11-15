@@ -30,7 +30,22 @@ func packageUtility(plan Plan, name string) (string, string, error) {
 }
 
 func nativeUtilityRunner(environment authored.Environment, platform, fallback string) string {
-	if environment.UtilityContainers != nil && environment.RunsOn == "" {
+	if environment.UtilityContainers != nil {
+		return defaultHostedRunner(environment, platform, fallback)
+	}
+	return fallback
+}
+
+func defaultUtilityRunner(environment authored.Environment) string {
+	runner := environment.RunsOn
+	if runner == "" {
+		runner = DefaultRunsOn
+	}
+	return nativeUtilityRunner(environment, environment.UtilityPlatform, runner)
+}
+
+func defaultHostedRunner(environment authored.Environment, platform, fallback string) string {
+	if environment.RunsOn == "" && environment.GitHubARC == "" {
 		switch platform {
 		case "linux/amd64":
 			return DefaultRunsOn

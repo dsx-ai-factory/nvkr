@@ -234,16 +234,31 @@ func TestGitHubPartitionMaintainedCapacity(t *testing.T) {
 		t.Fatal(err)
 	}
 	maxBytes := len(entry)
+	flatEvents, err := countGitHubWorkflowYAMLNodes(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	maxEvents, err := countGitHubWorkflowYAMLNodes(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for name, child := range workers {
 		if err := validateGitHubWorkflowSize(child); err != nil {
 			t.Fatalf("worker %s: %v", name, err)
 		}
 		maxBytes = max(maxBytes, len(child))
+		events, err := countGitHubWorkflowYAMLNodes(child)
+		if err != nil {
+			t.Fatalf("worker %s: %v", name, err)
+		}
+		maxEvents = max(maxEvents, events)
 	}
-	// Native utility grouping can make the flat file smaller than a forced
-	// partition. The fallback must preserve membership and fit provider limits;
-	// it need not shrink a flat workflow that already fits those limits.
-	t.Logf("single Run: flat %d bytes, entry %d bytes, %d workers, largest file %d bytes", len(raw), len(entry), len(workers), maxBytes)
+	// Native grouping can make a worker larger in bytes than the flat file.
+	// Partitioning must still reduce the parser-event count that binds first.
+	if maxEvents >= flatEvents {
+		t.Fatalf("partitioning did not reduce maximum parsing events: flat %d, partitioned %d", flatEvents, maxEvents)
+	}
+	t.Logf("single Run: flat %d bytes/%d events, entry %d bytes, %d workers, maximum bytes %d, maximum events %d", len(raw), flatEvents, len(entry), len(workers), maxBytes, maxEvents)
 }
 
 func TestGitHubPartitionDependenciesCrossSigningBoundary(t *testing.T) {

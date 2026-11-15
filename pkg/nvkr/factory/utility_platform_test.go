@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -201,6 +202,79 @@ func TestNativeDiskScannerSelectionUsesExactPlatformPin(t *testing.T) {
 				assertFactoryErrorCode(t, err, tc.code)
 			} else if err != nil {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestNativeScannerSelectionSkipsDiskOutputs(t *testing.T) {
+	for _, tc := range []struct {
+		name, amdFormat, armFormat string
+		legacy                     bool
+		want                       []string
+	}{
+		{"native disks only", authored.OutputDiskImage, authored.OutputDiskImage, false, nil},
+		{"native AMD binary", authored.OutputExecutable, authored.OutputDiskImage, false, []string{"syft"}},
+		{"native ARM binary", authored.OutputDiskImage, authored.OutputExecutable, false, []string{"syft/linux/arm64"}},
+		{"legacy disks unchanged", authored.OutputDiskImage, authored.OutputDiskImage, true, []string{"syft"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, plan := nativeUtilityFixture(t)
+			plan.Definition.Outputs[0].Format = tc.amdFormat
+			plan.Definition.Outputs[1].Format = tc.armFormat
+			if tc.legacy {
+				plan.Environment.UtilityContainers = nil
+			}
+			tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var scanners []string
+			for _, name := range sortedKeys(tools) {
+				if strings.HasPrefix(name, "syft") {
+					scanners = append(scanners, name)
+				}
+			}
+			if !reflect.DeepEqual(scanners, tc.want) {
+				t.Fatalf("scanner acquisitions = %v, want %v", scanners, tc.want)
+			}
+		})
+	}
+}
+
+func TestNativeScannerMustBeSelectedBeforeGraphCompilation(t *testing.T) {
+	_, plan := nativeUtilityFixture(t)
+	tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	delete(tools, "syft/linux/arm64")
+	packages, _, _, err := derivePublication(plan.Definition, plan.Environment, plan.Builds)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = compileArtifactGraph(*plan, tools, packages)
+	assertFactoryErrorCode(t, err, e.CodeProvenanceMissing)
+}
+
+func TestDefaultUtilityRunnerRespectsRouteOwnership(t *testing.T) {
+	for _, tc := range []struct {
+		name, platform, explicit, arc, want string
+		legacy                              bool
+	}{
+		{"native AMD", "linux/amd64", "", "", DefaultRunsOn, false},
+		{"native ARM", "linux/arm64", "", "", "ubuntu-24.04-arm", false},
+		{"explicit ARM", "linux/arm64", "ubuntu-24.04", "", "ubuntu-24.04", false},
+		{"ARC owns projection", "linux/arm64", "", "native-kvm-v1", DefaultRunsOn, false},
+		{"legacy ARM unchanged", "linux/arm64", "", "", DefaultRunsOn, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			env := authored.Environment{UtilityPlatform: tc.platform, RunsOn: tc.explicit, GitHubARC: tc.arc}
+			if !tc.legacy {
+				env.UtilityContainers = map[string]string{tc.platform: "test-only"}
+			}
+			if got := defaultUtilityRunner(env); got != tc.want {
+				t.Fatalf("utility runner = %q, want %q", got, tc.want)
 			}
 		})
 	}

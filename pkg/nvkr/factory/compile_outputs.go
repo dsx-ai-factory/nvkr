@@ -121,6 +121,9 @@ func selectedTools(definition authored.Definition, environment authored.Environm
 			platforms[environment.UtilityPlatform] = true
 		}
 		for _, output := range definition.Outputs {
+			if environment.UtilityContainers != nil && output.Format == authored.OutputDiskImage {
+				continue
+			}
 			for _, target := range nativeOutputSelections(output) {
 				_, platform, err := environment.OutputUtility(target.Platform)
 				if err != nil {

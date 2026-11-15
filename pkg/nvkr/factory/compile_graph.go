@@ -20,11 +20,7 @@ import (
 // It ignores the supplied Graph and never mutates the caller's Plan.
 func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSpecs []packageSpec) (ArtifactGraph, error) {
 	definition, delivery := plan.Definition, plan.Environment
-	runsOn := delivery.RunsOn
-	if runsOn == "" {
-		runsOn = DefaultRunsOn
-	}
-	runsOn = nativeUtilityRunner(delivery, delivery.UtilityPlatform, runsOn)
+	runsOn := defaultUtilityRunner(delivery)
 	plan.Graph = ArtifactGraph{SchemaVersion: ArtifactGraphSchema}
 	tools, err := withProducerTools(tools, plan.Builds)
 	if err != nil {
@@ -114,7 +110,11 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			}
 		}
 		if !disk && definition.SBOMTool != "" {
-			node.Inputs = append(node.Inputs, "tool/"+sbomToolName(&plan, node))
+			name := sbomToolName(&plan, node)
+			if _, ok := tools[name]; !ok {
+				return ArtifactGraph{}, e.New(e.CodeProvenanceMissing, "SBOM scanner is not a pinned tool")
+			}
+			node.Inputs = append(node.Inputs, "tool/"+name)
 		}
 		node.Inputs = uniqueSorted(node.Inputs)
 		nodes[id] = node
