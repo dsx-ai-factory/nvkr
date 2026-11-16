@@ -236,12 +236,10 @@ func TestNativeNVIDIAProducerRequirementsOffline(t *testing.T) {
 	}
 }
 
-// The disk's Packer version-pin patch is the only admitted source change.
+// The disk carries exactly its Packer version-pin patch; every other producer carries no patch.
 func changesUpstreamSource(component string, patches []catalog.Patch) bool {
-	for _, patch := range patches {
-		if component != "nvke-node-image" || patch.SHA256 != "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227" {
-			return true
-		}
+	if component != "nvke-node-image" {
+		return len(patches) != 0
 	}
-	return false
+	return len(patches) != 1 || patches[0].SHA256 != "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227"
 }
