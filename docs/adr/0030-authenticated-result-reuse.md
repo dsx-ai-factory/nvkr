@@ -1,13 +1,12 @@
 # ADR-30 — Authenticated result reuse
 
-- **Decision status:** Proposed (design only; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Designed, not implemented. No reuse key, discovery, acceptance, receipt or Run
   binding exists; see `reconciliation/README.md`.
 - **Acceptance-test maturity:** None. The test matrix below is the acceptance target for the implementing unit;
   no contract test, hosted Run or qualification result exercises reuse.
-- **Deciders:** Pending; release-engineering, publication and qualification owners must be named before ratification.
-- **Index:** Proposed ADR-30 supplements ADR-01–22 and proposed ADR-23/24; it remains outside the consolidated
-  contract set until accepted.
+- **Deciders:** njhensley
+- **Index:** ADR-30 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-01 (canonical codec and digest families), ADR-02 (Build identity tiers), ADR-04 (signing and
   consumer verification), ADR-06 (status), ADR-09 (production provenance), ADR-11 §2 (independent output uses),
   ADR-13 (typed evidence), ADR-16 §4–§5 (incremental validation and evidence tiers), ADR-17 §5–§6 (receipt lifetime

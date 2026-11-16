@@ -77,7 +77,7 @@ current [reconciliation index](../../../docs/adr/reconciliation/README.md), then
 read the owning per-ADR or topic file and cite its current section. Cross-check
 prerequisite statements against current PR merge state and owning code. Report
 stale prerequisite text separately and propose a correction in its owning ledger
-file, preserving dated evidence and pending ratification. A merged prerequisite
+file, preserving dated evidence and decision status. A merged prerequisite
 does not establish downstream implementation or acceptance.
 
 Apply the repository's live labels. These are the relevant conventions:

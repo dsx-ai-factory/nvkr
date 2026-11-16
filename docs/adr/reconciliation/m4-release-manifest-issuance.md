@@ -43,7 +43,7 @@ cover the status mapping, the event fallback for errored attempts, admission bef
 (including URL-escaped and base64 forms of the step's secrets), times kept outside the diagnostics, the size
 bound, an unchanged stdout and exit status, and the generated steps. No hosted Run has produced an outcome.
 
-`nvkr-results-publish` selects the outcomes a producer Run publishes and writes them to the proposed ADR-31
+`nvkr-results-publish` selects the outcomes a producer Run publishes and writes them to the ADR-31
 results index; it is implemented and contract-tested, not externally exercised. Contract tests cover selection
 (event admission, the qualify job's result and report, collection, fail-closed membership and built errored
 outcomes), the bucket layout, the TestGrid metadata, golden JUnit, the create-only protocol (order, idempotent

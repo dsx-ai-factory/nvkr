@@ -749,7 +749,7 @@ producer's OIDC jobs to sit in the entry workflow named by its anchored signer p
 admit no other committed workflow file. Lowering refuses worker or caller `id-token` declarations with
 `CodeEngineCapability`. These are local generation and contract results. The hosted Run 40727132359 above
 predates fragment forwarding, so hosted execution of the new forwarding, including failure and cancellation
-reporting, is unrecorded. Signer relocation remains a proposed ADR-18 §8 design with no implementation.
+reporting, is unrecorded. Signer relocation remains an ADR-18 §8 design with no implementation.
 
 The maintained release Environment now also selects `githubExecutionPartitions`. The NVKE v0.23.0 DOCA OVS
 producer added one source fetch per release disk and took the flat release workflow to 47,731 events,

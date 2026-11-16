@@ -199,7 +199,7 @@ frozen scope and expected targets/counts cannot be narrowed to the reporter's su
 unknown software and unsupported joins. A recorded list remains a reporter/API observation, not independent
 proof that it omitted nothing.
 
-[Proposed ADR-28](adr/0028-multi-platform-executable-indexes.md) separates executable delivery from runnable
+[ADR-28](adr/0028-multi-platform-executable-indexes.md) separates executable delivery from runnable
 images. Image-volume consumption uses an OCI identity comparison and needs a supported native-child/mount
 observation; existing container
 imageID checks do not cover it automatically. Copied/repackaged content needs downstream lineage to its
