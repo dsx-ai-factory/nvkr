@@ -5,6 +5,7 @@ package catalog
 
 import (
 	"context"
+	"crypto/sha256"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -188,6 +189,36 @@ func TestCommandFilesPreserveInlineScalars(t *testing.T) {
 				}
 				if !reflect.DeepEqual(got, want) {
 					t.Fatalf("inline scalar decoding changed: got %#v, want %#v", got, want)
+				}
+			})
+		}
+	}
+}
+
+func TestCommandFilesTypedDecodePreservesUnicode(t *testing.T) {
+	for _, body := range []string{"ASCII\r\n", "\u007f", "\u0080", "\u0085", "\u009f", "\ufeff", "\ufffe", "\uffff", "\x00\t\n", "héllo 🌍"} {
+		for _, fragment := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%q/fragment=%v", body, fragment), func(t *testing.T) {
+				root := t.TempDir()
+				raw := []byte("apiVersion: nvkr.dev/catalog/v3\nkind: SourceBuildRegistry\nsources:\n  source:\n    repo: https://example.test/source\n    toolchainImage: " + goodImage + "\n    vendorCommand: [sh, -ec, {file: body}]\ncomponents:\n  tool:\n    platforms: [linux/amd64]\n    fromSource: true\n    source: source\n    outputType: host-package\n    artifactPath: out/tool\n    writeDir: out\n    buildCommand: [sh, -ec, {file: body}]\n    buildCommandByPlatform: {linux/amd64: [sh, -ec, {file: body}]}\n")
+				writeFragmentFixture(t, filepath.Join(root, "body"), []byte(body))
+				if fragment {
+					fragmentRaw := []byte(strings.Replace(string(raw), "apiVersion: nvkr.dev/catalog/v3\nkind: SourceBuildRegistry", "apiVersion: nvkr.dev/catalog-fragment/v1\nkind: CatalogFragment", 1))
+					writeFragmentFixture(t, filepath.Join(root, "fragment.yaml"), fragmentRaw)
+					raw = []byte(fmt.Sprintf("apiVersion: nvkr.dev/catalog/v3\nkind: SourceBuildRegistry\nimports:\n- path: fragment.yaml\n  sha256: %x\n  sources: {source: source}\n  components: {tool: tool}\n", sha256.Sum256(fragmentRaw)))
+				}
+				provider, err := BindContext(t.Context(), Dir(root))
+				if err != nil {
+					t.Fatal(err)
+				}
+				reg, err := decodeRegistry(raw, "test", provider)
+				if err != nil {
+					t.Fatal(err)
+				}
+				for _, command := range [][]string{reg.Sources["source"].VendorCommand, reg.Components["tool"].BuildCommand, reg.Components["tool"].BuildCommandByPlatform["linux/amd64"]} {
+					if command[2] != body {
+						t.Fatalf("file bytes changed: got %q, want %q", command[2], body)
+					}
 				}
 			})
 		}

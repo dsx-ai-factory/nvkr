@@ -6,6 +6,7 @@ package catalog
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"path"
 	"sort"
 	"strings"
@@ -80,7 +81,19 @@ func expandCommandFiles(raw []byte, declaring string, providers []DataProvider) 
 	if err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "expanding command files")
 	}
-	return result, nil
+	// The typed decoder reads this JSON as YAML. JSON permits literal C1
+	// controls and noncharacters that YAML rejects or normalizes (notably NEL).
+	// Escape those runes in transport so YAML reconstructs the exact file bytes.
+	// encoding/json already escapes C0 controls and line/paragraph separators.
+	escaped := make([]byte, 0, len(result))
+	for _, r := range string(result) {
+		if r >= 0x7f && r <= 0x9f || r == 0xfffe || r == 0xffff {
+			escaped = fmt.Appendf(escaped, `\u%04x`, r)
+		} else {
+			escaped = utf8.AppendRune(escaped, r)
+		}
+	}
+	return escaped, nil
 }
 
 func commandKeys(values map[string]any) []string {
