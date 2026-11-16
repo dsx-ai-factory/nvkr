@@ -100,7 +100,7 @@ Those rows derive only from qualified SBOM and provenance capabilities that rech
 evidence bytes. The ValidationVector references the three publisher aggregates shown above. Attaching digest
 strings never makes a vector publishable.
 
-The retained verification diagnostic recomputes those publisher aggregates against the authenticated vector.
+Verification of those publisher aggregates against the authenticated vector is retired with the qualified lane.
 The unused digest setter and separate external-evidence release-receipt projections are removed. Acquisition
 still verifies exact external bytes, schema and subject before embedding their verified SBOM properties; it
 does not issue a release authorization.

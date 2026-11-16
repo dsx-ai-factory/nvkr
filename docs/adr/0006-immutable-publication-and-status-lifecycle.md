@@ -65,7 +65,7 @@ The deferred discovery protocol publishes a status declaration as a signed OCI r
 operator’s registry. A consumer holding a release digest **discovers** declarations by **querying that digest’s
 referrers** — no central service, no side-channel to poll. For **air-gap** there is no registry to query, so the
 same declarations must be mirrorable out-of-band as a bundle. Registry discovery, referrer publication and
-mirror-bundle integration are not implemented. Current commands authenticate explicitly supplied documents.
+mirror-bundle integration are not implemented. No current command authenticates status declarations.
 
 ### 4. Signed status checkpoints: freshness and anti-rollback
 

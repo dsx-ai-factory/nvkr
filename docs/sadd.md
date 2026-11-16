@@ -180,10 +180,10 @@ profile or lifecycle objects; native Helm charts retain their own media contract
 Deployment topology and node placement are downstream concerns,
 without another NVKR authored object or generated realization.
 
-The internal records appear where needed to explain trust: plans describe admitted execution; Inventory and
-ReleaseSet represent required and realized qualified membership; ValidationVectors carry signed reproduction
-expectations; clearance authorizes exact qualified contents; publication roots carry the transport closure.
-These remain typed and inspectable. Normal callers do not construct and connect them manually.
+The implemented internal records explain the supported workflow: plans describe admitted execution and
+publication roots carry the transport closure. These remain typed and inspectable. Normal callers do not
+construct and connect them manually. Qualified Inventory, ReleaseSet, ValidationVector and clearance records
+remain deferred design; their implementations and command routes are retired.
 
 Source lane describes how bytes were obtained: `hermetic-build`, `wrapped-build`, or `acquired`. Evidence tier
 describes the claim attached to those bytes. Neither is a synonym for artifact format or release status.

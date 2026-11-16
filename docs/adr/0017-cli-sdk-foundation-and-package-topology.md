@@ -540,5 +540,5 @@ Linux race tests provide contract evidence; repository checks are recorded in re
 End-to-end acceptance requires a separate consumer module using only `client/v1` to load inputs, prepare and
 execute a Run, and verify its published Release under explicit policy, plus cancellation tests against every
 real subprocess and network adapter proving no child, container, temporary output, or partial publication remains.
-Qualified diagnostic commands remain explicitly scoped consumers of their owning modules. They do not constitute
+Qualified diagnostic commands are retired. The retained diagnostic `publish` command does not constitute
 an alternative supported publication workflow, and current command orchestration is not described as fully thin.
