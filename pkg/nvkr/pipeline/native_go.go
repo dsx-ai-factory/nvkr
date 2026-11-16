@@ -141,8 +141,8 @@ func (tool *NativeGoToolchain) Close() error {
 // lockNativeGo admits the options and receipt together. The caller owns the
 // returned lock through execution, or releases it after an early capability check.
 func lockNativeGo(node ir.Node, options RunOptions) (*NativeGoToolchain, error) {
-	if options.NativeGo == nil || options.Qualification != nil || options.execution != nil || !options.Launch || options.Package {
-		return nil, e.New(e.CodeEngineCapability, "native Go execution requires a local unqualified toolchain receipt")
+	if options.NativeGo == nil || !options.Launch || options.Package {
+		return nil, e.New(e.CodeEngineCapability, "native Go execution requires a local toolchain receipt")
 	}
 	tool := options.NativeGo
 	tool.mu.Lock()

@@ -1,6 +1,7 @@
 # Demos
 
 Use these guided examples to explore NVKR with a team or at your own pace. Start with the
+[hello demo](hello/README.md), then the
 [quickstart](../docs/quickstart.md) for a local three-artifact NVKE build, or
 [build only the CLI](../docs/quickstart.md#build-only-the-cli) for planning and inspection.
 The [concept reference](../docs/user-concepts.md) explains the core ideas. The [documentation map](../docs/README.md) connects deeper tasks.
@@ -37,7 +38,7 @@ bash demos/demo-team-release.sh --help
 ```
 
 The tiny local demo builds a real executable in Docker and runs the portable result on the host;
-start with its [guide](quickstart/README.md).
+start with its [guide](hello/README.md).
 The catalog and OS tours inspect inputs, graphs, and dry-runs without building artifacts. The
 release tour reads bounded metadata and evidence; payloads, signatures, and consumer policy
 remain unverified. The [facilitator guide](team-guide.md) explains the separate verification step.
@@ -46,7 +47,7 @@ remain unverified. The [facilitator guide](team-guide.md) explains the separate 
 
 | Journey | Start here |
 |---|---|
-| Build your first artifact in seconds after warm-up | [Tiny local demo](quickstart/README.md) and [script](demo-local.sh) |
+| Build your first artifact in seconds after warm-up | [Tiny local demo](hello/README.md) and [script](demo-local.sh) |
 | Build, publish, and recover the local NVKE CLI | [Local NVKE walkthrough](m1-local.md) and [script](../scripts/demo-m1-local.sh) |
 | Bake an OS image on a prepared host | [OS-image routes and prerequisites](../inputs/definitions/diagnostics/README.md) |
 | Understand the native Linux/Mac site plus two-guest topology under validation | [Shared native path](../docs/local-nvke-demo.md#native-linux-and-mac-path) |

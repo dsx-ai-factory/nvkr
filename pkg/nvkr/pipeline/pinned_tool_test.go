@@ -45,7 +45,6 @@ func TestAdmitPinnedToolBeforeWork(t *testing.T) {
 		name   string
 		change func(*ir.Node, *RunOptions)
 	}{
-		{"qualified execution", func(_ *ir.Node, o *RunOptions) { o.Qualification = &QualifiedExecution{} }},
 		{"packaging", func(_ *ir.Node, o *RunOptions) { o.Package = true }},
 		{"undeclared output form", func(n *ir.Node, _ *RunOptions) { n.OutputType = "raw" }},
 		{"network", func(n *ir.Node, _ *RunOptions) { n.Network = ir.NetworkDefault }},

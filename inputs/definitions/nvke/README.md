@@ -13,14 +13,14 @@ the issue that adds it.
 
 | Definition | Environment | Produces | Lane when run | Status |
 |---|---|---|---|---|
-| [Core](core.yaml) | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) | Site controller: `nvkectl`, operator tools, controller image and chart, `controller-profiles`, CAPNICo, CAPI and cert-manager images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
+| [Core](core.yaml) | [github-nvke-core.yaml](../../environments/github-nvke-core.yaml) | Site controller: `nvkectl`, operator tools, controller image and chart, `controller-profiles`, CAPNICo, CAPI and cert-manager images | `pipeline-attested` | Generated production bundle; [standalone Run history](../../../docs/adr/reconciliation/maintained-input-and-schema-boundaries.md#maintained-input-and-schema-boundaries) |
 | [Services](services.yaml) | [github-nvke-services.yaml](../../environments/github-nvke-services.yaml) | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Telemetry](telemetry.yaml) | [github-nvke-telemetry.yaml](../../environments/github-nvke-telemetry.yaml) | NKTP chart and images | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Disks](disks.yaml) | [github-nvke-disks.yaml](../../environments/github-nvke-disks.yaml) | Ubuntu 26.04 `nvke-node-image-{amd64,arm64}` and `nvke-node-fde-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | [Disks Ubuntu 24](disks-ubuntu24.yaml) | [github-nvke-disks-ubuntu24.yaml](../../environments/github-nvke-disks-ubuntu24.yaml) | Ubuntu 24.04 `nvke-node-image-ubuntu24-{amd64,arm64}` and `nvke-node-fde-ubuntu24-{amd64,arm64}` | `pipeline-attested` | Generated production bundle; no hosted Release recorded |
 | Offline CAPI repository in Core | — | `clusterctl` provider manifests | — | Pending [#324](https://github.com/dsx-ai-factory/nvkr/issues/324) |
-| [GB200 AICR bundle](../aicr/nvke-gb200.yaml) | [aicr-local-arm64.yaml](../../environments/aicr-local-arm64.yaml) (local build only) | `aicr-nvke-gb200-ubuntu-training-kubeflow-{helm,flux,argocd-helm}` | `unqualified-local-execution` | One local Run recorded ([AICR inputs](../aicr/README.md#gb200-nvke-kubeflow-training)); a hosted Release is pending [#325](https://github.com/dsx-ai-factory/nvkr/issues/325) |
-| [GPU site composite](gpu-site.composite.yaml) | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | Every output of the five NVKE families and the GB200 AICR bundle above, 83 in all, in one Release ([GPU site composite](#gpu-site-composite)) | `pipeline-attested` | Generated named production bundle and the fixed development bundle; no hosted Release recorded |
+| [GB200 AICR bundle](../aicr/nvke-gb200.yaml) | [aicr-local-arm64.yaml](../../environments/aicr-local-arm64.yaml) (local build only) | `aicr-nvke-gb200-ubuntu-training-kubeflow-{helm,flux,argocd-helm}` | `unqualified-local-execution` | One local Run recorded ([AICR inputs](../aicr/README.md#gb200-nvke-kubeflow-training)); also included in the composite publication below |
+| [GPU site composite](gpu-site.composite.yaml) | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | Every output of the five NVKE families and the GB200 AICR bundle above, 83 in all, in one Release ([GPU site composite](#gpu-site-composite)) | `pipeline-attested` | [Historical 83-output hosted publication](../../../docs/adr/reconciliation/adr-26.md#hosted-gpu-site-publication); current-candidate execution and consumer verification pending |
 
 The [AICR inputs](../aicr/README.md) also hold a `generic` GB300 example, which is not an NVKE recipe and is
 not part of an NVKE site.
@@ -45,6 +45,17 @@ disks and disks-ubuntu24 Definitions and the [GB200 AICR bundle](../aicr/nvke-gb
 `nvkr.definition` digests. One Run builds all 83 outputs and
 publishes one Release whose membership is the exact union of the members' outputs. The family Definitions,
 Runs and Releases stay as they are; the composite reads the family files and changes none of them.
+The composite is the product entry point. Its [first recorded hosted publication](../../../docs/adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
+covers an earlier candidate, not current-head or consumer acceptance.
+
+A maintainer can dispatch the existing production workflow on `main`; it has no inputs:
+
+```sh
+gh workflow run nvkr-run-nvke-gpu-site.yml --repo dsx-ai-factory/nvkr --ref main
+```
+
+Record the Run URL, attempt, commit, complete output count and exact publication root after it succeeds.
+Use the root from that same completed Run for subsequent consumer verification.
 
 Both disk families select the same disk, agent, installer and DOCA OVS components, and the Ubuntu 24.04
 overlay replaces their producers. The composite declares those eight components as variants of the two disk
@@ -180,8 +191,9 @@ Keep the combined path until the consumer and qualification cutover has its own 
 Consumers select each exact digest-pinned family Release and verify it under independently chosen policy.
 Any record associating those references belongs to the downstream consumer; this pilot emits no automatic
 association file, native parent Release or cross-Release compatibility verdict. Family output publication
-still requires every output and its exact evidence within that Definition. No hosted family build,
-publication or independent consumer acceptance is established here. The
+still requires every output and its exact evidence within that Definition. The
+[family evidence ledger](../../../docs/adr/reconciliation/maintained-input-and-schema-boundaries.md#maintained-input-and-schema-boundaries)
+owns standalone Run and consumer-acceptance status. The
 [partitioning strategy](../../../docs/definition-partitioning-strategy.md) records the rationale,
 historical capacity measurements and remaining cutover work.
 

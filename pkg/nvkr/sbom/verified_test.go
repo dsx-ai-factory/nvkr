@@ -8,19 +8,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"os"
-	"path/filepath"
-	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/profile"
 )
 
 func evidenceDigest(body []byte) string {
@@ -116,7 +109,7 @@ func TestBuildVerifiedReadsAndHashesExternalEvidence(t *testing.T) {
 		t.Fatalf("verified bindings missing from SBOM: %+v", properties)
 	}
 
-	declared := fromBuild(resolved, buildDigest, map[string]string{"prebuilt": artifactDigest}, false)
+	declared := fromBuild(resolved, buildDigest, map[string]string{"prebuilt": artifactDigest})
 	declaredProperties := map[string]string{}
 	for _, property := range declared.Components[0].Properties {
 		declaredProperties[property.Name] = property.Value
@@ -229,14 +222,22 @@ func TestBuildVerifiedRequiresExactArtifactSetAndCanonicalReferences(t *testing.
 }
 
 func TestBuildDiagnosticSelectedScopesCallerObservationWithoutMintingAuthority(t *testing.T) {
-	resolved, report := qualifiedSBOMReport(t, []string{"beta"}, nil)
-	defer func() { _ = report.Close() }()
-	if len(report.Artifacts) != 1 || report.Artifacts[0].Component != "beta" {
-		t.Fatalf("fixture did not select beta: %+v", report.Artifacts)
+	resolved, _, artifactDigest := prebuiltResolved(t, &catalog.ExternalEvidence{None: true})
+	resolved.Components[0].Name = "alpha"
+	beta := resolved.Components[0]
+	beta.Name = "beta"
+	resolved.Components = append(resolved.Components, beta)
+	graph, err := buildgraph.Compile(resolved)
+	if err != nil {
+		t.Fatal(err)
 	}
-	hashes := map[string]string{"beta": report.Artifacts[0].SHA256}
+	buildDigest, err := graph.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	hashes := map[string]string{"beta": artifactDigest}
 
-	set, err := BuildDiagnosticSelected(context.Background(), resolved, report.BuildDigest, hashes, nil, nil)
+	set, err := BuildDiagnosticSelected(context.Background(), resolved, buildDigest, hashes, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,14 +248,11 @@ func TestBuildDiagnosticSelectedScopesCallerObservationWithoutMintingAuthority(t
 	if len(aggregate.Components) != 1 || aggregate.Components[0].Name != "beta" {
 		t.Fatalf("diagnostic SBOM leaked the unobserved build members: %+v", aggregate.Components)
 	}
-	if _, err := set.LocalReceipts(); sbomCode(err) != nvkrerr.CodePreflightFailed {
-		t.Fatalf("diagnostic subset minted publisher authority: %v", err)
-	}
-	if _, err := BuildVerified(context.Background(), resolved, report.BuildDigest, hashes, nil, nil); sbomCode(err) != nvkrerr.CodeProvenanceMissing {
+	if _, err := BuildVerified(context.Background(), resolved, buildDigest, hashes, nil, nil); sbomCode(err) != nvkrerr.CodeProvenanceMissing {
 		t.Fatalf("exhaustive BuildVerified silently accepted a subset: %v", err)
 	}
-	if _, err := BuildDiagnosticSelected(context.Background(), resolved, report.BuildDigest,
-		map[string]string{"unknown": report.Artifacts[0].SHA256}, nil, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
+	if _, err := BuildDiagnosticSelected(context.Background(), resolved, buildDigest,
+		map[string]string{"unknown": artifactDigest}, nil, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
 		t.Fatalf("unknown diagnostic artifact was accepted: %v", err)
 	}
 }
@@ -348,128 +346,6 @@ func TestBuildVerifiedRejectsDuplicateResolvedComponents(t *testing.T) {
 	}
 }
 
-func TestBuildVerifiedFromReportIssuesExactFullAndSubsetPublisherReceipts(t *testing.T) {
-	for _, test := range []struct {
-		name     string
-		only     []string
-		want     []string
-		wantGaps int
-	}{
-		{name: "full", want: []string{"alpha", "beta"}, wantGaps: 2},
-		{name: "exact subset", only: []string{"beta"}, want: []string{"beta"}, wantGaps: 1},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			resolved, report := qualifiedSBOMReport(t, test.only, nil)
-			set, err := BuildVerifiedFromReport(context.Background(), resolved, report, nil, nil)
-			if err != nil {
-				t.Fatal(err)
-			}
-			receipts, err := set.LocalReceipts()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(receipts) != len(test.want) {
-				t.Fatalf("got %d publisher receipts, want %d", len(receipts), len(test.want))
-			}
-			for index, receipt := range receipts {
-				binding, err := receipt.Binding()
-				if err != nil {
-					t.Fatal(err)
-				}
-				if binding.Component != test.want[index] || binding.BuildDigest != report.BuildDigest {
-					t.Fatalf("receipt[%d] lost full-recipe/subset binding: %+v", index, binding)
-				}
-			}
-			boms, index, err := set.PerArtifact()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(boms) != len(test.want) || len(index.Entries) != len(test.want) ||
-				index.BuildDigest != report.BuildDigest {
-				t.Fatalf("SBOM index scope drifted: boms=%v index=%+v", boms, index)
-			}
-			aggregate, err := set.Aggregate()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(aggregate.Components) != len(test.want) {
-				t.Fatalf("aggregate leaked unselected components: %+v", aggregate.Components)
-			}
-			gaps, err := set.EvidenceGaps()
-			if err != nil || len(gaps) != test.wantGaps {
-				t.Fatalf("external-evidence gaps did not retain exact subset scope: %+v, %v", gaps, err)
-			}
-		})
-	}
-}
-
-func TestBuildVerifiedFromReportSBOMIndexIsMirrorInvariant(t *testing.T) {
-	toolchainDigest := "sha256:" + strings.Repeat("c", 64)
-	onlineResolved, onlineReport := qualifiedSourceSBOMReport(t,
-		"https://source.online.example/agent.git",
-		"registry.online.example/toolchain@"+toolchainDigest)
-	mirrorResolved, mirrorReport := qualifiedSourceSBOMReport(t,
-		"https://source.airgap.example/mirror/agent.git",
-		"registry.airgap.example/mirror/toolchain@"+toolchainDigest)
-	if onlineReport.BuildDigest != mirrorReport.BuildDigest {
-		t.Fatalf("transport relocation changed build identity: %s != %s",
-			onlineReport.BuildDigest, mirrorReport.BuildDigest)
-	}
-
-	online, err := BuildVerifiedFromReport(context.Background(), onlineResolved, onlineReport, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	mirror, err := BuildVerifiedFromReport(context.Background(), mirrorResolved, mirrorReport, nil, nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	onlineBOMs, onlineIndex, err := online.PerArtifact()
-	if err != nil {
-		t.Fatal(err)
-	}
-	mirrorBOMs, mirrorIndex, err := mirror.PerArtifact()
-	if err != nil {
-		t.Fatal(err)
-	}
-	onlineIndexDigest, err := onlineIndex.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	mirrorIndexDigest, err := mirrorIndex.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if onlineIndexDigest != mirrorIndexDigest {
-		t.Fatalf("source/toolchain mirror relocation changed SBOM index: %s != %s",
-			onlineIndexDigest, mirrorIndexDigest)
-	}
-	onlineBOMDigest, err := onlineBOMs["agent"].Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	mirrorBOMDigest, err := mirrorBOMs["agent"].Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if onlineBOMDigest != mirrorBOMDigest {
-		t.Fatalf("source/toolchain mirror relocation changed artifact SBOM: %s != %s",
-			onlineBOMDigest, mirrorBOMDigest)
-	}
-	component := onlineBOMs["agent"].Metadata.Component
-	if component.PURL != "" {
-		t.Fatalf("publisher SBOM retained transport-derived purl %q", component.PURL)
-	}
-	properties := make(map[string]string, len(component.Properties))
-	for _, property := range component.Properties {
-		properties[property.Name] = property.Value
-	}
-	if properties["nvkr:repo"] != "" || properties["nvkr:source"] != "nvkr:source/agent" ||
-		properties["nvkr:toolchain"] != toolchainDigest {
-		t.Fatalf("publisher SBOM lost semantic source/toolchain projection: %+v", properties)
-	}
-}
-
 func TestBuildVerifiedSeparatesExternalVerificationFromPublisherAuthority(t *testing.T) {
 	expectedArtifactDigest := evidenceDigest([]byte("prebuilt-artifact"))
 	sbomBytes := externalSBOMEvidence("prebuilt", expectedArtifactDigest)
@@ -497,254 +373,4 @@ func TestBuildVerifiedSeparatesExternalVerificationFromPublisherAuthority(t *tes
 	if gaps, err := set.EvidenceGaps(); err != nil || len(gaps) != 0 {
 		t.Fatalf("caller-hash path lost independently verified external evidence: %+v, %v", gaps, err)
 	}
-	if _, err := set.LocalReceipts(); sbomCode(err) != nvkrerr.CodePreflightFailed {
-		t.Fatalf("caller artifact hashes minted publisher SBOM authority: %v", err)
-	}
 }
-
-func TestBuildVerifiedFromReportRejectsFabricationAndCallbackMutation(t *testing.T) {
-	resolved, report := qualifiedSBOMReport(t, []string{"alpha"}, nil)
-	assembled := &pipeline.Report{
-		BuildDigest: report.BuildDigest,
-		Artifacts:   append([]pipeline.ArtifactResult(nil), report.Artifacts...),
-	}
-	if _, err := BuildVerifiedFromReport(context.Background(), resolved, assembled, nil, nil); sbomCode(err) != nvkrerr.CodePreflightFailed {
-		t.Fatalf("caller-assembled report minted publisher SBOM authority: %v", err)
-	}
-
-	missing := *report
-	missing.Artifacts = nil
-	if _, err := BuildVerifiedFromReport(context.Background(), resolved, &missing, nil, nil); sbomCode(err) != nvkrerr.CodeVerifyFailed {
-		t.Fatalf("report artifact omission did not fail its opaque receipt: %v", err)
-	}
-
-	wrongResolved, _ := snapshotResolved(resolved)
-	wrongResolved.Components[0].Prebuilt.Digests["amd64"] = "sha256:" + strings.Repeat("9", 64)
-	if _, err := BuildVerifiedFromReport(context.Background(), wrongResolved, report, nil, nil); sbomCode(err) != nvkrerr.CodeUnverifiedRef {
-		t.Fatalf("caller build projection substitution did not fail closed: %v", err)
-	}
-
-	artifactDigest := report.Artifacts[0].SHA256
-	body := externalSBOMEvidence("alpha", artifactDigest)
-	external := &catalog.ExternalEvidence{
-		SBOMRef: "https://upstream.example/alpha.sbom", SBOMDigest: evidenceDigest(body),
-	}
-	resolved, report = qualifiedSBOMReport(t, []string{"alpha"}, map[string]*catalog.ExternalEvidence{"alpha": external})
-	reader := EvidenceReaderFunc(func(context.Context, string, int64) ([]byte, error) {
-		report.Artifacts[0].SHA256 = "sha256:" + strings.Repeat("f", 64)
-		return body, nil
-	})
-	if _, err := BuildVerifiedFromReport(context.Background(), resolved, report, reader, nil); sbomCode(err) != nvkrerr.CodeVerifyFailed {
-		t.Fatalf("external callback mutated qualified report without invalidating authority: %v", err)
-	}
-}
-
-type fixtureOCITransport struct{}
-
-type fixtureOCILayout struct {
-	digest string
-	files  map[string][]byte
-}
-
-func newFixtureOCILayout(component string) fixtureOCILayout {
-	config := []byte(`{"component":"` + component + `"}`)
-	configDigest := evidenceDigest(config)
-	manifest := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.oci.image.config.v1+json","digest":"` +
-		configDigest + `","size":` + strconv.Itoa(len(config)) + `},"layers":[]}`)
-	manifestDigest := evidenceDigest(manifest)
-	index := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[{"mediaType":"application/vnd.oci.image.manifest.v1+json","digest":"` +
-		manifestDigest + `","size":` + strconv.Itoa(len(manifest)) + `}]}`)
-	return fixtureOCILayout{digest: manifestDigest, files: map[string][]byte{
-		"oci-layout": []byte(`{"imageLayoutVersion":"1.0.0"}`),
-		"index.json": index,
-		filepath.Join("blobs", "sha256", strings.TrimPrefix(configDigest, "sha256:")):   config,
-		filepath.Join("blobs", "sha256", strings.TrimPrefix(manifestDigest, "sha256:")): manifest,
-	}}
-}
-
-type sourceSBOMExecutionObserver struct {
-	observation profile.ExecutionObservation
-}
-
-func (observer sourceSBOMExecutionObserver) ObserveExecution(context.Context,
-	pipeline.ExecutionObservationRequest,
-) (profile.ExecutionObservation, error) {
-	return observer.observation, nil
-}
-
-func (fixtureOCITransport) Acquire(ctx context.Context, digestRef, destination string) (string, int64, error) {
-	if err := ctx.Err(); err != nil {
-		return "", 0, err
-	}
-	digest := digestRef[strings.LastIndex(digestRef, "@")+1:]
-	reference := digestRef[:strings.LastIndex(digestRef, "@")]
-	component := reference[strings.LastIndex(reference, "/")+1:]
-	layout := newFixtureOCILayout(component)
-	if digest != layout.digest {
-		return "", 0, errors.New("fixture OCI digest does not match requested reference")
-	}
-	if err := os.MkdirAll(filepath.Join(destination, "blobs", "sha256"), 0o755); err != nil {
-		return "", 0, err
-	}
-	var size int64
-	for relative, raw := range layout.files {
-		if err := os.WriteFile(filepath.Join(destination, relative), raw, 0o600); err != nil {
-			return "", 0, err
-		}
-		size += int64(len(raw))
-	}
-	return digest, size, nil
-}
-
-func (fixtureOCITransport) Verify(context.Context, string, string) error { return nil }
-
-func qualifiedSBOMReport(t *testing.T, only []string,
-	evidence map[string]*catalog.ExternalEvidence,
-) (*buildgraph.Resolved, *pipeline.Report) {
-	t.Helper()
-	resolved := &buildgraph.Resolved{
-		Platform: "linux/amd64",
-	}
-	for _, name := range []string{"alpha", "beta"} {
-		declaredEvidence := &catalog.ExternalEvidence{None: true}
-		if replacement := evidence[name]; replacement != nil {
-			declaredEvidence = replacement
-		}
-		resolved.Components = append(resolved.Components, catalog.NamedComponent{
-			Name: name,
-			Component: catalog.Component{Platforms: []string{"linux/amd64"},
-				Tag: "v1.0.0", OutputType: "oci-image",
-				Prebuilt: &catalog.Prebuilt{
-					Image:    "registry.example.test/" + name,
-					Digests:  map[string]string{"amd64": newFixtureOCILayout(name).digest},
-					Evidence: declaredEvidence,
-				},
-			},
-		})
-	}
-	graph, err := buildgraph.Compile(resolved)
-	if err != nil {
-		t.Fatal(err)
-	}
-	buildDigest, err := graph.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	work := filepath.Join(t.TempDir(), "work")
-	report, err := (pipeline.Local{}).Run(graph, buildDigest, pipeline.RunOptions{
-		Ctx: context.Background(), SourceRoot: filepath.Join(work, "src"),
-		Only: only, OCI: fixtureOCITransport{},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	return resolved, report
-}
-
-func qualifiedSourceSBOMReport(t *testing.T, repo, toolchain string) (*buildgraph.Resolved, *pipeline.Report) {
-	t.Helper()
-	resolved := &buildgraph.Resolved{
-		Platform: "linux/amd64",
-		Components: []catalog.NamedComponent{{
-			Name: "agent",
-			Component: catalog.Component{Platforms: []string{"linux/amd64"},
-				FromSource: true, Repo: repo, Tag: "v1.0.0",
-				Commit: strings.Repeat("d", 40), TreeHash: strings.Repeat("e", 40),
-				ToolchainImage: toolchain, OutputType: "raw",
-				BuildCommand: []string{"true"}, ArtifactPath: "out/agent", WriteDir: "out",
-				SourceDate: 1,
-			},
-		}},
-	}
-	graph, err := buildgraph.Compile(resolved)
-	if err != nil {
-		t.Fatal(err)
-	}
-	buildDigest, err := graph.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	var build ir.Node
-	for _, node := range graph.Nodes {
-		if node.Kind == ir.KindBuild {
-			build = node
-		}
-	}
-	if build.ID == "" {
-		t.Fatal("source fixture compiled no build node")
-	}
-
-	runnerDigest := "sha256:" + strings.Repeat("a", 64)
-	runtimeDigest := "sha256:" + strings.Repeat("b", 64)
-	toolchainDigest := toolchain[strings.LastIndex(toolchain, "@")+1:]
-	builderProfile := profile.BuilderProfile{
-		SchemaVersion: profile.SchemaVersion, Identity: "publisher-source-fixture", Version: "1",
-		HostControlClass: profile.OperatorControlled, Provides: []string{ir.BuilderOCIHermetic},
-		Fields: []profile.Field{
-			{Name: profile.FieldTargetArch, Value: "amd64", HardFail: true, MeasurementStage: profile.MeasurementHost},
-			{Name: profile.FieldRunnerDigest, Value: runnerDigest, HardFail: true, MeasurementStage: profile.MeasurementExecution},
-			{Name: profile.FieldRuntimeIdentity, Value: runtimeDigest, HardFail: true, MeasurementStage: profile.MeasurementExecution},
-			{Name: profile.FieldOCISandboxMode, Value: "fixture-sandbox", HardFail: true, MeasurementStage: profile.MeasurementExecution},
-		},
-	}
-	host, divergences, err := builderProfile.VerifyHost(context.Background(),
-		map[string]string{profile.FieldTargetArch: "amd64"})
-	if err != nil || len(divergences) != 0 {
-		t.Fatalf("source fixture host preflight: %v %+v", err, divergences)
-	}
-	observation := profile.ExecutionObservation{
-		RunnerDigest: runnerDigest, RunnerOrigin: profile.RunnerPreexisting,
-		RuntimeIdentity: runtimeDigest,
-		Nodes: []profile.NodeExecutionObservation{{
-			NodeID: build.ID, EngineClass: ir.EngineOCIHermetic,
-			ToolchainDigest: toolchainDigest, SandboxMode: "fixture-sandbox",
-		}},
-	}
-	execution, err := profile.VerifyExecution(context.Background(), host, builderProfile,
-		[]ir.Node{build}, observation)
-	if err != nil {
-		t.Fatal(err)
-	}
-	work := filepath.Join(t.TempDir(), "work")
-	options := pipeline.RunOptions{
-		Ctx: context.Background(), SourceRoot: filepath.Join(work, "src"), Runtime: os.Args[0],
-		Qualification: &pipeline.QualifiedExecution{
-			Profile: builderProfile, HostReceipt: host,
-			Observer: sourceSBOMExecutionObserver{observation: observation},
-		},
-	}
-	artifactPath := pipeline.ArtifactPath(options, build)
-	payload := []byte("mirror-invariant-built-artifact")
-	if err := os.MkdirAll(filepath.Dir(artifactPath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(artifactPath, payload, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	result := pipeline.ArtifactResult{
-		Component: build.Component, OutputType: build.OutputType, Toolchain: build.Toolchain,
-		Qualification: pipeline.ArtifactQualifiedExecution,
-		InputDigest:   "sha256:" + strings.Repeat("f", 64),
-		BuilderType:   build.BuilderType, EngineClass: ir.EngineOCIHermetic,
-		ProfileDigest: execution.ProfileDigest(), ExecutionBinding: execution.ExecutionBinding(),
-		Path: build.ArtifactPath, SHA256: evidenceDigest(payload), Size: int64(len(payload)),
-	}
-	resultBytes, err := canonical.Marshal(result)
-	if err != nil {
-		t.Fatal(err)
-	}
-	resultsDir := filepath.Join(filepath.Dir(options.SourceRoot), "results")
-	if err := os.MkdirAll(resultsDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(resultsDir, build.ID+".json"), resultBytes, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	report, err := (pipeline.Local{}).VerifyResults(graph, buildDigest, resultsDir, options)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return resolved, report
-}
-
-var _ pipeline.OCITransport = fixtureOCITransport{}

@@ -119,15 +119,10 @@ The separate diagnostic installed-package gate remains QCOW2-only. Complete QCOW
 admission in the lifecycle's bounded header check remains unresolved; the header observer is not a
 self-contained-image or full decoder verdict.
 
-The implemented command surface is deliberately narrower than the target delivery model. It can measure an
-existing RAW or ISO into a typed `DiskManifest`, and Linux can verify an existing `qcow2` envelope through the
-exact held codec path. Script-backed RAW/ISO/`qcow2` production, ambient privileged rootfs production, boot
-observation, and the post-attestation encryption handoff fail with `engine-capability` **before input, output, or
-subprocess I/O**, until qualified adapters return receipts over their exact inputs, realized toolchain/runtime
-closure, and output bytes. The legacy `deb`/OCI packager remains available only to the ordinary unqualified
-development build. `RunOptions{Qualification: ..., Package: true}` and every authority-bearing CLI route reject
-at admission, before graph or path inspection: pathname-reopened, whole-buffer package output cannot feed
-attestation or release until a descriptor-held streaming packager publishes through a crash-safe transaction.
+RAW/ISO measurement into a typed `DiskManifest` and Linux verification of an existing `qcow2` envelope
+remain package-level contracts in `pkg/nvkr/assemble`; no command invokes them. Qualified disk production,
+boot observation and the post-attestation encryption handoff remain deferred. The legacy `deb`/OCI packager
+remains a tested library path without a command; its output cannot feed qualified attestation or release.
 
 Block manifests are resource-bounded contract objects: block size is `4 KiB..16 MiB`, and a manifest carries at
 most `100,000` block identities. The implementation checks caller-controlled block size before opening the input
@@ -250,11 +245,9 @@ and output capabilities, exact explicit probe argv including `vhd` to `vpc`, for
 probes, QCOW2-only diagnostic admission, VMDK single-file sparse pre-probe and extent-binding negatives
 using a controlled probe, decoded logical identity, no-follow regular-file
 capture, platform fail-closed behavior, bounded block-manifest allocations, and mutation or subject-substitution
-negatives. CLI and local-runner admission tests prove unsupported producer, boot, encryption, qualified-package,
-and removed staging interfaces fail before catalog, graph, input, output, or subprocess I/O, while
-existing-byte `DiskManifest` emission and ordinary unqualified development packaging remain available. Masked
-regions deliberately remain unsupported. Factory/lifecycle/delivery contracts additionally cover the
-process-local exact-QCOW2 observation described above. They use a controlled producer callback and do not
+negatives. `DiskManifest` measurement and envelope verification have no command route; their package
+contracts do not establish a supported disk-production workflow. Masked regions deliberately remain unsupported.
+Factory/lifecycle/delivery contracts additionally cover the process-local exact-QCOW2 observation described above. They use a controlled producer callback and do not
 establish production VM execution, NVKE disk production, full-disk evidence, compatibility, or publication.
 The real-QEMU VMDK fixture replay is opt-in through `NVKR_TEST_QEMU_IMG` and its exact executable pin;
 ordinary CI does not run it. Its [ARM64 replay evidence](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/disk-inspection-observations.md#vmdk-codec-admission)

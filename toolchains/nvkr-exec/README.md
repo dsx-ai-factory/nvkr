@@ -25,7 +25,7 @@ working tree. The image recipe's unpinned package installation still prevents a 
 
 Two matching builds on one host establish local repeatability only. Independent reproduction also needs exact
 source/toolchain inputs and a separate execution. A helper binary digest and its enclosing image digest are
-separate identities. Helper/runtime configuration belongs to Environment or the qualified builder profile;
+separate identities. Helper/runtime configuration belongs to Environment (the qualified builder profile is retired);
 component toolchains remain Recipe inputs.
 
 Qualified helper-image execution remains unavailable until the exact executable/runtime observation protocol

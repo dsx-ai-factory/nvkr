@@ -18,8 +18,8 @@ func TestCatalogToolsAndDerivedPublication(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	definitionPath := "docs/examples/nvke-tutorial/definition.yaml"
-	environmentPath := "docs/examples/nvke-tutorial/environment-local.yaml"
+	definitionPath := "docs/examples/nvke-module-tags/definition.yaml"
+	environmentPath := "docs/examples/nvke-module-tags/environment-local.yaml"
 	definition, err := LoadDefinition(t.Context(), definitionPath)
 	if err != nil {
 		t.Fatal(err)

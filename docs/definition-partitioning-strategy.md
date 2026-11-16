@@ -411,13 +411,13 @@ identity triple. Preserve these checks. A new importer needs its own authenticat
 [metadata model](../pkg/nvkr/delivery/release_metadata.go)
 
 If one native entry point becomes necessary, extend the existing Definition → Run → Release lifecycle
-explicitly rather than adding an authored Recipe or misusing the diagnostic `ReleaseSet`. Freeze exact
+explicitly rather than adding an authored Recipe or reviving the retired `ReleaseSet`. Freeze exact
 required child Releases/outputs before work, authenticate them under independent consumer policies, and
 issue package-owned receipts bound to child publication, original output, platform, artifact/evidence
 subjects, origin and policy. Preserve the origin Run rather than inventing a new build claim. A signed
 parent does not upgrade a child's lane, prove compatibility, or authorize reuse of sibling evidence.
-The current `ReleaseSet` represents component/artifact inventory for deferred promotion, not a collection
-of pipeline Releases. [ReleaseSet owner](../pkg/nvkr/release/release.go),
+The retired `ReleaseSet` represented component/artifact inventory for deferred promotion, not a collection
+of pipeline Releases. Its design remains in the
 [release gates](adr/0016-release-gates-and-digest-first-selection.md),
 [public lifecycle](adr/0017-cli-sdk-foundation-and-package-topology.md)
 
@@ -440,7 +440,9 @@ only that carrier, not recursively validate its embedded references.
 Proposed [ADR-26](adr/0026-definition-composition.md) takes a narrower path than a parent Release: a composite
 Definition pins the family Definitions by digest and rebuilds their exact union in one Run and one flat Release,
 without importing family Releases. Reusing published family outputs is deferred to authenticated result reuse.
-Units U1–U7 are implemented and contract-tested only; no hosted composite Run exists.
+Units U1–U8 are implemented and contract-tested. The
+[composite publication ledger](adr/reconciliation/adr-26.md#hosted-gpu-site-publication) owns hosted
+execution evidence and its consumer-acceptance and qualification limits.
 
 Any accepted native design must update ADR-17/19/20 and lane/policy contracts in ADR-04/16, reconciliation,
 SADD and domain vocabulary. Required negative contracts include missing/extra/duplicate children,

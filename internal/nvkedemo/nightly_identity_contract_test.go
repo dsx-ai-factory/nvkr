@@ -208,7 +208,7 @@ func nightlyCompiledFixture(t *testing.T, profile NightlyProfile, build NightlyB
 		t.Fatal(err)
 	}
 	declared := definition.Definition{APIVersion: definition.DefinitionAPIVersion, Kind: definition.DefinitionKind, Metadata: definition.Metadata{Name: profile.Name}, Catalog: definition.Catalog{Base: catalog}, SBOMTool: "syft", CosignTool: "cosign", Outputs: []definition.DefinitionOutput{{Name: "nvkectl", Platform: "linux/arm64", Format: definition.OutputExecutable, Components: []string{"nvkectl"}}}}
-	environment, err := definition.LoadEnvironment(t.Context(), "../../docs/examples/nvke-tutorial/environment-github.yaml")
+	environment, err := definition.LoadEnvironment(t.Context(), "../../docs/examples/nvke-module-tags/environment-github.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -22,7 +22,7 @@ func TestDemoDefaultAttemptsAreAcceptedByRunPreparation(t *testing.T) {
 	for _, test := range []struct {
 		prefix, definition, environment string
 	}{
-		{"m1", "docs/examples/nvke-tutorial/definition.yaml", "docs/examples/nvke-tutorial/environment-local.yaml"},
+		{"m1", "docs/examples/nvke-module-tags/definition.yaml", "docs/examples/nvke-module-tags/environment-local.yaml"},
 	} {
 		t.Run(test.prefix, func(t *testing.T) {
 			cmd := exec.Command("bash", "-c", `source scripts/_demo-common.sh; demo_default_attempt "$1"`, "demo-test", test.prefix)

@@ -18,7 +18,7 @@ import (
 	"golang.org/x/sys/unix"
 )
 
-func TestQualifiedRuntimeUsesSealedDescriptorForObservationBuildAndCleanup(t *testing.T) {
+func TestHeldRuntimeUsesSealedDescriptorForObservationExecutionAndCleanup(t *testing.T) {
 	root := t.TempDir()
 	source := filepath.Join(root, "runtime")
 	cleanupLog := filepath.Join(root, "cleanup.log")
@@ -54,30 +54,26 @@ func TestQualifiedRuntimeUsesSealedDescriptorForObservationBuildAndCleanup(t *te
 		t.Fatal(err)
 	}
 
-	// Stage-two observation invokes this same held capability.
+	// Runtime observation invokes this same held capability.
 	out, err := heldExecutionOutput(context.Background(), held)
 	if err != nil || string(out) != "original" {
 		t.Fatalf("held observation executed replaced pathname bytes: %q, %v", out, err)
 	}
 
-	// Every qualified build runtime command is routed to the descriptor capability.
+	// Runtime execution uses the same descriptor capability after observation.
 	var buildOutput bytes.Buffer
-	opts := RunOptions{
-		Ctx: context.Background(), Runtime: source,
-		Stdout: &buildOutput, Stderr: &buildOutput,
-		execution: &verifiedExecution{runtime: held},
-	}
-	err = runContainerRuntime(opts)
+	err = held.run(t.Context(), &buildOutput, &buildOutput)
 	if err != nil || buildOutput.String() != "original" {
-		t.Fatalf("qualified build executed replaced pathname bytes: %q, %v", buildOutput.String(), err)
+		t.Fatalf("held runtime executed replaced pathname bytes: %q, %v", buildOutput.String(), err)
 	}
 
 	// Cancellation/final cleanup uses the descriptor too; it cannot fall back to the
-	// now-malicious source pathname after qualification.
-	reaper := newReaper(context.Background(), source)
-	reaper.setRuntime(source, held)
-	reaper.add("container")
-	reaper.close()
+	// now-malicious source pathname after admission.
+	ctx, cancel := context.WithTimeout(t.Context(), defaultReaperCleanupTimeout)
+	defer cancel()
+	if err := held.runCleanup(ctx, reaperTerminationGrace, nil, nil, "rm", "-f", "container"); err != nil {
+		t.Fatal(err)
+	}
 	if got, err := os.ReadFile(cleanupLog); err != nil || string(got) != "original" {
 		t.Fatalf("qualified cleanup executed replaced pathname bytes: %q, %v", got, err)
 	}
