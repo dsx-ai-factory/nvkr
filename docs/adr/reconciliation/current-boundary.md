@@ -21,7 +21,9 @@ Local immutable attempts and Linux `pipeline-attested` consumers for `authentici
 payload downloads; artifact-publication retains payload integrity checks. Browsing does not verify payload
 bytes, signatures or consumer policy. Pulling checks the selected output's integrity without signature or
 policy verification. Neither supported verification scope satisfies full v1 release or qualified acceptance; unsupported stronger
-scopes fail before work.
+scopes fail before work. `release verify` accepts only `--lane pipeline-attested`; any other value fails flag
+admission with `usage`. The supported SDK execution route is
+`ExecuteLifecycleRun` → `lifecycle.ExecuteLocal` → `factory.RunLocal`.
 
 Ordinary local non-disk terminal observation reopens and hashes producer bytes in the host process, using the
 same filesystem view as collection after bounded BuildKit output transport. It executes no producer code or

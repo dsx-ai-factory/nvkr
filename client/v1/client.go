@@ -5,7 +5,7 @@
 //
 // Use LoadDefinition, LoadEnvironment, PrepareLifecycleRun/ExecuteLifecycleRun or
 // GenerateLifecycleRun, VerifyRelease, and AuthenticateRelease for the public lifecycle. ResolveBuild
-// and Run support exact component/platform diagnostics. Domain packages own
+// supports exact component/platform resolution diagnostics. Domain packages own
 // compilation, execution, publication, authentication and their authority checks;
 // the facade exposes no separate qualified-evidence or publication workflow.
 package client
@@ -19,7 +19,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 // CatalogIO is the narrow context-aware read boundary used by catalog.LoadContext.
@@ -46,7 +45,6 @@ type AtomicOutput interface {
 // WithCatalogIO for producer resolution. Graph export and Release consumption are opt-in.
 type Client struct {
 	catalogIO CatalogIO
-	runner    pipeline.Runner
 	runtime   string
 
 	output            AtomicOutput
@@ -112,17 +110,6 @@ func WithCatalogIO(catalogIO CatalogIO) Option {
 	}
 }
 
-// WithRunner injects the authoritative execution engine adapter.
-func WithRunner(runner pipeline.Runner) Option {
-	return func(c *Client) {
-		if runner == nil {
-			c.setConfigError("pipeline runner is nil")
-			return
-		}
-		c.runner = runner
-	}
-}
-
 // WithRuntime sets the container runtime binary (docker | podman | …) supplied to runs
 // that do not set one. It is runtime-neutral: the local runner only ever emits the common
 // run/pull subcommands and flags, so podman is a near drop-in for docker.
@@ -151,7 +138,6 @@ func WithAtomicOutput(output AtomicOutput) Option {
 // destination.
 func New(options ...Option) *Client {
 	c := &Client{
-		runner:  pipeline.Local{},
 		runtime: "docker",
 	}
 	for _, option := range options {

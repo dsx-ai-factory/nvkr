@@ -90,8 +90,8 @@ releases their named outputs through one Plan, Run and Release. Proposed
 [merge rules](docs/adr/0026-definition-composition.md#3-merge-rules-exact-union-never-precedence) and
 [member Release reuse](docs/adr/0026-definition-composition.md#6-reusing-already-published-member-releases-only-through-authenticated-acceptance-a-planned-follow-up);
 units U1–U8, including complete-composite hosted qualification with independent policies, are implemented
-and contract-tested only, with no hosted composite Run, publication or consumer
-verification yet.
+and contract-tested. The [evidence ledger](docs/adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
+owns hosted publication, qualification and independent consumer-acceptance status.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition (proposed)**:
@@ -306,7 +306,7 @@ Acceptance of a Release's signed membership, each named output's signatures and 
 _Avoid_: Payload verification, deployment readiness, full release acceptance
 
 **Evidence lane**:
-The contract governing an artifact's evidence: pipeline-attested production or qualified reproduction and release authorization. Static or dry-run output is unqualified.
+The contract governing an artifact's evidence. The supported production lane is pipeline-attested; the qualified reproduction and release lane is retired. Static or dry-run output is unqualified.
 _Avoid_: Build category, signing mode, release status
 
 **Authenticated receipt**:
@@ -397,11 +397,11 @@ The proposed qualification results index (ADR-31) publishes outcomes for TestGri
 _Avoid_: Qualification record, qualification evidence, test result
 
 **Inventory**:
-The internal qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.
+The retired qualified-lane declaration of required component membership, exact artifact identities, and compatibility requirements.
 _Avoid_: List of successful outputs, component catalog
 
 **ReleaseSet**:
-The internal qualified-lane atomic aggregate of exact release members bound to an Inventory.
+The retired qualified-lane atomic aggregate of exact release members bound to an Inventory.
 _Avoid_: Public Release synonym, output list, binary bundle
 
 **Reproduction, compatibility, and conformance evidence**:
@@ -436,7 +436,7 @@ selection does not authorize rewriting a member or infer registry support.
 _Avoid_: Mutable tag, clearance, separately authored product object
 
 **Lifecycle status**:
-Authenticated acceptance or withdrawal state evaluated with the lane's required freshness and time authority.
+The deferred qualified-lane acceptance or withdrawal contract, requiring authenticated freshness and time authority; its diagnostic status implementation is retired.
 _Avoid_: Build status, local clock, mutable release contents
 
 ## Catalog language

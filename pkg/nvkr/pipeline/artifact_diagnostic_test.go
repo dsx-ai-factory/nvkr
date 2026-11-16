@@ -21,7 +21,7 @@ import (
 
 func unexpectedArtifactCleanup(t *testing.T) reaperCleanupCommand {
 	t.Helper()
-	return func(context.Context, time.Duration, string, *heldRuntimeExecutable, []string) error {
+	return func(context.Context, time.Duration, string, []string) error {
 		t.Error("successful invocation requested cleanup")
 		return nil
 	}
@@ -49,7 +49,7 @@ func TestArtifactDiagnosticReplayFailurePreservesPrimary(t *testing.T) {
 						return primary
 					}
 					return nil
-				}, func(context.Context, time.Duration, string, *heldRuntimeExecutable, []string) error { return nil })
+				}, func(context.Context, time.Duration, string, []string) error { return nil })
 			if failed {
 				if !errors.Is(err, primary) {
 					t.Fatal("replay replaced suite failure", err)
@@ -170,7 +170,7 @@ func TestArtifactDiagnosticCleanupAndPrimaryFailure(t *testing.T) {
 						return primary
 					}
 					return nil
-				}, func(ctx context.Context, grace time.Duration, runtime string, _ *heldRuntimeExecutable, names []string) error {
+				}, func(ctx context.Context, grace time.Duration, runtime string, names []string) error {
 					cleaned++
 					if ctx.Err() != nil || grace <= 0 || grace > reaperTerminationGrace || runtime != "docker" || len(names) != 1 {
 						t.Error("cleanup lost its independent context, reserved grace or owned name")
@@ -190,7 +190,7 @@ func TestArtifactDiagnosticTimeoutCleanup(t *testing.T) {
 		func(opts RunOptions, _ ...string) error {
 			<-opts.ctx().Done()
 			return opts.ctx().Err()
-		}, func(ctx context.Context, _ time.Duration, _ string, _ *heldRuntimeExecutable, _ []string) error {
+		}, func(ctx context.Context, _ time.Duration, _ string, _ []string) error {
 			cleaned = true
 			return ctx.Err()
 		})

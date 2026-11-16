@@ -44,7 +44,6 @@ name: Prepare native NVKR toolchains
       - 'pkg/nvkr/ir/**'
       - 'pkg/nvkr/material/**'
       - 'pkg/nvkr/pipeline/**'
-      - 'pkg/nvkr/profile/**'
       - 'pkg/nvkr/qualificationpolicy/**'
       - 'pkg/nvkr/sbom/**'
       - 'pkg/nvkr/target/**'

@@ -100,8 +100,10 @@ broader adapter and profile support remains deferred.
 
 Proposed [ADR-26: Definition composition](adr/0026-definition-composition.md) designs composite Definitions
 that release several digest-pinned Definitions as one Release, with a worked NVKE four-family example and
-implementation units. Units U1–U7 are implemented and contract-tested only; no hosted composite Run, publication or
-consumer verification has been exercised or recorded, and qualification and member Release reuse remain deferred.
+implementation units. Units U1–U8 are implemented and contract-tested. The
+[hosted publication record](adr/reconciliation/adr-26.md#hosted-gpu-site-publication) owns execution evidence
+and its consumer-acceptance and qualification limits.
+Member Release reuse and local composite qualification rehearsal remain deferred.
 
 Proposed [ADR-27: Pinned-tool producers](adr/0027-pinned-tool-producers.md) designs producers that run one
 released, digest-pinned tool offline with fixed arguments and typed inputs, with AICR bundles as the first use.

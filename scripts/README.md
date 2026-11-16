@@ -214,8 +214,8 @@ no maintained nightly supplies their dispatch or consumer inputs. The current
 
 - `demo-catalog-change.sh` exercises previewed and machine-managed source pin
   changes against an isolated catalog copy.
-- `demo-tamper-detection.sh` demonstrates canonical identity changes, corrupt
-  transport rejection, and path-containment failures.
+- `demo-tamper-detection.sh` demonstrates rejection of changed OCI payload bytes before
+  extraction, corrupt transport rejection, and path-containment failures.
 
 Package representation details remain covered
 by contract tests rather than parallel public workflows. Workspaces live below

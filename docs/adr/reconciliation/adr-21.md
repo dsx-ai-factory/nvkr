@@ -44,9 +44,20 @@ Maintained consumer pins and local AMD64 image IDs select these published subjec
 contracts require Packer `1.16.2`, matching the candidate source lock. Frozen/local overlays and generated
 bundles follow those inputs. [Development Run 43774985236](https://github.com/dsx-ai-factory/nvkr/actions/runs/43774985236)
 stopped all eight disk builds at `packer validate`: the pinned NVKE project requires Packer `= 1.15.4` and
-QEMU plugin `= 1.1.6`. Disk producers now carry a content-addressed catalog patch that moves both pins to
+QEMU plugin `= 1.1.6`. Disk producers that select Packer `1.16.2` now carry a content-addressed catalog patch that moves both pins to
 `1.16.2` and `1.1.8`. A local `packer validate` in both pinned images accepts the patched project.
 The patched disk Build identities have not been executed end to end.
+The AMD64 local demo used by `nvkr-nightly.yml` has a separate diagnostic selection:
+Packer `1.15.4` and QEMU plugin `1.1.6`, matching NVKE main at `2f31480b360cbd7fc9d9db7a6ba274a8d0fd5049`.
+The existing builder selects those pinned archives and executables only with `--nightly`;
+its default maintenance inputs, published image pins and ARM64 selection are unchanged.
+This variant carries no version-pin patch. The other disk producers declare Packer `1.16.2` and carry
+the catalog patch above.
+The AMD64 variant's committed toolchain pins retain the `1.16.2` candidate selection.
+The launcher must replace them with its fresh diagnostic image to satisfy the variant's
+`1.15.4` contract; executing the variant with its committed pins fails closed at preflight.
+Local contracts check selection, admission and build/validation arguments. A successful hosted
+build/site/tenant/cleanup cycle with this rebuilt toolchain remains unrecorded.
 The corrected hosted proposal/App exchange remains unexercised; this publication attempt does not
 demonstrate a human environment-approval pause or complete refresh acceptance. GitHub rulesets,
 protected-environment review, private carrier retention, review-record authenticity and registry
