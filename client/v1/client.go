@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package client is the context-first embeddable SDK facade described by ADR-17.
+// Package client is the experimental context-first SDK facade described by ADR-17.
+// Its API is not stable; callers should expect changes while the public boundary is refined.
 //
 // Use LoadDefinition, LoadEnvironment, PrepareLifecycleRun/ExecuteLifecycleRun or
 // GenerateLifecycleRun, VerifyRelease, and AuthenticateRelease for the public lifecycle. ResolveBuild

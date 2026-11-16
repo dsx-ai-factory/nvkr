@@ -46,12 +46,12 @@ func TestGenerateFilesUsesLifecycleInputsForSupportedHostedEngines(t *testing.T)
 	}
 }
 
-// A selected projection adapter that cannot launch proves which paths consult
+// An unsupported projection selection proves which paths consult
 // the selection: top-level check and write render through it and write
 // nothing on refusal, and runtime refresh refuses it before reading inputs.
 func TestGenerateFilesHonorsProjectionSelectionOnlyAtTopLevel(t *testing.T) {
 	selected := factory.WithProjectionAdapter(context.Background(),
-		factory.ProjectionAdapter{Transport: factory.ProjectionOutOfProcess, Path: "/nonexistent/nvkr-projection-adapter", Release: "test"})
+		factory.ProjectionAdapter{Transport: "unsupported-transport", Release: "test"})
 	untouched := filepath.Join(t.TempDir(), "must-not-exist")
 	_, err := GenerateRuntimeFiles(selected, "missing-definition.yaml", "missing-environment.yaml", "test", factory.EngineGitHub, untouched, true)
 	assertCode(t, err, nvkrerr.CodeEngineCapability)
