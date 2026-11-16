@@ -7,8 +7,12 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+
+	"sigs.k8s.io/yaml"
 	"strings"
 	"testing"
 
@@ -42,7 +46,7 @@ func TestCommandFilesExactBytesAndPlatforms(t *testing.T) {
 }
 
 func TestCommandFilesRejectUnsafeOperands(t *testing.T) {
-	for _, operand := range []string{`null`, `false`, `123`, `[]`, `{"file":"../body"}`, `{"file":"a/../body"}`, `{"file":"/body"}`, `{"file":"a//body"}`, `{"file":"./body"}`, `{"file":""}`, `{"file":"C:/body"}`, `{"file":"a\\body"}`, `{"file":"a\u0000body"}`, `{"file":2}`, `{"file":null}`, `{"file":"body","extra":true}`, `{"shell":"body"}`, `{"file":"body","file":"other"}`} {
+	for _, operand := range []string{`{"file":"../body"}`, `{"file":"a/../body"}`, `{"file":"/body"}`, `{"file":"a//body"}`, `{"file":"./body"}`, `{"file":""}`, `{"file":"C:/body"}`, `{"file":"a\\body"}`, `{"file":"a\u0000body"}`, `{"file":2}`, `{"file":null}`, `{"file":"body","extra":true}`, `{"shell":"body"}`, `{"file":"body","file":"other"}`} {
 		t.Run(operand, func(t *testing.T) {
 			provider, err := BindContext(t.Context(), bytesProvider{"body": []byte("body")})
 			if err != nil {
@@ -145,6 +149,48 @@ func TestCommandFilesStrictDecode(t *testing.T) {
 		}
 		if catalogErrorCode(err) != e.CodeInvalidCatalog {
 			t.Fatalf("unknown field admitted: %v", err)
+		}
+	}
+}
+
+func TestCommandFilesPreserveInlineScalars(t *testing.T) {
+	for _, fileBacked := range []bool{false, true} {
+		for _, field := range []string{"buildCommand", "buildCommandByPlatform", "vendorCommand"} {
+			t.Run(fmt.Sprintf("%s/file=%v", field, fileBacked), func(t *testing.T) {
+				operand := `"body"`
+				if fileBacked {
+					operand = `{file: body}`
+				}
+				document := func(last string) []byte {
+					command := `[echo, 10, true, false, 1.5, 9007199254740993, null, ` + last + `]`
+					if field == "vendorCommand" {
+						return []byte("sources:\n  source:\n    vendorCommand: " + command + "\n")
+					}
+					if field == "buildCommandByPlatform" {
+						command = "{linux/amd64: " + command + "}"
+					}
+					return []byte("components:\n  tool:\n    " + field + ": " + command + "\n")
+				}
+				var want registryDoc
+				if err := yaml.UnmarshalStrict(document(`"body"`), &want); err != nil {
+					t.Fatal(err)
+				}
+				provider, err := BindContext(t.Context(), bytesProvider{"body": []byte("body")})
+				if err != nil {
+					t.Fatal(err)
+				}
+				expanded, err := expandCommandFiles(document(operand), RegistryFile, []DataProvider{provider})
+				if err != nil {
+					t.Fatal(err)
+				}
+				var got registryDoc
+				if err := yaml.UnmarshalStrict(expanded, &got); err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(got, want) {
+					t.Fatalf("inline scalar decoding changed: got %#v, want %#v", got, want)
+				}
+			})
 		}
 	}
 }

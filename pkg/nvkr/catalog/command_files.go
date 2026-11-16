@@ -51,12 +51,12 @@ func expandCommandFiles(raw []byte, declaring string, providers []DataProvider) 
 				for _, command := range commands {
 					argv, _ := command.([]any)
 					for i, operand := range argv {
-						if _, ok := operand.(string); ok {
-							continue
-						}
 						reference, ok := operand.(map[string]any)
 						if !ok {
-							return nil, e.New(e.CodeInvalidCatalog, "%s %q %s operand must be a string or {file: path}", section, name, field)
+							// Leave inline operands to the existing typed YAML decoder,
+							// including its number/bool-to-string conversions. It also
+							// rejects nested arrays; only file mappings are lowered here.
+							continue
 						}
 						file, ok := reference["file"].(string)
 						if !ok || len(reference) != 1 {

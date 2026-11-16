@@ -42,6 +42,10 @@ compile inputs retain the script bytes for replay. Moving an identical inline bo
 Build and VendorSpec identities; changing its bytes changes the applicable identity. Keep the interpreter
 and flags in the argv array. This does not add a shell mode or execute a file during catalog loading.
 
+Before using script files beneath sibling fragments, note that toolchain repinning does not yet capture
+those files in its edited-fragment input set. Loading and snapshot replay work, but that maintenance
+operation fails closed. See the [current limitation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-22.md).
+
 A source can serve several components. A pin set can derive several source or acquired-artifact versions
 from one upstream release's version file. Update those members through their owning source. Use
 `catalog bump --check` to preview changes without writing the lock; pending changes return `NVKR-E-DIFF`.
