@@ -30,8 +30,11 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 	if n.BuilderType == ir.BuilderPinnedTool {
 		return buildPinnedTool(n, opts)
 	}
-	if opts.ToolExecutable != "" {
+	if opts.ToolExecutable != "" && n.BuildTool == nil {
 		return nil, e.New(e.CodePipelineDrift, "build node %q received an undeclared tool input", n.ID)
+	}
+	if n.BuildTool != nil && !opts.DryRun && opts.buildTool == nil {
+		return nil, e.New(e.CodeVerifyFailed, "source build has no held auxiliary executable")
 	}
 	if err := admitBuildKit(n, opts); err != nil {
 		return nil, err
@@ -112,6 +115,10 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 
 	cname := containerName(n)
 	args := []string{"run", "--rm", "--name", cname}
+	if opts.buildTool != nil {
+		args = append(args, "--interactive", "--entrypoint", "/usr/bin/perl",
+			"-e", "PERL5OPT=", "-e", "PERL5LIB=", "-e", "PERLLIB=", "-e", "LD_PRELOAD=", "-e", "LD_LIBRARY_PATH=")
+	}
 	if buildKit != nil {
 		args = []string{"create", "--name", cname}
 		buildKit.resources.containers = append(buildKit.resources.containers, cname)
@@ -163,14 +170,25 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 		args = append(args, buildMaterialMountArgs(stagedMaterials.root)...)
 	}
 	args = append(args, "-w", n.Workdir, n.Toolchain)
-	args = append(args, n.Command...)
+	if opts.buildTool != nil {
+		args = append(args, buildToolCommand(n, opts.buildTool)...)
+	} else {
+		args = append(args, n.Command...)
+	}
 
 	fmt.Fprintf(opts.Stdout, "\n=== build %s (%s, --network=%s, isolated=%t) ===\n", n.Component, n.Toolchain, n.Network, isolated)
 	opts.progress.printf("[container] build %s — launching %s with --network=%s\n", n.Component, n.Toolchain, n.Network)
 	if err := registerContainer(opts, cname); err != nil {
 		return nil, err
 	}
-	if err := runContainerRuntime(opts, args...); err != nil {
+	var toolInput *os.File
+	if opts.buildTool != nil {
+		if err := opts.buildTool.AssertUnchangedContext(opts.ctx()); err != nil {
+			return nil, e.Wrap(e.CodeVerifyFailed, err, "rechecking auxiliary build tool")
+		}
+		toolInput = opts.buildTool.OSFile()
+	}
+	if err := runContainerRuntimeInput(opts, toolInput, args...); err != nil {
 		return nil, e.Wrap(e.CodeBuildFailed, err, "building %s", n.Component)
 	}
 	if buildKit != nil {
@@ -205,6 +223,12 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 				return ""
 			}
 			return stagedMaterials.manifestDigest
+		}(),
+		BuildToolDigest: func() string {
+			if opts.buildTool == nil {
+				return ""
+			}
+			return opts.buildTool.Digest()
 		}(),
 		BuilderType: n.BuilderType,
 		// Local selected and executed this exact in-process dispatch lane. Recording

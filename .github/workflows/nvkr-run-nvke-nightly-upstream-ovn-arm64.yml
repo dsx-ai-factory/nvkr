@@ -432,7 +432,7 @@ jobs:
     name: 'Build and package producer evidence for nvke-node-image-upstream-ovn-arm64'
     runs-on: 'arc-arm64-kvm'
     timeout-minutes: 1105
-    needs: [nvkr-nvke-node-image-upstream-ovn-arm64-f-43dc0780c3d0, nvkr-process-nvke-node-image-upstream-ovn-2214852ce50c]
+    needs: [nvkr-nvke-node-image-upstream-ovn-arm64-f-43dc0780c3d0, nvkr-process-nvke-node-image-upstream-ovn-2214852ce50c, nvkr-tool-nfpm-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
     permissions:
@@ -911,6 +911,16 @@ jobs:
           runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
       - *operation-execute-node-part-1
+    permissions:
+      actions: read
+      contents: read
+  nvkr-tool-nfpm-arm64:
+    name: 'Acquire pinned nfpm-arm64'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
@@ -1611,7 +1621,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-02'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-nvke-node-image-upstream-ovn-arm64-f-43dc0780c3d0, nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12, nvkr-process-attest-sboms-output-temporal-efbcb1393aa1, nvkr-process-postgresql-pull-postgresql-c-d1405b5f9a79, nvkr-process-temporal-ui-image-arm64-pull-4a75ae62b2bc]
+    needs: [nvkr-nvke-node-image-upstream-ovn-arm64-f-43dc0780c3d0, nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12, nvkr-process-attest-sboms-output-temporal-efbcb1393aa1, nvkr-process-postgresql-pull-postgresql-c-d1405b5f9a79, nvkr-process-temporal-ui-image-arm64-pull-4a75ae62b2bc, nvkr-tool-nfpm-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -1881,7 +1891,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 76 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 77 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {

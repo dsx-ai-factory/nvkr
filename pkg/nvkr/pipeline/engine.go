@@ -14,6 +14,7 @@ import (
 	"os"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
 
 // RunOptions parameterize a local run.
@@ -72,8 +73,9 @@ type RunOptions struct {
 	BuildMaterials *BuildMaterials
 	// ToolExecutable is the planned tool/<name> acquisition a pinned-tool build runs.
 	// It is a path, not authority: the executor re-hashes it against the node's
-	// executable digest before launch and rejects it for every other node.
+	// executable digest before launch. Source builds must declare BuildTool.
 	ToolExecutable string
+	buildTool      *heldfile.File // executor-owned snapshot; never caller-issued authority
 	// NativeGo is a process-local receipt over installed SDK/compiler bytes.
 	// It admits only explicitly declared local native-go producers.
 	NativeGo *NativeGoToolchain
@@ -111,6 +113,8 @@ type ArtifactResult struct {
 	// MaterialManifestDigest identifies the exact canonical manifest staged for
 	// this producer. It is present iff the producer consumed material bindings.
 	MaterialManifestDigest string `json:"materialManifestDigest,omitempty"`
+	// BuildToolDigest records the authenticated auxiliary executable supplied to the source build.
+	BuildToolDigest string `json:"buildToolDigest,omitempty"`
 	// BuilderType is the DECLARED from-source substrate (from the IR node). EngineClass
 	// is the OBSERVED substrate the runner actually used. Verify fails closed if they
 	// diverge — a producer that declares nix but whose artifact came off a native lane is

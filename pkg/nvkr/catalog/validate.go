@@ -188,6 +188,9 @@ func sourceExecutableTarget(fromSource bool, builder string, output string) bool
 }
 
 func validateComponent(name string, c Component) error {
+	if err := validateBuildTool(name, c); err != nil {
+		return err
+	}
 	if _, err := c.SourceMetadataEnv(); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "component %q", name)
 	}
@@ -208,7 +211,7 @@ func validateComponent(name string, c Component) error {
 			if strings.TrimSpace(argument) == "" || strings.ContainsRune(argument, '\x00') {
 				return e.New(e.CodeInvalidCatalog, "component %q: invalid platform command argument", name)
 			}
-			if err := checkArchTokens("component", name, "buildCommandByPlatform", argument); err != nil {
+			if err := checkBuildCommandTokens(name, "buildCommandByPlatform", argument); err != nil {
 				return err
 			}
 		}
@@ -417,7 +420,7 @@ func validateComponent(name string, c Component) error {
 		return e.New(e.CodeInvalidCatalog, "component %q: empty buildCommand", name)
 	}
 	for _, s := range c.BuildCommand {
-		if err := checkArchTokens("component", name, "buildCommand", s); err != nil {
+		if err := checkBuildCommandTokens(name, "buildCommand", s); err != nil {
 			return err
 		}
 	}
@@ -646,4 +649,8 @@ func checkArchTokens(subject, name, field, s string) error {
 			"%s %q: %s %q uses an unknown template token (only {{.Arch}} is supported)", subject, name, field, s)
 	}
 	return nil
+}
+
+func checkBuildCommandTokens(name, field, argument string) error {
+	return checkArchTokens("component", name, field, strings.ReplaceAll(argument, BuildToolToken, ""))
 }

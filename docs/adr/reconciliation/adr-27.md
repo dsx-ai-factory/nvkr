@@ -25,3 +25,27 @@ unverified trust level remains distinct from an authenticated NVKR Release.
 Contract coverage includes closure admission, index substitution, changed validation subjects, material
 bindings and complete publication/evidence membership. Linux subprocess tests use a fake runtime; these
 are separate from the recorded Docker execution and establish no hosted isolation acceptance.
+
+## Auxiliary tools in source builds
+
+The maintained nfpm binding's exact native pins and dependency/license inventory are recorded in
+[nfpm native tool review](nfpm-tool.md).
+
+Offline OCI source producers can select one native release tool through `buildTool`. Catalog and IR
+contracts bind its platform, archive/member and executable digests into logical Build identity while
+excluding its URL. Factory compilation adds a shared Run-only acquisition and exact consumer edge;
+missing edges and missing provenance dependencies fail validation. Such Plans use `wrapped-build`.
+The source executor captures a static native executable before source/output work, authenticates the
+container image, streams the bytes into a sealed descriptor and records the supplied executable digest
+in the producer result. It retains the existing source-build sandbox and cancellation owner.
+Acquisition stays daemonless and injection adds no image-ID, save/load or Buildx dependency. Podman
+execution of this new bootstrap remains unexercised; existing runtime admission and hosted policy apply.
+
+On November 16, a small native ARM64 Docker comparison used nfpm 2.48.0 from the maintained Packer
+image and the same executable supplied through the new sealed-descriptor bootstrap. Both produced
+Debian artifact `sha256:74f8c14d72c51bd9e359149161dc70ebba75f0b652951cbca0a711fe570ec4f4`.
+The container ran as UID/GID 65534, without network, with a read-only root, all capabilities dropped,
+no-new-privileges, 128 MiB memory, one CPU, 64 processes and 32 MiB scratch. Task records are
+`data/toolchain-images-retire/step2-nfpm-byte-proof.py`, `step2-nfpm-byte-proof.json` and the baseline/injected
+logs, retained outside Git. This exercises the bootstrap and one small package; it is not a complete
+NVKE Run, AMD64 execution, hosted evidence, publication acceptance or a qualification upgrade.

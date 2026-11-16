@@ -21,9 +21,6 @@ ARG GO_ARCHIVE_SHA256
 ARG CRANE_VERSION
 ARG CRANE_ARCHIVE_SHA256
 ARG CRANE_BINARY_SHA256
-ARG NFPM_VERSION
-ARG NFPM_ARCHIVE_SHA256
-ARG NFPM_BINARY_SHA256
 ARG NVKR_ARCHIVE_MODE=download
 ARG HELM_VERSION
 ARG HELM_ARCHIVE_SHA256
@@ -69,21 +66,16 @@ RUN --mount=type=secret,id=nvkr_ca_bundle,mode=0444 --mount=type=bind,from=nvkr_
       *) echo "unsupported target architecture: ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
     crane_archive="go-containerregistry_Linux_${release_arch}.tar.gz"; \
-    nfpm_archive="nfpm_${NFPM_VERSION}_Linux_${release_arch}.tar.gz"; \
     case "${NVKR_ARCHIVE_MODE}" in \
-    local) for archive in "${go_archive}" "${crane_archive}" "${nfpm_archive}"; do cp "/nvkr/archives/${archive}" "/tmp/${archive}"; done ;; \
+    local) for archive in "${go_archive}" "${crane_archive}"; do cp "/nvkr/archives/${archive}" "/tmp/${archive}"; done ;; \
     download) curl --fail --location --max-time 300 --retry 2 \
       "https://go.dev/dl/${go_archive}" --output "/tmp/${go_archive}"; \
     curl --fail --location --max-time 300 --retry 2 \
       "https://github.com/google/go-containerregistry/releases/download/v${CRANE_VERSION}/${crane_archive}" \
-      --output "/tmp/${crane_archive}"; \
-    curl --fail --location --max-time 300 --retry 2 \
-      "https://github.com/goreleaser/nfpm/releases/download/v${NFPM_VERSION}/${nfpm_archive}" \
-      --output "/tmp/${nfpm_archive}" ;; \
+      --output "/tmp/${crane_archive}" ;; \
     *) echo 'unsupported archive mode' >&2; exit 1 ;; esac; \
     printf '%s  %s\n' "${GO_ARCHIVE_SHA256}" "/tmp/${go_archive}" | sha256sum -c; \
-    printf '%s  %s\n' "${CRANE_ARCHIVE_SHA256}" "/tmp/${crane_archive}" | sha256sum -c; \
-    printf '%s  %s\n' "${NFPM_ARCHIVE_SHA256}" "/tmp/${nfpm_archive}" | sha256sum -c
+    printf '%s  %s\n' "${CRANE_ARCHIVE_SHA256}" "/tmp/${crane_archive}" | sha256sum -c
 
 # Extraction and checksum verification run on the builder; target binaries are
 # copied without execution. Native validation remains a separate build step.
@@ -102,16 +94,12 @@ ARG GO_ARCHIVE_SHA256
 ARG CRANE_VERSION
 ARG CRANE_ARCHIVE_SHA256
 ARG CRANE_BINARY_SHA256
-ARG NFPM_VERSION
-ARG NFPM_ARCHIVE_SHA256
-ARG NFPM_BINARY_SHA256
 
 COPY --from=download /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=download /tmp/packer_*.zip /tmp/
 COPY --from=download /tmp/packer-plugin-qemu_*.zip /tmp/
 COPY --from=download /tmp/go*.linux-*.tar.gz /tmp/
 COPY --from=download /tmp/go-containerregistry_Linux_*.tar.gz /tmp/
-COPY --from=download /tmp/nfpm_*_Linux_*.tar.gz /tmp/
 COPY --from=download /tmp/helm-*.tar.gz /tmp/
 COPY --from=download /tmp/oras_*.tar.gz /tmp/
 
@@ -166,22 +154,16 @@ RUN set -eux; \
       *) echo "unsupported target architecture: ${TARGETARCH}" >&2; exit 1 ;; \
     esac; \
     crane_archive="go-containerregistry_Linux_${release_arch}.tar.gz"; \
-    nfpm_archive="nfpm_${NFPM_VERSION}_Linux_${release_arch}.tar.gz"; \
     printf '%s  %s\n' "${GO_ARCHIVE_SHA256}" "/tmp/${go_archive}" | sha256sum -c; \
     tar -xzf "/tmp/${go_archive}" -C /out; \
     test -x /out/go/bin/go; \
-    install -d -m 0755 /out/tools /out/licenses/go /out/licenses/crane /out/licenses/nfpm; \
+    install -d -m 0755 /out/tools /out/licenses/go /out/licenses/crane; \
     install -m 0644 /out/go/LICENSE /out/licenses/go/LICENSE; \
     printf '%s  %s\n' "${CRANE_ARCHIVE_SHA256}" "/tmp/${crane_archive}" | sha256sum -c; \
     tar -xzf "/tmp/${crane_archive}" -C /out/tools crane LICENSE; \
     printf '%s  %s\n' "${CRANE_BINARY_SHA256}" /out/tools/crane | sha256sum -c; \
     install -m 0644 /out/tools/LICENSE /out/licenses/crane/LICENSE; \
-    rm /out/tools/LICENSE; \
-    printf '%s  %s\n' "${NFPM_ARCHIVE_SHA256}" "/tmp/${nfpm_archive}" | sha256sum -c; \
-    tar -xzf "/tmp/${nfpm_archive}" -C /out/tools nfpm LICENSE.md; \
-    printf '%s  %s\n' "${NFPM_BINARY_SHA256}" /out/tools/nfpm | sha256sum -c; \
-    install -m 0644 /out/tools/LICENSE.md /out/licenses/nfpm/LICENSE.md; \
-    rm /out/tools/LICENSE.md
+    rm /out/tools/LICENSE
 
 RUN set -eux; \
     helm_archive="helm-v${HELM_VERSION}-linux-${TARGETARCH}.tar.gz"; \
@@ -253,7 +235,6 @@ COPY --from=fetch /out/packer/packer.bin /usr/local/bin/packer
 COPY --from=fetch /out/plugins/ /nvkr/toolchain/packer/plugins/
 COPY --from=fetch /out/go/ /usr/local/go/
 COPY --from=fetch /out/tools/crane /usr/local/bin/crane
-COPY --from=fetch /out/tools/nfpm /usr/local/bin/nfpm
 COPY --from=fetch /out/tools/helm /usr/local/bin/helm
 COPY --from=fetch /out/tools/oras /usr/local/bin/oras
 COPY --from=fetch /out/licenses/ /usr/share/doc/nvkr-packer-toolchain/licenses/
@@ -289,7 +270,6 @@ RUN set -eux; \
 	command -v gzip; \
 	command -v make; \
 	command -v crane; \
-	command -v nfpm; \
 	command -v helm; \
 	command -v oras; \
 	command -v 7z; \

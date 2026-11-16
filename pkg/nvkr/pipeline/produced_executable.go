@@ -163,26 +163,8 @@ func captureExecutedTool(ctx context.Context, platform, buildDigest string, prod
 	if file.Size() != result.Size {
 		return nil, e.New(e.CodeVerifyFailed, "produced executable size changed during capture")
 	}
-	image, err := elf.NewFile(file)
-	if err != nil || !diskinspect.NativeELF(image) || image.Class != elf.ELFCLASS64 || image.Data != elf.ELFDATA2LSB ||
-		(image.OSABI != elf.ELFOSABI_NONE && image.OSABI != elf.ELFOSABI_LINUX) {
-		return nil, e.New(e.CodeEngineCapability, "produced tool is not a native Linux ELF executable")
-	}
-	entryMapped := false
-	for _, segment := range image.Progs {
-		if segment.Type == elf.PT_INTERP {
-			return nil, e.New(e.CodeEngineCapability, "produced tool requires a dynamic interpreter")
-		}
-		if segment.Type == elf.PT_LOAD && segment.Flags&elf.PF_X != 0 && image.Entry >= segment.Vaddr && image.Entry-segment.Vaddr < segment.Memsz {
-			entryMapped = true
-		}
-	}
-	if !entryMapped {
-		return nil, e.New(e.CodeEngineCapability, "produced tool lacks a mapped executable entry point")
-	}
-	libraries, err := image.ImportedLibraries()
-	if err != nil || len(libraries) != 0 {
-		return nil, e.New(e.CodeEngineCapability, "produced tool requires dynamic libraries or has malformed linkage")
+	if err := validateStaticTool(file); err != nil {
+		return nil, err
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "produced executable capture canceled")
@@ -264,6 +246,31 @@ func validateProducedExecutableGraph(g *ir.Graph, buildDigest string) error {
 	if buildDigest != digest {
 		return e.New(e.CodeVerifyFailed,
 			"pipeline buildDigest %q does not match validated graph digest %s", buildDigest, digest)
+	}
+	return nil
+}
+
+func validateStaticTool(file *heldfile.File) error {
+	image, err := elf.NewFile(file)
+	if err != nil || !diskinspect.NativeELF(image) || image.Class != elf.ELFCLASS64 || image.Data != elf.ELFDATA2LSB ||
+		(image.OSABI != elf.ELFOSABI_NONE && image.OSABI != elf.ELFOSABI_LINUX) {
+		return e.New(e.CodeEngineCapability, "produced tool is not a native Linux ELF executable")
+	}
+	entryMapped := false
+	for _, segment := range image.Progs {
+		if segment.Type == elf.PT_INTERP {
+			return e.New(e.CodeEngineCapability, "produced tool requires a dynamic interpreter")
+		}
+		if segment.Type == elf.PT_LOAD && segment.Flags&elf.PF_X != 0 && image.Entry >= segment.Vaddr && image.Entry-segment.Vaddr < segment.Memsz {
+			entryMapped = true
+		}
+	}
+	if !entryMapped {
+		return e.New(e.CodeEngineCapability, "produced tool lacks a mapped executable entry point")
+	}
+	libraries, err := image.ImportedLibraries()
+	if err != nil || len(libraries) != 0 {
+		return e.New(e.CodeEngineCapability, "produced tool requires dynamic libraries or has malformed linkage")
 	}
 	return nil
 }

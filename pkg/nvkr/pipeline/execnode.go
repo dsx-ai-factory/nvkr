@@ -29,6 +29,9 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	if err := admitNativeGo(n, opts); err != nil {
 		return nil, err
 	}
+	if err := admitBuildTool(n, opts); err != nil {
+		return nil, err
+	}
 	if opts.SourceWorkspace != nil && (n.Kind != ir.KindFetch || !opts.Launch) {
 		return nil, e.New(e.CodeEngineCapability, "held source workspace requires launched source fetching")
 	}
@@ -78,6 +81,14 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 // Isolation is enforced by the flag the verified helper passes, portable to any generic
 // runner — no engine-native container block, no bespoke network-none runner tag.
 func (l Local) execNodeLaunch(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
+	tool, toolErr := captureBuildTool(n, opts)
+	if toolErr != nil {
+		return nil, toolErr
+	}
+	if tool != nil {
+		opts.buildTool = tool
+		defer func() { _ = tool.Close() }()
+	}
 	if opts.ImageAccess != "" && !opts.DryRun && opts.SourceWorkspace == nil {
 		image, platform := n.Toolchain, localToolchainPlatform(n)
 		if n.Kind == ir.KindFetch {

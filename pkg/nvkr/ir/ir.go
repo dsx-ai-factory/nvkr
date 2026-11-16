@@ -194,6 +194,9 @@ type Node struct {
 	// its archive digest and member; together they bind the shared tool/<name>
 	// acquisition. Empty for every other builder.
 	Tool string `json:"tool,omitempty"`
+	// BuildTool binds an auxiliary executable consumed by an offline source build.
+	BuildTool    *BuildToolBinding `json:"buildTool,omitempty"`
+	BuildToolURL string            `json:"buildToolURL,omitempty"` // acquisition transport only
 	// FlakeRef / FlakeOutput / FlakeLockDigest pin a nix build's locked flake, output
 	// attribute, and transitive-closure lock digest (ADR-10 §2); empty for an
 	// oci-hermetic build. FlakeRef is transport (not in buildDigest); FlakeLockDigest

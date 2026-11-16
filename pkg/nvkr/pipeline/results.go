@@ -32,6 +32,9 @@ func ObserveResult(ctx context.Context, node ir.Node, payloadPath, resultPath st
 	if err != nil {
 		return ArtifactResult{}, err
 	}
+	if err := validateBuildToolObservation(node, result); err != nil {
+		return ArtifactResult{}, err
+	}
 	if result.Component != node.Component || result.OutputType != node.OutputType ||
 		!canonical.IsDigest(result.SHA256) || result.Size < 0 {
 		return ArtifactResult{}, e.New(e.CodeVerifyFailed, "producer result %q has no exact component, output type or byte identity", node.ID)
@@ -104,6 +107,9 @@ func AuthenticateResultForConsumption(ctx context.Context, node ir.Node, payload
 }
 
 func authenticateConsumedResultMetadata(node ir.Node, result ArtifactResult) (ArtifactResult, error) {
+	if err := validateBuildToolObservation(node, result); err != nil {
+		return ArtifactResult{}, err
+	}
 	switch node.Kind {
 	case ir.KindBuild:
 		if !canonical.IsDigest(result.InputDigest) {
@@ -144,6 +150,17 @@ func authenticateConsumedResultMetadata(node ir.Node, result ArtifactResult) (Ar
 			"producer result %q has unsupported kind %q", node.ID, node.Kind)
 	}
 	return result, nil
+}
+
+func validateBuildToolObservation(node ir.Node, result ArtifactResult) error {
+	want := ""
+	if node.BuildTool != nil {
+		want = node.BuildTool.ExecutableDigest
+	}
+	if result.BuildToolDigest != want {
+		return e.New(e.CodeVerifyFailed, "producer result %q omits or alters its auxiliary executable observation", node.ID)
+	}
+	return nil
 }
 
 func readArtifactResultContext(ctx context.Context, path string) (ArtifactResult, error) {

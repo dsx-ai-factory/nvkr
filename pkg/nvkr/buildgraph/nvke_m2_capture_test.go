@@ -115,7 +115,10 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				}
 			}
 			spire := cat.Components["nvke-spire-agent"]
-			if len(spire.Materials) != 0 || !strings.Contains(strings.Join(spire.VendorCommand, "\n"), "make -C os-image/packages/spire-agent bundle nfpm") ||
+			if len(spire.Materials) != 0 || !strings.Contains(strings.Join(spire.VendorCommand, "\n"), "make -C os-image/packages/spire-agent bundle") ||
+				strings.Contains(strings.Join(spire.VendorCommand, "\n"), "bundle nfpm") ||
+				spire.BuildTool[output.Platform] != "nfpm-"+strings.TrimPrefix(output.Platform, "linux/") ||
+				!strings.Contains(strings.Join(spire.BuildCommand, "\n"), "NFPM_BIN="+catalog.BuildToolToken) ||
 				!strings.Contains(strings.Join(spire.BuildCommand, "\n"), "/src/nvkr-output/work/os-image/packages/spire-agent/packaging/build-deb.sh") {
 				t.Fatal("SPIRE producer must retain source-owned acquisition and offline packaging without DSX materials")
 			}

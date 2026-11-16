@@ -78,18 +78,6 @@
       "arm64": "sha256:1799f559c299f068951822a5efe6689ebab6974f2054d5562e60798fa9db6a55"
     }
   },
-  "nfpm": {
-    "version": "2.48.0",
-    "license": "MIT",
-    "archives": {
-      "amd64": "sha256:6d7f9a28b2f397934403950fcbba83f598b08d02edbe79a0815b3b4897341750",
-      "arm64": "sha256:a9a75213763783b7669719e505474c748c5ad7dc66591a195619deb50f85c2f4"
-    },
-    "binaries": {
-      "amd64": "sha256:5377b2b61d5b39fab4adcd0fed263b85eb81da713f06fe08e93b967f36d1763c",
-      "arm64": "sha256:74631f33142d8606096149555817d1f9bbbed8df830dead07cf54b3d7ae5faab"
-    }
-  },
   "publicationGates": {
     "packerBUSLRedistributionApproval": "not-recorded",
     "vulnerabilityReviewApproval": "not-recorded"

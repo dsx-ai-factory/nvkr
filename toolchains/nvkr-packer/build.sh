@@ -127,12 +127,10 @@ jq -e '
   .oras.version == "1.3.6" and .oras.license == "Apache-2.0" and
   .crane.version == "0.22.1" and
   .crane.license == "Apache-2.0" and
-  .nfpm.version == "2.48.0" and
-  .nfpm.license == "MIT" and
   .publicationGates.packerBUSLRedistributionApproval == "not-recorded" and
   .publicationGates.vulnerabilityReviewApproval == "not-recorded" and
   ([.packer.archives, .packer.binaries, .qemuPlugin.archives, .qemuPlugin.binaries,
-    .go.archives, .crane.archives, .crane.binaries, .nfpm.archives, .nfpm.binaries,
+    .go.archives, .crane.archives, .crane.binaries,
     .helm.archives, .helm.binaries, .oras.archives, .oras.binaries] | all(
     (keys | sort) == ["amd64", "arm64"] and
     all(.[]; test("^sha256:[0-9a-f]{64}$"))
@@ -270,9 +268,6 @@ go_digest="$(jq -r --arg arch "${arch}" '.go.archives[$arch]' "${lock}")"
 crane_version="$(jq -r '.crane.version' "${lock}")"
 crane_digest="$(jq -r --arg arch "${arch}" '.crane.archives[$arch]' "${lock}")"
 crane_binary_digest="$(jq -r --arg arch "${arch}" '.crane.binaries[$arch]' "${lock}")"
-nfpm_version="$(jq -r '.nfpm.version' "${lock}")"
-nfpm_digest="$(jq -r --arg arch "${arch}" '.nfpm.archives[$arch]' "${lock}")"
-nfpm_binary_digest="$(jq -r --arg arch "${arch}" '.nfpm.binaries[$arch]' "${lock}")"
 tag="${tag:-localhost/nvkr-packer-toolchain:dev-${arch}}"
 
 build_command=("${runtime}" build)
@@ -336,9 +331,6 @@ build_command+=(
   --build-arg "CRANE_VERSION=${crane_version}" \
   --build-arg "CRANE_ARCHIVE_SHA256=${crane_digest#sha256:}" \
   --build-arg "CRANE_BINARY_SHA256=${crane_binary_digest#sha256:}" \
-  --build-arg "NFPM_VERSION=${nfpm_version}" \
-  --build-arg "NFPM_ARCHIVE_SHA256=${nfpm_digest#sha256:}" \
-  --build-arg "NFPM_BINARY_SHA256=${nfpm_binary_digest#sha256:}" \
   --file "${here}/Dockerfile" \
   --tag "${tag}")
 
@@ -456,7 +448,6 @@ fi
   command -v gzip >/dev/null
   command -v make >/dev/null
   command -v crane >/dev/null
-  command -v nfpm >/dev/null
   command -v 7z >/dev/null
   command -v unzip >/dev/null
   command -v xorriso >/dev/null
@@ -464,7 +455,6 @@ fi
   test "$(crane version)" = "0.22.1"
   test "$(helm version --template "{{.Version}}")" = "v4.3.1"
   oras version | grep -Eq "^Version:[[:space:]]+1.3.6$"
-  nfpm --version | grep -Eq "^GitVersion:[[:space:]]+2.48.0$"
   dpkg-scanpackages --version >/dev/null
   7z i >/dev/null
   xorriso -version >/dev/null 2>&1

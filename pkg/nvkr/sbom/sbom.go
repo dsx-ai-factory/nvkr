@@ -264,6 +264,13 @@ func componentForEvidence(nc catalog.NamedComponent, artifactHash, arch string,
 		{Name: "nvkr:toolchain", Value: toolchain},
 		{Name: "nvkr:outputType", Value: nc.OutputType},
 	}
+	if name, selected := nc.BuildTool["linux/"+arch]; selected {
+		pin := nc.BuildToolPins["linux/"+arch]
+		props = append(props, Property{Name: "nvkr:lane", Value: "wrapped-build"},
+			Property{Name: "nvkr:tool", Value: "nvkr:tool/" + name},
+			Property{Name: "nvkr:toolArchive", Value: pin.ArchiveDigest},
+			Property{Name: "nvkr:toolExecutable", Value: pin.ExecutableDigest})
+	}
 	sort.Slice(props, func(i, j int) bool { return props[i].Name < props[j].Name })
 	c := Component{
 		Type:       "application",

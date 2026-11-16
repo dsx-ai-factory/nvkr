@@ -323,6 +323,9 @@ func VendorSpecIdentity(command []string, image string) (string, error) {
 }
 
 func validateBuildNode(n Node) error {
+	if err := validateBuildTool(n); err != nil {
+		return err
+	}
 	if n.BuilderType == BuilderVMImage {
 		return validateVMImageNode(n)
 	}
@@ -334,7 +337,7 @@ func validateBuildNode(n Node) error {
 		"component", "builderType", "flakeRef", "flakeOutput", "flakeLockDigest",
 		"toolchain", "toolchainPlatform", "platform", "network", "env", "patches", "command", "workdir",
 		"sourceDest", "sourceCommit", "sourceTreeHash", "vendorSpecDigest",
-		"sourceReadOnly", "writeDir", "materials", "outputType", "artifactPath", "version")); err != nil {
+		"sourceReadOnly", "writeDir", "materials", "buildTool", "buildToolURL", "outputType", "artifactPath", "version")); err != nil {
 		return err
 	}
 	if n.ExecutionBinding != nil {
