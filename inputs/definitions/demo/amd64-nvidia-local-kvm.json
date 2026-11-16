@@ -6,14 +6,20 @@
     "description": "Native AMD64 KVM site bootstrap inputs using the shared NVKE, native tools and NVIDIA OVN producers. Local diagnostic build and deployment; no publication or signing."
   },
   "catalog": {
-    "base": "../../catalogs/tools/native"
+    "base": "../../catalogs/tools/native",
+    "overlays": [
+      "../../catalogs/tools/variants/nightly-go.json"
+    ]
   },
   "outputs": [
     {
       "name": "capi-exec-init-image-amd64",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools/native",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "native-capi-exec-init-image"
@@ -24,7 +30,10 @@
       "name": "capi-exec-plugin-image-amd64",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools/native",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "native-capi-exec-plugin-image"
@@ -46,7 +55,10 @@
       "name": "cluster-api-provider-provisioned-amd64",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke/native-site",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "cluster-api-provider-provisioned"
@@ -57,7 +69,10 @@
       "name": "controller-chart",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke/native-site",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "nvke-controller-chart"
@@ -95,7 +110,10 @@
       "name": "cwe",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke/native-site",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "nvke-controller"
@@ -106,7 +124,10 @@
       "name": "installer-tools-amd64",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools/native",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "clusterctl-linux-amd64",
@@ -121,7 +142,10 @@
       "name": "native-tools-linux-amd64",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools/native",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "clusterctl-linux-amd64",
@@ -141,7 +165,10 @@
       "name": "nicosim-tools-amd64",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools/native",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "nico-sim",
@@ -154,7 +181,10 @@
       "name": "nktp",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke/native-site",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "nktp-chart"
@@ -191,7 +221,10 @@
       "name": "nvkectl",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke/native-site",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "nvkectl"
@@ -246,7 +279,10 @@
       "name": "postgresql",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke/native-site",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "postgresql-chart"
@@ -268,7 +304,10 @@
       "name": "site-startup-tools-amd64",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools/native",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "nerdctl",
@@ -291,7 +330,10 @@
       "name": "spire",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke/native-site",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "spire-chart"
@@ -335,7 +377,10 @@
       "name": "spire-crds",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke/native-site",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "spire-crds-chart"
@@ -379,7 +424,10 @@
       "name": "temporal",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke/native-site",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "temporal-chart"
@@ -423,7 +471,10 @@
       "name": "workload-image-amd64",
       "platform": "linux/amd64",
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools/native",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "native-workload-image"
