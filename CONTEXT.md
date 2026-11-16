@@ -90,8 +90,8 @@ releases their named outputs through one Plan, Run and Release. Proposed
 [merge rules](docs/adr/0026-definition-composition.md#3-merge-rules-exact-union-never-precedence) and
 [member Release reuse](docs/adr/0026-definition-composition.md#6-reusing-already-published-member-releases-only-through-authenticated-acceptance-a-planned-follow-up);
 units U1–U8, including complete-composite hosted qualification with independent policies, are implemented
-and contract-tested only, with no hosted composite Run, publication or consumer
-verification yet.
+and contract-tested. The [evidence ledger](docs/adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
+owns hosted publication, qualification and independent consumer-acceptance status.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition (proposed)**:

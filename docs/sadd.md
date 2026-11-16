@@ -84,7 +84,8 @@ bundles, Run and publication records, consumer expectations and hosted complete-
 are implemented with contract tests. Qualification binds the full composition through artifact checks, smoke
 evidence and the production manifest; explicit policies select production/development pairs and bundle-archive
 applicability without deployment claims. Member Release reuse and local composite qualification rehearsal remain
-deferred and refused; no hosted composite acceptance is recorded.
+deferred and refused. The [hosted composite publication record](adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
+owns external execution evidence and its consumer-acceptance and qualification limits.
 
 Proposed [ADR-27](adr/0027-pinned-tool-producers.md) designs pinned-tool producers: catalog components that run
 one released, digest-pinned executable in the `wrapped-build` lane. AICR bundles are the first use. ADR-27 owns
