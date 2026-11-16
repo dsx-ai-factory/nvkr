@@ -96,7 +96,7 @@ test and demonstration has an accepted successor; it does not authorize silently
 | `nvke-controller/definition-profiles.yaml` | `inputs/definitions/diagnostics/controller-profiles.yaml` | No equivalent supported target yet | Retain transitional as a fixture example; its runnable profile payload is not the release's config-only fixture |
 | `nvke-deploy/definition.yaml` | `docs/examples/nvke-deploy/definition.yaml` | `nvke/definition.yaml` | Retain transitional as a nine-output example; CLI and runnable fixture-profile selection differ from the main release |
 | `nvke-ovn-source/definition.yaml` | `inputs/definitions/diagnostics/ovn.yaml` | `demo/arm64-nvidia-kvm.yaml` and `demo/arm64-nvidia-tcg.yaml` | Retain transitional as a standalone producer example; its AMD64 outputs have no equivalent in the ARM64 demo targets |
-| `nvke-v1/definition.yaml` | `docs/examples/nvke-tutorial/definition.yaml` | Existing generic quickstart, or a deliberately retained NVKE tutorial | Retire after caller migration; the three-output tutorial's historical producers and artifact names are not release aliases |
+| `nvke-v1/definition.yaml` | `docs/examples/nvke-module-tags/definition.yaml` | Existing generic quickstart, or a deliberately retained NVKE tutorial | Retire after caller migration; the three-output tutorial's historical producers and artifact names are not release aliases |
 
 Transitional inputs remain available through the initial ownership relocation, with callers updated to
 their exact relocated paths. They are not additional supported target Definitions. A deliberately
@@ -124,9 +124,9 @@ publication, signing, credential or runtime policies interchangeable.
 | `nvke-deploy/environment-github.yaml` | `docs/examples/nvke-deploy/environment-github.yaml` | `github-release.yaml` | Retire after caller migration; current discovery tag, namespace and aggregate publication behavior differ |
 | `nvke-deploy/environment-local.yaml` | `docs/examples/nvke-deploy/environment-local.yaml` | `local-linux-amd64-kvm.yaml` or retained deploy example | Retain transitional; current non-disk utility pin and no-publication policy must not change implicitly |
 | `nvke-ovn-source/environment-github.yaml` | `inputs/environments/github-ovn-diagnostics.yaml` | Retained OVN producer example | Retain transitional; its fork source-access grant and publication contract are not covered by a renamed nightly policy |
-| `nvke-v1/environment-github.yaml` | `docs/examples/nvke-tutorial/environment-github.yaml` | `github-release.yaml` or retained tutorial | Retire after caller migration; current namespace/publication behavior differs |
-| `nvke-v1/environment-github-dev.yaml` | `docs/examples/nvke-tutorial/environment-github-dev.yaml` | `github-development.yaml` or retained tutorial | Retain transitional; current build-only development must not silently gain signed publication |
-| `nvke-v1/environment-local.yaml` | `docs/examples/nvke-tutorial/environment-local.yaml` | Retained tutorial, until its caller is retired | Retain transitional; anonymous local HTTP registry and dry-run signing have no equivalent among the eight targets |
+| `nvke-v1/environment-github.yaml` | `docs/examples/nvke-module-tags/environment-github.yaml` | `github-release.yaml` or retained tutorial | Retire after caller migration; current namespace/publication behavior differs |
+| `nvke-v1/environment-github-dev.yaml` | `docs/examples/nvke-module-tags/environment-github-dev.yaml` | `github-development.yaml` or retained tutorial | Retain transitional; current build-only development must not silently gain signed publication |
+| `nvke-v1/environment-local.yaml` | `docs/examples/nvke-module-tags/environment-local.yaml` | Retained tutorial, until its caller is retired | Retain transitional; anonymous local HTTP registry and dry-run signing have no equivalent among the eight targets |
 
 ## Catalogs and other authored inputs
 

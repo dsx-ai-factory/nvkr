@@ -15,7 +15,7 @@ func TestMaintainedM2CandidatePublicationNamespace(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	production, err := definition.LoadEnvironment(t.Context(), "../../../docs/examples/nvke-tutorial/environment-github.yaml")
+	production, err := definition.LoadEnvironment(t.Context(), "../../../docs/examples/nvke-module-tags/environment-github.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

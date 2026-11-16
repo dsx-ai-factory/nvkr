@@ -5,6 +5,8 @@ apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
   name: local-demo
+toolchainAccess:
+  publicRoots: [docker.io/library/alpine]
 runtime:
   runtime: docker
 utilityPlatform: linux/amd64
