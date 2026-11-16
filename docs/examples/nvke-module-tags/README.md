@@ -9,7 +9,8 @@ source controller Helm chart from NVKE `v0.23.0`. The chart depends on the exact
 instructions live in the catalog; the Definition selects and packages outputs; the Environment selects
 runtime, destination and signing.
 
-The repository's committed production and full development workflows use [M2](../../../inputs/definitions/nvke/README.md).
+The committed production workflow uses the [M2 candidate](../../../inputs/definitions/nvke/README.md).
+The development workflow runs the 83-output GPU site composite, five NVKE family Definitions and the GB200 AICR bundle.
 This three-output Definition retains a smaller unsigned development example for scratch generation.
 Its [historical hosted run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md)
 passed real signing, complete Run finalization and independent consumption in a personal namespace.
@@ -117,7 +118,8 @@ packaging contract.
 
 For feature-branch generator changes, use `make workflows-generate` and `make workflows-check`, then
 commit and push your reviewed branch. `make pipeline-dev-run PIPELINE_DEV_REPO=dsx-ai-factory/nvkr`
-dispatches the current pushed commit after preflight using the full M2 development Environment.
+dispatches the current pushed commit after preflight using the development Environment for the
+83-output GPU site composite, five NVKE family Definitions and GB200 AICR bundle.
 Development Environments generate `.github/workflows/nvkr-dev.yml` and `.github/nvkr-dev/`, independently
 of the production paths below. Generate this smaller unsigned example only into a scratch root.
 See [pipeline development](../../../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) for one-time

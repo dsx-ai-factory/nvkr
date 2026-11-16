@@ -9,7 +9,7 @@ The [demo index](../demos/README.md) collects the presentation and guided journe
 `bash scripts/nvkr-quickstart.sh` checks Git, Go and Docker before starting. Make is not required.
 A missing or mismatched Go compiler can be installed inside the checkout after confirmation, or with explicit
 `--install-go` consent. Matching installed Go is reused; implicit toolchain downloads are disabled.
-The SDK is verified against [official download checksums](../toolchains/hello/README.md).
+The SDK is verified against [official download checksums](../toolchains/quickstart/README.md).
 Git must already be installed. Supported Docker package installs are shown for approval; they are never performed without consent.
 It selects the checkout's required Go compiler, compiles a native NVKR CLI, then builds
 the three [quickstart](../docs/quickstart.md) artifacts and dependency SBOMs.

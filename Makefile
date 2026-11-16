@@ -366,5 +366,5 @@ run-resolve: build ## Resolve the pinned kubectl producer and print its build gr
 	$(BIN) resolve --data testdata/catalogs/kubernetes-layered --component kubectl --platform linux/amd64
 
 .PHONY: demo-hello
-demo-hello: go-version-check ## Build and verify the hello demo (requires running Docker).
+demo-hello: ## Build and verify the hello demo (requires running Docker).
 	bash demos/demo-local.sh --out "$$(mktemp -d)/hello"

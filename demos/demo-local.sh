@@ -87,7 +87,9 @@ fi
 [ -x "$NVKR" ] || die 'NVKR_BIN must select an executable'
 required_go=$(tr -d '[:space:]' <"$ROOT/.go-version")
 sdk="$ROOT/.nvkr/quickstart-sdk/go${required_go}.${host_os}-${arch}/go/bin/go"
-if [ -z "${GO_BIN:-}" ] && [ -x "$sdk" ]; then GO=$sdk; fi
+if [ -x "$sdk" ] && { [ -z "${GO_BIN:-}" ] || [ "$(GOTOOLCHAIN=local "$GO" env GOVERSION 2>/dev/null)" != "go$required_go" ]; }; then
+  GO=$sdk
+fi
 NVKR=$(cd "$(dirname "$NVKR")" && printf '%s/%s\n' "$PWD" "$(basename "$NVKR")")
 for tool in git docker "$GO"; do command -v "$tool" >/dev/null || die "missing command: $tool"; done
 GO=$(command -v "$GO")
