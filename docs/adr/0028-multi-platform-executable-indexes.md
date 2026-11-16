@@ -7,8 +7,8 @@
 - **Acceptance-test maturity:** None. The implementation units below name the contract suites that must pass;
   no contract test, generated bundle, hosted Run or consumer verification exercises an executable index.
 - **Deciders:** njhensley
-- **Index:** ADR-28 in the consolidated NVKR ADR set. It builds on the tool companion contract proposed in
-  #286 (PR #294), which is not on `main`. Implementation is tracked in #296 and the retrofit in #297.
+- **Index:** ADR-28 in the consolidated NVKR ADR set. It builds on the implemented single-platform
+  tool companion contract. Multi-platform tool/index implementation is tracked in #296 and the retrofit in #297.
 - **Relates to:** ADR-01 (`nvkr.build` schemas), ADR-02 §2 (aggregate logical projection), ADR-03 (coded errors),
   ADR-04 (signing), ADR-11 §1–§2 (direct selection, no sibling reuse), ADR-12 §1 (concrete targets and the
   executable-aggregate exclusion this decision lifts), ADR-13 (SBOMs, `evidence: none`), ADR-16 (artifact check
@@ -119,9 +119,8 @@ this decision; the archive digest matches `aicr_checksums.txt`. `catalog pin` pr
 - Lock v1 gains an optional `tools` list, sorted by platform and exclusive with `tool`. Each entry has exactly
   the single-platform `tool` record shape. Older strict readers reject the field, as they reject
   `derivedFrom` (ADR-22 §1).
-- The optional `companions` field, in the declaration and in each entry, is the companion contract proposed in
-  #286 (PR #294). It is not on `main`. Until it lands, the shape is the current `tool` record without
-  `companions`, and companion declarations remain unadmitted.
+- The optional `companions` field uses the implemented single-platform companion contract in the declaration
+  and in each proposed `tools` entry. Multi-platform declarations and the `tools` lock list remain unimplemented.
 - A list rather than an architecture-keyed map, as prebuilt artifacts use, because `darwin/arm64` and
   `linux/arm64` share an architecture.
 - Completeness is an exact key set: one entry per declared platform. A missing entry, or one that disagrees with

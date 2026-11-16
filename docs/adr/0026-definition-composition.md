@@ -1,8 +1,8 @@
 # ADR-26 — Definition composition
 
 - **Decision status:** Accepted (2026-11-14)
-- **Implementation maturity:** U1–U8 implemented; U9 waits on the result-reuse decision and U10
-  on the publication, consumer-verification and equivalence gates below. `reconciliation/README.md` records the implemented scope.
+- **Implementation maturity:** U1–U8 implemented; U9 waits on result-reuse implementation and cross-workflow origin
+  admission; U10 waits on the publication, consumer-verification and equivalence gates below. `reconciliation/README.md` records the implemented scope.
 - **Acceptance-test maturity:** Contract suites for U1–U8, including an opt-in extended identity-invariance
   contract over the four NVKE families. The [hosted composite publication record](reconciliation/adr-26.md#hosted-gpu-site-publication)
   owns external execution evidence and its consumer-acceptance and qualification limits.
@@ -203,8 +203,8 @@ one is the existing coded failure, admitted before output work wherever the exis
 
 ### 6. Reusing already-published member Releases: only through authenticated acceptance, a planned follow-up
 
-Decided: composites rebuild every output until the authenticated result-reuse decision (draft ADR-30,
-backlog item 4) lands. Cross-workflow reuse of member outputs is then planned as follow-up unit U9.
+Decided: composites rebuild every output until authenticated result reuse under ADR-30 is implemented and
+admitted. Cross-workflow origin admission for member outputs remains planned as follow-up unit U9.
 
 In this decision every composite Run builds every output. No member Release, family Run or prior publication
 supplies a composite output, and no authored field selects one. A future authored reuse selection fails with

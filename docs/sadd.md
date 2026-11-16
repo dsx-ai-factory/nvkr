@@ -1307,7 +1307,7 @@ already obtained.
 | Hosted acceptance of ADR-26 composite qualification; local rehearsal and member Release reuse | Release-engineering, catalog, qualification and result-reuse owners | Governed composite cutover and optional member Release reuse |
 | ADR-27 pinned-tool producers, then AICR layout output (NVIDIA/aicr#3534) and layout import | Catalog, execution, evidence and release-engineering owners | Outputs rendered by released tools, starting with AICR bundles, without rebuilding the tool from source |
 | ADR-28 multi-platform executables, then the AICR migration and the per-platform retrofits | Catalog, release-engineering, delivery and evidence owners | One tool source per release where [ADR-28 §1](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform) admits it, and one image-index output per executable, consumable by standard OCI clients |
-| ADR-29 observation owner and AICR import exception, bounded access/log/field controls, host/package provider and downstream installation/boot records | NVKR observation, AICR and downstream deployment owners; named deciders unassigned | Standalone descriptive collection and supported exact chart/disk/package comparisons |
+| ADR-29 observation owner and AICR import exception, bounded access/log/field controls, host/package provider and downstream installation/boot records | NVKR observation, AICR and downstream deployment owners; operational owners unassigned | Standalone descriptive collection and supported exact chart/disk/package comparisons |
 
 Qualified helper-image use remains unavailable until it satisfies ADR-07/18's executable/runtime admission.
 Source bootstrap records only the identities that actually participated; delivery by image cannot imply
@@ -1320,7 +1320,7 @@ reproduction of helper bytes.
 | Title | NVKR (NVIDIA Kubernetes Recipes) — Software Architecture and Design Document |
 | Status | Draft |
 | Revision | 2026-10-07 |
-| Related ADRs | ADR-01…ADR-22 (`docs/adr/`) |
+| Related ADRs | ADR-01…ADR-31 (`docs/adr/`) |
 | Related acceptance documents | `docs/milestones.md` summarizes the roadmap; `docs/epics-v1-spec.md` owns product acceptance; ADRs own engineering contracts |
 | Current support record | `docs/adr/reconciliation/README.md` |
 | Related surface | `docs/lifecycle.md` |

@@ -12,7 +12,7 @@ intent. An output directly selects components. Packaging intent may bind catalog
 deployment repository remains transport configuration. Catalog-owned digest representation
 may retain the full OCI digest or supply SHA-256 hex to a template that owns the algorithm prefix;
 this does not change the authenticated image identity or rewrite templates.
-A proposed composite Definition is a form of this object, not a seventh lifecycle object (below).
+A composite Definition is a form of this object, not a seventh lifecycle object (below).
 _Avoid_: Factory, FactoryDefinition, cluster definition
 
 **Environment**:
@@ -185,7 +185,7 @@ authored lifecycle inputs are admitted.
 Opt-in execution partitioning moves original jobs into bounded same-commit worker workflows under the same
 manifest; [ADR-18 §8](docs/adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
 owns which jobs stay in the entry workflow and the proposed signer migration. A partition is generated
-scheduling structure, not a Definition, Run or Release, and never follows proposed composite member
+scheduling structure, not a Definition, Run or Release, and never follows composite member
 boundaries. It forwards original
 job results to the single finalizer; it does not authorize artifact acceptance. The complete Plan and required
 output set remain shared. The provider-independent execution graph owns membership, dependency conditions,
@@ -391,7 +391,7 @@ issuance, or errored, with the source and qualifier Runs, attempt times, per-out
 text. It points at the qualification evidence and release manifest by digest and grants no qualification,
 manifest, release or publication authority. An errored outcome's source Run comes from the unauthenticated
 triggering event and says so. `run qualify --issue-manifest --out` writes one for each attempt it qualifies.
-The proposed qualification results index (ADR-31) publishes outcomes for TestGrid; no generated job runs it yet.
+The qualification results index (ADR-31) publishes outcomes for TestGrid; no generated job runs it yet.
 _Avoid_: Qualification record, qualification evidence, test result
 
 **Inventory**:

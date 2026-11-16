@@ -107,7 +107,8 @@ Member Release reuse and local composite qualification rehearsal remain deferred
 
 [ADR-27: Pinned-tool producers](adr/0027-pinned-tool-producers.md) designs producers that run one
 released, digest-pinned tool offline with fixed arguments and typed inputs, with AICR bundles as the first use.
-It is design only.
+Units T1–T7 are implemented and contract-tested. The [ADR-27 ledger](adr/reconciliation/adr-27.md)
+owns execution evidence, unsupported capabilities and remaining hosted and consumer acceptance.
 
 [ADR-28: Multi-platform executables](adr/0028-multi-platform-executable-indexes.md) designs one tool
 source for every platform of a release, where the platforms share a format, companions and admitted URL
