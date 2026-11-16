@@ -32,25 +32,44 @@ func validateGitHubWorkflowSize(raw []byte) error {
 	return err
 }
 
+// githubWorkflowOverflows reports whether a workflow exceeds a per-file provider
+// limit that splitting the file relieves: the file-size ceiling or the parser
+// event cap. An oversized expression or malformed YAML is not an overflow; no
+// partitioning fixes either, so both stay ordinary admission errors.
+func githubWorkflowOverflows(raw []byte) bool {
+	if len(raw) > maxGitHubWorkflowBytes {
+		return true
+	}
+	_, overflow, _ := scanGitHubWorkflowYAML(raw)
+	return overflow
+}
+
 // countGitHubWorkflowYAMLNodes counts the provider's parsing events without
 // materializing expanded aliases. Its bounded traversal stops before an alias
 // graph can consume unbounded memory, stack or CPU.
 func countGitHubWorkflowYAMLNodes(raw []byte) (int, error) {
+	nodes, _, err := scanGitHubWorkflowYAML(raw)
+	return nodes, err
+}
+
+// scanGitHubWorkflowYAML also reports whether the scan stopped at the parser
+// event cap, as distinct from any other admission failure.
+func scanGitHubWorkflowYAML(raw []byte) (int, bool, error) {
 	decoder := yamlv3.NewDecoder(bytes.NewReader(raw))
 	var document yamlv3.Node
 	if err := decoder.Decode(&document); err != nil {
 		if err == io.EOF {
-			return 0, e.New(e.CodeInvalidCatalog, "generated workflow is empty")
+			return 0, false, e.New(e.CodeInvalidCatalog, "generated workflow is empty")
 		}
-		return 0, e.Wrap(e.CodePipelineDrift, err, "reading generated workflow YAML for provider admission")
+		return 0, false, e.Wrap(e.CodePipelineDrift, err, "reading generated workflow YAML for provider admission")
 	}
 	var trailing yamlv3.Node
 	if err := decoder.Decode(&trailing); err != io.EOF {
-		return 0, e.New(e.CodePipelineDrift, "generated workflow must contain exactly one YAML document")
+		return 0, false, e.New(e.CodePipelineDrift, "generated workflow must contain exactly one YAML document")
 	}
 
 	// A yaml.Node document omits the stream's start and end events.
-	nodes := 2
+	nodes, overflow := 2, false
 	active := make(map[*yamlv3.Node]bool)
 	var visit func(*yamlv3.Node, int) error
 	visit = func(node *yamlv3.Node, depth int) error {
@@ -79,6 +98,7 @@ func countGitHubWorkflowYAMLNodes(raw []byte) (int, error) {
 			return e.New(e.CodePipelineDrift, "generated workflow contains an unsupported YAML node")
 		}
 		if cost > maxGitHubWorkflowYAMLNodes-nodes {
+			overflow = true
 			return e.New(e.CodeEngineCapability, "generated workflow exceeds GitHub's parser implementation limit of %d YAML parsing events after alias expansion", maxGitHubWorkflowYAMLNodes)
 		}
 		nodes += cost
@@ -90,7 +110,7 @@ func countGitHubWorkflowYAMLNodes(raw []byte) (int, error) {
 		return nil
 	}
 	err := visit(&document, 1)
-	return nodes, err
+	return nodes, overflow, err
 }
 
 // GitHub rejects a workflow when one ${{ }} expression exceeds 21,000

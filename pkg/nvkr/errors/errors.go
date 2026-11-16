@@ -40,7 +40,6 @@ const (
 	// (signature-invalid) runs BEFORE the digest comparison (ADR-04).
 	CodeNoMatch            Code = "NVKR-E-NO-MATCH"             // reserved historical selector code: no match
 	CodeAmbiguous          Code = "NVKR-E-AMBIGUOUS"            // reserved historical selector code: ambiguous match
-	CodeReservedAxis       Code = "NVKR-E-RESERVED-AXIS"        // a reserved (v1-inactive) axis carried a value
 	CodeUnsupported        Code = "NVKR-E-UNSUPPORTED"          // active axis value outside its v1 domain
 	CodeUnpinnedSource     Code = "NVKR-E-UNPINNED-SOURCE"      // component lacks a full commit SHA / tree hash
 	CodeTagToolchain       Code = "NVKR-E-TOOLCHAIN-TAG"        // toolchain image referenced by tag, not digest
@@ -65,17 +64,14 @@ const (
 	CodeTimeout     Code = "NVKR-E-TIMEOUT"     // a deadline or cancellation elapsed
 
 	// Band 40–56 — release / lifecycle.
-	CodeVectorUnpinned     Code = "NVKR-E-VECTOR-UNPINNED"      // a validation vector / expected-digests ref is not pinned
 	CodeReleaseIncomplete  Code = "NVKR-E-RELEASE-INCOMPLETE"   // a required member/artifact/evidence is missing (not promotable)
 	CodeGateUnmet          Code = "NVKR-E-GATE-UNMET"           // an independent gate (e.g. conformance) has no matching passing result
 	CodeUnverifiedRef      Code = "NVKR-E-UNVERIFIED-REF"       // a resolved digest/signature did not verify
-	CodeCompatMismatch     Code = "NVKR-E-COMPAT-MISMATCH"      // a compatibility constraint (kubernetes/nvke/platform) is unmet
 	CodeProvenanceMissing  Code = "NVKR-E-PROVENANCE-MISSING"   // required provenance/evidence is absent
 	CodeInventoryUnpinned  Code = "NVKR-E-INVENTORY-UNPINNED"   // the inventory ref is not pinned by digest
 	CodeImmutableViolation Code = "NVKR-E-IMMUTABLE-VIOLATION"  // an attempt to mutate an immutable publication
 	CodeWithdrawn          Code = "NVKR-E-WITHDRAWN"            // a signed withdrawn status declaration applies (fail closed)
 	CodeUnpinnedInput      Code = "NVKR-E-UNPINNED-INPUT"       // a non-content-addressable input under air-gap/mirror
-	CodeMirrorMismatch     Code = "NVKR-E-MIRROR-MISMATCH"      // a mirrored input did not hash to its declared identity
 	CodePipelineDrift      Code = "NVKR-E-PIPELINE-DRIFT"       // a committed pipeline diverges from its IR (ADR-21)
 	CodeStatusCheckpoint   Code = "NVKR-E-STATUS-CHECKPOINT"    // a signed lifecycle checkpoint is missing, stale, or rolled back
 	CodePinSetMismatch     Code = "NVKR-E-PIN-SET-MISMATCH"     // derived member disagrees with its pinned umbrella
@@ -83,6 +79,8 @@ const (
 	CodeRegistryRejected   Code = "NVKR-E-REGISTRY-REJECTED"    // registry permanently rejected a publication request
 	CodeWriteConflict      Code = "NVKR-E-WRITE-CONFLICT"       // optimistic compare-and-swap lost to a concurrent writer
 )
+
+// Exit statuses 12, 40, 44 and 50 are retired and remain unassigned.
 
 // exitCodes maps each Code to a distinct small process exit status. The allocation
 // is banded (ADR-03) and frozen. Anything not found here (including nil) resolves
@@ -97,7 +95,6 @@ var exitCodes = map[Code]int{
 	// Band 10–19 — resolve / input / preflight / crypto.
 	CodeNoMatch:            10,
 	CodeAmbiguous:          11,
-	CodeReservedAxis:       12,
 	CodeUnsupported:        13,
 	CodeUnpinnedSource:     14,
 	CodeTagToolchain:       15,
@@ -122,17 +119,14 @@ var exitCodes = map[Code]int{
 	CodeTimeout:     31,
 
 	// Band 40–56 — release / lifecycle.
-	CodeVectorUnpinned:     40,
 	CodeReleaseIncomplete:  41,
 	CodeGateUnmet:          42,
 	CodeUnverifiedRef:      43,
-	CodeCompatMismatch:     44,
 	CodeProvenanceMissing:  45,
 	CodeInventoryUnpinned:  46,
 	CodeImmutableViolation: 47,
 	CodeWithdrawn:          48,
 	CodeUnpinnedInput:      49,
-	CodeMirrorMismatch:     50,
 	CodePipelineDrift:      51,
 	CodeStatusCheckpoint:   52,
 	CodeWriteConflict:      53,
@@ -146,14 +140,14 @@ var exitCodes = map[Code]int{
 // package's const block), so a new Code MUST be added here as well as to exitCodes.
 var AllCodes = []Code{
 	CodeInternal, CodeUsage, CodeDiff,
-	CodeNoMatch, CodeAmbiguous, CodeReservedAxis, CodeUnsupported, CodeUnpinnedSource,
+	CodeNoMatch, CodeAmbiguous, CodeUnsupported, CodeUnpinnedSource,
 	CodeTagToolchain, CodeInvalidCatalog, CodePreflightFailed, CodeBuilderNotProvided, CodeSignatureInvalid,
 	CodeFetchFailed, CodeBuildFailed, CodeVerifyFailed, CodeUntrustedSigner,
 	CodeTrustPolicyMissing, CodeUntrustedProfile, CodeEncryptedArtifact, CodeEnvelopeDecode, CodeEngineCapability,
 	CodeUnavailable, CodeTimeout,
-	CodeVectorUnpinned, CodeReleaseIncomplete, CodeGateUnmet, CodeUnverifiedRef, CodeCompatMismatch,
+	CodeReleaseIncomplete, CodeGateUnmet, CodeUnverifiedRef,
 	CodeProvenanceMissing, CodeInventoryUnpinned, CodeImmutableViolation, CodeWithdrawn, CodeUnpinnedInput,
-	CodeMirrorMismatch, CodePipelineDrift, CodeStatusCheckpoint, CodeWriteConflict, CodePinSetMismatch,
+	CodePipelineDrift, CodeStatusCheckpoint, CodeWriteConflict, CodePinSetMismatch,
 	CodeRegistryAuthFailed, CodeRegistryRejected,
 }
 

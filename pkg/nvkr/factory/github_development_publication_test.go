@@ -100,6 +100,14 @@ func TestGitHubDevelopmentPublicationScopesRealStages(t *testing.T) {
 						t.Fatalf("disk stage escaped native credential boundary: %+v", job)
 					}
 				}
+				// One release job runs several operations. Each credential stays
+				// on its operation's step and never reaches job scope.
+				for _, key := range []string{"NVKR_CREDENTIAL", "NVKR_REGISTRY_USER", githubRepositoryTokenEnv} {
+					if _, present := job.Env[key]; present {
+						t.Fatalf("stage %s binds %s at job scope", stage.ID, key)
+					}
+				}
+				wantOIDC := ""
 				for _, node := range stage.Nodes {
 					counts[node.Kind]++
 					secret, user := "", ""
@@ -109,28 +117,32 @@ func TestGitHubDevelopmentPublicationScopesRealStages(t *testing.T) {
 					case NodeVerifyPublication, NodeAssembleRelease:
 						secret, user = "${{ secrets.NVKR_DEV_REGISTRY_READ }}", "${{ vars.NVKR_DEV_REGISTRY_READ_USER }}"
 					}
-					if job.Env["NVKR_CREDENTIAL"] != secret || job.Env["NVKR_REGISTRY_USER"] != user {
-						t.Fatalf("%s credential differs from its operation scope: %+v", node.Kind, job.Env)
-					}
 					repositoryToken := ""
 					if node.Kind == NodePublish {
 						repositoryToken = "${{ github.token }}"
 					}
-					if job.Env[githubRepositoryTokenEnv] != repositoryToken {
-						t.Fatalf("%s repository metadata credential differs from its publication scope", node.Kind)
+					if stage.DiskOutput == "" {
+						step := githubNodeStep(t, &job, node.ID)
+						if step.Env["NVKR_CREDENTIAL"] != secret || step.Env["NVKR_REGISTRY_USER"] != user {
+							t.Fatalf("%s credential differs from its operation scope: %+v", node.Kind, step.Env)
+						}
+						if step.Env[githubRepositoryTokenEnv] != repositoryToken {
+							t.Fatalf("%s repository metadata credential differs from its publication scope", node.Kind)
+						}
 					}
 					if node.Kind == NodePublish || signFamilyNode(node.Kind) {
 						if job.Environment != githubDevelopmentReleaseEnvironment || job.Permissions["packages"] != "" {
 							t.Fatalf("%s has production protection/token access: %+v", node.Kind, job)
 						}
-						wantOIDC := ""
-						if node.Kind == NodeSign || node.Kind == NodeAttestEvidence {
-							wantOIDC = "write"
-						}
-						if job.Permissions["id-token"] != wantOIDC {
-							t.Fatalf("%s OIDC permission differs: %+v", node.Kind, job.Permissions)
-						}
+					} else if job.Environment == githubDevelopmentReleaseEnvironment {
+						t.Fatalf("%s shares a job with release authority", node.Kind)
 					}
+					if node.Kind == NodeSign || node.Kind == NodeAttestEvidence {
+						wantOIDC = "write"
+					}
+				}
+				if job.Permissions["id-token"] != wantOIDC {
+					t.Fatalf("stage %s OIDC permission differs from its operations: %+v", stage.ID, job.Permissions)
 				}
 			}
 			for _, kind := range []string{NodePublish, NodeSign, NodeVerifyPublication, NodeAssembleRelease, NodeAttestEvidence} {
@@ -165,23 +177,51 @@ func TestGitHubDevelopmentPublicationRejectsScopeTampering(t *testing.T) {
 	for _, node := range plan.Graph.Nodes {
 		selected[node.Kind] = jobs[node.ID]
 	}
+	selectedNode := map[string]string{}
+	for _, node := range plan.Graph.Nodes {
+		selectedNode[node.Kind] = node.ID
+	}
+	// A release job runs several operations, so credential tampering targets the
+	// execution step of one operation, not the job. Such a step is outside the
+	// closed shared interface and reaches validation through the lower boundary.
+	stepTampered := false
+	stepEnv := func(kind string, change func(map[string]string)) func(*githubJob) {
+		return func(job *githubJob) {
+			step := githubNodeStep(t, job, selectedNode[kind])
+			if step.Env == nil {
+				step.Env = map[string]string{}
+			}
+			change(step.Env)
+			stepTampered = true
+		}
+	}
 	for _, test := range []struct {
 		name, kind string
 		change     func(*githubJob)
 	}{
-		{"writer on reader", NodeVerifyPublication, func(job *githubJob) { job.Env["NVKR_CREDENTIAL"] = "${{ secrets.NVKR_DEV_REGISTRY_WRITE }}" }},
-		{"production token", NodePublish, func(job *githubJob) { job.Env["NVKR_CREDENTIAL"] = "${{ secrets.GITHUB_TOKEN }}" }},
-		{"missing repository token", NodePublish, func(job *githubJob) { delete(job.Env, githubRepositoryTokenEnv) }},
-		{"package token for repository", NodePublish, func(job *githubJob) { job.Env[githubRepositoryTokenEnv] = "${{ secrets.NVKR_DEV_REGISTRY_WRITE }}" }},
-		{"repository token on signing", NodeSign, func(job *githubJob) { job.Env[githubRepositoryTokenEnv] = "${{ github.token }}" }},
-		{"repository token on producer", NodeBuild, func(job *githubJob) { job.Env = map[string]string{githubRepositoryTokenEnv: "${{ github.token }}"} }},
-		{"actor username", NodeSign, func(job *githubJob) { job.Env["NVKR_REGISTRY_USER"] = "${{ github.actor }}" }},
-		{"source write scope", NodeSign, func(job *githubJob) { job.Permissions["contents"] = "write" }},
-		{"OIDC on reader", NodeAssembleRelease, func(job *githubJob) { job.Permissions["id-token"] = "write" }},
-		{"production protection", NodePublish, func(job *githubJob) { job.Environment = githubReleaseEnvironment }},
-		{"registry on SBOM attestation", NodeAttestEvidence, func(job *githubJob) {
+		{"writer on reader", NodeVerifyPublication, stepEnv(NodeVerifyPublication, func(env map[string]string) {
+			env["NVKR_CREDENTIAL"] = "${{ secrets.NVKR_DEV_REGISTRY_WRITE }}"
+		})},
+		{"production token", NodePublish, stepEnv(NodePublish, func(env map[string]string) { env["NVKR_CREDENTIAL"] = "${{ secrets.GITHUB_TOKEN }}" })},
+		{"missing repository token", NodePublish, stepEnv(NodePublish, func(env map[string]string) { delete(env, githubRepositoryTokenEnv) })},
+		{"package token for repository", NodePublish, stepEnv(NodePublish, func(env map[string]string) {
+			env[githubRepositoryTokenEnv] = "${{ secrets.NVKR_DEV_REGISTRY_WRITE }}"
+		})},
+		{"repository token on signing", NodeSign, stepEnv(NodeSign, func(env map[string]string) { env[githubRepositoryTokenEnv] = "${{ github.token }}" })},
+		{"repository token on producer", NodeBuild, stepEnv(NodeBuild, func(env map[string]string) { env[githubRepositoryTokenEnv] = "${{ github.token }}" })},
+		{"actor username", NodeSign, stepEnv(NodeSign, func(env map[string]string) { env["NVKR_REGISTRY_USER"] = "${{ github.actor }}" })},
+		{"writer at job scope", NodePublish, func(job *githubJob) {
 			job.Env = map[string]string{"NVKR_CREDENTIAL": "${{ secrets.NVKR_DEV_REGISTRY_WRITE }}"}
 		}},
+		{"source write scope", NodeSign, func(job *githubJob) { job.Permissions["contents"] = "write" }},
+		{"OIDC on producer", NodeBuild, func(job *githubJob) {
+			job.Permissions = map[string]string{"contents": "read", "id-token": "write"}
+		}},
+		{"OIDC dropped from signer", NodeSign, func(job *githubJob) { delete(job.Permissions, "id-token") }},
+		{"production protection", NodePublish, func(job *githubJob) { job.Environment = githubReleaseEnvironment }},
+		{"registry on SBOM attestation", NodeAttestEvidence, stepEnv(NodeAttestEvidence, func(env map[string]string) {
+			env["NVKR_CREDENTIAL"] = "${{ secrets.NVKR_DEV_REGISTRY_WRITE }}"
+		})},
 		{"short retention", NodePublish, func(job *githubJob) {
 			for i := range job.Steps {
 				if job.Steps[i].With["retention-days"] == "7" {
@@ -200,16 +240,34 @@ func TestGitHubDevelopmentPublicationRejectsScopeTampering(t *testing.T) {
 				id = "nvkr-lifecycle-run"
 			}
 			job := document.Jobs[id]
+			stepTampered = false
 			test.change(&job)
 			document.Jobs[id] = job
 			raw, err := yaml.Marshal(document)
 			if err != nil {
 				t.Fatal(err)
 			}
-			changed := relowerGitHubTestBundle(t, plan, bundle, raw)
+			changed := (*GeneratedBundle)(nil)
+			if stepTampered {
+				changed = unsharedGitHubTestBundle(t, plan, bundle, raw)
+			} else {
+				changed = relowerGitHubTestBundle(t, plan, bundle, raw)
+			}
 			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
 		})
 	}
+}
+
+// githubNodeStep returns the execution step of one Plan operation in its job.
+func githubNodeStep(t testing.TB, job *githubJob, nodeID string) *githubStep {
+	t.Helper()
+	for index := range job.Steps {
+		if job.Steps[index].ID == githubJobID(nodeID) {
+			return &job.Steps[index]
+		}
+	}
+	t.Fatalf("job %q has no execution step for %s", job.Name, nodeID)
+	return nil
 }
 
 func TestGitHubPublicationRepositoryIdentityCoversOutputAndReleaseRoots(t *testing.T) {
@@ -231,22 +289,29 @@ func TestGitHubPublicationRepositoryIdentityCoversOutputAndReleaseRoots(t *testi
 			if err != nil {
 				t.Fatal(err)
 			}
-			publishers := map[string]bool{}
+			// The repository token is bound to each publication's own step.
+			publishers := map[string]string{}
 			for _, node := range plan.Graph.Nodes {
 				if node.Kind == NodePublish {
-					publishers[nodeJobs[node.ID]] = true
+					publishers[githubJobID(node.ID)] = nodeJobs[node.ID]
 				}
 			}
 			if len(publishers) != len(plan.LifecycleOutputs)+1 {
 				t.Fatal("fixture must cover every output and the aggregate release publisher")
 			}
 			for jobID, job := range document.Jobs {
-				token, present := job.Env[githubRepositoryTokenEnv]
-				if present != publishers[jobID] || present && token != "${{ github.token }}" {
-					t.Fatalf("job %s received the wrong repository metadata credential scope", jobID)
+				if _, present := job.Env[githubRepositoryTokenEnv]; present {
+					t.Fatalf("job %s binds the repository metadata credential at job scope", jobID)
 				}
-				if present && job.Permissions["contents"] != "read" {
-					t.Fatalf("publisher %s lost read-only repository metadata access", jobID)
+				for _, step := range job.Steps {
+					token, present := step.Env[githubRepositoryTokenEnv]
+					publisher := publishers[step.ID] == jobID && step.ID != ""
+					if present != publisher || present && token != "${{ github.token }}" {
+						t.Fatalf("job %s step %q received the wrong repository metadata credential scope", jobID, step.Name)
+					}
+					if present && job.Permissions["contents"] != "read" {
+						t.Fatalf("publisher %s lost read-only repository metadata access", jobID)
+					}
 				}
 			}
 		})

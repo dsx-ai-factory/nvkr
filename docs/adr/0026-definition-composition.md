@@ -326,9 +326,9 @@ and owning operation carry that detail.
 
 ## Worked example: the four NVKE families
 
-This example is illustrative and is **not** added to `inputs/`. It assumes the composite would live beside the
-families as `inputs/definitions/nvke/composite.yaml`. The digests are the actual `nvkr.definition` digests of the
-family Definitions at commit `75f154fe`, computed with the existing `Definition.Digest` and the Go toolchain in
+This historical four-family example is illustrative and is **not** a maintained input. The maintained entry
+point is `inputs/definitions/nvke/gpu-site.composite.yaml`, which selects a larger membership. The digests
+below are the actual `nvkr.definition` digests of the family Definitions at commit `75f154fe`, computed with the existing `Definition.Digest` and the Go toolchain in
 `.go-version`. Until `definition pin` exists, a short program against the existing API reproduces them:
 
 ```go
@@ -426,7 +426,7 @@ Expected results, which unit U3 must prove rather than assume:
   selected by two families (checked against the authored inputs at `75f154fe`).
 - Every output's Build Digest and native build records equal those in the corresponding family Plan and in the
   retained combined `definition.yaml` Plan.
-- One Plan with a composition record; one partitioned Run; one Release at
+- One Plan with a composition record; one Run; one Release at
   `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/composite/releases@sha256:…` whose 69 outputs are each attributed to
   one family.
 

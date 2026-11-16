@@ -35,7 +35,7 @@ finalization retains its one-disk limit. The supplied Environments generate raw-
 `pkg/nvkr/lifecycle/nvke_ubuntu24_test.go` covers compilation, exact closure/pins, changed
 Build identity, native KVM admission and deterministic generation. Script fixtures cover
 selection and frozen-input routing through the shared release catalog. Disk producers
-retain stock NVKE capture source; the material owner accepts its original acquisition schema. The input-layout migration preserves the agent preparation
+retain stock NVKE capture source apart from the catalog patch to its Packer version pins; the material owner accepts its original acquisition schema. The input-layout migration preserves the agent preparation
 and build recipe used in the package exercise below. This is contract evidence: no Ubuntu 24 KVM bake,
 guest boot, full acquired-payload ABI inspection, agent-start smoke, release publication
 or qualification is established by these tests. ADR-10/11/18/22 own the unchanged contracts.

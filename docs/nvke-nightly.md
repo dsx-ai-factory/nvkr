@@ -137,7 +137,7 @@ gh workflow run nvkr-run-nvke-nightly-gpu-site.yml --repo dsx-ai-factory/nvkr --
 
 The producer is manual-only. The first bootstrap uploads `nvkr-runtime-inputs`; its
 `plan.json` contains `runtimeInputs.sources` (repository/ref/commit/tree/timestamp) and
-the exact captured authored input files. Every partition receives that frozen Plan.
+the exact captured authored input files. Every job receives that frozen Plan.
 A retry restores the original same-Run artifact; it fails if that artifact has expired.
 Use a new dispatch to select newer main commits. Workflow topology or recipe changes
 still require reviewed regeneration.

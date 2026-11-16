@@ -74,9 +74,7 @@ func githubCIStageRestoreStep(plan *Plan, name string) *yamlv3.Node {
 		family = strings.TrimSuffix(family, "-container")
 		shell = "sh -e {0}"
 	}
-	switch family {
-	case "execute-node", "execute-source", "prepare-inputs":
-	default:
+	if !githubExecutionFamily(family) && family != "prepare-inputs" {
 		return nil
 	}
 	step := githubYAMLMap("name", githubYAMLString(githubParameterExpression("restore_name")), "id", githubYAMLString("operation_restore"))

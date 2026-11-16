@@ -30,9 +30,12 @@ type partitionedRun struct {
 
 func partitionedRecoveryRun(t *testing.T) partitionedRun {
 	t.Helper()
+	engageGitHubPartitions(t)
 	plan := recompileGitHubStabilityPlan(t, referenceTestPlan(t), func(inputs *githubStabilityInputs) {
 		inputs.environment.GitHubExecutionPartitions = true
-		for index := len(inputs.definition.Outputs); index < 6; index++ {
+		// Each output is one producer job and one release job; enough of them
+		// cross the collector threshold of 64 required jobs.
+		for index := len(inputs.definition.Outputs); index < 36; index++ {
 			output := inputs.definition.Outputs[0]
 			output.Name = fmt.Sprintf("worker-z%02d", index)
 			inputs.definition.Outputs = append(inputs.definition.Outputs, output)

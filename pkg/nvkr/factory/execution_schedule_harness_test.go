@@ -175,7 +175,17 @@ func harnessGraphFor(t *testing.T, name string, plan *Plan) harnessGraph {
 	if len(ops) != len(deps) {
 		t.Fatalf("%s: harness classified operations outside the execution graph", name)
 	}
-	return harnessGraph{name: name, partitioned: plan.Environment.GitHubExecutionPartitions, model: model, layout: layout, deps: deps, ops: ops}
+	// The clear-improvement rule applies only to a Plan that engages the
+	// partition fallback: its flat workflow must fail provider size admission.
+	partitioned := false
+	if plan.Environment.GitHubExecutionPartitions {
+		flat, err := renderGitHubFlat(t.Context(), plan, false)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		partitioned = githubPartitionsEngaged(plan, flat.Files[flat.WorkflowPath])
+	}
+	return harnessGraph{name: name, partitioned: partitioned, model: model, layout: layout, deps: deps, ops: ops}
 }
 
 func harnessPool(runsOn string) string {

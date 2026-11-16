@@ -300,6 +300,11 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 				continue
 			}
 			sourceStage, sourceJob := byNodeForJob(stages, jobID)
+			// A release operation's registry credential is admitted only on its
+			// own execution step; stage execution checks its exact value below.
+			if sourceJob && githubReleaseCredentialStep(plan, sourceStage, step) {
+				continue
+			}
 			if len(wantSourceEnv) == 0 || !sourceJob || len(sourceStage.Nodes) != 1 ||
 				step.ID != githubJobID(sourceStage.Nodes[0].ID) || len(step.Env) != len(wantSourceEnv) {
 				return e.New(e.CodeEngineCapability, "GitHub job %q has unexpected step credentials or environment", jobID)
@@ -450,58 +455,34 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 		if len(githubStagePrivateImages(plan, stage)) > 0 && !reflect.DeepEqual(job.Permissions, map[string]string{"contents": "read"}) {
 			return e.New(e.CodeEngineCapability, "private toolchain jobs require exactly contents:read")
 		}
+		// One job holds one token. Its scopes are exactly the union of its
+		// operations' scopes, so no operation gains authority by co-location.
+		wantPermissions, err := githubStagePermissions(plan, stage)
+		if err != nil {
+			return err
+		}
+		if !maps.Equal(job.Permissions, wantPermissions) {
+			return e.New(e.CodeEngineCapability, "GitHub job %q token permissions differ from its operations' exact scopes", jobID)
+		}
 		wantCondition := stage.condition(plan, preflightJobs...)
 		if job.If != wantCondition {
 			return e.New(e.CodeEngineCapability, "GitHub execution job %q must require dispatch on an admitted branch", jobID)
 		}
-		repositoryToken, repositoryTokenPresent := job.Env[githubRepositoryTokenEnv]
-		if want := githubPublicationRepositoryToken(plan, node); repositoryToken != want || repositoryTokenPresent != (want != "") {
-			return e.New(e.CodeEngineCapability, "GitHub job %q repository metadata credential differs from its publication scope", jobID)
-		}
-		if githubScopedPublication(plan) {
-			if err := validateGitHubRegistryEnvironment(plan, node.Kind, node.Target, jobID, job); err != nil {
-				return err
+		// Registry credentials and the repository token are step-scoped. Only an
+		// object publication, which owns its job, binds them at job scope.
+		if !IsObjectPublicationNode(plan, node.ID) {
+			for _, key := range []string{"NVKR_CREDENTIAL", "NVKR_REGISTRY_USER", githubRepositoryTokenEnv} {
+				if _, present := job.Env[key]; present {
+					return e.New(e.CodeEngineCapability, "GitHub job %q binds release credential %s outside its operation step", jobID, key)
+				}
 			}
 		}
 		if err := validateObjectPublicationJob(plan, node, stage, job); err != nil {
 			return err
 		}
-		if node.Kind == NodePublish && !IsObjectPublicationNode(plan, node.ID) {
-			target := plan.Targets[node.Target]
-			if !githubScopedPublication(plan) && strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "write" {
-				return e.New(e.CodeEngineCapability, "GitHub publish job %q lacks explicit packages:write", jobID)
-			}
-			if !strings.HasPrefix(target.Ref, "ghcr.io/") && job.Permissions["packages"] != "" {
-				return e.New(e.CodeEngineCapability, "GitHub anonymous publish job %q has unnecessary packages permission", jobID)
-			}
-			if target.CredentialRef != "" && node.Kind != NodeAttestEvidence && job.Env["NVKR_CREDENTIAL"] == "" {
-				return e.New(e.CodeEngineCapability, "GitHub publish job %q omits its credential reference", jobID)
-			}
-		}
-		if signFamilyNode(node.Kind) {
-			if plan.Environment.Signing == nil {
-				return e.New(e.CodeTrustPolicyMissing,
-					"GitHub signing job %q has no delivery signing profile", jobID)
-			}
-			if node.Kind == NodeAttestEvidence && (job.Env["NVKR_CREDENTIAL"] != "" || job.Env["NVKR_REGISTRY_USER"] != "") {
-				return e.New(e.CodeEngineCapability, "SBOM attestation job must not receive registry credentials")
-			}
-			expected := githubSigningPermissionsFor(plan, node.Kind)
-			if len(job.Permissions) != len(expected) {
-				return e.New(e.CodeEngineCapability,
-					"GitHub signing job %q holds %d permissions; %s signing requires exactly %v",
-					jobID, len(job.Permissions), plan.Environment.Signing.Mode, expected)
-			}
-			for name, value := range expected {
-				if job.Permissions[name] != value {
-					return e.New(e.CodeEngineCapability,
-						"GitHub signing job %q has %s: %q, want %q", jobID, name, job.Permissions[name], value)
-				}
-			}
-			target := plan.Targets[node.Target]
-			if target.CredentialRef != "" && node.Kind != NodeAttestEvidence && job.Env["NVKR_CREDENTIAL"] == "" {
-				return e.New(e.CodeEngineCapability, "GitHub signing job %q omits its credential reference", jobID)
-			}
+		if signFamilyNode(node.Kind) && plan.Environment.Signing == nil {
+			return e.New(e.CodeTrustPolicyMissing,
+				"GitHub signing job %q has no delivery signing profile", jobID)
 		}
 		for _, output := range githubCarrierOutputs(plan, node, artifacts, nodeJobs) {
 			if !hasExactGitHubRun(job.Steps, githubRunnerCommand(plan, "pack-outputs", "node", node.ID)) ||
@@ -829,6 +810,15 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 			strings.TrimSpace(step.Run) != strings.Join(commands, "\n") {
 			return e.New(e.CodeEngineCapability, "GitHub stage %q must execute exact node %q in graph order without skipping failures", stage.ID, node.ID)
 		}
+		// Each operation holds exactly its own credentials: a co-located step
+		// neither lends nor borrows a source or registry credential.
+		wantEnv, err := githubNodeStepEnvironment(plan, node)
+		if err != nil {
+			return err
+		}
+		if len(step.Env) != len(wantEnv) || (len(wantEnv) > 0 && !maps.Equal(step.Env, wantEnv)) {
+			return e.New(e.CodeEngineCapability, "GitHub stage %q operation %q credential scope differs from its exact admitted environment", stage.ID, node.ID)
+		}
 		next++
 	}
 	if next != len(stage.Nodes) {
@@ -851,6 +841,19 @@ func validateGitHubScriptLimits(document githubWorkflowDocument) error {
 		}
 	}
 	return nil
+}
+
+// githubReleaseCredentialStep reports whether a step is the execution step of
+// a release operation that is entitled to a registry credential or repository
+// token. Stage execution separately requires its exact environment.
+func githubReleaseCredentialStep(plan *Plan, stage githubStage, step githubStep) bool {
+	for _, node := range stage.Nodes {
+		if step.ID == githubJobID(node.ID) && !IsObjectPublicationNode(plan, node.ID) &&
+			(node.Kind == NodePublish || signFamilyNode(node.Kind)) {
+			return true
+		}
+	}
+	return false
 }
 
 func byNodeForJob(stages []githubStage, id string) (githubStage, bool) {

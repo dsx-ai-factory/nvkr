@@ -18,7 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
-func TestGitHubProducerStagesKeepOnlyClosedOfflineConsumers(t *testing.T) {
+func TestGitHubProducerStagesAdmitOnlyClosedSameAuthorityConsumers(t *testing.T) {
 	for _, test := range []struct {
 		name   string
 		mutate func([]Node)
@@ -33,8 +33,9 @@ func TestGitHubProducerStagesKeepOnlyClosedOfflineConsumers(t *testing.T) {
 		{name: "different platform", mutate: func(nodes []Node) { nodes[2].Platform = "linux/arm64" }},
 		{name: "different named output", mutate: func(nodes []Node) { nodes[2].BuildTarget = "other" }},
 		{name: "cross-output join", mutate: func(nodes []Node) { nodes[2].Inputs = append(nodes[2].Inputs, "other-result") }},
-		{name: "network-enabled consumer", mutate: func(nodes []Node) { nodes[2].Network = ir.NetworkDefault }},
-		{name: "source credential boundary", mutate: func(nodes []Node) { nodes[2].Kind = NodeFetch }},
+		// Network isolation belongs to the helper, not the job boundary.
+		{name: "network-enabled consumer", mutate: func(nodes []Node) { nodes[2].Network = ir.NetworkDefault }, joined: true},
+		{name: "source fetch without a credential", mutate: func(nodes []Node) { nodes[2].Kind = NodeFetch }, joined: true},
 		{name: "publication credential boundary", mutate: func(nodes []Node) { nodes[2].Kind = NodePublish }},
 		{name: "signer OIDC boundary", mutate: func(nodes []Node) { nodes[2].Kind = NodeSign }},
 		{name: "SBOM attestation OIDC boundary", mutate: func(nodes []Node) { nodes[2].Kind = NodeAttestEvidence }},
@@ -137,13 +138,13 @@ func TestGitHubProducerStagePreservesSignedWorkflowBoundaries(t *testing.T) {
 			}
 		}
 	}
-	if kinds[NodeBuild] != 1 || kinds[NodeVerify] != 1 || kinds[NodeSBOM] != 1 || kinds[NodePackage] != 2 || !slices.Equal(executed, expected) {
+	if kinds[NodeFetch] != 1 || kinds[NodeBuild] != 1 || kinds[NodeVerify] != 1 || kinds[NodeSBOM] != 1 || kinds[NodePackage] != 2 || !slices.Equal(executed, expected) {
 		t.Fatalf("producer closure was not retained in execution order: kinds=%v execute=%v expected=%v", kinds, executed, expected)
 	}
 	for _, node := range plan.Graph.Nodes {
-		if node.Kind == NodeFetch || node.Kind == NodePublish || signFamilyNode(node.Kind) {
+		if node.Kind == NodePublish || signFamilyNode(node.Kind) {
 			if jobs[node.ID] == stage.ID {
-				t.Fatalf("credential boundary %q joined producer", node.ID)
+				t.Fatalf("release operation %q joined producer", node.ID)
 			}
 		}
 	}
@@ -239,10 +240,15 @@ func githubSingleProducerPlan(t *testing.T) *Plan {
 func requireGitHubProducerStage(t *testing.T, stages []githubStage) githubStage {
 	t.Helper()
 	for _, stage := range stages {
-		if githubProducerStage(stage) && len(stage.Nodes) > 1 {
-			return stage
+		if stage.DiskOutput != "" || len(stage.Nodes) < 2 {
+			continue
+		}
+		for _, node := range stage.Nodes {
+			if node.Kind == NodeBuild || node.Kind == NodeAcquire {
+				return stage
+			}
 		}
 	}
-	t.Fatal("fixture has no producer stage with offline consumers")
+	t.Fatal("fixture has no producer job with co-located consumers")
 	return githubStage{}
 }

@@ -284,11 +284,12 @@ control/evidence limit per root. Each output's full payload validation remains i
 independent consumers retain full payload validation under `artifact-publication` scope. The separate
 `authenticity` scope authenticates root/output signatures, provenance and required SBOM bundles using the
 metadata/evidence closure, and explicitly leaves payload integrity unchecked. This mode is GitHub-only and requires production cosign
-signing. Assembly and finalization receive registry-read access without OIDC or package-write permission.
+signing. The assembly step and the finalizer receive only registry-read access; the finalizer job has no
+OIDC or package-write permission.
 
-The SBOM-attestation job uses the same protected workflow identity and issuer as artifact signing. It needs
-OIDC access but no registry credentials. Artifact publication/signing retain their existing scoped registry
-access. These effects are not an atomic remote transaction: failure can leave payloads or partial evidence;
+The SBOM-attestation step uses the same protected workflow identity and issuer as artifact signing. Its job
+has OIDC access, and the step itself receives no registry credentials. Artifact publication and signing keep
+their scoped registry access on their own steps. These effects are not an atomic remote transaction: failure can leave payloads or partial evidence;
 no rollback or cross-run resume is claimed.
 
 Dry-run and local development can retain raw SBOM preparation layouts. They do not create signed bundles.

@@ -144,6 +144,14 @@ func lowerGitHubActions(plan *Plan, raw []byte, actions githubActionRefs) ([]byt
 				position++
 				continue
 			}
+			// One action takes one value per input. A release job changes
+			// registry credential between operations, so start a new action
+			// instead of letting a later step borrow an earlier credential.
+			if githubRegistryCredentialChange(pending, step) {
+				if err := flush(); err != nil {
+					return nil, nil, err
+				}
+			}
 			pending = append(pending, step)
 		}
 		if err := flush(); err != nil {
@@ -274,6 +282,30 @@ func githubCompositeSafeStep(step *yamlv3.Node) bool {
 	return !githubYAMLContains(step, "steps.")
 }
 
+// githubRegistryCredentialChange reports whether a step binds a registry
+// credential that an earlier pending step binds differently. Any other
+// conflicting caller value still fails closed in githubComposite.
+func githubRegistryCredentialChange(pending []*yamlv3.Node, step *yamlv3.Node) bool {
+	for _, key := range []string{"NVKR_CREDENTIAL", "NVKR_REGISTRY_USER"} {
+		value := githubYAMLField(githubYAMLField(step, "env"), key)
+		if value == nil {
+			continue
+		}
+		for _, earlier := range pending {
+			if previous := githubYAMLField(githubYAMLField(earlier, "env"), key); previous != nil && previous.Value != value.Value {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// githubCompositeCallerValue reports whether an environment value needs a
+// context only the calling workflow can resolve.
+func githubCompositeCallerValue(value string) bool {
+	return strings.Contains(value, "secrets.") || strings.Contains(value, "vars.") || value == "${{ toJSON(needs) }}"
+}
+
 var githubTransferControlFields = []string{"id", "if", "timeout-minutes", "continue-on-error"}
 
 const githubAlwaysCondition = "${{ always() }}"
@@ -313,7 +345,7 @@ func githubComposite(files map[string][]byte, path, name string, steps []*yamlv3
 		if env := githubYAMLField(step, "env"); env != nil {
 			for index := 0; index < len(env.Content); index += 2 {
 				key, value := env.Content[index].Value, env.Content[index+1]
-				if !strings.Contains(value.Value, "secrets.") && !strings.Contains(value.Value, "vars.") && value.Value != "${{ toJSON(needs) }}" {
+				if !githubCompositeCallerValue(value.Value) {
 					continue
 				}
 				input := strings.ToLower(strings.ReplaceAll(key, "_", "-"))

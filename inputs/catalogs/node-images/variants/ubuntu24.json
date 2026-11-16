@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-ubuntu24",
-  "requiresCatalogDigest": "sha256:c621c0060d2de66202ea1417786fd65159b8f85cdccba72452b43564da4f7471",
+  "requiresCatalogDigest": "sha256:edd602859278e748bbd634fc1f7e90b6b8eb4b278641701655d4dc590820915e",
   "components": {
     "nvke-agent": {
       "component": {
@@ -162,6 +162,13 @@
             "ubuntu_series": "24.04"
           }
         },
+        "patches": [
+          {
+            "name": "patches/packer-toolchain-version.patch",
+            "sha256": "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227",
+            "content": "--- a/os-image/packer/versions.pkr.hcl\n+++ b/os-image/packer/versions.pkr.hcl\n@@ -4,8 +4,8 @@\n packer {\n-  required_version = \"= 1.15.4\"\n+  required_version = \"= 1.16.2\"\n\n   required_plugins {\n     qemu = {\n       source  = \"github.com/hashicorp/qemu\"\n-      version = \"= 1.1.6\"\n+      version = \"= 1.1.8\"\n     }\n"
+          }
+        ],
         "materials": {
           "image-inputs": "nvke-image-inputs",
           "installer-iso": "nvke-patched-installer-iso-amd64"
@@ -242,6 +249,13 @@
             "ubuntu_series": "24.04"
           }
         },
+        "patches": [
+          {
+            "name": "patches/packer-toolchain-version.patch",
+            "sha256": "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227",
+            "content": "--- a/os-image/packer/versions.pkr.hcl\n+++ b/os-image/packer/versions.pkr.hcl\n@@ -4,8 +4,8 @@\n packer {\n-  required_version = \"= 1.15.4\"\n+  required_version = \"= 1.16.2\"\n\n   required_plugins {\n     qemu = {\n       source  = \"github.com/hashicorp/qemu\"\n-      version = \"= 1.1.6\"\n+      version = \"= 1.1.8\"\n     }\n"
+          }
+        ],
         "materials": {
           "image-inputs": "nvke-image-inputs",
           "installer-iso": "nvke-patched-installer-iso"
@@ -321,6 +335,13 @@
             "ubuntu_series": "24.04"
           }
         },
+        "patches": [
+          {
+            "name": "patches/packer-toolchain-version.patch",
+            "sha256": "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227",
+            "content": "--- a/os-image/packer/versions.pkr.hcl\n+++ b/os-image/packer/versions.pkr.hcl\n@@ -4,8 +4,8 @@\n packer {\n-  required_version = \"= 1.15.4\"\n+  required_version = \"= 1.16.2\"\n\n   required_plugins {\n     qemu = {\n       source  = \"github.com/hashicorp/qemu\"\n-      version = \"= 1.1.6\"\n+      version = \"= 1.1.8\"\n     }\n"
+          }
+        ],
         "materials": {
           "image-inputs": "nvke-image-inputs",
           "installer-iso": "nvke-patched-installer-iso"
@@ -399,6 +420,13 @@
             "ubuntu_series": "24.04"
           }
         },
+        "patches": [
+          {
+            "name": "patches/packer-toolchain-version.patch",
+            "sha256": "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227",
+            "content": "--- a/os-image/packer/versions.pkr.hcl\n+++ b/os-image/packer/versions.pkr.hcl\n@@ -4,8 +4,8 @@\n packer {\n-  required_version = \"= 1.15.4\"\n+  required_version = \"= 1.16.2\"\n\n   required_plugins {\n     qemu = {\n       source  = \"github.com/hashicorp/qemu\"\n-      version = \"= 1.1.6\"\n+      version = \"= 1.1.8\"\n     }\n"
+          }
+        ],
         "materials": {
           "image-inputs": "nvke-image-inputs",
           "installer-iso": "nvke-patched-installer-iso-amd64"

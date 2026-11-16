@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nvke-os-arm64-native-kvm
-requiresCatalogDigest: sha256:36bb7e57a9fca8f46c897b5879007a9916e5952718dfc1bbc38c9312255fe525
+requiresCatalogDigest: sha256:c61be04c7e7ee3929a2703f8ab603703598ec8a3b2e0d8ba013f4d7f4a1a96b2
 components:
   nvke-node-image:
     component:
@@ -61,6 +61,23 @@ components:
           - name: kvm
             policy: required
         timeoutSeconds: 21600
+      patches:
+        - name: patches/packer-toolchain-version.patch
+          sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227
+          content: |
+            --- a/os-image/packer/versions.pkr.hcl
+            +++ b/os-image/packer/versions.pkr.hcl
+            @@ -4,8 +4,8 @@
+             packer {
+            -  required_version = "= 1.15.4"
+            +  required_version = "= 1.16.2"
+
+               required_plugins {
+                 qemu = {
+                   source  = "github.com/hashicorp/qemu"
+            -      version = "= 1.1.6"
+            +      version = "= 1.1.8"
+                 }
       packer:
         projectPath: os-image/packer
         packerVersion: 1.16.2

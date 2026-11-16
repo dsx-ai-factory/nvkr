@@ -306,6 +306,12 @@ components:
     platforms: [linux/amd64]
     fromSource: true
     source: nvke-os
+    # The pinned NVKE source accepts only Packer 1.15.4 and QEMU plugin 1.1.6.
+    # The toolchain images carry 1.16.2 and 1.1.8, so `packer validate` refuses
+    # the unpatched project. Drop this patch when the NVKE pin accepts them.
+    patches:
+      - name: patches/packer-toolchain-version.patch
+        sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227
     builderType: vm-image
     buildNetwork: default
     outputType: disk-image
@@ -356,6 +362,9 @@ components:
     platforms: [linux/arm64]
     fromSource: true
     source: nvke-os
+    patches:
+      - name: patches/packer-toolchain-version.patch
+        sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227
     builderType: vm-image
     buildNetwork: default
     outputType: disk-image
@@ -407,6 +416,9 @@ components:
     platforms: [linux/arm64]
     fromSource: true
     source: nvke-os
+    patches:
+      - name: patches/packer-toolchain-version.patch
+        sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227
     builderType: vm-image
     buildNetwork: default
     outputType: disk-image
@@ -455,6 +467,9 @@ components:
     platforms: [linux/amd64]
     fromSource: true
     source: nvke-os
+    patches:
+      - name: patches/packer-toolchain-version.patch
+        sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227
     builderType: vm-image
     buildNetwork: default
     outputType: disk-image

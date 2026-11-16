@@ -1,7 +1,9 @@
 # Execution partition scheduling
 
-Opt-in GitHub execution partitioning places the original jobs of one logical Run into same-commit worker
-workflows. A worker call completes only when every member completes, so a job waits for its partition's
+GitHub execution partitioning is a fallback that places the original jobs of one logical Run into
+same-commit worker workflows when the flat workflow exceeds a provider size limit (ADR-18 §8). No maintained
+bundle currently engages it; the results below were measured on the earlier per-kind job layout.
+A worker call completes only when every member completes, so a job waits for its partition's
 slowest sibling as well as its own prerequisites. This page records how the grouping was measured, the
 layouts compared, and the decision. Partitioning changes execution organization only: one Definition, one
 complete Plan, one logical Run, one finalizer and one Release remain, and no layout changes Plan, Definition
@@ -104,6 +106,9 @@ The generator adopts timeout-gap splitting with a 30-worker target. Declared job
 Plan-derived bounds the generator already emits, so scheduling does not depend on an unrecorded estimate
 table. The adoption rule, enforced by the harness, is that the adopted layout improves every worst case for
 a partitioned Plan by at least 5% and never loses more than 1% for any Plan, capacity or perturbation.
+A partitioned Plan is one whose flat workflow fails provider size admission. No maintained Plan does
+today, so the harness currently enforces only the 1% regression bound; the 5% rule applies again as soon
+as a maintained Plan engages the fallback.
 
 The change is local to provider scheduling. Membership, prerequisite results, recovery conditions,
 entry-pinned OIDC signers, collectors and the single finalizer are unchanged; the generator still rejects a

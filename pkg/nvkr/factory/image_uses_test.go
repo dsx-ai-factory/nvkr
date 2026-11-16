@@ -125,6 +125,7 @@ func TestImageUsesRefreshedPlanRefusesUnknownRootBeforeWrites(t *testing.T) {
 }
 
 func TestImageUsesPartitionReaderCannotBeOmitted(t *testing.T) {
+	engageGitHubPartitions(t)
 	plan := recompileGitHubStabilityPlan(t, privateImageTestPlan(t, ProductionRegistryWriteCredential), func(in *githubStabilityInputs) { in.environment.GitHubExecutionPartitions = true })
 	bundle, err := RenderGitHub(t.Context(), plan)
 	if err != nil {

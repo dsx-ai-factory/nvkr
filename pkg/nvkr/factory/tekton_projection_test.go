@@ -21,12 +21,16 @@ func TestTektonProjectionPreservesSharedOperationMembership(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	github, owners, err := githubStages(plan)
+	// Tekton keeps the v1 grouping; GitHub groups by authority and runner.
+	github, owners, err := projectExecutionStages(plan, plan.GitHubExecutionFor, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(owners, projection.owners) || len(github) != len(projection.stages) {
 		t.Fatal("Tekton changed logical stage membership")
+	}
+	if authority, _, err := githubStages(plan); err != nil || len(authority) >= len(github) {
+		t.Fatalf("GitHub authority grouping did not contract the v1 stages: %d vs %d: %v", len(authority), len(github), err)
 	}
 	_, artifacts := planIndex(plan)
 	seen := make(map[string]bool)

@@ -60,39 +60,49 @@ func assertGitHubPackageStageGates(t *testing.T, plan *Plan) {
 	packages, observations := 0, 0
 	for _, stage := range stages {
 		job := workflow.Jobs[stage.ID]
-		switch stage.Nodes[0].Kind {
-		case NodeVerify:
+		// A terminal observation outside its producer's job keeps its
+		// unconditional schedule and still runs before its target's SBOM.
+		observed := stage.Nodes[0].Kind == NodeVerify
+		if observed {
 			observations++
-			if len(stage.Nodes) != 2 || stage.Nodes[1].Kind != NodeSBOM ||
-				stage.Nodes[0].BuildTarget != stage.Nodes[1].BuildTarget {
-				t.Fatalf("target observation lost its independent SBOM pair: %+v", stage)
+			sbom := slices.IndexFunc(stage.Nodes, func(node Node) bool {
+				return node.Kind == NodeSBOM && node.BuildTarget == stage.Nodes[0].BuildTarget
+			})
+			if sbom < 1 {
+				t.Fatalf("target observation lost its SBOM: %+v", stage)
 			}
 			if job.If != githubCompletionCondition(plan, preflight) {
 				t.Fatalf("observation job no longer reports unsuccessful dependencies: %q", job.If)
 			}
 			if plan.Definition.SBOMTool != "" {
 				tool := "tool/" + plan.Definition.SBOMTool
-				if slices.Contains(stage.Nodes[0].Inputs, tool) || !slices.Contains(stage.Nodes[1].Inputs, tool) ||
+				if slices.Contains(stage.Nodes[0].Inputs, tool) || !slices.Contains(stage.Nodes[sbom].Inputs, tool) ||
 					!slices.Contains(job.Needs, nodeJobs[tool]) {
 					t.Fatal("SBOM-only scanner prerequisite was lost when its observation joined the stage")
 				}
 				_, artifacts := planIndex(plan)
 				inputs, err := stage.carrierInputs(plan, artifacts, nodeJobs)
 				if err != nil || !slices.Contains(inputs, tool) {
-					t.Fatalf("paired stage omits its pinned scanner carrier: %v / %v", inputs, err)
+					t.Fatalf("observation job omits its pinned scanner carrier: %v / %v", inputs, err)
 				}
 			}
-		case NodePackage:
-			packages++
-			if len(stage.Nodes) != 1 {
-				t.Fatalf("package shares another operation's failure boundary: %+v", stage)
+		}
+		for _, node := range stage.Nodes {
+			if node.Kind != NodePackage {
+				continue
 			}
-			// No status function overrides GitHub's implicit success() gate.
-			if job.If != "${{ "+githubExecutionCondition+" }}" {
+			packages++
+			// Packaging never runs ahead of its dependencies. Its own job keeps
+			// GitHub's implicit success() gate; in an observation's job it is a
+			// later unconditional step, which a failed earlier step stops.
+			if !observed && job.If != "${{ "+githubExecutionCondition+" }}" {
 				t.Fatalf("package bypasses dependency success: %q", job.If)
 			}
+			if step := githubNodeStep(t, &job, node.ID); step.If != "" || step.ContinueOnError {
+				t.Fatalf("package %s can run after a failed earlier step", node.ID)
+			}
 			if !slices.Contains(finalizer.Needs, stage.ID) {
-				t.Fatalf("finalizer omits independent package job %q", stage.ID)
+				t.Fatalf("finalizer omits package job %q", stage.ID)
 			}
 		}
 	}
@@ -100,11 +110,23 @@ func assertGitHubPackageStageGates(t *testing.T, plan *Plan) {
 		t.Fatalf("fixture did not exercise packaging and every target: packages=%d observations=%d", packages, observations)
 	}
 	for _, output := range plan.LifecycleOutputs {
-		packageJob := nodeJobs["package/"+output.Name]
-		observationJob := nodeJobs[output.Name+"/terminal-observe"]
-		if packageJob == "" || observationJob == "" || packageJob == observationJob ||
-			!slices.Contains(workflow.Jobs[packageJob].Needs, observationJob) {
-			t.Fatalf("output %q lost its separate package dependency on observation", output.Name)
+		packageNode, observationNode := "package/"+output.Name, output.Name+"/terminal-observe"
+		packageJob, observationJob := nodeJobs[packageNode], nodeJobs[observationNode]
+		if packageJob == "" || observationJob == "" {
+			t.Fatalf("output %q lost its package or observation", output.Name)
+		}
+		job := workflow.Jobs[packageJob]
+		if packageJob != observationJob {
+			if !slices.Contains(job.Needs, observationJob) {
+				t.Fatalf("output %q package does not depend on its observation", output.Name)
+			}
+			continue
+		}
+		order := func(id string) int {
+			return slices.IndexFunc(job.Steps, func(step githubStep) bool { return step.ID == githubJobID(id) })
+		}
+		if order(observationNode) < 0 || order(observationNode) >= order(packageNode) {
+			t.Fatalf("output %q packages before its observation", output.Name)
 		}
 	}
 }
