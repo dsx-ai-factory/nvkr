@@ -19,19 +19,24 @@ import (
 // validate` refuses the unpatched project. A catalog patch moves the project's
 // pins to the producer's declared Packer version and the toolchain lock's
 // plugin version. A toolchain refresh that changes one side without the patch
-// fails here instead of in a hosted disk build. Remove this test with that patch.
+// fails here instead of in a hosted disk build. A producer on another Packer
+// selection, such as the nightly one that matches NVKE's own pins, must stay
+// unpatched. Remove this test with that patch.
 func TestMaintainedDiskProducersPatchPackerVersion(t *testing.T) {
 	raw, err := os.ReadFile("../../../toolchains/nvkr-packer/toolchain.lock.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var lock struct {
+		Packer struct {
+			Version string `json:"version"`
+		} `json:"packer"`
 		QEMUPlugin struct {
 			Version string `json:"version"`
 		} `json:"qemuPlugin"`
 	}
-	if err := json.Unmarshal(raw, &lock); err != nil || lock.QEMUPlugin.Version == "" {
-		t.Fatalf("toolchain lock declares no QEMU plugin version: %v", err)
+	if err := json.Unmarshal(raw, &lock); err != nil || lock.Packer.Version == "" || lock.QEMUPlugin.Version == "" {
+		t.Fatalf("toolchain lock declares no Packer or QEMU plugin version: %v", err)
 	}
 	plugin := `+      version = "= ` + lock.QEMUPlugin.Version + `"` + "\n"
 	plans, err := filepath.Glob("../../../.github/*/plan.json")
@@ -50,6 +55,15 @@ func TestMaintainedDiskProducersPatchPackerVersion(t *testing.T) {
 					continue
 				}
 				producers++
+				if node.Packer.PackerVersion != lock.Packer.Version {
+					if slices.ContainsFunc(node.Patches, func(patch ir.PatchRef) bool {
+						return strings.Contains(patch.Content, "required_version")
+					}) {
+						t.Errorf("%s: %s selects Packer %s, not the toolchain lock's %s, but carries a version-pin patch",
+							path, node.ID, node.Packer.PackerVersion, lock.Packer.Version)
+					}
+					continue
+				}
 				pin := `+  required_version = "= ` + node.Packer.PackerVersion + `"` + "\n"
 				if !slices.ContainsFunc(node.Patches, func(patch ir.PatchRef) bool {
 					return strings.Contains(patch.Content, pin) && strings.Contains(patch.Content, plugin)

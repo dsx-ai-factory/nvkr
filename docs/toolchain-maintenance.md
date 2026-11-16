@@ -139,7 +139,8 @@ The pinned NVKE Packer project also requires one exact Packer and QEMU plugin ve
 images, the `packer-toolchain-version.patch` catalog patch moves those pins; update the patch, its digest
 and its embedded overlay copies in the same change. A maintained-Plan test fails until the patch's
 Packer version equals each producer's `packerVersion` and its plugin version equals `qemuPlugin.version`
-in `toolchains/nvkr-packer/toolchain.lock.json`.
+in `toolchains/nvkr-packer/toolchain.lock.json`. A producer that selects another Packer version, such as
+the AMD64 nightly variant on `1.15.4`, matches NVKE's own pins and must carry no version-pin patch.
 Repin updates local configuration-ID pins and their frozen copies when an explicit
 native substitution binds the old ID to a candidate Packer reference and architecture.
 Ambiguous mappings fail closed; unbound local IDs remain untouched. Pull the approved
