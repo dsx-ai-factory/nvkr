@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"log"
@@ -236,5 +237,194 @@ func TestReleasePullPresentationSurroundsOneOwnedOperation(t *testing.T) {
 				t.Fatalf("unexpected result: calls=%d views=%d output=%q err=%v", calls, views, out.String(), err)
 			}
 		})
+	}
+}
+
+func runInjectedReleasePull(t *testing.T, result delivery.PulledOutput, opErr error, calls *int, flags ...string) (string, error) {
+	t.Helper()
+	operation := func(context.Context, string, string, string, lifecycle.PullOptions) (delivery.PulledOutput, error) {
+		*calls++
+		return result, opErr
+	}
+	var out bytes.Buffer
+	// An eligible TUI makes --ui=tui reach the JSON conflict check instead of
+	// failing earlier on terminal eligibility; the viewer must never open.
+	services := runPresentationServices{eligible: func(io.Writer) bool { return true },
+		show: func(context.Context, runpresenter.Options, runSnapshotSource, func(context.Context) error) runpresenter.Result {
+			t.Error("TUI opened for a JSON or rejected request")
+			return runpresenter.Result{}
+		}}
+	app := &cli.App{Writer: &out, Metadata: map[string]interface{}{commandPresentationServicesKey: services},
+		Commands: []*cli.Command{{Name: "release", Subcommands: []*cli.Command{releasePullCmdWithOperation(operation)}}}}
+	args := append([]string{"nvkr", "release", "pull", "--reference", "exact-reference", "--output", "tools", "--out", "dest"}, flags...)
+	err := app.RunContext(t.Context(), args)
+	return out.String(), err
+}
+
+func TestReleasePullJSONResult(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	buildDigest := "sha256:" + strings.Repeat("b", 64)
+	fileDigest := "sha256:" + strings.Repeat("c", 64)
+	scope := `"scope":{"payloadIntegrityChecked":true,"signaturesChecked":false,"policyChecked":false}`
+	// Fields owned by delivery but outside the script contract are populated so
+	// an accidental leak into the JSON fails the exact comparison below.
+	publication := func(output delivery.Output) delivery.PublicationOutput {
+		return delivery.PublicationOutput{Output: output, ArtifactType: "internal/artifact-type",
+			DescriptorDigest: "sha256:" + strings.Repeat("d", 64), ChartArchiveDigest: "sha256:" + strings.Repeat("e", 64)}
+	}
+	head := `{"schemaVersion":"nvkr.dev/release-pull-result/v1","reference":"exact-reference",`
+	for _, test := range []struct {
+		name   string
+		result delivery.PulledOutput
+		want   string
+	}{
+		{"executable", delivery.PulledOutput{
+			Output: publication(delivery.Output{Name: "tools", Kind: "executable", OS: "linux", Arch: "amd64", Digest: digest, BuildDigest: buildDigest}),
+			Files:  []delivery.PulledFile{{Path: "cli", SHA256: fileDigest, Size: 17}}},
+			head + `"output":{"name":"tools","kind":"executable","digest":"` + digest + `","buildDigest":"` + buildDigest +
+				`","platform":{"os":"linux","arch":"amd64"}},"destination":"dest","payload":"files",` +
+				`"files":[{"path":"cli","sha256":"` + fileDigest + `","size":17}],` + scope + `}`},
+		{"chart", delivery.PulledOutput{
+			Output: publication(delivery.Output{Name: "tools", Kind: "helm-oci", Digest: digest, BuildDigest: buildDigest}),
+			Files:  []delivery.PulledFile{{Path: "tools.tgz", SHA256: fileDigest, Size: 99}}},
+			head + `"output":{"name":"tools","kind":"helm-oci","digest":"` + digest + `","buildDigest":"` + buildDigest +
+				`"},"destination":"dest","payload":"files",` +
+				`"files":[{"path":"tools.tgz","sha256":"` + fileDigest + `","size":99}],` + scope + `}`},
+		{"oci directory", delivery.PulledOutput{
+			Output: publication(delivery.Output{Name: "tools", Kind: "oci", Digest: digest, BuildDigest: buildDigest,
+				ImageIndex: &delivery.ImageIndexBinding{RequiredPlatforms: []string{"linux/amd64", "linux/arm64"}}})},
+			head + `"output":{"name":"tools","kind":"oci","digest":"` + digest + `","buildDigest":"` + buildDigest +
+				`","requiredPlatforms":["linux/amd64","linux/arm64"]},"destination":"dest","payload":"directory",` +
+				`"files":[],` + scope + `}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			calls := 0
+			raw, err := runInjectedReleasePull(t, test.result, nil, &calls, "--format", "json")
+			if err != nil || calls != 1 {
+				t.Fatalf("pull failed: calls=%d err=%v", calls, err)
+			}
+			var compact bytes.Buffer
+			decoder := json.NewDecoder(strings.NewReader(raw))
+			var value json.RawMessage
+			if err := decoder.Decode(&value); err != nil || decoder.More() {
+				t.Fatalf("output is not exactly one JSON value: %v: %q", err, raw)
+			}
+			if err := json.Compact(&compact, value); err != nil {
+				t.Fatal(err)
+			}
+			if compact.String() != test.want {
+				t.Errorf("result mismatch\n got: %s\nwant: %s", compact.String(), test.want)
+			}
+		})
+	}
+}
+
+func TestReleasePullJSONAdmissionAndFailure(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		flags     []string
+		opErr     error
+		wantCode  e.Code
+		wantCalls int
+		wantMsg   string
+	}{
+		{"unknown format", []string{"--format", "yaml"}, nil, e.CodeUsage, 0, "must be text or json"},
+		{"json with tui", []string{"--format", "json", "--ui=tui"}, nil, e.CodeUsage, 0, "cannot be combined"},
+		{"operation error", []string{"--format", "json"}, e.New(e.CodeFetchFailed, "owner failure"), e.CodeFetchFailed, 1, "owner failure"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			calls := 0
+			raw, err := runInjectedReleasePull(t, delivery.PulledOutput{}, test.opErr, &calls, test.flags...)
+			if cliErrorCode(err) != test.wantCode || calls != test.wantCalls || raw != "" {
+				t.Fatalf("unexpected: code=%v calls=%d output=%q err=%v", cliErrorCode(err), calls, raw, err)
+			}
+			if err == nil || !strings.Contains(err.Error(), test.wantMsg) {
+				t.Fatalf("error %v does not carry the expected reason %q", err, test.wantMsg)
+			}
+		})
+	}
+}
+
+func TestReleasePullTextDefaultUnchanged(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	result := delivery.PulledOutput{Output: delivery.PublicationOutput{Output: delivery.Output{Name: "tools", Kind: "executable", OS: "linux", Arch: "amd64"}},
+		Files: []delivery.PulledFile{{Path: "cli", SHA256: digest, Size: 1}}}
+	// The literal pins the pre-existing bytes; it must not be derived from the
+	// production formatter.
+	want := "Pulled \"tools\" (\"executable\") into \"dest\"; payload integrity checked, signatures and policy not verified.\n" +
+		"  Platform: \"linux/amd64\"\n" +
+		"  \"dest/cli\" (" + digest + ")\n"
+	for _, flags := range [][]string{nil, {"--format", "text"}} {
+		calls := 0
+		raw, err := runInjectedReleasePull(t, result, nil, &calls, flags...)
+		if err != nil || calls != 1 || raw != want {
+			t.Fatalf("text bytes changed with flags %v: %q, calls=%d, err=%v", flags, raw, calls, err)
+		}
+	}
+}
+
+func TestReleasePullPayloadKindIsExplicit(t *testing.T) {
+	for _, test := range []struct {
+		kind    string
+		want    string
+		wantErr bool
+	}{
+		{"executable", releasePullPayloadFiles, false},
+		{"debian-package", releasePullPayloadFiles, false},
+		{"disk-image", releasePullPayloadFiles, false},
+		{"helm-oci", releasePullPayloadFiles, false},
+		{"bundle-oci", releasePullPayloadFiles, false},
+		{"oci", releasePullPayloadDirectory, false},
+		{"apt-repository", releasePullPayloadDirectory, false},
+		{"future-format", "", true},
+		{"", "", true},
+	} {
+		t.Run(test.kind, func(t *testing.T) {
+			got, err := releasePullPayloadKind(test.kind)
+			if test.wantErr {
+				if cliErrorCode(err) != e.CodeInternal {
+					t.Fatalf("want %v for unclassified kind, got %v", e.CodeInternal, err)
+				}
+				return
+			}
+			if err != nil || got != test.want {
+				t.Fatalf("payload = %q, %v; want %q", got, err, test.want)
+			}
+		})
+	}
+}
+
+func TestReleasePullJSONRejectsUnclassifiedKindWithoutOutput(t *testing.T) {
+	calls := 0
+	result := delivery.PulledOutput{Output: delivery.PublicationOutput{Output: delivery.Output{Name: "tools", Kind: "future-format"}}}
+	raw, err := runInjectedReleasePull(t, result, nil, &calls, "--format", "json")
+	if cliErrorCode(err) != e.CodeInternal || raw != "" {
+		t.Fatalf("unclassified kind produced output=%q err=%v", raw, err)
+	}
+}
+
+func TestReleasePullJSONEdgeFiles(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	result := delivery.PulledOutput{Output: delivery.PublicationOutput{Output: delivery.Output{Name: "tools", Kind: "executable"}},
+		Files: []delivery.PulledFile{{Path: "empty", SHA256: digest, Size: 0}, {Path: "bin/cli", SHA256: digest, Size: 3}}}
+	calls := 0
+	raw, err := runInjectedReleasePull(t, result, nil, &calls, "--format", "json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded struct {
+		Files []struct {
+			Path string `json:"path"`
+			Size *int64 `json:"size"`
+		} `json:"files"`
+	}
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		t.Fatal(err)
+	}
+	// A legitimately empty file keeps an explicit size of 0, and order is the
+	// owner's returned order, not re-sorted or deduplicated by the presenter.
+	if len(decoded.Files) != 2 || decoded.Files[0].Path != "empty" || decoded.Files[0].Size == nil || *decoded.Files[0].Size != 0 ||
+		decoded.Files[1].Path != "bin/cli" {
+		t.Fatalf("file records changed: %s", raw)
 	}
 }

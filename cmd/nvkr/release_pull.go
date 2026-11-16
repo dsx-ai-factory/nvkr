@@ -32,6 +32,7 @@ func releasePullCmdWithOperation(pull releasePullOperation) *cli.Command {
 			&cli.StringFlag{Name: "output", Usage: "exact output name from release browse (required)"},
 			&cli.StringFlag{Name: "out", Usage: "new destination directory for the selected output (required)"},
 			&cli.StringFlag{Name: "workspace", Usage: "parent for temporary registry download storage"},
+			&cli.StringFlag{Name: "format", Value: "text", Usage: "text or json result on stdout"},
 			&cli.DurationFlag{Name: "timeout", Value: 10 * time.Minute, Usage: "bound the complete download and extraction"},
 			&cli.BoolFlag{Name: "anonymous", Usage: "disable ambient registry credentials"},
 			&cli.BoolFlag{Name: "plain-http", Usage: "use HTTP for a local registry"},
@@ -40,6 +41,9 @@ func releasePullCmdWithOperation(pull releasePullOperation) *cli.Command {
 			view, err := selectCommandPresentation(c)
 			if err != nil {
 				return err
+			}
+			if format := c.String("format"); format != "text" && format != "json" {
+				return e.New(e.CodeUsage, "release pull format must be text or json")
 			}
 			shown := false
 			defer func() {
@@ -65,6 +69,16 @@ func releasePullCmdWithOperation(pull releasePullOperation) *cli.Command {
 			if view.tui {
 				shown = true
 				return showCommandResult(c, view, releasePullDisplay(c.String("output"), result), nil)
+			}
+			if c.String("format") == "json" {
+				raw, err := renderReleasePullJSON(c.String("reference"), c.String("out"), result)
+				if err != nil {
+					return err
+				}
+				if _, err := c.App.Writer.Write(raw); err != nil {
+					return e.Wrap(e.CodeUnavailable, err, "writing release pull result")
+				}
+				return nil
 			}
 			if _, err := c.App.Writer.Write([]byte(releasePullMessage(c.String("output"), c.String("out"), result))); err != nil {
 				return e.Wrap(e.CodeUnavailable, err, "writing release pull result")

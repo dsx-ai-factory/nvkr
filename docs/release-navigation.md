@@ -164,6 +164,15 @@ fails with a coded error before payload or destination work. APT archives reject
 directories must be readable and searchable by their owner. Every file, including repository indexes, is bound
 to the downloaded archive by its digest.
 
+Add `--format json` for a script-readable result; `--format text` is the default and keeps its current text.
+The command writes exactly one JSON value to stdout after success and nothing on failure. It records the supplied
+`reference` and `destination`, the output's name, kind, digests and platform (an aggregate image lists every
+required platform), and the actual returned files with relative path, SHA-256 and size. A `payload` field says
+whether the result is `files` or a `directory`; a directory output (`oci`, `apt-repository`) has an empty `files`
+list and no invented checksum. The `scope` field reports `payloadIntegrityChecked: true`,
+`signaturesChecked: false` and `policyChecked: false`. The result is not a verification receipt and is not written
+to disk. An unknown format, or `--format json` with `--ui=tui`, is a usage error before any download.
+
 `release pull` accepts only a registry reference. Use `publish extract` for an executable bundle already in a
 local layout. Registry credentials, `--anonymous`, `--plain-http`, `--workspace`, follow the browsing transport rules above. Pull retains its ten-minute default
 `--timeout` and does not use the metadata cache. `--workspace` selects the parent for private temporary registry
