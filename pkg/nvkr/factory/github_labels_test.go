@@ -60,7 +60,8 @@ func TestMaintainedWorkflowMakesImageBindingVisible(t *testing.T) {
 			}
 			if step.ID == githubJobID("package/controller-chart") {
 				found = true
-				if job.Name != "Bind image digest and package Helm: controller-chart" || step.Name != job.Name {
+				if !strings.Contains(job.Name, "Helm image binding") || !strings.Contains(job.Name, "controller-chart") ||
+					step.Name != "Bind image digest and package Helm: controller-chart" {
 					t.Fatalf("binding hidden: %s / %s", job.Name, step.Name)
 				}
 			}

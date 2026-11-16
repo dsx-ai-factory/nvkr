@@ -308,7 +308,18 @@ func validateGitHubSBOMMetadata(content cistore.MetadataContent) error {
 	if err := index.Validate(); err != nil {
 		return err
 	}
-	if len(files) != len(index.Entries)+1 {
+	expectedFiles := len(index.Entries) + 1
+	if raw, ok := files[internalToolUseFile]; ok {
+		var record internalToolUseRecord
+		if err := metadataJSON(raw, &record); err != nil {
+			return err
+		}
+		if err := record.validate(); err != nil {
+			return err
+		}
+		expectedFiles++
+	}
+	if len(files) != expectedFiles {
 		return e.New(e.CodeVerifyFailed, "SBOM metadata differs from its complete index")
 	}
 	for _, entry := range index.Entries {

@@ -57,10 +57,9 @@ snapshot is admitted; there is no wildcard or general deep merge. Catalog snapsh
 rejects removed classification fields even when the caller supplies the current version. Registry v3 accepts
 the explicit pin-set declarations in §7.
 Lock v1 retains its version and adds optional `derivedFrom` provenance to source and artifact pins; older strict
-readers reject these new fields rather than ignoring them. The accepted, deferred multi-platform tool
+readers reject these new fields rather than ignoring them. The accepted multi-platform tool
 contract also adds an optional `tools` list under each source pin, exclusive with `tool`, without changing
-lock v1. Its exact platform membership and compatibility rules are defined in "Tool release assets" below;
-current readers continue to reject `tools` until that contract is implemented.
+lock v1. Its exact platform membership and compatibility rules are defined in "Tool release assets" below. Older strict readers reject an unknown `tools` field with `invalid-catalog`.
 
 **Shared declarations.** Registry `imports` select sources and components from
 `nvkr.dev/catalog-fragment/v1` / `CatalogFragment` documents. Each import declares a canonical relative
@@ -525,8 +524,14 @@ on supported filesystems and publication of a separately versioned catalog-data 
 A source may declare `tool` with `format` (`raw` or `tar-gzip`), a version-rendered HTTPS `url`,
 `platform` (`linux/amd64` or `linux/arm64`), `executablePath`, and optional `companions`. Tool names are source names; they do not
 include release versions. The same source constraint and tag-prefix selection used by other sources governs
-`catalog pin` and `catalog bump`. The implemented form selects one platform per source. The accepted
-multi-platform form below is deferred; current declarations still need distinct source names for multiple platforms. No platform fallback is inferred.
+`catalog pin` and `catalog bump`. A tool may instead declare nonempty sorted unique `platforms`,
+exclusive with `platform`, using the existing Linux AMD64/ARM64 and Darwin ARM64 executable domain.
+The multi-platform form expands `{{.OS}}` and `{{.Arch}}` in URL, executable member and companion paths.
+Each platform must select a distinct URL/member pair; unknown tokens fail admission. The lock uses a
+sorted `tools` list, exclusive with `tool`, with exactly one complete pin per declared platform.
+Missing entries are `unpinned-source`; extra, duplicate or competing forms are `invalid-catalog`.
+Pinning resolves one source release and acquires every platform before its single lock CAS write.
+Single-platform declarations and locks retain their canonical bytes. No platform fallback is inferred.
 
 Pinning resolves the upstream tag to commit/tree/epoch, downloads the release asset with bounded I/O, checks
 archive structure and computes both archive and selected-executable SHA-256 digests without running the tool.
@@ -536,7 +541,9 @@ lock snapshot/CAS writer, including `--check` no-write behavior; a failed downlo
 These hashes pin acquired bytes; they do not establish an upstream signature or reproducible build.
 
 The resolved catalog snapshot includes tool pins. Definition selects tools by purpose, and compilation
-requires each selected catalog tool to match the utility execution platform. Missing pins, invalid formats
+selects the exact tool pin matching each utility operation platform, failing `engine-capability` when absent.
+The optional resolved `toolPlatforms` snapshot field binds the complete per-source platform list.
+The original `tools` single-pin map remains unchanged for legacy catalogs. Missing pins, invalid formats
 or ambiguous declarations fail before execution. Regenerate the Run bundle after any tool bump.
 
 An acquired `host-package` producer may set `prebuilt.releaseExecutable: true`
@@ -582,8 +589,7 @@ Production provenance records archive and selected-member digests independently 
 
 ### Multi-platform tool declarations and lock entries
 
-The accepted ADR-28 §1–§2 contract is owned here. Implementation remains deferred under E1; the current
-runtime continues to reject multi-platform declarations and `tools` lock entries. See
+The accepted ADR-28 §1–§2 contract is owned here. See
 [the ledger](reconciliation/adr-28.md) for implementation and acceptance limits.
 
 A tool may declare `platforms` instead of `platform`: a nonempty, sorted, unique list from
@@ -598,15 +604,15 @@ Lock v1's optional `tools` list is sorted by platform, exclusive with `tool`, an
 single-platform tool record shape for each entry, including companion digests. A list distinguishes
 `linux/arm64` from `darwin/arm64`. Completeness requires exactly one entry per declared platform. Missing or
 inconsistent entries fail with `unpinned-source`; extra or duplicate entries fail with `invalid-catalog`.
-Older strict readers reject the new field. Source commit, tree and epoch remain shared across all entries.
+Older strict readers reject an unknown `tools` field with `invalid-catalog`. Source commit, tree and epoch remain shared across all entries.
 
 `catalog pin` and `catalog bump` resolve the tag once and acquire every declared platform through the
 existing bounded selector. All entries commit in one compare-and-swap write; any failure leaves the lock
 unchanged. `--check` reports every entry, and one platform cannot be pinned independently.
 Run-wide `sbomTool` and `cosignTool` select the utility execution platform's entry; pinned-tool producers
 select their target's entry. A missing execution-platform entry fails with `engine-capability` before
-acquisition. This replaces separate source names with separate entries for the deferred multi-platform
-form; the implemented single-platform acquisition and companion contracts above remain unchanged.
+acquisition. Utility selection uses per-platform entries; multi-platform executable producer lowering
+remains deferred as recorded in the ledger. Single-platform acquisition and companion contracts remain unchanged.
 
 ## GitHub action dependencies
 

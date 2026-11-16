@@ -30,7 +30,11 @@ Declared-access GitHub Runs observe exact manifest/config availability with that
 Plan validation and before producer fan-out, separately per runner placement. This point-in-time
 observation grants no runtime or release authority and does not replace per-job pulls or byte checks.
 Native hosted platform routes are explicit execution settings; they do not change logical Build identity
-or prove provider allocation. Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
+or prove provider allocation. An optional per-platform utility-container map keeps observation, SBOM and
+packaging on each output's native platform; release authority remains on the default utility platform.
+Tool releases are catalog-owned dependencies selected by purpose in the Definition, with one exact pin
+per declared execution platform. Changing the scanner architecture changes its recorded SBOM digest,
+not the logical producer Build Digest. GitHub action releases
 are also catalog dependencies ([ADR-22](docs/adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies)).
 An explicit GitHub development setting selects branch dispatch. Signed development uses the same admitted
 native disk and pipeline-attested stages with separate signer policy, credentials and disposable run-attempt
@@ -466,6 +470,15 @@ the file form and one layout root with its explicit regular-file material closur
 AICR layouts pass a fixed, separately owned post-render integrity check before packaging.
 Execution and acceptance evidence are scoped in the ADR-27 reconciliation.
 _Avoid_: Run-wide pipeline tool, release executable output, build script
+
+**Internal tool artifact**:
+A pinned catalog producer's result required for execution within one Run but excluded from delivered
+Release membership. ADR-19 requires its complete Plan dependency graph, authenticated producer bytes,
+consumer-bound evidence and successful completion. Build-time tools are logical consumer inputs;
+observation-only tools retain separate observation identity. This is an internal role, not a seventh
+public object or a separate preparation/publication lifecycle. The native hosted disk inspector uses
+this mechanism within one original execution owner; other consumers and cross-job use remain deferred.
+_Avoid_: Optional helper, delivered output, path as proof, publication exception
 
 **Component catalog overlay**:
 An ordered, predecessor-bound catalog change replacing a complete component producer or performing an exact

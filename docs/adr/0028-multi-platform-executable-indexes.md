@@ -1,9 +1,9 @@
 # ADR-28 — Multi-platform executables as OCI image indexes
 
 - **Decision status:** Accepted (2026-11-14)
-- **Implementation maturity:** Designed, not implemented. No multi-platform tool declaration, `tools` lock entry,
-  executable `platforms` output, executable-index identity projection or index packaging exists; see
-  `reconciliation/README.md`.
+- **Implementation maturity:** Per-platform tool declarations, `tools` lock lists and native utility selection
+  implement the tool-only portion of E1. Executable `platforms` outputs, executable-index identity projection
+  and index packaging remain designed, not implemented; see `reconciliation/adr-28.md`.
 - **Acceptance-test maturity:** None. The implementation units below name the contract suites that must pass;
   no contract test, generated bundle, hosted Run or consumer verification exercises an executable index.
 - **Deciders:** njhensley
@@ -21,16 +21,15 @@
 ## Context
 
 One upstream tool release usually ships an asset per platform, at a URL that differs only in OS and
-architecture. NVKR cannot express that in one declaration.
+architecture. ADR-22 now admits that in one tool declaration; executable index outputs remain separate work.
 
-- **Tool pins are single-platform.** An ADR-22 `tool` declaration has one `platform` and one URL; a second
-  platform needs a second source name. The maintained catalogs therefore repeat each tool. `tools/operator-amd64`
-  and `tools/operator-arm64` pin the same Helm and kubectl releases twice, `tools/native` declares Helm three
-  times (`helm`, `helm-linux`, `helm-linux-amd64`), `nvsentinel` declares `syft-amd64` and `syft-arm64`, and
-  PR #294 adds `tools/aicr-arm64` because the AICR source can carry only one URL. Each copy is pinned and bumped
-  on its own, and nothing checks that the copies stay on one version.
-- **Executable outputs are single-platform.** The runtime rejects executable platform sets; the accepted
-  target contract is owned by ADR-12 §1. The NVKE Definitions publish `nvkectl` and `nvkectl-linux-arm64` as two outputs, and
+- **Tool pins can share one source across platforms.** ADR-22 admits `platforms` and a complete `tools` lock
+  list; NVKE uses it for native AMD64 and ARM64 Syft utility execution. Other catalogs still repeat tools:
+  `tools/operator-amd64` and `tools/operator-arm64` pin Helm and kubectl separately, `tools/native` declares
+  Helm three times, and `nvsentinel` declares `syft-amd64` and `syft-arm64`. Those retrofits remain explicit
+  migrations; admitting the new form does not rewrite their identities.
+- **Executable outputs are single-platform.** The current runtime rejects executable platform sets; the
+  accepted target contract is owned by ADR-12 §1. The NVKE Definitions publish `nvkectl` and `nvkectl-linux-arm64` as two outputs, and
   NVSentinel publishes 19 executables twice, from two Definitions.
 - **The Binary Bundle is not an image.** ADR-20 publishes each executable output as an OCI manifest with NVKR
   config and layer media types and files under `files/`. ORAS can download its layer. BuildKit `COPY --from`
@@ -49,8 +48,8 @@ publish one standard index over native children (ADR-12 §1, ADR-20). AICR v1.1.
 ## Placement
 
 ADR-12 §1 owns executable platform-set admission, and ADR-22 owns multi-platform tool declarations and
-lock entries. Their accepted contracts incorporate §1–§2 and §4 below; current runtime refusal and deferred
-implementation remain in force. This ADR records the remaining cross-cutting identity, packaging, evidence
+lock entries. Their accepted contracts incorporate §1–§2 and §4 below; current executable-index refusal and deferred
+index implementation remain in force. This ADR records the remaining cross-cutting identity, packaging, evidence
 and consumption contract and its implementation units.
 
 ## Decision
@@ -120,7 +119,8 @@ this decision; the archive digest matches `aicr_checksums.txt`. `catalog pin` pr
   the single-platform `tool` record shape. Older strict readers reject the field, as they reject
   `derivedFrom` (ADR-22 §1).
 - The optional `companions` field uses the implemented single-platform companion contract in the declaration
-  and in each proposed `tools` entry. Multi-platform declarations and the `tools` lock list remain unimplemented.
+  and in each `tools` entry. Multi-platform declarations and the `tools` lock list implement the tool-only
+  portion of E1; executable indexes remain deferred.
 - A list rather than an architecture-keyed map, as prebuilt artifacts use, because `darwin/arm64` and
   `linux/arm64` share an architecture.
 - Completeness is an exact key set: one entry per declared platform. A missing entry, or one that disagrees with
@@ -326,7 +326,7 @@ Each unit lands with table-driven contract tests that assert the coded error, no
 |---|---|---|
 | E1 Catalog and lock | `pkg/nvkr/catalog`, `internal/releaseasset` | `platforms` declaration and exclusivity; `{{.OS}}` and `{{.Arch}}` in URL, member and companion paths; distinct-asset rule; `tools` entries with an exact platform key set; all-platform atomic pin, bump and `--check`; per-platform tool selection |
 | E2 Identity | `pkg/nvkr/buildgraph`, `pkg/nvkr/ir` | Per-platform node filled from its entry; unchanged node bytes for a migrated pin (AICR ARM64 fixture); `nvkr.dev/executable-index-build/v1` vector with an independently measured digest |
-| E3 Definition and compilation | `pkg/nvkr/definition`, `pkg/nvkr/factory` | Executable `platforms` admission; per-platform native closures plus one index package node; Plan and artifact-graph membership |
+| E3 Definition and compilation | `pkg/nvkr/definition`, `pkg/nvkr/factory` | Executable `platforms` admission, including a singleton set producing a one-child index; Darwin-set and simultaneous `platform`/`platforms` refusal with `invalid-catalog`; per-platform native closures plus one index package node; Plan and artifact-graph membership |
 | E4 Packaging | `pkg/nvkr/delivery` | Child image and layer encoding, semantic record and index assembly; byte-stable fixtures; held verification rejecting extra or missing files, non-regular entries, wrong platforms and NVKR child media types |
 | E5 Evidence and publication | `pkg/nvkr/factory`, `pkg/nvkr/delivery`, `pkg/nvkr/releasemanifest` | Index and child signatures and provenance; child SBOM referrers; PublicationRoot and Release binding; reader rejection of the unknown kind |
 | E6 Consumption | `pkg/nvkr/delivery`, `pkg/nvkr/lifecycle` | `release pull` per-platform projection; artifact verification and retention for index outputs |
@@ -396,8 +396,9 @@ Each unit lands with table-driven contract tests that assert the coded error, no
 
 ## Follow-ups
 
-- **ADR-12 §1 and ADR-22:** own the accepted target and tool/lock contracts. Their implementation remains
-  deferred under E1–E3; the single-platform companion prerequisite is already implemented.
+- **ADR-12 §1 and ADR-22:** own the accepted target and tool/lock contracts. The tool-only portion of E1 and
+  single-platform companions are implemented; executable producer lowering, identity and output admission
+  remain deferred under E1–E3.
 - **ADR-01/02:** add `nvkr.dev/executable-index-build/v1` beside the image-index projection.
 - **ADR-20:** add the executable index publication form, its metadata binding and its `release pull` projection.
 - **ADR-13:** child SBOM referrers; verified upstream evidence referrers once #287 lands.

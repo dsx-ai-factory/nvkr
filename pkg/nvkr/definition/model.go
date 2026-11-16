@@ -62,6 +62,8 @@ type Definition struct {
 	SBOMTool   string             `json:"sbomTool,omitempty"`
 	CosignTool string             `json:"cosignTool,omitempty"`
 	Outputs    []DefinitionOutput `json:"outputs"`
+	// InternalTools selects required Run producers, never delivered output slots.
+	InternalTools []InternalTool `json:"internalTools,omitempty"`
 }
 
 type Catalog struct {
@@ -132,6 +134,9 @@ type Environment struct {
 	DiskInspectionProfiles map[string]DiskInspectionProfile `json:"diskInspectionProfiles,omitempty"`
 	UtilityContainer       string                           `json:"utilityContainer"`
 	UtilityPlatform        string                           `json:"utilityPlatform"`
+	// UtilityContainers enables native output utilities with an exhaustive platform map.
+	// UtilityPlatform still selects release and aggregate operations.
+	UtilityContainers map[string]string `json:"utilityContainers,omitempty" yaml:"utilityContainers,omitempty"`
 	// GitHubRunners selects explicit native hosted routes by execution platform.
 	GitHubRunners map[string]string `json:"githubRunners,omitempty"`
 
@@ -284,7 +289,7 @@ func (definition Definition) Validate() error {
 		previous = output.Name
 	}
 
-	return nil
+	return definition.validateInternalTools()
 }
 
 func (definition Definition) Digest() (string, error) {
@@ -349,6 +354,9 @@ func (environment Environment) Validate() error {
 	}
 	if !containerPinPattern.MatchString(environment.UtilityContainer) {
 		return e.New(e.CodeUnpinnedSource, "environment utilityContainer must be digest-pinned")
+	}
+	if err := environment.validateUtilityContainers(); err != nil {
+		return err
 	}
 	if strings.ContainsAny(environment.RunsOn, "\r\n\x00") {
 		return e.New(e.CodeInvalidCatalog, "environment runner contains control characters")

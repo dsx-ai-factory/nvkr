@@ -58,6 +58,9 @@ func bindMetadataEvidenceAttestation(plan *Plan, route Route, index int) error {
 			}
 			plan.Graph.Nodes[i].Outputs = uniqueSorted([]string{payload.ID, prepared.ID})
 			stage.RunsOn = node.RunsOn
+			if plan.Environment.UtilityContainers != nil {
+				stage.RunsOn = defaultUtilityRunner(plan.Environment)
+			}
 			producerFound = true
 		}
 		if node.ID == NodePublish+"/"+route.Name {

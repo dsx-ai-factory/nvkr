@@ -92,3 +92,33 @@ func TestRawDebianPublicationInspectionAdmitsBeforeWork(t *testing.T) {
 		})
 	}
 }
+
+func TestNativeDebianInspectionRequiresMatchingDefault(t *testing.T) {
+	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+		t.Run(platform, func(t *testing.T) {
+			d, environment, stack := debianObjectPublicationInputs(t, true)
+			d.Outputs[0].Platform = platform
+			environment.UtilityContainers = map[string]string{
+				"linux/amd64": environment.UtilityContainer,
+				"linux/arm64": environment.UtilityContainer,
+			}
+			if platform != environment.UtilityPlatform {
+				d.Catalog.Base = "missing-catalog"
+				_, err := CompileDocuments(t.Context(), "definition.yaml", d, "environment.yaml", environment, "test")
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+				if !strings.Contains(err.Error(), "native Debian inspection") {
+					t.Fatalf("wrong admission branch: %v", err)
+				}
+				return
+			}
+			plan, err := Compile(t.Context(), d, environment, stack, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			node := planNode(plan, "agent/sbom")
+			if node.Platform != platform || node.Container != environment.DiskInspectionProfiles[platform].Image {
+				t.Fatalf("matching reader profile lost: %+v", node)
+			}
+		})
+	}
+}

@@ -79,6 +79,19 @@ func TestDiskPublicationSelectsFrozenExecutionHostProfile(t *testing.T) {
 	for _, pair := range [][2]string{{"linux/arm64", "linux/amd64"}, {"linux/amd64", "linux/arm64"}} {
 		t.Run(pair[0]+" on "+pair[1], func(t *testing.T) {
 			plan := diskPublicationPlanFixtureForHost(t, pair[0], pair[1])
+			plan.Environment.RunsOn = ""
+			plan.Environment.UtilityContainers = map[string]string{
+				"linux/amd64": plan.Environment.UtilityContainer,
+				"linux/arm64": plan.Environment.UtilityContainer,
+			}
+			stack, err := catalog.ApplyStack(plan.CatalogSnapshot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan, err = Compile(t.Context(), plan.Definition, plan.Environment, stack, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
 			expected := plan.LifecycleOutputs[0]
 			nodes, artifacts := planIndex(plan)
 			root, err := plan.ExecutionFor(nodes[artifacts[expected.ArtifactID].Producer])
@@ -86,7 +99,11 @@ func TestDiskPublicationSelectsFrozenExecutionHostProfile(t *testing.T) {
 				t.Fatalf("root execution host = %+v, %v", root, err)
 			}
 			profile := plan.Environment.DiskInspectionProfiles[pair[1]]
-			if evidence := nodes[expected.Name+"/sbom"]; evidence.Platform != pair[1] || evidence.Container != profile.Image {
+			wantRunner := "ubuntu-latest"
+			if pair[1] == "linux/arm64" {
+				wantRunner = "ubuntu-24.04-arm"
+			}
+			if evidence := nodes[expected.Name+"/sbom"]; evidence.Platform != pair[1] || evidence.Container != profile.Image || evidence.RunsOn != wantRunner {
 				t.Fatalf("inspection used guest instead of frozen host: %+v", evidence)
 			}
 			guest, selected, err := reconciledDiskPackageBinding(plan, expected, artifacts["package/"+expected.Name])

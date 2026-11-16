@@ -262,6 +262,11 @@ original producer and held disk open through disk-evidence packaging. Declared c
 package and evidence to one generic hosted release job per output, where attestation, publication, signing
 and verification run as steps, each with its own step-scoped credential (ADR-18/20). On GitHub a job is one
 authority class on one runner: producer operations never share a job with release authority.
+An explicit per-platform utility-container map keeps output observation, SBOM generation and packaging
+on the native producer platform. Catalog tools can pin both architectures under one name; the compiler
+selects and authenticates the matching scanner acquisition. Release operations retain the default
+utility platform. This changes Environment/catalog/Plan identity and the scanner digest in ARM64 SBOMs,
+without changing logical producer Build identity.
 Fused large-output wrapped publication and verification remain deferred (ADR-10).
 
 | Boundary | Data and responsibility | Trust or persistence rule |
@@ -310,6 +315,16 @@ Environment values and returns a complete Plan, including the original input ide
 publication routes, and required output slots, then joins independently observed bytes into those slots.
 Required membership exists before execution, so omitting a failed output cannot make a partial run complete.
 Specialized byte-changing transformations remain explicit product intent.
+
+ADR-19 additionally defines internal tool artifacts: ordinary pinned catalog results required for a
+Run's execution and evidence, excluded from the named delivery-output set. Their full dependency graph
+and consumer uses must be frozen in the Plan, with authenticated producer bytes and exact Run receipts.
+Failure of a required internal tool prevents Run completion; success cannot add a Release member.
+Build-time tools bind logical consumer Build identity, while observation-only helpers retain ADR-13's
+separate observation identity. The native hosted disk inspector retains its produced executable and
+evidence in the same owner as the disk, and Run completion requires its exact recorded use. Other
+consumers and cross-job use remain deferred; pinned static tools and the VM runtime must extend this
+mechanism rather than introduce another lifecycle.
 
 A proposed composite Definition (ADR-26) would enter this flow before the compiler: admission loads each
 digest-pinned member, rejects drift and structural conflicts, and derives one effective Definition that the same

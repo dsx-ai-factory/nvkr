@@ -199,6 +199,12 @@ Changing the lowest member, capacity chunks or finish gaps can still change affe
 `__partition-NN.yml` files are accepted only from the prior ownership manifest for authenticated retirement;
 new bundles emit only the stable worker names.
 
+Native output utility placement is compiled from the Environment utility-container map and per-platform
+catalog tool pins. Changing that selection requires regenerating every consuming Plan and bundle,
+including runtime-Plan baselines; rendered workflows are never patched to move a step independently
+of its authenticated platform and container. Root scanner acquisitions remain separate jobs, while
+output utilities join their native producer subject when authority, prerequisites and limits permit.
+
 ### 2. Drift detection is a fail-closed `--check` twin, run by a separate generated gate
 
 `run generate --check` re-emits in memory using the recorded Definition/Environment selection and compares

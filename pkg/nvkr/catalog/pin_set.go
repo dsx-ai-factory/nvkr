@@ -153,7 +153,7 @@ func validatePinSets(reg *registryDoc) error {
 			source, ok := reg.Sources[raw.Source]
 			if !ok || source.Tool == nil || raw.PinnedBy != "" || raw.FromSource ||
 				raw.Prebuilt.URL != "" || raw.Prebuilt.Image != "" || raw.Prebuilt.Chart != nil ||
-				len(raw.Prebuilt.Digests) != 0 || len(raw.Platforms) != 1 || raw.Platforms[0] != source.Tool.Platform ||
+				len(raw.Prebuilt.Digests) != 0 || len(raw.Platforms) != 1 || !source.Tool.supportsPlatform(raw.Platforms[0]) ||
 				raw.OutputType != "host-package" {
 				return e.New(e.CodeInvalidCatalog, "release executable %q requires one matching tool-source platform, host-package output and no competing acquisition", name)
 			}

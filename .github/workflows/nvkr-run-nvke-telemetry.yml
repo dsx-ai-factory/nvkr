@@ -79,16 +79,36 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-nktp-collector-image-arm64-pull-nktp-85cb8e91f658:
-    name: 'Acquire pinned nktp-collector-image-arm64/pull-nktp-collector-image'
+  preflight-images-ubuntu-24-04-arm:
+    name: 'Observe image reader availability (ubuntu-24.04-arm)'
     runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    needs: [preflight-images-ubuntu-24-04]
+    timeout-minutes: 15
+    needs: [build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: &steps-ubuntu-24-04-arm-node
+    steps:
       - *check-native-linux-arm64
       - *checkout-workflow-source
-      - name: Prepare NVKR runner and job parameters
+      - name: Observe image reader availability (ubuntu-24.04-arm)
+        uses: ./.github/nvkr-run-nvke-telemetry/actions/jobs/preflight-images-ubuntu-24-04-arm/part-1
+        with:
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+      - name: Observe exact image manifests
+        timeout-minutes: 3
+        run: ./nvkr-exec factory github preflight-images --plan .github/nvkr-run-nvke-telemetry/plan.json --runner ubuntu-24.04-arm
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-nktp-collector-image-arm64-p-254a213ce332:
+    name: 'Acquire and prepare nktp-collector-image-arm64'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 300
+    needs: [nvkr-tool-syft-linux-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - &prepare-stage-nvkr-exec-ubuntu-24-04-arm
+        name: Prepare NVKR runner and job parameters
         id: nvkr-context
         uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/prepare-stage
         with:
@@ -101,26 +121,6 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
-  nvkr-process-nktp-collector-image-arm64-t-e4a0801b2bf4:
-    name: 'Verify and package outputs: nktp-collector-image-arm64, publication-nktp-collector-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-nktp-collector-image-arm64-pull-nktp-85cb8e91f658, nvkr-tool-syft, preflight-images-ubuntu-24-04]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-ubuntu-24-04'].result == 'success' }}
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - &prepare-stage-nvkr-exec-ubuntu-24-04
-        name: Prepare NVKR runner and job parameters
-        id: nvkr-context
-        uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/prepare-stage
-        with:
-          runner-artifact: 'nvkr-exec-ubuntu-24-04'
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-      - *operation-execute-node-part-1
       - &operation-execute-node-part-2
         name: execute node part-2
         uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/execute-node
@@ -142,6 +142,13 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - &operation-execute-node-part-5
+        name: execute node part-5
+        uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -154,45 +161,36 @@ jobs:
     steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-node-part-2
-      - *operation-execute-node-part-3
-      - *operation-execute-node-part-4
-      - &operation-execute-node-part-5
-        name: execute node part-5
-        uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/execute-node
+      - &prepare-stage-nvkr-exec-ubuntu-24-04
+        name: Prepare NVKR runner and job parameters
+        id: nvkr-context
+        uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/prepare-stage
         with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
+          runner-artifact: 'nvkr-exec-ubuntu-24-04'
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-    permissions:
-      actions: read
-      contents: read
-  nvkr-nktp-kube-state-metrics-image-arm64-5e368a6dbdf1:
-    name: 'Acquire pinned nktp-kube-state-metrics-image-arm64/pull-nktp-kube-state-metrics-image'
-    runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    needs: [preflight-images-ubuntu-24-04]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
-    permissions:
-      actions: read
-      contents: read
-  nvkr-process-nktp-kube-state-metrics-imag-4e4b7bd3832b:
-    name: 'Verify and package outputs: nktp-kube-state-metrics-image-arm64, publication-nktp-kube-state-metrics-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-nktp-kube-state-metrics-image-arm64-5e368a6dbdf1, nvkr-tool-syft, preflight-images-ubuntu-24-04]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-ubuntu-24-04'].result == 'success' }}
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
       - *operation-execute-node-part-4
+      - *operation-execute-node-part-5
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-nktp-kube-state-metrics-imag-e0532701e664:
+    name: 'Acquire and prepare nktp-kube-state-metrics-image-arm64'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 300
+    needs: [nvkr-tool-syft-linux-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
+      - *operation-execute-node-part-3
+      - *operation-execute-node-part-4
+      - *operation-execute-node-part-5
     permissions:
       actions: read
       contents: read
@@ -214,30 +212,21 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-nktp-kubectl-image-arm64-pull-nktp-kubectl-image:
-    name: 'Acquire pinned nktp-kubectl-image-arm64/pull-nktp-kubectl-image'
+  nvkr-process-nktp-kubectl-image-arm64-pul-c601d6089765:
+    name: 'Acquire and prepare nktp-kubectl-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    needs: [preflight-images-ubuntu-24-04]
+    timeout-minutes: 300
+    needs: [nvkr-tool-syft-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
-    permissions:
-      actions: read
-      contents: read
-  nvkr-process-nktp-kubectl-image-arm64-ter-267e6d3bc2c7:
-    name: 'Verify and package outputs: nktp-kubectl-image-arm64, publication-nktp-kubectl-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-nktp-kubectl-image-arm64-pull-nktp-kubectl-image, nvkr-tool-syft, preflight-images-ubuntu-24-04]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-ubuntu-24-04'].result == 'success' }}
     steps:
-      - *check-native-linux-amd64
+      - *check-native-linux-arm64
       - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
       - *operation-execute-node-part-4
+      - *operation-execute-node-part-5
     permissions:
       actions: read
       contents: read
@@ -259,30 +248,21 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-nktp-lgtm-image-arm64-pull-nktp-lgtm-image:
-    name: 'Acquire pinned nktp-lgtm-image-arm64/pull-nktp-lgtm-image'
+  nvkr-process-nktp-lgtm-image-arm64-pull-n-290430591175:
+    name: 'Acquire and prepare nktp-lgtm-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    needs: [preflight-images-ubuntu-24-04]
+    timeout-minutes: 300
+    needs: [nvkr-tool-syft-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
-    permissions:
-      actions: read
-      contents: read
-  nvkr-process-nktp-lgtm-image-arm64-termin-982447db1bb3:
-    name: 'Verify and package outputs: nktp-lgtm-image-arm64, publication-nktp-lgtm-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-nktp-lgtm-image-arm64-pull-nktp-lgtm-image, nvkr-tool-syft, preflight-images-ubuntu-24-04]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-ubuntu-24-04'].result == 'success' }}
     steps:
-      - *check-native-linux-amd64
+      - *check-native-linux-arm64
       - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
       - *operation-execute-node-part-4
+      - *operation-execute-node-part-5
     permissions:
       actions: read
       contents: read
@@ -304,30 +284,21 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-nktp-metrics-server-image-arm64-pull-3fed0eeaa550:
-    name: 'Acquire pinned nktp-metrics-server-image-arm64/pull-nktp-metrics-server-image'
+  nvkr-process-nktp-metrics-server-image-ar-757d08c35161:
+    name: 'Acquire and prepare nktp-metrics-server-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    needs: [preflight-images-ubuntu-24-04]
+    timeout-minutes: 300
+    needs: [nvkr-tool-syft-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
-    permissions:
-      actions: read
-      contents: read
-  nvkr-process-nktp-metrics-server-image-ar-5910963baf4b:
-    name: 'Verify and package outputs: nktp-metrics-server-image-arm64, publication-nktp-metrics-server-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-nktp-metrics-server-image-arm64-pull-3fed0eeaa550, nvkr-tool-syft, preflight-images-ubuntu-24-04]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-ubuntu-24-04'].result == 'success' }}
     steps:
-      - *check-native-linux-amd64
+      - *check-native-linux-arm64
       - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
       - *operation-execute-node-part-4
+      - *operation-execute-node-part-5
     permissions:
       actions: read
       contents: read
@@ -349,30 +320,21 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-nktp-node-exporter-image-arm64-pull-1c64e723ec3e:
-    name: 'Acquire pinned nktp-node-exporter-image-arm64/pull-nktp-node-exporter-image'
+  nvkr-process-nktp-node-exporter-image-arm-66bf6c6556d1:
+    name: 'Acquire and prepare nktp-node-exporter-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    needs: [preflight-images-ubuntu-24-04]
+    timeout-minutes: 300
+    needs: [nvkr-tool-syft-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
-    permissions:
-      actions: read
-      contents: read
-  nvkr-process-nktp-node-exporter-image-arm-6e6069e81027:
-    name: 'Verify and package outputs: nktp-node-exporter-image-arm64, publication-nktp-node-exporter-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-nktp-node-exporter-image-arm64-pull-1c64e723ec3e, nvkr-tool-syft, preflight-images-ubuntu-24-04]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-ubuntu-24-04'].result == 'success' }}
     steps:
-      - *check-native-linux-amd64
+      - *check-native-linux-arm64
       - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
       - *operation-execute-node-part-4
+      - *operation-execute-node-part-5
     permissions:
       actions: read
       contents: read
@@ -394,30 +356,21 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-nktp-operator-image-arm64-pull-nktp-37961a5b06a1:
-    name: 'Acquire pinned nktp-operator-image-arm64/pull-nktp-operator-image'
+  nvkr-process-nktp-operator-image-arm64-pu-b99a053f47f2:
+    name: 'Acquire and prepare nktp-operator-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    needs: [preflight-images-ubuntu-24-04]
+    timeout-minutes: 300
+    needs: [nvkr-tool-syft-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
-    permissions:
-      actions: read
-      contents: read
-  nvkr-process-nktp-operator-image-arm64-te-86709c8a589e:
-    name: 'Verify and package outputs: nktp-operator-image-arm64, publication-nktp-operator-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-nktp-operator-image-arm64-pull-nktp-37961a5b06a1, nvkr-tool-syft, preflight-images-ubuntu-24-04]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-ubuntu-24-04'].result == 'success' }}
     steps:
-      - *check-native-linux-amd64
+      - *check-native-linux-arm64
       - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
       - *operation-execute-node-part-4
+      - *operation-execute-node-part-5
     permissions:
       actions: read
       contents: read
@@ -439,30 +392,21 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-nktp-target-allocator-image-arm64-pu-0868c06386fa:
-    name: 'Acquire pinned nktp-target-allocator-image-arm64/pull-nktp-target-allocator-image'
+  nvkr-process-nktp-target-allocator-image-722bca1a145d:
+    name: 'Acquire and prepare nktp-target-allocator-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 60
-    needs: [preflight-images-ubuntu-24-04]
+    timeout-minutes: 300
+    needs: [nvkr-tool-syft-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-arm-node
-    permissions:
-      actions: read
-      contents: read
-  nvkr-process-nktp-target-allocator-image-2159442f665d:
-    name: 'Verify and package outputs: nktp-target-allocator-image-arm64, publication-nktp-target-allocator-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-nktp-target-allocator-image-arm64-pu-0868c06386fa, nvkr-tool-syft, preflight-images-ubuntu-24-04]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) && needs['preflight-images-ubuntu-24-04'].result == 'success' }}
     steps:
-      - *check-native-linux-amd64
+      - *check-native-linux-arm64
       - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
       - *operation-execute-node-part-4
+      - *operation-execute-node-part-5
     permissions:
       actions: read
       contents: read
@@ -512,7 +456,7 @@ jobs:
     name: 'Acquire pinned cosign'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [preflight-images-ubuntu-24-04]
+    needs: [preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: &steps-ubuntu-24-04-node
       - *check-native-linux-amd64
@@ -526,7 +470,7 @@ jobs:
     name: 'Acquire pinned syft'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
-    needs: [preflight-images-ubuntu-24-04]
+    needs: [preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-node
     permissions:
@@ -594,49 +538,11 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81:
-    name: 'Attest, publish, sign and verify output-nktp-collector-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-collector-image-arm64-t-e4a0801b2bf4, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-kub-c8449a367a99:
     name: 'Attest, publish, sign and verify output-nktp-kube-state-metrics-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
     needs: [nvkr-process-nktp-kube-state-metrics-imag-9237b3d3c42d, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a:
-    name: 'Attest, publish, sign and verify output-nktp-kube-state-metrics-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-kube-state-metrics-imag-4e4b7bd3832b, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -670,49 +576,11 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-kub-38a63daab836:
-    name: 'Attest, publish, sign and verify output-nktp-kubectl-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-kubectl-image-arm64-ter-267e6d3bc2c7, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851:
     name: 'Attest, publish, sign and verify output-nktp-lgtm-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
     needs: [nvkr-process-nktp-lgtm-image-pull-nktp-lg-0ce720331605, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688:
-    name: 'Attest, publish, sign and verify output-nktp-lgtm-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-lgtm-image-arm64-termin-982447db1bb3, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -746,49 +614,11 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71:
-    name: 'Attest, publish, sign and verify output-nktp-metrics-server-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-metrics-server-image-ar-5910963baf4b, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-nod-a5920c5bad6d:
     name: 'Attest, publish, sign and verify output-nktp-node-exporter-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
     needs: [nvkr-process-nktp-node-exporter-image-pul-68a771ea8298, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f:
-    name: 'Attest, publish, sign and verify output-nktp-node-exporter-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-node-exporter-image-arm-6e6069e81027, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -822,25 +652,6 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2:
-    name: 'Attest, publish, sign and verify output-nktp-operator-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-operator-image-arm64-te-86709c8a589e, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d:
     name: 'Attest, publish, sign and verify output-nktp-target-allocator-image'
     runs-on: 'ubuntu-24.04'
@@ -860,11 +671,158 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
+  nvkr-tool-syft-linux-arm64:
+    name: 'Acquire pinned syft/linux/arm64'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81:
+    name: 'Attest, publish, sign and verify output-nktp-collector-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 240
+    needs: [nvkr-process-nktp-collector-image-arm64-p-254a213ce332, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-publication-part-2
+      - *operation-execute-registry-part-3
+      - *operation-execute-registry-part-4
+  nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a:
+    name: 'Attest, publish, sign and verify output-nktp-kube-state-metrics-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 240
+    needs: [nvkr-process-nktp-kube-state-metrics-imag-e0532701e664, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-publication-part-2
+      - *operation-execute-registry-part-3
+      - *operation-execute-registry-part-4
+  nvkr-process-attest-sboms-output-nktp-kub-38a63daab836:
+    name: 'Attest, publish, sign and verify output-nktp-kubectl-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 240
+    needs: [nvkr-process-nktp-kubectl-image-arm64-pul-c601d6089765, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-publication-part-2
+      - *operation-execute-registry-part-3
+      - *operation-execute-registry-part-4
+  nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688:
+    name: 'Attest, publish, sign and verify output-nktp-lgtm-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 240
+    needs: [nvkr-process-nktp-lgtm-image-arm64-pull-n-290430591175, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-publication-part-2
+      - *operation-execute-registry-part-3
+      - *operation-execute-registry-part-4
+  nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71:
+    name: 'Attest, publish, sign and verify output-nktp-metrics-server-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 240
+    needs: [nvkr-process-nktp-metrics-server-image-ar-757d08c35161, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-publication-part-2
+      - *operation-execute-registry-part-3
+      - *operation-execute-registry-part-4
+  nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f:
+    name: 'Attest, publish, sign and verify output-nktp-node-exporter-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 240
+    needs: [nvkr-process-nktp-node-exporter-image-arm-66bf6c6556d1, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-publication-part-2
+      - *operation-execute-registry-part-3
+      - *operation-execute-registry-part-4
+  nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2:
+    name: 'Attest, publish, sign and verify output-nktp-operator-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 240
+    needs: [nvkr-process-nktp-operator-image-arm64-pu-b99a053f47f2, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-publication-part-2
+      - *operation-execute-registry-part-3
+      - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3:
     name: 'Attest, publish, sign and verify output-nktp-target-allocator-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-nktp-target-allocator-image-2159442f665d, nvkr-tool-cosign]
+    needs: [nvkr-process-nktp-target-allocator-image-722bca1a145d, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -909,7 +867,7 @@ jobs:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-nktp-collector-image-arm64-pull-nktp-85cb8e91f658, nvkr-nktp-kube-state-metrics-image-arm64-5e368a6dbdf1, nvkr-nktp-kubectl-image-arm64-pull-nktp-kubectl-image, nvkr-nktp-lgtm-image-arm64-pull-nktp-lgtm-image, nvkr-nktp-metrics-server-image-arm64-pull-3fed0eeaa550, nvkr-nktp-node-exporter-image-arm64-pull-1c64e723ec3e, nvkr-nktp-operator-image-arm64-pull-nktp-37961a5b06a1, nvkr-nktp-target-allocator-image-arm64-pu-0868c06386fa, nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81, nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7, nvkr-process-attest-sboms-output-nktp-kub-38a63daab836, nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a, nvkr-process-attest-sboms-output-nktp-kub-c8449a367a99, nvkr-process-attest-sboms-output-nktp-kub-c9a4d1b91ba8, nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688, nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851, nvkr-process-attest-sboms-output-nktp-met-5bfa54ed25c3, nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71, nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f, nvkr-process-attest-sboms-output-nktp-nod-a5920c5bad6d, nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2, nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0, nvkr-process-attest-sboms-output-nktp-pub-10938e2cfef1, nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3, nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d, nvkr-process-nktp-collector-image-arm64-t-e4a0801b2bf4, nvkr-process-nktp-collector-image-pull-nk-1b2717680e5c, nvkr-process-nktp-fetch-nktp-chart-nktp-b-409641394abc, nvkr-process-nktp-kube-state-metrics-imag-4e4b7bd3832b, nvkr-process-nktp-kube-state-metrics-imag-9237b3d3c42d, nvkr-process-nktp-kubectl-image-arm64-ter-267e6d3bc2c7, nvkr-process-nktp-kubectl-image-pull-nktp-7a5465c5ace2, nvkr-process-nktp-lgtm-image-arm64-termin-982447db1bb3, nvkr-process-nktp-lgtm-image-pull-nktp-lg-0ce720331605, nvkr-process-nktp-metrics-server-image-ar-5910963baf4b, nvkr-process-nktp-metrics-server-image-pu-4d0ea0695597, nvkr-process-nktp-node-exporter-image-arm-6e6069e81027, nvkr-process-nktp-node-exporter-image-pul-68a771ea8298, nvkr-process-nktp-operator-image-arm64-te-86709c8a589e, nvkr-process-nktp-operator-image-pull-nkt-61fc7278e4c5, nvkr-process-nktp-target-allocator-image-112efff693b7, nvkr-process-nktp-target-allocator-image-2159442f665d, nvkr-process-package-release-publish-rele-e70edb401cae, nvkr-tool-cosign, nvkr-tool-syft, preflight-images-ubuntu-24-04]
+    needs: [build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81, nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7, nvkr-process-attest-sboms-output-nktp-kub-38a63daab836, nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a, nvkr-process-attest-sboms-output-nktp-kub-c8449a367a99, nvkr-process-attest-sboms-output-nktp-kub-c9a4d1b91ba8, nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688, nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851, nvkr-process-attest-sboms-output-nktp-met-5bfa54ed25c3, nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71, nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f, nvkr-process-attest-sboms-output-nktp-nod-a5920c5bad6d, nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2, nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0, nvkr-process-attest-sboms-output-nktp-pub-10938e2cfef1, nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3, nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d, nvkr-process-nktp-collector-image-arm64-p-254a213ce332, nvkr-process-nktp-collector-image-pull-nk-1b2717680e5c, nvkr-process-nktp-fetch-nktp-chart-nktp-b-409641394abc, nvkr-process-nktp-kube-state-metrics-imag-9237b3d3c42d, nvkr-process-nktp-kube-state-metrics-imag-e0532701e664, nvkr-process-nktp-kubectl-image-arm64-pul-c601d6089765, nvkr-process-nktp-kubectl-image-pull-nktp-7a5465c5ace2, nvkr-process-nktp-lgtm-image-arm64-pull-n-290430591175, nvkr-process-nktp-lgtm-image-pull-nktp-lg-0ce720331605, nvkr-process-nktp-metrics-server-image-ar-757d08c35161, nvkr-process-nktp-metrics-server-image-pu-4d0ea0695597, nvkr-process-nktp-node-exporter-image-arm-66bf6c6556d1, nvkr-process-nktp-node-exporter-image-pul-68a771ea8298, nvkr-process-nktp-operator-image-arm64-pu-b99a053f47f2, nvkr-process-nktp-operator-image-pull-nkt-61fc7278e4c5, nvkr-process-nktp-target-allocator-image-112efff693b7, nvkr-process-nktp-target-allocator-image-722bca1a145d, nvkr-process-package-release-publish-rele-e70edb401cae, nvkr-tool-cosign, nvkr-tool-syft, nvkr-tool-syft-linux-arm64, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     env:
@@ -997,7 +955,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 48 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 42 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {

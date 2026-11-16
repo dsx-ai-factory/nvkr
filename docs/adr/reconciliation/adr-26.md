@@ -47,9 +47,14 @@ The root binds Definition `sha256:fcf147a347ee9b6559d98a20d9a09d5208e3d33b916796
 Environment `sha256:3bc43a6761c6a592496a8162859c4a6ded3d189f51421033d11cfa148e2dda94`,
 Plan `sha256:8ccb0763bd35b3a0a9ee888513e0ae27bc55d3027b9a0f0701a4c529e4d2da32`, and
 aggregate invocation `https://github.com/dsx-ai-factory/nvkr/actions/runs/42131864402/attempts/2`.
-Attempt 1 prepared all 83 outputs and signed 75 before it failed. Attempt 2 reran the failed jobs:
-it signed the remaining 8, published the root, verified it and finalized the Run.
-The Actions artifact listing is now empty; the job logs and registry metadata remain available.
+Attempt 1 prepared all 83 outputs. Its [job history](https://github.com/dsx-ai-factory/nvkr/actions/runs/42131864402/attempts/1)
+records 81 successful output-signing jobs and two skips, including six successful disk-signing jobs
+such as [this FDE signing job](https://github.com/dsx-ai-factory/nvkr/actions/runs/42131864402/job/127637691426).
+Attempt 2 reran the eight-output disk partition and signed all eight outputs, including those six,
+then published the root, verified it and finalized the Run. The final root retains 75 output-signing
+receipts from attempt 1 and eight from attempt 2; those receipt counts are not counts of signing executions.
+The job logs and registry metadata were observed available on November 14, 2026; the Actions
+artifact listing was empty at that observation.
 
 This records hosted `pipeline-attested` publication (the Plan's lane) for the exact historical candidate. The root's
 qualification remains `diagnostic`, and disks use `build-provenance-v1`. Metadata retrieval did not
@@ -66,10 +71,15 @@ the 25 changed outputs are all 17 telemetry outputs and all eight disks, four in
 This record does not establish execution of that later candidate or authorize the combined
 Definition's retirement.
 
-On November 14, 2026, the current registry metadata reader completed against this private root using
+On November 14, 2026, the current registry metadata reader completed against this root using
 existing Docker credentials: `release browse --format json --no-cache`, with a three-minute timeout.
 It read all 271 metadata objects and returned 83 outputs and 188 evidence records. This checked the
 registry metadata closure with the reader at `72309337216e0be486c1d08e2c6acb2d9766bd2d`; it did not
 verify payloads, signatures or consumer policy. The literal `release inspect` command was not run:
 it requires a complete local OCI layout, which was not downloaded. Registry inspection uses
 `release browse`; the containerized consumer script requires read credentials through `--registry-config`.
+
+On November 16, 2026, the same uncached metadata read completed again with existing Docker credentials,
+returning all 83 outputs and 188 evidence records. The exact root also returned HTTP 200 with the
+local GitHub CLI credential. GHCR reported the package as `internal`; anonymous access was refused.
+These are dated retrieval observations, not guarantees of continuous availability or access for other readers.

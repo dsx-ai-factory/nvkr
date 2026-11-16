@@ -70,6 +70,9 @@ func validatePinLockShape(lock *PinLock) error {
 
 	for _, name := range sortedPinNames(lock.Pins) {
 		pin := lock.Pins[name]
+		if err := validateToolPinsShape(pin); err != nil {
+			return err
+		}
 		if pin.Tool != nil {
 			if err := validateToolPin(*pin.Tool); err != nil {
 				return err
@@ -318,6 +321,7 @@ func clonePinLock(lock *PinLock) *PinLock {
 			copy := pin.Tool.clone()
 			pin.Tool = &copy
 		}
+		pin.Tools = cloneToolPins(pin.Tools)
 		out.Pins[name] = pin
 	}
 	if len(lock.Artifacts) > 0 {
