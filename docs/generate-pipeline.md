@@ -43,12 +43,13 @@ Before generation, [declare consumer image access](https://github.com/dsx-ai-fac
 for every selected producer, vendor, utility, inspector and startup image. Ordinary hosted Environments
 require explicit public roots too. Private ordinary-hosted and startup routes are refused.
 
-For one Definition whose generated workflow is too large, the Environment can select
-`githubExecutionPartitions: true`. Generation then emits an entry workflow and bounded sibling workers;
+For one Definition whose generated workflow is too large, the Environment can permit a fallback with
+`githubExecutionPartitions: true`. Generation renders the flat workflow first. Only when that workflow
+exceeds a provider size limit does it emit an entry workflow and bounded sibling workers;
 all belong to one generated manifest, use one complete Plan and feed one Run finalizer and Release.
 Jobs requiring an OIDC token stay in the entry workflow to preserve their signing identity policy.
-Do not edit or dispatch workers independently. The default remains the flat workflow. The maintained
-release and development Environments select this topology. It has local generation contracts and a hosted
+Do not edit or dispatch workers independently. The default is the flat workflow, and every maintained
+bundle currently fits it. The fallback has local generation contracts and a hosted
 development Run; hosted release execution, including failure and cancellation reporting, is unrecorded.
 
 ```sh
@@ -203,8 +204,9 @@ generator rejects larger bundles before writing them; signed development retries
 
 The generator rejects workflows above 500,000 bytes or 50,000 expanded YAML parsing events. YAML aliases
 reduce file size but do not reduce the parser's expanded count. Maintained rendering tests reserve five
-percent headroom. Compatible offline observation, SBOM and packaging steps share their producer job;
-signing, publication and remote verification keep separate jobs and permissions. Payloads consumed only
+percent headroom. A job is one authority class on one runner: source fetch, build, observation, SBOM and
+packaging share a producer job, and attestation, publication, signing and remote verification share a
+release job in which each registry credential stays on its own step. Payloads consumed only
 inside their producing job are not packed or uploaded unless finalization needs them. This avoids shipping
 an intermediate disk package as well as its prepared publication layout.
 
@@ -236,7 +238,7 @@ The per-output pipeline gives each remaining payload transfer a specific purpose
 
 The publisher authenticates the attested metadata against the original preparation, verifies each bundle
 and its exact decoded SBOM, and moves unchanged blobs into the final layout before full-byte publication
-checks. The SBOM and signing jobs do not download or re-upload output payloads. Metadata inspection alone
+checks. The SBOM attestation and signing steps do not read or re-upload output payloads. Metadata inspection alone
 is not payload verification; the independent remote readback remains required. This is the existing
 `pipeline-attested` claim, not qualification or a new SLSA level.
 

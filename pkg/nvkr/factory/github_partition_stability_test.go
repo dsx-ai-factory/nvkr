@@ -82,7 +82,8 @@ func TestGitHubPartitionRootAdditionChurn(t *testing.T) {
 		}
 	}
 	t.Logf("workers: before=%d after=%d modified=%d removed=%d added=%d", len(before), len(after), modified, removed, added)
-	if len(before) < 30 || modified+removed+added > 2 || added != 1 {
+	// Authority-grouped jobs partition the maintained Plan into 13 workers; the floor only rejects a degenerate fixture.
+	if len(before) < 10 || modified+removed+added > 2 || added != 1 {
 		t.Fatal("adding one root changed more than two worker files or failed to add its worker")
 	}
 }

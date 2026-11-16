@@ -5,6 +5,7 @@ package factory
 
 import (
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -12,9 +13,11 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
-// A stage is a scheduling choice, not a new graph or authority record. Offline
-// consumers may stay with their sole producer; other ordinary grouping follows
-// one target's observation-to-SBOM edge, never global adjacency. A disk's
+// A stage is a scheduling choice, not a new graph or authority record. GitHub
+// contracts operations that share one authority class, runner and subject
+// (github_stage_authority.go). Tekton keeps the v1 grouping: offline consumers
+// may stay with their sole producer, and other ordinary grouping follows one
+// target's observation-to-SBOM edge. Neither uses global adjacency. A disk's
 // operations share its live owner. Validate the complete contracted graph.
 type githubStage struct {
 	DiskOutput                      string
@@ -32,6 +35,8 @@ const (
 	githubDiskProviderOverheadMinutes  = githubSupportJobTimeoutMinutes
 	githubDiskCleanupHeadroomMinutes   = 5
 	githubDiskDiagnosticUploadMinutes  = 5
+	// One provider job runs at most sixteen serial operations.
+	githubMaximumStageNodes = 16
 )
 
 // GitHub limits an explicitly configured step timeout to six hours even on
@@ -46,9 +51,9 @@ func githubDiskStepTimeoutMinutes(stage githubStage) int {
 }
 
 // githubStageTimeoutMinutes projects the producer-owned per-node timeout into
-// GitHub's whole-minute job limit. Utility-only stages without declared timeouts
-// keep the bounded 60-minute adapter default. Producer stages reserve each serial
-// node's declared or default budget so co-location cannot shorten producer time.
+// GitHub's whole-minute job limit. A job reserves each serial node's declared
+// budget, or the bounded 60-minute adapter default, so co-location cannot
+// shorten any operation's time.
 func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 	if stage.objectPublicationTimeoutMinutes > 0 {
 		return stage.objectPublicationTimeoutMinutes, nil
@@ -61,38 +66,14 @@ func githubStageTimeoutMinutes(stage githubStage) (int, error) {
 	}
 	limit := uint64(githubMaximumJobTimeoutMinutes)
 	var total uint64
-	declared := false
-	undeclared := 0
 	for _, node := range stage.Nodes {
-		if node.Requirements == nil || node.Requirements.TimeoutSeconds == 0 {
-			undeclared++
-			continue
-		}
-		declared = true
-		minutes := node.Requirements.TimeoutSeconds / 60
-		if node.Requirements.TimeoutSeconds%60 != 0 {
-			minutes++
-		}
+		minutes := githubNodeTimeoutMinutes(node)
 		if minutes > limit || total > limit-minutes {
 			return 0, e.New(e.CodeEngineCapability,
 				"GitHub stage %q timeout exceeds the %d-minute job limit",
 				stage.ID, limit)
 		}
 		total += minutes
-	}
-	if !declared && !githubProducerStage(stage) {
-		return githubDefaultStageTimeoutMinutes, nil
-	}
-	// Producer stages and stages with a declared timeout sum serial budgets.
-	// Give each undeclared node the bounded adapter default rather than silently
-	// counting it as zero.
-	for range undeclared {
-		if total > limit-githubDefaultStageTimeoutMinutes {
-			return 0, e.New(e.CodeEngineCapability,
-				"GitHub stage %q timeout exceeds the %d-minute job limit",
-				stage.ID, limit)
-		}
-		total += githubDefaultStageTimeoutMinutes
 	}
 	return int(total), nil
 }
@@ -175,14 +156,29 @@ func githubDiskProducerTimeoutSeconds(node Node) (uint64, error) {
 	return seconds, nil
 }
 
+// githubNodeTimeoutMinutes is one operation's declared budget in whole minutes.
+// An undeclared operation gets the bounded adapter default rather than zero.
+func githubNodeTimeoutMinutes(node Node) uint64 {
+	if node.Requirements == nil || node.Requirements.TimeoutSeconds == 0 {
+		return githubDefaultStageTimeoutMinutes
+	}
+	minutes := node.Requirements.TimeoutSeconds / 60
+	if node.Requirements.TimeoutSeconds%60 != 0 {
+		minutes++
+	}
+	return minutes
+}
+
 func githubStages(plan *Plan) ([]githubStage, map[string]string, error) {
-	return projectExecutionStages(plan, plan.GitHubExecutionFor)
+	return projectExecutionStages(plan, plan.GitHubExecutionFor, true)
 }
 
 // projectExecutionStages is the common operation grouping used by CI adapters.
-// Placement only resolves where an existing operation runs. Membership, source
-// cohorts, artifact boundaries and stage contraction remain one shared policy.
-func projectExecutionStages(plan *Plan, placement func(Node) (Node, error)) ([]githubStage, map[string]string, error) {
+// Placement only resolves where an existing operation runs. Source cohorts,
+// disk groups, artifact boundaries and the DAG check are shared. byAuthority
+// selects GitHub's authority-and-runner contraction; Tekton passes false and
+// keeps the v1 producer and observation-pair contraction.
+func projectExecutionStages(plan *Plan, placement func(Node) (Node, error), byAuthority bool) ([]githubStage, map[string]string, error) {
 	ordered, schedulingKeys, err := githubSchedulingProjection(plan)
 	if err != nil {
 		return nil, nil, err
@@ -192,6 +188,7 @@ func projectExecutionStages(plan *Plan, placement func(Node) (Node, error)) ([]g
 	observationStages := make(map[string]int)
 	nodeStages := make(map[string]int, len(ordered))
 	nodes, artifacts := planIndex(plan)
+	grouping := &authorityStages{plan: plan, artifacts: artifacts, needs: map[int]map[int]bool{}}
 	for _, node := range ordered {
 		node, err := placement(node)
 		if err != nil {
@@ -206,6 +203,19 @@ func projectExecutionStages(plan *Plan, placement func(Node) (Node, error)) ([]g
 			}
 			stages[index].Nodes = append(stages[index].Nodes, node)
 			nodeStages[node.ID] = index
+			grouping.record(node, index, nodeStages)
+			continue
+		}
+		if byAuthority {
+			index, ok := grouping.join(node, stages, nodeStages)
+			if ok {
+				stages[index].Nodes = append(stages[index].Nodes, node)
+			} else {
+				index = len(stages)
+				stages = append(stages, githubStage{Nodes: []Node{node}})
+			}
+			nodeStages[node.ID] = index
+			grouping.record(node, index, nodeStages)
 			continue
 		}
 		if index, ok := githubProducerStageFor(node, stages, nodeStages, artifacts); ok {
@@ -245,6 +255,9 @@ func projectExecutionStages(plan *Plan, placement func(Node) (Node, error)) ([]g
 					stage.Name = "Acquire and prepare " + stage.Nodes[0].BuildTarget
 				}
 			}
+			if byAuthority {
+				stage.Name = githubAuthorityStageLabel(plan, stage.Nodes)
+			}
 		}
 		if stage.DiskOutput != "" {
 			stage.ID = githubJobID("disk/" + stage.DiskOutput)
@@ -277,10 +290,26 @@ func projectExecutionStages(plan *Plan, placement func(Node) (Node, error)) ([]g
 			jobs[node.ID] = stage.ID
 		}
 	}
+	if byAuthority {
+		numberRepeatedStageNames(stages)
+	}
 	if err := validateGitHubStageDAG(plan, stages, jobs); err != nil {
 		return nil, nil, err
 	}
 	return stages, jobs, nil
+}
+
+// numberRepeatedStageNames keeps job display names distinct. Jobs that split
+// one subject, such as a target's source fetches, would otherwise share one.
+func numberRepeatedStageNames(stages []githubStage) {
+	seen := map[string]int{}
+	for index := range stages {
+		name := stages[index].Name
+		seen[name]++
+		if seen[name] > 1 {
+			stages[index].Name = name + " (part " + strconv.Itoa(seen[name]) + ")"
+		}
+	}
 }
 
 func githubProducerStage(stage githubStage) bool {
@@ -310,7 +339,7 @@ func githubProducerStageFor(node Node, stages []githubStage, owners map[string]i
 	}
 	stage := stages[index]
 	first := stage.Nodes[0]
-	if !githubProducerStage(stage) || first.BuildTarget == "" || len(stage.Nodes) >= 16 ||
+	if !githubProducerStage(stage) || first.BuildTarget == "" || len(stage.Nodes) >= githubMaximumStageNodes ||
 		first.RunsOn != node.RunsOn || first.Platform != node.Platform ||
 		node.BuildTarget != "" && node.BuildTarget != first.BuildTarget {
 		return 0, false

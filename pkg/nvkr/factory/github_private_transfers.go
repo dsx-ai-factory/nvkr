@@ -100,8 +100,35 @@ func (t githubCITransfer) inputs() []string {
 	return result
 }
 
+// githubStagePermissions is the union of its operations' token scopes. A job
+// holds one token, so authority grouping keeps producers out of any job whose
+// union includes release authority.
 func githubStagePermissions(plan *Plan, stage githubStage) (map[string]string, error) {
-	node := stage.Nodes[0]
+	var permissions map[string]string
+	grant := func(scopes map[string]string) {
+		for name, access := range scopes {
+			if permissions == nil {
+				permissions = map[string]string{}
+			}
+			if permissions[name] != "write" {
+				permissions[name] = access
+			}
+		}
+	}
+	for _, node := range stage.Nodes {
+		scopes, err := githubNodePermissions(plan, node)
+		if err != nil {
+			return nil, err
+		}
+		grant(scopes)
+	}
+	if len(githubStagePrivateImages(plan, stage)) > 0 {
+		grant(map[string]string{"contents": "read"})
+	}
+	return permissions, nil
+}
+
+func githubNodePermissions(plan *Plan, node Node) (map[string]string, error) {
 	if signFamilyNode(node.Kind) {
 		if plan.Environment.Signing == nil {
 			return nil, e.New(e.CodeTrustPolicyMissing, "GitHub node %q signs without a delivery signing profile", node.ID)
@@ -122,9 +149,6 @@ func githubStagePermissions(plan *Plan, stage githubStage) (map[string]string, e
 			permissions["packages"] = "write"
 		}
 		return permissions, nil
-	}
-	if len(githubStagePrivateImages(plan, stage)) > 0 {
-		return map[string]string{"contents": "read"}, nil
 	}
 	return nil, nil
 }

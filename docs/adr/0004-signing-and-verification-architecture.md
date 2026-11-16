@@ -183,13 +183,16 @@ referrer manifest beside the associated deliverable; source evidence retains its
 Hosted pull-back verification independently checks every bundle. Keyless creation/verification remains
 Linux-only and raw preparation layouts cannot satisfy authenticated release consumption.
 
-In GitHub `per-output-v1`, the preparation producer inspects the complete payload. The separate SBOM job
-receives only its bounded metadata and canonical documents, with exact subject, membership, Plan and Run
+In GitHub `per-output-v1`, the preparation producer inspects the complete payload. The SBOM attestation step
+reads only its bounded metadata and canonical documents, with exact subject, membership, Plan and Run
 bindings; it does not independently inspect payload bytes. The publisher combines the resulting bundles
 with the original preparation only after verifying the bundles, unchanged subjects and metadata, and exact
 decoded document equality. It then checks the complete final payload before publication. Metadata alone
 grants no payload-integrity capability. The full-layout attestation path retains its existing complete-byte
-checks. This separation removes the unchanged payload's SBOM round trip while preserving OIDC isolation.
+checks. This removes the unchanged payload's SBOM round trip. Under ADR-18's job boundaries the attestation
+step and the publisher share one release job, so the job that can request the workflow identity also holds
+the output's payload carrier. The boundary between attestation and payload is the step's input scoping and
+the carrier transport's extraction guard, not a separate machine.
 
 SBOM bundle creation permits at most three fresh keyless invocations within one three-minute deadline,
 with cancellation-aware one- and two-second delays, only when Rekor v1 reports its explicit HTTP 409
