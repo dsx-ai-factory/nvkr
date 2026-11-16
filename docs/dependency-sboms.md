@@ -1,7 +1,7 @@
 # Artifact dependency SBOMs
 
 The NVKE Definition selects a catalog-pinned Syft executable using `sbomTool: syft`. The scanner
-is acquired as a normal pipeline tool. SBOM jobs run offline after artifact observation and consume the exact
+is acquired as a normal pipeline tool. SBOM steps run offline after artifact observation and consume the exact
 payloads plus their producer records. The implementation is selected by artifact format, not component name.
 
 | Artifact | Discovery | Scope |

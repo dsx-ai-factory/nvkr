@@ -54,7 +54,7 @@ func projectTektonExecution(ctx context.Context, plan *Plan, platform string) (*
 		resolved.RunsOn = "tekton-native"
 		return resolved, nil
 	}
-	stages, owners, err := projectExecutionStages(plan, placement)
+	stages, owners, err := projectExecutionStages(plan, placement, false)
 	if err != nil {
 		return nil, err
 	}

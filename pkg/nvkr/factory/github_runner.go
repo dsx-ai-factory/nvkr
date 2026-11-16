@@ -131,9 +131,11 @@ func launchGitHubUtility(ctx context.Context, plan *Plan, node Node, options Git
 	return githubUtilityError(ctx, err)
 }
 
-// githubUtilityContext bounds a hosted utility by its existing provider stage
-// budget. An earlier caller deadline still wins; this is not a measurement of
-// the job's remaining time. Local and producer-owned deadlines are unchanged.
+// githubUtilityContext bounds a hosted utility by its own share of its job's
+// budget, so sharing a job neither shortens nor extends an operation's time. A
+// disk group keeps its one shared budget. An earlier caller deadline still
+// wins; this is not a measurement of the job's remaining time. Local and
+// producer-owned deadlines are unchanged.
 func githubUtilityContext(ctx context.Context, plan *Plan, nodeID string) (context.Context, context.CancelFunc, error) {
 	stages, _, err := githubStages(plan)
 	if err != nil {
@@ -147,6 +149,9 @@ func githubUtilityContext(ctx context.Context, plan *Plan, nodeID string) (conte
 			minutes, err := githubStageTimeoutMinutes(stage)
 			if err != nil {
 				return nil, nil, err
+			}
+			if stage.DiskOutput == "" {
+				minutes = int(githubNodeTimeoutMinutes(node))
 			}
 			bounded, cancel := context.WithTimeout(ctx, time.Duration(minutes)*time.Minute)
 			return bounded, cancel, nil

@@ -182,7 +182,8 @@ removed while preserving the prerequisite closure.
 Large finalizers collect the exact original per-job results through fixed, bounded diagnostic buckets;
 collector success never substitutes for producer success. Neither scripts supplied as data nor separately
 authored lifecycle inputs are admitted.
-Opt-in execution partitioning moves original jobs into bounded same-commit worker workflows under the same
+Execution partitioning is a fallback the Environment permits. When the flat workflow exceeds a provider
+size limit, it moves original jobs into bounded same-commit worker workflows under the same
 manifest; [ADR-18 §8](docs/adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
 owns which jobs stay in the entry workflow and the proposed signer migration. A partition is generated
 scheduling structure, not a Definition, Run or Release, and never follows composite member
@@ -199,11 +200,12 @@ explicit cross-Run transfers remain exact-attempt. Qualification independently c
 The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
 visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
 the complete bundle still requires regeneration and checking.
-Edit locality additionally preserves existing output jobs when an independent output is added. Ordinary
-grouping can append offline observation, SBOM and packaging to a producer when that one stage owns all
-inputs and runtime/target constraints agree; otherwise one BuildTarget's observation and SBOM may pair.
-Other nodes keep separate jobs. Signing, publication and remote verification retain their boundaries. A shared pinned root tool may be an additional prerequisite for the pair,
-which waits for its acquisition and restoration before observation. Required aggregate accounting changes,
+Edit locality additionally preserves existing output jobs when an independent output is added. A GitHub
+job is one authority class on one runner for one Build target or publication route. Source fetch, build,
+observation, SBOM and packaging share a producer job; attestation, publication, signing and remote
+verification share a release job with step-scoped credentials. An operation joins a job only when it adds
+no prerequisite. A shared pinned root tool may be an additional prerequisite for a job,
+which waits for its acquisition and restoration first. Required aggregate accounting changes,
 and an identical YAML anchor may gain an earlier owner without changing expanded execution. The current Plan determines this projection; previous
 generated files do not supply scheduling state.
 Payload carriers use an unlinked private/internal GHCR package with separate storage credentials.

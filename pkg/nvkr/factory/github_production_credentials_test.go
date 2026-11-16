@@ -33,23 +33,28 @@ func TestGitHubProductionRegistryCredentialBoundaries(t *testing.T) {
 		t.Fatal(err)
 	}
 	document := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
-	selected := map[string]string{}
+	// Each registry credential is bound to its own operation's step.
+	selected, selectedNode := map[string]string{}, map[string]string{}
 	for _, stage := range stages {
 		job := document.Jobs[stage.ID]
 		if job.Permissions["packages"] != "" {
 			t.Fatal("production retains repository package access")
 		}
-		kind := stage.Nodes[0].Kind
-		selected[kind] = stage.ID
-		want := ""
-		switch kind {
-		case NodePublish, NodeSign:
-			want = "${{ secrets.NVKR_REGISTRY_WRITE }}"
-		case NodeVerifyPublication, NodeAssembleRelease:
-			want = "${{ secrets.NVKR_REGISTRY_READ }}"
+		if job.Env["NVKR_CREDENTIAL"] != "" {
+			t.Fatalf("job %s binds a registry credential at job scope", stage.ID)
 		}
-		if job.Env["NVKR_CREDENTIAL"] != want {
-			t.Fatalf("%s has wrong registry credential", kind)
+		for _, node := range stage.Nodes {
+			selected[node.Kind], selectedNode[node.Kind] = stage.ID, node.ID
+			want := ""
+			switch node.Kind {
+			case NodePublish, NodeSign:
+				want = "${{ secrets.NVKR_REGISTRY_WRITE }}"
+			case NodeVerifyPublication, NodeAssembleRelease:
+				want = "${{ secrets.NVKR_REGISTRY_READ }}"
+			}
+			if got := githubNodeStep(t, &job, node.ID).Env["NVKR_CREDENTIAL"]; got != want {
+				t.Fatalf("%s has wrong registry credential %q", node.Kind, got)
+			}
 		}
 	}
 	final := document.Jobs["nvkr-lifecycle-run"]
@@ -65,13 +70,14 @@ func TestGitHubProductionRegistryCredentialBoundaries(t *testing.T) {
 			doc := decodeGitHubWorkflow(t, expandedGitHubWorkflow(t, bundle))
 			id := selected[tc.kind]
 			job := doc.Jobs[id]
-			job.Env["NVKR_CREDENTIAL"] = tc.token
+			githubNodeStep(t, &job, selectedNode[tc.kind]).Env["NVKR_CREDENTIAL"] = tc.token
 			doc.Jobs[id] = job
 			raw, err := yaml.Marshal(doc)
 			if err != nil {
 				t.Fatal(err)
 			}
-			changed := relowerGitHubTestBundle(t, plan, bundle, raw)
+			// A substituted step credential is outside the closed shared interface.
+			changed := unsharedGitHubTestBundle(t, plan, bundle, raw)
 			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeEngineCapability)
 		})
 	}

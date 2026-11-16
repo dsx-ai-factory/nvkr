@@ -645,21 +645,22 @@ published output membership.
 
 Per-output GitHub handoffs move only the bytes required by each role. The preparation producer retains
 complete-byte inspection and exports a bounded control/evidence layout with the same root digest. Its
-payload carrier goes directly to the publisher; the isolated OIDC SBOM job receives only those controls
-and canonical documents, and returns only attested controls and bundles. Before any publication side
+payload carrier goes directly to the publisher; the SBOM attestation operation reads only those controls
+and canonical documents, and returns only attested controls and bundles. On GitHub it is a step of the
+output's release job (ADR-18 §8) and holds no registry credential. Before any publication side
 effect, the publisher re-inspects the original complete preparation and requires the returned metadata to
 preserve every output descriptor, repository, payload digest/size, Build Subject and release identity.
 Only raw CycloneDX evidence may become a verified bundle containing the identical decoded document.
 The publisher verifies those bundles under the admitted signer policy, consumes unchanged prepared blobs
 through the exclusive rename mechanism, and inspects the complete final layout before committing it.
-There is no payload download or re-upload in the SBOM job, no hardlinked retained preparation, and no
-caller-supplied verification flag.
+The SBOM attestation neither reads nor re-uploads the payload; there is no hardlinked retained preparation
+and no caller-supplied verification flag.
 
 After the existing full-byte/privacy/push gate, the publisher exports separate bounded signing metadata
 whose root must equal the digest-pinned publication reference before the metadata is committed. This is a
 pre-sign description, distinct from the remote verifier's authenticated output handoff. The signer checks
 its exact route, named output, Plan, Definition, Environment and invocation bindings, re-derives all signing
-subjects, and verifies required SBOM bundles before signing. The subsequent independent remote verifier
+subjects, and verifies required SBOM bundles before signing. The subsequent remote verification step
 still retrieves and authenticates the complete served payload closure. Signing metadata cannot issue a
 full-payload receipt, bypass remote readback, or authorize finalization by itself. Legacy and aggregate
 routes retain their existing contracts. This reduces repeated transport within the pipeline-attested lane;
@@ -684,7 +685,9 @@ In this mode finalization requires every provider job to succeed, then reauthent
 exact Plan/invocation-bound production predicate, output signatures/provenance and SBOM bundles. Persisted
 success records and unverified metadata cannot authorize a complete Run. This is the pipeline-attested lane:
 it trusts the admitted producing workflow's output-local byte checks, not qualified reproduction. Registry
-read access suffices for assembly and finalization; neither receives OIDC minting or package-write permission.
+read access suffices for assembly and finalization. The finalizer job receives no OIDC minting or
+package-write permission; the assembly step receives only the read credential inside the aggregate route's
+release job (ADR-18 §8).
 Production GitHub per-output publication additionally admits the fixed `github:NVKR_REGISTRY_WRITE`
 policy. Publishers and signers receive that secret and its explicit account; verification, assembly and
 finalization receive `NVKR_REGISTRY_READ` and its explicit account. These jobs request no workflow-token
@@ -932,13 +935,14 @@ Each attempt's packages remain independently discoverable for cleanup. Expired o
 rebuilding the affected dependency closure; a fresh dispatch does not implicitly reuse another run.
 
 The fixed `github:NVKR_DEV_REGISTRY_WRITE` reference selects only the dedicated development publisher.
-Generated publishing/signing jobs use that secret and `NVKR_DEV_REGISTRY_WRITE_USER`; verification,
+Generated publishing/signing steps use that secret and `NVKR_DEV_REGISTRY_WRITE_USER`; verification,
 assembly and finalization instead receive `NVKR_DEV_REGISTRY_READ` and `NVKR_DEV_REGISTRY_READ_USER`.
 The usernames are provider variables. No development job gets repository-token package-write permission.
 The operator must configure token scopes and package ACLs so these development principals cannot modify
 production packages. The same development account may hold separate write, read-only and cleanup tokens;
 token scope still differs by phase. Provider ACLs are external prerequisites, never inferred from a prefix.
-Only artifact signing and SBOM attestation receive OIDC. The distinct default-branch cleanup environment
+Only a release job that signs or attests holds `id-token: write`. The grant is at job scope, so that job's
+publication and verification steps share it (ADR-18 §8). The distinct default-branch cleanup environment
 holds the cleanup token; branch execution receives no deletion credential.
 
 Development qualification may attach its distinct predicate to existing immutable output subjects in the

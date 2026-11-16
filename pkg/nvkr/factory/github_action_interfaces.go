@@ -4,6 +4,7 @@
 package factory
 
 import (
+	"slices"
 	"strconv"
 	"strings"
 
@@ -79,6 +80,8 @@ func projectGitHubActionInterfaces(plan *Plan, body, call *yamlv3.Node, actions 
 				execute = step
 				if githubYAMLField(githubYAMLField(step, "env"), sourceTokenEnv) != nil {
 					family = "execute-source"
+				} else if release := githubReleaseFamily(githubYAMLField(step, "env")); release != "" {
+					family = release
 				}
 				index++
 				if index < len(steps.Content) && githubInterfaceOperation(plan, steps.Content[index]) == "pack-outputs" {
@@ -267,7 +270,7 @@ func githubProjectInterfaceRole(plan *Plan, original, call *yamlv3.Node, actions
 		return githubProjectInterfaceTransfer(call, actions, invocation, inputs, role, step)
 	}
 	operation := role.kind
-	if operation == "execute-node" || operation == "execute-source" {
+	if githubExecutionFamily(operation) {
 		operation = "run-node"
 	}
 	if operation == "run-node" || operation == "pack-outputs" || operation == "restore-inputs" || operation == "prepare-images" {
@@ -323,11 +326,17 @@ func githubProjectInterfaceRole(plan *Plan, original, call *yamlv3.Node, actions
 			githubYAMLSet(env, key, githubYAMLString(expected[key]))
 		}
 	} else if originalEnv != nil {
-		if originalEnv.Kind != yamlv3.MappingNode || (role.kind != "execute-source" && role.kind != "recover" && role.kind != "finalize") {
+		if originalEnv.Kind != yamlv3.MappingNode || (role.kind != "execute-source" && githubReleaseFamilyKeys[role.kind] == nil &&
+			role.kind != "recover" && role.kind != "finalize") {
 			return nil, e.New(e.CodeEngineCapability, "semantic GitHub role has an unsupported credential environment")
 		}
 		if role.kind == "execute-source" {
 			if err := githubInterfaceSourceEnvironment(originalEnv); err != nil {
+				return nil, err
+			}
+		}
+		if keys := githubReleaseFamilyKeys[role.kind]; keys != nil {
+			if err := githubInterfaceReleaseEnvironment(originalEnv, keys); err != nil {
 				return nil, err
 			}
 		}
@@ -543,6 +552,48 @@ func githubInterfaceSourceEnvironment(env *yamlv3.Node) error {
 		value := githubYAMLField(env, key)
 		if value == nil || value.Kind != yamlv3.ScalarNode || value.Value == "" || strings.Contains(value.Value, "${{") || strings.HasPrefix(value.Value, "!") {
 			return e.New(e.CodeEngineCapability, "semantic source execution requires a literal Git route")
+		}
+	}
+	return nil
+}
+
+// githubReleaseFamilyKeys names each release execution interface by the exact
+// credential environment of its step. A release job runs several operations,
+// so the interface, not the job, carries each registry credential.
+var githubReleaseFamilyKeys = map[string][]string{
+	"execute-registry":    {"NVKR_CREDENTIAL", "NVKR_REGISTRY_USER"},
+	"execute-publication": {"NVKR_CREDENTIAL", "NVKR_REGISTRY_USER", githubRepositoryTokenEnv},
+	"execute-repository":  {githubRepositoryTokenEnv},
+}
+
+func githubReleaseFamily(env *yamlv3.Node) string {
+	for _, family := range sortedKeys(githubReleaseFamilyKeys) {
+		if slices.Equal(githubInterfaceKeys(env), uniqueSorted(githubReleaseFamilyKeys[family])) {
+			return family
+		}
+	}
+	return ""
+}
+
+// githubExecutionFamily reports whether an interface executes one Plan node.
+func githubExecutionFamily(family string) bool {
+	return family == "execute-node" || family == "execute-source" || githubReleaseFamilyKeys[family] != nil
+}
+
+// A release credential is always a provider expression: the secret arrives as
+// an explicit action input, and the account and repository token come from an
+// input or the provider's own github context. No literal is admitted.
+func githubInterfaceReleaseEnvironment(env *yamlv3.Node, keys []string) error {
+	if len(env.Content) != 2*len(keys) {
+		return e.New(e.CodeEngineCapability, "semantic release execution changes its credential interface")
+	}
+	for _, key := range keys {
+		value := githubYAMLField(env, key)
+		input := "${{ inputs." + strings.ToLower(strings.ReplaceAll(key, "_", "-")) + " }}"
+		if value == nil || value.Kind != yamlv3.ScalarNode || (value.Value != input &&
+			(key != "NVKR_REGISTRY_USER" || value.Value != "${{ github.actor }}") &&
+			(key != githubRepositoryTokenEnv || value.Value != "${{ github.token }}")) {
+			return e.New(e.CodeEngineCapability, "semantic release execution changes credential %q", key)
 		}
 	}
 	return nil

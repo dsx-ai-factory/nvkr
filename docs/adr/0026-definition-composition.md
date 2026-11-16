@@ -424,7 +424,7 @@ Expected results, which unit U3 must prove rather than assume:
   selected by two families (checked against the authored inputs at `75f154fe`).
 - Every output's Build Digest and native build records equal those in the corresponding family Plan and in the
   retained combined `definition.yaml` Plan.
-- One Plan with a composition record; one partitioned Run; one Release at
+- One Plan with a composition record; one Run; one Release at
   `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/composite/releases@sha256:…` whose 69 outputs are each attributed to
   one family.
 

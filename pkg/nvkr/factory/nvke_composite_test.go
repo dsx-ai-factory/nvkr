@@ -229,6 +229,7 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 // partitions follow dependency depth and capacity, never member boundaries.
 func assertPartitionsIgnoreMembers(t *testing.T, plain, composite *Plan) {
 	t.Helper()
+	engageGitHubPartitions(t)
 	partitionJobs := func(plan *Plan) [][]string {
 		bundle, err := RenderGitHub(t.Context(), plan)
 		if err != nil {

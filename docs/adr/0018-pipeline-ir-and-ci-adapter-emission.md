@@ -1173,13 +1173,13 @@ catalog credential is required. The bundle validator rejects missing or broadene
 rejects this GitHub-only option. Omitting it preserves default-branch-only execution.
 Pull-request regeneration checks run in the separate repository Merge Gate workflow when generator inputs
 or outputs change. Default-branch push
-publication and in-repository PR builds remain deferred. Live publication/signing/verification jobs name the
+publication and in-repository PR builds remain deferred. Live release jobs name the
 `nvkr-release` GitHub deployment environment; operators must configure its deployment policy to admit only
 the default branch and any explicitly authorized dispatch branches. The signing identity policy must also
-recognize those exact workflow refs. Only artifact signing and the pre-publication SBOM-attestation job receive OIDC minting permission.
-The SBOM job receives no product-publication credentials. Private carrier upload steps require the
-dedicated CI storage write token; they do not elevate repository-token package permissions. The verifier needs product registry read
-access and obtains no identity token; its private report-carrier uploads use the same CI storage boundary. Job timeouts are
+recognize those exact workflow refs. Only a release job that signs or attests receives OIDC minting permission, at job scope.
+Its SBOM-attestation step receives no product-publication credentials. Private carrier upload steps require the
+dedicated CI storage write token; they do not elevate repository-token package permissions. The verification step receives only product
+registry read access; its private report-carrier uploads use the same CI storage boundary. Job timeouts are
 bounded, and workflow concurrency does not cancel an in-progress publication. Terminal observation and Run
 finalization still run after failures within an admitted execution. The generated Run workflow does not
 start on pull requests.
@@ -1207,7 +1207,7 @@ admission rejects development before qualification evidence collection.
 Development publication and signing jobs use `nvkr-dev-release`; native disk jobs use `nvkr-dev-arc`.
 They never inherit the production deployment environments. Dedicated write and read registry credentials
 are delivered only to their corresponding phases. Private carrier uploads use a separate storage writer
-without additional repository-token permissions or a product-publication route. Only signing and SBOM attestation receive OIDC. Read-only toolchain preparation requires the Environment-declared independent reader for its private
+without additional repository-token permissions or a product-publication route. Only a release job that signs or attests receives OIDC minting permission, at job scope. Read-only toolchain preparation requires the Environment-declared independent reader for its private
 roots; credentials are removed before producer execution. ARC jobs never receive source, publication-write or OIDC credentials. Source-read credentials
 remain confined to the existing fixed source-fetch and catalog-validation steps. Branch code must be
 reviewed before dispatch. Provider ACLs must independently exclude production write access from development
@@ -1285,29 +1285,51 @@ network isolation, exact version/source checks and the command timeout remain un
 Both NICoSim profiles use the executor-owned `version --output=json` arguments. ADR-16 owns their
 source-patch and tree-state requirements; neither profile permits caller-supplied executable arguments.
 
-The v1 scheduler first appends offline terminal observation, SBOM and packaging work to one Build/Acquire
-stage only when every input is already produced inside that stage, effective runner/platform agree and
-Build targets are compatible. The group is bounded to sixteen nodes and its summed timeout must fit the
-provider ceiling. Every operation retains its pinned execution and result slot; failure marks the whole
-provider stage unsuccessful for finalization. Source fetch, OIDC attestation/signing, publication and remote
-publication verification remain separate. No extra external prerequisite or cross-output barrier is introduced.
+A GitHub job is one runner and one token scope, so the GitHub adapter sets job boundaries by authority and
+runner, not by operation kind. Each operation has one authority class. A producer operation (source fetch
+without a credential, build, acquisition, terminal observation, SBOM, packaging) holds no deployment
+environment, identity token or product registry credential; a private toolchain reader stays on its
+preparation step. A release operation (SBOM attestation, publication,
+signing, publication verification, release assembly) runs only NVKR's own code inside the protected release
+environment. A source fetch that holds a source credential, an object publication and the explicit native
+ARC disk group above each keep their own job.
 
-When this closed-input grouping is unavailable, the scheduler pairs a terminal observation and its directly dependent SBOM for the same exact
-BuildTarget, with identical runner, container and platform and offline execution. Every external SBOM input
-must already be an observation input or a pinned pipeline tool from an independent root acquisition:
-`pipeline-tool` produced by `NodeAcquire` with no BuildTarget, IR instruction or inputs. The pair waits for
-and restores that tool before observation; failed tool acquisition prevents pair completion. No additional
-source or output dependency is admitted, so a new dependency cannot leave and reenter the pair. Other
-ordinary nodes, including packaging whose inputs cross producer stages, each own a provider job. The explicit native ARC disk group remains
-the separate live-owner exception above. Membership never depends on adjacency in the global topological
-order or on a fixed-size chunk of unrelated nodes; the projected provider graph must remain acyclic.
-Every logical node retains its exact command, isolation and carrier. The paired nodes use the same
-workspace bytes and consumer checks; pair failure makes both unsuccessful for finalization, even if the
-observation already uploaded a carrier. Independent packaging retains its own provider success condition,
-so an unrelated output's failure does not become an accidental shared barrier. Complete finalization still
-requires every required provider job to succeed. Scheduling does not change the logical graph or Build identity.
+An operation joins an existing job only when it has the same class, runner label and native platform,
+serves the same Build target (producer) or publication route (release), and adds no prerequisite: every input comes from that
+job, from a job it already awaits, or from an independent root tool acquisition (`pipeline-tool` produced by
+`NodeAcquire` with no BuildTarget, IR instruction or inputs). Input-free operations of one Build target on
+one runner start in one job. A root tool acquisition never gains members; a job that uses the tool waits
+for it and restores it first, and a failed acquisition prevents that job. Contraction therefore cannot
+create a cycle or make one output wait for another, and the projected provider graph must remain acyclic.
+A job holds at most sixteen operations, and the sum of each operation's declared or default 60-minute budget
+must fit the provider ceiling; an operation that does not fit starts a new job. Membership never depends on
+adjacency in the global topological order or on a fixed-size chunk of unrelated nodes.
 
-GitHub job and step labels describe the operation and selected component or output. Packaging jobs name their
+Every operation keeps its pinned execution, exact command, isolation, carrier and result slot. A job's
+token scope is exactly the union of its operations' scopes. Registry credentials and the repository token
+are bound only to the execution step of the operation that uses them; the attestation step receives none
+and the verification step receives only the read credential. No producer operation shares a job with the
+release environment, an identity token or a product registry credential. A job that starts with its own source
+or producer runs after success. A terminal observation outside its producer's job keeps the unconditional
+schedule of §7. Failure of any operation marks the whole provider job unsuccessful for finalization, and
+complete finalization still requires every required provider job to succeed. Scheduling does not change the
+logical graph, Plan identity or Build identity.
+
+One output's attestation, publication, signing and verification share a job and a machine. The job that can
+mint the workflow identity therefore also restores that output's payload carrier. The carrier transport's
+extraction guard is the boundary, as it already was for the controls the attestation job restored.
+Step-scoped credentials limit what each operation is given; they are not a machine boundary between
+operations in one job. [Reconciliation](reconciliation/adr-18.md) owns this layout's validation status.
+
+Tekton keeps the earlier grouping. Offline terminal observation, SBOM and packaging join one Build or
+Acquire stage only when every input is produced inside that stage, effective runner/platform agree and
+Build targets are compatible. Otherwise a terminal observation pairs with its directly dependent SBOM for
+the same exact BuildTarget, with identical runner, container and platform and offline execution, and may
+wait for a root tool acquisition. Other operations each own a task, and task roles are unchanged.
+
+GitHub job and step labels describe the operation and selected component or output. A producer job is named
+for its Build target and a release job for its publication route; jobs that split one subject are numbered.
+Packaging jobs name their
 outputs and disclose Helm image binding when present; stable execution step IDs and exact commands
 retain the graph binding independently of display names. Each execution step logs its operation, node and
 producer instruction, component and selected output where applicable, platform/network, declared inputs and
@@ -1344,15 +1366,17 @@ rebuilding and repinning its complete inspection image before claiming hosted op
 Retention uses a separate ten-second cleanup context with cancellation checks between filesystem operations;
 an already-entered regular-file syscall cannot be interrupted, so this is not a hard filesystem deadline.
 
-The compiler creates a private release preparation, a production SBOM-attestation stage, and a
-publish/sign/verify route. The attestation stage binds and verifies each CycloneDX document before final
-release identity is derived. In `per-output-v1`, that job receives and returns only bounded controls and
+The compiler creates a private release preparation, a production SBOM-attestation operation, and a
+publish/sign/verify route. The attestation operation binds and verifies each CycloneDX document before final
+release identity is derived. In `per-output-v1`, that operation reads and returns only bounded controls and
 evidence. The original payload preparation goes directly to the publisher, which verifies and combines
 the signed evidence with its unchanged payload files under ADR-20 §6's exclusive ownership contract.
-The publisher retains full-byte checks and exports exact-root-bound metadata for the independent signer;
-the signer re-derives subjects and verifies SBOMs without downloading payloads. The independent remote
-verifier still reads the complete published payload. Legacy full-layout attestation retains its existing
-ownership and retry contract. These handoffs are internal transfers, not additional deliverables.
+The publisher retains full-byte checks and exports exact-root-bound metadata for the signer; the signer
+re-derives subjects and verifies SBOMs without downloading payloads. The remote verifier still reads the
+complete published payload. Signer and verifier take their own inputs and credentials on their own steps of
+the output's release job, under the job boundaries above; they are not separate machines. Legacy
+full-layout attestation retains its existing ownership and retry contract. These handoffs are internal
+transfers, not additional deliverables.
 
 Generated steps invoke `factory github run-node`, `restore-inputs`, `pack-outputs`, or `recover` against
 the complete canonical Plan and an exact node or derived stage selector. The factory module admits the
@@ -1394,16 +1418,17 @@ through a step environment value, with an exact stage/bootstrap job set, known s
 and bounded parsing before filesystem work. Unknown, missing or malformed job results fail closed. Individual
 carrier failure does not stop later recovery; cancellation or failed outcome persistence does.
 With `publication.mode: per-output-v1`, the compiler emits independent output publication routes and a
-metadata-only aggregate operation (ADR-20 §6). Output publication packages cannot be grouped with other
-utility nodes, so grouping cannot recreate an all-output payload download. Offline packaging receives only
+metadata-only aggregate operation (ADR-20 §6). An output's publication package joins only that output's
+producer job, so grouping cannot recreate an all-output payload download. Offline packaging receives only
 the public GitHub workflow/run identity variables, never registry, source or OIDC credentials. Each output's
 verification exports a bounded metadata carrier. The finalizer downloads the aggregate metadata,
 published reference, signing record, predicate, verification record and pinned cosign tool. For the complete
 qualification handoff it also restores each output's original publication reference, signing record and
 predicate; these bounded metadata carriers do not download output payloads. Provider-result
 admission still covers every stage and bootstrap job; any failed, skipped or missing required job prevents
-completion. Assembly and finalization have registry-read permission and no OIDC minting or package-write
-permission. All credentials and signing remain outside ARC producer jobs.
+completion. The assembly step and the finalizer receive only the registry-read credential. The finalizer
+job has no OIDC minting or package-write permission; assembly shares the aggregate route's release job with
+its publication, signing and verification. All credentials and signing remain outside ARC producer jobs.
 
 The top-level workflow keeps each named job, prerequisite closure and execution condition visible.
 All jobs retain their runner, timeout, permissions and protected Environment inline. Native-platform preflight
@@ -1562,8 +1587,10 @@ introducing `pipefail`. Job policies and the source checkout are not hidden insi
 
 The caller passes secrets and provider-result expressions as explicit action inputs. Each input is mapped
 only to the original inner step field that consumes it: source credentials remain on source execution,
-private-image credentials remain on preparation, and catalog credentials remain on catalog validation or
-finalization. Packing and uploads gain no credential environment through extraction. Recovery receives the
+registry credentials and the repository token remain on release execution, private-image credentials remain
+on preparation, and catalog credentials remain on catalog validation or finalization. A release job starts
+a new action where its registry credential changes, so one action never carries two values for one input.
+Packing and uploads gain no credential environment through extraction. Recovery receives the
 caller's exact `toJSON(needs)` value. It contains either the original job results or the closed collector
 reports below; normalization preserves the complete original job-to-result mapping. No matrix aggregate
 stands in for a required producer result.
@@ -1621,14 +1648,29 @@ Local expansion is contract evidence; provider dispatch and result propagation r
 hosted evidence. GitHub's internal graph-processing limits are not inferred as a numerical contract from
 successful diagnostic dispatches.
 
-The opt-in Environment setting `githubExecutionPartitions: true` projects producer jobs into generated
-same-commit `workflow_call` workers. This is one Definition, complete Plan, provider Run and final Release;
+The Environment setting `githubExecutionPartitions: true` permits generated same-commit `workflow_call`
+workers as a fallback. The generator renders the flat workflow first and projects producer jobs into
+workers only when that workflow exceeds one of the two per-file limits below: 500,000 bytes or 50,000
+parser events. An oversized expression or script is not relieved by splitting a file, so it stays an
+ordinary admission error. An Environment without the setting fails closed on an oversized flat workflow.
+No maintained bundle currently engages the fallback; it remains for Definitions large enough to exceed a
+per-file limit.
+
+Job count is not a trigger. GitHub's [limits page](https://docs.github.com/en/actions/reference/limits),
+as read on 2026-11-14, states a job-count limit only for matrices ("A job matrix can generate a maximum of
+256 jobs per workflow run") and one per-file limit, size ("Each workflow file in the `.github/workflows`
+directory must be 500 KB or smaller to trigger a run"). It states no limit on explicitly listed jobs, on
+`needs` or on reusable-workflow calls. The generator emits no matrix.
+[Run 39673173322](https://github.com/dsx-ai-factory/nvkr/actions/runs/39673173322) of the flat production
+workflow completed on the default branch with 580 explicitly listed jobs in one file.
+
+A partitioned Run is one Definition, complete Plan, provider Run and final Release;
 workers do not publish independent family Releases. Local generation contracts are implemented. A minimal
 hosted diagnostic at commit `902f3febd10cd61abecb82571f66283857169851` exercised the earlier member-by-member
 result forwarding on success, failure and cancellation. The full development Run recorded in reconciliation
 exercised generated-bundle execution and signing identity with that earlier forwarding. Hosted execution of
 per-worker fragment forwarding (§8) is unrecorded, and qualification remains unestablished for this topology. The retained flat mode
-remains the default.
+remains the default and is the form every maintained bundle uses.
 
 Factory's provider-independent execution graph owns operation membership, admitted success/completion
 conditions, prerequisite results through recovery, and exact outcome accounting. GitHub derives this model
@@ -1677,12 +1719,12 @@ require every committed producer's OIDC jobs to remain in the entry workflow nam
 #### Proposed: signer relocation requires an explicit identity migration
 
 This subsection is proposed design, not implemented behavior. Today every `id-token: write` job stays
-inline, and no code path relocates a signer. Local measurements of the committed bundles show where those
-jobs fall. In the partitioned development entry, the 139 inline signing and SBOM-attestation jobs account
-for 10,984 of 13,308 expanded YAML parsing events and 104,357 of 264,038 bytes. The maintained release
-producer selects the same inline-signer partition layout; its entry has 13,333 events and 272,696 bytes.
-Before that selection, its flat workflow had reached 47,731 events, above the maintained 95% headroom
-threshold. These are local generation measurements, not provider evidence.
+inline, and no code path relocates a signer. Local measurements of the earlier per-kind job layout showed
+where those jobs fell. In the then-partitioned development entry, the 139 inline signing and
+SBOM-attestation jobs accounted for 10,984 of 13,308 expanded YAML parsing events and 104,357 of 264,038
+bytes. The release producer's entry had 13,333 events and 272,696 bytes, and its flat workflow had reached
+47,731 events, above the maintained 95% headroom threshold. Authority grouping has since removed that
+pressure: no maintained bundle is partitioned. These are local generation measurements, not provider evidence.
 
 Relocation is not a scheduling change. For GitHub OIDC, Fulcio sets the certificate SAN and Build Signer
 URI from `job_workflow_ref`, which names the called reusable workflow, not the entry workflow. Build Config
