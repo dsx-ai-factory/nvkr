@@ -125,3 +125,15 @@ a networked wrapped build, not qualified execution or publication authorization.
 See [reconciliation](../../../docs/adr/reconciliation/README.md) for implementation and
 test boundaries. Ordinary tests do not execute the full demo; a fresh complete
 build/deploy/cleanup acceptance record remains required.
+
+## AMD64 nightly compiler
+
+`amd64-nvidia-local-kvm.json`, used by the scheduled AMD64 E2E, selects the
+[site](../../catalogs/nvke/variants/nightly-go.json) and
+[tools](../../catalogs/tools/variants/nightly-go.json) Go 1.27.4 overlays for NVKE's CLI,
+controller, installer sources, NICoSim and shared chart toolchain. These overlays retain the source-version
+stamp templates used when the nightly freezes NVKE `main`. They apply only to this Definition;
+the shared catalogs and release Plans keep their existing pins. Catalog changes must refresh each
+overlay's predecessor digest and copied producers together. The AMD64 Go predecessor bindings in
+`toolchains/nvkr-packer/local-bindings.json` track these images for local utility preparation;
+the Packer version and image pins are unchanged.
