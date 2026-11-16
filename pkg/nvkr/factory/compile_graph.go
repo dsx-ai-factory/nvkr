@@ -71,6 +71,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				}
 				node := nodes[target.Name+"/sbom"]
 				node.Container, node.Platform = profile.Image, host
+				node.RunsOn = nativeUtilityRunner(delivery, host, runsOn)
 				nodes[node.ID] = node
 			}
 		}

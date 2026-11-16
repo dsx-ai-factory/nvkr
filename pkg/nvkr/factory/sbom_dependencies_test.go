@@ -25,7 +25,7 @@ func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
 			code       e.Code
 		}{
 			{"complete", "", ""},
-			{"missing scanner", "tool/syft", e.CodeEngineCapability},
+			{"missing scanner", "scanner", e.CodeEngineCapability},
 			{"missing payload", "artifact/cwe/" + platform + "/nvke-controller", e.CodeProvenanceMissing},
 		} {
 			t.Run(platform+"/"+tc.name, func(t *testing.T) {
@@ -46,9 +46,13 @@ func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
 					if tc.omit == "" {
 						break
 					}
+					omit := tc.omit
+					if omit == "scanner" {
+						omit = "tool/" + sbomToolName(plan, *node)
+					}
 					var inputs []string
 					for _, input := range node.Inputs {
-						if input == tc.omit {
+						if input == omit {
 							removed = true
 						} else {
 							inputs = append(inputs, input)

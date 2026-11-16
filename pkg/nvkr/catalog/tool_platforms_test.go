@@ -37,6 +37,7 @@ func TestPlatformToolPinContracts(t *testing.T) {
 		{"unsorted declarations", func(s *ToolSource, _ *Pin) { s.Platforms[0], s.Platforms[1] = s.Platforms[1], s.Platforms[0] }, e.CodeInvalidCatalog},
 		{"unknown platform", func(s *ToolSource, _ *Pin) { s.Platforms[1] = "linux/any" }, e.CodeInvalidCatalog},
 		{"same asset", func(s *ToolSource, _ *Pin) { s.URL = "https://example.test/tool"; s.ExecutablePath = "tool" }, e.CodeInvalidCatalog},
+		{"unknown URL token", func(s *ToolSource, _ *Pin) { s.URL = "https://example.test/{{.Os}}/{{.Arch}}" }, e.CodeInvalidCatalog},
 		{"unknown member token", func(s *ToolSource, _ *Pin) { s.ExecutablePath = "{{.Unknown}}" }, e.CodeInvalidCatalog},
 		{"missing entry", func(_ *ToolSource, p *Pin) { p.Tools = p.Tools[:1] }, e.CodeUnpinnedSource},
 		{"extra entry", func(_ *ToolSource, p *Pin) {
@@ -137,6 +138,106 @@ func TestPlatformToolResolutionIsAllOrNothing(t *testing.T) {
 			}
 			if old.Tools[0].URL == server.URL+"/v1.2.3/linux-amd64" {
 				t.Fatal("existing pin mutated")
+			}
+		})
+	}
+}
+
+func TestPlatformToolComponentConsumers(t *testing.T) {
+	source, pin := platformToolFixture()
+	source.Format, source.Companions = "tar-gzip", []string{"evidence/{{.Arch}}.sig"}
+	for i := range pin.Tools {
+		arch := strings.TrimPrefix(pin.Tools[i].Platform, "linux/")
+		pin.Tools[i].Format = source.Format
+		pin.Tools[i].ExecutableDigest = "sha256:" + strings.Repeat(string(rune('b'+i)), 64)
+		pin.Tools[i].Companions = []ToolCompanion{{Path: "evidence/" + arch + ".sig", Digest: "sha256:" + strings.Repeat(string(rune('d'+i)), 64)}}
+	}
+	sources := map[string]Source{"shared": {Repo: "https://example.test/tool", Tool: &source}}
+	lock := &PinLock{Pins: map[string]Pin{"shared": pin}}
+	for _, consumer := range []string{"release executable", "pinned tool"} {
+		for _, platform := range []string{"linux/amd64", "linux/arm64", "darwin/arm64"} {
+			t.Run(consumer+"/"+platform, func(t *testing.T) {
+				raw := rawComponent{Platforms: []string{platform}}
+				if consumer == "release executable" {
+					raw.Source, raw.Prebuilt = "shared", &Prebuilt{ReleaseExecutable: true, Evidence: &ExternalEvidence{None: true}}
+				} else {
+					raw.BuilderType, raw.Tool = BuilderPinnedTool, "shared"
+				}
+				got, err := resolveComponent("consumer", raw, sources, lock)
+				if platform == "darwin/arm64" {
+					assertCatalogContractCode(t, err, e.CodeEngineCapability)
+					return
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				want := pin.Tools[0]
+				if platform == "linux/arm64" {
+					want = pin.Tools[1]
+				}
+				selected := got.ToolExecutable
+				if consumer == "release executable" {
+					if got.Prebuilt == nil {
+						t.Fatal("missing release executable")
+					}
+					selected = got.Prebuilt.Executable
+					arch := strings.TrimPrefix(platform, "linux/")
+					if got.Prebuilt.URL != want.URL || !reflect.DeepEqual(got.Prebuilt.Digests, map[string]string{arch: want.ExecutableDigest}) {
+						t.Fatalf("release transport/member binding = %+v", got.Prebuilt)
+					}
+				}
+				if selected == nil || !reflect.DeepEqual(*selected, want) {
+					t.Fatalf("selected pin = %+v, want %+v", selected, want)
+				}
+			})
+		}
+	}
+}
+
+func TestPlatformToolSnapshotIdentity(t *testing.T) {
+	cat, err := LoadContext(t.Context(), Dir("../../../testdata/catalogs/kubernetes-layered"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The pre-platform snapshot contains these exact fields, including omission of
+	// empty optional fields. Keep this contract independent of catalogSnapshot.
+	legacy := map[string]any{
+		"schemaVersion": "nvkr.dev/catalog-snapshot/v3", "apiVersion": cat.APIVersion,
+		"kind": cat.Kind, "metadata": cat.Metadata, "sources": cat.Sources, "components": cat.Components,
+	}
+	if len(cat.Actions) > 0 {
+		legacy["actions"] = cat.Actions
+	}
+	if len(cat.Tools) > 0 {
+		legacy["tools"] = cat.Tools
+	}
+	want, err := canonical.Digest(canonical.KindCatalogSnapshot, legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, empty := range []map[string][]ToolPin{nil, {}} {
+		cat.ToolPlatforms = empty
+		got, err := cat.SnapshotDigest()
+		if err != nil || got != want {
+			t.Fatalf("legacy snapshot = %s, want %s: %v", got, want, err)
+		}
+	}
+	source, pin := platformToolFixture()
+	cat.Sources["platform-tool"] = Source{Repo: "https://example.test/tool", Tool: &source}
+	cat.ToolPlatforms = map[string][]ToolPin{"platform-tool": pin.Tools}
+	before, err := cat.SnapshotDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range pin.Tools {
+		t.Run(pin.Tools[i].Platform, func(t *testing.T) {
+			changed := cloneToolPins(pin.Tools)
+			changed[i].ExecutableDigest = "sha256:" + strings.Repeat("e", 64)
+			changed[i].ArchiveDigest = changed[i].ExecutableDigest
+			cat.ToolPlatforms["platform-tool"] = changed
+			after, err := cat.SnapshotDigest()
+			if err != nil || after == before {
+				t.Fatalf("platform-only change retained snapshot %s: %v", after, err)
 			}
 		})
 	}
