@@ -161,7 +161,7 @@ func TestPrebuiltEvidenceSignerIdentityRendersFromPin(t *testing.T) {
 	authored := &ExternalEvidence{ProvenanceRef: "archive:aicr-attestation.sigstore.json", ProvenanceDigest: goodArtifactDigest,
 		Signer: &EvidenceSigner{Issuer: "https://token.actions.githubusercontent.com",
 			Identity: "https://github.com/NVIDIA/aicr/.github/workflows/on-tag.yaml@refs/tags/{{.Tag}}"}}
-	raw := rawComponent{Prebuilt: &Prebuilt{ReleaseExecutable: true, Evidence: authored}}
+	raw := rawComponent{Platforms: []string{"linux/amd64"}, Prebuilt: &Prebuilt{ReleaseExecutable: true, Evidence: authored}}
 	resolved, err := resolvePrebuilt("aicr", raw, Source{Repo: "https://github.com/NVIDIA/aicr", Tool: &tool}, pin, &PinLock{}, Component{})
 	if err != nil {
 		t.Fatal(err)

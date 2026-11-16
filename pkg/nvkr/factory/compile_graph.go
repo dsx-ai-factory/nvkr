@@ -20,10 +20,7 @@ import (
 // It ignores the supplied Graph and never mutates the caller's Plan.
 func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSpecs []packageSpec) (ArtifactGraph, error) {
 	definition, delivery := plan.Definition, plan.Environment
-	runsOn := delivery.RunsOn
-	if runsOn == "" {
-		runsOn = DefaultRunsOn
-	}
+	runsOn := defaultUtilityRunner(delivery)
 	plan.Graph = ArtifactGraph{SchemaVersion: ArtifactGraphSchema}
 	tools, err := withProducerTools(tools, plan.Builds)
 	if err != nil {
@@ -33,6 +30,10 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 	nodes := map[string]Node{}
 	for _, name := range sortedKeys(tools) {
 		node, artifact := compileToolOperation(name, tools[name], runsOn)
+		if delivery.UtilityContainers != nil {
+			node.Platform = tools[name].Platform
+			node.RunsOn = nativeUtilityRunner(delivery, node.Platform, runsOn)
+		}
 		nodes[node.ID] = node
 		artifacts[artifact.ID] = artifact
 	}
@@ -50,7 +51,15 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		for _, name := range build.Components {
 			selected[name] = true
 		}
-		if err := addBuildDataflow(selection, runsOn, build.Graph, selected, delivery.UtilityContainer, tool.Platform, false, nodes, artifacts); err != nil {
+		container := delivery.UtilityContainer
+		if delivery.UtilityContainers != nil {
+			var err error
+			container, _, err = delivery.OutputUtility(tool.Platform)
+			if err != nil {
+				return ArtifactGraph{}, err
+			}
+		}
+		if err := addBuildDataflow(selection, nativeUtilityRunner(delivery, tool.Platform, runsOn), build.Graph, selected, container, tool.Platform, false, nodes, artifacts); err != nil {
 			return ArtifactGraph{}, err
 		}
 	}
@@ -64,7 +73,11 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			for _, name := range build.Components {
 				selected[name] = true
 			}
-			if err := addBuildDataflow(target, runsOn, build.Graph, selected, delivery.UtilityContainer, delivery.UtilityPlatform, delivery.Publication != nil, nodes, artifacts); err != nil {
+			container, platform, err := delivery.OutputUtility(target.Platform)
+			if err != nil {
+				return ArtifactGraph{}, err
+			}
+			if err := addBuildDataflow(target, nativeUtilityRunner(delivery, platform, runsOn), build.Graph, selected, container, platform, delivery.Publication != nil, nodes, artifacts); err != nil {
 				return ArtifactGraph{}, err
 			}
 			if target.Format == "disk-image" && delivery.Publication != nil {
@@ -80,13 +93,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				}
 				node := nodes[target.Name+"/sbom"]
 				node.Container, node.Platform = profile.Image, host
+				node.RunsOn = nativeUtilityRunner(delivery, host, runsOn)
 				nodes[node.ID] = node
 			}
-		}
-	}
-	if definition.SBOMTool != "" {
-		if _, ok := tools[definition.SBOMTool]; !ok {
-			return ArtifactGraph{}, e.New(e.CodeProvenanceMissing, "SBOM scanner is not a pinned tool")
 		}
 	}
 	toolPlan := plan
@@ -109,7 +118,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		}
 		disk := plan.hasCompiledDiskTarget(node.BuildTarget, artifacts)
 		bundle := plan.hasBundleTarget(node.BuildTarget)
-		scanner := plan.sbomToolForBuild(node.BuildTarget)
+		scanner := sbomToolName(&plan, node)
 		if !disk && !bundle && scanner == "" {
 			continue
 		}
@@ -125,6 +134,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			}
 		}
 		if !disk && scanner != "" {
+			if _, ok := tools[scanner]; !ok {
+				return ArtifactGraph{}, e.New(e.CodeProvenanceMissing, "SBOM scanner is not a pinned tool")
+			}
 			node.Inputs = append(node.Inputs, "tool/"+scanner)
 		}
 		node.Inputs = uniqueSorted(node.Inputs)
@@ -217,14 +229,18 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			inputs = append(inputs, publicationSBOMInputs(inputs, nodes, artifacts)...)
 		}
 		inputs = uniqueSorted(inputs)
+		container, platform, err := packageUtility(plan, spec.Name)
+		if err != nil {
+			return ArtifactGraph{}, err
+		}
 		nodeID := "package/" + spec.Name
 		artifactID := "package/" + spec.Name
 		nodes[nodeID] = Node{ID: nodeID, Kind: NodePackage, PackageKind: spec.Kind,
 			HelmImage:    spec.HelmImage,
 			ImageIndex:   spec.ImageIndex.Clone(),
 			Distribution: spec.Distribution, PackageComponent: spec.Component,
-			Inputs: inputs, Outputs: []string{artifactID}, Network: ir.NetworkNone, RunsOn: runsOn,
-			Container: delivery.UtilityContainer, Platform: delivery.UtilityPlatform}
+			Inputs: inputs, Outputs: []string{artifactID}, Network: ir.NetworkNone, RunsOn: nativeUtilityRunner(delivery, platform, runsOn),
+			Container: container, Platform: platform}
 		artifacts[artifactID] = Artifact{ID: artifactID, Name: spec.Name, Kind: spec.Kind,
 			MediaType: packageSpecMediaType(spec), Path: filepath.ToSlash(filepath.Join(".nvkr", "factory", "packages", spec.Name)), Producer: nodeID}
 	}

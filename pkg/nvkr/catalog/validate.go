@@ -122,6 +122,9 @@ func (cat *Catalog) Validate() error {
 	if cat == nil {
 		return e.New(e.CodeInvalidCatalog, "catalog is nil")
 	}
+	if err := cat.validatePlatformTools(); err != nil {
+		return err
+	}
 	for _, name := range sortedSourceNames(cat.Sources) {
 		if err := validatePinSetDeclaration(name, cat.Sources[name]); err != nil {
 			return err

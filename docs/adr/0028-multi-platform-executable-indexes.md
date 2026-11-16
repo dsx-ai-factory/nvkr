@@ -1,9 +1,9 @@
 # ADR-28 — Multi-platform executables as OCI image indexes
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
-- **Implementation maturity:** Designed, not implemented. No multi-platform tool declaration, `tools` lock entry,
-  executable `platforms` output, executable-index identity projection or index packaging exists; see
-  `reconciliation/README.md`.
+- **Implementation maturity:** Per-platform tool declarations, `tools` lock lists and native utility selection
+  implement the tool-only portion of E1. Executable `platforms` outputs, executable-index identity projection
+  and index packaging remain designed, not implemented; see `reconciliation/adr-28.md`.
 - **Acceptance-test maturity:** None. The implementation units below name the contract suites that must pass;
   no contract test, generated bundle, hosted Run or consumer verification exercises an executable index.
 - **Deciders:** Pending; catalog, release-engineering, delivery and evidence owners must be named before
@@ -23,14 +23,13 @@
 ## Context
 
 One upstream tool release usually ships an asset per platform, at a URL that differs only in OS and
-architecture. NVKR cannot express that in one declaration.
+architecture. ADR-22 now admits that in one tool declaration; executable index outputs remain separate work.
 
-- **Tool pins are single-platform.** An ADR-22 `tool` declaration has one `platform` and one URL; a second
-  platform needs a second source name. The maintained catalogs therefore repeat each tool. `tools/operator-amd64`
-  and `tools/operator-arm64` pin the same Helm and kubectl releases twice, `tools/native` declares Helm three
-  times (`helm`, `helm-linux`, `helm-linux-amd64`), `nvsentinel` declares `syft-amd64` and `syft-arm64`, and
-  PR #294 adds `tools/aicr-arm64` because the AICR source can carry only one URL. Each copy is pinned and bumped
-  on its own, and nothing checks that the copies stay on one version.
+- **Tool pins can share one source across platforms.** ADR-22 admits `platforms` and a complete `tools` lock
+  list; NVKE uses it for native AMD64 and ARM64 Syft utility execution. Other catalogs still repeat tools:
+  `tools/operator-amd64` and `tools/operator-arm64` pin Helm and kubectl separately, `tools/native` declares
+  Helm three times, and `nvsentinel` declares `syft-amd64` and `syft-arm64`. Those retrofits remain explicit
+  migrations; admitting the new form does not rewrite their identities.
 - **Executable outputs are single-platform.** ADR-12 §1 states that "the image-index contract does not create
   an executable aggregate". The NVKE Definitions publish `nvkectl` and `nvkectl-linux-arm64` as two outputs, and
   NVSentinel publishes 19 executables twice, from two Definitions.

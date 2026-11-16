@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
@@ -89,10 +90,25 @@ func TestGitHubDiskHelperLifecycleFailures(t *testing.T) {
 }
 
 func TestInternalToolNativeHostedPlanGeneration(t *testing.T) {
-	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
-		t.Run(platform, func(t *testing.T) {
+	for _, tc := range []struct {
+		name, platform string
+		native         bool
+	}{
+		{"legacy AMD", "linux/amd64", false}, {"legacy ARM", "linux/arm64", false},
+		{"native AMD", "linux/amd64", true}, {"native ARM", "linux/arm64", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			platform := tc.platform
 			base := arcTestPlan(t, platform)
 			definition, environment := base.Definition.Clone(), base.Environment.Clone()
+			if tc.native {
+				environment.UtilityContainers = map[string]string{
+					environment.UtilityPlatform: environment.UtilityContainer,
+				}
+				if platform != environment.UtilityPlatform {
+					environment.UtilityContainers[platform] = strings.Split(environment.UtilityContainer, "@")[0] + "@sha256:" + strings.Repeat("b", 64)
+				}
+			}
 			definition.InternalTools = []authored.InternalTool{{Name: "inspector", Platform: platform,
 				Format: authored.OutputExecutable, Components: []string{"helper"}, Result: "helper", SBOMTool: "helper-scanner"}}
 			profile := environment.DiskInspectionProfiles[platform]
@@ -114,6 +130,13 @@ func TestInternalToolNativeHostedPlanGeneration(t *testing.T) {
 			plan, err := Compile(t.Context(), definition, environment, stack, base.GeneratorVersion)
 			if err != nil {
 				t.Fatal(err)
+			}
+			if tc.native {
+				node := planNode(plan, "internal/inspector/sbom")
+				wantScanner := utilityToolName(environment, "helper-scanner", platform)
+				if node.Platform != platform || node.Container != environment.UtilityContainers[platform] || !containsString(node.Inputs, "tool/"+wantScanner) {
+					t.Fatalf("internal scanner lost native binding: %+v", node)
+				}
 			}
 			plan.DefinitionPath, plan.EnvironmentPath = base.DefinitionPath, base.EnvironmentPath
 			bundle, err := RenderGitHub(t.Context(), plan)

@@ -134,6 +134,9 @@ type Environment struct {
 	DiskInspectionProfiles map[string]DiskInspectionProfile `json:"diskInspectionProfiles,omitempty"`
 	UtilityContainer       string                           `json:"utilityContainer"`
 	UtilityPlatform        string                           `json:"utilityPlatform"`
+	// UtilityContainers enables native output utilities with an exhaustive platform map.
+	// UtilityPlatform still selects release and aggregate operations.
+	UtilityContainers map[string]string `json:"utilityContainers,omitempty" yaml:"utilityContainers,omitempty"`
 	// GitHubRunners selects explicit native hosted routes by execution platform.
 	GitHubRunners map[string]string `json:"githubRunners,omitempty"`
 
@@ -351,6 +354,9 @@ func (environment Environment) Validate() error {
 	}
 	if !containerPinPattern.MatchString(environment.UtilityContainer) {
 		return e.New(e.CodeUnpinnedSource, "environment utilityContainer must be digest-pinned")
+	}
+	if err := environment.validateUtilityContainers(); err != nil {
+		return err
 	}
 	if strings.ContainsAny(environment.RunsOn, "\r\n\x00") {
 		return e.New(e.CodeInvalidCatalog, "environment runner contains control characters")

@@ -164,14 +164,20 @@ func resolvePrebuilt(name string, raw rawComponent, src Source, pin Pin, lock *P
 		if err := checkToolPin(src.Tool, pin); err != nil {
 			return c, err
 		}
-		if pin.Tool == nil {
+		if pin.Tool == nil && len(pin.Tools) == 0 {
 			return c, e.New(e.CodeUnpinnedSource, "release executable %q has no source tool pin", name)
+		}
+		if len(raw.Platforms) != 1 {
+			return c, e.New(e.CodeInvalidCatalog, "release executable %q requires one platform", name)
 		}
 		evidence, err := renderEvidence(name, raw.Prebuilt.Evidence, pin)
 		if err != nil {
 			return c, err
 		}
-		tool := pin.Tool.clone()
+		tool, err := selectToolPin(pin, raw.Platforms[0])
+		if err != nil {
+			return c, err
+		}
 		c.Prebuilt = &Prebuilt{URL: tool.URL, Executable: &tool,
 			Digests:  map[string]string{target.ExecutableArch(tool.Platform): tool.ExecutableDigest},
 			Evidence: evidence}

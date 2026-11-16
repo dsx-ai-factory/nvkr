@@ -108,7 +108,7 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 			}
 			continue
 		}
-		if selectedScanner := plan.sbomToolForBuild(artifact.BuildTarget); selectedScanner != "" || plan.hasBundleTarget(artifact.BuildTarget) {
+		if selectedScanner := sbomToolName(plan, node); selectedScanner != "" || plan.hasBundleTarget(artifact.BuildTarget) {
 			material := false
 			for _, inputID := range node.Inputs {
 				input := artifacts[inputID]

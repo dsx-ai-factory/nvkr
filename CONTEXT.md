@@ -30,7 +30,11 @@ Declared-access GitHub Runs observe exact manifest/config availability with that
 Plan validation and before producer fan-out, separately per runner placement. This point-in-time
 observation grants no runtime or release authority and does not replace per-job pulls or byte checks.
 Native hosted platform routes are explicit execution settings; they do not change logical Build identity
-or prove provider allocation. Tool releases are catalog-owned dependencies selected by purpose in the Definition. GitHub action releases
+or prove provider allocation. An optional per-platform utility-container map keeps observation, SBOM and
+packaging on each output's native platform; release authority remains on the default utility platform.
+Tool releases are catalog-owned dependencies selected by purpose in the Definition, with one exact pin
+per declared execution platform. Changing the scanner architecture changes its recorded SBOM digest,
+not the logical producer Build Digest. GitHub action releases
 are also catalog dependencies ([ADR-22](docs/adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies)).
 An explicit GitHub development setting selects branch dispatch. Signed development uses the same admitted
 native disk and pipeline-attested stages with separate signer policy, credentials and disposable run-attempt

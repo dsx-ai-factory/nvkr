@@ -68,6 +68,7 @@ func (input Environment) Clone() Environment {
 		value := *input.GitHubRuntimeSource
 		input.GitHubRuntimeSource = &value
 	}
+	input.UtilityContainers = maps.Clone(input.UtilityContainers)
 	input.GitHubRunners = maps.Clone(input.GitHubRunners)
 	input.GitHubDispatchBranches = append([]string(nil), input.GitHubDispatchBranches...)
 	input.ExecutionClasses = execution.CloneClasses(input.ExecutionClasses)
