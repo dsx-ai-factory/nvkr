@@ -1207,7 +1207,7 @@ admission rejects development before qualification evidence collection.
 Development publication and signing jobs use `nvkr-dev-release`; native disk jobs use `nvkr-dev-arc`.
 They never inherit the production deployment environments. Dedicated write and read registry credentials
 are delivered only to their corresponding phases. Private carrier uploads use a separate storage writer
-without additional repository-token permissions or a product-publication route. Only signing and SBOM attestation receive OIDC. Read-only toolchain preparation requires the Environment-declared independent reader for its private
+without additional repository-token permissions or a product-publication route. Only a release job that signs or attests receives OIDC minting permission, at job scope. Read-only toolchain preparation requires the Environment-declared independent reader for its private
 roots; credentials are removed before producer execution. ARC jobs never receive source, publication-write or OIDC credentials. Source-read credentials
 remain confined to the existing fixed source-fetch and catalog-validation steps. Branch code must be
 reviewed before dispatch. Provider ACLs must independently exclude production write access from development

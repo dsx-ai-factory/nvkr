@@ -941,7 +941,8 @@ The usernames are provider variables. No development job gets repository-token p
 The operator must configure token scopes and package ACLs so these development principals cannot modify
 production packages. The same development account may hold separate write, read-only and cleanup tokens;
 token scope still differs by phase. Provider ACLs are external prerequisites, never inferred from a prefix.
-Only artifact signing and SBOM attestation receive OIDC. The distinct default-branch cleanup environment
+Only a release job that signs or attests holds `id-token: write`. The grant is at job scope, so that job's
+publication and verification steps share it (ADR-18 §8). The distinct default-branch cleanup environment
 holds the cleanup token; branch execution receives no deletion credential.
 
 Development qualification may attach its distinct predicate to existing immutable output subjects in the
