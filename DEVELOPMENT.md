@@ -439,15 +439,15 @@ Catalog resolution, pin maintenance, and producer admission have distinct files 
 | Immutable attempts and Release consumer workflow | `pkg/nvkr/lifecycle` |
 | Complete compilation, output joins, scheduling, packaging and provider generation | `pkg/nvkr/factory` |
 | Catalog/pins, resolution and canonical identity | `catalog`, `buildgraph`, `target`, `ir`, `canonical` |
-| Producer execution, observations and qualified receipts | `pipeline`, `profile` |
+| Producer execution and observations | `pipeline` |
 | External test output descriptions, wrapper validation and deterministic serialization (no execution or authority) | `pkg/nvkr/testresults` |
 | Qualification outcome schema, triggering-event description, text scrubbing and publish selection (no authority) | `pkg/nvkr/qualificationoutcome` |
 | Release manifest issuance, outcome-input admission and outcome classification | `pkg/nvkr/releasemanifest` |
 | Qualification results index layout, TestGrid projection and create-only publishing (no credential or authority) | `pkg/nvkr/resultspublish` — `cmd/nvkr-results-publish` supplies the store |
 | Configured diagnostic check selection and local upstream conformance execution | `validation`, `conformance` — delegate product/tool publication authentication and exact executable-member export to `lifecycle` |
 | Bounded archive transport and descriptor-safe paths | `internal/transportarchive`, `internal/securepath` |
-| Subject-bound evidence and verification | `attest`, `sbom`, `provenance`, `trust`, `sign` |
-| Release authority and delivery | `release`, `status`, `delivery` |
+| Subject-bound evidence and verification | `sbom`, `provenance`, `trust`, `sign` |
+| Delivery | `delivery` |
 | Public adapters | `client/v1`, `cmd/nvkr` — delegate authority |
 
 Read the relevant current ADR and [reconciliation row](docs/adr/reconciliation/README.md) before changing authority.
