@@ -126,7 +126,7 @@ See [reconciliation](../../../docs/adr/reconciliation/README.md) for implementat
 test boundaries. Ordinary tests do not execute the full demo; a fresh complete
 build/deploy/cleanup acceptance record remains required.
 
-## AMD64 nightly compiler
+## AMD64 nightly inputs
 
 `amd64-nvidia-local-kvm.json`, used by the scheduled AMD64 E2E, selects the
 [site](../../catalogs/nvke/variants/nightly-go.json) and
@@ -137,3 +137,13 @@ the shared catalogs and release Plans keep their existing pins. Catalog changes 
 overlay's predecessor digest and copied producers together. The AMD64 Go predecessor bindings in
 `toolchains/nvkr-packer/local-bindings.json` track these images for local utility preparation;
 the Packer version and image pins are unchanged.
+
+The same nightly overlays pin NKTP `nktp/v0.2.0` from
+`dsx-ai-factory/nvke-telemetry-pipeline`, matching current NVKE's
+`deploy/nico/nktp/release.yaml`. The installer fetch verifies that exact commit
+and tree before vendoring NKTP and its source-owned NVCB chart. Its archive keeps
+the legacy chart path required by the installer extractor. NVKE pins that still
+contain the in-tree chart retain those bytes and skip the external fetch. An
+absent chart with a different deployment version or repository fails before
+fetching. The independently built nightly NKTP chart uses the same source pin;
+the shared release catalogs retain their existing NKTP selection.
