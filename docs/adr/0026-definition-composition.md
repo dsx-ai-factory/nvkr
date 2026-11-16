@@ -459,7 +459,7 @@ not only failure, and are table-driven.
 | U6 Run and publication records | `pkg/nvkr/lifecycle`, `pkg/nvkr/delivery` | Run-record and publication-root schema majors with composition binding and per-output attribution; release description export | U3 |
 | U7 Consumer view | `pkg/nvkr/lifecycle`, `client/v1` | Composite exact-input expectation, member-set requirement, cross-form refusal | U6 |
 | U8 Hosted qualification | ADR-16/21 owners | Bind complete composition into handoff, artifact checks, native smoke, qualification evidence and release manifest; explicit per-run policies and isolated workflow pairs | U6 |
-| U9 Follow-up: member Release reuse | result-reuse owner | Cross-workflow origin admission in the reuse decision, §6 and §7 | draft ADR-30 (backlog item 4) landing |
+| U9 Follow-up: member Release reuse | result-reuse owner | Cross-workflow origin admission in the reuse decision, §6 and §7 | ADR-30 result-reuse implementation and cross-workflow origin admission |
 | U10 Cutover: retire combined `definition.yaml` | NVKE release owner | Move the combined production, development and qualification paths to the composite; retire the combined bundles and input | U5–U8; hosted composite Run and consumer verification |
 
 Acceptance tests per unit:
@@ -561,7 +561,7 @@ Acceptance tests per unit:
 - **ADR-20:** record the composition binding in publication-root metadata (U6).
 - **ADR-21:** enroll composite bundles in maintenance and drift checks, and admit named composite development
   bundles (U5).
-- **Result reuse (draft ADR-30, backlog item 4):** once it lands, add authored cross-workflow origin admission
+- **Result reuse (ADR-30):** after result-reuse implementation, add authored cross-workflow origin admission
   for member outputs (U9). Until then composites rebuild every output.
 - **NVKE cutover:** retire the combined `definition.yaml` and its bundles after a hosted composite Run and
   independent consumer verification succeed (U10).
@@ -573,7 +573,8 @@ The questions left open by the first draft were decided on 2026-10-29:
 1. Error codes: reuse `invalid-catalog`, `unverified-ref`, `engine-capability` and `timeout`; no new ADR-03 band (§11).
 2. Cross-member pin divergence: rejected unless the composite declares a variant naming the component and both
    members (§1, §3); every undeclared divergence fails.
-3. Cross-workflow reuse: a follow-up after draft ADR-30 lands; composites rebuild everything until then (§6, U9).
+3. Cross-workflow reuse: a follow-up requiring ADR-30 result-reuse implementation and origin admission;
+   composites rebuild everything until then (§6, U9).
 4. Combined `definition.yaml`: a separate cutover gated on a hosted composite Run and consumer verification (U10).
 5. Development bundles: pulled forward into U5 (§9). On 2026-11-04 the fixed development layout was opened to
    composites so the GPU site composite can use the already registered `nvkr-dev.yml` workflow (§9).

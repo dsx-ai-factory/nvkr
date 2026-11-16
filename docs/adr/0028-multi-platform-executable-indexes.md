@@ -11,7 +11,7 @@
   tool companion contract. Multi-platform tool/index implementation is tracked in #296 and the retrofit in #297.
 - **Relates to:** ADR-01 (`nvkr.build` schemas), ADR-02 §2 (aggregate logical projection), ADR-03 (coded errors),
   ADR-04 (signing), ADR-11 §1–§2 (direct selection, no sibling reuse), ADR-12 §1 (concrete targets and the
-  executable-aggregate exclusion this decision lifts), ADR-13 (SBOMs, `evidence: none`), ADR-16 (artifact check
+  executable platform-set admission), ADR-13 (SBOMs, `evidence: none`), ADR-16 (artifact check
   and qualification), ADR-20 (Binary Bundle, runnable image indexes, `release pull`), ADR-21 (regeneration),
   ADR-22 (tool release assets, lock v1), ADR-27 §3 (one tool pin per platform).
 - **Scope:** `linux/amd64` and `linux/arm64` executable outputs on the `static-unqualified` and
@@ -29,8 +29,8 @@ architecture. NVKR cannot express that in one declaration.
   times (`helm`, `helm-linux`, `helm-linux-amd64`), `nvsentinel` declares `syft-amd64` and `syft-arm64`, and
   PR #294 adds `tools/aicr-arm64` because the AICR source can carry only one URL. Each copy is pinned and bumped
   on its own, and nothing checks that the copies stay on one version.
-- **Executable outputs are single-platform.** ADR-12 §1 states that "the image-index contract does not create
-  an executable aggregate". The NVKE Definitions publish `nvkectl` and `nvkectl-linux-arm64` as two outputs, and
+- **Executable outputs are single-platform.** The runtime rejects executable platform sets; the accepted
+  target contract is owned by ADR-12 §1. The NVKE Definitions publish `nvkectl` and `nvkectl-linux-arm64` as two outputs, and
   NVSentinel publishes 19 executables twice, from two Definitions.
 - **The Binary Bundle is not an image.** ADR-20 publishes each executable output as an OCI manifest with NVKR
   config and layer media types and files under `files/`. ORAS can download its layer. BuildKit `COPY --from`
@@ -48,10 +48,10 @@ publish one standard index over native children (ADR-12 §1, ADR-20). AICR v1.1.
 
 ## Placement
 
-This is a new ADR rather than an amendment. ADR-12 §1 explicitly excludes an executable aggregate, and the
-change spans the ADR-22 tool contract, ADR-20 publication, the ADR-01/02 identity projections, ADR-13
-evidence and ADR-27 §3. No existing decision owns all of it. On acceptance, each part folds into its owning
-ADR (Follow-ups).
+ADR-12 §1 owns executable platform-set admission, and ADR-22 owns multi-platform tool declarations and
+lock entries. Their accepted contracts incorporate §1–§2 and §4 below; current runtime refusal and deferred
+implementation remain in force. This ADR records the remaining cross-cutting identity, packaging, evidence
+and consumption contract and its implementation units.
 
 ## Decision
 
@@ -161,7 +161,7 @@ outputs:
     components: [aicr]
 ```
 
-ADR-12 §1's exclusion is lifted for `format: executable`. `platforms` is a nonempty, sorted, unique subset of
+ADR-12 §1 owns admission for `format: executable`. `platforms` is a nonempty, sorted, unique subset of
 `linux/amd64` and `linux/arm64`, exclusive with `platform`, exactly as for OCI aggregates; the existing
 validator rejects `darwin/arm64` in a set with `invalid-catalog`. Darwin stays a single-platform local
 diagnostic output.
@@ -396,9 +396,8 @@ Each unit lands with table-driven contract tests that assert the coded error, no
 
 ## Follow-ups
 
-- **ADR-12 §1:** on acceptance, admit `platforms` for executable outputs and remove the exclusion sentence.
-- **ADR-22:** on acceptance, move §1–§2 into "Tool release assets" and lock v1. Per-platform `companions`
-  depend on #286 (PR #294) landing first.
+- **ADR-12 §1 and ADR-22:** own the accepted target and tool/lock contracts. Their implementation remains
+  deferred under E1–E3; the single-platform companion prerequisite is already implemented.
 - **ADR-01/02:** add `nvkr.dev/executable-index-build/v1` beside the image-index projection.
 - **ADR-20:** add the executable index publication form, its metadata binding and its `release pull` projection.
 - **ADR-13:** child SBOM referrers; verified upstream evidence referrers once #287 lands.
