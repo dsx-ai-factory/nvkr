@@ -298,3 +298,32 @@ func TestReleaseExportTUIRejectsDescriptionSchemaDrift(t *testing.T) {
 		})
 	}
 }
+
+func TestReleaseExportAICRInventory(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	description := releaseview.Description{Outputs: []releaseview.Output{{Name: "image", Kind: "oci", Reference: "registry.example.test/image@" + digest, Digest: digest, OS: "linux", Arch: "amd64"}}}
+	raw, err := json.Marshal(description)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected, err := releaseview.ArtifactInventory(description)
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := 0
+	command := releaseExportCmdWithOperation(func(_ context.Context, reference string, _ lifecycle.InspectionOptions) ([]byte, error) {
+		calls++
+		if reference != "registry.example.test/releases@"+digest {
+			t.Fatal(reference)
+		}
+		return raw, nil
+	})
+	var out bytes.Buffer
+	app := &cli.App{Commands: []*cli.Command{command}, Writer: &out}
+	if err := app.RunContext(t.Context(), []string{"nvkr", "export", "--reference", "registry.example.test/releases@" + digest, "--format", "aicr-inventory"}); err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || !bytes.Equal(out.Bytes(), expected) {
+		t.Fatalf("calls=%d output=%s", calls, out.String())
+	}
+}

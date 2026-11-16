@@ -39,6 +39,31 @@ notices drift, workflow drift and Fern docs checks. Workflow drift re-reads the 
 network access to the public NVKE repository; the docs check needs Node and the Fern CLI. CodeQL runs only on
 GitHub.
 
+`make zizmor-report` runs optional report-only workflow security diagnostics, separate from
+`make ci-check`. It downloads zizmor 1.32.0 and verifies the pinned archive SHA-256 before
+execution (Linux AMD64 or Darwin ARM64; Python 3.12+ and curl required). The scan uses strict
+collection and offline mode on Git-listed workflows and action definitions under `.github/`,
+including committed generated bundles and new non-ignored files. No generated scratch bundles
+are scanned. Online audits (including remote action/repository metadata checks) are omitted;
+this is not a clean bill of health or release evidence.
+
+The existing actionlint CI job retains the JSON findings, stderr, text summary and input list
+as the ordinary `zizmor-report` artifact for seven days. Locally these go to a fresh attempt
+under `.nvkr/zizmor-report/`; set `ZIZMOR_REPORT_DIR` to relocate them. Findings return success;
+download, integrity, collection, execution, malformed-output and audit-warning failures return
+nonzero and are labeled **INCOMPLETE**, with partial diagnostics retained. CI reports these
+failures without blocking merging. Review the report status, not the green job alone.
+The scan, upload and incomplete-status steps have separate non-blocking timeouts; the job
+budget reserves the original five minutes for required checks plus these diagnostic steps.
+Actionlint and shellcheck remain required and unchanged. Finding remediation and enforcement
+are separate follow-up changes.
+
+Local tool archives and binaries are retained in the `nvkr-zizmor-*` temporary directory
+printed in each summary. After reviewing an attempt, archive any needed diagnostics and
+remove that attempt’s tool scratch within seven days; keep at most the latest two attempts
+for routine local troubleshooting. Cleanup is manual: only remove paths recorded by completed
+attempts, never an active scan’s scratch. CI runner scratch is ephemeral.
+
 `make help` lists targets. The full release-blocking verification includes:
 
 ```sh

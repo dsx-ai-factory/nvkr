@@ -11,7 +11,10 @@
   "outputs": [
     {
       "catalog": {
-        "base": "../../catalogs/tools"
+        "base": "../../catalogs/tools",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "native-capi-exec-init-image"
@@ -22,7 +25,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools"
+        "base": "../../catalogs/tools",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "native-capi-exec-plugin-image"
@@ -44,7 +50,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke"
+        "base": "../../catalogs/nvke",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "cluster-api-provider-provisioned-native-site"
@@ -55,7 +64,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke"
+        "base": "../../catalogs/nvke",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "nvke-controller-chart-native-site"
@@ -93,7 +105,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke"
+        "base": "../../catalogs/nvke",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "nvke-controller-native-site"
@@ -104,7 +119,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools"
+        "base": "../../catalogs/tools",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "clusterctl",
@@ -119,7 +137,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools"
+        "base": "../../catalogs/tools",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "clusterctl",
@@ -139,7 +160,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools"
+        "base": "../../catalogs/tools",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "nico-sim",
@@ -152,7 +176,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke"
+        "base": "../../catalogs/nvke",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "nktp-chart-native-site"
@@ -189,7 +216,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke"
+        "base": "../../catalogs/nvke",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "nvkectl-native-site"
@@ -244,7 +274,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke"
+        "base": "../../catalogs/nvke",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "postgresql-chart-native-site"
@@ -266,7 +299,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools"
+        "base": "../../catalogs/tools",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "nerdctl",
@@ -289,7 +325,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke"
+        "base": "../../catalogs/nvke",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "spire-chart-native-site"
@@ -333,7 +372,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke"
+        "base": "../../catalogs/nvke",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "spire-crds-chart-native-site"
@@ -377,7 +419,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke"
+        "base": "../../catalogs/nvke",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
       },
       "components": [
         "temporal-chart-native-site"
@@ -421,7 +466,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools"
+        "base": "../../catalogs/tools",
+        "overlays": [
+          "../../catalogs/tools/variants/nightly-go.json"
+        ]
       },
       "components": [
         "native-workload-image"
