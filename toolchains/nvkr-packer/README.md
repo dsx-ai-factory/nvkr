@@ -1,7 +1,7 @@
 # Direct-Packer toolchain image
 
 This directory defines the OCI toolchain consumed by NVKR's local direct-Packer
-executor. Each host-platform image contains Packer 1.16.2, the QEMU plugin 1.1.8,
+executor. The default host-platform images contain Packer 1.16.2, the QEMU plugin 1.1.8,
 QEMU for both supported guest architectures, AMD64 and ARM64 UEFI firmware, `qemu-img`,
 `ssh-keygen`, Python, `tar`, a shell and the core utilities used by the NVKE
 Packer project. It also contains Go 1.27.4, crane 0.22.1, nfpm 2.48.0,
@@ -37,6 +37,18 @@ Ubuntu 26.04 and download-helper indexes. Both architectures' release archives
 were checked against upstream checksum files and their executable hashes were
 measured from those archives. These are source inputs for a fresh preparation;
 existing consumer image pins and license/security approval gates remain unchanged.
+
+The AMD64 demo launcher, also used by `nvkr-nightly.yml`, selects `--nightly` with
+`--diagnostic-local`. Its `nightly-packer.lock.json` pins Packer 1.15.4 and QEMU
+plugin 1.1.6 to match
+[NVKE's source contract](https://github.com/dsx-ai-factory/nvke/blob/2f31480b360cbd7fc9d9db7a6ba274a8d0fd5049/os-image/packer/versions.pkr.hcl).
+The archive hashes were checked against the official release checksum files and
+the executable hashes measured from those archives. This selection changes only
+Packer and its plugin; all other image inputs still come from `toolchain.lock.json`.
+It requires native AMD64 diagnostic validation and keeps the observed image ID
+bound to the attempt. Default native maintenance and ARM64 builds retain their
+existing pins. Check the nightly inputs without building with
+`toolchains/nvkr-packer/build.sh --nightly --arch amd64 --check`.
 
 Build and validate one local host architecture. The runtime check proves the
 exact Packer, plugin, Go, crane, nfpm, Helm and ORAS versions; QEMU/QCOW2 and firmware

@@ -16,7 +16,7 @@ The Build Digest identifies that generated graph's logical content. Output label
 execution settings remain in their owning records. Two outputs can share a Build Digest while requiring
 separate producer jobs, observations and evidence; one successful output cannot satisfy a missing sibling.
 
-The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/definition.yaml) directly selects `nvkectl`, `cwe`, and `nvke-helm`
+The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-module-tags/definition.yaml) directly selects `nvkectl`, `cwe`, and `nvke-helm`
 for three outputs. The Helm output explicitly depends on the NVKE management-plane image output (`cwe`). No reusable membership group,
 criteria query, inheritance chain, or mixin sits between an output and its producers.
 
@@ -25,8 +25,8 @@ Definitions and Releases contain no cluster views, deployment roles or categorie
 
 ## Select an Environment
 
-The [local Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/environment-local.yaml) supplies execution settings and a local
-registry destination. The [GitHub Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/environment-github.yaml) supplies the
+The [local Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-module-tags/environment-local.yaml) supplies execution settings and a local
+registry destination. The [GitHub Environment](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-module-tags/environment-github.yaml) supplies the
 corresponding hosted-run settings. Environments own runner routes and may declare named execution classes with
 host platform, resource capacity, exposed capabilities, and timeout ceilings. The compiler deterministically
 binds a requested build to one satisfying class and records that exact route in the Plan. A class declaration is
@@ -71,11 +71,11 @@ With `bin/nvkr` built as described in the quickstart, inspect the three-output N
 
 ```sh
 bin/nvkr definition validate \
-  --definition docs/examples/nvke-tutorial/definition.yaml
+  --definition docs/examples/nvke-module-tags/definition.yaml
 
 bin/nvkr run plan \
-  --definition docs/examples/nvke-tutorial/definition.yaml \
-  --environment docs/examples/nvke-tutorial/environment-local.yaml
+  --definition docs/examples/nvke-module-tags/definition.yaml \
+  --environment docs/examples/nvke-module-tags/environment-local.yaml
 ```
 
 A composite Definition (proposed ADR-26) pins complete member
@@ -106,13 +106,13 @@ The matching `--check` invocation regenerates in memory and fails if generated f
 ```sh
 NVKR_LIFECYCLE_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-lifecycle.XXXXXX")
 bin/nvkr run generate \
-  --definition docs/examples/nvke-tutorial/definition.yaml \
-  --environment docs/examples/nvke-tutorial/environment-github.yaml \
+  --definition docs/examples/nvke-module-tags/definition.yaml \
+  --environment docs/examples/nvke-module-tags/environment-github.yaml \
   --engine github --root "$NVKR_LIFECYCLE_ROOT"
 
 bin/nvkr run generate \
-  --definition docs/examples/nvke-tutorial/definition.yaml \
-  --environment docs/examples/nvke-tutorial/environment-github.yaml \
+  --definition docs/examples/nvke-module-tags/definition.yaml \
+  --environment docs/examples/nvke-module-tags/environment-github.yaml \
   --engine github --root "$NVKR_LIFECYCLE_ROOT" --check
 ```
 
@@ -126,8 +126,8 @@ Inspect a local attempt without creating its workspace or executing nodes:
 
 ```sh
 bin/nvkr run local \
-  --definition docs/examples/nvke-tutorial/definition.yaml \
-  --environment docs/examples/nvke-tutorial/environment-local.yaml \
+  --definition docs/examples/nvke-module-tags/definition.yaml \
+  --environment docs/examples/nvke-module-tags/environment-local.yaml \
   --attempt review-001 --dry-run
 ```
 
@@ -154,10 +154,14 @@ observation, finalization, release verification or runtime health.
 
 ```sh
 bin/nvkr run local \
-  --definition docs/examples/nvke-tutorial/definition.yaml \
-  --environment docs/examples/nvke-tutorial/environment-local.yaml \
+  --definition docs/examples/nvke-module-tags/definition.yaml \
+  --environment docs/examples/nvke-module-tags/environment-local.yaml \
   --attempt build-001 --ui=plain
 ```
+
+Plain output labels steps by output and operation, including the source tag for
+fetches. Add `--verbose` to show exact operation IDs. A heartbeat every ten
+seconds keeps compilation, vendoring and source preparation visible while they run.
 
 Choose `--ui=tui` explicitly to require an interactive dashboard; incompatible
 terminal/JSON choices fail before input or execution work. `--no-color` or a
@@ -215,7 +219,7 @@ and `--ui=tui` are incompatible and fail before input, network or write work.
 presentation flags.
 
 ```sh
-bin/nvkr definition inspect --definition docs/examples/nvke-tutorial/definition.yaml --ui=tui
+bin/nvkr definition inspect --definition docs/examples/nvke-module-tags/definition.yaml --ui=tui
 bin/nvkr run graph --plan .github/nvkr-run/plan.json --ui=tui
 bin/nvkr catalog list --data inputs/catalogs/nvke/module-tags --ui=tui
 ```

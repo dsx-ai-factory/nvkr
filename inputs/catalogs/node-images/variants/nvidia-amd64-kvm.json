@@ -52,7 +52,7 @@
           },
           "materialManifestVariable": "material_manifest",
           "outputDirectoryVariable": "output_directory",
-          "packerVersion": "1.16.2",
+          "packerVersion": "1.15.4",
           "projectPath": "os-image/packer",
           "sshPrivateKeyVariable": "ssh_private_key_file",
           "sshPublicKeyVariable": "ssh_public_key_file",

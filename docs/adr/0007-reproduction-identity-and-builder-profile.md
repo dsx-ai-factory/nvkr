@@ -10,7 +10,8 @@
 - **Relates to:** ADR-10 (pluggable builder types), ADR-04 (signing & verification), ADR-05 (trust object model /
   ValidationVector), ADR-08 (bake-off gate).
 
-- **Scope:** This is the qualified reproduction contract. V1 production scope is explicit in §7.
+- **Scope:** This retains the deferred qualified reproduction contract; the lane and its profile/runner
+  implementation are retired. V1 production scope is explicit in §7.
 
 ## Context
 
@@ -212,16 +213,8 @@ qualified reproduction gate. A nonmatching output is a new Artifact identity eve
 
 ## Acceptance evidence
 
-Current module evidence in `pkg/nvkr/profile/execution_test.go` and
-`pkg/nvkr/pipeline/execution_identity_integration_test.go` covers opaque host/execution receipts, exact
-profile/node binding, conditional bootstrap identity, zero/changed/extra-input attacks, explicit report
-qualification, concurrent validation, and the local stage-two barrier after authenticated source materialization.
-The Linux local OCI adapter measures sealed runner/runtime capabilities, the selected image manifest, the runtime
-endpoint, and the daemon server identity. Qualified local execution on other platforms, qualified Nix, and
-generic CI execution remain fail-closed because no equally strong executable capability, realized-closure
-observer, or provider-selected runtime receipt exists; these tests are not end-to-end provider conformance.
-
-Acceptance additionally requires:
+The removed profile and qualified-runner tests are available in Git history.
+[Reconciliation](reconciliation/adr-07-08.md) records the current boundary. Future acceptance would require:
 
 1. a `profile repin` → plan preflight → runner/toolchain materialization → execution preflight test proving a
    valid repin succeeds rather than failing as an unobservable host field;

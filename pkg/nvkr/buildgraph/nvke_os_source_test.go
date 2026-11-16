@@ -173,33 +173,19 @@ func TestNVKEOSPublicSourcesLive(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	digest, err := graph.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
 	ctx, cancel := context.WithTimeout(t.Context(), 70*time.Minute)
 	defer cancel()
 	t.Log("UNQUALIFIED SOURCE BUILD TEST: no OS-image, package-installation, TPM-attestation or release-acceptance claim")
 	t.Log("PREBUILT EXCEPTION PENDING: DSX IMDS public source is unresolved in the release inventory; retain the existing pinned payloads in the eventual package graph. This public-source-only test does not acquire DSX or establish complete release membership.")
-	report, runErr := (pipeline.Local{}).Run(graph, digest, pipeline.RunOptions{
+	artifacts := executeSourceFixture(t, graph, pipeline.RunOptions{
 		Ctx: ctx, SourceRoot: filepath.Join(t.TempDir(), "src"), Runtime: containerRuntime,
-		Jobs: 1, Stdout: os.Stdout, Stderr: os.Stderr,
+		Stdout: os.Stdout, Stderr: os.Stderr,
 	})
-	if report != nil {
-		defer func() {
-			if closeErr := report.Close(); closeErr != nil {
-				t.Errorf("closing source test report: %v", closeErr)
-			}
-		}()
-	}
-	if runErr != nil {
-		t.Fatal(runErr)
-	}
-	if report == nil || len(report.Artifacts) != len(names) {
+	if len(artifacts) != len(names) {
 		t.Fatalf("terminal artifact membership does not match %v", names)
 	}
 	var observed []string
-	for _, artifact := range report.Artifacts {
+	for _, artifact := range artifacts {
 		observed = append(observed, artifact.Component)
 	}
 	slices.Sort(observed)
@@ -208,7 +194,7 @@ func TestNVKEOSPublicSourcesLive(t *testing.T) {
 	if !slices.Equal(observed, expected) {
 		t.Fatalf("terminal artifact identities = %v, want %v", observed, expected)
 	}
-	for _, artifact := range report.Artifacts {
+	for _, artifact := range artifacts {
 		t.Run(artifact.Component, func(t *testing.T) {
 			if artifact.Qualification != pipeline.ArtifactUnqualified || artifact.InputDigest == "" || artifact.Size <= 0 {
 				t.Fatalf("invalid or overclaimed observation: %+v", artifact)

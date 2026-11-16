@@ -17,9 +17,8 @@ import (
 )
 
 // runContainerRuntime is the only subprocess boundary for runtime-backed build
-// operations. Qualified execution dispatches through the held executable
-// capability; development and prequalification acquisition retain the configured
-// runtime pathname behavior.
+// operations. It rechecks admitted images before run/create and dispatches through
+// the configured runtime pathname.
 func runContainerRuntime(opts RunOptions, args ...string) error {
 	if opts.preparedImage != nil && len(args) > 0 && (args[0] == "run" || args[0] == "create") {
 		image := opts.preparedImage
@@ -29,9 +28,6 @@ func runContainerRuntime(opts RunOptions, args ...string) error {
 		args = append([]string{args[0], "--pull=never"}, args[1:]...)
 	}
 
-	if opts.execution != nil && opts.execution.runtime != nil {
-		return opts.execution.runtime.run(opts.ctx(), opts.Stdout, opts.Stderr, args...)
-	}
 	cmd := execCmd(opts, opts.Runtime, args...)
 	cmd.Stdout = opts.Stdout
 	cmd.Stderr = opts.Stderr
@@ -45,7 +41,6 @@ type reaper struct {
 	mu             sync.Mutex
 	names          map[string]bool
 	docker         string
-	runtime        *heldRuntimeExecutable
 	cleanupCommand reaperCleanupCommand
 	closing        bool
 	cleanupTimeout time.Duration
@@ -112,16 +107,6 @@ func (r *reaper) forget(name string) {
 	r.mu.Unlock()
 }
 
-func (r *reaper) setRuntime(runtimePath string, runtime *heldRuntimeExecutable) {
-	if r == nil {
-		return
-	}
-	r.mu.Lock()
-	r.docker = runtimePath
-	r.runtime = runtime
-	r.mu.Unlock()
-}
-
 func (r *reaper) close() {
 	if r == nil {
 		return
@@ -142,7 +127,7 @@ func (r *reaper) cleanup() {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	docker, runtimeExecutable := r.docker, r.runtime
+	docker := r.docker
 	cleanupCommand := r.cleanupCommand
 	timeout := r.cleanupTimeout
 	r.mu.Unlock()
@@ -177,21 +162,18 @@ func (r *reaper) cleanup() {
 	for _, name := range names {
 		go func() {
 			defer cleanup.Done()
-			_ = cleanupCommand(commandCtx, grace, docker, runtimeExecutable, []string{name})
+			_ = cleanupCommand(commandCtx, grace, docker, []string{name})
 		}()
 	}
 	cleanup.Wait()
 }
 
-type reaperCleanupCommand func(context.Context, time.Duration, string, *heldRuntimeExecutable, []string) error
+type reaperCleanupCommand func(context.Context, time.Duration, string, []string) error
 
 func runReaperCleanupCommand(ctx context.Context, grace time.Duration, docker string,
-	runtimeExecutable *heldRuntimeExecutable, names []string,
+	names []string,
 ) error {
 	args := append([]string{"rm", "-f"}, names...)
-	if runtimeExecutable != nil {
-		return runtimeExecutable.runCleanup(ctx, grace, nil, nil, args...)
-	}
 	cmd := execCmd(RunOptions{Ctx: ctx}, docker, args...)
 	cmd.WaitDelay = grace
 	return runOwnedCommand(ctx, cmd)
