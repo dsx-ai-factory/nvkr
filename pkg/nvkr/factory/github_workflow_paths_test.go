@@ -14,6 +14,8 @@ func TestLegacyGeneratedGitHubChildWorkflowNamespace(t *testing.T) {
 		owner string
 	}{
 		{".github/workflows/nvkr-run__host-amd64-node.yml", GitHubWorkflowPath},
+		{".github/workflows/nvkr-run__partition-00.yml", GitHubWorkflowPath},
+		{".github/workflows/nvkr-dev-nightly__partition-49.yml", ".github/workflows/nvkr-dev-nightly.yml"},
 		{".github/workflows/nvkr-dev__host-arm64-node.yml", GitHubDevelopmentWorkflowPath},
 		{".github/workflows/nvkr-run-nightly__host-amd64-node.yml", ".github/workflows/nvkr-run-nightly.yml"},
 		{".github/workflows/nvkr-run__" + strings.Repeat("a", 64) + ".yml", GitHubWorkflowPath},
@@ -47,6 +49,32 @@ func TestLegacyGeneratedGitHubChildWorkflowNamespace(t *testing.T) {
 				bundle.WorkflowPath = ".github/workflows/nvkr-run-other.yml"
 				if priorGeneratedMemberInNamespace(bundle, test.path) {
 					t.Fatal("child retirement escaped its exact entry namespace")
+				}
+			}
+		})
+	}
+}
+
+func TestStableGitHubWorkerNamespace(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		valid bool
+	}{
+		{"w-build", true}, {"w-" + strings.Repeat("a", 62), true},
+		{"w-" + strings.Repeat("a", 63), false}, {"w-", false},
+		{"w-Build", false}, {"w-build-", false}, {"w-build_other", false},
+		{"partition-00", false}, {"partition-49", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			for _, entry := range []string{GitHubWorkflowPath, GitHubDevelopmentWorkflowPath, ".github/workflows/nvkr-dev-nightly.yml"} {
+				layout, ok := githubWorkflowNamespace(entry)
+				if !ok {
+					t.Fatal("unknown fixture namespace")
+				}
+				bundle := &GeneratedBundle{WorkflowPath: entry, ManifestPath: layout.manifestPath}
+				path := strings.TrimSuffix(entry, ".yml") + "__" + test.name + ".yml"
+				if generatedMemberInNamespace(bundle, path) != test.valid {
+					t.Fatalf("current worker admission: %s", path)
 				}
 			}
 		})

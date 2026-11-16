@@ -63,7 +63,8 @@ to accommodate a selected workflow filename. Operators must select the matching 
 Producer generation emits independent bundles whose entrypoints support manual dispatch, with no cron or
 callable trigger. By default every producer job remains in its bundle's entry workflow. The opt-in
 `githubExecutionPartitions` projection also owns up to 50 same-commit sibling workers named
-`<entry-stem>__partition-00.yml` through `<entry-stem>__partition-49.yml`. Only those exact sibling names
+`<entry-stem>__w-<lowest member job id>.yml`, with a template portion of at most 64 characters.
+Only those exact Plan-derived sibling names
 belong to this entry's current manifest; arbitrary reusable workflows and another owner's siblings remain
 outside its namespace. Every worker receives the same per-file size and parsing bounds as the entry.
 The root manifest binds every worker's exact bytes. Regeneration checks and retirement cover the complete
@@ -133,7 +134,7 @@ it is not a substitute for validating the complete manifest-owned execution clos
 The producer entry workflow is bounded to 500,000 UTF-8 bytes before output work. Shared action interfaces
 and descriptive YAML aliases compact repeated operations without introducing callable producer workflows.
 The default flat projection rejects producer child workflows. A current manifest may own only the opt-in
-`<entry-stem>__partition-NN.yml` workers described above. Any other file in the entry workflow's
+`<entry-stem>__w-<lowest member job id>.yml` workers described above. Any other file in the entry workflow's
 reserved `<entry-stem>__*.yml` namespace is admitted only from a prior v1 manifest, for migration.
 Regeneration retires prior-owned files only after checking their exact prior bytes and modes. Changed or unowned siblings fail closed and are preserved;
 other bundle namespaces and handwritten workflows retain their separate ownership.
@@ -191,7 +192,12 @@ are diagnostic accounting, not execution groups: fixed buckets do not move exist
 complete membership is derived from the current Plan. Crossing the direct-result threshold changes finalizer
 accounting only. ADR-18 §8 owns collector bounds, exact result normalization and authored-context preservation.
 Producer matrices and general callable producer interfaces remain deferred; the opt-in partition workers
-above are generated scheduling structure, not an authored callable interface.
+above are generated scheduling structure, not an authored callable interface. Worker filenames, caller
+IDs and cross-worker outputs use `w-<lowest member job id>`, derived only from current Plan membership.
+The local 30-minute finish-gap split (ADR-18 §8) avoids rebalancing other depths when a root is added.
+Changing the lowest member, capacity chunks or finish gaps can still change affected workers. Legacy
+`__partition-NN.yml` files are accepted only from the prior ownership manifest for authenticated retirement;
+new bundles emit only the stable worker names.
 
 ### 2. Drift detection is a fail-closed `--check` twin, run by a separate generated gate
 
@@ -210,12 +216,18 @@ manifest; it does not replace or reinterpret the producer Plan bundle.
 Top-level regeneration and generated-stage admission take separate routes. Only `run generate` writes,
 qualification generation and catalog maintenance render through the `factory.Render` generation seam. A
 top-level `run generate --check` also takes it, but only when the hidden diagnostic `--projection-pilot`
-flag selects the reference projection plugin, reached in-process or out-of-process through one contract.
+flag selects the GitHub or Tekton reference projection plugin, reached in-process or out-of-process through
+one Describe/Emit contract. Core binds the selected engine to its implementation, layout and exact validator;
+it refuses an engine, release, Plan-schema or generator-ABI mismatch before sending Plan bytes to the plugin.
+Tekton's default built-in generation uses that same contract. The Go selector can invoke a separately compiled
+trusted executable; the hidden CLI selects this NVKR binary with an explicit engine. Unknown engines fail
+before plugin launch or output work. This adds no discovery, acquisition or supported third-party ecosystem.
 Generated bootstraps and stages run `run generate --check`, runtime Plan preparation, runtime input
-installation and checking, and action description. These re-emit only through the core's in-binary GitHub
-projection, never that seam, so a generator selected at top-level generation cannot run inside a generated
-stage. A seam and adapter-launcher trap over every stage owner, a selector trap on the bootstrap check
-invocation and an inventory of every committed generated closure contract-test this boundary. The pilot is
+installation and checking, and action description. These re-emit only through the core's in-binary engine
+projection, never that seam. Tekton's core bundle check and native task admission independently render the
+complete Plan; neither consults plugin selection. A seam and adapter-launcher trap over stage owners,
+including native Tekton task admission, a selector trap on bootstrap checks and actual generated Tekton CLI
+arguments, and an inventory of committed generated closures contract-test this boundary. The pilot is
 diagnostic only: runtime Plan refresh refuses its selection, and core admits the plugin's bundle with the
 exact validator before any write, whichever transport carried it.
 

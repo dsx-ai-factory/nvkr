@@ -27,7 +27,7 @@ import (
 func forbidGenerationSeam(t *testing.T) {
 	t.Helper()
 	previous, reached := renderSelected, 0
-	renderSelected = func(context.Context, *Plan) (*GeneratedBundle, error) {
+	renderSelected = func(context.Context, *Plan, string) (*GeneratedBundle, error) {
 		reached++
 		return nil, e.New(e.CodeEngineCapability, "generated stage reached the generation seam")
 	}
@@ -57,9 +57,9 @@ func TestRenderIsTheGenerationSeam(t *testing.T) {
 		t.Fatal(err)
 	}
 	previous, reached := renderSelected, 0
-	renderSelected = func(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
+	renderSelected = func(ctx context.Context, plan *Plan, engine string) (*GeneratedBundle, error) {
 		reached++
-		return previous(ctx, plan)
+		return previous(ctx, plan, engine)
 	}
 	t.Cleanup(func() { renderSelected = previous })
 	assertFactoryErrorCode(t, func() error { _, err := Render(t.Context(), plan, EngineGitLab); return err }(), e.CodeEngineCapability)

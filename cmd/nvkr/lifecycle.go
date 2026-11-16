@@ -171,7 +171,7 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 				return err
 			}
 			if c.IsSet("projection-pilot") {
-				if c.Context, err = selectProjectionPilot(c.Context, c.String("projection-pilot")); err != nil {
+				if c.Context, err = selectProjectionPilot(c.Context, c.String("projection-pilot"), c.String("engine")); err != nil {
 					return err
 				}
 			}

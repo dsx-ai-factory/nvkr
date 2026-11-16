@@ -12,17 +12,21 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// referenceProjection is the same-module reference GitHub projection plugin. It
+// referenceProjection is the same-module reference projection plugin. It
 // ports the in-binary renderer verbatim, never writes files, and serves both
 // transports unchanged. release is the plugin's own label.
-type referenceProjection struct{ release string }
+type referenceProjection struct{ engine, release string }
 
 func (plugin referenceProjection) describe(context.Context) (projectionDescription, error) {
-	return projectionDescription{Protocol: projectionProtocol, Release: plugin.release, Engine: EngineGitHub,
+	return projectionDescription{Protocol: projectionProtocol, Release: plugin.release, Engine: plugin.engine,
 		PlanSchema: PlanSchemaVersion, GeneratorABI: projectionGeneratorABI}, nil
 }
 
-func (referenceProjection) emit(ctx context.Context, request projectionEmitRequest) (projectionEmission, error) {
+func (plugin referenceProjection) emit(ctx context.Context, request projectionEmitRequest) (projectionEmission, error) {
+	core, err := projectionCoreForEngine(plugin.engine)
+	if err != nil {
+		return projectionEmission{}, err
+	}
 	var plan Plan
 	if err := canonical.UnmarshalExact(request.Plan, &plan); err != nil {
 		return projectionEmission{}, e.Wrap(e.CodeUsage, err, "decoding projection Plan")
@@ -30,10 +34,10 @@ func (referenceProjection) emit(ctx context.Context, request projectionEmitReque
 	if plan.GeneratorVersion != request.GeneratorVersion {
 		return projectionEmission{}, e.New(e.CodeUsage, "projection Plan generator %q is not the requested %q", plan.GeneratorVersion, request.GeneratorVersion)
 	}
-	if want := projectionLayoutFor(githubLayoutFor(&plan)); request.Layout != want {
+	if want := projectionLayoutFor(core.layout(&plan)); request.Layout != want {
 		return projectionEmission{}, e.New(e.CodeEngineCapability, "projection layout %+v is not this Plan's %+v", request.Layout, want)
 	}
-	bundle, err := RenderGitHub(ctx, &plan)
+	bundle, err := core.render(ctx, &plan)
 	if err != nil {
 		return projectionEmission{}, err
 	}
@@ -44,7 +48,7 @@ func (referenceProjection) emit(ctx context.Context, request projectionEmitReque
 	return projectionEmission{PlanDigest: bundle.PlanDigest, WorkflowPath: bundle.WorkflowPath, Members: members}, nil
 }
 
-// ServeProjectionAdapter serves the reference projection plugin as an
+// ServeProjectionAdapter serves the GitHub reference projection plugin as an
 // out-of-process adapter: it reads one request frame from in, answers Describe
 // or Emit with one frame on out and exits. It owns in and out for the call. A
 // canceled ctx stops it before any I/O. Cancellation during the read or write
@@ -54,7 +58,19 @@ func (referenceProjection) emit(ctx context.Context, request projectionEmitReque
 // the projection host closes the adapter's stdin after one frame and owns the
 // adapter's process group.
 func ServeProjectionAdapter(ctx context.Context, release string, in io.Reader, out io.Writer) error {
-	return serveProjection(ctx, referenceProjection{release: release}, in, out)
+	return ServeProjectionAdapterForEngine(ctx, EngineGitHub, release, in, out)
+}
+
+// ServeProjectionAdapterForEngine serves the admitted engine's diagnostic
+// Describe/Emit contract. A separately compiled trusted command can call this
+// helper; the host independently checks its engine, release, schema and ABI.
+// Unsupported engines fail before reading a request or writing a response.
+func ServeProjectionAdapterForEngine(ctx context.Context, engine, release string, in io.Reader, out io.Writer) error {
+	core, err := projectionCoreForEngine(engine)
+	if err != nil {
+		return err
+	}
+	return serveProjection(ctx, referenceProjection{engine: core.engine, release: release}, in, out)
 }
 
 // serveProjection carries one framed request to any contract implementation.
