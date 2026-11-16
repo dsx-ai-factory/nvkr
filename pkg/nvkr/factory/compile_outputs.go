@@ -95,16 +95,16 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 	return nil
 }
 
-// Run-wide tools use the Definition catalog; each generator uses its output's
-// catalog. Utility acquisitions bind one exact pin per selected execution platform.
-func selectedTools(definition authored.Definition, environment authored.Environment, source *catalog.Catalog,
+// Run-wide tools use the Definition catalog; explicit internal scanners use
+// their producer catalog. Each acquisition binds one exact execution-platform pin.
+func selectedTools(definition authored.Definition, environment authored.Environment, source *catalog.Catalog, builds []BuildPlan,
 ) (map[string]catalog.ToolPin, error) {
 	if source == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "tool selection requires a resolved catalog")
 	}
 	tools := map[string]catalog.ToolPin{}
-	selectTool := func(name, platform string) error {
-		pin, err := source.SelectTool(name, platform)
+	selectTool := func(name string, selected *catalog.Catalog, platform string) error {
+		pin, err := selected.SelectTool(name, platform)
 		if err != nil {
 			return err
 		}
@@ -133,14 +133,37 @@ func selectedTools(definition authored.Definition, environment authored.Environm
 			}
 		}
 		for _, platform := range sortedKeys(platforms) {
-			if err := selectTool(definition.SBOMTool, platform); err != nil {
+			if err := selectTool(definition.SBOMTool, source, platform); err != nil {
 				return nil, err
 			}
 		}
 	}
 	if environment.Signing != nil && environment.Signing.Mode == SigningModeCosign {
-		if err := selectTool(definition.CosignTool, environment.UtilityPlatform); err != nil {
+		if err := selectTool(definition.CosignTool, source, environment.UtilityPlatform); err != nil {
 			return nil, err
+		}
+	}
+	for _, internal := range definition.InternalTools {
+		scanner := internal.SBOMTool
+		selected := source
+		if scanner == "" {
+			scanner = definition.SBOMTool
+		} else {
+			selected = nil
+			for _, build := range builds {
+				if build.Name == internalToolSelection(internal).Name {
+					selected = build.CatalogSnapshot
+					break
+				}
+			}
+			if selected == nil {
+				return nil, e.New(e.CodePipelineDrift, "internal tool %q lacks its selected scanner catalog", internal.Name)
+			}
+		}
+		if scanner != "" {
+			if err := selectTool(scanner, selected, internal.Platform); err != nil {
+				return nil, err
+			}
 		}
 	}
 	return tools, nil

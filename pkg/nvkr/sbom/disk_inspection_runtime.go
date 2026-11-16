@@ -7,11 +7,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/assemble"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/diskinspect"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -43,6 +42,15 @@ func (runtime *DiskInspectionRuntime) BindingContext(ctx context.Context) (image
 	return runtime.container.BindingContext(ctx)
 }
 
+// RepositoryDigestContext authenticates the appliance manifest separately from
+// the runtime-local image identity used by BindingContext for freshness.
+func (runtime *DiskInspectionRuntime) RepositoryDigestContext(ctx context.Context) (string, error) {
+	if runtime == nil {
+		return "", e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
+	}
+	return runtime.container.RepositoryDigestContext(ctx)
+}
+
 func (runtime *DiskInspectionRuntime) Close() error {
 	if runtime == nil {
 		return nil
@@ -55,6 +63,13 @@ func (runtime *DiskInspectionRuntime) SelectionContext(ctx context.Context) (pip
 		return pipeline.DiskInspectionSelection{}, e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
 	}
 	return runtime.container.SelectionContext(ctx)
+}
+
+func (runtime *DiskInspectionRuntime) AuthenticateProducedTool(ctx context.Context, name string, tool *pipeline.ProducedExecutable) (pipeline.ProducedExecutableBinding, error) {
+	if runtime == nil {
+		return pipeline.ProducedExecutableBinding{}, e.New(e.CodeEngineCapability, "disk inspection runtime is absent")
+	}
+	return runtime.container.AuthenticateProducedTool(ctx, name, tool)
 }
 
 func (runtime *DiskInspectionRuntime) InspectPackerContent(ctx context.Context, artifact *pipeline.PackerArtifact, platform string) (*DiskContentInspection, error) {
@@ -144,7 +159,8 @@ func inventoryFromContainerObservation(observation *pipeline.DiskInspectionObser
 	if err != nil {
 		return nil, err
 	}
-	return &DiskInstalledInventory{subjectDigest: subject, subjectSize: size, inspectorDigest: inspector, codecDigest: codec, runtimeDigest: image, packages: packages}, nil
+	helperName, helper := observation.ToolBinding()
+	return &DiskInstalledInventory{subjectDigest: subject, subjectSize: size, inspectorDigest: inspector, codecDigest: codec, runtimeDigest: image, packages: packages, helperName: helperName, helper: helper}, nil
 }
 
 // checkedContainerInstalledPackages validates untrusted helper metadata without
@@ -170,70 +186,7 @@ func checkedContainerInstalledPackages(raw []byte, subject string, size int64, i
 	return checkedInstalledDiskPackages(report.Packages)
 }
 
-// RunDiskInspectionHelper is the thin container entrypoint's owning operation.
-// It accepts exact stdin bytes, pins both Linux ELF tools and uses the existing
-// held-envelope gate before libguestfs. No guest executable is ever run.
+// RunDiskInspectionHelper delegates to the isolated executable-only owner.
 func RunDiskInspectionHelper(ctx context.Context, inspectorDigest, codecDigest, subjectDigest string, size int64, input io.Reader, output io.Writer) error {
-	if err := validateSBOMContext(ctx); err != nil {
-		return err
-	}
-	if size <= 0 || size > MaxDiagnosticDiskBytes || !canonical.IsDigest(subjectDigest) || !canonical.IsDigest(inspectorDigest) || !canonical.IsDigest(codecDigest) {
-		return e.New(e.CodeUnpinnedInput, "inspection helper requires a bounded exact subject")
-	}
-	if input == nil || output == nil {
-		return e.New(e.CodeUsage, "inspection helper requires input and output streams")
-	}
-	ctx, cancel := context.WithTimeout(ctx, pipeline.MaxDiskInspectionTimeout)
-	defer cancel()
-	codec, err := assemble.OpenQemuImgCodec(ctx, "/usr/bin/qemu-img", codecDigest)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = codec.Close() }()
-	inspector, err := OpenDiskInspector(ctx, "/usr/bin/virt-inspector", inspectorDigest, codec)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = inspector.Close() }()
-	subject, err := holdDiskInspectionSubject(ctx, input, subjectDigest, size)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = subject.Close() }()
-	inventory, err := inspector.InspectHeldInstalledPackages(ctx, subject, "qcow2", "none")
-	if err != nil {
-		return err
-	}
-	report := diskInspectionReport{Subject: subject.Digest(), Size: subject.Size(), Inspector: inspectorDigest, Codec: codecDigest, Packages: inventory.Packages()}
-	raw, err := canonical.Marshal(report)
-	if err != nil {
-		return err
-	}
-	if len(raw) > maxDiskPackageReportBytes {
-		return e.New(e.CodeEnvelopeDecode, "inspection helper report exceeds its budget")
-	}
-	// Do not emit an accepted report before owned capabilities have closed. The
-	// enclosing adapter still waits for process exit and container cleanup.
-	if err := errors.Join(inspector.Close(), codec.Close(), subject.Close()); err != nil {
-		return e.Wrap(e.CodeInternal, err, "closing inspection helper capabilities")
-	}
-	if _, err := output.Write(raw); err != nil {
-		return e.Wrap(e.CodeInternal, err, "writing inspection report")
-	}
-	return nil
-}
-
-func holdDiskInspectionSubject(ctx context.Context, input io.Reader, digest string, size int64) (*heldfile.File, error) {
-	subject, err := heldfile.FromReaderContext(ctx, input, heldfile.Options{Label: "inspection-subject", MaxBytes: size, ExpectedDigest: digest})
-	if err != nil {
-		if ctx.Err() != nil {
-			return nil, e.Wrap(e.CodeTimeout, errors.Join(err, ctx.Err()), "holding container inspection subject")
-		}
-		return nil, e.Wrap(e.CodeVerifyFailed, err, "holding container inspection subject")
-	}
-	if subject.Size() != size {
-		_ = subject.Close()
-		return nil, e.New(e.CodeVerifyFailed, "inspection subject size differs")
-	}
-	return subject, nil
+	return diskinspect.RunDiskInspectionHelper(ctx, inspectorDigest, codecDigest, subjectDigest, size, input, output)
 }

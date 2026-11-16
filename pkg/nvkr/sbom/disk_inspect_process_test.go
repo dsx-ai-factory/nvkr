@@ -203,3 +203,12 @@ func TestDiskInspectorRejectsRootBeforeWork(t *testing.T) {
 		t.Fatalf("root was not rejected first: %v", err)
 	}
 }
+
+func diskInspectorEnvironment(workspace string) []string {
+	// No KVM capability is admitted; use the supported TCG setting. Nothing
+	// from the caller's ambient environment configures the appliance.
+	return []string{"PATH=/usr/bin:/bin", "HOME=" + workspace, "TMPDIR=" + workspace,
+		"XDG_CONFIG_HOME=" + workspace, "XDG_RUNTIME_DIR=" + workspace,
+		"LIBGUESTFS_CACHEDIR=" + workspace, "LC_ALL=C", "TZ=UTC", "LIBGUESTFS_BACKEND=direct",
+		"LIBGUESTFS_BACKEND_SETTINGS=force_tcg"}
+}

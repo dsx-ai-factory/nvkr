@@ -13,6 +13,16 @@ import (
 // Clone transfers ownership of every mutable authored value to its new owner.
 func (input Definition) Clone() Definition {
 	input.Catalog.Overlays = append([]string(nil), input.Catalog.Overlays...)
+	input.InternalTools = slices.Clone(input.InternalTools)
+	for i := range input.InternalTools {
+		tool := &input.InternalTools[i]
+		tool.Components = slices.Clone(tool.Components)
+		if tool.Catalog != nil {
+			value := *tool.Catalog
+			value.Overlays = slices.Clone(value.Overlays)
+			tool.Catalog = &value
+		}
+	}
 	input.Outputs = append([]DefinitionOutput(nil), input.Outputs...)
 	for i := range input.Outputs {
 		out := &input.Outputs[i]

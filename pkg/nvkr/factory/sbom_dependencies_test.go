@@ -18,6 +18,50 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
+func TestSBOMGraphRejectsUndeclaredForeignToolResult(t *testing.T) {
+	for _, requiredTool := range []bool{false, true} {
+		t.Run(fmt.Sprintf("tool_requirement=%t", requiredTool), func(t *testing.T) {
+			plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := plan.validateSBOMGraph(); err != nil {
+				t.Fatal(err)
+			}
+			_, artifacts := planIndex(plan)
+			subject := artifacts["result/cwe/linux/amd64/nvke-controller"]
+			foreign := artifacts["result/cwe/linux/arm64/nvke-controller"]
+			if subject.ID == "" || foreign.ID == "" || subject.Component != foreign.Component || subject.BuildTarget == foreign.BuildTarget {
+				t.Fatal("fixture lacks independently evidenced same-name producer results")
+			}
+			if requiredTool {
+				// A tool requirement elsewhere in the Plan is not a use by this
+				// consumer. This test targets membership validation, not platform admission.
+				plan.InternalTools = []InternalToolPlan{{Name: "foreign-helper", BuildTarget: foreign.BuildTarget, ResultArtifactID: foreign.ID}}
+			}
+			found := false
+			for i := range plan.Graph.Nodes {
+				node := &plan.Graph.Nodes[i]
+				if node.ID == subject.BuildTarget+"/sbom" {
+					if len(node.InternalTools) != 0 {
+						t.Fatal("fixture already declares an internal-tool use")
+					}
+					node.Inputs = append(node.Inputs, foreign.ID)
+					found = true
+				}
+			}
+			if !found {
+				t.Fatal("fixture lacks subject SBOM node")
+			}
+			err = plan.validateSBOMGraph()
+			assertFactoryErrorCode(t, err, e.CodeProvenanceMissing)
+			if !strings.Contains(err.Error(), "neither a subject nor a declared internal tool") {
+				t.Fatalf("did not exercise the cross-build membership guard: %v", err)
+			}
+		})
+	}
+}
+
 func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
 	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
 		for _, tc := range []struct {

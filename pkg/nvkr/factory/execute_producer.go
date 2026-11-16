@@ -19,9 +19,19 @@ import (
 // instruction, workspace and result slot; pipeline owns launching and collecting it.
 func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string, jobs int, stdout, stderr io.Writer,
 	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error), owner *LocalRunResult) (returnErr error) {
-	_, instruction, err := plan.producerInstruction(node)
+	build, instruction, err := plan.producerInstruction(node)
 	if err != nil {
 		return err
+	}
+	tool, internal := plan.internalToolForTarget(node.BuildTarget)
+	selectedTool := internal && instruction.Kind != ir.KindFetch && instruction.Component == tool.Component
+	if selectedTool && (owner == nil || tool.Format != "executable") {
+		return e.New(e.CodeEngineCapability, "internal executable production requires its original Run owner")
+	}
+	if selectedTool {
+		if err := owner.admitInternalExecutable(ctx, plan, tool); err != nil {
+			return err
+		}
 	}
 	access, err := plan.runtimeImageAccess(node, plan.operationImageEngine())
 	if err != nil {
@@ -67,10 +77,22 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 			return err
 		}
 	}
-	result, err := run(instruction, pipeline.RunOptions{
+	opts := pipeline.RunOptions{
 		Ctx: ctx, SourceRoot: sourceRoot, Runtime: runtime, Jobs: jobs, Launch: true, ImageAccess: access,
 		BuildMaterials: buildMaterials, ToolExecutable: toolExecutable, Stdout: stdout, Stderr: stderr,
-	})
+	}
+	var result *pipeline.ArtifactResult
+	var produced *pipeline.ProducedExecutable
+	if selectedTool {
+		result, produced, err = (pipeline.Local{}).ExecuteProducedExecutable(build.Graph, build.BuildDigest, instruction.Component, opts)
+	} else {
+		result, err = run(instruction, opts)
+	}
+	defer func() {
+		if produced != nil {
+			returnErr = joinFactoryCleanupError(returnErr, produced.Close(), "closing unowned internal executable")
+		}
+	}()
 	if err != nil {
 		return err
 	}
@@ -112,7 +134,15 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 		return err
 	}
 	if owner != nil {
-		return owner.recordProducerConsumption(ctx, plan, node, instruction, result, observedMaterials)
+		if err := owner.recordProducerConsumption(ctx, plan, node, instruction, result, observedMaterials); err != nil {
+			return err
+		}
+	}
+	if produced != nil {
+		if err := owner.retainInternalExecutable(ctx, plan, tool, produced); err != nil {
+			return err
+		}
+		produced = nil // The Run now owns revocation and cleanup.
 	}
 	return nil
 }

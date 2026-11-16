@@ -17,7 +17,7 @@ func utilityToolName(environment authored.Environment, name, platform string) st
 }
 
 func sbomToolName(plan *Plan, node Node) string {
-	return utilityToolName(plan.Environment, plan.Definition.SBOMTool, node.Platform)
+	return utilityToolName(plan.Environment, plan.sbomToolForBuild(node.BuildTarget), node.Platform)
 }
 
 func packageUtility(plan Plan, name string) (string, string, error) {

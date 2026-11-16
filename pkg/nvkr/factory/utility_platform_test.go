@@ -225,7 +225,7 @@ func TestNativeScannerSelectionSkipsDiskOutputs(t *testing.T) {
 			if tc.legacy {
 				plan.Environment.UtilityContainers = nil
 			}
-			tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot)
+			tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot, plan.Builds)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -244,7 +244,7 @@ func TestNativeScannerSelectionSkipsDiskOutputs(t *testing.T) {
 
 func TestNativeScannerMustBeSelectedBeforeGraphCompilation(t *testing.T) {
 	_, plan := nativeUtilityFixture(t)
-	tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot)
+	tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot, plan.Builds)
 	if err != nil {
 		t.Fatal(err)
 	}

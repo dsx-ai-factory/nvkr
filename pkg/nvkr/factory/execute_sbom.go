@@ -51,7 +51,7 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	hashes := make(map[string]string)
 	for _, input := range node.Inputs {
 		artifact := artifacts[input]
-		if artifact.Kind != "producer-result" {
+		if artifact.Kind != "producer-result" || plan.internalToolInput(node, artifact) {
 			continue
 		}
 		result, err := readProducerResult(ctx, artifact.Path)
@@ -174,12 +174,12 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 }
 
 func (plan *Plan) validateSBOMGraph() error {
-	tool := plan.Definition.SBOMTool
 	nodes, artifacts := planIndex(plan)
 	for _, artifact := range artifacts {
 		if artifact.Kind != "producer-result" {
 			continue
 		}
+		tool := plan.sbomToolForBuild(artifact.BuildTarget)
 		disk := plan.hasCompiledDiskTarget(artifact.BuildTarget, artifacts)
 		if tool == "" && !disk && !plan.hasBundleTarget(artifact.BuildTarget) {
 			continue
@@ -243,8 +243,11 @@ func (plan *Plan) validateSBOMGraph() error {
 		}
 		for _, input := range node.Inputs {
 			result := artifacts[input]
-			if result.Kind != "producer-result" {
+			if result.Kind != "producer-result" || plan.internalToolInput(node, result) {
 				continue
+			}
+			if result.BuildTarget != node.BuildTarget {
+				return e.New(e.CodeProvenanceMissing, "SBOM input is neither a subject nor a declared internal tool")
 			}
 			matches := 0
 			for _, candidateID := range node.Inputs {
