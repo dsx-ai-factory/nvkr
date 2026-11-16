@@ -1,9 +1,10 @@
 # Documentation
 
-Start with the [quickstart](quickstart.md): copy one block to build NVKR from source and produce
+Start with the [hello demo](../demos/hello/README.md), then the [quickstart](quickstart.md): copy one block to build NVKR from source and produce
 the NVKE CLI, controller image, Helm chart and dependency SBOMs locally on macOS or Linux.
 The guide shows the resulting files and links to larger builds, publication and deployment.
 For a preview without Docker, see the [tutorial inputs](examples/nvke-tutorial/README.md#preview-the-native-build).
+[What is NVKR?](overview/what-is-nvkr.md) introduces the lifecycle.
 The [34-concept reference](user-concepts.md) explains the vocabulary and connects each concept to a worked example.
 
 ## User tasks
@@ -11,7 +12,7 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | I want to… | Read |
 |---|---|
 | Ask an AI agent to acquire the CLI, author inputs, and operate NVKR | [Use NVKR with Your AI Agent](use-with-agents.md), [operator skill](../.agents/skills/nvkr-operator/SKILL.md) |
-| Understand NVKR and try my first local artifact | [Quickstart](quickstart.md) |
+| Understand NVKR and try my first local artifact | [Hello demo](../demos/hello/README.md), then [Quickstart](quickstart.md) |
 | Build only the CLI for planning and inspection | [CLI setup](quickstart.md#build-only-the-cli) |
 | Present catalog → build → publication → NVKE through the Go CLIs | [Runnable commands](nvkr-demo.md) |
 | Start local Linux ARM64 NVKE development, including images and charts | [First-time local build guide](local-development.md), [example inputs](../inputs/definitions/demo/README.md) |
@@ -100,8 +101,10 @@ broader adapter and profile support remains deferred.
 
 Proposed [ADR-26: Definition composition](adr/0026-definition-composition.md) designs composite Definitions
 that release several digest-pinned Definitions as one Release, with a worked NVKE four-family example and
-implementation units. Units U1–U7 are implemented and contract-tested only; no hosted composite Run, publication or
-consumer verification has been exercised or recorded, and qualification and member Release reuse remain deferred.
+implementation units. Units U1–U8 are implemented and contract-tested. The
+[hosted publication record](adr/reconciliation/adr-26.md#hosted-gpu-site-publication) owns execution evidence
+and its consumer-acceptance and qualification limits.
+Member Release reuse and local composite qualification rehearsal remain deferred.
 
 Proposed [ADR-27: Pinned-tool producers](adr/0027-pinned-tool-producers.md) designs producers that run one
 released, digest-pinned tool offline with fixed arguments and typed inputs, with AICR bundles as the first use.

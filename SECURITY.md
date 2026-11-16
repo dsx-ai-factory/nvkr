@@ -29,12 +29,12 @@ For security bulletins, policies, acknowledgements, and reporting resources, vis
 ## Scope
 
 nvkr's target trust model is **reproducibility as provenance**. The currently implemented authority-bearing
-surface is narrower: contract-tested Linux local qualification and exact-byte verification require authenticated
-profiles, descriptor-held pinned tools, terminal artifact receipts, and signed typed evidence; unavailable
+surface is narrower: the Linux pipeline-attested `release verify` consumer supports authenticity and
+artifact-publication scopes, using descriptor-held pinned tools and signed typed evidence; unavailable
 adapters fail closed. This is not a claim that a production deployment or its external services have been
 qualified. Reports of particular interest:
 
-- a way to make `verify` **pass** on artifacts that do **not** match the signed manifest (a fail-**open** hole),
+- a way to make `release verify --scope artifact-publication` **pass** on artifacts that do **not** match the signed manifest (a fail-**open** hole),
 - a path that lets an unpinned source ref, a tag-pinned toolchain, or a reserved axis **build instead of
   failing closed**,
 - non-determinism that lets host/clock/random state leak into the IR, a digest, an SBOM, or a signature,
@@ -46,12 +46,12 @@ an **operator-authored catalog** (`--data`) that ships outside this repository.
 
 ## Trust boundaries and deployment assumptions
 
-Qualified paths treat catalogs, signed documents, detached signature material, producer results, fetched
+Authority-bearing paths treat catalogs, signed documents, detached signature material, producer results, fetched
 content, artifact paths, mirror state, and publication inputs as untrusted until their owning module has issued
 an opaque receipt over the exact bytes and policy. Mutable filesystem names are not authority: standalone
 authority subprocesses whose protocols accept descriptor paths use held or anonymous file descriptors for the
 executable and security-sensitive inputs. A platform that cannot execute the held capability must fail that
-qualified operation rather than fall back to an ambient or private pathname. Container execution is a distinct
+authority-bearing operation rather than fall back to an ambient or private pathname. Container execution is a distinct
 engine boundary: the configured daemon and its mount implementation are trusted to consume the materialized,
 receipt-bound source tree presented by the runner; NVKR does not claim a pathname bind mount is an FD transfer.
 
@@ -59,14 +59,14 @@ That hardening is not a sandbox for the account running nvkr. The trusted comput
 host kernel, the integrity of the running nvkr process, root-owned loader and library state, the configured
 container-daemon endpoint, trusted time and trust-store configuration, and every explicitly injected in-process
 adapter. Arbitrary code that can ptrace the process, replace its memory, control its container daemon, or obtain
-its inherited descriptors can act with the same authority. Run qualified producer and verifier roles under
+its inherited descriptors can act with the same authority. Run producer and verifier roles under
 dedicated service identities or isolated machines, protect the runtime socket, prohibit untrusted same-account
 processes, and prefer static externally pinned tools. Cross-machine producer, scanner, signer, time, and registry
 claims require authenticated protocols; a Go interface alone cannot prove that its implementation performed the
 claimed I/O.
 
 Descriptor-held executable invocation is currently an authority capability on Linux. macOS has no equivalent
-`fexecve`/`execveat` primitive and its descriptor filesystem is not executable, so qualified subprocess paths
+`fexecve`/`execveat` primitive and its descriptor filesystem is not executable, so authority-bearing subprocess paths
 that require exact executable-byte authority fail closed there. Read-only diagnostic operations may have a
 broader platform surface, but their outputs cannot authorize attestation, release, or publication.
 

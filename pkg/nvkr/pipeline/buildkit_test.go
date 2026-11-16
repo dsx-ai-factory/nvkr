@@ -104,7 +104,6 @@ func TestBuildKitAdmission(t *testing.T) {
 		name       string
 		launch     bool
 		runtime    string
-		qualified  bool
 		packaged   bool
 		noReadOnly bool
 		noWriteDir bool
@@ -115,7 +114,6 @@ func TestBuildKitAdmission(t *testing.T) {
 		{name: "launched Podman", launch: true, runtime: "podman"},
 		{name: "direct execution", runtime: "docker", code: e.CodeEngineCapability},
 		{name: "unsupported runtime", launch: true, runtime: "containerd", code: e.CodeEngineCapability},
-		{name: "qualified", launch: true, runtime: "docker", qualified: true, code: e.CodeEngineCapability},
 		{name: "legacy packaging", launch: true, runtime: "docker", packaged: true, code: e.CodeEngineCapability},
 		{name: "writable source", launch: true, runtime: "docker", noReadOnly: true, code: e.CodeEngineCapability},
 		{name: "missing output isolation", launch: true, runtime: "docker", noWriteDir: true, code: e.CodeEngineCapability},
@@ -135,9 +133,6 @@ func TestBuildKitAdmission(t *testing.T) {
 				node.Materials = []ir.MaterialBinding{{Binding: "runtime", Component: "runtime", Producer: "pull-runtime"}}
 			}
 			opts := RunOptions{Ctx: context.Background(), Launch: tc.launch, Runtime: tc.runtime, DryRun: true, Package: tc.packaged, SourceRoot: filepath.Join(t.TempDir(), "missing")}
-			if tc.qualified {
-				opts.Qualification = &QualifiedExecution{}
-			}
 			_, err := (Local{}).ExecNode(node, opts)
 			if tc.code == "" {
 				if err != nil {

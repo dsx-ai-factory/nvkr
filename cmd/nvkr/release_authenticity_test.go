@@ -108,7 +108,6 @@ func TestReleaseVerifyAuthenticityRejectsInvalidPolicyBeforeWork(t *testing.T) {
 		{"--identity", ""},
 		{"--identity", "["},
 		{"--issuer", ""},
-		{"--lane", "qualified"},
 		{"--minimum-disk-evidence", "unknown"},
 	} {
 		t.Run(strings.Join(flags, " "), func(t *testing.T) {

@@ -212,6 +212,9 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 		}
 		for componentIndex, component := range build.ResolvedComponents {
 			name := component.Name
+			if name == "nvke-node-image-amd64" && (component.Packer == nil || component.Packer.PackerVersion != "1.15.4") {
+				t.Fatal("frozen nightly disk must match NVKE's Packer 1.15.4 contract")
+			}
 			original := prior.ResolvedComponents[componentIndex]
 			if original.Name != name {
 				t.Fatal("source selection changed component membership")

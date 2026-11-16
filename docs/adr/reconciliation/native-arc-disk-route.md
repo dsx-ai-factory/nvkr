@@ -105,7 +105,11 @@ maintained Plans and checks every stage selecting the retained private subjects 
 explicit reader wiring before execution, including partition workers.
 Repository secret-name and variable-name read-back confirmed
 `NVKR_REGISTRY_READ` and `NVKR_REGISTRY_READ_USER`; `nvkr-arc` has no overriding entries.
-This is generation and configuration evidence only; a successful production rerun remains pending.
+The later [Run 42131864402](adr-26.md#hosted-gpu-site-publication) published the composite at
+`ee79958425989861d93845d8b9fdef0d78ed33db`. Attempt 1 prepared all 83 outputs and signed 75 before
+it failed. Attempt 2 reran the failed jobs: it signed the remaining 8, published the root, verified it
+and finalized the Run. This historical rerun does
+not establish fresh execution of the later declaration and reader-preflight changes below.
 
 The declaration migration is generation/admission behavior only. Public declarations request anonymous
 pulls; they are not registry visibility evidence. Private reader grants, successful pulls and current-head

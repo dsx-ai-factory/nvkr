@@ -310,7 +310,13 @@ func prepareDefaultNativeBuild(ctx context.Context, runner Runner, cfg *BuildCon
 	if _, err := runner.Capture(ctx, scopeCommand, "native-build-toolchain-admission", 2*time.Minute); err != nil {
 		return e.Wrap(e.CodeEngineCapability, err, "local toolchain preparation admission")
 	}
-	image, err := runner.Capture(ctx, []string{"bash", "toolchains/nvkr-packer/build.sh", "--arch", arch, "--diagnostic-local", "--print-validated-image-id", "--tag", "localhost/nvkr-packer-toolchain:laptop-" + cfg.AttemptPrefix}, "native-build-utility-bootstrap", 6*time.Hour)
+	toolchainCommand := []string{"bash", "toolchains/nvkr-packer/build.sh", "--arch", arch, "--diagnostic-local", "--print-validated-image-id", "--tag", "localhost/nvkr-packer-toolchain:laptop-" + cfg.AttemptPrefix}
+	if platform == "linux/amd64" {
+		// The AMD64 demo is also the nightly consumer of NVKE main. Its
+		// Packer contract differs from the maintained publication toolchain.
+		toolchainCommand = append(toolchainCommand, "--nightly")
+	}
+	image, err := runner.Capture(ctx, toolchainCommand, "native-build-utility-bootstrap", 6*time.Hour)
 	if err != nil {
 		return err
 	}

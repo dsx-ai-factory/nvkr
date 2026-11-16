@@ -9,6 +9,8 @@ All three artifacts and their dependency SBOMs stay on your machine.
 The guided artifact build has been exercised on Apple Silicon macOS and Ubuntu ARM64/AMD64.
 Intel Mac artifact execution remains unverified; CLI-only setup and planning are separate routes.
 
+For a smaller first build, start with the [hello demo](https://github.com/dsx-ai-factory/nvkr/blob/main/demos/hello/README.md).
+
 ## Before you start
 
 You need:
@@ -23,6 +25,8 @@ Open a terminal in a directory that does not already contain an `nvkr` folder, t
 The launcher checks Docker, compiles NVKR from this checkout and builds all three NVKE artifacts.
 It checks prerequisites before building. If the required Go compiler is missing, it offers a verified installation
 inside this checkout; confirm with `y` to install and continue. It reuses a matching compiler without a download.
+For a non-interactive shell, pass `--install-go` to consent to the pinned SDK installation.
+If inherited Git settings are rejected, run `unset GIT_CONFIG_COUNT` and retry.
 No Make or host Python is required. Supported Docker package installs are shown for approval; Git must already
 be installed for the clone command, and Docker must be running and accessible before the build can start.
 The launcher runs in a child shell. A failed command returns an error without changing your SSH shell settings.
@@ -33,7 +37,8 @@ cd nvkr &&
 bash scripts/nvkr-quickstart.sh
 ```
 
-The first build downloads dependencies. Wait for NVKR to report:
+Before building, the launcher prints the selected Definition and a Plan summary.
+Read the three named outputs and their producers there. The first build downloads dependencies. Wait for NVKR to report:
 
 ```text
 status: complete
@@ -41,6 +46,8 @@ observed outputs: 3
 ```
 
 The launcher lists the three payload files and prints the full path to their build directory.
+It then prints commands for `run inspect`, `run graph --output nvke-controller-chart`
+and `catalog show nvkectl`, with the paths and attempt filled in.
 NVKR runs directly on your host; Docker runs the NVKE build tools. The native CLI is `bin/nvkr`.
 The checkout and results are inside the new `nvkr` folder. To build again from there, run
 `bash scripts/nvkr-quickstart.sh`; it selects a fresh build directory and retains earlier results.

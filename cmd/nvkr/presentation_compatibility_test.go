@@ -78,8 +78,8 @@ func TestDefaultLeafBytesMatchPreDashboardFixtures(t *testing.T) {
 		name, fixture string
 		args          []string
 	}{
-		{"Definition validation", "definition-validate.txt", []string{"definition", "validate", "--definition", "docs/examples/nvke-tutorial/definition.yaml"}},
-		{"Definition inspection", "definition-inspect.json", []string{"definition", "inspect", "--definition", "docs/examples/nvke-tutorial/definition.yaml"}},
+		{"Definition validation", "definition-validate.txt", []string{"definition", "validate", "--definition", "docs/examples/nvke-module-tags/definition.yaml"}},
+		{"Definition inspection", "definition-inspect.json", []string{"definition", "inspect", "--definition", "docs/examples/nvke-module-tags/definition.yaml"}},
 		{"identical Plans", "identical-plans.txt", []string{"run", "diff", "--before", maintainedPlan, "--after", maintainedPlan}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -88,7 +88,7 @@ func TestDefaultLeafBytesMatchPreDashboardFixtures(t *testing.T) {
 				t.Fatal(err)
 			}
 			if test.fixture == "definition-validate.txt" || test.fixture == "definition-inspect.json" {
-				definition, err := lifecycle.LoadDefinition(t.Context(), "docs/examples/nvke-tutorial/definition.yaml")
+				definition, err := lifecycle.LoadDefinition(t.Context(), "docs/examples/nvke-module-tags/definition.yaml")
 				if err != nil {
 					t.Fatal(err)
 				}

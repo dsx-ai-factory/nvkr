@@ -90,20 +90,11 @@ func newApp() *cli.App {
 			// The Definition -> Run -> Release lifecycle is the normal surface (ADR-17).
 			// Low-level execution and evidence tools are hidden from the product workflow.
 			cmdResolve(),
-			hideCommand(cmdBuild()),
-			hideCommand(cmdAssemble()),
-			hideCommand(cmdAttest()),
-			hideCommand(cmdVerify()),
 			hideCommand(cmdPublish()),
 			cmdCatalog(),
 			cmdRelease(),
-			hideCommand(cmdProfile()),
 			hideCommand(cmdFactory()),
 			// Execution helpers and focused diagnostics:
-			cmdFetch(),
-			cmdBakeOff(),
-			cmdSBOM(),
-			cmdDisk(),
 			cmdExecNode(),
 			cmdTransportPack(),
 			cmdTransportUnpack(),
