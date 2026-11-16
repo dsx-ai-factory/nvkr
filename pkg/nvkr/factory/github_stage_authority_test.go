@@ -331,6 +331,7 @@ func TestGitHubWorkflowOverflowsOnlyOnPerFileLimits(t *testing.T) {
 		{"within every limit", "jobs: {}\n", false, true},
 		{"file size ceiling", "a: " + strings.Repeat("x", maxGitHubWorkflowBytes) + "\n", true, false},
 		{"parser event cap", strings.Repeat("- x\n", maxGitHubWorkflowYAMLNodes), true, false},
+		{"alias expansion past the event cap", githubAliasExpansionFixture(), true, false},
 		{"oversized expression", expression, false, false},
 		{"malformed YAML", "jobs: [\n", false, false},
 	} {
@@ -357,7 +358,8 @@ func TestGitHubWorkflowOverflowsOnlyOnPerFileLimits(t *testing.T) {
 // engageGitHubPartitions forces the permitted fallback for the rest of one
 // test, so small partition-permitted fixtures exercise it. The force only adds
 // engagement; the production limits are never replaced. Plans that do not
-// permit partitions are unaffected.
+// permit partitions are unaffected. The switch is package-wide until cleanup,
+// so a caller must not run in parallel with another test that renders.
 func engageGitHubPartitions(t testing.TB) {
 	t.Helper()
 	previous := githubForcePartitionFallback
