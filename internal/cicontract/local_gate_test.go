@@ -41,6 +41,9 @@ var (
 		{"docs", "Install Fern CLI"},
 		{"lint", "Install checksum-pinned golangci-lint"},
 		{"tests", "Summarize test timings"},
+		// D1 diagnostics are report-only, not local/hosted merge gates.
+		{"vulnerabilities", "Nested Go tool vulnerabilities (report-only)"},
+		{"vulnerabilities", "Nested tool coverage"},
 		// Z1 is an optional diagnostic, not a local or hosted admission gate.
 		{"actionlint", "zizmor report (offline)"},
 		{"actionlint", "Report incomplete zizmor collection"},
@@ -62,6 +65,38 @@ func TestCompleteLocalGateMatchesMergeGate(t *testing.T) {
 	}
 	if err := checkLocalGate(hosted, makePrerequisites(t)); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// D1 may report new findings without weakening the existing root gate.
+func TestDependencyReportsRemainNonblocking(t *testing.T) {
+	jobs := readMergeGateJobs(t)
+	for _, tc := range []struct {
+		job, name, run, uses, condition string
+		soft                            bool
+	}{
+		{"check-paths", "Dependency changes (report-only)", "", "actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294", "github.event_name == 'pull_request'", true},
+		{"vulnerabilities", "Nested Go tool vulnerabilities (report-only)", "make vulncheck-tools", "", "always()", true},
+		{"vulnerabilities", "Go vulnerability check", "make vulncheck", "", "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			steps := jobs[tc.job].Steps
+			index := slices.IndexFunc(steps, func(s mergeGateStep) bool { return s.Name == tc.name })
+			if index < 0 {
+				t.Fatalf("missing step %s", tc.name)
+			}
+			s := steps[index]
+			if s.Run != tc.run || s.Uses != tc.uses || s.If != tc.condition || (s.ContinueOnError == true) != tc.soft {
+				t.Fatalf("unexpected report/gate contract: %+v", s)
+			}
+			if tc.uses != "" {
+				for key, want := range map[string]any{"comment-summary-in-pr": "never", "warn-only": true, "license-check": false, "show-openssf-scorecard": false} {
+					if s.With[key] != want {
+						t.Errorf("%s = %v, want %v", key, s.With[key], want)
+					}
+				}
+			}
+		})
 	}
 }
 
