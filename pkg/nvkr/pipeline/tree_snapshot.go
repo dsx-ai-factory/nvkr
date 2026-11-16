@@ -6,7 +6,6 @@ package pipeline
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/ociclosure"
 )
@@ -34,10 +33,4 @@ func (tree *terminalHeldTree) blobInventory(ctx context.Context) (map[string]int
 		return nil, fmt.Errorf("held OCI tree is nil")
 	}
 	return tree.snapshot.BlobInventory(ctx)
-}
-func captureRegularTreeContext(ctx context.Context, root string) (ociclosure.TreeState, error) {
-	return ociclosure.CaptureTreeState(ctx, root)
-}
-func readDirectoryEntriesBounded(directory *os.File, limit int) ([]os.DirEntry, error) {
-	return ociclosure.ReadDirectoryEntriesBounded(directory, limit)
 }
