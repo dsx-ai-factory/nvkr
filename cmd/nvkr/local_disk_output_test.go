@@ -58,8 +58,8 @@ func TestRunLocalPrintsDurableDiskOutput(t *testing.T) {
 	app := &cli.App{Commands: []*cli.Command{cmdRunWithLocalExecutor(execute)}}
 	runErr := app.RunContext(t.Context(), []string{
 		"nvkr", "run", "local",
-		"--definition", filepath.Join("docs", "examples", "nvke-tutorial", "definition.yaml"),
-		"--environment", filepath.Join("docs", "examples", "nvke-tutorial", "environment-local.yaml"),
+		"--definition", filepath.Join("docs", "examples", "nvke-module-tags", "definition.yaml"),
+		"--environment", filepath.Join("docs", "examples", "nvke-module-tags", "environment-local.yaml"),
 		"--attempt", "disk-cli-output", "--attempts-root", attemptsRoot,
 	})
 	if err := writer.Close(); err != nil {
@@ -116,8 +116,8 @@ func TestRunLocalPrintsRetainedDiskOutputWhenCommitCleanupFails(t *testing.T) {
 	app := &cli.App{Commands: []*cli.Command{cmdRunWithLocalExecutor(execute)}}
 	runErr := app.RunContext(t.Context(), []string{
 		"nvkr", "run", "local",
-		"--definition", filepath.Join("docs", "examples", "nvke-tutorial", "definition.yaml"),
-		"--environment", filepath.Join("docs", "examples", "nvke-tutorial", "environment-local.yaml"),
+		"--definition", filepath.Join("docs", "examples", "nvke-module-tags", "definition.yaml"),
+		"--environment", filepath.Join("docs", "examples", "nvke-module-tags", "environment-local.yaml"),
 		"--attempt", "disk-cli-cleanup-warning", "--attempts-root", attemptsRoot,
 	})
 	if err := writer.Close(); err != nil {

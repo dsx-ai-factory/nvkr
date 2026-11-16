@@ -35,15 +35,15 @@ func TestRunGenerateProjectionPilotMatchesInBinaryGeneration(t *testing.T) {
 		return previous(ctx, transport, engine)
 	}
 	t.Cleanup(func() { selectProjectionPilot = previous })
-	generate := []string{"run", "generate", "--definition", "docs/examples/nvke-tutorial/definition.yaml",
-		"--environment", "docs/examples/nvke-tutorial/environment-github.yaml"}
+	generate := []string{"run", "generate", "--definition", "docs/examples/nvke-module-tags/definition.yaml",
+		"--environment", "docs/examples/nvke-module-tags/environment-github.yaml"}
 	inBinary := t.TempDir()
 	if _, err := invokeLifecycleCLI(t, append(generate, "--root", inBinary)...); err != nil {
 		t.Fatal(err)
 	}
 	// The generated bootstrap argv, with no pilot flag, never selects a plugin.
-	if output, err := invokeLifecycleCLI(t, "run", "generate", "--engine", "github", "--definition", "docs/examples/nvke-tutorial/definition.yaml",
-		"--environment", "docs/examples/nvke-tutorial/environment-github.yaml", "--root", inBinary, "--check"); err != nil || !strings.Contains(output, "generated run is current") {
+	if output, err := invokeLifecycleCLI(t, "run", "generate", "--engine", "github", "--definition", "docs/examples/nvke-module-tags/definition.yaml",
+		"--environment", "docs/examples/nvke-module-tags/environment-github.yaml", "--root", inBinary, "--check"); err != nil || !strings.Contains(output, "generated run is current") {
 		t.Fatalf("bootstrap check: %s %v", output, err)
 	}
 	if len(selected) != 0 {
