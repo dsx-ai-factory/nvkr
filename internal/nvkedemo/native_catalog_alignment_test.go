@@ -92,7 +92,7 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 						if c.Commit != row.pin.Commit || c.TreeHash != row.pin.TreeHash || c.SourceDate != row.pin.SourceDateEpoch {
 							t.Fatalf("%s/%s source identity differs from its selected catalog lock", row.output, row.component)
 						}
-						if (c.Name == "nvke-node-image" || c.Name == "nvke-local-profiles") && len(c.Patches) != 0 {
+						if (c.Name == "nvke-node-image" || c.Name == "nvke-local-profiles") && changesUpstreamSource(c.Name, c.Patches) {
 							t.Fatalf("%s must consume unchanged upstream source", c.Name)
 						}
 						if c.Name == "nvke-node-image" {
@@ -229,9 +229,19 @@ func TestNativeNVIDIAProducerRequirementsOffline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, component := range []catalog.Component{disk, profiles.Components["nvke-local-profiles"]} {
-		if len(component.Patches) != 0 {
+	for name, component := range map[string]catalog.Component{"nvke-node-image": disk, "nvke-local-profiles": profiles.Components["nvke-local-profiles"]} {
+		if changesUpstreamSource(name, component.Patches) {
 			t.Fatal("native source producer must not apply source patches")
 		}
 	}
+}
+
+// The disk's Packer version-pin patch is the only admitted source change.
+func changesUpstreamSource(component string, patches []catalog.Patch) bool {
+	for _, patch := range patches {
+		if component != "nvke-node-image" || patch.SHA256 != "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227" {
+			return true
+		}
+	}
+	return false
 }

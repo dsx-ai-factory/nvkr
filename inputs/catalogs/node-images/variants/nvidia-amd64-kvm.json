@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-native-local-amd64-kvm",
-  "requiresCatalogDigest": "sha256:cc36d1fc6d09aef5feb8337725018b5ac1514b2dbb8ce1cdfd309e1ba636764e",
+  "requiresCatalogDigest": "sha256:decafe1447981f2371d684912307ec0273eb156ee2eb9975d6c1a085f6869237",
   "components": {
     "nvke-node-image-amd64": {
       "component": {
@@ -64,6 +64,13 @@
             "ubuntu_series": "26.04"
           }
         },
+        "patches": [
+          {
+            "content": "--- a/os-image/packer/versions.pkr.hcl\n+++ b/os-image/packer/versions.pkr.hcl\n@@ -4,8 +4,8 @@\n packer {\n-  required_version = \"= 1.15.4\"\n+  required_version = \"= 1.16.2\"\n\n   required_plugins {\n     qemu = {\n       source  = \"github.com/hashicorp/qemu\"\n-      version = \"= 1.1.6\"\n+      version = \"= 1.1.8\"\n     }\n",
+            "name": "patches/packer-toolchain-version.patch",
+            "sha256": "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227"
+          }
+        ],
         "platforms": [
           "linux/amd64"
         ],

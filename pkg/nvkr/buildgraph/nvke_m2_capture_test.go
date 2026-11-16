@@ -174,8 +174,11 @@ func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
 				if node.Packer == nil || node.Packer.AcquisitionArchive != want.variant+"/apt-acquisitions.tar" {
 					t.Fatal("capture carrier did not reach compiled graph")
 				}
-				if len(node.Patches) != 0 {
-					t.Fatal("capture producer must preserve stock source; the acquisition owner accepts its original schema")
+				// The Packer version-pin patch is the only admitted source change.
+				for _, patch := range node.Patches {
+					if patch.SHA256 != "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227" {
+						t.Fatal("capture producer must preserve stock source apart from its Packer version pins; the acquisition owner accepts its original schema")
+					}
 				}
 				if node.ArtifactPath != want.variant+"/nvke-node.qcow2" || node.Disk == nil || node.Disk.Encryption != want.encryption ||
 					node.Packer.BuildName != "nvke-node-"+want.variant+".qemu.nvke-"+want.variant {

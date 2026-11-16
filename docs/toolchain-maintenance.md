@@ -135,6 +135,10 @@ exception records and source-lock approval gates are unchanged.
 
 When a refresh changes the Packer version, review and update consumer `packerVersion`
 contracts alongside the image pins; runtime preflight requires an exact version match.
+The pinned NVKE Packer project also requires one exact Packer and QEMU plugin version. While it lags the
+images, the `packer-toolchain-version.patch` catalog patch moves those pins; update the patch, its digest
+and its embedded overlay copies in the same change. A maintained-Plan test fails until the patch's
+Packer version equals each producer's `packerVersion`; the plugin version has no such check.
 Repin updates local configuration-ID pins and their frozen copies when an explicit
 native substitution binds the old ID to a candidate Packer reference and architecture.
 Ambiguous mappings fail closed; unbound local IDs remain untouched. Pull the approved

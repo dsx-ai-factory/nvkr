@@ -42,7 +42,11 @@ checks local diagnostic predecessor bindings; the proposal admits only their exa
 under `toolchains/`, leaving image build locks outside its write set.
 Maintained consumer pins and local AMD64 image IDs select these published subjects; disk producer
 contracts require Packer `1.16.2`, matching the candidate source lock. Frozen/local overlays and generated
-bundles follow those inputs. The new disk Build identities have not been executed end to end.
+bundles follow those inputs. [Development Run 43774985236](https://github.com/dsx-ai-factory/nvkr/actions/runs/43774985236)
+stopped all eight disk builds at `packer validate`: the pinned NVKE project requires Packer `= 1.15.4` and
+QEMU plugin `= 1.1.6`. Disk producers now carry a content-addressed catalog patch that moves both pins to
+`1.16.2` and `1.1.8`. A local `packer validate` in both pinned images accepts the patched project.
+The patched disk Build identities have not been executed end to end.
 The corrected hosted proposal/App exchange remains unexercised; this publication attempt does not
 demonstrate a human environment-approval pause or complete refresh acceptance. GitHub rulesets,
 protected-environment review, private carrier retention, review-record authenticity and registry
