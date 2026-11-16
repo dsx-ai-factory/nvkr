@@ -12,12 +12,12 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-func unitExecutionLayout(graph map[string][]string, maxJobs, target int) executionPartitioning {
+func unitExecutionLayout(graph map[string][]string, maxJobs, gap int) executionPartitioning {
 	bounds := make(map[string]int, len(graph))
 	for id := range graph {
 		bounds[id] = 1
 	}
-	return executionPartitioning{Bounds: bounds, MaxJobs: maxJobs, Target: target}
+	return executionPartitioning{Bounds: bounds, MaxJobs: maxJobs, Gap: gap}
 }
 
 func TestGitHubExecutionPartitions(t *testing.T) {
@@ -27,8 +27,8 @@ func TestGitHubExecutionPartitions(t *testing.T) {
 	pinned := unitExecutionLayout(map[string][]string{"a": nil, "b": nil, "c": {"b"}}, 64, 0)
 	pinned.Pinned = map[string]bool{"b": true}
 	layer := map[string][]string{"a": nil, "b": nil, "c": nil, "d": nil}
-	gaps := func(maxJobs, target int, bounds map[string]int) executionPartitioning {
-		return executionPartitioning{Bounds: bounds, MaxJobs: maxJobs, Target: target}
+	gaps := func(maxJobs, gap int, bounds map[string]int) executionPartitioning {
+		return executionPartitioning{Bounds: bounds, MaxJobs: maxJobs, Gap: gap}
 	}
 	for _, test := range []struct {
 		name   string
@@ -50,15 +50,17 @@ func TestGitHubExecutionPartitions(t *testing.T) {
 			[]githubExecutionPartition{{Jobs: []string{"a", "b", "c"}}, {Jobs: []string{"d"}}}},
 		{"long sibling split", split, bounded,
 			[]githubExecutionPartition{{Jobs: []string{"a", "c"}}, {Jobs: []string{"b"}}, {Jobs: []string{"d"}}}},
-		{"target without bound gap", split, unitExecutionLayout(split, 64, 50),
+		{"threshold without bound gap", split, unitExecutionLayout(split, 64, 50),
 			[]githubExecutionPartition{{Jobs: []string{"a", "b", "c"}}, {Jobs: []string{"d"}}}},
-		{"equal gaps cut earliest", layer, gaps(64, 2, map[string]int{"a": 1, "b": 2, "c": 3, "d": 4}),
-			[]githubExecutionPartition{{Jobs: []string{"a"}}, {Jobs: []string{"b", "c", "d"}}}},
-		{"repeated cuts widest first", layer, gaps(64, 4, map[string]int{"a": 1, "b": 5, "c": 20, "d": 22}),
+		{"equal gaps all split", layer, gaps(64, 1, map[string]int{"a": 1, "b": 2, "c": 3, "d": 4}),
 			[]githubExecutionPartition{{Jobs: []string{"a"}}, {Jobs: []string{"b"}}, {Jobs: []string{"c"}}, {Jobs: []string{"d"}}}},
-		{"target stops with gaps left", layer, gaps(64, 2, map[string]int{"a": 1, "b": 5, "c": 20, "d": 22}),
+		{"threshold inclusive", layer, gaps(64, 2, map[string]int{"a": 1, "b": 5, "c": 20, "d": 22}),
+			[]githubExecutionPartition{{Jobs: []string{"a"}}, {Jobs: []string{"b"}}, {Jobs: []string{"c"}}, {Jobs: []string{"d"}}}},
+		{"smaller gaps stay together", layer, gaps(64, 15, map[string]int{"a": 1, "b": 5, "c": 20, "d": 22}),
 			[]githubExecutionPartition{{Jobs: []string{"a", "b"}}, {Jobs: []string{"c", "d"}}}},
-		{"cuts within capacity chunks", layer, gaps(2, 3, map[string]int{"a": 1, "b": 9, "c": 10, "d": 30}),
+		{"thirty minute boundary", layer, gaps(64, githubExecutionPartitionGapMinutes, map[string]int{"a": 1, "b": 31, "c": 60, "d": 90}),
+			[]githubExecutionPartition{{Jobs: []string{"a"}}, {Jobs: []string{"b", "c"}}, {Jobs: []string{"d"}}}},
+		{"cuts within capacity chunks", layer, gaps(2, 20, map[string]int{"a": 1, "b": 9, "c": 10, "d": 30}),
 			[]githubExecutionPartition{{Jobs: []string{"a", "b"}}, {Jobs: []string{"c"}}, {Jobs: []string{"d"}}}},
 		{"pinned operation", map[string][]string{"a": nil, "b": nil, "c": {"b"}}, pinned,
 			[]githubExecutionPartition{{Jobs: []string{"a"}}, {Jobs: []string{"c"}}}},

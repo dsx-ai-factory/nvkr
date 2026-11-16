@@ -265,10 +265,12 @@ func TestToolchainDockerExportAndLoad(t *testing.T) {
 		loadExit     string
 		wantError    bool
 		localInputs  bool
+		nightly      bool
 		emptyArchive bool
 		wantExit     int
 	}{
 		{name: "archive loaded before validation", buildExit: "0", loadExit: "0"},
+		{name: "nightly Packer and plugin reach build and smoke", buildExit: "0", loadExit: "0", nightly: true},
 		{name: "local archives and build CA", buildExit: "0", loadExit: "0", localInputs: true},
 		{name: "partial export failure does not load or validate", buildExit: "42", loadExit: "0", wantError: true, wantExit: 42},
 		{name: "empty export failure preserves primary error", buildExit: "42", loadExit: "0", emptyArchive: true, wantError: true, wantExit: 42},
@@ -311,9 +313,21 @@ esac
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, "bash", "build.sh", "--arch", runtime.GOARCH)
+			arch := runtime.GOARCH
+			args := []string{"build.sh", "--arch", arch}
+			if tc.nightly {
+				arch = "amd64"
+				args = []string{"build.sh", "--arch", arch, "--nightly", "--diagnostic-local"}
+				// The runtime is a stub; report its host architecture without
+				// starting an emulated image or claiming native execution.
+				if err := os.WriteFile(filepath.Join(dir, "uname"), []byte("#!/bin/sh\ntest \"$1\" = -m || exit 99\necho x86_64\n"), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			cmd := exec.CommandContext(ctx, "bash", args...)
 			cmd.Env = append(os.Environ(), "CONTAINER_RUNTIME="+fake, "TEST_CALLS="+log,
-				"TEST_BUILD_EXIT="+tc.buildExit, "TEST_LOAD_EXIT="+tc.loadExit, "TEST_ARCH="+runtime.GOARCH,
+				"TEST_BUILD_EXIT="+tc.buildExit, "TEST_LOAD_EXIT="+tc.loadExit, "TEST_ARCH="+arch,
+				"PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"),
 				"NVKR_BUILD_ARCHIVES=", "NVKR_BUILD_CA_BUNDLE=", "TMPDIR="+dir,
 				fmt.Sprintf("TEST_EMPTY_ARCHIVE=%t", tc.emptyArchive))
 			if tc.localInputs {
@@ -340,6 +354,30 @@ esac
 					}
 				}
 			}
+			if !tc.wantError {
+				packer, plugin := "1.16.2", "1.1.8"
+				if tc.nightly {
+					packer, plugin = "1.15.4", "1.1.6"
+				}
+				for _, flag := range []string{"--build-arg PACKER_VERSION=" + packer, "--build-arg QEMU_PLUGIN_VERSION=" + plugin,
+					"--env EXPECTED_PACKER_VERSION=" + packer, "--env EXPECTED_QEMU_PLUGIN_VERSION=" + plugin} {
+					if strings.Count(string(calls), flag) != 1 {
+						t.Fatalf("Packer selection lost before build/validation: missing unique %q", flag)
+					}
+				}
+				if tc.nightly {
+					for _, digest := range []string{
+						"PACKER_ARCHIVE_SHA256=15f97a6a99645c7d5308c609973b5280837b38e112beac413ccbce80da927cf1",
+						"PACKER_BINARY_SHA256=6f016067b41152b9f49981727eb9f02c8dddc46cbdf5684d6f35f6c02b4958db",
+						"QEMU_PLUGIN_ARCHIVE_SHA256=3f735539fbdd0368785babda272b85738866f736415dce59d04b4cb550c4db87",
+						"QEMU_PLUGIN_BINARY_SHA256=4b336cdddbbc91e30eb54ad6d5ca62f02edcce70c1cf54667104d33c25c1b9b5",
+					} {
+						if !strings.Contains(string(calls), "--build-arg "+digest) {
+							t.Fatalf("nightly version used different archive/executable bytes: %s", digest)
+						}
+					}
+				}
+			}
 			loaded := strings.Contains(string(calls), "image load --input ")
 			wantLoad := tc.buildExit == "0" && !tc.emptyArchive
 			if loaded != wantLoad {
@@ -358,6 +396,43 @@ esac
 			remaining, err := filepath.Glob(filepath.Join(dir, "nvkr-packer-identity.*"))
 			if err != nil || len(remaining) != 0 {
 				t.Fatalf("private export temporary files retained: %v %v", remaining, err)
+			}
+		})
+	}
+}
+
+func TestNightlyToolchainAdmissionBeforeRuntime(t *testing.T) {
+	if _, err := exec.LookPath("jq"); err != nil {
+		t.Skip("requires jq")
+	}
+	for _, tc := range []struct {
+		name  string
+		flags []string
+		valid bool
+	}{
+		{"check", []string{"--arch", "amd64", "--check"}, true},
+		{"requires diagnostic mode", []string{"--arch", "amd64"}, false},
+		{"requires explicit arch", []string{"--diagnostic-local"}, false},
+		{"refuses ARM64", []string{"--arch", "arm64", "--diagnostic-local"}, false},
+		{"refuses cross build", []string{"--arch", "amd64", "--diagnostic-local", "--cross-build-only"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			marker := filepath.Join(dir, "called")
+			fake := filepath.Join(dir, "docker")
+			if err := os.WriteFile(fake, []byte("#!/bin/sh\ntouch \"$TEST_MARKER\"\nexit 99\n"), 0o700); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, "bash", append([]string{"build.sh", "--nightly"}, tc.flags...)...)
+			cmd.Env = append(os.Environ(), "CONTAINER_RUNTIME="+fake, "TEST_MARKER="+marker)
+			output, err := cmd.CombinedOutput()
+			if (err == nil) != tc.valid {
+				t.Fatalf("admission: %v, want valid %t: %s", err, tc.valid, output)
+			}
+			if _, err := os.Stat(marker); !os.IsNotExist(err) {
+				t.Fatalf("runtime reached before admission: %v", err)
 			}
 		})
 	}

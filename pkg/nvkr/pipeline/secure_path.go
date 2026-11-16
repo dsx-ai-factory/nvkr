@@ -106,22 +106,3 @@ func (reader pipelineContextReader) Read(raw []byte) (int, error) {
 func copyPipelineContext(ctx context.Context, destination io.Writer, source io.Reader) (int64, error) {
 	return ociclosure.CopyContext(ctx, destination, source)
 }
-
-func relativeBeneath(root, target string) (string, error) {
-	absRoot, err := filepath.Abs(root)
-	if err != nil {
-		return "", err
-	}
-	absTarget, err := filepath.Abs(target)
-	if err != nil {
-		return "", err
-	}
-	relative, err := filepath.Rel(absRoot, absTarget)
-	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("artifact path %q is not beneath trusted root %q", target, root)
-	}
-	if filepath.Clean(relative) != relative {
-		return "", fmt.Errorf("artifact path %q is not canonical beneath trusted root", target)
-	}
-	return relative, nil
-}

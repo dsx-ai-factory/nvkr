@@ -76,7 +76,7 @@ func TestLocalBuildActivityIsSeparateAndOptional(t *testing.T) {
 				return &run, nil
 			}
 			app := &cli.App{Commands: []*cli.Command{cmdRunWithLocalExecutor(execute)}}
-			args := []string{"nvkr", "run", "local", "--definition", "docs/examples/nvke-tutorial/definition.yaml", "--environment", "docs/examples/nvke-tutorial/environment-local.yaml", "--attempt", "fresh"}
+			args := []string{"nvkr", "run", "local", "--definition", "docs/examples/nvke-module-tags/definition.yaml", "--environment", "docs/examples/nvke-module-tags/environment-local.yaml", "--attempt", "fresh"}
 			if opted {
 				args = append(args, "--build-activity-fd", strconv.Itoa(fd))
 			}

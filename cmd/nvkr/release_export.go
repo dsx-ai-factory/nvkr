@@ -27,7 +27,7 @@ func releaseExportCmdWithOperation(export releaseExportOperation) *cli.Command {
 	return &cli.Command{
 		Name: "export", Usage: "export a versioned release description (metadata only; all outputs and platforms)",
 		Flags: append([]cli.Flag{
-			&cli.StringFlag{Name: "format", Value: "json", Usage: "description encoding: json"},
+			&cli.StringFlag{Name: "format", Value: "json", Usage: "description encoding: json or aicr-inventory"},
 			&cli.StringFlag{Name: "reference", Required: true, Usage: "published release repository@sha256:digest"},
 			&cli.StringFlag{Name: "layout", Usage: "inspect a cached publication layout with --reference"},
 			&cli.DurationFlag{Name: "timeout", Value: time.Hour, Usage: "bound the entire export"},
@@ -40,8 +40,14 @@ func releaseExportCmdWithOperation(export releaseExportOperation) *cli.Command {
 			if err != nil {
 				return err
 			}
-			if c.NArg() != 0 || c.String("format") != "json" || c.Duration("timeout") <= 0 {
-				return e.New(e.CodeUsage, "release export takes flags only, format json and a positive timeout")
+			if c.NArg() != 0 || (c.String("format") != "json" && c.String("format") != "aicr-inventory") || c.Duration("timeout") <= 0 {
+				return e.New(e.CodeUsage, "release export takes flags only, format json or aicr-inventory and a positive timeout")
+			}
+			if c.String("format") == "aicr-inventory" {
+				if c.String("ui") == "tui" {
+					return e.New(e.CodeUsage, "AICR inventory output requires plain presentation")
+				}
+				view.tui = false
 			}
 			if view.tui && c.String("layout") == "" {
 				return showReleaseMetadataLoad(c, view, "Release description export", "", func(ctx context.Context, report func(delivery.MetadataProgress)) (commandDisplay, error) {
@@ -77,6 +83,16 @@ func releaseExportCmdWithOperation(export releaseExportOperation) *cli.Command {
 				}
 				shown = true
 				return showCommandResult(c, view, display, nil)
+			}
+			if c.String("format") == "aicr-inventory" {
+				var description releaseview.Description
+				if err := json.Unmarshal(raw, &description); err != nil {
+					return e.Wrap(e.CodeInternal, err, "decoding release description")
+				}
+				raw, err = releaseview.ArtifactInventory(description)
+				if err != nil {
+					return err
+				}
 			}
 			if _, err := c.App.Writer.Write(raw); err != nil {
 				return e.Wrap(e.CodeUnavailable, err, "writing release description")

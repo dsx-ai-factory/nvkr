@@ -62,8 +62,8 @@ type preparedSourceEntry struct {
 // preparedSourceCache is a run-scoped single-flight cache. It deduplicates the
 // expensive checkout hash -> normalized copy -> copy hash -> patched-input hash
 // chain for build nodes that consume the exact same read-only source input. The
-// cache never crosses runs or persists authority; Local.Run or NodeSession owns
-// and closes it. A NodeSession keeps separate caches for each source workspace.
+// cache never crosses sessions or persists authority; NodeSession owns and closes
+// it, retaining separate caches for each source workspace.
 type preparedSourceCache struct {
 	mu      sync.Mutex
 	entries map[string]*preparedSourceEntry

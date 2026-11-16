@@ -7,11 +7,27 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "${repo_root}"
 install_go=0
-if [[ "${1:-}" == --install-go && $# == 1 ]]; then
-  install_go=1
-elif [[ $# != 0 ]]; then
-  echo 'Usage: bash scripts/nvkr-quickstart.sh [--install-go]' >&2
-  exit 1
+build_only=0
+for argument in "$@"; do
+  case "$argument" in
+    --install-go) install_go=1 ;;
+    --build-only) build_only=1 ;;
+    *) echo 'Usage: bash scripts/nvkr-quickstart.sh [--install-go] [--build-only]' >&2; exit 1 ;;
+  esac
+done
+# Report inherited settings before compiling, without changing Git policy.
+# Redirects remain subject to NVKR's complete admission checks.
+if [[ "${GIT_CONFIG_COUNT:-0}" != 0 ]]; then
+  [[ "${GIT_CONFIG_COUNT}" =~ ^[0-9]+$ ]] || {
+    echo 'Invalid inherited Git settings; unset GIT_CONFIG_COUNT and rerun.' >&2; exit 1;
+  }
+  for ((index=0; index<GIT_CONFIG_COUNT; index++)); do
+    key_var="GIT_CONFIG_KEY_${index}"
+    case "${!key_var:-}" in
+      url./*.insteadOf) ;;
+      *) echo 'Inherited Git settings are unsupported; unset GIT_CONFIG_COUNT and rerun.' >&2; exit 1 ;;
+    esac
+  done
 fi
 # Require explicit installation consent from an interactive terminal.
 confirm() {
@@ -71,15 +87,21 @@ sdk="${repo_root}/.nvkr/quickstart-sdk/go${go_version}.${host_os}-${arch}"
 if [[ -x "${sdk}/go/bin/go" ]]; then
   export PATH="${sdk}/go/bin:$PATH"
 fi
+go_command="${GO_BIN:-go}"
 # Never let a version probe or build install a compiler before consent.
 export GOTOOLCHAIN=local
 need_sdk=1
-if command -v go >/dev/null; then
-  if actual="$(go env GOVERSION)" && [[ "${actual}" == "go${go_version}" ]]; then need_sdk=0; fi
+if command -v "$go_command" >/dev/null; then
+  if actual="$("$go_command" env GOVERSION)" && [[ "${actual}" == "go${go_version}" ]]; then need_sdk=0; fi
 fi
 if [[ "${need_sdk}" == 1 ]]; then
   printf 'Proposed Go installation: Go %s inside %s (no sudo or shell-profile changes).\n' "${go_version}" "${sdk}" >&2
-  if [[ "${install_go}" != 1 ]]; then confirm 'Download, verify and install this Go SDK?' || exit 1; fi
+  if [[ "${install_go}" != 1 ]]; then
+    confirm 'Download, verify and install this Go SDK?' || {
+      echo 'To allow the pinned Go SDK installation, rerun with --install-go.' >&2
+      exit 1
+    }
+  fi
   archive="go${go_version}.${host_os}-${arch}.tar.gz"
   checksum="${repo_root}/toolchains/quickstart/${archive}.sha256"
   [[ -f "${checksum}" ]] || { echo 'This checkout has no SDK checksum for your platform.' >&2; exit 1; }
@@ -100,21 +122,33 @@ if [[ "${need_sdk}" == 1 ]]; then
   tar -xzf "${stage}/${archive}" -C "${stage}"
   mv "${stage}" "${sdk}"
   export PATH="${sdk}/go/bin:$PATH"
+  go_command="${sdk}/go/bin/go"
 fi
-actual="$(go env GOVERSION)"
+actual="$("$go_command" env GOVERSION)"
 [[ "${actual}" == "go${go_version}" ]] || { printf 'Go %s does not match pinned go%s.\n' "${actual}" "${go_version}" >&2; exit 1; }
 attempt="quickstart-$(date -u +%Y%m%d-%H%M%S)-$$"
 outputs="${repo_root}/.nvkr/runs/${attempt}"
 printf 'Build directory: %s\n' "${outputs}"
 version="$(git describe --tags --always --dirty)"
 commit="$(git rev-parse --short HEAD)"
-go build -ldflags "-X main.version=${version} -X main.commit=${commit}" -o bin/nvkr ./cmd/nvkr
+bash scripts/with-heartbeat.sh "Compile NVKR" "$go_command" build -ldflags "-X main.version=${version} -X main.commit=${commit}" -o bin/nvkr ./cmd/nvkr
 bin/nvkr --version
+if [[ "$build_only" == 1 ]]; then exit 0; fi
+definition="docs/examples/nvke-tutorial/definition-${arch}.yaml"
+environment="docs/examples/nvke-tutorial/environment-local-${arch}.yaml"
+printf '\nDefinition: %s\n' "$definition"
+cat "$definition"
+printf '\nPlan summary:\n'
+bin/nvkr run plan --definition "$definition" --environment "$environment"
 bin/nvkr run local \
   --definition "docs/examples/nvke-tutorial/definition-${arch}.yaml" \
   --environment "docs/examples/nvke-tutorial/environment-local-${arch}.yaml" \
-  --attempt "${attempt}" --ui plain
+  --attempt "${attempt}" --go "$go_command" --ui plain
 ls -lh "${outputs}/nvkectl/out/nvkectl/"* \
   "${outputs}/nvke-controller/out/nvke-controller/"* \
   "${outputs}/nvke-controller-chart/out/nvke-controller-chart/"*
 printf '\nBuild complete. Artifacts and SBOMs: %s\n' "${outputs}"
+printf '\nExplore this Run next:\n'
+printf '  bin/nvkr run inspect --record .nvkr/runs/%s/lifecycle.json\n' "$attempt"
+printf '  bin/nvkr run graph --definition %s --environment %s --output nvke-controller-chart\n' "$definition" "$environment"
+printf '  bin/nvkr catalog show --data inputs/catalogs/nvke/release nvkectl\n'

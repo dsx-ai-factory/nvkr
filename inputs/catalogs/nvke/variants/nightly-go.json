@@ -1,0 +1,81 @@
+{
+  "apiVersion": "nvkr.dev/catalog-overlay/v3",
+  "kind": "CatalogOverlay",
+  "name": "nvke-nightly-site-go-1-27-4",
+  "requiresCatalogDigest": "sha256:8c09fc0d80355f4b578e5224d810b51ae5c117a98e13d18a0c2fa9b649c41b6a",
+  "components": {
+    "nvke-controller": {
+      "component": {
+        "artifactPath": "bin/nvke-controller-image-{{.Arch}}.oci.tar",
+        "buildCommand": [
+          "sh",
+          "-ec",
+          "buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/. --local dockerfile=/src/controller --opt platform=linux/{{.Arch}} --opt build-arg:GOLANG_IMAGE=docker.io/library/golang@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c --opt \"build-arg:BUILD_VERSION=$BUILD_VERSION\" --opt \"build-arg:GIT_VERSION=$GIT_VERSION\" --opt \"build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH\" --output type=oci,dest=/src/bin/nvke-controller-image-{{.Arch}}.oci.tar,oci-mediatypes=true"
+        ],
+        "builderType": "buildkit-rootless",
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "fromSource": true,
+        "outputType": "oci-image",
+        "platforms": [
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "sourceDateEpoch": 1793236039,
+        "tag": "v0.23.0",
+        "toolchainImage": "moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "versionStamp": {
+          "BUILD_VERSION": "{{.Commit}}",
+          "GIT_VERSION": "{{.Commit}}"
+        },
+        "writeDir": "bin"
+      }
+    },
+    "nvkectl": {
+      "component": {
+        "artifactPath": "cli/bin/nvkectl",
+        "buildCommand": [
+          "bash",
+          "-euc",
+          "export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor\nmake -C cli build NVKECTL_TREE=clean\n"
+        ],
+        "builderType": "oci-hermetic",
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "fromSource": true,
+        "outputType": "host-package",
+        "platforms": [
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "sourceDateEpoch": 1793236039,
+        "tag": "v0.23.0",
+        "toolchainImage": "golang@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "vendorCommand": [
+          "bash",
+          "-euc",
+          "export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\n# The source-owned charts module has no dependencies or go.sum.\ntest ! -e controller/deploy/charts/go.sum\npins=\"$(sha256sum cli/go.mod cli/go.sum controller/api/go.mod controller/api/go.sum controller/deploy/charts/go.mod management-engine/go.mod management-engine/go.sum)\"\ncd cli\ntimeout --kill-after=10s 540s go mod download\nGOPROXY=off timeout --kill-after=10s 60s go mod verify\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor\ncd ..\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c -\ntest ! -e controller/deploy/charts/go.sum\n"
+        ],
+        "versionStamp": {
+          "NVKECTL_VERSION": "git-{{.Commit}}",
+          "NVKECTL_COMMIT": "{{.Commit}}",
+          "NVKECTL_DATE": "{{.Date}}"
+        },
+        "writeDir": "cli/bin"
+      }
+    }
+  },
+  "toolchainSubstitutions": [
+    {
+      "arch": "amd64",
+      "from": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+      "to": "golang@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c",
+      "components": [
+        "nktp-chart",
+        "nvke-controller-chart"
+      ]
+    }
+  ]
+}

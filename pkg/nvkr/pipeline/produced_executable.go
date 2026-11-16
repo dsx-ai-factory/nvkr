@@ -29,10 +29,10 @@ func (tool *ProducedExecutable) AuthenticateResultContext(ctx context.Context, r
 		return err
 	}
 	defer s.mu.Unlock()
-	if s.file == nil || s.report == nil || len(s.report.Artifacts) != 1 {
+	if s.file == nil || s.receipt.binding == "" {
 		return e.New(e.CodeVerifyFailed, "produced executable result receipt is closed or absent")
 	}
-	want, err := canonical.Marshal(s.report.Artifacts[0])
+	want, err := canonical.Marshal(s.receipt.result)
 	if err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "encoding original executable result")
 	}
@@ -58,8 +58,7 @@ type producedExecutableState struct {
 	buildDigest string
 	platform    string
 	component   string
-	report      *Report
-	terminal    terminalVerificationReceipt
+	receipt     producedExecutableReceipt
 }
 
 // ProducedExecutableBinding is descriptive. It cannot recreate a capability.
@@ -81,7 +80,7 @@ func (l Local) ExecuteProducedExecutable(graph *ir.Graph, buildDigest, component
 	if err != nil {
 		return nil, nil, err
 	}
-	if !opts.Launch || opts.DryRun || opts.Qualification != nil || opts.Package {
+	if !opts.Launch || opts.DryRun || opts.Package {
 		return nil, nil, e.New(e.CodeEngineCapability, "produced executable requires launched unqualified native production")
 	}
 	result, err := l.ExecNode(*producer, opts)
@@ -105,7 +104,7 @@ func admitProducedExecutable(ctx context.Context, graph *ir.Graph, buildDigest, 
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "produced executable capture canceled")
 	}
-	if err := validateGraphIdentity(graph, buildDigest); err != nil {
+	if err := validateProducedExecutableGraph(graph, buildDigest); err != nil {
 		return nil, err
 	}
 	if runtime.GOOS != "linux" || graph.Platform != "linux/"+runtime.GOARCH {
@@ -118,7 +117,7 @@ func admitProducedExecutable(ctx context.Context, graph *ir.Graph, buildDigest, 
 // work or requiring the producer's native host. Compilation and restored Plan
 // validation share the concrete executor's regular-file boundary.
 func ValidateProducedExecutableProducer(graph *ir.Graph, buildDigest, component string) error {
-	if err := validateGraphIdentity(graph, buildDigest); err != nil {
+	if err := validateProducedExecutableGraph(graph, buildDigest); err != nil {
 		return err
 	}
 	_, err := selectProducedExecutableProducer(graph, component)
@@ -199,14 +198,12 @@ func captureExecutedTool(ctx context.Context, platform, buildDigest string, prod
 		return nil, err
 	}
 	retained.AbsPath = result.AbsPath
-	report := &Report{BuildDigest: buildDigest, Artifacts: []ArtifactResult{retained},
-		Nodes: []NodeResult{{ID: producer.ID, Kind: producer.Kind, Status: "ok"}}}
-	terminal, err := issueTerminalReceipt(ctx, report, map[string]ir.Node{producer.ID: producer}, map[string]bool{producer.ID: true}, opts)
+	receipt, err := captureProducedExecutableReceipt(ctx, buildDigest, producer, retained, opts)
 	if err != nil {
 		return nil, err
 	}
 	accepted = true
-	return &ProducedExecutable{state: &producedExecutableState{file: file, buildDigest: buildDigest, platform: platform, component: producer.Component, report: report, terminal: terminal}}, nil
+	return &ProducedExecutable{state: &producedExecutableState{file: file, buildDigest: buildDigest, platform: platform, component: producer.Component, receipt: receipt}}, nil
 }
 
 // BindingContext revalidates the live held bytes before returning descriptions.
@@ -225,13 +222,13 @@ func (tool *ProducedExecutable) BindingContext(ctx context.Context) (ProducedExe
 	if s.file == nil {
 		return ProducedExecutableBinding{}, e.New(e.CodeVerifyFailed, "produced executable receipt is closed")
 	}
-	if err := s.terminal.require(ctx, s.report); err != nil {
+	if err := s.receipt.require(ctx); err != nil {
 		return ProducedExecutableBinding{}, err
 	}
 	if err := s.file.AssertUnchangedContext(ctx); err != nil {
 		return ProducedExecutableBinding{}, mapCancellation(ctx, e.Wrap(e.CodeVerifyFailed, err, "revalidating produced executable"), "produced executable binding")
 	}
-	return ProducedExecutableBinding{BuildDigest: s.buildDigest, Platform: s.platform, Component: s.component, Digest: s.file.Digest(), Size: s.file.Size(), TerminalDigest: s.terminal.binding}, nil
+	return ProducedExecutableBinding{BuildDigest: s.buildDigest, Platform: s.platform, Component: s.component, Digest: s.file.Digest(), Size: s.file.Size(), TerminalDigest: s.receipt.binding}, nil
 }
 
 // Close revokes the held tool and every shallow copy. It is idempotent.
@@ -248,4 +245,25 @@ func (tool *ProducedExecutable) Close() error {
 	err := s.file.Close()
 	s.file = nil
 	return err
+}
+
+// validateProducedExecutableGraph is the common execution gate. A buildDigest is
+// authority only for the exact semantically valid graph that produced it; accepting
+// a caller-supplied label here would let an unsafe graph masquerade as another build.
+func validateProducedExecutableGraph(g *ir.Graph, buildDigest string) error {
+	if g == nil {
+		return e.New(e.CodeInvalidCatalog, "pipeline requires an IR graph")
+	}
+	if err := g.Validate(); err != nil {
+		return err
+	}
+	digest, err := g.Digest()
+	if err != nil {
+		return err
+	}
+	if buildDigest != digest {
+		return e.New(e.CodeVerifyFailed,
+			"pipeline buildDigest %q does not match validated graph digest %s", buildDigest, digest)
+	}
+	return nil
 }

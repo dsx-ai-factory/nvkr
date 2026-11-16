@@ -22,7 +22,9 @@ NVKR owns the build and release workflow that supplies their artifacts.
 
 ## Build your first artifact
 
-Build the NVKE CLI, controller container image and Helm chart locally, with dependency SBOMs.
+Start with the [hello demo](demos/hello/README.md): one tiny executable, built in Docker
+and run on your host. Then use the [quickstart](docs/quickstart.md) to build the NVKE CLI,
+controller container image and Helm chart with dependency SBOMs.
 You need **Git 2.38 or later, Bash and running Docker**. You also need the pinned Go compiler; if it is missing, the launcher asks before installing it locally. You do not need Make or host Python.
 Use Docker Desktop on macOS, or Docker on Linux.
 NVKR runs on your host. The NVKE CLI and image it builds target Linux.
@@ -34,30 +36,34 @@ Open a terminal in a directory without an existing `nvkr` folder and copy the wh
 ```sh
 git clone https://github.com/dsx-ai-factory/nvkr.git &&
 cd nvkr &&
-bash scripts/nvkr-quickstart.sh
+bash demos/demo-local.sh
 ```
 
-Wait for `status: complete` and `observed outputs: 3`. The block lists the payload files
-and prints the full path to the artifacts and SBOMs. The native CLI is `bin/nvkr`.
-The launcher runs in a child shell, so a failed build returns an error without changing your SSH shell settings.
-Nothing is published or deployed; the local build is unsigned.
-
-The [quickstart](docs/quickstart.md) explains the output files and next steps.
-This builds three selected artifacts; OS images belong to the larger NVKE selection.
+Wait for `Hello, team!`, then run `bash scripts/nvkr-quickstart.sh` for the three NVKE artifacts.
+In CI, a piped shell, or an agent terminal, pass `--install-go` to either script to
+consent to installing the pinned Go SDK. A different Go patch version does not satisfy the pin.
+If inherited Git settings are rejected, run `unset GIT_CONFIG_COUNT` before retrying.
+The scripts run in child shells and retain their build directories. Nothing is published or deployed.
 
 ## From components to releases
 
-The public lifecycle is **Definition → Run → Release**:
+```mermaid
+flowchart LR
+  C[Catalog: pinned components] --> D[Definition: requested outputs]
+  D --> P[Generated Plan]
+  E[Environment: execution settings] --> P
+  P --> R[Run: build and observe]
+  R --> L[Release: publish and verify]
+```
 
-1. **Define the deliverables.** A Definition selects named outputs, their
-   components, platforms and formats. Catalogs supply pinned sources, artifacts
-   and tools; an Environment supplies execution, registry and signing settings.
-2. **Inspect and run.** NVKR generates a Plan and dependency graphs you can
-   review before execution. Run locally or generate GitHub Actions. Each Run
-   records its required outputs, observed artifacts, evidence and failures.
-3. **Publish and verify.** A digest-pinned OCI registry reference connects a
-   Release's outputs to their SBOMs and provenance. Consumers choose a
-   Verification Policy and authenticate the supported claims before using the artifacts.
+- **Catalog:** reusable component producers and their pinned sources and tools.
+- **Definition:** the named outputs, formats and platforms you want to build.
+- **Environment:** where work runs and how publication and signing are configured.
+- **Run:** one attempt, recording the required outputs, observations and failures.
+- **Release:** published artifacts and evidence that consumers verify under their policy.
+
+The Plan is generated for inspection; you author the Definition and Environment.
+[What is NVKR?](docs/overview/what-is-nvkr.md) explains the lifecycle and its boundaries.
 
 Start with the [tutorial Definition](docs/examples/nvke-tutorial/README.md),
 which selects the NVKE CLI, management-plane image and Helm bundle. The

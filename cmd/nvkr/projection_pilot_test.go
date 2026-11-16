@@ -18,7 +18,7 @@ import (
 // TestMain lets this test binary serve the hidden adapter command that
 // --projection-pilot launches from os.Executable with an empty environment.
 func TestMain(m *testing.M) {
-	if len(os.Args) == 2 && os.Args[1] == projectionAdapterCommand {
+	if len(os.Args) >= 2 && os.Args[1] == projectionAdapterCommand {
 		main()
 		os.Exit(0)
 	}
@@ -30,20 +30,20 @@ func TestMain(m *testing.M) {
 func TestRunGenerateProjectionPilotMatchesInBinaryGeneration(t *testing.T) {
 	lifecycleCommandRepo(t)
 	previous, selected := selectProjectionPilot, []string{}
-	selectProjectionPilot = func(ctx context.Context, transport string) (context.Context, error) {
+	selectProjectionPilot = func(ctx context.Context, transport, engine string) (context.Context, error) {
 		selected = append(selected, transport)
-		return previous(ctx, transport)
+		return previous(ctx, transport, engine)
 	}
 	t.Cleanup(func() { selectProjectionPilot = previous })
-	generate := []string{"run", "generate", "--definition", "docs/examples/nvke-tutorial/definition.yaml",
-		"--environment", "docs/examples/nvke-tutorial/environment-github.yaml"}
+	generate := []string{"run", "generate", "--definition", "docs/examples/nvke-module-tags/definition.yaml",
+		"--environment", "docs/examples/nvke-module-tags/environment-github.yaml"}
 	inBinary := t.TempDir()
 	if _, err := invokeLifecycleCLI(t, append(generate, "--root", inBinary)...); err != nil {
 		t.Fatal(err)
 	}
 	// The generated bootstrap argv, with no pilot flag, never selects a plugin.
-	if output, err := invokeLifecycleCLI(t, "run", "generate", "--engine", "github", "--definition", "docs/examples/nvke-tutorial/definition.yaml",
-		"--environment", "docs/examples/nvke-tutorial/environment-github.yaml", "--root", inBinary, "--check"); err != nil || !strings.Contains(output, "generated run is current") {
+	if output, err := invokeLifecycleCLI(t, "run", "generate", "--engine", "github", "--definition", "docs/examples/nvke-module-tags/definition.yaml",
+		"--environment", "docs/examples/nvke-module-tags/environment-github.yaml", "--root", inBinary, "--check"); err != nil || !strings.Contains(output, "generated run is current") {
 		t.Fatalf("bootstrap check: %s %v", output, err)
 	}
 	if len(selected) != 0 {

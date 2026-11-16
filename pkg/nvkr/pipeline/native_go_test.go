@@ -107,7 +107,7 @@ func TestNativeGoToolchainAuthenticatesInstalledBytes(t *testing.T) {
 }
 
 func TestNativeGoRejectsWrongOrClosedReceiptBeforeSourceWork(t *testing.T) {
-	for _, scenario := range []string{"missing", "closed", "wrong identity", "qualified", "not launched"} {
+	for _, scenario := range []string{"missing", "closed", "wrong identity", "not launched"} {
 		t.Run(scenario, func(t *testing.T) {
 			root, compiler, manifest, digest := nativeGoFixture(t)
 			tool, err := OpenNativeGo(t.Context(), manifest, digest, root, compiler)
@@ -127,8 +127,6 @@ func TestNativeGoRejectsWrongOrClosedReceiptBeforeSourceWork(t *testing.T) {
 			case "wrong identity":
 				node.Toolchain = "sha256:" + strings.Repeat("b", 64)
 				want = e.CodeUnverifiedRef
-			case "qualified":
-				options.Qualification = &QualifiedExecution{}
 			case "not launched":
 				options.Launch = false
 			}
@@ -143,8 +141,8 @@ func TestNativeGoRejectsWrongOrClosedReceiptBeforeSourceWork(t *testing.T) {
 	}
 }
 
-func TestNativeGoRunAdmitsAllSelectedBuildsBeforeFetching(t *testing.T) {
-	for _, scenario := range []string{"missing", "closed", "wrong identity", "wrong platform", "qualified", "not launched", "packaged"} {
+func TestNativeGoExecNodeAdmitsBeforeSourceAccess(t *testing.T) {
+	for _, scenario := range []string{"missing", "closed", "wrong identity", "wrong platform", "not launched", "packaged"} {
 		t.Run(scenario, func(t *testing.T) {
 			root, compiler, manifest, digest := nativeGoFixture(t)
 			tool, err := OpenNativeGo(t.Context(), manifest, digest, root, compiler)
@@ -163,9 +161,6 @@ func TestNativeGoRunAdmitsAllSelectedBuildsBeforeFetching(t *testing.T) {
 					build.Env[i].Value = runtime.GOOS
 				}
 			}
-			graph := testSourceGraph(fetch, build)
-			graph.Platform = build.Platform
-			selected := mustGraphDigest(t, graph)
 			workspace := filepath.Join(t.TempDir(), "must-not-exist")
 			options := RunOptions{Ctx: t.Context(), NativeGo: tool, Launch: true, SourceRoot: workspace}
 			want := e.CodeEngineCapability
@@ -181,8 +176,6 @@ func TestNativeGoRunAdmitsAllSelectedBuildsBeforeFetching(t *testing.T) {
 			case "wrong platform":
 				tool.spec.Platform = "foreign/arm64"
 				want = e.CodeUnverifiedRef
-			case "qualified":
-				options.Qualification = &QualifiedExecution{}
 			case "not launched":
 				options.Launch = false
 			case "packaged":
@@ -190,13 +183,9 @@ func TestNativeGoRunAdmitsAllSelectedBuildsBeforeFetching(t *testing.T) {
 			}
 			var output strings.Builder
 			options.Stdout, options.Stderr = &output, &output
-			for _, boundary := range []string{"run", "exec-node"} {
+			for _, boundary := range []string{"exec-node"} {
 				var err error
-				if boundary == "run" {
-					_, err = (Local{}).Run(graph, selected, options)
-				} else {
-					_, err = (Local{}).ExecNode(build, options)
-				}
+				_, err = (Local{}).ExecNode(build, options)
 				if code(err) != want || output.Len() != 0 {
 					t.Fatalf("%s admission = %v, output=%q; want %s before work", boundary, err, output.String(), want)
 				}

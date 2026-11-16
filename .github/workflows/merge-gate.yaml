@@ -76,7 +76,7 @@ jobs:
 
   check-paths:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     # `pull-requests: read` is required by dorny/paths-filter: on a
     # pull_request event it lists changed files via
     # GET /repos/{owner}/{repo}/pulls/{n}/files. On a public repository that
@@ -158,6 +158,13 @@ jobs:
             actions:
               - '.github/actionlint.yaml'
               - '.github/workflows/**'
+              - '.github/**/action.yml'
+              - '.github/**/action.yaml'
+              - 'scripts/zizmor*'
+              - 'zizmor.yml'
+              - 'zizmor.yaml'
+              - '.github/zizmor.yml'
+              - '.github/zizmor.yaml'
               - '.github/actions/**'
               - '.github/scripts/**'
               # The pinned linter and its make recipe.
@@ -221,6 +228,34 @@ jobs:
               - 'tools/fern/**'
               - 'Makefile'
               - '.github/workflows/merge-gate.yaml'
+
+      - name: Dependency changes (report-only)
+        id: dependency-review
+        timeout-minutes: 1
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          comment-summary-in-pr: never
+          warn-only: true
+          license-check: false
+          show-openssf-scorecard: false
+
+      - name: Dependency graph coverage
+        if: always()
+        env:
+          REVIEW_OUTCOME: ${{ steps.dependency-review.outcome }}
+          HAS_DEPENDENCY_REPORT: ${{ steps.dependency-review.outputs.dependency-changes != '' }}
+        run: |
+          {
+            echo '## Dependency review coverage (report-only)'
+            if [ "$REVIEW_OUTCOME" != success ] || [ "$HAS_DEPENDENCY_REPORT" != true ]; then
+              echo 'INCOMPLETE: dependency review unavailable, failed, skipped, or returned no report. See action diagnostics for unsupported/disabled dependency graph or missing snapshots.'
+            else
+              echo 'GitHub returned a dependency-change report; consult its findings and snapshot warnings above.'
+            fi
+            echo 'Coverage is limited to changes GitHub recognizes. Missing/unsupported manifests and snapshots remain unverified, including nested tool modules and non-manifest artifact dependencies. An empty diff does not establish complete graph coverage; snapshot warnings mean incomplete coverage.'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   # Repository checks — the same gates `make check` runs locally, plus build.
   # `make ci-check` runs these and every other locally reproducible job below.
@@ -315,7 +350,7 @@ jobs:
     needs: [check-paths]
     if: needs.check-paths.outputs.code == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -328,6 +363,27 @@ jobs:
 
       - name: Go vulnerability check
         run: make vulncheck
+
+      - name: Nested Go tool vulnerabilities (report-only)
+        id: tool-vulnerabilities
+        if: always()
+        timeout-minutes: 3
+        continue-on-error: true
+        run: make vulncheck-tools
+
+      - name: Nested tool coverage
+        if: always()
+        env:
+          SCAN_OUTCOME: ${{ steps.tool-vulnerabilities.outcome }}
+        run: |
+          {
+            echo '## Nested Go tool coverage (report-only)'
+            if [ "$SCAN_OUTCOME" = success ]; then
+              echo 'Both enumerated tool entry points scanned; see logs for findings and per-module results.'
+            else
+              echo 'INCOMPLETE: nested tool scanning failed or was skipped. See logs; no clean result is implied.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
 
   tests:
     needs: [check-paths]
@@ -379,6 +435,22 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  hello:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Build and verify hello
+        run: make demo-hello
+
   check-skip:
     needs: [check-paths]
     if: needs.check-paths.outputs.code != 'true'
@@ -397,7 +469,8 @@ jobs:
     needs: [check-paths]
     if: needs.check-paths.outputs.actions == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Preserve five minutes for required checks, plus bounded diagnostics and margin.
+    timeout-minutes: 11
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -421,6 +494,36 @@ jobs:
       # Workflow scripts required by triage, title lint and label guard.
       - name: test-workflow-scripts
         run: make test-workflow-scripts
+
+      # Z1 diagnostics only: findings and incomplete scans do not block merging.
+      - name: zizmor report (offline)
+        id: zizmor
+        timeout-minutes: 3
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        env:
+          ZIZMOR_REPORT_DIR: ${{ runner.temp }}/zizmor-report
+        run: make zizmor-report
+
+      - name: Retain zizmor diagnostics
+        id: zizmor-artifact
+        timeout-minutes: 1
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zizmor-report
+          path: ${{ runner.temp }}/zizmor-report/
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Report incomplete zizmor collection
+        timeout-minutes: 1
+        continue-on-error: true
+        if: ${{ !cancelled() && (steps.zizmor.outcome != 'success' || steps.zizmor-artifact.outcome != 'success') }}
+        run: |
+          echo '::warning::zizmor report or artifact collection INCOMPLETE; inspect retained diagnostics (not a clean scan).'
+          echo 'zizmor: INCOMPLETE — report-only; inspect diagnostics.' >> "$GITHUB_STEP_SUMMARY"
 
   actionlint-skip:
     needs: [check-paths]
@@ -701,6 +804,7 @@ jobs:
       - lint
       - vulnerabilities
       - tests
+      - hello
       - check-skip
       - actionlint
       - actionlint-skip
@@ -761,7 +865,7 @@ jobs:
             | flag($fork_pull_request; "fork status") as $fork_pull_request
             | flag($pull_request; "pull request status") as $pull_request
             | [
-                {skip: "check-skip", jobs: ["check", "lint", "vulnerabilities", "tests"],
+                {skip: "check-skip", jobs: ["check", "lint", "vulnerabilities", "tests", "hello"],
                  run: flag($paths.code; "code classification")},
                 {skip: "actionlint-skip", jobs: ["actionlint"],
                  run: flag($paths.actions; "actions classification")},

@@ -121,13 +121,13 @@ func TestHeldPrivateImageAdmission(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			got, err := observeHeldContainerImage(t.Context(), held, node, ImageScopedReader)
+			got, err := prepareHeldContainerImage(t.Context(), held, node, ImageScopedReader)
 			if tc.want == "" {
-				if err != nil || got != "sha256:"+strings.Repeat("a", 64) {
-					t.Fatalf("identity=%q err=%v", got, err)
+				if err != nil || got == nil || got.digest != "sha256:"+strings.Repeat("a", 64) {
+					t.Fatalf("receipt=%v err=%v", got, err)
 				}
-			} else if code(err) != tc.want || got != "" {
-				t.Fatalf("identity=%q err=%v", got, err)
+			} else if code(err) != tc.want || got != nil {
+				t.Fatalf("receipt=%v err=%v", got, err)
 			}
 			calls, err := os.ReadFile(filepath.Join(root, "held-calls"))
 			if err != nil {
@@ -148,7 +148,7 @@ func TestHeldImageAdmissionCancellationJoins(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 	done := make(chan error, 1)
-	go func() { _, err := observeHeldContainerImage(ctx, held, node, ImageScopedReader); done <- err }()
+	go func() { _, err := prepareHeldContainerImage(ctx, held, node, ImageScopedReader); done <- err }()
 	timer := time.NewTimer(10 * time.Second)
 	defer timer.Stop()
 	ticker := time.NewTicker(10 * time.Millisecond)

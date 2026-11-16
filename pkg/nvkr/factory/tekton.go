@@ -44,7 +44,7 @@ func renderTekton(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 	if err != nil {
 		return nil, err
 	}
-	layout := generationLayout{workflowPath: tektonResourcePath, manifestPath: tektonManifestPath, planPath: tektonPlanPath}
+	layout := tektonLayoutFor(plan)
 	files, digest, err := renderStaticInputs(ctx, plan, layout)
 	if err != nil {
 		return nil, err

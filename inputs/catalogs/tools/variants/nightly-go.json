@@ -1,0 +1,82 @@
+{
+  "apiVersion": "nvkr.dev/catalog-overlay/v3",
+  "kind": "CatalogOverlay",
+  "name": "nvke-nightly-tools-go-1-27-4",
+  "requiresCatalogDigest": "sha256:2b39bca1e77dad7469ed70371b2ea645dba9b50075918dcc792b37685ca2c650",
+  "components": {
+    "nvke-installer-sources": {
+      "component": {
+        "artifactPath": "bin/nvke-installer-sources.tar.gz",
+        "buildCommand": [
+          "bash",
+          "-euc",
+          "set -o pipefail\nprintf '%s\\n' \"${NKECTL_COMMIT:?}\" > bin/SOURCE_COMMIT\nunset CAPI_VERSION\nmake --no-print-directory -s -f make/tool-versions.mk \\\n  --eval='nvkr-capi-version: ; @printf \"%s\\n\" \"$(CAPI_VERSION)\"' \\\n  nvkr-capi-version > bin/CAPI_VERSION\ntar --sort=name --format=ustar --mtime=\"@${SOURCE_DATE_EPOCH:?}\" \\\n  --owner=0 --group=0 --numeric-owner --mode=u=rwX,go=rX \\\n  -cf - make/tool-versions.mk deploy/nvke-deploy.sh deploy/lib deploy/nico \\\n  cli/internal/bootstrap/sitespec/template.yaml \\\n  controller/deploy/charts/controller nktp/deploy/charts/nktp \\\n  controller/hack/apply-capi-spiffe-exec-auth.sh \\\n  controller/deploy/k8s/capi-spiffe-exec-auth \\\n  controller/test/fixtures/releases \\\n  controller/nico-sim/internal/seed/default-seed.yaml controller/nico-sim/ui \\\n  -C bin SOURCE_COMMIT CAPI_VERSION | gzip -n > bin/nvke-installer-sources.tar.gz\n"
+        ],
+        "builderType": "oci-hermetic",
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "fromSource": true,
+        "outputType": "tarball",
+        "platforms": [
+          "darwin/arm64",
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "sourceDateEpoch": 1793236039,
+        "tag": "v0.23.0",
+        "toolchainImage": "golang@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "versionStamp": {
+          "NKECTL_COMMIT": "{{.Commit}}"
+        },
+        "writeDir": "bin"
+      }
+    },
+    "nvkectl": {
+      "component": {
+        "artifactPath": "cli/bin/nvkectl",
+        "buildCommand": [
+          "bash",
+          "-euc",
+          "export GOENV=off GOWORK=off GOTOOLCHAIN=local\ntarget_os=\"${GOOS:?}\"\ntarget_arch=\"${GOARCH:?}\"\nenv -u GOOS -u GOARCH make -C cli build-cross DIST=bin NVKECTL_PLATFORMS=\"$target_os/$target_arch\" \\\n  LEGACY_BINARY_NAME= NVKECTL_VERSION=\"git-${NKECTL_COMMIT}\" NVKECTL_COMMIT=\"${NKECTL_COMMIT}\" \\\n  NVKECTL_DATE=\"${NKECTL_DATE}\" NVKECTL_TREE=clean\ncp \"cli/bin/nvkectl-$target_os-$target_arch\" cli/bin/nvkectl\n"
+        ],
+        "builderType": "oci-hermetic",
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "fromSource": true,
+        "outputType": "host-package",
+        "platforms": [
+          "darwin/arm64",
+          "linux/amd64",
+          "linux/arm64"
+        ],
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "sourceDateEpoch": 1793236039,
+        "tag": "v0.23.0",
+        "toolchainImage": "golang@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "vendorCommand": [
+          "bash",
+          "-euc",
+          "cd cli\nexport GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=\npins=\"$(sha256sum go.mod go.sum ../controller/api/go.mod ../controller/api/go.sum ../controller/deploy/charts/go.mod ../management-engine/go.mod ../management-engine/go.sum)\"\ntimeout --kill-after=10s 540s go mod download\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c -\nGOPROXY=off timeout --kill-after=10s 60s go mod verify\nGOPROXY=off timeout --kill-after=10s 180s go mod vendor\nprintf '%s\\n' \"$pins\" | sha256sum --quiet -c -\n"
+        ],
+        "versionStamp": {
+          "NKECTL_COMMIT": "{{.Commit}}",
+          "NKECTL_DATE": "{{.Date}}"
+        },
+        "writeDir": "cli/bin"
+      }
+    }
+  },
+  "toolchainSubstitutions": [
+    {
+      "arch": "amd64",
+      "from": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+      "to": "golang@sha256:08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c",
+      "components": [
+        "nico-sim",
+        "nico-sim-runtime-assets",
+        "nico-simctl"
+      ]
+    }
+  ]
+}
