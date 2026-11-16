@@ -234,10 +234,11 @@ func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStag
 		}
 		if inspector == nil && githubDiskInspectionRequired(plan) {
 			return completeGitHubDiskWithHelper(ctx, func(ctx context.Context) (func() error, error) {
-				inspector, err = owner.openDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace, inspectionLog)
+				opened, err := owner.openDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace, inspectionLog)
 				if err != nil {
 					return nil, err
 				}
+				inspector = opened
 				return inspector.Close, nil
 			}, complete)
 		}
