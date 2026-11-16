@@ -4,6 +4,8 @@
 package factory
 
 import (
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -12,12 +14,26 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
-// The pinned NVKE Packer project accepts one exact Packer version and the
-// toolchain image carries another, so `packer validate` refuses the unpatched
-// project. A catalog patch moves the project's pin to the producer's declared
-// version. A toolchain refresh that changes one without the other fails here
-// instead of in a hosted disk build. Remove this test with that patch.
+// The pinned NVKE Packer project accepts one exact Packer version and one exact
+// QEMU plugin version, and the toolchain image carries others, so `packer
+// validate` refuses the unpatched project. A catalog patch moves the project's
+// pins to the producer's declared Packer version and the toolchain lock's
+// plugin version. A toolchain refresh that changes one side without the patch
+// fails here instead of in a hosted disk build. Remove this test with that patch.
 func TestMaintainedDiskProducersPatchPackerVersion(t *testing.T) {
+	raw, err := os.ReadFile("../../../toolchains/nvkr-packer/toolchain.lock.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lock struct {
+		QEMUPlugin struct {
+			Version string `json:"version"`
+		} `json:"qemuPlugin"`
+	}
+	if err := json.Unmarshal(raw, &lock); err != nil || lock.QEMUPlugin.Version == "" {
+		t.Fatalf("toolchain lock declares no QEMU plugin version: %v", err)
+	}
+	plugin := `+      version = "= ` + lock.QEMUPlugin.Version + `"` + "\n"
 	plans, err := filepath.Glob("../../../.github/*/plan.json")
 	if err != nil || len(plans) == 0 {
 		t.Fatalf("no committed Plan found: %v (%v)", plans, err)
@@ -34,11 +50,12 @@ func TestMaintainedDiskProducersPatchPackerVersion(t *testing.T) {
 					continue
 				}
 				producers++
-				pin := `+  required_version = "= ` + node.Packer.PackerVersion + `"`
+				pin := `+  required_version = "= ` + node.Packer.PackerVersion + `"` + "\n"
 				if !slices.ContainsFunc(node.Patches, func(patch ir.PatchRef) bool {
-					return strings.Contains(patch.Content, pin+"\n")
+					return strings.Contains(patch.Content, pin) && strings.Contains(patch.Content, plugin)
 				}) {
-					t.Errorf("%s: %s has no patch that pins the project to Packer %s", path, node.ID, node.Packer.PackerVersion)
+					t.Errorf("%s: %s has no patch that pins the project to Packer %s and QEMU plugin %s",
+						path, node.ID, node.Packer.PackerVersion, lock.QEMUPlugin.Version)
 				}
 			}
 		}
