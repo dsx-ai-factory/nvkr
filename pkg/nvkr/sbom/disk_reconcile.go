@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/diskinspect"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -31,7 +32,7 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 	materialFiles := make(map[string][]string)
 	seenInputs := make(map[string]bool)
 	for _, input := range inputs {
-		if input == nil || !canonical.IsDigest(input.report.Subject) || input.report.Size <= 0 || input.runtimeDigest != root.runtimeDigest || input.report.Platform != root.report.Platform ||
+		if input == nil || !canonical.IsDigest(input.report.Subject) || input.report.Size <= 0 || input.runtimeDigest != root.runtimeDigest || input.report.Platform != root.report.Platform || input.helperName != root.helperName || input.helper != root.helper ||
 			input.report.Scanner != root.report.Scanner || input.report.Guestfish != root.report.Guestfish || input.report.PackageReader != root.report.PackageReader || input.report.Codec != root.report.Codec || input.report.Inspector != root.report.Inspector || input.report.MaxFilesystemBytes != root.report.MaxFilesystemBytes {
 			return nil, e.New(e.CodeVerifyFailed, "disk material content differs from its exact inspection closure")
 		}
@@ -129,6 +130,7 @@ func ReconcileDiskContents(ctx context.Context, buildDigest, name string, root *
 	bom.Metadata.Props = append(bom.Metadata.Props,
 		Property{Name: "nvkr:diskInspectionRuntimeDigest", Value: root.runtimeDigest}, Property{Name: "nvkr:diskInspectorDigest", Value: root.report.Inspector},
 		Property{Name: "nvkr:diskCodecDigest", Value: root.report.Codec})
+	bom.Metadata.Props = append(bom.Metadata.Props, diskHelperProperties(root)...)
 	slices.SortFunc(bom.Metadata.Props, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
 	return ForSubject(bom, root.report.Subject, "build-output", "")
 }
@@ -137,13 +139,13 @@ type diskPackageKey struct{ name, version, format, architecture string }
 
 const (
 	// Property names emitted and consumed by the NVKR inspection report.
-	diskContentClassProperty        = "nvkr:diskContentClass"
-	diskPackageFormatProperty       = "nvkr:packageFormat"
-	diskPackageArchitectureProperty = "nvkr:packageArchitecture"
-	diskContainedInProperty         = "nvkr:containedIn"
-	diskClassFilesystem             = "filesystem"
-	diskClassContainer              = "container"
-	diskClassDebianArchive          = "debian-archive"
+	diskContentClassProperty        = diskinspect.ContentClassProperty
+	diskPackageFormatProperty       = diskinspect.PackageFormatProperty
+	diskPackageArchitectureProperty = diskinspect.PackageArchitectureProperty
+	diskContainedInProperty         = diskinspect.ContainedInProperty
+	diskClassFilesystem             = diskinspect.ClassFilesystem
+	diskClassContainer              = diskinspect.ClassContainer
+	diskClassDebianArchive          = diskinspect.ClassDebianArchive
 )
 
 type diskObservedPackageKey struct {
@@ -151,39 +153,8 @@ type diskObservedPackageKey struct {
 	class string
 }
 
-// This class describes the actual observation operation, not installed origin.
-// Native scanner fields are projected separately; they cannot author this key.
-func withDiskContentClass(components []Component, class string) []Component {
-	result := make([]Component, len(components))
-	for index, component := range components {
-		result[index] = cloneComponent(component)
-		result[index].Properties = append(result[index].Properties, Property{Name: diskContentClassProperty, Value: class})
-		slices.SortFunc(result[index].Properties, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
-	}
-	return result
-}
-
 func diskComponentClass(component Component) (string, error) {
-	class := ""
-	seen := false
-	for _, property := range component.Properties {
-		if property.Name != diskContentClassProperty {
-			continue
-		}
-		if seen {
-			return "", e.New(e.CodeEnvelopeDecode, "disk component has ambiguous observation classes")
-		}
-		seen = true
-		class = property.Value
-	}
-	switch class {
-	case diskClassFilesystem, diskClassContainer, diskClassDebianArchive:
-		return class, nil
-	case "":
-		return "", e.New(e.CodeProvenanceMissing, "disk component has no owner-issued observation class")
-	default:
-		return "", e.New(e.CodeEnvelopeDecode, "disk component has an unsupported observation class")
-	}
+	return diskinspect.ComponentClass(component)
 }
 
 func diskObservedComponentKey(component Component, platform string) (diskObservedPackageKey, error) {
@@ -278,7 +249,20 @@ func DiskContentDocument(buildDigest, name string, inspection *DiskContentInspec
 	if err != nil {
 		return nil, err
 	}
+	bom.Metadata.Props = append(bom.Metadata.Props, diskHelperProperties(inspection)...)
+	slices.SortFunc(bom.Metadata.Props, func(a, b Property) int { return strings.Compare(a.Name, b.Name) })
 	return ForSubject(bom, inspection.report.Subject, "build-output", "")
+}
+
+func diskHelperProperties(inspection *DiskContentInspection) []Property {
+	if inspection.helperName == "" {
+		return nil
+	}
+	// The terminal receipt is attempt-scoped and stays in Run evidence. SBOM
+	// properties name reproducible producer and executable content identities.
+	return []Property{{Name: "nvkr:diskInspectionHelperBuildDigest", Value: inspection.helper.BuildDigest},
+		{Name: "nvkr:diskInspectionHelperComponent", Value: inspection.helper.Component},
+		{Name: "nvkr:diskInspectionHelperDigest", Value: inspection.helper.Digest}}
 }
 
 // WithSourceSubject retains the existing source-bound per-artifact subject
@@ -319,20 +303,6 @@ func WithSourceSubject(document, source *BOM) (*BOM, error) {
 // Values are exactly those reported by pinned Syft/dpkg-deb. In particular the
 // Debian version is never shortened, parsed or compared with a made-up grammar.
 func diskComponentKey(component Component, platform string) (diskPackageKey, error) {
-	key := diskPackageKey{name: component.Name, version: component.Version}
-	for _, property := range component.Properties {
-		switch property.Name {
-		case diskPackageFormatProperty:
-			key.format = property.Value
-		case diskPackageArchitectureProperty:
-			key.architecture = property.Value
-		}
-	}
-	if key.name == "" || key.format == "" || (key.format == "deb" && key.version == "") {
-		return diskPackageKey{}, e.New(e.CodeProvenanceMissing, "disk package lacks an exact semantic identity")
-	}
-	if key.format == "deb" && key.architecture != "all" && key.architecture != strings.TrimPrefix(platform, "linux/") {
-		return diskPackageKey{}, e.New(e.CodeVerifyFailed, "disk Debian package has a missing or different consumer architecture")
-	}
-	return key, nil
+	name, version, format, architecture, err := diskinspect.ComponentPackageIdentity(component, platform)
+	return diskPackageKey{name, version, format, architecture}, err
 }

@@ -30,7 +30,7 @@ const (
 // packages or installed paths. The standard library owns tar/gzip decoding;
 // nothing is extracted, followed, executed or resolved outside the held archive.
 func inspectArchiveContents(ctx context.Context, source io.Reader) ([]Component, error) {
-	buffered := bufio.NewReader(filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(source)})
+	buffered := bufio.NewReader(archiveContextReader{ctx: ctx, ReadCloser: io.NopCloser(source)})
 	var expanded io.Reader = buffered
 	if magic, _ := buffered.Peek(2); len(magic) == 2 && magic[0] == 0x1f && magic[1] == 0x8b {
 		compressed, err := gzip.NewReader(buffered)
@@ -40,7 +40,7 @@ func inspectArchiveContents(ctx context.Context, source io.Reader) ([]Component,
 		defer func() { _ = compressed.Close() }()
 		expanded = compressed
 	}
-	limited := &io.LimitedReader{R: filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(expanded)}, N: maxArchiveExpanded + 1}
+	limited := &io.LimitedReader{R: archiveContextReader{ctx: ctx, ReadCloser: io.NopCloser(expanded)}, N: maxArchiveExpanded + 1}
 	reader := tar.NewReader(limited)
 	paths := map[string]byte{}
 	var components []Component
@@ -143,4 +143,17 @@ func (archivePaddingWriter) Write(raw []byte) (int, error) {
 		}
 	}
 	return len(raw), nil
+}
+
+// archiveContextReader checks cancellation before each bounded archive read.
+type archiveContextReader struct {
+	ctx context.Context
+	io.ReadCloser
+}
+
+func (reader archiveContextReader) Read(raw []byte) (int, error) {
+	if err := reader.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return reader.ReadCloser.Read(raw)
 }

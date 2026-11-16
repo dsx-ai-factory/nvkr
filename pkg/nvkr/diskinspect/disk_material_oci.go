@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package sbom
+package diskinspect
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/diskdiagnostic"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/ociclosure"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/layout"
@@ -77,7 +77,7 @@ func inspectNestedOCILayoutScan(ctx context.Context, subject inspectionArchive, 
 		}
 		want = manifest.Manifests[0].Digest.String()
 	}
-	if err := pipeline.VerifyOfflineOCILayout(ctx, workspace, want); err != nil {
+	if err := ociclosure.VerifyPath(ctx, workspace, want); err != nil {
 		return nil, nestedOCIValidationError(ctx, err, "validating nested OCI closure")
 	}
 	images, err := nestedOCIImages(ctx, index, platform, budget, 0)
@@ -98,10 +98,10 @@ func inspectNestedOCILayoutScan(ctx context.Context, subject inspectionArchive, 
 			}
 			return nil, err
 		}
-		result.components = append(result.components, withDiskContentClass(inventory.Components, diskClassContainer)...)
+		result.components = append(result.components, withDiskContentClass(inventory.Components, ClassContainer)...)
 	}
 	diskdiagnostic.Emit(ctx, "subject-revalidation", "start", depth, 0)
-	if err := pipeline.VerifyOfflineOCILayout(ctx, workspace, want); err != nil {
+	if err := ociclosure.VerifyPath(ctx, workspace, want); err != nil {
 		return nil, nestedOCIValidationError(ctx, err, "revalidating scanned OCI closure")
 	}
 	if err := archive.AssertUnchangedContext(ctx); err != nil {
@@ -134,7 +134,7 @@ func nestedOCIImages(ctx context.Context, index v1.ImageIndex, platform string, 
 }
 
 func nestedOCIImagesSeen(ctx context.Context, index v1.ImageIndex, platform string, budget *materialInspectionBudget, depth int, seen map[v1.Hash]bool) ([]v1.Image, error) {
-	if err := validateSBOMContext(ctx); err != nil {
+	if err := validateContext(ctx); err != nil {
 		return nil, err
 	}
 	if depth > 8 {
@@ -146,7 +146,7 @@ func nestedOCIImagesSeen(ctx context.Context, index v1.ImageIndex, platform stri
 	}
 	var images []v1.Image
 	for _, descriptor := range manifest.Manifests {
-		if err := validateSBOMContext(ctx); err != nil {
+		if err := validateContext(ctx); err != nil {
 			return nil, err
 		}
 		if err := budget.member(); err != nil {

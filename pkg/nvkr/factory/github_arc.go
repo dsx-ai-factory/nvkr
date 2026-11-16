@@ -70,6 +70,11 @@ func githubBootstrapRunner(runner string) string {
 }
 
 func admitGitHubRequirements(plan *Plan, adapter string) error {
+	for _, tool := range plan.InternalTools {
+		if _, err := internalToolDiskOutput(plan, tool); err != nil {
+			return err
+		}
+	}
 	if err := admitSharedExecutionRequirements(plan, adapter); err != nil {
 		return err
 	}
@@ -187,6 +192,12 @@ func githubDiskOutput(plan *Plan, node Node) string {
 	if plan.Environment.GitHubARC != "native-kvm-v1" {
 		return ""
 	}
+	if tool, internal := plan.internalToolForTarget(node.BuildTarget); internal && node.Kind != NodeFetch {
+		if node.IRNode != "" || node.Kind == NodeVerify || node.Kind == NodeSBOM {
+			output, _ := internalToolDiskOutput(plan, tool)
+			return output
+		}
+	}
 	for _, output := range plan.LifecycleOutputs {
 		if output.Kind == PackageDiskImage && PerOutputPublication(plan) &&
 			node.ID == "package/"+outputPublicationPackage(output.Name) &&
@@ -201,6 +212,35 @@ func githubDiskOutput(plan *Plan, node Node) string {
 		}
 	}
 	return ""
+}
+
+// Original executable capabilities cannot cross jobs as result descriptions.
+// Until use-instance scheduling exists, a hosted tool must have one native disk
+// consumer; sharing it across independent groups fails admission explicitly.
+func internalToolDiskOutput(plan *Plan, tool InternalToolPlan) (string, error) {
+	if plan.Environment.GitHubARC != "native-kvm-v1" {
+		return "", e.New(e.CodeEngineCapability, "internal tools require an original native grouped executor")
+	}
+	selected := ""
+	uses := 0
+	for _, node := range plan.Graph.Nodes {
+		if !containsString(node.InternalTools, tool.Name) {
+			continue
+		}
+		uses++
+		if node.Kind != NodeSBOM || node.Platform != tool.Platform {
+			return "", e.New(e.CodeEngineCapability, "internal tool has an unsupported hosted consumer")
+		}
+		for _, output := range plan.LifecycleOutputs {
+			if output.Name == node.BuildTarget && output.Kind == PackageDiskImage {
+				selected = output.Name
+			}
+		}
+	}
+	if uses != 1 || selected == "" {
+		return "", e.New(e.CodeEngineCapability, "internal tool %q requires one native disk consumer per hosted execution", tool.Name)
+	}
+	return selected, nil
 }
 
 func projectARCNode(plan *Plan, node Node) Node {

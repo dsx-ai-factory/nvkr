@@ -25,6 +25,10 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 	if err != nil {
 		return nil, err
 	}
+	node := planNode(plan, artifact.Producer)
+	if err := validateInternalToolUseEvidence(ctx, plan, node, path, artifacts, local); err != nil {
+		return nil, err
+	}
 	raw, err := readFactorySBOMFile(ctx, filepath.Join(path, "index.json"), "hosted SBOM index")
 	if err != nil {
 		return nil, e.Wrap(e.CodeProvenanceMissing, err, "reading hosted SBOM index")
@@ -36,11 +40,10 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 	if err := index.Validate(); err != nil {
 		return nil, err
 	}
-	node := planNode(plan, artifact.Producer)
 	results := map[string]pipeline.ArtifactResult{}
 	for _, inputID := range node.Inputs {
 		input := artifacts[inputID]
-		if input.Kind != "producer-result" {
+		if input.Kind != "producer-result" || plan.internalToolInput(node, input) {
 			continue
 		}
 		inputPath, err := local(input.Path)
@@ -105,11 +108,11 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 			}
 			continue
 		}
-		if plan.Definition.SBOMTool != "" || plan.hasBundleTarget(artifact.BuildTarget) {
+		if selectedScanner := plan.sbomToolForBuild(artifact.BuildTarget); selectedScanner != "" || plan.hasBundleTarget(artifact.BuildTarget) {
 			material := false
 			for _, inputID := range node.Inputs {
 				input := artifacts[inputID]
-				if input.Component == entry.Artifact && input.Kind != "producer-result" {
+				if input.Component == entry.Artifact && input.BuildTarget == node.BuildTarget && input.Kind != "producer-result" {
 					kind, err := plan.sbomPayloadKind(input)
 					if err != nil {
 						return nil, err
@@ -135,7 +138,7 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 			kind := ""
 			for _, inputID := range node.Inputs {
 				input := artifacts[inputID]
-				if input.Component == entry.Artifact && input.Kind != "producer-result" {
+				if input.Component == entry.Artifact && input.BuildTarget == node.BuildTarget && input.Kind != "producer-result" {
 					var err error
 					kind, err = plan.sbomPayloadKind(input)
 					if err != nil {
@@ -170,10 +173,10 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 					}
 					matches = scanner == profile.ScannerDigest && reader == profile.PackageReaderDigest && sbom.ValidateDebianPayloadEvidence(&bom, platform, entry.ArtifactSHA) == nil
 				} else {
-					matches = method == "syft-cyclonedx/v1" && scanner == toolExecutableDigest(plan, plan.Definition.SBOMTool)
+					matches = method == "syft-cyclonedx/v1" && scanner == toolExecutableDigest(plan, selectedScanner)
 				}
 			case "oci-image":
-				matches = method == "syft-cyclonedx/v1" && scanner == toolExecutableDigest(plan, plan.Definition.SBOMTool)
+				matches = method == "syft-cyclonedx/v1" && scanner == toolExecutableDigest(plan, selectedScanner)
 			}
 			if !matches {
 				return nil, e.New(e.CodeVerifyFailed, "hosted SBOM inspection does not match the planned scanner")

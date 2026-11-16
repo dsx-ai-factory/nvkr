@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package sbom
+package diskinspect
 
 import (
 	"archive/tar"
@@ -125,9 +125,9 @@ func TestOrdinaryArchiveProbeDoesNotChargeImageBudgets(t *testing.T) {
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			subject := compressedMaterialBytes(t, test.raw)
-			budget := &materialInspectionBudget{remaining: 2 << 20, members: maxDiskInstalledPackages, images: 256}
+			budget := &materialInspectionBudget{remaining: 2 << 20, members: MaxInstalledPackages, images: 256}
 			inspection, err := inspectNestedImagesBudget(t.Context(), subject, "linux/amd64", Scanner{}, 2<<20, 2, budget)
-			if err != nil || inspection != nil || budget.remaining != 2<<20 || budget.members != maxDiskInstalledPackages || budget.images != 256 {
+			if err != nil || inspection != nil || budget.remaining != 2<<20 || budget.members != MaxInstalledPackages || budget.images != 256 {
 				t.Fatalf("ordinary data charged image inventory: %+v %v", budget, err)
 			}
 		})
@@ -426,7 +426,7 @@ func TestControlOnlyDebianMaterialRetainsObservedMetadata(t *testing.T) {
 				t.Fatal("metapackage subject changed to its empty data filesystem")
 			}
 			class, err := diskComponentClass(components[0])
-			if err != nil || class != diskClassDebianArchive {
+			if err != nil || class != ClassDebianArchive {
 				t.Fatalf("actual package-reader operation issued class %q: %v", class, err)
 			}
 		})
@@ -476,7 +476,7 @@ func TestCachedDebianArchivesDoNotInventInstalledPaths(t *testing.T) {
 			}
 			carriers := map[string]bool{}
 			for _, component := range inspection.Components() {
-				if class, err := diskComponentClass(component); err != nil || class != diskClassDebianArchive {
+				if class, err := diskComponentClass(component); err != nil || class != ClassDebianArchive {
 					t.Fatalf("cached archive changed class: %q %v", class, err)
 				}
 				for _, property := range component.Properties {
@@ -512,10 +512,10 @@ func TestMaterialScanOperationsIssueTheirOwnClasses(t *testing.T) {
 			t.Run(architecture+"/"+operation, func(t *testing.T) {
 				var components []Component
 				var err error
-				want := diskClassContainer
+				want := ClassContainer
 				switch operation {
 				case "filesystem":
-					want = diskClassFilesystem
+					want = ClassFilesystem
 					subject, createErr := createGeneratedInspectionFile(t.Context(), 1<<20, func(destination io.Writer) error {
 						archive := tar.NewWriter(destination)
 						if err := archive.WriteHeader(&tar.Header{Name: "payload", Typeflag: tar.TypeReg, Mode: 0o644, Size: 1}); err != nil {
@@ -804,7 +804,7 @@ func TestRootOrdinaryCandidatesDoNotExhaustNestedImageBudgets(t *testing.T) {
 	member := compressedMaterialBytes(t, []byte("ordinary manpage"))
 	parent, err := createGeneratedInspectionFile(t.Context(), 64<<20, func(destination io.Writer) error {
 		archive := tar.NewWriter(destination)
-		for index := range maxDiskInstalledPackages + 1 {
+		for index := range MaxInstalledPackages + 1 {
 			if err := archive.WriteHeader(&tar.Header{Name: "usr/share/man/page" + strconv.Itoa(index) + ".gz", Typeflag: tar.TypeReg, Mode: 0o644, Size: member.Size()}); err != nil {
 				return err
 			}
@@ -832,7 +832,7 @@ func TestRootOrdinaryCandidatesDoNotExhaustNestedImageBudgets(t *testing.T) {
 	defer parent.Close()
 	budget := &materialInspectionBudget{remaining: 2 << 20}
 	inspection, err := inspectMaterialArchiveBudget(t.Context(), parent, "linux/amd64", Scanner{Path: scannerPath, Digest: rawDigest(script)}, "", 64<<20, 0, false, budget)
-	if err != nil || len(inspection.files) != maxDiskInstalledPackages+3 || budget.remaining != 2<<20 || budget.members != 0 || budget.images != 0 {
+	if err != nil || len(inspection.files) != MaxInstalledPackages+3 || budget.remaining != 2<<20 || budget.members != 0 || budget.images != 0 {
 		t.Fatalf("ordinary root files were charged as nested images: %+v %v", budget, err)
 	}
 }

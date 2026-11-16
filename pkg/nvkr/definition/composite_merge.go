@@ -46,6 +46,9 @@ func mergeComposite(compositePath string, metadata Metadata, admitted []Admitted
 	}
 	for i, member := range members {
 		source := member.Definition.Clone()
+		if len(source.InternalTools) != 0 {
+			return Definition{}, nil, e.New(e.CodeEngineCapability, "composite internal tools require exact member attribution and completeness integration")
+		}
 		if source.SBOMTool == "" {
 			source.SBOMTool = shared
 		}

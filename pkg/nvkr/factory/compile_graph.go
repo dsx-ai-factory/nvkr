@@ -40,6 +40,20 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 	for _, build := range plan.Builds {
 		builds[build.Name] = build
 	}
+	for _, tool := range definition.InternalTools {
+		selection := internalToolSelection(tool)
+		build, ok := builds[selection.Name]
+		if !ok || build.Graph == nil {
+			return ArtifactGraph{}, e.New(e.CodePipelineDrift, "internal tool %q has no producer graph", tool.Name)
+		}
+		selected := make(map[string]bool, len(build.Components))
+		for _, name := range build.Components {
+			selected[name] = true
+		}
+		if err := addBuildDataflow(selection, runsOn, build.Graph, selected, delivery.UtilityContainer, tool.Platform, false, nodes, artifacts); err != nil {
+			return ArtifactGraph{}, err
+		}
+	}
 	for _, output := range definition.Outputs {
 		for _, target := range nativeOutputSelections(output) {
 			build, ok := builds[target.Name]
@@ -95,7 +109,8 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		}
 		disk := plan.hasCompiledDiskTarget(node.BuildTarget, artifacts)
 		bundle := plan.hasBundleTarget(node.BuildTarget)
-		if !disk && !bundle && definition.SBOMTool == "" {
+		scanner := plan.sbomToolForBuild(node.BuildTarget)
+		if !disk && !bundle && scanner == "" {
 			continue
 		}
 		components := map[string]bool{}
@@ -109,11 +124,15 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				node.Inputs = append(node.Inputs, artifact.ID)
 			}
 		}
-		if !disk && definition.SBOMTool != "" {
-			node.Inputs = append(node.Inputs, "tool/"+definition.SBOMTool)
+		if !disk && scanner != "" {
+			node.Inputs = append(node.Inputs, "tool/"+scanner)
 		}
 		node.Inputs = uniqueSorted(node.Inputs)
 		nodes[id] = node
+	}
+
+	if err := bindInternalToolUses(plan, nodes, artifacts); err != nil {
+		return ArtifactGraph{}, err
 	}
 
 	packages, err := orderPackageSpecs(packageSpecs)
@@ -193,6 +212,8 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		}
 		if spec.Kind == PackageOCI {
 			inputs = append(inputs, packageProducerResults(inputs, nodes, artifacts)...)
+		}
+		if spec.Kind == PackageOCI || spec.Kind == PackageDiskImage {
 			inputs = append(inputs, publicationSBOMInputs(inputs, nodes, artifacts)...)
 		}
 		inputs = uniqueSorted(inputs)
@@ -322,7 +343,7 @@ func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
 			return e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", build.Name)
 		}
 	}
-	tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot)
+	tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot, plan.Builds)
 	if err != nil {
 		return err
 	}

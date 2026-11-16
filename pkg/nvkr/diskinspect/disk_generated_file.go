@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-package sbom
+package diskinspect
 
 import (
 	"context"
@@ -43,7 +43,7 @@ type generatedInspectionFile struct {
 // caller pathname can become a scanner subject through this owner. Its bound is
 // enforced while writing; disk capacity itself is observed, not quota-reserved.
 func createGeneratedInspectionFile(ctx context.Context, maxBytes int64, produce func(io.Writer) error) (*generatedInspectionFile, error) {
-	if err := validateSBOMContext(ctx); err != nil {
+	if err := validateContext(ctx); err != nil {
 		return nil, err
 	}
 	if maxBytes <= 0 || maxBytes > 16<<30 || produce == nil {
@@ -97,7 +97,7 @@ func (file *generatedInspectionFile) WriteToContext(ctx context.Context, output 
 	return io.Copy(output, filesystemContextReader{ctx: ctx, ReadCloser: io.NopCloser(io.NewSectionReader(file.file, 0, file.size))})
 }
 func (file *generatedInspectionFile) AssertUnchangedContext(ctx context.Context) error {
-	if err := validateSBOMContext(ctx); err != nil {
+	if err := validateContext(ctx); err != nil {
 		return err
 	}
 	if file == nil || file.file == nil {
@@ -153,9 +153,9 @@ func inspectGeneratedDependencies(ctx context.Context, subject *generatedInspect
 		return DependencyInventory{}, e.Wrap(e.CodeTimeout, ctx.Err(), "generated transport scan canceled")
 	}
 	rawDiagnostic := diagnostic.Bytes()
-	truncated := len(rawDiagnostic) > maxDiskDiagnosticBytes
+	truncated := len(rawDiagnostic) > MaxDiagnosticBytes
 	if truncated {
-		rawDiagnostic = rawDiagnostic[:maxDiskDiagnosticBytes]
+		rawDiagnostic = rawDiagnostic[:MaxDiagnosticBytes]
 	}
 	message := strconv.Quote(strings.TrimSpace(string(rawDiagnostic)))
 	if err != nil {
