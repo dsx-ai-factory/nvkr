@@ -99,6 +99,49 @@ func TestGitHubImagePreflightGatesProducerFanout(t *testing.T) {
 	}
 }
 
+// The utility container is pinned for one platform. The ARC disk job on the
+// other platform never launches it, so its reader probe must not request it.
+func TestGitHubImagePreflightSkipsUnlaunchedDiskUtilities(t *testing.T) {
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-dev/plan.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	placements, err := githubPreflightSubjects(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(placements["arc-arm64-kvm"]) == 0 || len(placements["arc-amd64-kvm"]) == 0 {
+		t.Fatal("maintained development Plan must probe both ARC placements")
+	}
+	for runner, subjects := range placements {
+		for _, subject := range subjects {
+			if subject.Image == plan.Environment.UtilityContainer && subject.Platform != plan.Environment.UtilityPlatform {
+				t.Fatalf("%s probes the %s utility container as %s", runner, plan.Environment.UtilityPlatform, subject.Platform)
+			}
+		}
+	}
+	stages, _, err := githubStages(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, stage := range stages {
+		if stage.DiskOutput == "" {
+			continue
+		}
+		for _, node := range stage.Nodes {
+			// Producer containers of a disk job are still probed.
+			if node.IRNode == "" || node.Container == "" {
+				continue
+			}
+			if !slices.ContainsFunc(placements[node.RunsOn], func(subject imagepreflight.Subject) bool {
+				return subject.Image == node.Container && subject.Platform == node.Platform
+			}) {
+				t.Fatalf("disk producer %s lost its reader probe", node.ID)
+			}
+		}
+	}
+}
+
 func TestGitHubImagePreflightSelectsFinalPlanAndOnlyReader(t *testing.T) {
 	before := runtimeTransportPlan(t, privateImageTestPlan(t, ProductionRegistryWriteCredential))
 	after := recompileGitHubStabilityPlan(t, before, func(in *githubStabilityInputs) {

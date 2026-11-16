@@ -48,7 +48,7 @@ func localPresentationTestApp(execute localLifecycleExecutor, output io.Writer, 
 }
 
 func localPresentationArgs(flags ...string) []string {
-	return append([]string{"nvkr", "run", "local", "--definition", "docs/examples/nvke-tutorial/definition.yaml", "--environment", "docs/examples/nvke-tutorial/environment-local.yaml", "--attempt", "presenter-test"}, flags...)
+	return append([]string{"nvkr", "run", "local", "--definition", "docs/examples/nvke-module-tags/definition.yaml", "--environment", "docs/examples/nvke-module-tags/environment-local.yaml", "--attempt", "presenter-test"}, flags...)
 }
 
 func completedPresentationRun(prepared *lifecycle.PreparedRun) *lifecycle.Run {
@@ -331,7 +331,7 @@ func TestLocalPresentationFailureDoesNotReplaceBuildCode(t *testing.T) {
 
 func TestLocalJSONResultIsDeterministicAndCleanupDistinct(t *testing.T) {
 	lifecycleCommandRepo(t)
-	prepared, err := lifecycle.PrepareFiles(t.Context(), "docs/examples/nvke-tutorial/definition.yaml", "docs/examples/nvke-tutorial/environment-local.yaml", "test", "summary-test")
+	prepared, err := lifecycle.PrepareFiles(t.Context(), "docs/examples/nvke-module-tags/definition.yaml", "docs/examples/nvke-module-tags/environment-local.yaml", "test", "summary-test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +357,7 @@ func TestLocalJSONResultIsDeterministicAndCleanupDistinct(t *testing.T) {
 
 func TestLocalJSONResultRejectsUnknownOwnerDescriptionsBeforeWriting(t *testing.T) {
 	lifecycleCommandRepo(t)
-	prepared, err := lifecycle.PrepareFiles(t.Context(), "docs/examples/nvke-tutorial/definition.yaml", "docs/examples/nvke-tutorial/environment-local.yaml", "test", "projection-test")
+	prepared, err := lifecycle.PrepareFiles(t.Context(), "docs/examples/nvke-module-tags/definition.yaml", "docs/examples/nvke-module-tags/environment-local.yaml", "test", "projection-test")
 	if err != nil {
 		t.Fatal(err)
 	}

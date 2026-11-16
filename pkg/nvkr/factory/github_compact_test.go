@@ -334,13 +334,19 @@ func TestGitHubWorkflowYAMLAdmissionRejectsMalformedGraphs(t *testing.T) {
 	assertFactoryErrorCode(t, validateGitHubWorkflowSize([]byte(deep)), e.CodeEngineCapability)
 }
 
-func TestGitHubWorkflowYAMLAliasExpansionStopsAtBudget(t *testing.T) {
+// githubAliasExpansionFixture is a small document whose aliases expand past
+// the parser event cap.
+func githubAliasExpansionFixture() string {
 	var raw strings.Builder
 	raw.WriteString("a0: &a0 [x]\n")
 	for i := 1; i <= 20; i++ {
 		fmt.Fprintf(&raw, "a%d: &a%d [*a%d, *a%d]\n", i, i, i-1, i-1)
 	}
-	nodes, err := countGitHubWorkflowYAMLNodes([]byte(raw.String()))
+	return raw.String()
+}
+
+func TestGitHubWorkflowYAMLAliasExpansionStopsAtBudget(t *testing.T) {
+	nodes, err := countGitHubWorkflowYAMLNodes([]byte(githubAliasExpansionFixture()))
 	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 	if nodes > maxGitHubWorkflowYAMLNodes {
 		t.Fatalf("alias traversal exceeded its budget: %d", nodes)

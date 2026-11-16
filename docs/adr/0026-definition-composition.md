@@ -2,10 +2,10 @@
 
 - **Decision status:** Proposed (design only; pending named-decider ratification)
 - **Implementation maturity:** U1–U8 implemented; U9 waits on the result-reuse decision and U10
-  on a hosted composite Run. `reconciliation/README.md` records the implemented scope.
+  on the publication, consumer-verification and equivalence gates below. `reconciliation/README.md` records the implemented scope.
 - **Acceptance-test maturity:** Contract suites for U1–U8, including an opt-in extended identity-invariance
-  contract over the four NVKE families. No hosted Run, composite publication or consumer verification
-  exercises a composite.
+  contract over the four NVKE families. The [hosted composite publication record](reconciliation/adr-26.md#hosted-gpu-site-publication)
+  owns external execution evidence and its consumer-acceptance and qualification limits.
 - **Deciders:** Pending; release-engineering, publication, catalog and qualification owners must be named before
   ratification.
 - **Index:** Proposed ADR-26 supplements ADR-01–22 and proposed ADR-23/24; it remains outside the consolidated
@@ -326,9 +326,9 @@ and owning operation carry that detail.
 
 ## Worked example: the four NVKE families
 
-This example is illustrative and is **not** added to `inputs/`. It assumes the composite would live beside the
-families as `inputs/definitions/nvke/composite.yaml`. The digests are the actual `nvkr.definition` digests of the
-family Definitions at commit `75f154fe`, computed with the existing `Definition.Digest` and the Go toolchain in
+This historical four-family example is illustrative and is **not** a maintained input. The maintained entry
+point is `inputs/definitions/nvke/gpu-site.composite.yaml`, which selects a larger membership. The digests
+below are the actual `nvkr.definition` digests of the family Definitions at commit `75f154fe`, computed with the existing `Definition.Digest` and the Go toolchain in
 `.go-version`. Until `definition pin` exists, a short program against the existing API reproduces them:
 
 ```go
@@ -582,7 +582,7 @@ The questions left open by the first draft were decided on 2026-10-29:
 
 ## Acceptance evidence
 
-Contract suites only. U1–U7 are implemented with table-driven contract tests that assert coded errors. Declared
+U1–U8 are implemented with table-driven contract tests that assert coded errors. Declared
 variants are contract-tested at admission (U1), compilation and Plan validation (U3), in the inspect view (U4),
 in prepared Run records and publication metadata (U6), and in the verified consumer view (U7). The opt-in
 extended contract also compiles the 26.04 and 24.04 disk families as separate members: refused without
@@ -591,5 +591,7 @@ declarations and admitted with the eight components the 24.04 overlay replaces d
 catalogs and shows that every composite output and native build keeps the Build Digest and native build records
 of the combined Definition and the four families, including family-only outputs the combined Definition lacks,
 and that its worker partitions equal those of its effective Definition compiled plainly under the same
-partitioned Environment. These are local contracts. No hosted composite Run, composite publication or consumer verification
-has been exercised or recorded, and no claim follows from the family pilot's or the combined candidate's evidence.
+partitioned Environment. These are local contracts. The separate
+[hosted publication record](reconciliation/adr-26.md#hosted-gpu-site-publication) binds one 83-output
+composite to its Run, commit and root. It does not establish current-candidate execution, independent
+consumer verification or qualification; no claim transfers from the family pilot or combined candidate.

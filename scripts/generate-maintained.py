@@ -45,7 +45,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--group", choices=GROUPS)
-    parser.add_argument("--projection-pilot", choices=["in-process", "out-of-process"])
+    parser.add_argument("--projection-pilot", choices=["in-process"])
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     inventory = load_inventory(root)

@@ -104,6 +104,24 @@ vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinn
 	GOBIN="$(CURDIR)/bin" go -C toolchains/govulncheck install tool
 	"$(CURDIR)/bin/govulncheck" ./...
 
+# Tool modules have no local packages: scan their explicit tool entry points,
+# not ./... (which would match nothing). Keep the root vulncheck gate unchanged.
+.PHONY: vulncheck-tools
+vulncheck-tools: go-version-check ## Report nested Go tool vulnerabilities; errors mean incomplete coverage.
+	GOBIN="$(CURDIR)/bin" go -C toolchains/govulncheck install tool
+	@incomplete=0; \
+	for scope in toolchains/actionlint:github.com/rhysd/actionlint/cmd/actionlint toolchains/govulncheck:golang.org/x/vuln/cmd/govulncheck; do \
+	  module=$${scope%%:*}; package=$${scope#*:}; status=0; \
+	  echo "Scanning $$module ($$package)"; \
+	  "$(CURDIR)/bin/govulncheck" -C "$$module" "$$package" || status=$$?; \
+	  case $$status in \
+	    0) echo "$$module: complete, no reachable findings" ;; \
+	    3) echo "$$module: findings (report-only)" ;; \
+	    *) echo "$$module: INCOMPLETE (scanner exit $$status)"; incomplete=1 ;; \
+	  esac; \
+	done; \
+	exit $$incomplete
+
 .PHONY: actionlint
 actionlint: go-version-check ## Lint GitHub workflows with the actionlint pinned in toolchains/actionlint.
 	@# actionlint silently skips its run-script checks when shellcheck is absent.
@@ -228,11 +246,12 @@ LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
 	-ignore '.github/workflows/nvkr-run-*.yml' \
 	-ignore '.github/workflows/nvkr-qualify-*.yml' -ignore '.github/workflows/nvkr-smoke-*.yml' \
 	-ignore '.github/workflows/nvkr-*__partition-[0-9][0-9].yml' \
+	-ignore '.github/workflows/nvkr-*__w-*.yml' \
 	-ignore '.github/workflows/nvkr-dev-*.yml' \
 	-ignore '.github/workflows/nvkr-smoke.yml' -ignore '.github/workflows/nvkr-dev.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
 	-ignore '.nvkr/**' -ignore '.nvkr-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify(-[a-z0-9-]+)?|smoke(-[a-z0-9-]+)?|dev(-[a-z0-9-]+)?)(__partition-[0-9]{2})?\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify(-[a-z0-9-]+)?|smoke(-[a-z0-9-]+)?|dev(-[a-z0-9-]+)?)(__partition-[0-9]{2}|__w-[a-z0-9-]+)?\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
 LICENSE_AUTHORED := ^\.github/workflows/nvkr-dev-cleanup\.yml$$
 LICENSE_SOURCES := git ls-files '*.go' '*.py' '*.sh' '*.yaml' '*.yml' '*.jq' '*Dockerfile*' '*Makefile'
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
@@ -279,7 +298,7 @@ workflow-generator: go-version-check
 		-ldflags '-X main.version=dev -X main.commit=unknown' \
 		-o bin/nvkr-exec ./cmd/nvkr
 
-# Diagnostic: `make workflows-check PROJECTION_PILOT=in-process` or `=out-of-process` checks the
+# Diagnostic: `make workflows-check PROJECTION_PILOT=in-process` checks the
 # production, development and NVKE family producer bundles through the reference projection
 # plugin over that transport. Qualification workflows and runtime bundles stay core-only.
 PROJECTION_PILOT ?=
@@ -359,7 +378,7 @@ check: go-version-check fmt-check definitions-location-check reconciliation-loca
 # merge gate runs. CodeQL and the DCO App run only on GitHub.
 # Checks needing extra tools or network access run before the long test suite.
 CI_CHECKS := fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check shellcheck actionlint test-workflow-scripts \
-	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test
+	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test demo-hello
 
 .PHONY: ci-check
 ci-check: go-version-check $(CI_CHECKS) ## Complete local merge gate (needs public NVKE access, Node and Fern; see CONTRIBUTING.md).
@@ -372,3 +391,7 @@ clean: ## Remove build output, coverage, and the local engine workspace.
 .PHONY: run-resolve
 run-resolve: build ## Resolve the pinned kubectl producer and print its build graph.
 	$(BIN) resolve --data testdata/catalogs/kubernetes-layered --component kubectl --platform linux/amd64
+
+.PHONY: demo-hello
+demo-hello: ## Build and verify the hello demo (requires running Docker).
+	bash demos/demo-local.sh --out "$$(mktemp -d)/hello"

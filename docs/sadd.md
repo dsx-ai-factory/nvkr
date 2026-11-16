@@ -27,8 +27,8 @@ of NVKR run where, the objects they exchange, the trust boundaries they enforce,
 work fails. Shared structure comes first; the v1 and qualified contracts are then described separately.
 Implementation status is summarized once under Current support boundary.
 
-NVKR supports two different evidence contracts. They share resolution and identity primitives, but require
-separate acceptance decisions:
+NVKR defines two evidence contracts. The maintained lifecycle uses `pipeline-attested`; the `qualified`
+column records deferred design. They share resolution and identity primitives but require separate acceptance decisions:
 
 | Concern | v1 delivery — `pipeline-attested` | Qualified release — `qualified` |
 |---|---|---|
@@ -52,6 +52,8 @@ The tool and its catalogs are separate products: the tool owns resolution and ve
 provide reusable component producers and pins, including tool releases and GitHub actions.
 Explicit digest-pinned fragments share authored declarations before resolution; each catalog retains its own
 complete lock. Snapshot capture includes those fragment bytes and replay remains confined to captured inputs.
+File-backed build/vendor argv operands expand to exact bytes during catalog loading and join that captured
+closure; their paths do not enter resolved command identities (ADR-22).
 [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies) owns how generated
 Runs bind action commits from the catalog lock. Definitions declare named deliverable outputs once.
 NVKR does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source
@@ -84,7 +86,8 @@ bundles, Run and publication records, consumer expectations and hosted complete-
 are implemented with contract tests. Qualification binds the full composition through artifact checks, smoke
 evidence and the production manifest; explicit policies select production/development pairs and bundle-archive
 applicability without deployment claims. Member Release reuse and local composite qualification rehearsal remain
-deferred and refused; no hosted composite acceptance is recorded.
+deferred and refused. The [hosted composite publication record](adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
+owns external execution evidence and its consumer-acceptance and qualification limits.
 
 Proposed [ADR-27](adr/0027-pinned-tool-producers.md) designs pinned-tool producers: catalog components that run
 one released, digest-pinned executable in the `wrapped-build` lane. AICR bundles are the first use. ADR-27 owns
@@ -180,10 +183,10 @@ profile or lifecycle objects; native Helm charts retain their own media contract
 Deployment topology and node placement are downstream concerns,
 without another NVKR authored object or generated realization.
 
-The internal records appear where needed to explain trust: plans describe admitted execution; Inventory and
-ReleaseSet represent required and realized qualified membership; ValidationVectors carry signed reproduction
-expectations; clearance authorizes exact qualified contents; publication roots carry the transport closure.
-These remain typed and inspectable. Normal callers do not construct and connect them manually.
+The implemented internal records explain the supported workflow: plans describe admitted execution and
+publication roots carry the transport closure. These remain typed and inspectable. Normal callers do not
+construct and connect them manually. Qualified Inventory, ReleaseSet, ValidationVector and clearance records
+remain deferred design; their implementations and command routes are retired.
 
 Source lane describes how bytes were obtained: `hermetic-build`, `wrapped-build`, or `acquired`. Evidence tier
 describes the claim attached to those bytes. Neither is a synonym for artifact format or release status.
@@ -473,12 +476,11 @@ in reconciliation; a facade alone does not discharge that debt.
 | Compilation and execution | `factory` | Compile authored inputs into complete plans; render and execute the same operations with one producer instruction; observe typed payloads against exact planned producers |
 | Diagnostic checks | `validation`, `conformance`, `testresults` | Explicit profile dispatch, local suite/harness capture and descriptive outputs; no qualification authority (ADR-16 §6) |
 | Plan inspection | `planview` | Validate through factory, retain immutable descriptive snapshots, render linked graphs and compare named Plan fields without granting execution or evidence authority |
-| Producer execution and qualified graph protocols | `pipeline` | Shared producer launcher, graph admission, runtime observations, terminal receipts, and provider transport |
-| Trust and signing | `trust`, `sign`, `profile` | Authenticate documents, tools, signer policies, and execution profiles |
-| Evidence | `attest`, `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
+| Producer execution | `pipeline` | Shared producer launcher, source snapshots, runtime observations, artifact-byte verification and provider transport |
+| Trust and signing | `trust`, `sign` | Authenticate documents, tools and signer policies |
+| Evidence | `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
 | Packaging and transport | `assemble`, `delivery` | Artifact representation and OCI publication/closure |
-| Release authority and durable status | `release`, `status` | Status owns diagnostic checkpoint acceptance and high-water persistence; qualified release authorization, trusted time and publication remain deferred |
-| Public adaptation | `errors`; `client/v1` and `cmd/nvkr` outside this tree | Stable error mapping, read surfaces, SDK and CLI |
+| Public adaptation | `errors`; `client/v1` and `cmd/nvkr` outside this tree | Stable error mapping, read surfaces, experimental SDK and CLI |
 
 The purity guard lives in `internal/architecture` as a repository test, not a domain module.
 
@@ -709,14 +711,16 @@ reduce routine pin churn without changing executable Plan/IR identities. Workflo
 while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
 complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
 bytes, preserving credential scope and per-job finalizer results. Edit locality separately preserves existing
-jobs when an independent output is added. Offline observation, SBOM and packaging can share a producer
-stage only when that stage owns their complete inputs and runtime/target constraints agree. The bounded
-group preserves each operation and marks all members unsuccessful if its provider job fails. Otherwise
-ordinary grouping pairs a terminal observation and its dependent SBOM for the same BuildTarget and compatible offline runtime. A shared pinned tool acquired by
-an independent root operation may be an additional prerequisite; the pair waits for acquisition and
-restores the tool before observation. Failed acquisition prevents pair completion. No additional source
-or output dependency is admitted.
-Other ordinary nodes, including packaging with external inputs, retain their own jobs and success conditions; the explicit ARC
+jobs when an independent output is added. On GitHub a job is one authority class on one runner for one
+Build target or publication route (ADR-18 §8). Source fetch without a credential, build, acquisition,
+terminal observation, SBOM and packaging share a producer job. SBOM attestation, publication, signing,
+publication verification and release assembly share a release job with step-scoped credentials. An
+operation joins a job only when it has the same class, runner label and native platform and adds no
+prerequisite. The job preserves each operation, and failure of any operation marks the whole provider
+job unsuccessful for finalization. A shared pinned tool acquired by an independent root operation may be
+an additional prerequisite; the job waits for acquisition and restores the tool first, and a failed
+acquisition prevents that job. The root tool acquisition never gains members. A source fetch that holds
+a source credential and an object publication keep their own jobs; the explicit ARC
 disk group preserves its live owner. Membership does not follow global adjacency or fixed-size chunks.
 Aggregate accounting and summaries change with the complete required set, and finalization still requires
 every job. The current Plan determines scheduling without previous-generated-state input.
@@ -899,9 +903,8 @@ deferred beyond the MVP.
 
 #### Qualified reproduction and release
 
-This is a deferred architecture, not a second maintained lifecycle. The unused authorization, gate receipts,
-qualified publisher and release-specific trusted-time implementation have been removed. Current diagnostics
-can authenticate their retained documents and status checkpoints without authorizing release.
+This is a deferred architecture, not a second maintained lifecycle. The qualified commands and their attest,
+release, status and profile implementations are retired.
 
 The publisher creates a signed ValidationVector of expected identities. The operator admits the signed builder
 profile, materializes exact inputs, executes through authenticated runtime boundaries, and independently compares

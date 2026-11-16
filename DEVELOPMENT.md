@@ -182,7 +182,7 @@ Configure these **separate development environments**, retaining the existing pr
 |---|---|
 | `nvkr-dev-release` | Admit reviewed feature branches. Store `NVKR_DEV_REGISTRY_WRITE` and `NVKR_DEV_REGISTRY_READ` secrets, plus `NVKR_DEV_REGISTRY_WRITE_USER` and `NVKR_DEV_REGISTRY_READ_USER` variables. |
 | `nvkr-dev-arc` | Admit the reviewed development workflow and selected branch refs to the existing ephemeral `arc-amd64-kvm` and `arc-arm64-kvm` pools. Preserve the existing capacity, Docker/KVM and isolation requirements. |
-| `nvkr-dev-cleanup` | Admit **only the default branch**. Store `NVKR_DEV_REGISTRY_CLEANUP`; allow its daily scheduled job to run without a per-run approval if automatic cleanup is desired. |
+| `nvkr-dev-cleanup` | Admit **only the default branch**. Store `NVKR_DEV_REGISTRY_CLEANUP`; allow its hourly scheduled job to run without a per-run approval if automatic cleanup is desired. |
 
 Use a dedicated development publishing account with no production-package write/admin access. Its write
 credential needs `write:packages`; its read credential is a separate token restricted to `read:packages`.
@@ -255,19 +255,20 @@ committed pair is retired.
 
 ### Disposable registry cleanup
 
-The default-branch `nvkr-dev-cleanup.yml` runs daily and supports a manual preview (`apply: false`, the
+The default-branch `nvkr-dev-cleanup.yml` runs hourly and supports a manual preview (`apply: false`, the
 default). It uses its own compiled cleanup owner and credential; it never executes a feature branch's code
-or downloaded artifacts. Preview from the default branch before enabling deletion:
+or downloaded artifacts. Each run previews or deletes at most 25 packages in name order; later runs take
+the rest. Preview from the default branch before enabling deletion:
 
 ```sh
 gh workflow run nvkr-dev-cleanup.yml --repo dsx-ai-factory/nvkr --ref main -f apply=false
 ```
 
-Cleanup requires private packages in the exact reserved namespace, matching GitHub account and workflow attempt, a completed
+Cleanup requires internal packages in the exact reserved namespace, matching GitHub account and workflow attempt, a completed
 attempt at least 24 hours old, and package/version timestamps at least 24 hours old. It rechecks candidates
 before deletion. Active, young or ambiguous state is retained; API/admission failures fail the job rather
 than claim cleanup succeeded. Whole-package deletion includes that package's versions, signatures and
-referrers, avoiding guesses based on tags. The next daily sweep removes eligible packages; this is not an
+referrers, avoiding guesses based on tags. The next hourly sweep removes eligible packages; this is not an
 exact 24-hour expiry or proof of physical storage reclamation. Existing production and older unscoped
 publications are outside the cleanup namespace. GitHub retains its own restoration policy.
 
@@ -275,7 +276,7 @@ The cleanup report records candidates and API-confirmed deletions, including par
 failure. Its CI artifact retains seven days. A timed-out deletion has an unknown outcome and is not retried
 within the command. Inspect the next preview before retrying.
 
-The three-output unsigned Environment in `docs/examples/nvke-tutorial/environment-github-dev.yaml` remains a
+The three-output unsigned Environment in `docs/examples/nvke-module-tags/environment-github-dev.yaml` remains a
 smaller scratch-generation example. It uses one-day transfers, automatic cancellation and no publication.
 It does not supply the committed full-development bundle. Hosted execution, credential/pool setup and
 actual registry deletion still need a recorded external Run; local contract tests establish none of those.
@@ -439,15 +440,15 @@ Catalog resolution, pin maintenance, and producer admission have distinct files 
 | Immutable attempts and Release consumer workflow | `pkg/nvkr/lifecycle` |
 | Complete compilation, output joins, scheduling, packaging and provider generation | `pkg/nvkr/factory` |
 | Catalog/pins, resolution and canonical identity | `catalog`, `buildgraph`, `target`, `ir`, `canonical` |
-| Producer execution, observations and qualified receipts | `pipeline`, `profile` |
+| Producer execution and observations | `pipeline` |
 | External test output descriptions, wrapper validation and deterministic serialization (no execution or authority) | `pkg/nvkr/testresults` |
 | Qualification outcome schema, triggering-event description, text scrubbing and publish selection (no authority) | `pkg/nvkr/qualificationoutcome` |
 | Release manifest issuance, outcome-input admission and outcome classification | `pkg/nvkr/releasemanifest` |
 | Qualification results index layout, TestGrid projection and create-only publishing (no credential or authority) | `pkg/nvkr/resultspublish` — `cmd/nvkr-results-publish` supplies the store |
 | Configured diagnostic check selection and local upstream conformance execution | `validation`, `conformance` — delegate product/tool publication authentication and exact executable-member export to `lifecycle` |
 | Bounded archive transport and descriptor-safe paths | `internal/transportarchive`, `internal/securepath` |
-| Subject-bound evidence and verification | `attest`, `sbom`, `provenance`, `trust`, `sign` |
-| Release authority and delivery | `release`, `status`, `delivery` |
+| Subject-bound evidence and verification | `sbom`, `provenance`, `trust`, `sign` |
+| Delivery | `delivery` |
 | Public adapters | `client/v1`, `cmd/nvkr` — delegate authority |
 
 Read the relevant current ADR and [reconciliation row](docs/adr/reconciliation/README.md) before changing authority.

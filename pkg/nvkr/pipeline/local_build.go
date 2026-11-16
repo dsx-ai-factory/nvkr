@@ -16,7 +16,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/assemble"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/profile"
 )
 
 // build runs one from-source build node in its pinned toolchain container, then
@@ -39,18 +38,6 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 	}
 	if err := admitBuildMaterials(n, opts); err != nil {
 		return nil, err
-	}
-	var executionIdentity profile.VerifiedNodeIdentity
-	if opts.execution != nil {
-		if err := opts.execution.receipt.RequireFor(opts.ctx(), opts.execution.profile, opts.execution.nodes); err != nil {
-			return nil, err
-		}
-		var ok bool
-		executionIdentity, ok = observedNodeIdentity(opts.execution, n.ID)
-		if !ok {
-			return nil, e.New(e.CodePreflightFailed,
-				"build node %q is absent from the qualified execution receipt", n.ID)
-		}
 	}
 	// Nix builder dispatch (ADR-10 §6/§7): a nix component is built from a LOCKED flake
 	// inside the pinned nix container, offline. Hermeticity is enforced by the same
@@ -221,19 +208,12 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 		}(),
 		BuilderType: n.BuilderType,
 		// Local selected and executed this exact in-process dispatch lane. Recording
-		// that observation is useful even on an unqualified development report;
-		// ProfileDigest/ExecutionBinding below remain the authority boundary.
+		// that observation describes the producer and confers no release authority.
 		EngineClass: n.BuilderType,
 		Path:        n.ArtifactPath,
 		SHA256:      sum,
 		Size:        size,
 		AbsPath:     binPath,
-	}
-	if opts.execution != nil {
-		res.Qualification = ArtifactQualifiedExecution
-		res.EngineClass = executionIdentity.EngineClass
-		res.ProfileDigest = opts.execution.receipt.ProfileDigest()
-		res.ExecutionBinding = opts.execution.receipt.ExecutionBinding()
 	}
 	// When packaging, assemble the compiled binary into its delivery artifact and
 	// record THAT digest — a real oci-image/.deb digest, not a raw-binary hash.

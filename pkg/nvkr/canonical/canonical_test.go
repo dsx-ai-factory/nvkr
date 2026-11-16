@@ -81,38 +81,13 @@ func TestDigestRejectsUnregisteredDomain(t *testing.T) {
 	}
 }
 
-func TestRetiredDomainsRemainReservedButCannotMint(t *testing.T) {
-	for _, allocation := range []struct{ kind, want string }{
-		{KindLegacyRecipe, "nvkr.recipe"},
-		{KindBundle, "nvkr.bundle"},
-		{KindReproductionResult, "nvkr.reproduction-result"},
-		{KindCompatibilityResult, "nvkr.compatibility-result"},
-		{KindConformanceResult, "nvkr.conformance-result"},
-		{KindEvidenceWaiver, "nvkr.evidence-waiver"},
-		{KindClearance, "nvkr.clearance"},
-		{KindTrustedTime, "nvkr.status-trusted-time/v1"},
-		{KindPublication, "nvkr.publication"},
-		{KindPublicationManifest, "nvkr.publication-manifest"},
-		{KindVulnReport, "nvkr.vuln-report"},
-		{KindCompileSpec, "nvkr.compile-spec/v1"},
-		{KindExecutionSettings, "nvkr.execution-settings/v1"},
-		{KindLifecycleBinding, "nvkr.lifecycle-binding/v1"},
-		{KindClusterDefinition, "nvkr.cluster-definition"},
-		{KindClusterComposition, "nvkr.cluster-composition"},
-		{KindClusterRealization, "nvkr.cluster-realization/v1"},
-		{KindStagingManifest, "nvkr.staging-manifest"},
-		{KindAICRBundle, "nvkr.aicr-bundle"},
-	} {
-		t.Run(allocation.want, func(t *testing.T) {
-			kind := allocation.kind
-			if kind != allocation.want || !registeredKind(kind) {
-				t.Fatal("retired domain allocation must remain reserved")
-			}
-			value := map[string]string{"value": "new-object"}
-			digest, err := Digest(kind, value)
+func TestRetiredDomainsCannotMint(t *testing.T) {
+	for _, kind := range []string{"nvkr.compile-spec/v1", "nvkr.execution-settings/v1", "nvkr.lifecycle-binding/v1", "nvkr.recipe", "nvkr.cluster-definition", "nvkr.cluster-composition", "nvkr.cluster-realization/v1", "nvkr.staging-manifest", "nvkr.bundle", "nvkr.reproduction-result", "nvkr.compatibility-result", "nvkr.conformance-result", "nvkr.evidence-waiver", "nvkr.clearance", "nvkr.status-trusted-time/v1", "nvkr.publication", "nvkr.publication-manifest", "nvkr.vuln-report", "nvkr.aicr-bundle"} {
+		t.Run(kind, func(t *testing.T) {
+			digest, err := Digest(kind, map[string]string{"value": "new-object"})
 			var coded *e.Error
-			if digest != "" || !errors.As(err, &coded) || coded.Code != e.CodeUnsupported {
-				t.Fatalf("retired identity = %q, %v; want no digest and %s", digest, err, e.CodeUnsupported)
+			if digest != "" || !errors.As(err, &coded) || coded.Code != e.CodeInternal {
+				t.Fatalf("retired identity = %q, %v; want no digest and %s", digest, err, e.CodeInternal)
 			}
 		})
 	}

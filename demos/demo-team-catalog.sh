@@ -18,7 +18,7 @@ Usage: bash demos/demo-team-catalog.sh [--deploy] [--out NEW_DIR] [--non-interac
 Inspect catalog inputs, export a real Plan and native linked graphs, then generate
 and check a GitHub bundle in a new directory. Default: three-output nvke-v1;
 no Docker or source checkout needed.
---deploy selects the six-output nvke-deploy inputs and requires private pinned Git
+--deploy selects the nine-output nvke-deploy inputs and requires private pinned Git
 source access because that catalog revalidates an upstream pin set.
 
 Prerequisites: Python 3 and make build with the Go patch in .go-version. NVKR_BIN
@@ -76,8 +76,8 @@ if [ "$NON_INTERACTIVE" -eq 0 ] && [ ! -t 0 ]; then die 'use --non-interactive w
 if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-team-catalog.XXXXXX"); fi
 cd "$ROOT"
 printf 'cd %q\n' "$ROOT" >"$OUT/commands.txt"
-DEFINITION=docs/examples/nvke-tutorial/definition.yaml
-ENVIRONMENT=docs/examples/nvke-tutorial/environment-github.yaml
+DEFINITION=docs/examples/nvke-module-tags/definition.yaml
+ENVIRONMENT=docs/examples/nvke-module-tags/environment-github.yaml
 CATALOG=inputs/catalogs/nvke/module-tags
 if [ "$DEPLOY" -eq 1 ]; then
   DEFINITION=docs/examples/nvke-deploy/definition.yaml

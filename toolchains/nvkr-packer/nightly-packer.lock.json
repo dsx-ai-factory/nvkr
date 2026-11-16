@@ -1,0 +1,23 @@
+{
+  "packer": {
+    "version": "1.15.4",
+    "license": "BUSL-1.1",
+    "archives": {
+      "amd64": "sha256:15f97a6a99645c7d5308c609973b5280837b38e112beac413ccbce80da927cf1"
+    },
+    "binaries": {
+      "amd64": "sha256:6f016067b41152b9f49981727eb9f02c8dddc46cbdf5684d6f35f6c02b4958db"
+    }
+  },
+  "qemuPlugin": {
+    "source": "github.com/hashicorp/qemu",
+    "version": "1.1.6",
+    "license": "MPL-2.0",
+    "archives": {
+      "amd64": "sha256:3f735539fbdd0368785babda272b85738866f736415dce59d04b4cb550c4db87"
+    },
+    "binaries": {
+      "amd64": "sha256:4b336cdddbbc91e30eb54ad6d5ca62f02edcce70c1cf54667104d33c25c1b9b5"
+    }
+  }
+}

@@ -76,7 +76,6 @@ type Property struct {
 }
 
 func fromBuild(res *buildgraph.Resolved, buildDigest string, artifactHashes map[string]string,
-	transportIndependent bool,
 ) *BOM {
 	bom := &BOM{
 		BOMFormat:    bomFormat,
@@ -95,7 +94,7 @@ func fromBuild(res *buildgraph.Resolved, buildDigest string, artifactHashes map[
 	for _, nc := range comps {
 		bom.Components = append(bom.Components,
 			componentForEvidence(nc, artifactHashes[nc.Name], target.ExecutableArch(res.Platform),
-				externalEvidenceDeclarationProps(nc.Prebuilt), transportIndependent))
+				externalEvidenceDeclarationProps(nc.Prebuilt)))
 	}
 	return bom
 }
@@ -146,8 +145,7 @@ const IndexSchemaVersion = "nvkr.dev/sbom-index/v2"
 
 // PerArtifact builds one SBOM per from-source, prebuilt or pinned-tool component (bound to its
 // artifact digest) plus the aggregate index linking them, all deterministic.
-// These documents describe observed composition. Publisher-qualified flows use
-// BuildVerifiedFromReport and its PerArtifact method to obtain evidence receipts.
+// These documents describe observed composition and confer no publisher authority.
 func PerArtifact(res *buildgraph.Resolved, buildDigest string, artifactHashes map[string]string) (map[string]*BOM, *Index, error) {
 	comps := append([]catalog.NamedComponent(nil), res.Components...)
 	sort.Slice(comps, func(i, j int) bool { return comps[i].Name < comps[j].Name })
@@ -210,25 +208,15 @@ func (ix *Index) Digest() (string, error) {
 
 func componentForArch(nc catalog.NamedComponent, artifactHash, arch string) Component {
 	return componentForEvidence(nc, artifactHash, arch,
-		externalEvidenceDeclarationProps(nc.Prebuilt), false)
+		externalEvidenceDeclarationProps(nc.Prebuilt))
 }
 
 func componentForWithExternalEvidence(nc catalog.NamedComponent, artifactHash, arch string, evidenceProps []Property) Component {
-	return componentForEvidence(nc, artifactHash, arch, evidenceProps, false)
-}
-
-// componentForPublisherEvidence removes source/toolchain transport locators from
-// locally generated publisher evidence. Build identity deliberately ignores those
-// locators, so retaining them would let an online-to-mirror relocation perturb an
-// SBOM and the publisher-evidence aggregate for identical content.
-func componentForPublisherEvidence(nc catalog.NamedComponent, artifactHash, arch string,
-	evidenceProps []Property,
-) Component {
-	return componentForEvidence(nc, artifactHash, arch, evidenceProps, true)
+	return componentForEvidence(nc, artifactHash, arch, evidenceProps)
 }
 
 func componentForEvidence(nc catalog.NamedComponent, artifactHash, arch string,
-	evidenceProps []Property, transportIndependent bool,
+	evidenceProps []Property,
 ) Component {
 	// A prebuilt (no-compile) component is recorded honestly as acquired, carrying its
 	// externally verified evidence state or an explicit evidence:none (ADR-13 §2) —
@@ -251,9 +239,6 @@ func componentForEvidence(nc catalog.NamedComponent, artifactHash, arch string,
 		// A pinned-tool result is produced bytes, never from-source: it records the
 		// wrapped-build lane and the exact executable that made it (ADR-27 §7).
 		toolchain := nc.ToolchainImage
-		if transportIndependent {
-			toolchain = contentDigestIdentity(toolchain)
-		}
 		executable := ""
 		if nc.ToolExecutable != nil {
 			executable = nc.ToolExecutable.ExecutableDigest
@@ -286,11 +271,6 @@ func componentForEvidence(nc catalog.NamedComponent, artifactHash, arch string,
 	sourceProperty := Property{Name: "nvkr:repo", Value: nc.Repo}
 	toolchain := selectedToolchain(nc, arch)
 	purlValue := purl(nc.Repo, nc.Commit)
-	if transportIndependent {
-		sourceProperty = Property{Name: "nvkr:source", Value: "nvkr:source/" + nc.Name}
-		toolchain = contentDigestIdentity(toolchain)
-		purlValue = ""
-	}
 	props := []Property{
 		{Name: "nvkr:fromSource", Value: "true"},
 		sourceProperty,
@@ -336,15 +316,8 @@ func selectedToolchain(nc catalog.NamedComponent, arch string) string {
 	return ""
 }
 
-func contentDigestIdentity(reference string) string {
-	if separator := strings.LastIndex(reference, "@sha256:"); separator >= 0 {
-		return reference[separator+1:]
-	}
-	return reference
-}
-
 // externalEvidenceDeclarationProps deliberately does not copy a catalog reference
-// into an SBOM as if it had been verified. The release-qualified constructor reads
+// into an SBOM as if it had been verified. BuildVerified reads
 // and hashes those bytes first, then supplies verified properties through
 // componentForWithExternalEvidence. Legacy callers therefore produce an honest
 // non-authorizing state instead of a forged evidence receipt.

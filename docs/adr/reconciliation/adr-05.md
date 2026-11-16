@@ -2,4 +2,4 @@
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
-| 05 Trust and membership | Subject-bound vectors, publisher evidence, required Inventory versus realized ReleaseSet, frozen lifecycle output slots | Signed cross-process publication of all authority records; governed coverage profiles |
+| 05 Trust and membership | Frozen lifecycle output slots and shared trust authentication; legacy vectors, publisher evidence, Inventory and ReleaseSet implementations removed | Signed cross-process publication of all authority records; governed coverage profiles |

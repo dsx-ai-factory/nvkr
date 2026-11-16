@@ -239,6 +239,9 @@ esac
 				if err != nil || !strings.Contains(string(raw), "--arch "+arch) || strings.Contains(string(raw), "factory prepare-native-packer") {
 					t.Fatalf("architecture-specific preparation: %s %v", raw, err)
 				}
+				if strings.Contains(string(raw), "--nightly") != (arch == "amd64") {
+					t.Fatalf("nightly Packer selection must apply only to the AMD64 demo: %s", raw)
+				}
 			})
 		}
 	}

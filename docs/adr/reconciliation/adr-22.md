@@ -21,3 +21,13 @@ Digest-pinned, explicitly selected catalog fragments share source and component 
 lock resolution. Catalog tests cover aliasing, collisions, unknown inputs, content mutation, pin ownership,
 provider admission and resource bounds; factory snapshot tests cover complete capture and replay. These
 contracts preserve resolved producer values and do not establish fresh build or runtime acceptance.
+
+File operands in build/vendor argv expand through bounded context-aware catalog providers.
+`TestCommandFilesIdentityGoldens` freezes equal inline/file Build and VendorSpec identities;
+catalog contracts cover byte preservation, platform overrides, confinement and resource limits.
+`TestCompileSnapshotCapturesCommandFiles` covers registry/fragment script capture and replay after
+working-file mutation, with missing captured files rejected. These are local contracts, not hosted
+execution evidence. Migration of maintained inline scripts is a separate follow-up.
+Before migrating sibling-fragment scripts, toolchain repinning's edited-fragment provider must capture
+those files as well; its current tracked edit set contains YAML/JSON declarations only and fails closed
+for other sibling inputs. Directory loading and factory snapshot capture/replay support these files.

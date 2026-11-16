@@ -71,6 +71,34 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 	}
 	const definitionPath = "inputs/definitions/demo/amd64-nvidia-local-kvm.json"
 	const environmentPath = "inputs/environments/local-amd64-kvm.json"
+	// The fixture changed the site source pins. Rebind its copied producers and
+	// predecessor while retaining the authored nightly compiler and stamp templates.
+	site, err := catalog.LoadContext(t.Context(), catalog.Dir(directory))
+	if err != nil {
+		t.Fatal(err)
+	}
+	overlayPath := "inputs/catalogs/nvke/variants/nightly-go.json"
+	overlay, err := catalog.LoadOverlayContext(t.Context(), overlayPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	overlay.RequiresCatalogDigest, err = site.SnapshotDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, replacement := range overlay.Components {
+		component := replacement.Component
+		fixture := site.Components[name]
+		component.Commit, component.Tag, component.TreeHash = fixture.Commit, fixture.Tag, fixture.TreeHash
+		component.SourceDate = fixture.SourceDate
+	}
+	rawOverlay, err := json.Marshal(overlay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(overlayPath, rawOverlay, 0600); err != nil {
+		t.Fatal(err)
+	}
 	original, err := os.ReadFile(definitionPath)
 	if err != nil {
 		t.Fatal(err)
@@ -184,6 +212,13 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 		}
 		for componentIndex, component := range build.ResolvedComponents {
 			name := component.Name
+			if name == "nvke-node-image-amd64" && (component.Packer == nil || component.Packer.PackerVersion != "1.15.4") {
+				t.Fatal("frozen nightly disk must match NVKE's Packer 1.15.4 contract")
+			}
+			// NVKE's own pins accept this Packer version, so the version-pin patch must not apply here.
+			if name == "nvke-node-image-amd64" && len(component.Patches) != 0 {
+				t.Fatal("frozen nightly disk must build unpatched NVKE source")
+			}
 			original := prior.ResolvedComponents[componentIndex]
 			if original.Name != name {
 				t.Fatal("source selection changed component membership")

@@ -14,7 +14,9 @@ import (
 
 var legacyGitHubWorkflowTemplateName = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$`)
 
-var githubPartitionWorkflowSuffix = regexp.MustCompile(`__partition-[0-4][0-9]\.yml$`)
+var githubPartitionWorkflowSuffix = regexp.MustCompile(`__w-[a-z0-9]([a-z0-9-]{0,60}[a-z0-9])?\.yml$`)
+
+var legacyGitHubPartitionWorkflowSuffix = regexp.MustCompile(`__partition-[0-4][0-9]\.yml$`)
 
 // IsLegacyGeneratedGitHubChildWorkflowPath identifies names reserved for retiring
 // prior producer-owned workflows, including the admitted partition subset.
@@ -34,7 +36,8 @@ func legacyGitHubChildWorkflowOwner(relative string) (string, bool) {
 	entry := stem + ".yml"
 	// Named development bundles postdate legacy producer children; they own
 	// only their execution partition workers.
-	if strings.HasPrefix(entry, ".github/workflows/nvkr-dev-") && !githubPartitionWorkflowSuffix.MatchString(relative) {
+	if strings.HasPrefix(entry, ".github/workflows/nvkr-dev-") &&
+		!githubPartitionWorkflowSuffix.MatchString(relative) && !legacyGitHubPartitionWorkflowSuffix.MatchString(relative) {
 		return "", false
 	}
 	_, ok = githubWorkflowNamespace(entry)

@@ -114,12 +114,13 @@ type executionPartition struct {
 }
 
 // executionPartitioning shapes provider scheduling only. Bounds are declared
-// per-operation time limits; they order work, never membership or identity.
+// per-operation time limits; they shape worker placement, not the operation set
+// or artifact authority.
 type executionPartitioning struct {
 	Bounds  map[string]int
 	Pinned  map[string]bool // operations the adapter runs outside every partition
 	MaxJobs int
-	Target  int // partition count up to which layers split where bounds diverge
+	Gap     int // positive adjacent finish-time gap that splits a capacity chunk; zero disables splitting
 }
 
 // Members of one depth are independent and every edge increases depth, so any
@@ -179,30 +180,15 @@ func partitionExecutionGraph(ctx context.Context, dependencies map[string][]stri
 		jobs := layers[level]
 		slices.SortStableFunc(jobs, func(a, b string) int { return cmp.Compare(finish[a], finish[b]) })
 		for chunk := range slices.Chunk(jobs, options.MaxJobs) {
-			groups = append(groups, chunk)
-		}
-	}
-	// Split the widest bounded-finish gap first; ties keep the earliest group and cut.
-	// Rescanning per cut assumes a small Target (provider worker budgets of tens);
-	// a much larger Target would warrant a priority queue of gaps.
-	for len(groups) < options.Target {
-		if err := executionContext(ctx); err != nil {
-			return nil, err
-		}
-		group, cut, gap := -1, 0, 0
-		for n, jobs := range groups {
-			for i := 1; i < len(jobs); i++ {
-				if delta := finish[jobs[i]] - finish[jobs[i-1]]; delta > gap {
-					group, cut, gap = n, i, delta
+			start := 0
+			for i := 1; i < len(chunk); i++ {
+				if options.Gap > 0 && finish[chunk[i]]-finish[chunk[i-1]] >= options.Gap {
+					groups = append(groups, chunk[start:i])
+					start = i
 				}
 			}
+			groups = append(groups, chunk[start:])
 		}
-		if group < 0 {
-			break
-		}
-		jobs := groups[group]
-		groups = slices.Insert(groups, group+1, jobs[cut:])
-		groups[group] = jobs[:cut]
 	}
 	partitions := make([]executionPartition, 0, len(groups))
 	for _, jobs := range groups {

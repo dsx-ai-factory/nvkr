@@ -15,18 +15,6 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// TestMain lets this test binary serve the hidden adapter command that
-// --projection-pilot launches from os.Executable with an empty environment.
-func TestMain(m *testing.M) {
-	if len(os.Args) >= 2 && os.Args[1] == projectionAdapterCommand {
-		main()
-		os.Exit(0)
-	}
-	os.Exit(m.Run())
-}
-
-// The same reference plugin, selected in-process and out-of-process, writes
-// and checks exactly the in-binary bundle.
 func TestRunGenerateProjectionPilotMatchesInBinaryGeneration(t *testing.T) {
 	lifecycleCommandRepo(t)
 	previous, selected := selectProjectionPilot, []string{}
@@ -35,57 +23,69 @@ func TestRunGenerateProjectionPilotMatchesInBinaryGeneration(t *testing.T) {
 		return previous(ctx, transport, engine)
 	}
 	t.Cleanup(func() { selectProjectionPilot = previous })
-	generate := []string{"run", "generate", "--definition", "docs/examples/nvke-tutorial/definition.yaml",
-		"--environment", "docs/examples/nvke-tutorial/environment-github.yaml"}
+	generate := []string{"run", "generate", "--definition", "docs/examples/nvke-module-tags/definition.yaml",
+		"--environment", "docs/examples/nvke-module-tags/environment-github.yaml"}
 	inBinary := t.TempDir()
 	if _, err := invokeLifecycleCLI(t, append(generate, "--root", inBinary)...); err != nil {
 		t.Fatal(err)
 	}
 	// The generated bootstrap argv, with no pilot flag, never selects a plugin.
-	if output, err := invokeLifecycleCLI(t, "run", "generate", "--engine", "github", "--definition", "docs/examples/nvke-tutorial/definition.yaml",
-		"--environment", "docs/examples/nvke-tutorial/environment-github.yaml", "--root", inBinary, "--check"); err != nil || !strings.Contains(output, "generated run is current") {
+	if output, err := invokeLifecycleCLI(t, "run", "generate", "--engine", "github", "--definition", "docs/examples/nvke-module-tags/definition.yaml",
+		"--environment", "docs/examples/nvke-module-tags/environment-github.yaml", "--root", inBinary, "--check"); err != nil || !strings.Contains(output, "generated run is current") {
 		t.Fatalf("bootstrap check: %s %v", output, err)
 	}
 	if len(selected) != 0 {
 		t.Fatalf("unflagged generation selected projection transports %v", selected)
 	}
 	want := generatedTree(t, inBinary)
-	for _, transport := range []string{"in-process", "out-of-process"} {
+	t.Run("in-process", func(t *testing.T) {
+		const transport = "in-process"
+		pilot, selector := t.TempDir(), "--projection-pilot="+transport
+		selected = selected[:0]
+		if _, err := invokeLifecycleCLI(t, append(generate, "--root", pilot, selector)...); err != nil {
+			t.Fatal(err)
+		}
+		if len(selected) != 1 || selected[0] != transport {
+			t.Fatalf("pilot generation selected %v, want [%s]", selected, transport)
+		}
+		if got := generatedTree(t, pilot); !reflect.DeepEqual(got, want) {
+			t.Fatal("pilot generation differs from in-binary generation")
+		}
+		for _, check := range [][]string{
+			append(generate, "--root", inBinary, "--check", selector),
+			append(generate, "--root", pilot, "--check"),
+		} {
+			if output, err := invokeLifecycleCLI(t, check...); err != nil || !strings.Contains(output, "generated run is current") {
+				t.Fatalf("%v: %s %v", check, output, err)
+			}
+		}
+		// Runtime refresh refuses the selection itself, before reading inputs.
+		_, err := invokeLifecycleCLI(t, append(generate, "--root", pilot, "--runtime", "--check", selector)...)
+		assertLifecycleCommandCode(t, err, e.CodeEngineCapability)
+		if !strings.Contains(err.Error(), "selected projection adapter") {
+			t.Fatalf("runtime refusal is not the projection refusal: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(pilot, ".github", "workflows", "nvkr-run.yml"), []byte("drifted\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		_, err = invokeLifecycleCLI(t, append(generate, "--root", pilot, "--check", selector)...)
+		assertLifecycleCommandCode(t, err, e.CodePipelineDrift)
+	})
+}
+
+func TestRunGenerateRejectsUnsupportedProjectionBeforeInputs(t *testing.T) {
+	for _, transport := range []string{"grpc", "out-of-process"} {
 		t.Run(transport, func(t *testing.T) {
-			pilot, selector := t.TempDir(), "--projection-pilot="+transport
-			selected = selected[:0]
-			if _, err := invokeLifecycleCLI(t, append(generate, "--root", pilot, selector)...); err != nil {
-				t.Fatal(err)
+			root := t.TempDir()
+			_, err := invokeLifecycleCLI(t, "run", "generate", "--definition", filepath.Join(root, "missing-definition.yaml"),
+				"--environment", filepath.Join(root, "missing-environment.yaml"), "--root", root, "--projection-pilot="+transport)
+			assertLifecycleCommandCode(t, err, e.CodeUsage)
+			entries, err := os.ReadDir(root)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("unsupported projection changed output root: entries=%v error=%v", entries, err)
 			}
-			if len(selected) != 1 || selected[0] != transport {
-				t.Fatalf("pilot generation selected %v, want [%s]", selected, transport)
-			}
-			if got := generatedTree(t, pilot); !reflect.DeepEqual(got, want) {
-				t.Fatal("pilot generation differs from in-binary generation")
-			}
-			for _, check := range [][]string{
-				append(generate, "--root", inBinary, "--check", selector),
-				append(generate, "--root", pilot, "--check"),
-			} {
-				if output, err := invokeLifecycleCLI(t, check...); err != nil || !strings.Contains(output, "generated run is current") {
-					t.Fatalf("%v: %s %v", check, output, err)
-				}
-			}
-			// Runtime refresh refuses the selection itself, before reading inputs.
-			_, err := invokeLifecycleCLI(t, append(generate, "--root", pilot, "--runtime", "--check", selector)...)
-			assertLifecycleCommandCode(t, err, e.CodeEngineCapability)
-			if !strings.Contains(err.Error(), "selected projection adapter") {
-				t.Fatalf("runtime refusal is not the projection refusal: %v", err)
-			}
-			if err := os.WriteFile(filepath.Join(pilot, ".github", "workflows", "nvkr-run.yml"), []byte("drifted\n"), 0o644); err != nil {
-				t.Fatal(err)
-			}
-			_, err = invokeLifecycleCLI(t, append(generate, "--root", pilot, "--check", selector)...)
-			assertLifecycleCommandCode(t, err, e.CodePipelineDrift)
 		})
 	}
-	_, err := invokeLifecycleCLI(t, append(generate, "--root", t.TempDir(), "--projection-pilot=grpc")...)
-	assertLifecycleCommandCode(t, err, e.CodeUsage)
 }
 
 func generatedTree(t *testing.T, root string) map[string]string {

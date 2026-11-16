@@ -1,7 +1,7 @@
 # Architecture implementation and evidence
 
 This ledger carries no global review date: each row is current as of the change that last edited it.
-ADR-01–22 own the lane-specific engineering contracts pending named-decider
+ADR-01–31 own the lane-specific engineering contracts pending named-decider
 ratification. This ledger owns current implementation and remaining acceptance. Code and contract tests,
 recorded external execution, and organizational approval are separate facts. Historical source and
 schema results do not transfer to a changed candidate.
@@ -21,8 +21,9 @@ and hardware acceptance, as recorded below.
 [ADR-26](../0026-definition-composition.md) proposes composite Definitions: complete member Definitions pinned by
 `nvkr.definition` digest, joined into one effective Definition, one Plan, one Run and one Release whose
 membership is the exact union of member outputs. Implemented, contract-tested units are listed in its row
-below, including named composite development bundles (U5); no hosted composite Run, composite publication or
-consumer verification has been exercised or recorded. Hosted complete-composite qualification binds composition and every output through handoff, checks, smoke,
+below, including named composite development bundles (U5). A historical
+[83-output hosted publication](adr-26.md#hosted-gpu-site-publication) is recorded; current-candidate execution
+and independent consumer verification remain unrecorded. Hosted complete-composite qualification binds composition and every output through handoff, checks, smoke,
 qualification evidence and the production manifest. GPU-site production/development pairs select explicit
 policies, including artifact-only bundle archive validation. Local composite qualification rehearsal and member
 Release reuse remain deferred and fail closed; reuse follows the separately drafted result-reuse decision.

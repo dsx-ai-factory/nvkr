@@ -31,8 +31,8 @@ or authenticated internal records, inspectable without becoming independently au
 **Internal workflow:** Resolve output-selected pinned producers → freeze required outputs → compile → execute and observe →
 check completeness and evidence → publish → authenticate the selected closure under consumer policy.
 
-Two evidence lanes share this workflow. `qualified` requires exact-byte reproduction and authenticated
-runtime/evidence/release gates. `pipeline-attested` is the v1 hosted-workflow production claim (ADR-04/09/16/18).
+`pipeline-attested` is the v1 hosted-workflow production claim (ADR-04/09/16/18). The dormant
+`qualified` lane is retired; its reproduction and release contracts remain deferred design.
 Dry-run stays `static-unqualified`. Never infer qualification or operational acceptance from a plan or test.
 
 **Tech Stack:** Go (version in `.go-version`, `GOTOOLCHAIN=local`), go-containerregistry for OCI, cosign
@@ -41,7 +41,7 @@ paths; macOS builds and runs tests and diagnostics.
 
 ## Authority order
 
-1. Current ADR-01–22 contain the engineering contracts directly, pending named-decider ratification.
+1. Current ADR-01–31 contain the engineering contracts directly, pending named-decider ratification.
    Each section states its lane and any deferred capability; proposed design is not organizational acceptance.
 2. `docs/adr/reconciliation/` (index: `README.md`) owns current implementation, evidence and disabled-path status.
 3. Code and tests establish implementation; unit tests do not prove external services or production workflows.

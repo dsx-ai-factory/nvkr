@@ -1218,7 +1218,7 @@ admission rejects development before qualification evidence collection.
 Development publication and signing jobs use `nvkr-dev-release`; native disk jobs use `nvkr-dev-arc`.
 They never inherit the production deployment environments. Dedicated write and read registry credentials
 are delivered only to their corresponding phases. Private carrier uploads use a separate storage writer
-without additional repository-token permissions or a product-publication route. Only signing and SBOM attestation receive OIDC. Read-only toolchain preparation requires the Environment-declared independent reader for its private
+without additional repository-token permissions or a product-publication route. Only a release job that signs or attests receives OIDC minting permission, at job scope. Read-only toolchain preparation requires the Environment-declared independent reader for its private
 roots; credentials are removed before producer execution. ARC jobs never receive source, publication-write or OIDC credentials. Source-read credentials
 remain confined to the existing fixed source-fetch and catalog-validation steps. Branch code must be
 reviewed before dispatch. Provider ACLs must independently exclude production write access from development
@@ -1692,16 +1692,19 @@ with partitioned prerequisite-result evaluation under failure and cancellation. 
 not proof of provider cancellation timing or support for another CI adapter.
 
 The compiler groups jobs by dependency depth and orders each depth by bounded finish time, the longest
-path of declared job timeouts. It splits a depth where those finish times diverge, widest gap first, until
-it reaches 30 workers, with at most 64 original jobs per worker and at most 50 workers. Timeouts only order
-scheduling; they never change membership, conditions or identity. A local
+path of declared job timeouts. It chunks each depth at 64 original jobs, then splits each chunk wherever
+adjacent bounded finish times differ by at least 30 minutes. Each split is local: adding a depth does not consume a global
+worker budget or merge other depths. More than 50 workers fails closed before emission. Timeouts only
+shape scheduling; they never change the original operation set, conditions or identities. A local
 [scheduling harness](../execution-partition-scheduling.md) over the maintained Plans motivated this
 grouping with estimated durations; hosted wall time remains unmeasured. Jobs requesting `id-token: write` remain in the entry workflow: Fulcio uses the
 reusable workflow path for the certificate signer identity, so moving them would change the authored signer
 policy (see the proposed migration below). Dependencies and result reports project both inline jobs and worker
 jobs without widening that policy.
-Original job IDs, operations, runner admission, per-job permissions and output slots
-remain intact. A partition may wait for unrelated jobs sharing an earlier partition; it must not turn their
+Worker paths are `<entry>__w-<lowest member job id>.yml`; caller job IDs and cross-worker
+result exports use the same `w-<lowest member job id>` key. Display names summarize members without
+a positional prefix. The template portion stays within 64 characters. Original job IDs, operations, runner
+admission, per-job permissions and output slots remain intact. A partition may wait for unrelated jobs sharing an earlier partition; it must not turn their
 failure into a false prerequisite failure. Ordinary jobs require `!cancelled()` and check their original
 prerequisites' reported success, including ancestors reached through `always()` recovery jobs. A successful
 recovery must not hide an earlier failure from an ordinary descendant. Jobs with the admitted `always()`
@@ -1738,8 +1741,9 @@ Relocation is not a scheduling change. For GitHub OIDC, Fulcio sets the certific
 URI from `job_workflow_ref`, which names the called reusable workflow, not the entry workflow. Build Config
 URI carries the top-level `workflow_ref`. Moving a signer into a worker therefore changes the identity
 that every current signer policy (`^https://github.com/<repo>/.github/workflows/<entry>.yml@<ref>$`) and every
-consumer verification policy authenticates. Partition indexes depend on grouping, so a worker-path identity
-would also churn with unrelated topology changes. Any relocation must ship together with all of the following:
+consumer verification policy authenticates. Worker paths use the lowest member job ID, but changing
+that member or its grouping can still change a worker-path identity. Any relocation must ship together
+with all of the following:
 
 1. **One fixed signer workflow.** A generator-owned `<entry-stem>__signer.yml` would be the only file that
    requests `id-token`, whatever the partition count. Each signing operation would call it with an explicit

@@ -190,9 +190,8 @@ func TestDownloadVerifyCancellationNeverPublishes(t *testing.T) {
 	}
 }
 
-// The runner over a pull-only (binary) graph: it downloads the artifact, verifies it
-// against the pin, and the terminal verify re-hashes it. A tampered pin fails closed.
-func TestRunPullLaneRawBinary(t *testing.T) {
+// The node executor verifies downloaded bytes against the pin. A tampered pin fails closed.
+func TestExecNodePullRawBinary(t *testing.T) {
 	body := []byte("kubectl-like-binary")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write(body) }))
 	defer srv.Close()
@@ -209,17 +208,17 @@ func TestRunPullLaneRawBinary(t *testing.T) {
 
 	// correct pin: acquire + verify pass, and the artifact digest equals the pin.
 	validGraph := mk(sha256Of(body))
-	rep, err := Local{}.Run(validGraph, mustGraphDigest(t, validGraph), RunOptions{Ctx: context.Background(), SourceRoot: root})
+	rep, err := Local{}.ExecNode(validGraph.Nodes[0], RunOptions{Ctx: context.Background(), SourceRoot: root})
 	if err != nil {
 		t.Fatalf("valid pull must succeed: %v", err)
 	}
-	if len(rep.Artifacts) != 1 || rep.Artifacts[0].SHA256 != sha256Of(body) {
-		t.Fatalf("artifact digest not recorded: %+v", rep.Artifacts)
+	if rep == nil || rep.SHA256 != sha256Of(body) {
+		t.Fatalf("artifact digest not recorded: %+v", rep)
 	}
 
 	// tampered pin: the served bytes no longer match -> fail closed.
 	tamperedGraph := mk(sha256Of([]byte("tampered")))
-	_, err = Local{}.Run(tamperedGraph, mustGraphDigest(t, tamperedGraph), RunOptions{Ctx: context.Background(), SourceRoot: filepath.Join(t.TempDir(), "src")})
+	_, err = Local{}.ExecNode(tamperedGraph.Nodes[0], RunOptions{Ctx: context.Background(), SourceRoot: filepath.Join(t.TempDir(), "src")})
 	if code(err) != nvkrerr.CodeVerifyFailed {
 		t.Fatalf("tampered pin must fail closed, got %v", err)
 	}

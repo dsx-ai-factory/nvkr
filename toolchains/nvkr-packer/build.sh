@@ -9,12 +9,14 @@ lock="${here}/toolchain.lock.json"
 
 usage() {
   cat <<'EOF'
-Usage: build.sh [--check] [--cross-build-only] [--diagnostic-local] [--print-validated-image-id] [--arch amd64|arm64] [--tag IMAGE]
+Usage: build.sh [--check] [--cross-build-only] [--diagnostic-local] [--nightly] [--print-validated-image-id] [--arch amd64|arm64] [--tag IMAGE]
 
   --check             Validate the source lock without building an image.
   --cross-build-only  Build a non-native image without claiming runtime validation.
   --diagnostic-local  Validate fresh native bytes for an attempt-specific local pin,
                       not the older recorded local image ID. No maintained-pin update.
+  --nightly           Use NVKE-compatible Packer/plugin pins for the AMD64 demo/nightly.
+                      Requires --arch amd64 and --diagnostic-local (or --check).
   --print-validated-image-id
                       Print only the native-validated immutable ID on stdout;
                       send build and validation diagnostics to stderr.
@@ -29,6 +31,7 @@ EOF
 check_only=0
 cross_build_only=0
 diagnostic_local=0
+nightly=0
 print_validated_image_id=0
 arch=""
 tag=""
@@ -44,6 +47,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --diagnostic-local)
       diagnostic_local=1
+      shift
+      ;;
+    --nightly)
+      nightly=1
       shift
       ;;
     --print-validated-image-id)
@@ -71,6 +78,11 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if [[ "${nightly}" -eq 1 && ( "${arch}" != amd64 || "${cross_build_only}" -eq 1 || ( "${diagnostic_local}" -ne 1 && "${check_only}" -ne 1 ) ) ]]; then
+  echo '--nightly requires --arch amd64 and --diagnostic-local (or --check); cross builds are not admitted' >&2
+  exit 2
+fi
 
 if [[ "${print_validated_image_id}" -eq 1 ]]; then
   if [[ "${check_only}" -eq 1 || "${cross_build_only}" -eq 1 ]]; then
@@ -130,6 +142,20 @@ jq -e '
   (.images | keys | sort) == ["amd64", "arm64"] and
   all(.images[]; . == null or test("^.+@sha256:[0-9a-f]{64}$"))
 ' "${lock}" >/dev/null
+
+packer_lock="${lock}"
+if [[ "${nightly}" -eq 1 ]]; then
+  packer_lock="${here}/nightly-packer.lock.json"
+  jq -e '
+    (keys | sort) == ["packer", "qemuPlugin"] and
+    .packer.version == "1.15.4" and .packer.license == "BUSL-1.1" and
+    .qemuPlugin.source == "github.com/hashicorp/qemu" and
+    .qemuPlugin.version == "1.1.6" and .qemuPlugin.license == "MPL-2.0" and
+    ([.packer.archives, .packer.binaries, .qemuPlugin.archives, .qemuPlugin.binaries] | all(
+      keys == ["amd64"] and all(.[]; test("^sha256:[0-9a-f]{64}$"))
+    ))
+  ' "${packer_lock}" >/dev/null
+fi
 
 if [[ "${check_only}" -eq 1 ]]; then
   echo "Packer toolchain source lock is valid"
@@ -233,12 +259,12 @@ esac
 base_image="$(jq -r '.baseImage' "${lock}")"
 download_image="$(jq -r '.downloadImage' "${lock}")"
 snapshot="$(jq -r '.ubuntuSnapshot' "${lock}")"
-packer_version="$(jq -r '.packer.version' "${lock}")"
-packer_digest="$(jq -r --arg arch "${arch}" '.packer.archives[$arch]' "${lock}")"
-packer_binary_digest="$(jq -r --arg arch "${arch}" '.packer.binaries[$arch]' "${lock}")"
-plugin_version="$(jq -r '.qemuPlugin.version' "${lock}")"
-plugin_digest="$(jq -r --arg arch "${arch}" '.qemuPlugin.archives[$arch]' "${lock}")"
-plugin_binary_digest="$(jq -r --arg arch "${arch}" '.qemuPlugin.binaries[$arch]' "${lock}")"
+packer_version="$(jq -r '.packer.version' "${packer_lock}")"
+packer_digest="$(jq -r --arg arch "${arch}" '.packer.archives[$arch]' "${packer_lock}")"
+packer_binary_digest="$(jq -r --arg arch "${arch}" '.packer.binaries[$arch]' "${packer_lock}")"
+plugin_version="$(jq -r '.qemuPlugin.version' "${packer_lock}")"
+plugin_digest="$(jq -r --arg arch "${arch}" '.qemuPlugin.archives[$arch]' "${packer_lock}")"
+plugin_binary_digest="$(jq -r --arg arch "${arch}" '.qemuPlugin.binaries[$arch]' "${packer_lock}")"
 go_version="$(jq -r '.go.version' "${lock}")"
 go_digest="$(jq -r --arg arch "${arch}" '.go.archives[$arch]' "${lock}")"
 crane_version="$(jq -r '.crane.version' "${lock}")"
@@ -390,14 +416,16 @@ fi
   --env CHECKPOINT_DISABLE=1 \
   --env HOME=/nvkr/work/home \
   --env "EXPECTED_GO_VERSION=${go_version}" \
+  --env "EXPECTED_PACKER_VERSION=${packer_version}" \
+  --env "EXPECTED_QEMU_PLUGIN_VERSION=${plugin_version}" \
   --env PACKER_PLUGIN_PATH=/nvkr/toolchain/packer/plugins \
   --env PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   --env TMPDIR=/nvkr/work/tmp \
   --entrypoint sh \
   "${image_id}" -ec '
   mkdir -p "${HOME}" "${TMPDIR}"
-  test "$(CHECKPOINT_DISABLE=1 packer version)" = "Packer v1.16.2"
-  plugin=/nvkr/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v1.1.8_x5.0_linux_'"${arch}"'
+  test "$(CHECKPOINT_DISABLE=1 packer version)" = "Packer v${EXPECTED_PACKER_VERSION}"
+  plugin=/nvkr/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v${EXPECTED_QEMU_PLUGIN_VERSION}_x5.0_linux_'"${arch}"'
   test -x "${plugin}"
   test "$(cat "${plugin}_SHA256SUM")" = "$(sha256sum "${plugin}" | cut -d" " -f1)"
   test "$(packer plugins installed)" = "${plugin}"
@@ -453,13 +481,13 @@ fi
   ssh-keygen -q -t ed25519 -N "" -f "${key}"
   test "$(ssh-keygen -y -f "${key}" | cut -d" " -f1-2)" = "$(cut -d" " -f1-2 "${key}.pub")"
   mkdir -p "${TMPDIR}/packer-probe"
-  cat >"${TMPDIR}/packer-probe/probe.pkr.hcl" <<"EOF"
+  cat >"${TMPDIR}/packer-probe/probe.pkr.hcl" <<EOF
 packer {
-  required_version = "= 1.16.2"
+  required_version = "= ${EXPECTED_PACKER_VERSION}"
   required_plugins {
     qemu = {
       source  = "github.com/hashicorp/qemu"
-      version = "= 1.1.8"
+      version = "= ${EXPECTED_QEMU_PLUGIN_VERSION}"
     }
   }
 }
