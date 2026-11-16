@@ -37,11 +37,11 @@ func resolveCP(t *testing.T) (*buildgraph.Resolved, string) {
 
 func TestSBOMDeterministic(t *testing.T) {
 	res, digest := resolveCP(t)
-	a, err := fromBuild(res, digest, nil, false).Marshal()
+	a, err := fromBuild(res, digest, nil).Marshal()
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, _ := fromBuild(res, digest, nil, false).Marshal()
+	b, _ := fromBuild(res, digest, nil).Marshal()
 	if !bytes.Equal(a, b) {
 		t.Fatal("SBOM marshaling is not deterministic")
 	}
@@ -49,7 +49,7 @@ func TestSBOMDeterministic(t *testing.T) {
 
 func TestSBOMFoldsArtifactHashes(t *testing.T) {
 	res, digest := resolveCP(t)
-	b := fromBuild(res, digest, map[string]string{"kubectl": "sha256:abc"}, false)
+	b := fromBuild(res, digest, map[string]string{"kubectl": "sha256:abc"})
 	var found bool
 	for _, c := range b.Components {
 		if c.Name == "kubectl" {

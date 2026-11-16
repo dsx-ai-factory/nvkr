@@ -100,7 +100,7 @@ bash demos/demo-local.sh --version 1.1.0
 ```
 
 The greeting becomes `Welcome` and the version becomes `v1.1.0`. Both the Build Digest and the artifact
-bytes change. See the [local demo guide](quickstart/README.md) for each exported file.
+bytes change. See the [local demo guide](hello/README.md) for each exported file.
 This is real, unqualified local execution with a composition SBOM. It does not sign, publish, or scan dependencies.
 
 ## Follow the OS-image materials

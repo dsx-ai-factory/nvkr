@@ -24,9 +24,9 @@ make ci-check      # every merge-gate check that runs locally
   **`make test-race`** adds race detection and coverage; **`make test-full`** also
   enables expensive capacity and full-product integration fixtures. Direct
   `go test ./...` uses the fast default too.
-- Active local **development producer** paths such as `build` (and the build phase of an applicable `attest` or
-  `bake-off`) need **Docker + git** and network for their fetch step. The ordinary `build` path is unqualified.
-  The OS-image build owns the worker payload. Removed package/rootfs producer commands are not a development path.
+- Local development Runs use `run local` with an explicit Definition and Environment. Container
+  producers need **Docker + git** and network for their fetch step; native producers have their own
+  capability admission. Local execution does not establish qualified reproduction.
 - **Lint** uses `golangci-lint` (config in [`.golangci.yml`](.golangci.yml)) and warning-or-higher
   `shellcheck` for executable scripts; both gates are deliberately focused.
 
@@ -35,7 +35,7 @@ make ci-check      # every merge-gate check that runs locally
 `make ci-check` runs every check in the merge gate (`.github/workflows/merge-gate.yaml`) that can run locally:
 the `make check` code gate (format, Definition and ledger location, license header, restated status, vet, lint,
 shellcheck, Python report-tool tests, fast tests and Go vulnerability checks), the binary build, actionlint,
-third-party notices drift, generated-workflow drift and the Fern docs check. Workflow drift needs network access
+third-party notices drift, generated-workflow drift, the Fern docs check and the hello container demo (requires running Docker). Workflow drift needs network access
 to the public NVKE source, and the docs check needs Node and the Fern CLI. CodeQL and the DCO App run only on
 GitHub. A test in `internal/cicontract` fails when the Makefile's `CI_CHECKS` list and the make targets the
 merge gate runs differ, so add a new hosted check to both.
@@ -89,7 +89,7 @@ current implementation boundary:
 Adding a component is a **declarative** change in the selected Definition’s catalog under `inputs/catalogs/`.
 Select it directly in an output with a concrete platform, with every source, toolchain, vendor closure, or acquired artifact pinned by exact
 content identity. A qualified prebuilt entry must also declare digest-pinned typed evidence or an exact authenticated
-waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nvkr definition validate --definition <path>`. A source bake-off is useful contract evidence, but
+waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nvkr definition validate --definition <path>`. The source bake-off command is retired;
 release qualification also requires the authenticated producer, terminal, evidence, policy, and status chain
 described in the ADR reconciliation. Operators may ship an entirely separate catalog via `--data` (see
 `testdata/examples/operator-catalog/`).

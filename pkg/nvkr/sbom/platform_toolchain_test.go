@@ -121,9 +121,6 @@ func TestSBOMSelectsToolchainForExecutablePlatform(t *testing.T) {
 				if got != tc.toolchain {
 					t.Fatalf("aggregate toolchain = %q, want %q", got, tc.toolchain)
 				}
-				if _, err := set.LocalReceipts(); sbomCode(err) != nvkrerr.CodePreflightFailed {
-					t.Fatalf("descriptive SBOM gained publisher authority: %v", err)
-				}
 			})
 			if tc.builder == ir.BuilderNativeGo {
 				t.Run("missing-compiler", func(t *testing.T) {

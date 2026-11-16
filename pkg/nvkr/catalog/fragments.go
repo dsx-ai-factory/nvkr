@@ -16,8 +16,9 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-// FragmentDataProvider admits explicit, digest-pinned sibling inputs. Providers
-// must retain their confinement boundary, cancellation and no-follow guarantees.
+// FragmentDataProvider admits explicit sibling fragments and their command files.
+// The loader checks fragment digests; command bytes join the resolved input closure.
+// Providers retain their confinement boundary, cancellation and no-follow guarantees.
 // Snapshot providers resolve these inputs exclusively inside their captured root.
 type FragmentDataProvider interface {
 	ReadFragmentContext(context.Context, string) ([]byte, error)
@@ -136,6 +137,10 @@ func expandFragments(reg *registryDoc, providers []DataProvider) error {
 		}
 		if fmt.Sprintf("%x", sha256.Sum256(raw)) != imp.SHA256 {
 			return e.New(e.CodeInvalidCatalog, "fragment %q bytes do not match sha256", imp.Path)
+		}
+		raw, err = expandCommandFiles(raw, imp.Path, providers)
+		if err != nil {
+			return err
 		}
 		var fragment registryFragment
 		if err := yaml.UnmarshalStrict(raw, &fragment); err != nil {

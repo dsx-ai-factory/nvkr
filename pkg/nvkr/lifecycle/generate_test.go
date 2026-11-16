@@ -21,9 +21,9 @@ func TestGenerateFilesUsesLifecycleInputsForSupportedHostedEngines(t *testing.T)
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	definition := "docs/examples/nvke-tutorial/definition.yaml"
+	definition := "docs/examples/nvke-module-tags/definition.yaml"
 	environments := map[string]string{
-		factory.EngineGitHub: "docs/examples/nvke-tutorial/environment-github.yaml",
+		factory.EngineGitHub: "docs/examples/nvke-module-tags/environment-github.yaml",
 	}
 	for engine, environment := range environments {
 		t.Run(engine, func(t *testing.T) {
@@ -46,12 +46,12 @@ func TestGenerateFilesUsesLifecycleInputsForSupportedHostedEngines(t *testing.T)
 	}
 }
 
-// A selected projection adapter that cannot launch proves which paths consult
+// An unsupported projection selection proves which paths consult
 // the selection: top-level check and write render through it and write
 // nothing on refusal, and runtime refresh refuses it before reading inputs.
 func TestGenerateFilesHonorsProjectionSelectionOnlyAtTopLevel(t *testing.T) {
 	selected := factory.WithProjectionAdapter(context.Background(),
-		factory.ProjectionAdapter{Transport: factory.ProjectionOutOfProcess, Path: "/nonexistent/nvkr-projection-adapter", Release: "test"})
+		factory.ProjectionAdapter{Transport: "unsupported-transport", Release: "test"})
 	untouched := filepath.Join(t.TempDir(), "must-not-exist")
 	_, err := GenerateRuntimeFiles(selected, "missing-definition.yaml", "missing-environment.yaml", "test", factory.EngineGitHub, untouched, true)
 	assertCode(t, err, nvkrerr.CodeEngineCapability)
@@ -61,7 +61,7 @@ func TestGenerateFilesHonorsProjectionSelectionOnlyAtTopLevel(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Chdir(repo)
-	definition, environment := "docs/examples/nvke-tutorial/definition.yaml", "docs/examples/nvke-tutorial/environment-github.yaml"
+	definition, environment := "docs/examples/nvke-module-tags/definition.yaml", "docs/examples/nvke-module-tags/environment-github.yaml"
 	root := t.TempDir()
 	if _, err := GenerateFiles(context.Background(), definition, environment, "test (deadbeef)", factory.EngineGitHub, root, false); err != nil {
 		t.Fatal(err)

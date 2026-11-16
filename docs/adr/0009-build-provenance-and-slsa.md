@@ -10,7 +10,8 @@
 - **Relates to:** ADR-02 (tier boundary), ADR-05 (evidence bundle / ValidationVector), ADR-07 (observed engine
   class), ADR-13 (external evidence for prebuilt), ADR-01 (canonical codec / serialization profile).
 
-- **Scope:** Sections 1–4 describe reproduction/acquisition evidence; §5 defines the distinct production predicate.
+- **Scope:** Sections 1–4 retain the deferred reproduction/acquisition evidence design; qualified report
+  issuance is retired. Section 5 defines the supported production predicate.
 
 ## Context
 
@@ -126,16 +127,16 @@ the authored transport URI with the exact parent digest, and the normalized nati
 the selected native manifest digest. A tag URI is a descriptive origin locator, not a claim that
 the mutable tag was dereferenced at execution; acquisition consumes the immutable repository/parent
 reference authenticated under ADR-22. The pair records the parent selection constraint separately
-from the native artifact subject. The qualified emitter retains only its existing native prebuilt
-dependency; parent-bound qualified acquisition provenance is unsupported.
+from the native artifact subject. The deferred qualified-lane contract binds only the native prebuilt
+dependency; its emitter is retired, and parent-bound qualified acquisition provenance is unsupported.
 
 In the pipeline-attested lane, for a selected release executable the transport URL dependency binds the archive's exact digest, never
 the extracted executable digest. A separate `nvkr:prebuilt/<component>` URI with `archive` and `member` query
 parameters records the selected member's exact executable digest. This logical dependency distinguishes
 members and architecture-specific archive URLs without claiming that fetching the archive URL returns the
 selected member bytes. Raw executable assets retain the ordinary URL/executable digest pair.
-The qualified emitter retains its existing bare prebuilt URI; release archive/member binding in that
-lane remains unsupported and must not be inferred from the pipeline-attested acquisition contract.
+The deferred qualified-lane contract uses a bare prebuilt URI; its emitter is retired. Release archive/member
+binding in that lane remains unsupported and must not be inferred from the pipeline-attested acquisition contract.
 
 ## Consequences
 

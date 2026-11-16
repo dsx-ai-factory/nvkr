@@ -50,6 +50,12 @@ func TestExitCodeContract(t *testing.T) {
 		}
 	}
 
+	for _, status := range []int{12, 40, 44, 50} {
+		if code, ok := byStatus[status]; ok {
+			t.Errorf("retired status %d reused by %s", status, code)
+		}
+	}
+
 	// Banding: each code sits in the band ADR-03 assigns it.
 	band := func(status int) string {
 		switch {
@@ -71,7 +77,7 @@ func TestExitCodeContract(t *testing.T) {
 		CodeInternal: "semantic", CodeUsage: "semantic", CodeDiff: "semantic",
 
 		CodeNoMatch: "resolve/input/preflight/crypto", CodeAmbiguous: "resolve/input/preflight/crypto",
-		CodeReservedAxis: "resolve/input/preflight/crypto", CodeUnsupported: "resolve/input/preflight/crypto",
+		CodeUnsupported:    "resolve/input/preflight/crypto",
 		CodeUnpinnedSource: "resolve/input/preflight/crypto", CodeTagToolchain: "resolve/input/preflight/crypto",
 		CodeInvalidCatalog: "resolve/input/preflight/crypto", CodePreflightFailed: "resolve/input/preflight/crypto",
 		CodeBuilderNotProvided: "resolve/input/preflight/crypto", CodeSignatureInvalid: "resolve/input/preflight/crypto",
@@ -84,12 +90,12 @@ func TestExitCodeContract(t *testing.T) {
 
 		CodeUnavailable: "retryable", CodeTimeout: "retryable",
 
-		CodeVectorUnpinned: "release/lifecycle", CodeReleaseIncomplete: "release/lifecycle",
-		CodeGateUnmet: "release/lifecycle", CodeUnverifiedRef: "release/lifecycle",
-		CodeCompatMismatch: "release/lifecycle", CodeProvenanceMissing: "release/lifecycle",
+		CodeReleaseIncomplete: "release/lifecycle",
+		CodeGateUnmet:         "release/lifecycle", CodeUnverifiedRef: "release/lifecycle",
+		CodeProvenanceMissing: "release/lifecycle",
 		CodeInventoryUnpinned: "release/lifecycle", CodeImmutableViolation: "release/lifecycle",
 		CodeWithdrawn: "release/lifecycle", CodeUnpinnedInput: "release/lifecycle",
-		CodeMirrorMismatch: "release/lifecycle", CodePipelineDrift: "release/lifecycle",
+		CodePipelineDrift:  "release/lifecycle",
 		CodePinSetMismatch: "release/lifecycle", CodeStatusCheckpoint: "release/lifecycle", CodeWriteConflict: "release/lifecycle",
 		CodeRegistryAuthFailed: "release/lifecycle", CodeRegistryRejected: "release/lifecycle",
 	}

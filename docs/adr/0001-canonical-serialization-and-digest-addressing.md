@@ -115,7 +115,8 @@ families. The unused qualified clearance implementation is removed: reproduction
 compatibility-result, conformance-result, evidence-waiver, clearance, status-trusted-time, publication,
 publication-manifest and vulnerability-report allocations likewise remain reserved and reject minting. Retained publication-root and
 release-content identities continue to serve the maintained publication path. Deployment topology and
-classification have no current authored or executable schema.
+classification have no current authored or executable schema. Retired families are absent from the code
+registry and fail through the unregistered-domain check; the historical allocations above must not be reused.
 
 The authored schemas use `apiVersion`; generated structured records use `schemaVersion`. The migration's
 changed shapes are:

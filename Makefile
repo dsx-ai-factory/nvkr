@@ -298,7 +298,7 @@ workflow-generator: go-version-check
 		-ldflags '-X main.version=dev -X main.commit=unknown' \
 		-o bin/nvkr-exec ./cmd/nvkr
 
-# Diagnostic: `make workflows-check PROJECTION_PILOT=in-process` or `=out-of-process` checks the
+# Diagnostic: `make workflows-check PROJECTION_PILOT=in-process` checks the
 # production, development and NVKE family producer bundles through the reference projection
 # plugin over that transport. Qualification workflows and runtime bundles stay core-only.
 PROJECTION_PILOT ?=
@@ -378,7 +378,7 @@ check: go-version-check fmt-check definitions-location-check reconciliation-loca
 # merge gate runs. CodeQL and the DCO App run only on GitHub.
 # Checks needing extra tools or network access run before the long test suite.
 CI_CHECKS := fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check shellcheck actionlint test-workflow-scripts \
-	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test
+	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test demo-hello
 
 .PHONY: ci-check
 ci-check: go-version-check $(CI_CHECKS) ## Complete local merge gate (needs public NVKE access, Node and Fern; see CONTRIBUTING.md).
@@ -391,3 +391,7 @@ clean: ## Remove build output, coverage, and the local engine workspace.
 .PHONY: run-resolve
 run-resolve: build ## Resolve the pinned kubectl producer and print its build graph.
 	$(BIN) resolve --data testdata/catalogs/kubernetes-layered --component kubectl --platform linux/amd64
+
+.PHONY: demo-hello
+demo-hello: ## Build and verify the hello demo (requires running Docker).
+	bash demos/demo-local.sh --out "$$(mktemp -d)/hello"

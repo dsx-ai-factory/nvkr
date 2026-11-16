@@ -23,7 +23,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
@@ -61,75 +60,6 @@ type EvidenceBundleVerifier interface {
 	VerifyEvidenceBundle(ctx context.Context, bundle []byte, policy EvidenceBundlePolicy) error
 }
 
-// LocalEvidenceReceipt is the artifact-scoped capability for an NVKR-generated
-// CycloneDX document.  EvidenceDigest is its domain-separated semantic identity;
-// BlobDigest is the ordinary sha256 of the exact canonical bytes that may be
-// transported as an OCI referrer.  Both are retained because an OCI descriptor
-// digest and an NVKR object identity intentionally use different domains.
-//
-// The receipt cannot be populated through JSON.  It is issued only by
-// VerifiedSet.LocalReceipts after BuildVerifiedFromReport has bound every generated
-// SBOM to the exact qualified producer build and artifact set.
-type LocalEvidenceReceipt struct {
-	valid            bool
-	component        string
-	buildDigest      string
-	artifactDigest   string
-	evidenceDigest   string
-	blobDigest       string
-	evidenceSchema   string
-	canonicalPayload string
-}
-
-// LocalEvidenceBinding is a defensive, read-only projection of a qualified local
-// SBOM receipt.  Possessing this value is not authority; every call to Binding
-// revalidates the receipt's private exact-byte binding first.
-type LocalEvidenceBinding struct {
-	Component      string
-	BuildDigest    string
-	ArtifactDigest string
-	EvidenceDigest string
-	BlobDigest     string
-	EvidenceSchema string
-}
-
-func (receipt LocalEvidenceReceipt) Binding() (LocalEvidenceBinding, error) {
-	if !receipt.valid || !canonicalText(receipt.component) || !canonical.IsDigest(receipt.buildDigest) ||
-		!canonical.IsDigest(receipt.artifactDigest) || !canonical.IsDigest(receipt.evidenceDigest) ||
-		!canonical.IsDigest(receipt.blobDigest) || receipt.evidenceSchema != "cyclonedx-json/1.5" ||
-		receipt.canonicalPayload == "" {
-		return LocalEvidenceBinding{}, e.New(e.CodeUnverifiedRef,
-			"local SBOM receipt is absent or lost its exact identity binding")
-	}
-	var document BOM
-	if err := canonical.UnmarshalExact([]byte(receipt.canonicalPayload), &document); err != nil {
-		return LocalEvidenceBinding{}, err
-	}
-	identity, err := document.Digest()
-	if err != nil {
-		return LocalEvidenceBinding{}, err
-	}
-	documentBuild, documentArtifact, err := metadataBindings(document.Metadata.Props)
-	if err != nil {
-		return LocalEvidenceBinding{}, err
-	}
-	if identity != receipt.evidenceDigest || rawDigest([]byte(receipt.canonicalPayload)) != receipt.blobDigest {
-		return LocalEvidenceBinding{}, e.New(e.CodeUnverifiedRef,
-			"local SBOM receipt no longer matches its canonical payload")
-	}
-	subject := document.Metadata.Component
-	if documentBuild != receipt.buildDigest || documentArtifact != receipt.component ||
-		len(document.Components) != 0 || subject.Name != receipt.component ||
-		len(subject.Hashes) != 1 || subject.Hashes[0].Alg != "SHA-256" ||
-		"sha256:"+subject.Hashes[0].Content != receipt.artifactDigest {
-		return LocalEvidenceBinding{}, e.New(e.CodeUnverifiedRef,
-			"local SBOM receipt no longer binds its exact artifact subject")
-	}
-	return LocalEvidenceBinding{Component: receipt.component, BuildDigest: receipt.buildDigest,
-		ArtifactDigest: receipt.artifactDigest, EvidenceDigest: receipt.evidenceDigest,
-		BlobDigest: receipt.blobDigest, EvidenceSchema: receipt.evidenceSchema}, nil
-}
-
 // EvidenceGap is an explicit waiver-required signal. It has no accepted/passing
 // bit and cannot satisfy evidence requirements.
 type EvidenceGap struct {
@@ -142,20 +72,18 @@ type EvidenceGap struct {
 // VerifiedSet groups deterministic SBOMs with verified external-evidence bindings
 // and explicit gaps. The validity marker is package-private.
 type VerifiedSet struct {
-	aggregate          *BOM
-	perArtifact        map[string]*BOM
-	index              *Index
-	gaps               []EvidenceGap
-	valid              bool
-	publisherQualified bool
+	aggregate   *BOM
+	perArtifact map[string]*BOM
+	index       *Index
+	gaps        []EvidenceGap
+	valid       bool
 }
 
 // BuildVerified verifies declared external evidence and emits deterministic SBOM
 // documents from caller-supplied artifact hashes. External evidence properties
 // bind bytes that this function reads, re-hashes and checks against the subject. The
 // locally generated SBOMs are diagnostic only: caller hash strings do not prove a
-// producer observed those artifact bytes, so this path cannot issue LocalReceipts
-// or qualify publisher evidence. Use BuildVerifiedFromReport for publisher output.
+// producer observed those artifact bytes, so this path cannot qualify publisher evidence.
 func BuildVerified(ctx context.Context, res *buildgraph.Resolved, buildDigest string,
 	artifactHashes map[string]string, reader EvidenceReader, verifier EvidenceBundleVerifier,
 ) (*VerifiedSet, error) {
@@ -181,17 +109,16 @@ func BuildVerified(ctx context.Context, res *buildgraph.Resolved, buildDigest st
 	if err := bindDeclaredPrebuiltSubjects(graph, hashes); err != nil {
 		return nil, err
 	}
-	return buildVerifiedSet(ctx, snapshot, buildDigest, components, hashes, reader, verifier, false)
+	return buildVerifiedSet(ctx, snapshot, buildDigest, components, hashes, reader, verifier)
 }
 
 // BuildDiagnosticSelected verifies the full resolved build identity, then emits a
 // deterministic diagnostic SBOM for exactly the caller-observed artifact subset.
-// It exists for development tools such as the local bake-off: a one-component
-// observation must not need fabricated hashes for every other build component.
+// A one-component observation must not need fabricated hashes for every other
+// build component.
 //
 // Like BuildVerified, this caller-hash path can independently verify external
-// evidence bytes, but it cannot issue LocalEvidenceReceipts or publisher authority.
-// Qualified publisher output must use BuildVerifiedFromReport instead.
+// evidence bytes, but it cannot issue publisher authority.
 func BuildDiagnosticSelected(ctx context.Context, res *buildgraph.Resolved, buildDigest string,
 	artifactHashes map[string]string, reader EvidenceReader, verifier EvidenceBundleVerifier,
 ) (*VerifiedSet, error) {
@@ -215,49 +142,7 @@ func BuildDiagnosticSelected(ctx context.Context, res *buildgraph.Resolved, buil
 	if err != nil {
 		return nil, err
 	}
-	return buildVerifiedSet(ctx, snapshot, buildDigest, components, hashes, reader, verifier, false)
-}
-
-// BuildVerifiedFromReport is the sole local producer-to-SBOM authority seam. It
-// preserves the full resolved build identity while emitting only the exact
-// artifact subset authorized by the opaque qualified pipeline report. Artifact
-// names and hashes are derived from that report, never accepted as caller input.
-// External evidence remains independently verified by reading its exact bytes.
-func BuildVerifiedFromReport(ctx context.Context, res *buildgraph.Resolved, report *pipeline.Report,
-	reader EvidenceReader, verifier EvidenceBundleVerifier,
-) (*VerifiedSet, error) {
-	if err := validateSBOMContext(ctx); err != nil {
-		return nil, err
-	}
-	if report == nil {
-		return nil, e.New(e.CodePreflightFailed,
-			"publisher SBOM construction requires a qualified pipeline report")
-	}
-	if err := report.RequireQualified(ctx); err != nil {
-		return nil, err
-	}
-	snapshot, err := requireResolvedSnapshot(res)
-	if err != nil {
-		return nil, err
-	}
-	graph, err := requireResolvedBuildIdentity(snapshot, report.BuildDigest)
-	if err != nil {
-		return nil, err
-	}
-	components, hashes, err := qualifiedReportArtifactSelection(snapshot, graph, report)
-	if err != nil {
-		return nil, err
-	}
-	set, err := buildVerifiedSet(ctx, snapshot, report.BuildDigest, components, hashes, reader, verifier, true)
-	if err != nil {
-		return nil, err
-	}
-	// Evidence readers and verifiers are untrusted callbacks. Revalidate the report and its
-	// live terminal artifact bytes after all external I/O before issuing authority.
-	if err := report.RequireQualified(ctx); err != nil {
-		return nil, err
-	}
-	return set, nil
+	return buildVerifiedSet(ctx, snapshot, buildDigest, components, hashes, reader, verifier)
 }
 
 func validateSBOMContext(ctx context.Context) error {
@@ -343,8 +228,8 @@ func declarationArtifactSelection(snapshot *buildgraph.Resolved, hashes map[stri
 		}
 	}
 	// Preserve the legacy aggregate's inventory semantics, including declared
-	// exclusions. Only producer components create per-artifact documents; unlike
-	// BuildVerifiedFromReport this diagnostic path is not a selected publication.
+	// exclusions. Only producer components create per-artifact documents; this
+	// diagnostic path is not a selected publication.
 	return components, nil
 }
 
@@ -422,75 +307,9 @@ func bindDeclaredPrebuiltSubjects(graph *ir.Graph, hashes map[string]string) err
 	return nil
 }
 
-func qualifiedReportArtifactSelection(snapshot *buildgraph.Resolved, graph *ir.Graph,
-	report *pipeline.Report,
-) ([]catalog.NamedComponent, map[string]string, error) {
-	resolvedComponents, err := validatedResolvedComponents(snapshot)
-	if err != nil {
-		return nil, nil, err
-	}
-	byComponent := make(map[string]catalog.NamedComponent, len(resolvedComponents))
-	for _, component := range resolvedComponents {
-		byComponent[component.Name] = component
-	}
-	producers := make(map[string]ir.Node)
-	for _, node := range graph.Nodes {
-		if node.Kind == ir.KindBuild || node.Kind == ir.KindPull {
-			producers[node.Component] = node
-		}
-	}
-	profileDigest := report.QualificationProfileDigest()
-	executionBinding := report.ExecutionBinding()
-	selected := make([]catalog.NamedComponent, 0, len(report.Artifacts))
-	hashes := make(map[string]string, len(report.Artifacts))
-	for _, artifact := range report.Artifacts {
-		if _, duplicate := hashes[artifact.Component]; duplicate {
-			return nil, nil, e.New(e.CodeVerifyFailed,
-				"qualified report repeats artifact component %q", artifact.Component)
-		}
-		component, knownComponent := byComponent[artifact.Component]
-		node, produced := producers[artifact.Component]
-		if !knownComponent || !produced || artifact.OutputType != node.OutputType ||
-			!canonical.IsDigest(artifact.SHA256) {
-			return nil, nil, e.New(e.CodeVerifyFailed,
-				"qualified report artifact %q is not an exact resolved build producer", artifact.Component)
-		}
-		switch node.Kind {
-		case ir.KindBuild:
-			if !component.FromSource || component.Prebuilt != nil ||
-				!canonical.IsDigest(profileDigest) ||
-				artifact.Qualification != pipeline.ArtifactQualifiedExecution ||
-				artifact.BuilderType != node.BuilderType || artifact.EngineClass != node.BuilderType ||
-				artifact.Toolchain != node.Toolchain || !canonical.IsDigest(artifact.InputDigest) ||
-				artifact.ProfileDigest != profileDigest || artifact.ExecutionBinding != executionBinding {
-				return nil, nil, e.New(e.CodeVerifyFailed,
-					"qualified build artifact %q lost its exact build/execution binding", artifact.Component)
-			}
-		case ir.KindPull:
-			if component.FromSource || component.Prebuilt == nil ||
-				artifact.Qualification != pipeline.ArtifactProfileFreeAcquisition ||
-				artifact.BuilderType != "" || artifact.EngineClass != ir.EnginePrebuiltAcquire ||
-				artifact.Toolchain != "" || artifact.InputDigest != "" ||
-				artifact.ProfileDigest != "" || artifact.ExecutionBinding != "" ||
-				artifact.SHA256 != node.Digest {
-				return nil, nil, e.New(e.CodeVerifyFailed,
-					"qualified prebuilt artifact %q lost its exact acquisition binding", artifact.Component)
-			}
-		}
-		selected = append(selected, component)
-		hashes[artifact.Component] = artifact.SHA256
-	}
-	if len(selected) == 0 {
-		return nil, nil, e.New(e.CodeProvenanceMissing,
-			"qualified report contains no selected artifact SBOM subjects")
-	}
-	sort.Slice(selected, func(i, j int) bool { return selected[i].Name < selected[j].Name })
-	return selected, hashes, nil
-}
-
 func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildDigest string,
 	components []catalog.NamedComponent, hashes map[string]string, reader EvidenceReader,
-	verifier EvidenceBundleVerifier, publisherQualified bool,
+	verifier EvidenceBundleVerifier,
 ) (*VerifiedSet, error) {
 	verifiedProps := make(map[string][]Property)
 	gaps := make([]EvidenceGap, 0)
@@ -512,17 +331,12 @@ func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildD
 
 	scoped := *snapshot
 	scoped.Components = append([]catalog.NamedComponent(nil), components...)
-	aggregate := fromBuild(&scoped, buildDigest, hashes, publisherQualified)
+	aggregate := fromBuild(&scoped, buildDigest, hashes)
 	for i := range aggregate.Components {
 		for _, component := range components {
 			if aggregate.Components[i].Name == component.Name && component.Prebuilt != nil {
-				if publisherQualified {
-					aggregate.Components[i] = componentForPublisherEvidence(component,
-						hashes[component.Name], target.ExecutableArch(snapshot.Platform), verifiedProps[component.Name])
-				} else {
-					aggregate.Components[i] = componentForWithExternalEvidence(component,
-						hashes[component.Name], target.ExecutableArch(snapshot.Platform), verifiedProps[component.Name])
-				}
+				aggregate.Components[i] = componentForWithExternalEvidence(component,
+					hashes[component.Name], target.ExecutableArch(snapshot.Platform), verifiedProps[component.Name])
 				break
 			}
 		}
@@ -534,19 +348,9 @@ func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildD
 			continue
 		}
 		bom := fromComponentForArch(component, buildDigest, hashes[component.Name], target.ExecutableArch(snapshot.Platform))
-		if publisherQualified {
-			publisherComponent := componentForPublisherEvidence(component,
-				hashes[component.Name], target.ExecutableArch(snapshot.Platform),
-				externalEvidenceDeclarationProps(component.Prebuilt))
-			bom.Metadata.Component = publisherComponent
-		}
 		if component.Prebuilt != nil {
 			verifiedComponent := componentForWithExternalEvidence(component,
 				hashes[component.Name], target.ExecutableArch(snapshot.Platform), verifiedProps[component.Name])
-			if publisherQualified {
-				verifiedComponent = componentForPublisherEvidence(component,
-					hashes[component.Name], target.ExecutableArch(snapshot.Platform), verifiedProps[component.Name])
-			}
 			bom.Metadata.Component = verifiedComponent
 		}
 		digest, err := bom.Digest()
@@ -565,8 +369,7 @@ func buildVerifiedSet(ctx context.Context, snapshot *buildgraph.Resolved, buildD
 		return nil, err
 	}
 	return &VerifiedSet{aggregate: aggregate, perArtifact: perArtifact, index: index,
-		gaps: gaps, valid: true,
-		publisherQualified: publisherQualified}, nil
+		gaps: gaps, valid: true}, nil
 }
 
 func verifyExternalEvidence(ctx context.Context, component catalog.NamedComponent, artifactDigest string,
@@ -1028,54 +831,6 @@ func (set *VerifiedSet) PerArtifact() (map[string]*BOM, *Index, error) {
 	index := *set.index
 	index.Entries = append([]IndexEntry(nil), set.index.Entries...)
 	return boms, &index, nil
-}
-
-// LocalReceipts returns one immutable, exact-byte receipt per locally generated
-// artifact SBOM. Only BuildVerifiedFromReport may issue these capabilities; the
-// declaration-only BuildVerified path remains usable for verified external
-// evidence and diagnostic documents but cannot mint publisher authority.
-func (set *VerifiedSet) LocalReceipts() ([]LocalEvidenceReceipt, error) {
-	if set == nil || !set.valid || !set.publisherQualified || set.index == nil {
-		return nil, e.New(e.CodePreflightFailed,
-			"local SBOM receipts require BuildVerifiedFromReport producer authority")
-	}
-	byArtifact := make(map[string]IndexEntry, len(set.index.Entries))
-	for _, entry := range set.index.Entries {
-		byArtifact[entry.Artifact] = entry
-	}
-	components := make([]string, 0, len(set.perArtifact))
-	for component := range set.perArtifact {
-		components = append(components, component)
-	}
-	sort.Strings(components)
-	receipts := make([]LocalEvidenceReceipt, 0, len(components))
-	for _, component := range components {
-		document := cloneBOM(set.perArtifact[component])
-		entry, ok := byArtifact[component]
-		if !ok || entry.ArtifactSHA == "" {
-			return nil, e.New(e.CodeUnverifiedRef,
-				"verified SBOM set lost index binding for artifact %q", component)
-		}
-		identity, err := document.Digest()
-		if err != nil {
-			return nil, err
-		}
-		if identity != entry.SBOMDigest {
-			return nil, e.New(e.CodeUnverifiedRef,
-				"verified SBOM index identity for %q changed after construction", component)
-		}
-		payload, err := canonical.Marshal(document)
-		if err != nil {
-			return nil, err
-		}
-		receipts = append(receipts, LocalEvidenceReceipt{
-			valid: true, component: component, buildDigest: set.index.BuildDigest,
-			artifactDigest: entry.ArtifactSHA, evidenceDigest: identity,
-			blobDigest: rawDigest(payload), evidenceSchema: "cyclonedx-json/1.5",
-			canonicalPayload: string(payload),
-		})
-	}
-	return receipts, nil
 }
 
 // EvidenceGaps returns explicit missing-evidence signals. The returned values are
