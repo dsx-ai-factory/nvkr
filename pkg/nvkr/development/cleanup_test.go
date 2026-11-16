@@ -487,17 +487,22 @@ func TestCleanupBatchSelectionAndInventoryAdmission(t *testing.T) {
 	for _, test := range []struct {
 		name      string
 		malformed bool
+		young     int
 	}{
-		{"preview and subsequent batches", false},
-		{"invalid package beyond batch", true},
+		{"preview and subsequent batches", false, 0},
+		{"young packages precede eligible batch", false, 10},
+		{"invalid package beyond batch", true, 0},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			fixture := newCleanupFixture()
 			original := fixture.packages[0]
 			fixture.packages = nil
 			// Reverse provider order; selection must still use package names.
-			for i := 29; i >= 0; i-- {
+			for i := 29 + test.young; i >= 0; i-- {
 				pkg := original
+				if i < test.young {
+					pkg.UpdatedAt = fixture.now.Add(-time.Hour)
+				}
 				pkg.ID += uint64(i)
 				pkg.Name = fmt.Sprintf("project/development/runs/100/attempts/1/output-%03d", i)
 				fixture.packages = append(fixture.packages, pkg)
@@ -514,14 +519,18 @@ func TestCleanupBatchSelectionAndInventoryAdmission(t *testing.T) {
 			if err != nil || len(preview.Candidates) != 25 || len(fixture.deletes) != 0 {
 				t.Fatalf("preview=%+v error=%v deletes=%v", preview, err, fixture.deletes)
 			}
+			if !strings.HasSuffix(preview.Candidates[0], fmt.Sprintf("output-%03d", test.young)) ||
+				!strings.HasSuffix(preview.Candidates[24], fmt.Sprintf("output-%03d", test.young+24)) {
+				t.Fatalf("preview did not skip young packages in name order: %+v", preview)
+			}
 			applied, err := fixture.execute(t, t.Context(), true)
 			if err != nil || strings.Join(preview.Candidates, "\n") != strings.Join(applied.Deleted, "\n") {
 				t.Fatalf("preview/apply differ: preview=%+v applied=%+v error=%v", preview, applied, err)
 			}
 			// The provider's next inventory omits confirmed deletions.
-			fixture.packages = fixture.packages[:5]
+			fixture.packages = append(fixture.packages[:5], fixture.packages[30:]...)
 			remaining, err := fixture.execute(t, t.Context(), true)
-			if err != nil || len(remaining.Deleted) != 5 || !strings.HasSuffix(remaining.Deleted[0], "output-025") {
+			if err != nil || len(remaining.Deleted) != 5 || !strings.HasSuffix(remaining.Deleted[0], fmt.Sprintf("output-%03d", test.young+25)) {
 				t.Fatalf("remaining batch=%+v error=%v", remaining, err)
 			}
 		})

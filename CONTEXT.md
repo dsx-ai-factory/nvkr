@@ -443,6 +443,8 @@ _Avoid_: Build status, local clock, mutable release contents
 Reusable producer, source, tool, and pin declarations from which Definitions select their inputs.
 A registry may select shared, digest-pinned declaration fragments; its lock still owns the complete expanded
 source and artifact key sets. Fragments are authoring inputs, not additional lifecycle objects.
+Command operands may reference confined files; loading expands their exact bytes into the existing argv.
+Captured compile inputs retain these files, while resolved command identities exclude their paths.
 _Avoid_: Inventory, registry destination
 
 **Component producer**:

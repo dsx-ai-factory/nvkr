@@ -153,6 +153,8 @@ func (api *cleanupAPI) cleanup(ctx context.Context, repository, token string, ap
 			return report, err
 		}
 		candidate := cleanupCandidate{metadata: pkg, reference: ref, path: accountPath + "/container/" + url.PathEscape(pkg.Name)}
+		// Authenticate every package, including young ones, before selection.
+		// Age filters candidates in eligible; it does not bypass inventory admission.
 		if _, err := api.packageOldEnough(repo, candidate, pkg); err != nil {
 			return report, err
 		}

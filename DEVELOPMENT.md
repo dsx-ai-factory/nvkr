@@ -264,7 +264,7 @@ the rest. Preview from the default branch before enabling deletion:
 gh workflow run nvkr-dev-cleanup.yml --repo dsx-ai-factory/nvkr --ref main -f apply=false
 ```
 
-Cleanup requires private packages in the exact reserved namespace, matching GitHub account and workflow attempt, a completed
+Cleanup requires internal packages in the exact reserved namespace, matching GitHub account and workflow attempt, a completed
 attempt at least 24 hours old, and package/version timestamps at least 24 hours old. It rechecks candidates
 before deletion. Active, young or ambiguous state is retained; API/admission failures fail the job rather
 than claim cleanup succeeded. Whole-package deletion includes that package's versions, signatures and

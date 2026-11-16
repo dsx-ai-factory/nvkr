@@ -71,8 +71,21 @@ func TestRunGenerateProjectionPilotMatchesInBinaryGeneration(t *testing.T) {
 		_, err = invokeLifecycleCLI(t, append(generate, "--root", pilot, "--check", selector)...)
 		assertLifecycleCommandCode(t, err, e.CodePipelineDrift)
 	})
-	_, err := invokeLifecycleCLI(t, append(generate, "--root", t.TempDir(), "--projection-pilot=grpc")...)
-	assertLifecycleCommandCode(t, err, e.CodeUsage)
+}
+
+func TestRunGenerateRejectsUnsupportedProjectionBeforeInputs(t *testing.T) {
+	for _, transport := range []string{"grpc", "out-of-process"} {
+		t.Run(transport, func(t *testing.T) {
+			root := t.TempDir()
+			_, err := invokeLifecycleCLI(t, "run", "generate", "--definition", filepath.Join(root, "missing-definition.yaml"),
+				"--environment", filepath.Join(root, "missing-environment.yaml"), "--root", root, "--projection-pilot="+transport)
+			assertLifecycleCommandCode(t, err, e.CodeUsage)
+			entries, err := os.ReadDir(root)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("unsupported projection changed output root: entries=%v error=%v", entries, err)
+			}
+		})
+	}
 }
 
 func generatedTree(t *testing.T, root string) map[string]string {
