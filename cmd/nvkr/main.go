@@ -99,7 +99,6 @@ func newApp() *cli.App {
 			cmdTransportPack(),
 			cmdTransportUnpack(),
 			cmdSandboxExec(),
-			cmdProjectionAdapter(),
 		},
 	}
 	for _, command := range app.Commands {

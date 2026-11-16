@@ -473,7 +473,7 @@ in reconciliation; a facade alone does not discharge that debt.
 | Trust and signing | `trust`, `sign` | Authenticate documents, tools and signer policies |
 | Evidence | `sbom`, `provenance`, `vuln` | Validate evidence shape and subject binding |
 | Packaging and transport | `assemble`, `delivery` | Artifact representation and OCI publication/closure |
-| Public adaptation | `errors`; `client/v1` and `cmd/nvkr` outside this tree | Stable error mapping, read surfaces, SDK and CLI |
+| Public adaptation | `errors`; `client/v1` and `cmd/nvkr` outside this tree | Stable error mapping, read surfaces, experimental SDK and CLI |
 
 The purity guard lives in `internal/architecture` as a repository test, not a domain module.
 

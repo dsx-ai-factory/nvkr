@@ -27,10 +27,13 @@ codes slot in without renumbering, and they **never change meaning**. Shell comm
 | Band | Purpose | Examples |
 | :---- | :---- | :---- |
 | `0–3` | Semantic (non-error) | success `0`; internal `1`; usage `2`; "differences present" (diff) `3` |
-| `10–19` | Resolve / input / preflight / crypto | `no-match`, `ambiguous`, `reserved-axis`, `unsupported`, `invalid-catalog`, `unpinned-source`, `tag-toolchain`, **`builder-not-provided`**, `preflight-failed` (including builder-version mismatch), `signature-invalid` |
+| `10–19` | Resolve / input / preflight / crypto | `no-match`, `ambiguous`, `unsupported`, `invalid-catalog`, `unpinned-source`, `tag-toolchain`, **`builder-not-provided`**, `preflight-failed` (including builder-version mismatch), `signature-invalid` |
 | `20–29` | Build / verify / trust-policy / disk | `fetch-failed`, `build-failed`, `verify-failed` (digest divergence), `untrusted-signer`, `trust-policy-missing`, `untrusted-profile`, `encrypted-artifact`, `envelope-decode`, `engine-capability` |
 | `30–31` | Retryable / transient | `unavailable`, `timeout` (`32–39` reserved) |
-| `40–56` | Release / lifecycle | `vector-unpinned`, `release-incomplete`, `gate-unmet`, `unverified-ref`, `compat-mismatch`, `provenance-missing`, `inventory-unpinned`, `immutable-violation`, `withdrawn`, `unpinned-input`, `mirror-mismatch`, `pipeline-drift`, `status-checkpoint`, `write-conflict`, `pin-set-mismatch`, `registry-auth-failed`, `registry-rejected` |
+| `40–56` | Release / lifecycle | `release-incomplete`, `gate-unmet`, `unverified-ref`, `provenance-missing`, `inventory-unpinned`, `immutable-violation`, `withdrawn`, `unpinned-input`, `pipeline-drift`, `status-checkpoint`, `write-conflict`, `pin-set-mismatch`, `registry-auth-failed`, `registry-rejected` |
+
+Unused codes `reserved-axis` (12), `vector-unpinned` (40), `compat-mismatch` (44), and
+`mirror-mismatch` (50) are removed. Their integers remain unassigned and must not be reused.
 
 Builder-preflight failures live in the resolve/preflight band. A profile that does not provide a required
 builder maps to `builder-not-provided`; a builder version, executable-identity, sandbox, or privilege mismatch

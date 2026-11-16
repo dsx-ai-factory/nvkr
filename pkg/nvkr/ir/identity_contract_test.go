@@ -56,8 +56,8 @@ func TestBuildIdentityCanonicalVectors(t *testing.T) {
 			if fmt.Sprintf("sha256:%x", historical) == got {
 				t.Fatal("new build identity reused the retired recipe domain")
 			}
-			retired, err := canonical.Digest(canonical.KindLegacyRecipe, logical)
-			assertIRCode(t, err, e.CodeUnsupported)
+			retired, err := canonical.Digest("nvkr.recipe", logical)
+			assertIRCode(t, err, e.CodeInternal)
 			if retired != "" {
 				t.Fatal("retired recipe domain minted an identity")
 			}
