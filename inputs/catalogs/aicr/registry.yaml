@@ -9,7 +9,7 @@ metadata:
 sources:
   aicr-tool-arm64:
     repo: https://github.com/NVIDIA/aicr
-    constraint: 1.2.0
+    constraint: 1.3.0
     tool:
       format: tar-gzip
       url: https://github.com/NVIDIA/aicr/releases/download/{{.Tag}}/aicr_{{.Version}}_linux_arm64.tar.gz
@@ -54,7 +54,7 @@ components:
         out=/src/bin/nvkr-aicr
         mkdir -p "$out"
         timeout --kill-after=10s 900s go build -mod=vendor -trimpath -buildvcs=false \
-          -ldflags "-s -w -buildid= -X github.com/NVIDIA/aicr/pkg/cli.version=$BUILD_VERSION -X github.com/NVIDIA/aicr/pkg/cli.commit=$GIT_VERSION -X github.com/NVIDIA/aicr/pkg/cli.date=$build_date" \
+          -ldflags "-s -w -buildid= -X aicr.run/pkg/cli.version=$BUILD_VERSION -X aicr.run/pkg/cli.commit=$GIT_VERSION -X aicr.run/pkg/cli.date=$build_date" \
           -o "$out/aicr" ./cmd/aicr
         timeout --kill-after=10s 120s "$out/aicr" recipe \
           --service "$1" --accelerator "$2" \

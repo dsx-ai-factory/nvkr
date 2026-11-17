@@ -15,8 +15,9 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// Output-only projection of NVIDIA/aicr@dc78e354f2a55985782cfe0d9d6b8f1591e75dd5
-// pkg/artifact/{types,parse}.go. These compatibility bounds do not verify a release.
+// Output-only projection of NVIDIA/aicr v1.3.0@d3493485869ca0a3f49f1058b3985d6ed536b6b2
+// pkg/artifact/{types,parse}.go and pkg/defaults/artifacts.go.
+// These compatibility bounds do not verify a release.
 var inventoryHost = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::[0-9]+)?$`)
 var inventoryRepository = regexp.MustCompile(`^[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*(?:/[a-z0-9]+(?:(?:[._]|__|-+)[a-z0-9]+)*)*$`)
 var inventoryName = regexp.MustCompile(`^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$`)
