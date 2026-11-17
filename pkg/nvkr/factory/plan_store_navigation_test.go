@@ -164,3 +164,120 @@ func TestPlanStoreCorruptNeighborWorkflowRefusesPublication(t *testing.T) {
 		t.Fatal("restored neighbor did not permit the new shared index commit")
 	}
 }
+
+func TestPlanStoreNavigationStructureAndOwnerScope(t *testing.T) {
+	previous := githubForcePartitionFallback
+	githubForcePartitionFallback = true
+	t.Cleanup(func() { githubForcePartitionFallback = previous })
+	first := recompileGitHubStabilityPlan(t, githubRuntimePlanFixture(t), func(in *githubStabilityInputs) {
+		in.environment.GitHubExecutionPartitions = true
+	})
+	second := recompileGitHubStabilityPlan(t, first, func(in *githubStabilityInputs) {
+		in.environment.GitHubBundle = "other-project"
+	})
+	root := t.TempDir()
+	var bundles []*GeneratedBundle
+	for _, plan := range []*Plan{first, freshGitHubRuntimePins(t, second)} {
+		bundle, err := RenderGitHub(t.Context(), plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
+			t.Fatal(err)
+		}
+		bundles = append(bundles, bundle)
+	}
+	indexPath := filepath.Join(root, PlanStoreIndexPath)
+	raw, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decode := func(t *testing.T) planStoreIndexDocument {
+		t.Helper()
+		var index planStoreIndexDocument
+		if err := json.Unmarshal(raw, &index); err != nil {
+			t.Fatal(err)
+		}
+		return index
+	}
+	index := decode(t)
+	shared, divergent := "", ""
+	for _, id := range sortedKeys(index.Jobs) {
+		variants := index.Jobs[id]
+		if len(variants) == 2 {
+			divergent = id
+		}
+		if len(variants) == 1 && len(variants[0].Workflows) == 2 {
+			shared = id
+		}
+	}
+	if shared == "" || divergent == "" {
+		t.Fatal("fixture needs shared and divergent partitioned jobs")
+	}
+	for _, bundle := range bundles {
+		if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
+			t.Fatal("valid partitioned navigation failed", err)
+		}
+	}
+	// Prefer neighbor-only damage so the selected-job equality check cannot
+	// hide a missing structural guard.
+	for _, test := range []struct {
+		name   string
+		change func(*planStoreIndexDocument)
+	}{
+		{"empty variants", func(index *planStoreIndexDocument) { index.Jobs["empty-variants"] = []planStoreJobVariant{} }},
+		{"empty workflow users", func(index *planStoreIndexDocument) { index.Jobs[divergent][1].Workflows = []planStoreWorkflow{} }},
+		{"duplicate operations", func(index *planStoreIndexDocument) {
+			index.Jobs[divergent][1].Operations = index.Jobs[divergent][0].Operations
+		}},
+		{"unordered variants", func(index *planStoreIndexDocument) { slices.Reverse(index.Jobs[divergent]) }},
+		{"unordered users", func(index *planStoreIndexDocument) { slices.Reverse(index.Jobs[shared][0].Workflows) }},
+		{"unknown owner", func(index *planStoreIndexDocument) {
+			index.Jobs[divergent][1].Workflows[0] = planStoreWorkflow{Bundle: "nvkr-run-unknown", File: ".github/workflows/nvkr-run-unknown.yml"}
+		}},
+		{"repeated owner", func(index *planStoreIndexDocument) {
+			users := index.Jobs[shared][0].Workflows
+			index.Jobs[shared][0].Workflows = append(users, users[len(users)-1])
+		}},
+		{"invalid workflow namespace", func(index *planStoreIndexDocument) {
+			index.Jobs[divergent][1].Workflows[0].File = ".github/workflows/nvkr-run-foreign.yml"
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			changed := decode(t)
+			test.change(&changed)
+			encoded, err := treeJSON(changed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if bytes.Equal(encoded, raw) {
+				t.Fatal("navigation fixture did not change bytes")
+			}
+			writeGeneratedFixture(t, indexPath, encoded)
+			assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), root, bundles[0]), e.CodePipelineDrift)
+		})
+	}
+	t.Run("well-formed neighbor-only mutation", func(t *testing.T) {
+		changed := decode(t)
+		neighbor := filepath.Base(filepath.Dir(bundles[1].PlanPath))
+		mutated := false
+		for i, variant := range changed.Jobs[divergent] {
+			if len(variant.Workflows) == 1 && variant.Workflows[0].Bundle == neighbor && len(variant.Operations) != 0 {
+				changed.Jobs[divergent][i].Operations[0].Node += "-changed"
+				mutated = true
+			}
+		}
+		if !mutated {
+			t.Fatal("fixture lacks a neighbor-only job variant")
+		}
+		encoded, err := treeJSON(changed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeGeneratedFixture(t, indexPath, encoded)
+		if err := CheckGeneratedBundle(t.Context(), root, bundles[0]); err != nil {
+			t.Fatal("neighbor-only navigation drift blocked selected bundle", err)
+		}
+		assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), root, bundles[1]), e.CodePipelineDrift)
+	})
+}
