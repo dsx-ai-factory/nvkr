@@ -268,6 +268,59 @@ func TestLeafAdmissionLines(t *testing.T) {
 	}
 }
 
+func TestAICRBuildIdentityAdmission(t *testing.T) {
+	aicrInputTestRoot(t)
+	const expected = "aicr version 1.3.0 (commit: d3493485869ca0a3f49f1058b3985d6ed536b6b2, date: 2026-11-16T22:54:16Z)"
+	for _, file := range []string{"definition.yaml", "nvke-gb200.yaml"} {
+		plan := compileAICRInput(t, file, "aicr-local-arm64.yaml")
+		for _, build := range plan.Builds {
+			for _, node := range build.Graph.Nodes {
+				if node.Kind != ir.KindBuild || node.BuilderType == ir.BuilderPinnedTool {
+					continue
+				}
+				script := node.Command[4]
+				start := strings.Index(script, "version_report=")
+				end := strings.Index(script, `timeout --kill-after=10s 120s "$out/aicr" recipe`)
+				if start < 0 || end <= start || !strings.Contains(script[:start], `-o "$out/aicr" ./cmd/aicr`) {
+					t.Fatal("build identity assertion must follow compilation and precede rendering")
+				}
+				for _, tc := range []struct {
+					name, report  string
+					failed, admit bool
+				}{
+					{"matching", expected, false, true},
+					{"version", strings.Replace(expected, "1.3.0", "dev", 1), false, false},
+					{"commit", strings.Replace(expected, "d3493485869ca0a3f49f1058b3985d6ed536b6b2", "unknown", 1), false, false},
+					{"date", strings.Replace(expected, "2026-11-16T22:54:16Z", "unknown", 1), false, false},
+					{"empty", "", false, false},
+					{"failed command", expected, true, false},
+				} {
+					t.Run(build.Name+"/"+tc.name, func(t *testing.T) {
+						out := t.TempDir()
+						stub := "#!/bin/sh\n[ \"$#\" -eq 1 ] && [ \"$1\" = --version ] || exit 2\nprintf '%s\\n' \"$NVKR_TEST_REPORT\"\n[ \"$NVKR_TEST_FAIL\" = false ]\n"
+						if err := os.WriteFile(filepath.Join(out, "aicr"), []byte(stub), 0o700); err != nil {
+							t.Fatal(err)
+						}
+						// Exercise the compiled shell assertion while checking its timeout operands.
+						prefix := "out=\"$NVKR_TEST_OUT\"\ntimeout() { [ \"$1\" = --kill-after=10s ] && [ \"$2\" = 30s ] || return 2; shift 2; \"$@\"; }\n"
+						run := exec.CommandContext(t.Context(), "bash", "-euo", "pipefail", "-c", prefix+script[start:end])
+						failed := "false"
+						if tc.failed {
+							failed = "true"
+						}
+						run.Env = append(os.Environ(), "NVKR_TEST_OUT="+out, "NVKR_TEST_REPORT="+tc.report, "NVKR_TEST_FAIL="+failed,
+							"BUILD_VERSION=1.3.0", "GIT_VERSION=d3493485869ca0a3f49f1058b3985d6ed536b6b2", "build_date=2026-11-16T22:54:16Z")
+						output, err := run.CombinedOutput()
+						if (err == nil) != tc.admit {
+							t.Fatalf("admission = %v, want %v: %v\n%s", err == nil, tc.admit, err, output)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
 func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node, contract []string) {
 	t.Helper()
 	const commit = "d3493485869ca0a3f49f1058b3985d6ed536b6b2"

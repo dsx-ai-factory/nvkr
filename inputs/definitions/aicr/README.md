@@ -80,6 +80,9 @@ bin/nvkr run local \
   --attempt aicr-nvke-gb200-local-1 --jobs 1
 ```
 
+The following recipe and installation assumptions are retained v1.2.0 observations;
+they have not been revalidated for the current v1.3.0 pin.
+
 AICR's recipe constrains nodes to Ubuntu `24.04`, and its NVKE guide assumes NVIDIA's
 `-nvidia-64k` kernel. No NVKR Run has paired these bundles with a node image. AICR `v1.2.0` has no GB200 recipe
 for Ubuntu 26.04 and no `gb200-nvke-ubuntu-inference-dynamo` leaf, so this Definition has

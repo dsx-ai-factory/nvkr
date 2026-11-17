@@ -56,6 +56,8 @@ components:
         timeout --kill-after=10s 900s go build -mod=vendor -trimpath -buildvcs=false \
           -ldflags "-s -w -buildid= -X aicr.run/pkg/cli.version=$BUILD_VERSION -X aicr.run/pkg/cli.commit=$GIT_VERSION -X aicr.run/pkg/cli.date=$build_date" \
           -o "$out/aicr" ./cmd/aicr
+        version_report="$(timeout --kill-after=10s 30s "$out/aicr" --version)"
+        [ "$version_report" = "aicr version $BUILD_VERSION (commit: $GIT_VERSION, date: $build_date)" ] || { echo "AICR build identity does not match pinned source" >&2; exit 1; }
         timeout --kill-after=10s 120s "$out/aicr" recipe \
           --service "$1" --accelerator "$2" \
           --os ubuntu --intent training --output "$out/recipe.yaml"
