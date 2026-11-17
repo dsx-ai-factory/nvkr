@@ -47,6 +47,12 @@ memory requests to the seven site telemetry collector roles and three target
 allocators. Recorded small-profile runtime acceptance covers these settings,
 not the default reservations.
 
+The demo supplies four 1-GiB static volumes and writable guest directories for
+NKTP's persistent queues alongside the PostgreSQL and SPIRE volumes. The default
+StorageClass has no dynamic provisioner. Queue data survives Pod restarts in the
+site VM and is removed with that disposable VM; this is demo storage, not a
+production durability claim.
+
 Runtime fixes admit the installer's legacy/current controller identity, bounded
 writable helper staging with source-supported shell, unchanged pinned-context
 readiness convergence, current/retained image-URL placeholders and unfiltered

@@ -79,6 +79,11 @@ memory requests to the seven site telemetry collector roles and three target
 allocators. Recorded small-profile runtime acceptance covers these settings,
 not the default reservations.
 
+The demo's default StorageClass has no dynamic provisioner. It supplies four
+1-GiB volumes and writable guest directories for NKTP's persistent queues, in
+addition to the PostgreSQL and SPIRE volumes. Queue data survives Pod restarts
+within the disposable site VM; deleting that VM removes the data.
+
 The six-hour job passes its remaining deadline to Go, which preserves two hours
 for independently bounded cleanup. Setup requires a GitHub-hosted AMD64 machine,
 KVM, unattended administrator access and sufficient disk/memory. A runner-scoped
