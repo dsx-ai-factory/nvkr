@@ -55,7 +55,23 @@ func freshGitHubRuntimePins(t *testing.T, before *Plan) *Plan {
 	})
 }
 
+type runtimeInputInstaller func(context.Context, *Plan, string) error
+
+func testRuntimeInstallers(t *testing.T, test func(*testing.T, runtimeInputInstaller)) {
+	t.Helper()
+	for _, installer := range []struct {
+		name string
+		run  runtimeInputInstaller
+	}{{"bootstrap", InstallGitHubRuntimeInputs}, {"stage", InstallGitHubStageRuntimeInputs}} {
+		t.Run(installer.name, func(t *testing.T) { test(t, installer.run) })
+	}
+}
+
 func TestInstallGitHubRuntimeInputsUsesGeneratedFileOwner(t *testing.T) {
+	testRuntimeInstallers(t, testInstallGitHubRuntimeInputsUsesGeneratedFileOwner)
+}
+
+func testInstallGitHubRuntimeInputsUsesGeneratedFileOwner(t *testing.T, install runtimeInputInstaller) {
 	before, baseline, original := runtimeInputsFixture(t)
 	for _, refreshed := range []bool{false, true} {
 		t.Run(map[bool]string{false: "unchanged", true: "updated source pins"}[refreshed], func(t *testing.T) {
@@ -69,7 +85,7 @@ func TestInstallGitHubRuntimeInputsUsesGeneratedFileOwner(t *testing.T) {
 				t.Fatal("fixture did not refresh the Plan")
 			}
 			staged := githubRuntimeTree(t, filepath.Join(root, githubRuntimeInputDirectory))
-			if err := InstallGitHubRuntimeInputs(t.Context(), before, root); err != nil {
+			if err := install(t.Context(), before, root); err != nil {
 				t.Fatal(err)
 			}
 			if err := CheckGitHubRuntimeInputs(t.Context(), fresh, root); err != nil {
@@ -93,6 +109,10 @@ func TestInstallGitHubRuntimeInputsUsesGeneratedFileOwner(t *testing.T) {
 }
 
 func TestInstallGitHubRuntimeInputsRejectsIncompleteOrMixedHandoff(t *testing.T) {
+	testRuntimeInstallers(t, testInstallGitHubRuntimeInputsRejectsIncompleteOrMixedHandoff)
+}
+
+func testInstallGitHubRuntimeInputsRejectsIncompleteOrMixedHandoff(t *testing.T, install runtimeInputInstaller) {
 	before, baseline, original := runtimeInputsFixture(t)
 	fresh := freshGitHubRuntimePins(t, before)
 	stageGitHubRuntimeInputs(t, original, fresh)
@@ -138,7 +158,7 @@ func TestInstallGitHubRuntimeInputsRejectsIncompleteOrMixedHandoff(t *testing.T)
 				}
 			}
 			prior := githubRuntimeTree(t, root)
-			assertFactoryErrorCode(t, InstallGitHubRuntimeInputs(t.Context(), before, root), e.CodePipelineDrift)
+			assertFactoryErrorCode(t, install(t.Context(), before, root), e.CodePipelineDrift)
 			if !reflect.DeepEqual(prior, githubRuntimeTree(t, root)) {
 				t.Fatal("rejected handoff changed existing files")
 			}
@@ -147,6 +167,10 @@ func TestInstallGitHubRuntimeInputsRejectsIncompleteOrMixedHandoff(t *testing.T)
 }
 
 func TestInstallGitHubRuntimeInputsRejectsChangedAuthority(t *testing.T) {
+	testRuntimeInstallers(t, testInstallGitHubRuntimeInputsRejectsChangedAuthority)
+}
+
+func testInstallGitHubRuntimeInputsRejectsChangedAuthority(t *testing.T, install runtimeInputInstaller) {
 	before, baseline, original := runtimeInputsFixture(t)
 	updated := freshGitHubRuntimePins(t, before)
 	stageGitHubRuntimeInputs(t, original, updated)
@@ -192,7 +216,7 @@ func TestInstallGitHubRuntimeInputsRejectsChangedAuthority(t *testing.T) {
 				}
 			}
 			prior := githubRuntimeTree(t, root)
-			assertFactoryErrorCode(t, InstallGitHubRuntimeInputs(t.Context(), before, root), e.CodePipelineDrift)
+			assertFactoryErrorCode(t, install(t.Context(), before, root), e.CodePipelineDrift)
 			if !reflect.DeepEqual(prior, githubRuntimeTree(t, root)) {
 				t.Fatal("rejected authority change modified the checkout")
 			}
@@ -201,6 +225,10 @@ func TestInstallGitHubRuntimeInputsRejectsChangedAuthority(t *testing.T) {
 }
 
 func TestInstallGitHubRuntimeInputsRejectsLinkedStagingDirectory(t *testing.T) {
+	testRuntimeInstallers(t, testInstallGitHubRuntimeInputsRejectsLinkedStagingDirectory)
+}
+
+func testInstallGitHubRuntimeInputsRejectsLinkedStagingDirectory(t *testing.T, install runtimeInputInstaller) {
 	plan, baseline, root := runtimeInputsFixture(t)
 	stageGitHubRuntimeInputs(t, root, plan)
 	name := filepath.Join(root, githubRuntimeInputDirectory)
@@ -212,7 +240,7 @@ func TestInstallGitHubRuntimeInputsRejectsLinkedStagingDirectory(t *testing.T) {
 		t.Fatal(err)
 	}
 	prior := githubRuntimeTree(t, target)
-	assertFactoryErrorCode(t, InstallGitHubRuntimeInputs(t.Context(), plan, root), e.CodePipelineDrift)
+	assertFactoryErrorCode(t, install(t.Context(), plan, root), e.CodePipelineDrift)
 	if err := CheckGeneratedBundle(t.Context(), root, baseline); err != nil {
 		t.Fatal(err)
 	}
@@ -222,6 +250,10 @@ func TestInstallGitHubRuntimeInputsRejectsLinkedStagingDirectory(t *testing.T) {
 }
 
 func TestInstallGitHubRuntimeInputsAdmitsBeforeIO(t *testing.T) {
+	testRuntimeInstallers(t, testInstallGitHubRuntimeInputsAdmitsBeforeIO)
+}
+
+func testInstallGitHubRuntimeInputsAdmitsBeforeIO(t *testing.T, install runtimeInputInstaller) {
 	baseline := githubRuntimePlanFixture(t)
 	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -240,7 +272,7 @@ func TestInstallGitHubRuntimeInputsAdmitsBeforeIO(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			plan, root := *baseline, t.TempDir()
 			test.change(&plan)
-			assertFactoryErrorCode(t, InstallGitHubRuntimeInputs(test.ctx, &plan, root), test.code)
+			assertFactoryErrorCode(t, install(test.ctx, &plan, root), test.code)
 			if len(githubRuntimeTree(t, root)) != 0 {
 				t.Fatal("runtime installer wrote before capability admission")
 			}

@@ -24,7 +24,7 @@ runs:
         mv -- .nvkr/runtime-runner/.nvkr/runtime-export/plan.json .nvkr/runtime-inputs/plan.json
         mv -- .nvkr/runtime-runner/.nvkr/runtime-export/manifest.json .nvkr/runtime-inputs/manifest.json
         chmod +x ./nvkr-exec
-        ./nvkr-exec factory github install-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
+        ./nvkr-exec factory github install-stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
       shell: bash -e {0}
 inputs:
   runner-artifact:

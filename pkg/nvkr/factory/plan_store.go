@@ -11,6 +11,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -26,11 +27,54 @@ func planStorePath(raw []byte, extension string) string {
 	return PlanStoreDirectory + "/" + strings.TrimPrefix(pipeline.FileDigest(raw), "sha256:") + extension
 }
 
+// Named addresses are deterministic for one object's logical role and exact
+// bytes. Full integrity remains bound by every owning manifest, not this suffix.
+func namedPlanStorePath(logical string, raw []byte, extension string) (string, error) {
+	name := PlanStoreDirectory + "/" + logical + "@" + strings.TrimPrefix(pipeline.FileDigest(raw), "sha256:")[:12] + extension
+	if !isPlanStorePath(name) {
+		return "", e.New(e.CodePipelineDrift, "unsafe logical Plan object name %q", logical)
+	}
+	return name, nil
+}
+
 func isPlanStorePath(name string) bool {
-	if path.Dir(name) != PlanStoreDirectory || (path.Ext(name) != ".json" && path.Ext(name) != ".sh") {
+	if strings.ContainsFunc(name, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) }) || !safeGeneratedPath(name) || !strings.HasPrefix(name, PlanStoreDirectory+"/") || (path.Ext(name) != ".json" && path.Ext(name) != ".sh") {
 		return false
 	}
-	return canonical.IsDigest("sha256:" + strings.TrimSuffix(path.Base(name), path.Ext(name)))
+	base := strings.TrimSuffix(path.Base(name), path.Ext(name))
+	if path.Dir(name) == PlanStoreDirectory {
+		// Previous generated manifests retain retirement authority during migration.
+		return canonical.IsDigest("sha256:" + base)
+	}
+	kind, _, _ := strings.Cut(strings.TrimPrefix(name, PlanStoreDirectory+"/"), "/")
+	switch kind {
+	case "catalogs", "components", "sources", "steps", "resolved-components", "scripts", "graph", "definition", "composition", "environment", "actions", "overlays", "tools", "outputs", "routes", "runtime-inputs", "targets", "records":
+	default:
+		return false
+	}
+	at := strings.LastIndex(base, "@")
+	if at <= 0 || len(base)-at-1 != 12 {
+		return false
+	}
+	suffix := base[at+1:]
+	for _, c := range suffix {
+		if !strings.ContainsRune("0123456789abcdef", c) {
+			return false
+		}
+	}
+	return true
+}
+
+func planStoreMatches(name string, raw []byte) bool {
+	if !isPlanStorePath(name) {
+		return false
+	}
+	if path.Dir(name) == PlanStoreDirectory {
+		return planStorePath(raw, path.Ext(name)) == name
+	}
+	base := strings.TrimSuffix(path.Base(name), path.Ext(name))
+	suffix := base[strings.LastIndex(base, "@")+1:]
+	return suffix == strings.TrimPrefix(pipeline.FileDigest(raw), "sha256:")[:12]
 }
 
 func isPlanStoreRecord(name string) bool { return isPlanStorePath(name) && path.Ext(name) == ".json" }
@@ -38,8 +82,8 @@ func isPlanStoreScript(name string) bool { return isPlanStorePath(name) && path.
 
 // Other manifests describe shared-file ownership, not executable authority.
 // Inspect only the finite producer namespace, never arbitrary repository paths.
-func otherPlanStoreMembers(ctx context.Context, root string, bundle *GeneratedBundle) (map[string]bool, error) {
-	result := map[string]bool{}
+func planStoreOwners(ctx context.Context, root, except string) (map[string]planStoreOwner, error) {
+	result := map[string]planStoreOwner{}
 	if err := validateGeneratedDirectoryChain(root, ".github"); err != nil {
 		return nil, err
 	}
@@ -57,7 +101,7 @@ func otherPlanStoreMembers(ctx context.Context, root string, bundle *GeneratedBu
 			return nil, e.Wrap(e.CodeTimeout, err, "reading shared Plan owners")
 		}
 		layout, ok := githubWorkflowNamespace(".github/workflows/" + entry.Name() + ".yml")
-		if !ok || layout.manifestPath == bundle.ManifestPath {
+		if !ok || layout.manifestPath == except {
 			continue
 		}
 		owner := &GeneratedBundle{Engine: EngineGitHub, WorkflowPath: layout.workflowPath, ManifestPath: layout.manifestPath, PlanPath: layout.planPath}
@@ -69,10 +113,13 @@ func otherPlanStoreMembers(ctx context.Context, root string, bundle *GeneratedBu
 			if !isPlanStorePath(member.Path) {
 				continue
 			}
-			if member.SHA256 != "sha256:"+strings.TrimSuffix(path.Base(member.Path), path.Ext(member.Path)) {
-				return nil, e.New(e.CodePipelineDrift, "shared Plan manifest address differs from its bytes")
+			prior := result[member.Path]
+			if prior.Member.Path != "" && prior.Member.SHA256 != member.SHA256 {
+				return nil, e.New(e.CodePipelineDrift, "shared Plan owners disagree on full digest for %s", member.Path)
 			}
-			result[member.Path] = true
+			prior.Member = member
+			prior.Bundles = append(prior.Bundles, entry.Name())
+			result[member.Path] = prior
 			if len(result) > maxGeneratedDirEntries {
 				return nil, e.New(e.CodePipelineDrift, "shared Plan store exceeds member bound")
 			}
@@ -81,82 +128,145 @@ func otherPlanStoreMembers(ctx context.Context, root string, bundle *GeneratedBu
 	return result, nil
 }
 
-// The union of producer manifests owns the store. Extra objects, unsafe names,
-// linked files and altered bytes fail closed even when another bundle owns them.
-// During generation only incoming members may be absent before publication.
-func checkPlanStore(ctx context.Context, root string, bundle *GeneratedBundle, writing bool) error {
+// Store-wide admission belongs to generation and drift checks, never Plan loads.
+// Checks report garbage without mutating it. A writer holds the store lock from
+// this inventory through manifest publication and the subsequent sweep.
+func checkPlanStore(ctx context.Context, root string, bundle *GeneratedBundle) error {
+	_, err := inspectPlanStore(ctx, root, bundle, false)
+	return err
+}
+
+func inspectPlanStore(ctx context.Context, root string, bundle *GeneratedBundle, writing bool) ([]GeneratedMember, error) {
 	if bundle.Engine != EngineGitHub {
-		return nil
+		return nil, nil
 	}
-	allowed, err := otherPlanStoreMembers(ctx, root, bundle)
+	owners, err := planStoreOwners(ctx, root, bundle.ManifestPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	for name := range bundle.Files {
+	allowed := map[string]string{}
+	for name, owner := range owners {
+		allowed[name] = owner.Member.SHA256
+	}
+	for name, raw := range bundle.Files {
 		if isPlanStorePath(name) {
-			allowed[name] = true
+			digest := pipeline.FileDigest(raw)
+			if prior := allowed[name]; prior != "" && prior != digest {
+				return nil, e.New(e.CodePipelineDrift, "short Plan address collision at %s", name)
+			}
+			allowed[name] = digest
+			owner := owners[name]
+			owner.Member = GeneratedMember{Path: name, SHA256: digest, Mode: 0o644}
+			owner.Bundles = append(owner.Bundles, path.Base(path.Dir(bundle.ManifestPath)))
+			owners[name] = owner
 		}
+	}
+	if _, err := encodePlanStoreIndex(owners); err != nil {
+		return nil, err
 	}
 	if len(allowed) > maxGeneratedDirEntries {
-		return e.New(e.CodePipelineDrift, "shared Plan store exceeds member bound")
+		return nil, e.New(e.CodePipelineDrift, "shared Plan store exceeds member bound")
 	}
-	directory := filepath.Join(root, PlanStoreDirectory)
-	if _, err := os.Lstat(directory); errors.Is(err, os.ErrNotExist) && len(allowed) == 0 {
-		return nil
+	entries, directories, err := planStoreInventory(ctx, root)
+	if err != nil {
+		return nil, err
 	}
-	if writing {
-		if _, err := os.Lstat(directory); errors.Is(err, os.ErrNotExist) {
-			total := int64(0)
-			for name := range allowed {
-				raw, incoming := bundle.Files[name]
-				if !incoming {
-					return e.New(e.CodePipelineDrift, "shared Plan store is missing")
-				}
-				total += int64(len(raw))
-				if total > maxPlanTreeBytes {
-					return e.New(e.CodePipelineDrift, "shared Plan store exceeds size bound")
-				}
-			}
-			return nil
+	plannedEntries := map[string]bool{path.Base(PlanStoreIndexPath): true}
+	addEntry := func(name string) {
+		for current := strings.TrimPrefix(name, PlanStoreDirectory+"/"); current != "."; current = path.Dir(current) {
+			plannedEntries[current] = true
 		}
 	}
-	if err := validateGeneratedDirectoryChain(root, PlanStoreDirectory); err != nil {
-		return e.Wrap(e.CodePipelineDrift, err, "unsafe shared Plan store")
-	}
-	basenames := map[string]bool{}
 	for name := range allowed {
-		basenames[path.Base(name)] = true
+		addEntry(name)
 	}
-	if err := checkGeneratedInventory(ctx, directory, basenames, map[string]bool{".": true}); err != nil {
-		return err
+	for _, name := range entries {
+		addEntry(PlanStoreDirectory + "/" + name)
 	}
+	for _, name := range directories {
+		addEntry(PlanStoreDirectory + "/" + name)
+	}
+	if len(plannedEntries) > maxGeneratedDirEntries {
+		return nil, e.New(e.CodePipelineDrift, "shared Plan store exceeds directory bound")
+	}
+	seen := map[string]bool{}
+	var garbage []GeneratedMember
 	total := int64(0)
-	for _, name := range sortedKeys(allowed) {
+	for _, entry := range entries {
+		if err := ctx.Err(); err != nil {
+			return nil, e.Wrap(e.CodeTimeout, err, "reading shared Plan inventory")
+		}
+		name := PlanStoreDirectory + "/" + entry
+		if name == PlanStoreIndexPath {
+			info, err := os.Lstat(filepath.Join(root, name))
+			if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0o644 || info.Size() > maxGeneratedFileBytes {
+				return nil, e.New(e.CodePipelineDrift, "shared Plan index is unsafe or exceeds member bound")
+			}
+			continue
+		}
+		staging := strings.HasPrefix(path.Base(name), ".nvkr-run-stage-")
+		if !isPlanStorePath(name) && !staging {
+			return nil, e.New(e.CodePipelineDrift, "unexpected shared Plan store member %q", name)
+		}
 		filename := filepath.Join(root, filepath.FromSlash(name))
 		info, err := os.Lstat(filename)
-		if writing && errors.Is(err, os.ErrNotExist) {
-			if raw, incoming := bundle.Files[name]; incoming {
-				total += int64(len(raw))
-				if total > maxPlanTreeBytes {
-					return e.New(e.CodePipelineDrift, "shared Plan store exceeds size bound")
-				}
-				continue
-			}
-		}
-		if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0o644 {
-			return e.New(e.CodePipelineDrift, "shared Plan member %q is missing, unsafe or has changed mode", name)
+		if err != nil || !info.Mode().IsRegular() || (info.Mode().Perm() != 0o644 && !(staging && info.Mode().Perm() == 0o600)) {
+			return nil, e.New(e.CodePipelineDrift, "shared Plan member %q is unsafe or has changed mode", name)
 		}
 		if info.Size() > maxPlanTreeBytes-total {
-			return e.New(e.CodePipelineDrift, "shared Plan store exceeds size bound")
+			return nil, e.New(e.CodePipelineDrift, "shared Plan store exceeds size bound")
 		}
 		raw, err := readGeneratedContext(ctx, filename)
 		if err != nil {
-			return e.Wrap(e.CodePipelineDrift, err, "reading shared Plan member")
+			return nil, e.Wrap(e.CodePipelineDrift, err, "reading shared Plan member")
 		}
 		total += int64(len(raw))
-		if total > maxPlanTreeBytes || planStorePath(raw, path.Ext(name)) != name {
-			return e.New(e.CodePipelineDrift, "shared Plan member %q differs from its content address", name)
+		if total > maxPlanTreeBytes || (!staging && !planStoreMatches(name, raw)) {
+			return nil, e.New(e.CodePipelineDrift, "shared Plan member %q differs from its content address", name)
+		}
+		seen[name] = true
+		if expected := allowed[name]; expected != "" && pipeline.FileDigest(raw) != expected {
+			return nil, e.New(e.CodePipelineDrift, "shared Plan member %q differs from its owning manifest", name)
+		}
+		if allowed[name] == "" {
+			garbage = append(garbage, GeneratedMember{Path: name, SHA256: pipeline.FileDigest(raw), Mode: uint32(info.Mode().Perm())})
 		}
 	}
-	return nil
+	for _, name := range sortedKeys(allowed) {
+		if seen[name] {
+			continue
+		}
+		raw, incoming := bundle.Files[name]
+		if !writing || !incoming {
+			return nil, e.New(e.CodePipelineDrift, "shared Plan member %q is missing; regenerate its owning bundle", name)
+		}
+		total += int64(len(raw))
+		if total > maxPlanTreeBytes {
+			return nil, e.New(e.CodePipelineDrift, "shared Plan store exceeds size bound")
+		}
+	}
+	if !writing && len(garbage) != 0 {
+		names := make([]string, 0, len(garbage))
+		for _, member := range garbage {
+			names = append(names, member.Path)
+		}
+		return nil, e.New(e.CodePipelineDrift, "unreferenced shared Plan members %q; run generate with the same Definition and Environment without --check to sweep them", names)
+	}
+	if !writing {
+		if err := checkPlanStoreIndex(ctx, root); err != nil {
+			return nil, err
+		}
+		files, directories := map[string]bool{path.Base(PlanStoreIndexPath): true}, map[string]bool{".": true}
+		for name := range allowed {
+			rel := strings.TrimPrefix(name, PlanStoreDirectory+"/")
+			files[rel] = true
+			for parent := path.Dir(rel); parent != "."; parent = path.Dir(parent) {
+				directories[parent] = true
+			}
+		}
+		if err := checkGeneratedInventory(ctx, filepath.Join(root, PlanStoreDirectory), files, directories); err != nil {
+			return nil, err
+		}
+	}
+	return garbage, nil
 }

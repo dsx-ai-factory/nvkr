@@ -1,0 +1,68 @@
+{
+  "artifactPath": "nvkr-output/ovn-kubernetes-chart.tar",
+  "buildCommand": [
+    "bash",
+    "-ec",
+    {
+      "file": ".github/nvkr-plan-store/scripts/ovn-kubernetes-chart/build@375fe15cc8a8.sh"
+    }
+  ],
+  "builderType": "oci-hermetic",
+  "commit": "8af51273d52dfa07454435d18d37230e582d797a",
+  "fromSource": true,
+  "helm": {
+    "chart": ".",
+    "images": {
+      "control-plane": {
+        "values": {
+          "digest": "ovnkube-control-plane.ovnkubeControlPlane.image.sha256",
+          "digestFormat": "sha256-hex"
+        }
+      },
+      "nbdb": {
+        "values": {
+          "digest": "ovnkube-single-node-zone.ovnkubeSingleNodeZoneNbdb.image.sha256",
+          "digestFormat": "sha256-hex"
+        }
+      },
+      "node": {
+        "values": {
+          "digest": "ovnkube-single-node-zone.ovnkubeSingleNodeZone.image.sha256",
+          "digestFormat": "sha256-hex"
+        }
+      },
+      "northd": {
+        "values": {
+          "digest": "ovnkube-single-node-zone.ovnkubeSingleNodeZoneNorthd.image.sha256",
+          "digestFormat": "sha256-hex"
+        }
+      },
+      "ovn-host": {
+        "values": {
+          "digest": "ovnkube-single-node-zone.ovnkubeSingleNodeZoneOvnHost.image.sha256",
+          "digestFormat": "sha256-hex"
+        }
+      },
+      "sbdb": {
+        "values": {
+          "digest": "ovnkube-single-node-zone.ovnkubeSingleNodeZoneSbdb.image.sha256",
+          "digestFormat": "sha256-hex"
+        }
+      }
+    }
+  },
+  "outputType": "tarball",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "repo": "https://github.com/dsx-ai-factory/ovn-kubernetes",
+  "sourceDateEpoch": 1792137152,
+  "tag": "v2.4.2",
+  "toolchainImages": {
+    "amd64": "docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90",
+    "arm64": "docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b"
+  },
+  "treeHash": "c4a54b0b3b615e5bd6df2d591451d7ab03dffc08",
+  "writeDir": "nvkr-output"
+}

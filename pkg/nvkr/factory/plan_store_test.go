@@ -5,12 +5,15 @@ package factory
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -57,7 +60,7 @@ func TestPlanStoreSharesFrozenRecords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	scriptPath := planStorePath([]byte(body), ".sh")
+	scriptPath := testNamedStorePath(t, "scripts/kubelet/build", []byte(body), ".sh")
 	if string(bundle.Files[scriptPath]) != body {
 		t.Fatal("exact script bytes were not stored")
 	}
@@ -223,8 +226,410 @@ func TestPlanStoreChecksOtherOwnerAndUnownedObjects(t *testing.T) {
 			test.change(t, root)
 			assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), root, bundles[0]), e.CodePipelineDrift)
 			_, err := LoadPlanContext(t.Context(), filepath.Join(root, bundles[0].PlanPath))
-			assertFactoryErrorCode(t, err, e.CodePipelineDrift)
-			assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), root, bundles[0]), e.CodePipelineDrift)
+			if err != nil {
+				t.Fatal("unrelated store damage blocked own Plan load", err)
+			}
+			err = WriteGeneratedBundle(t.Context(), root, bundles[0])
+			if test.name == "extra" {
+				if err != nil {
+					t.Fatal("generation did not sweep unowned objects", err)
+				}
+				if err := CheckGeneratedBundle(t.Context(), root, bundles[0]); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+			}
 		})
+	}
+}
+
+// Removing or renaming a whole owner leaves no manifest to authorize private
+// retirement. The content-addressed store has its own bounded sweep authority.
+func TestPlanStoreRecoversRemovedAndRenamedBundles(t *testing.T) {
+	plans, bundles := sharedPlanStoreFixtures(t)
+	for _, rename := range []bool{false, true} {
+		t.Run(map[bool]string{false: "remove", true: "rename"}[rename], func(t *testing.T) {
+			root := t.TempDir()
+			for _, bundle := range bundles {
+				if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for _, name := range []string{filepath.Dir(bundles[1].ManifestPath), bundles[1].WorkflowPath} {
+				if err := os.RemoveAll(filepath.Join(root, name)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := LoadPlanContext(t.Context(), filepath.Join(root, bundles[0].PlanPath)); err != nil {
+				t.Fatal(err)
+			}
+			before := githubRuntimeTree(t, root)
+			err := CheckGeneratedBundle(t.Context(), root, bundles[0])
+			assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+			if !strings.Contains(err.Error(), "run generate") {
+				t.Fatal("missing sweep recovery guidance", err)
+			}
+			if !bytes.Equal(mustCanonical(t, before), mustCanonical(t, githubRuntimeTree(t, root))) {
+				t.Fatal("drift check mutated files")
+			}
+			incoming := bundles[0]
+			if rename {
+				renamed := recompileGitHubStabilityPlan(t, plans[1], func(in *githubStabilityInputs) { in.environment.GitHubBundle = "renamed-project" })
+				incoming, err = RenderGitHub(t.Context(), renamed)
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := WriteGeneratedBundle(t.Context(), root, incoming); err != nil {
+				t.Fatal(err)
+			}
+			for _, bundle := range []*GeneratedBundle{bundles[0], incoming} {
+				if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
+					t.Fatal(err)
+				}
+			}
+			for name := range bundles[1].Files {
+				if isPlanStorePath(name) && bundles[0].Files[name] == nil && incoming.Files[name] == nil {
+					if _, err := os.Lstat(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
+						t.Fatal("departed owner's object survived sweep", name, err)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestPlanStoreRecoversInterruptedWrites(t *testing.T) {
+	plans, bundles := sharedPlanStoreFixtures(t)
+	freshPlan := recompileGitHubStabilityPlan(t, freshGitHubRuntimePins(t, plans[0]), func(in *githubStabilityInputs) {
+		in.environment.Metadata.Description = "changed recovery fixture"
+	})
+	fresh, err := RenderGitHub(t.Context(), freshPlan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, phase := range []string{"staging", "objects published", "manifest published", "old objects retired before manifest"} {
+		t.Run(phase, func(t *testing.T) {
+			root := t.TempDir()
+			for _, bundle := range bundles {
+				if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
+					t.Fatal(err)
+				}
+			}
+			switch phase {
+			case "staging":
+				name := filepath.Join(root, PlanStoreDirectory, ".nvkr-run-stage-interrupted")
+				if err := os.WriteFile(name, []byte("partial"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			case "objects published":
+				for name, raw := range fresh.Files {
+					if isPlanStorePath(name) && bundles[0].Files[name] == nil {
+						writeGeneratedFixture(t, filepath.Join(root, name), raw)
+					}
+				}
+			case "manifest published":
+				for name, raw := range fresh.Files {
+					writeGeneratedFixture(t, filepath.Join(root, name), raw)
+				}
+				_, manifest, err := ManifestFor(fresh)
+				if err != nil {
+					t.Fatal(err)
+				}
+				writeGeneratedFixture(t, filepath.Join(root, fresh.ManifestPath), manifest)
+			case "old objects retired before manifest":
+				removed := 0
+				for name := range bundles[0].Files {
+					if isPlanStorePath(name) && bundles[1].Files[name] == nil && fresh.Files[name] == nil {
+						if err := os.Remove(filepath.Join(root, name)); err != nil {
+							t.Fatal(err)
+						}
+						removed++
+					}
+				}
+				if removed == 0 {
+					t.Fatal("fixture did not interrupt an obsolete object retirement")
+				}
+			}
+			if _, err := LoadPlanContext(t.Context(), filepath.Join(root, bundles[1].PlanPath)); err != nil {
+				t.Fatal("interruption blocked neighboring Plan", err)
+			}
+			// Recover with changed inputs, not only by retrying the same attempt.
+			if err := WriteGeneratedBundle(t.Context(), root, fresh); err != nil {
+				t.Fatal(err)
+			}
+			for _, bundle := range []*GeneratedBundle{fresh, bundles[1]} {
+				if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func TestPlanStoreReaderDuringOtherOwnerWrite(t *testing.T) {
+	plans, bundles := sharedPlanStoreFixtures(t)
+	root := t.TempDir()
+	for _, bundle := range bundles {
+		if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
+			t.Fatal(err)
+		}
+	}
+	fresh, err := RenderGitHub(t.Context(), freshGitHubRuntimePins(t, plans[0]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	staged, resume := make(chan struct{}), make(chan struct{})
+	previous := syncStagedMember
+	var once sync.Once
+	syncStagedMember = func(file *os.File) error {
+		once.Do(func() {
+			close(staged)
+			select {
+			case <-resume:
+			case <-ctx.Done():
+			}
+		})
+		return previous(file)
+	}
+	result := make(chan error, 1)
+	go func() { result <- WriteGeneratedBundle(ctx, root, fresh) }()
+	// Always stop and join before restoring the injection or failing the test.
+	select {
+	case <-staged:
+	case <-ctx.Done():
+	}
+	loaded, loadErr := LoadPlanContext(ctx, filepath.Join(root, bundles[1].PlanPath))
+	close(resume)
+	writeErr := <-result
+	syncStagedMember = previous
+	if loadErr != nil || writeErr != nil {
+		t.Fatal("concurrent read/write", loadErr, writeErr)
+	}
+	if !bytes.Equal(mustCanonical(t, loaded), mustCanonical(t, plans[1])) {
+		t.Fatal("neighbor Plan changed during publication")
+	}
+}
+
+func TestPlanStoreAggregateBoundBeforePublication(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, ".github"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, extra := range []int{0, 1} {
+		t.Run(map[int]string{0: "at bound", 1: "above bound"}[extra], func(t *testing.T) {
+			files := map[string][]byte{}
+			for _, fill := range []byte{'a', 'b'} {
+				raw := bytes.Repeat([]byte{fill}, int(maxGeneratedFileBytes))
+				files[planStorePath(raw, ".sh")] = raw
+			}
+			if extra != 0 {
+				raw := []byte("c")
+				files[planStorePath(raw, ".sh")] = raw
+			}
+			_, err := inspectPlanStore(t.Context(), root, &GeneratedBundle{Engine: EngineGitHub, Files: files}, true)
+			if extra == 0 {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+			}
+			if _, err := os.Lstat(filepath.Join(root, PlanStoreDirectory)); !errors.Is(err, os.ErrNotExist) {
+				t.Fatal("admission wrote the store", err)
+			}
+		})
+	}
+}
+
+func TestPlanStoreScriptSurvivesUntilLastOwner(t *testing.T) {
+	plans, _ := sharedPlanStoreFixtures(t)
+	root := t.TempDir()
+	const oldBody = "printf shared\nprintf old\n"
+	const newBody = "printf shared\nprintf new\n"
+	bundles := make([]*GeneratedBundle, len(plans))
+	render := func(plan *Plan, body string) *GeneratedBundle {
+		changed := recompileGitHubStabilityPlan(t, plan, func(in *githubStabilityInputs) {
+			component := in.catalog.Components["kubelet"]
+			component.BuildCommand = []string{"sh", "-c", body}
+			in.catalog.Components["kubelet"] = component
+		})
+		bundle, err := RenderGitHub(t.Context(), changed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return bundle
+	}
+	for i, plan := range plans {
+		bundles[i] = render(plan, oldBody)
+		if err := WriteGeneratedBundle(t.Context(), root, bundles[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+	name := filepath.Join(root, testNamedStorePath(t, "scripts/kubelet/build", []byte(oldBody), ".sh"))
+	for i, plan := range plans {
+		bundles[i] = render(plan, newBody)
+		if err := WriteGeneratedBundle(t.Context(), root, bundles[i]); err != nil {
+			t.Fatal(err)
+		}
+		if i == 0 {
+			raw, err := os.ReadFile(name)
+			if err != nil || string(raw) != oldBody {
+				t.Fatal("shared script retired while another owner references it", err)
+			}
+		} else if _, err := os.Lstat(name); !errors.Is(err, os.ErrNotExist) {
+			t.Fatal("last owner left an obsolete script", err)
+		}
+		if err := CheckGeneratedBundle(t.Context(), root, bundles[1]); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestPlanStoreSweepPreservesUnsafeGarbage(t *testing.T) {
+	_, bundles := sharedPlanStoreFixtures(t)
+	original := t.TempDir()
+	if err := WriteGeneratedBundle(t.Context(), original, bundles[0]); err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{"bad address", "wrong mode", "staging symlink", "staging directory", "unknown filename", "bad manifest", "index symlink", "index mode"} {
+		t.Run(kind, func(t *testing.T) {
+			root := copyGitHubRuntimeRoot(t, original)
+			raw := []byte("orphan\n")
+			name := filepath.Join(root, planStorePath(raw, ".sh"))
+			switch kind {
+			case "bad address":
+				writeGeneratedFixture(t, name, []byte("changed\n"))
+			case "wrong mode":
+				if err := os.WriteFile(name, raw, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			case "staging symlink":
+				if err := os.Symlink(filepath.Join(root, bundles[0].PlanPath), filepath.Join(root, PlanStoreDirectory, ".nvkr-run-stage-link")); err != nil {
+					t.Fatal(err)
+				}
+			case "staging directory":
+				if err := os.Mkdir(filepath.Join(root, PlanStoreDirectory, ".nvkr-run-stage-dir"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			case "unknown filename":
+				writeGeneratedFixture(t, filepath.Join(root, PlanStoreDirectory, "notes.txt"), raw)
+			case "bad manifest":
+				writeGeneratedFixture(t, filepath.Join(root, bundles[1].ManifestPath), []byte("{"))
+			case "index symlink":
+				index := filepath.Join(root, PlanStoreIndexPath)
+				if err := os.Remove(index); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(filepath.Join(root, bundles[0].PlanPath), index); err != nil {
+					t.Fatal(err)
+				}
+			case "index mode":
+				if err := os.Chmod(filepath.Join(root, PlanStoreIndexPath), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if _, err := LoadPlanContext(t.Context(), filepath.Join(root, bundles[0].PlanPath)); err != nil {
+				t.Fatal("unrelated garbage blocked own load", err)
+			}
+			before := githubRuntimeTree(t, root)
+			assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), root, bundles[0]), e.CodePipelineDrift)
+			if !bytes.Equal(mustCanonical(t, before), mustCanonical(t, githubRuntimeTree(t, root))) {
+				t.Fatal("unsafe garbage was modified")
+			}
+		})
+	}
+}
+
+func testNamedStorePath(t *testing.T, logical string, raw []byte, extension string) string {
+	t.Helper()
+	name, err := namedPlanStorePath(logical, raw, extension)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return name
+}
+
+func TestPlanStoreNamesAndIndexDoNotDependOnGenerationOrder(t *testing.T) {
+	plans, bundles := sharedPlanStoreFixtures(t)
+	// These bundles deliberately contain different variants of the same targets.
+	var err error
+	bundles[1], err = RenderGitHub(t.Context(), freshGitHubRuntimePins(t, plans[1]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	roots := []string{t.TempDir(), t.TempDir()}
+	for i, root := range roots {
+		order := []int{0, 1}
+		if i == 1 {
+			order = []int{1, 0}
+		}
+		for _, index := range order {
+			if err := WriteGeneratedBundle(t.Context(), root, bundles[index]); err != nil {
+				t.Fatal(err)
+			}
+		}
+		for _, bundle := range bundles {
+			for name, expected := range bundle.Files {
+				raw, err := os.ReadFile(filepath.Join(root, name))
+				if err != nil || !bytes.Equal(raw, expected) {
+					t.Fatal("neighbor changed an object's path or bytes", name, err)
+				}
+			}
+		}
+	}
+	first, err := os.ReadFile(filepath.Join(roots[0], PlanStoreIndexPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := os.ReadFile(filepath.Join(roots[1], PlanStoreIndexPath))
+	if err != nil || !bytes.Equal(first, second) {
+		t.Fatal("generation order changed the index", err)
+	}
+	var groups map[string][]planStoreVariant
+	if err := json.Unmarshal(first, &groups); err != nil {
+		t.Fatal(err)
+	}
+	diverged := false
+	for logical, variants := range groups {
+		if strings.HasPrefix(logical, "steps/") && len(variants) > 1 {
+			diverged = true
+		}
+		for _, variant := range variants {
+			if len(variant.Bundles) == 0 || !strings.Contains(variant.File, "@") || !strings.HasPrefix(variant.SHA256, "sha256:") {
+				t.Fatal("index omits a variant's name, full digest or users", variant)
+			}
+		}
+	}
+	if !diverged {
+		t.Fatal("index did not group divergent target variants")
+	}
+	for _, name := range []string{filepath.Dir(bundles[1].ManifestPath), bundles[1].WorkflowPath} {
+		if err := os.RemoveAll(filepath.Join(roots[0], name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := WriteGeneratedBundle(t.Context(), roots[0], bundles[0]); err != nil {
+		t.Fatal(err)
+	}
+	for name, expected := range bundles[0].Files {
+		raw, err := os.ReadFile(filepath.Join(roots[0], name))
+		if err != nil || !bytes.Equal(raw, expected) {
+			t.Fatal("removing neighbor changed object", name, err)
+		}
+	}
+	writeGeneratedFixture(t, filepath.Join(roots[0], PlanStoreIndexPath), []byte("{}\n"))
+	assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), roots[0], bundles[0]), e.CodePipelineDrift)
+	if _, err := LoadPlanContext(t.Context(), filepath.Join(roots[0], bundles[0].PlanPath)); err != nil {
+		t.Fatal("descriptive index blocked own Plan", err)
+	}
+	if err := WriteGeneratedBundle(t.Context(), roots[0], bundles[0]); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckGeneratedBundle(t.Context(), roots[0], bundles[0]); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -66,22 +66,17 @@ func retiredGeneratedMembers(ctx context.Context, root string, bundle *Generated
 	for name, raw := range bundle.Files {
 		union.Files[name] = raw
 	}
-	others := map[string]bool{}
-	if bundle.Engine == EngineGitHub {
-		others, err = otherPlanStoreMembers(ctx, root, bundle)
-		if err != nil {
-			return nil, err
-		}
-	}
 	var retired []GeneratedMember
 	for _, member := range prior {
-		if _, retained := bundle.Files[member.Path]; !retained && !others[member.Path] {
+		// Shared objects are swept only after the new manifest is published.
+		// Its union with every other manifest decides whether an object survives.
+		if isPlanStorePath(member.Path) {
+			continue
+		}
+		if _, retained := bundle.Files[member.Path]; !retained {
 			union.Files[member.Path] = nil
 			retired = append(retired, member)
 		}
-	}
-	if err := checkPlanStore(ctx, root, &union, true); err != nil {
-		return nil, err
 	}
 	if err := checkGeneratedDirectoryContents(ctx, root, &union); err != nil {
 		return nil, err

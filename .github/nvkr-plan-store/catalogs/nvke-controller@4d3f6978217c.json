@@ -1,0 +1,118 @@
+{
+  "APIVersion": "nvkr.dev/catalog/v3",
+  "Actions": {
+    "checkout": {
+      "repo": "actions/checkout",
+      "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+      "version": "v7.0.1"
+    },
+    "download-artifact": {
+      "repo": "actions/download-artifact",
+      "sha": "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+      "version": "v8.0.1"
+    },
+    "setup-go": {
+      "repo": "actions/setup-go",
+      "sha": "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+      "version": "v7.0.0"
+    },
+    "upload-artifact": {
+      "repo": "actions/upload-artifact",
+      "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+      "version": "v7.0.1"
+    }
+  },
+  "Components": {
+    "cluster-api-provider-provisioned": {
+      "file": ".github/nvkr-plan-store/components/cluster-api-provider-provisioned@2e80d0ee6cc8.json"
+    },
+    "nvke-controller": {
+      "file": ".github/nvkr-plan-store/components/nvke-controller@1fb29258e1a0.json"
+    },
+    "nvke-controller-chart": {
+      "file": ".github/nvkr-plan-store/components/nvke-controller-chart@7f46e91311a9.json"
+    },
+    "nvke-controller-profiles-image": {
+      "file": ".github/nvkr-plan-store/components/nvke-controller-profiles-image@eadd2854c6fa.json"
+    },
+    "nvkectl": {
+      "file": ".github/nvkr-plan-store/components/nvkectl@95b4361ab1af.json"
+    },
+    "postgresql-chart": {
+      "file": ".github/nvkr-plan-store/components/postgresql-chart@2870bcedf8b5.json"
+    },
+    "spire-chart": {
+      "file": ".github/nvkr-plan-store/components/spire-chart@1443048c0b01.json"
+    },
+    "spire-crds-chart": {
+      "file": ".github/nvkr-plan-store/components/spire-crds-chart@ffb79a105e5c.json"
+    },
+    "temporal-chart": {
+      "file": ".github/nvkr-plan-store/components/temporal-chart@0e0b0726af29.json"
+    }
+  },
+  "Kind": "SourceBuildRegistry",
+  "Metadata": {
+    "description": "NVKE controller containers and helm chart.",
+    "name": "nvke-controller"
+  },
+  "Sources": {
+    "checkout": {
+      "file": ".github/nvkr-plan-store/sources/checkout@882620c7c0e4.json"
+    },
+    "cosign": {
+      "file": ".github/nvkr-plan-store/sources/cosign@9398f031178c.json"
+    },
+    "download-artifact": {
+      "file": ".github/nvkr-plan-store/sources/download-artifact@442663c59380.json"
+    },
+    "nvke": {
+      "file": ".github/nvkr-plan-store/sources/nvke@f42aa6738ec8.json"
+    },
+    "nvke-cli": {
+      "file": ".github/nvkr-plan-store/sources/nvke-cli@01f209c25249.json"
+    },
+    "nvke-helm": {
+      "file": ".github/nvkr-plan-store/sources/nvke-helm@1e9c1d8e68a3.json"
+    },
+    "setup-go": {
+      "file": ".github/nvkr-plan-store/sources/setup-go@a1dcc71aec85.json"
+    },
+    "syft": {
+      "file": ".github/nvkr-plan-store/sources/syft@99c8003df7e7.json"
+    },
+    "upload-artifact": {
+      "file": ".github/nvkr-plan-store/sources/upload-artifact@b18663119b38.json"
+    }
+  },
+  "ToolPlatforms": {
+    "syft": [
+      {
+        "archiveDigest": "sha256:8fcb33017a0dc1058298c923c436d19dfa68ae93968e0b423248542e3afb9fc3",
+        "executableDigest": "sha256:abca2def61de9952fa06d3977bb1e064818facb9badfce502b450d3d6846a91f",
+        "executablePath": "syft",
+        "format": "tar-gzip",
+        "platform": "linux/amd64",
+        "url": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_amd64.tar.gz"
+      },
+      {
+        "archiveDigest": "sha256:a7fd2b784e6664acd44719270574f6cd8c6864fc2b1700bf9099bd1cccda7d7f",
+        "executableDigest": "sha256:617cef943234e0cae184b4901414ca4059ad6c6923a9c9decb46f49f6a2c6573",
+        "executablePath": "syft",
+        "format": "tar-gzip",
+        "platform": "linux/arm64",
+        "url": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_arm64.tar.gz"
+      }
+    ]
+  },
+  "Tools": {
+    "cosign": {
+      "archiveDigest": "sha256:4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71",
+      "executableDigest": "sha256:4629c757b7618056f8ddd7e2625ae9fdd94c0372a65049520bc7d9df9efc7f71",
+      "executablePath": "cosign-linux-amd64",
+      "format": "raw",
+      "platform": "linux/amd64",
+      "url": "https://github.com/sigstore/cosign/releases/download/v3.1.3/cosign-linux-amd64"
+    }
+  }
+}

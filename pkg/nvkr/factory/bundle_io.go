@@ -98,7 +98,7 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 				return GeneratedManifest{}, nil, err
 			}
 		}
-		if isPlanStorePath(name) && planStorePath(bundle.Files[name], filepath.Ext(name)) != name {
+		if isPlanStorePath(name) && !planStoreMatches(name, bundle.Files[name]) {
 			return GeneratedManifest{}, nil, e.New(e.CodePipelineDrift, "shared Plan member differs from its content address")
 		}
 		members = append(members, GeneratedMember{Path: name, SHA256: pipeline.FileDigest(bundle.Files[name]), Mode: 0o644})
@@ -184,6 +184,10 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		return e.Wrap(e.CodeTimeout, err, "generated Run write canceled")
 	}
 	retired, err := retiredGeneratedMembers(ctx, root, bundle)
+	if err != nil {
+		return err
+	}
+	garbage, err := inspectPlanStore(ctx, root, bundle, true)
 	if err != nil {
 		return err
 	}
@@ -280,8 +284,28 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		}
 		entry.temporary = ""
 	}
+	// A crash before this sweep leaves only unreferenced objects. The next
+	// generation can reclaim them even when its inputs differ from this attempt.
+	if err := removeRetiredGeneratedMembers(context.WithoutCancel(ctx), root, bundle, garbage); err != nil {
+		return err
+	}
+	for _, member := range garbage {
+		names = append(names, member.Path)
+	}
+	if bundle.Engine == EngineGitHub {
+		if err := writePlanStoreIndex(context.WithoutCancel(ctx), root); err != nil {
+			return err
+		}
+		if err := prunePlanStoreDirectories(context.WithoutCancel(ctx), root); err != nil {
+			return err
+		}
+		names = append(names, PlanStoreIndexPath)
+	}
 	for _, directory := range generatedDirectories(root, append(names, bundle.ManifestPath)) {
 		opened, err := os.Open(directory)
+		if errors.Is(err, os.ErrNotExist) && strings.HasPrefix(directory, filepath.Join(root, PlanStoreDirectory)+string(filepath.Separator)) {
+			continue // The sweep removed this empty store directory; sync its surviving parents.
+		}
 		if err != nil {
 			return err
 		}
@@ -310,7 +334,7 @@ func CheckGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	if err != nil {
 		return err
 	}
-	if err := checkPlanStore(ctx, root, bundle, false); err != nil {
+	if err := checkPlanStore(ctx, root, bundle); err != nil {
 		return err
 	}
 	if err := checkGeneratedDirectoryContents(ctx, root, bundle); err != nil {

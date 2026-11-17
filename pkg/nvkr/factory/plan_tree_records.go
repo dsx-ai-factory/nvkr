@@ -4,7 +4,10 @@
 package factory
 
 import (
+	"bytes"
 	"encoding/json"
+	"net/url"
+	"path"
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -15,12 +18,18 @@ import (
 // structured fields, including the complete graph, share exact stored bytes.
 var sharedPlanFields = []string{"actions", "appliedOverlays", "composition", "definition", "environment", "graph", "internalTools", "lifecycleOutputs", "routes", "runtimeInputs", "targets"}
 
-func storeTreeJSON(value any, files map[string][]byte) (json.RawMessage, error) {
+func storeTreeJSON(value any, files map[string][]byte, logical string) (json.RawMessage, error) {
 	raw, err := treeJSON(value)
 	if err != nil {
 		return nil, err
 	}
-	name := planStorePath(raw, ".json")
+	name, err := namedPlanStorePath(logical, raw, ".json")
+	if err != nil {
+		return nil, err
+	}
+	if prior, exists := files[name]; exists && !bytes.Equal(prior, raw) {
+		return nil, e.New(e.CodePipelineDrift, "short Plan address collision at %s", name)
+	}
 	files[name] = raw
 	return canonical.Marshal(map[string]string{"file": name})
 }
@@ -31,7 +40,7 @@ func readTreeJSON(ref json.RawMessage, files map[string][]byte) (json.RawMessage
 		return nil, e.New(e.CodePipelineDrift, "invalid frozen Plan reference")
 	}
 	raw, ok := files[record["file"]]
-	if !ok || planStorePath(raw, ".json") != record["file"] || int64(len(raw)) > maxGeneratedFileBytes {
+	if !ok || !planStoreMatches(record["file"], raw) || int64(len(raw)) > maxGeneratedFileBytes {
 		return nil, e.New(e.CodePipelineDrift, "missing or altered frozen Plan record")
 	}
 	var value json.RawMessage
@@ -43,7 +52,7 @@ func readTreeJSON(ref json.RawMessage, files map[string][]byte) (json.RawMessage
 
 // Component and source records use the same command extraction as execution
 // nodes, so an identical script has one physical copy across all three forms.
-func treeRecordCommands(record planFields, files map[string][]byte, expand bool) error {
+func treeRecordCommands(record planFields, files map[string][]byte, expand bool, logical string) error {
 	for _, field := range []string{"command", "vendorCmd", "buildCommand", "vendorCommand"} {
 		if record[field] == nil {
 			continue
@@ -57,9 +66,23 @@ func treeRecordCommands(record planFields, files map[string][]byte, expand bool)
 			var literal string
 			if err := json.Unmarshal(arg, &literal); err == nil && string(arg) != "null" {
 				if !expand && strings.Contains(literal, "\n") {
-					name := planStorePath([]byte(literal), ".sh")
+					operation := map[string]string{"command": "build", "buildCommand": "build", "vendorCmd": "vendor", "vendorCommand": "vendor"}[field]
+					owner := logical
+					if operation == "vendor" {
+						var repository string
+						_ = json.Unmarshal(record["repo"], &repository)
+						if parsed, err := url.Parse(repository); err == nil && parsed.Path != "" {
+							owner = strings.TrimSuffix(path.Base(parsed.Path), ".git")
+						}
+					}
+					name, err := namedPlanStorePath("scripts/"+owner+"/"+operation, []byte(literal), ".sh")
+					if err != nil {
+						return err
+					}
+					if prior, exists := files[name]; exists && string(prior) != literal {
+						return e.New(e.CodePipelineDrift, "short script address collision at %s", name)
+					}
 					files[name] = []byte(literal)
-					var err error
 					argv[i], err = canonical.Marshal(map[string]string{"file": name})
 					if err != nil {
 						return err
@@ -71,7 +94,7 @@ func treeRecordCommands(record planFields, files map[string][]byte, expand bool)
 					return e.New(e.CodePipelineDrift, "invalid frozen command operand")
 				}
 				body, ok := files[ref["file"]]
-				if !ok || planStorePath(body, ".sh") != ref["file"] || int64(len(body)) > MaxPlanBytes {
+				if !ok || !planStoreMatches(ref["file"], body) || int64(len(body)) > MaxPlanBytes {
 					return e.New(e.CodePipelineDrift, "missing, altered or oversized frozen script")
 				}
 				var err error
@@ -98,7 +121,7 @@ func treeRecordCommands(record planFields, files map[string][]byte, expand bool)
 		}
 		for name, argv := range commands {
 			command := planFields{"buildCommand": argv}
-			if err := treeRecordCommands(command, files, expand); err != nil {
+			if err := treeRecordCommands(command, files, expand, logical); err != nil {
 				return err
 			}
 			commands[name] = command["buildCommand"]
@@ -145,13 +168,13 @@ func treeCatalogRecords(raw json.RawMessage, files map[string][]byte, expand boo
 			if err := json.Unmarshal(raw, &record); err != nil {
 				return nil, e.Wrap(e.CodePipelineDrift, err, "reading catalog record")
 			}
-			if err := treeRecordCommands(record, files, expand); err != nil {
+			if err := treeRecordCommands(record, files, expand, name); err != nil {
 				return nil, err
 			}
 			if expand {
 				records[name], err = canonical.Marshal(record)
 			} else {
-				records[name], err = storeTreeJSON(record, files)
+				records[name], err = storeTreeJSON(record, files, strings.ToLower(field)+"/"+name)
 			}
 			if err != nil {
 				return nil, err
@@ -169,13 +192,24 @@ func treeCatalogRecords(raw json.RawMessage, files map[string][]byte, expand boo
 	if expand {
 		return canonical.Marshal(snapshot)
 	}
-	return storeTreeJSON(snapshot, files)
+	var metadata struct {
+		Name string `json:"name"`
+	}
+	if raw := snapshot["Metadata"]; len(raw) != 0 {
+		if err := json.Unmarshal(raw, &metadata); err != nil {
+			return nil, e.Wrap(e.CodePipelineDrift, err, "reading frozen catalog name")
+		}
+	}
+	if metadata.Name == "" {
+		metadata.Name = "catalog"
+	}
+	return storeTreeJSON(snapshot, files, "catalogs/"+metadata.Name)
 }
 
 // Named resolved components add only a name to the frozen component value. Exact
 // matches reuse the snapshot's component object; platform-specific resolutions
 // retain their distinct bytes without invoking catalog resolution during load.
-func treeResolvedRecords(raw json.RawMessage, files map[string][]byte, expand bool) (json.RawMessage, error) {
+func treeResolvedRecords(raw json.RawMessage, files map[string][]byte, expand bool, target string) (json.RawMessage, error) {
 	var err error
 	if expand {
 		raw, err = readTreeJSON(raw, files)
@@ -190,6 +224,10 @@ func treeResolvedRecords(raw json.RawMessage, files map[string][]byte, expand bo
 	size := 0
 	for i, record := range records {
 		name := record["Name"]
+		var logical string
+		if err := json.Unmarshal(name, &logical); err != nil {
+			return nil, e.Wrap(e.CodePipelineDrift, err, "reading resolved component name")
+		}
 		if expand {
 			delete(record, "Name")
 			ref, err := canonical.Marshal(record)
@@ -207,17 +245,17 @@ func treeResolvedRecords(raw json.RawMessage, files map[string][]byte, expand bo
 			if record["Name"] != nil {
 				return nil, e.New(e.CodePipelineDrift, "resolved component has duplicate name")
 			}
-			if err := treeRecordCommands(record, files, true); err != nil {
+			if err := treeRecordCommands(record, files, true, logical); err != nil {
 				return nil, err
 			}
 			record["Name"] = name
 			records[i] = record
 		} else {
 			delete(record, "Name")
-			if err := treeRecordCommands(record, files, false); err != nil {
+			if err := treeRecordCommands(record, files, false, logical); err != nil {
 				return nil, err
 			}
-			ref, err := storeTreeJSON(record, files)
+			ref, err := storeTreeJSON(record, files, "components/"+logical)
 			if err != nil {
 				return nil, err
 			}
@@ -240,7 +278,7 @@ func treeResolvedRecords(raw json.RawMessage, files map[string][]byte, expand bo
 	if expand {
 		return canonical.Marshal(records)
 	}
-	return storeTreeJSON(records, files)
+	return storeTreeJSON(records, files, "resolved-components/"+target)
 }
 
 func treeGraphCommands(step planFields, files map[string][]byte, expand bool, remaining int64) error {
@@ -254,7 +292,12 @@ func treeGraphCommands(step planFields, files map[string][]byte, expand bool, re
 	}
 	size := int64(0)
 	for _, node := range nodes {
-		if err := treeRecordCommands(node, files, expand); err != nil {
+		var logical string
+		_ = json.Unmarshal(node["component"], &logical)
+		if logical == "" {
+			logical = "execution"
+		}
+		if err := treeRecordCommands(node, files, expand, logical); err != nil {
 			return err
 		}
 		raw, err := canonical.Marshal(node)

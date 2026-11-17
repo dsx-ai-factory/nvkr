@@ -114,9 +114,17 @@ plus plan and workflow identities. It is written last and never lists itself. No
 
 GitHub stores that same Plan as a generated file tree.
 Each bundle's small `plan.json` index carries the `storage: nvkr-plan-tree-v1` discriminator, outside the executable Plan schema.
-Frozen JSON records and raw scripts live in one repository store, `.github/nvkr-plan-store/`, named by their exact-byte SHA-256 and a `.json` or `.sh` extension.
-These addresses are blob integrity checks, not new logical identities.
-The index retains scalar metadata, ordered build names and references, and a `catalogSnapshots` map keyed by the existing `catalogDigest`.
+Frozen JSON records and raw scripts live in one repository store, `.github/nvkr-plan-store/`.
+Paths identify kind and logical name, followed by `@` and the first 12 hex characters of the exact-byte
+SHA-256, then `.json` or `.sh`: for example `catalogs/nvke-v1@<digest>.json`,
+`steps/<target>/build@<digest>.json` and `scripts/<component>/build@<digest>.sh`.
+Every object has a suffix, including a name with only one variant. A path depends only on that object's
+kind, logical name and bytes; adding, removing or reordering neighboring bundles cannot change it.
+Full digests in each owning manifest authenticate bytes. A short-suffix collision with different full
+bytes fails closed; the suffix is a locator, not a new logical identity.
+The generated `index.json` groups variants by kind and logical name, with each object's path, full digest
+and sorted bundle users. The drift check covers its exact bytes; loads do not consult this descriptive index.
+Each bundle's `plan.json` retains scalar metadata, ordered build names and references, and a `catalogSnapshots` map keyed by the existing `catalogDigest`.
 Every distinct snapshot is stored once; identical snapshots across bundles share the same object.
 Snapshots reference component and source records, and build records reference their resolved-component lists and step records.
 A resolved component stores its name beside a reference to its exact frozen component value; values identical to a snapshot component reuse its object.
@@ -130,16 +138,20 @@ JSON objects use the canonical codec's bytes indented with two spaces and one fi
 Every multiline command operand in a snapshot, resolved component or execution step references the same exact script bytes through a single-key `{ "file": "<store path>" }` operand.
 Other operands remain strings.
 Raw script bytes gain no header, shebang or newline.
-References admit only flat content-addressed members of the fixed store; arbitrary paths and symlinks fail closed.
+References admit only safe named objects beneath the fixed store; arbitrary paths and symlinks fail closed.
 
 Loading admits the manifest's root and shared objects, their bounded inventory, regular-file modes, hashes and Plan digest.
 It reconstructs and validates the complete existing Plan and compares the exact regenerated tree without rendering or reading workflows and actions, fetching catalogs, or resolving inputs again.
 Duplicate or unknown fields, alternate encodings, missing, extra, symlinked, edited or mixed-generation members fail admission.
 The union of producer manifests describes ownership of the shared store; a manifest does not grant executable authority over another bundle.
-Loading also checks that union's exact store inventory and byte addresses.
+A load verifies only the objects listed by its own manifest. A malformed neighboring manifest,
+an unreferenced object, a stale generated index or an interrupted neighboring write cannot prevent that load.
+Generation and drift checks validate the union's store inventory and byte addresses; drift checks
+report unreferenced objects without changing files, and generation sweeps them under the store lock.
 Complete workflow/action closure checks remain with generation and runtime bootstrap, so read-only inspection does not depend on the binary's workflow renderer.
 Execution uses the captured Plan without reopening command files.
-The store has a 64 MiB aggregate bound and 4,096-object bound, with the existing 32 MiB member and 4 MiB reconstructed Plan bounds.
+The object store has a 64 MiB aggregate bound and 4,096-entry inventory bound, including directories.
+The generated index has the existing 32 MiB member bound; reconstructed Plans retain their 4 MiB bound.
 Diagnostic `planSha256` denotes the reconstructed packed bytes.
 The tree adds no Plan schema, digest family, Build identity or execution authority.
 Packed canonical bytes remain the wire and non-GitHub storage form, including Tekton.
@@ -205,8 +217,13 @@ no regeneration commit. `--runtime --check` validates that contract without writ
 still compares the complete current bundle. The two-file carrier contains the packed canonical Plan
 and the manifest of the rendered tree. Secondary bootstraps and
 helper consumers restore these two runtime JSON files into a fresh staging directory, then admit
-their exact bytes and current authored selection against
-the complete committed baseline. The generation owner installs the admitted bundle using its existing
+their exact bytes and current authored selection. Bootstraps render and check the complete committed
+baseline. Stage jobs load and validate that baseline Plan, render only the delivered candidate, match its
+packed bytes and manifest, and compare every fixed member's path, mode and bytes with the checkout.
+The stage path preserves the same Environment, authored selection, target and script-consumer bindings
+without rendering the baseline workflow again. A secondary bootstrap's runtime-input check also stages
+the two-file carrier, avoiding a duplicate check/render for export.
+The generation owner installs the admitted bundle using its existing
 lock, per-file atomic replacement and manifest-last semantics; this is not an atomic directory transaction.
 The root and content-addressed JSON objects are refreshable Plan data; new pins may change their object paths.
 Target membership, script bytes and the scripts' logical consumer cohorts remain fixed.
@@ -460,8 +477,13 @@ The legacy `--toolchain` spelling cannot alter component producer pins.
 Catalog lock writes use original-byte compare-and-swap, a persistent kernel lock inode, same-filesystem
 staging, fsync and atomic replacement (ADR-22).
 GitHub generation acquires the repository Plan-store kernel lock before its per-bundle kernel lock.
-Writers stage and fsync complete files, publish new shared objects with no-replace semantics, replace private payloads, retire obsolete members, and replace the manifest last.
-Existing shared objects must match their exact byte addresses and are reused without replacement.
+Writers stage and fsync complete files, publish new shared objects with no-replace semantics, replace
+private payloads and retire obsolete private members, then replace the manifest. Only after publication
+do they sweep objects unreferenced by the new manifest and every other producer manifest.
+Existing shared objects must match their name suffix and each owner's full digest and are reused without
+replacement. Generation migrates former flat SHA-256 paths through the prior manifests and sweep;
+it does not preserve a second committed layout. After sweeping, generation publishes the derived index
+and removes empty generated store directories. A stale index after interruption is repaired by regeneration.
 Each named namespace owns its distinct manifest and lock. Write and check reject mixed
 namespace paths or members before output work; retirement cannot claim another bundle's
 workflow or generated directory. Default and multiple named bundles may coexist. Changing
@@ -471,12 +493,27 @@ conflict for two separately compiled bundles.
 
 Retirement reads the previous generated-run/v1 manifest as a bounded ownership description. It validates
 its schema, engine, workflow path, sorted member paths, digests and modes. A member may be retired only
-inside the generator-owned directory, the exact owner's reserved legacy child workflow namespace, or the shared Plan store,
+inside the generator-owned directory or the exact owner's reserved legacy child workflow namespace,
 and only when it is a regular file whose current bytes and mode still match that manifest.
-A shared object is retired only when no other producer manifest references it; the store lock covers ownership inspection through manifest publication. Missing obsolete
-members are tolerated for retry after an interrupted retirement.
+Missing obsolete private members are tolerated for retry after an interrupted retirement.
+
+The shared store has separate sweep authority over valid content-addressed objects and regular files
+with the reserved `.nvkr-run-stage-` prefix. The bounded inventory checks all addresses, modes and
+remaining owners before payload publication. A referenced object survives while any producer manifest
+lists it, including a script removed from another bundle. Unreferenced objects and abandoned staging
+files are rechecked against the inspected bytes and modes immediately before removal. Staging files
+may have the writer's initial 0600 mode or final 0644 mode; symlinks, directories, arbitrary names,
+altered addressed objects and malformed ownership manifests fail generation without being swept.
+The store lock covers ownership inspection, manifest publication and sweeping.
+
+To remove a whole bundle, remove its generated private directory and workflow closure together;
+then regenerate a retained bundle from its Definition and Environment without `--check`. Renaming
+also requires removing the old owner: generating a new name alone keeps both owners. Regeneration
+sweeps only objects no remaining manifest lists. The same sweep recovers objects published before an
+interruption, even if the retry has different inputs, and abandoned store staging files. Loads of
+unaffected bundles continue to work while the drift check reports the incomplete repository inventory.
 Symlinks, changed obsolete members and unlisted directory members fail closed before payload publication.
-A missing prior manifest grants no ownership over unexpected files. Empty directories made obsolete by
+Outside the shared store, a missing prior manifest grants no ownership over unexpected files. Empty directories made obsolete by
 retired members are removed nonrecursively; unknown files are never swept by a recursive cleanup.
 
 New bundles cannot introduce child destinations; unsupported members fail before filesystem work.
@@ -490,14 +527,17 @@ before removal, writes the new manifest last, and fsyncs generated directories. 
 mixed payloads or incomplete retirement that fails the byte-exact check; regeneration is the recovery path
 when the prior ownership record remains available. The writer does not claim a crash-wide transaction or
 protection from an arbitrary same-user editor outside its kernel lock. If an older generator already replaced
-the ownership manifest while leaving old files behind, recover the authentic prior manifest from version
-control before regeneration; the current writer does not guess which unlisted files it may delete.
+the ownership manifest while leaving old private files behind, recover the authentic prior manifest
+from version control before regeneration; private files have no content-addressed sweep authority.
 
 The persistent owner-only lock inode is opened without following symlinks and is never removed. Process death
 releases kernel ownership automatically. Acquisition uses nonblocking attempts with context-aware retries;
 unsupported lock platforms fail closed. Staging honors cancellation; after publication begins the small
 commit finishes without voluntary cancellation. No daemon or distributed lock is required. Separate branches
-and worktrees retain Git's ordinary review and merge-conflict behavior.
+and worktrees retain Git's ordinary review and merge-conflict behavior. A textual merge can remove an
+object another branch newly references without a Git conflict. The repository-wide drift check on the
+merged tree, including `main`, detects that missing reference; regenerate from the merged inputs before
+accepting the tree. Per-bundle loads are not a replacement for that gate.
 
 ### 7. Single-owner rule for "the CI files"
 

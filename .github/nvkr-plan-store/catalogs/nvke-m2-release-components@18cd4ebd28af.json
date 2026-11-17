@@ -1,0 +1,80 @@
+{
+  "APIVersion": "nvkr.dev/catalog/v3",
+  "Actions": {},
+  "Components": {
+    "capi-controller-image": {
+      "file": ".github/nvkr-plan-store/components/capi-controller-image@43636ba1b971.json"
+    },
+    "capi-kubeadm-bootstrap-image": {
+      "file": ".github/nvkr-plan-store/components/capi-kubeadm-bootstrap-image@966c18f0fb8b.json"
+    },
+    "capi-kubeadm-control-plane-image": {
+      "file": ".github/nvkr-plan-store/components/capi-kubeadm-control-plane-image@728645b252fc.json"
+    },
+    "capnico-controller": {
+      "file": ".github/nvkr-plan-store/components/capnico-controller@53c4d253fb4e.json"
+    },
+    "cert-manager-cainjector-image": {
+      "file": ".github/nvkr-plan-store/components/cert-manager-cainjector-image@d7c370de2d7c.json"
+    },
+    "cert-manager-controller-image": {
+      "file": ".github/nvkr-plan-store/components/cert-manager-controller-image@4483c648c1d8.json"
+    },
+    "cert-manager-webhook-image": {
+      "file": ".github/nvkr-plan-store/components/cert-manager-webhook-image@6b27f11a69d9.json"
+    },
+    "nktp-chart": {
+      "file": ".github/nvkr-plan-store/components/nktp-chart@8d48da6d6167.json"
+    },
+    "nktp-collector-image": {
+      "file": ".github/nvkr-plan-store/components/nktp-collector-image@efc98d28f62d.json"
+    },
+    "nktp-kube-state-metrics-image": {
+      "file": ".github/nvkr-plan-store/components/nktp-kube-state-metrics-image@4f924c78ce5a.json"
+    },
+    "nktp-kubectl-image": {
+      "file": ".github/nvkr-plan-store/components/nktp-kubectl-image@40a9f36f6fbb.json"
+    },
+    "nktp-lgtm-image": {
+      "file": ".github/nvkr-plan-store/components/nktp-lgtm-image@0738be3da096.json"
+    },
+    "nktp-metrics-server-image": {
+      "file": ".github/nvkr-plan-store/components/nktp-metrics-server-image@499d3e334c5e.json"
+    },
+    "nktp-node-exporter-image": {
+      "file": ".github/nvkr-plan-store/components/nktp-node-exporter-image@f2e6be00db1b.json"
+    },
+    "nktp-operator-image": {
+      "file": ".github/nvkr-plan-store/components/nktp-operator-image@2c8f5d302017.json"
+    },
+    "nktp-target-allocator-image": {
+      "file": ".github/nvkr-plan-store/components/nktp-target-allocator-image@1e2068cc949f.json"
+    },
+    "nvke-nico-reference-profiles": {
+      "file": ".github/nvkr-plan-store/components/nvke-nico-reference-profiles@51e88ed34423.json"
+    }
+  },
+  "Kind": "SourceBuildRegistry",
+  "Metadata": {
+    "description": "Source-built CAPNICo, NKTP chart and NICO reference-profile fixtures, plus digest-pinned acquired CAPI, cert-manager and NKTP runtime images. Deployment topology and site configuration remain consumer-owned.",
+    "name": "nvke-m2-release-components"
+  },
+  "Sources": {
+    "capi": {
+      "file": ".github/nvkr-plan-store/sources/capi@f7b06568d66b.json"
+    },
+    "capnico": {
+      "file": ".github/nvkr-plan-store/sources/capnico@7c60a1fe620d.json"
+    },
+    "cert-manager": {
+      "file": ".github/nvkr-plan-store/sources/cert-manager@d5961fa5ff84.json"
+    },
+    "nvke-content": {
+      "file": ".github/nvkr-plan-store/sources/nvke-content@28b62a61b757.json"
+    },
+    "nvke-nktp": {
+      "file": ".github/nvkr-plan-store/sources/nvke-nktp@9c683bea0974.json"
+    }
+  },
+  "Tools": {}
+}

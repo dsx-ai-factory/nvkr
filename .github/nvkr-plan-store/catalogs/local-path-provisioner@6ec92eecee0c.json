@@ -1,0 +1,26 @@
+{
+  "APIVersion": "nvkr.dev/catalog/v3",
+  "Actions": {},
+  "Components": {
+    "local-path-helper-image": {
+      "file": ".github/nvkr-plan-store/components/local-path-helper-image@ffe76569cc1a.json"
+    },
+    "local-path-provisioner-chart": {
+      "file": ".github/nvkr-plan-store/components/local-path-provisioner-chart@04f49243a48e.json"
+    },
+    "local-path-provisioner-image": {
+      "file": ".github/nvkr-plan-store/components/local-path-provisioner-image@8bc8b5df3799.json"
+    }
+  },
+  "Kind": "SourceBuildRegistry",
+  "Metadata": {
+    "description": "Rancher local-path-provisioner chart packaged from one source pin with its acquired provisioner and helper images bound by digest; Rancher publishes no Helm repository.",
+    "name": "local-path-provisioner"
+  },
+  "Sources": {
+    "local-path-provisioner": {
+      "file": ".github/nvkr-plan-store/sources/local-path-provisioner@7311fda94301.json"
+    }
+  },
+  "Tools": {}
+}

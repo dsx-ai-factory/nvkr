@@ -271,12 +271,12 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 					command = githubRuntimeGenerationCommand(plan) + " --check"
 				}
 				if len(plan.Environment.GitHubRuntimeSources) != 0 {
-					command = "./nvkr-exec factory github check-runtime-inputs --plan " + shellQuote(layout.planPath)
+					command = "./nvkr-exec factory github stage-runtime-inputs --plan " + shellQuote(layout.planPath)
 				}
 			}
 		}
 		writeCatalogValidationStep(&body, plan, "Verify committed Run generation is current", "validate-catalog", command)
-		if plan.Environment.GitHubRuntimePlan {
+		if plan.Environment.GitHubRuntimePlan && !(runner != sortedKeys(bootstrapJobs)[0] && len(plan.Environment.GitHubRuntimeSources) != 0) {
 			writeGitHubShellStep(&body, "Stage packed runtime inputs", []string{"./nvkr-exec factory github stage-runtime-inputs --plan " + shellQuote(layout.planPath)})
 		}
 		if plan.Environment.GitHubRuntimePlan && runner == sortedKeys(bootstrapJobs)[0] {
@@ -891,7 +891,7 @@ func prepareHelperRunFor(plan *Plan) string {
 		fmt.Fprintf(&command, "mv -- %s %s\n", shellQuote(githubHelperDownloadPath(plan)+"/"+member), shellQuote(destination))
 	}
 	fmt.Fprintln(&command, prepareHelperRun)
-	fmt.Fprintln(&command, githubRuntimeInstallCommand(plan))
+	fmt.Fprintln(&command, "./nvkr-exec factory github install-stage-runtime-inputs --plan "+shellQuote(githubLayoutFor(plan).planPath))
 	return strings.TrimSuffix(command.String(), "\n")
 }
 

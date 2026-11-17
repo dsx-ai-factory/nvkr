@@ -35,6 +35,25 @@ func TestPlanTreeDirectoryLimitAdmittedBeforeWrites(t *testing.T) {
 	}
 }
 
+func TestPlanStoreEmptyDirectoriesCountBeforePublication(t *testing.T) {
+	bundle, err := RenderGitHub(t.Context(), githubRuntimePlanFixture(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	for i := 0; i < maxGeneratedDirEntries-2; i++ {
+		if err := os.MkdirAll(filepath.Join(root, PlanStoreDirectory, "components", fmt.Sprintf("unused-%d", i)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), root, bundle), e.CodePipelineDrift)
+	for name := range bundle.Files {
+		if _, err := os.Lstat(filepath.Join(root, name)); !os.IsNotExist(err) {
+			t.Fatal("directory admission published a bundle member", name, err)
+		}
+	}
+}
+
 func TestPlanTreeWriterSyncsEveryDirectory(t *testing.T) {
 	plan := githubRuntimePlanFixture(t)
 	bundle, err := RenderGitHub(t.Context(), plan)
@@ -79,6 +98,14 @@ func TestPlanTreeAdditionalBuilders(t *testing.T) {
 		name string
 		plan func(*testing.T) *Plan
 	}{
+		{"composite", func(t *testing.T) *Plan {
+			root, _ := compositeFactoryFixture(t, nil)
+			plan, _, err := CaptureCompileFiles(t.Context(), root, compositeFixturePath, snapshotEnvironment, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			return plan
+		}},
 		{"pinned tool", func(t *testing.T) *Plan {
 			d, env, stack := pinnedToolFactoryInputs(t, nil)
 			plan, err := Compile(t.Context(), d, env, stack, "test")
@@ -141,7 +168,7 @@ func TestPlanTreeCommandBytes(t *testing.T) {
 					if !strings.Contains(arg, "\n") {
 						continue
 					}
-					name := planStorePath([]byte(arg), ".sh")
+					name := testNamedStorePath(t, "scripts/widget/build", []byte(arg), ".sh")
 					if !bytes.Equal(files[name], []byte(arg)) {
 						t.Fatal("script bytes changed")
 					}
@@ -319,7 +346,7 @@ func TestPlanTreeRejectsMalformedStorage(t *testing.T) {
 			delete(files, treeStepPath(t, planPath, files, 0))
 		}},
 		{"extra addressed record", func(files map[string][]byte) {
-			if _, err := storeTreeJSON(map[string]string{"unexpected": "record"}, files); err != nil {
+			if _, err := storeTreeJSON(map[string]string{"unexpected": "record"}, files, "records/unexpected"); err != nil {
 				t.Fatal(err)
 			}
 		}},
@@ -369,9 +396,9 @@ func TestPlanTreeRejectsMalformedStorage(t *testing.T) {
 	}
 }
 
-func TestPlanTreeLoadAdmitsCompleteInventory(t *testing.T) {
+func TestPlanTreeLoadAdmitsOwnInventory(t *testing.T) {
 	plan := githubRuntimePlanFixture(t)
-	for _, mutation := range []string{"none", "extra", "extra directory", "missing", "missing directory", "missing manifest", "unlisted root", "edited", "symlink", "manifest digest"} {
+	for _, mutation := range []string{"none", "extra", "extra directory", "private steps", "missing", "missing directory", "missing manifest", "unlisted root", "edited", "symlink", "manifest digest"} {
 		t.Run(mutation, func(t *testing.T) {
 			root := t.TempDir()
 			bundle := writeGitHubRuntimeBaseline(t, root, plan)
@@ -383,6 +410,10 @@ func TestPlanTreeLoadAdmitsCompleteInventory(t *testing.T) {
 				}
 			case "extra directory":
 				if err := os.Mkdir(step+".extra", 0755); err != nil {
+					t.Fatal(err)
+				}
+			case "private steps":
+				if err := os.Mkdir(filepath.Join(root, filepath.Dir(bundle.PlanPath), "steps"), 0o755); err != nil {
 					t.Fatal(err)
 				}
 			case "missing directory":
@@ -425,7 +456,10 @@ func TestPlanTreeLoadAdmitsCompleteInventory(t *testing.T) {
 				}
 			}
 			loaded, digest, err := loadPlanDocument(t.Context(), filepath.Join(root, bundle.PlanPath))
-			if mutation == "none" {
+			if mutation == "none" || mutation == "extra" || mutation == "extra directory" {
+				if mutation != "none" {
+					assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), root, bundle), e.CodePipelineDrift)
+				}
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -436,6 +470,13 @@ func TestPlanTreeLoadAdmitsCompleteInventory(t *testing.T) {
 				assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 				if mutation == "unlisted root" && !strings.Contains(err.Error(), "manifest does not list the root") {
 					t.Fatal("missing root diagnostic", err)
+				}
+				if mutation == "private steps" {
+					_, err := LoadPlanContext(t.Context(), filepath.Join(root, bundle.PlanPath))
+					assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+					if !strings.Contains(err.Error(), "unexpected private Plan steps directory") {
+						t.Fatal("wrong stale-layout refusal", err)
+					}
 				}
 			}
 		})

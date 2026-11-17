@@ -70,6 +70,7 @@ Under that scratch root, inspect:
 - `.github/nvkr-run/actions/`: shared actions with fixed interfaces for execution, preparation and transport.
 - `.github/nvkr-run/plan.json`: the per-bundle Plan index.
 - `.github/nvkr-plan-store/`: frozen Plan records and command files shared by generated bundles; [ADR-21](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold) owns the storage contract.
+- `.github/nvkr-plan-store/index.json`: object variants grouped by logical name, with full digests and the bundles that use them.
 - `.github/nvkr-run/manifest.json`: the generated bundle's ownership and content record.
 
 Those are the default production paths when the Environment omits `githubBundle`

@@ -1,0 +1,35 @@
+{
+  "artifactPath": "agent/bin/nvke-agent.deb",
+  "buildCommand": [
+    "bash",
+    "-ec",
+    {
+      "file": ".github/nvkr-plan-store/scripts/nvke-agent/build@708c184d26f9.sh"
+    }
+  ],
+  "builderType": "oci-hermetic",
+  "cgo": true,
+  "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+  "fromSource": true,
+  "outputType": "host-package",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "repo": "https://github.com/dsx-ai-factory/nvke.git",
+  "sourceDateEpoch": 1793236039,
+  "tag": "v0.23.0",
+  "toolchainImages": {
+    "amd64": "docker.io/library/golang@sha256:55395706e9703db746cc507abfc4eb2aea75918f8a8024e4848e2cb81004f5ad",
+    "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+  },
+  "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+  "vendorCommand": [
+    "bash",
+    "-ec",
+    {
+      "file": ".github/nvkr-plan-store/scripts/nvke/vendor@42481e224c2f.sh"
+    }
+  ],
+  "writeDir": "agent/bin"
+}

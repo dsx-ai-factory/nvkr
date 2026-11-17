@@ -1,0 +1,10 @@
+[
+  {
+    "Name": "helm",
+    "file": ".github/nvkr-plan-store/components/helm@0a2d680a3df5.json"
+  },
+  {
+    "Name": "kubectl",
+    "file": ".github/nvkr-plan-store/components/kubectl@2addeb828f2b.json"
+  }
+]

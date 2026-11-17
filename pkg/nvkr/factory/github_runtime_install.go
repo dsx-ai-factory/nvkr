@@ -14,6 +14,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 const githubRuntimeInputDirectory = ".nvkr/runtime-inputs"
@@ -66,10 +67,21 @@ func StageGitHubRuntimeInputs(ctx context.Context, plan *Plan, root string) erro
 // owner preserves its lock, per-file atomic replacement and manifest-last
 // semantics; this is not an atomic replacement of the complete directory.
 func InstallGitHubRuntimeInputs(ctx context.Context, baseline *Plan, root string) error {
+	return installGitHubRuntimeInputs(ctx, baseline, root, checkCoreGitHubBundle)
+}
+
+// InstallGitHubStageRuntimeInputs renders only the delivered candidate. Bootstrap
+// jobs own baseline projection checks; stages verify the saved baseline Plan and
+// compare every fixed member against the checkout before installing Plan data.
+func InstallGitHubStageRuntimeInputs(ctx context.Context, baseline *Plan, root string) error {
+	return installGitHubRuntimeInputs(ctx, baseline, root, readGitHubRuntimeBaseline)
+}
+
+func installGitHubRuntimeInputs(ctx context.Context, baseline *Plan, root string, readBaseline func(context.Context, *Plan, string) (*GeneratedBundle, error)) error {
 	if err := admitGitHubRuntimeInputs(ctx, baseline, root); err != nil {
 		return err
 	}
-	baselineBundle, err := checkCoreGitHubBundle(ctx, baseline, root)
+	baselineBundle, err := readBaseline(ctx, baseline, root)
 	if err != nil {
 		return err
 	}
@@ -114,7 +126,7 @@ func InstallGitHubRuntimeInputs(ctx context.Context, baseline *Plan, root string
 			return e.New(e.CodePipelineDrift, "staged runtime input %s differs from the complete generated bundle", name)
 		}
 	}
-	// Reuse the checked baseline and rendered candidate. The generated-file owner
+	// Reuse the admitted baseline and rendered candidate. The generated-file owner
 	// still checks replacements and publishes the manifest last. No staged pathname
 	// is moved over an existing member.
 	if err := prepareGitHubRuntimeBundle(ctx, baseline, &fresh, baselineBundle, bundle, root, false); err != nil {
@@ -124,6 +136,58 @@ func InstallGitHubRuntimeInputs(ctx context.Context, baseline *Plan, root string
 		return err
 	}
 	return CheckGeneratedBundle(ctx, root, bundle)
+}
+
+// Read only this namespace. Loading authenticates its frozen Plan objects; the
+// remaining manifest members are checked here without projecting a workflow.
+func readGitHubRuntimeBaseline(ctx context.Context, baseline *Plan, root string) (*GeneratedBundle, error) {
+	layout := githubLayoutFor(baseline)
+	saved, err := LoadPlanContext(ctx, filepath.Join(root, layout.planPath))
+	if err != nil {
+		return nil, err
+	}
+	before, err := canonical.Marshal(baseline)
+	if err != nil {
+		return nil, err
+	}
+	after, err := canonical.Marshal(saved)
+	if err != nil || !bytes.Equal(before, after) {
+		return nil, e.New(e.CodePipelineDrift, "runtime baseline differs from the saved Plan")
+	}
+	bundle := &GeneratedBundle{Engine: EngineGitHub, WorkflowPath: layout.workflowPath,
+		ManifestPath: layout.manifestPath, PlanPath: layout.planPath, Files: map[string][]byte{}}
+	members, err := priorGeneratedMembers(ctx, root, bundle)
+	if err != nil {
+		return nil, err
+	}
+	total := int64(0)
+	for _, member := range members {
+		bundle.Files[member.Path] = nil
+		if member.Path == layout.planPath || isPlanStoreRecord(member.Path) {
+			continue
+		}
+		if err := validateGeneratedDirectoryChain(root, filepath.Dir(member.Path)); err != nil {
+			return nil, err
+		}
+		filename := filepath.Join(root, filepath.FromSlash(member.Path))
+		info, err := os.Lstat(filename)
+		if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != os.FileMode(member.Mode) || info.Size() > maxPlanTreeBytes-total {
+			return nil, e.New(e.CodePipelineDrift, "runtime baseline member %q is missing, unsafe or oversized", member.Path)
+		}
+		raw, err := readGeneratedContext(ctx, filename)
+		if err != nil {
+			return nil, e.Wrap(e.CodePipelineDrift, err, "reading runtime baseline member")
+		}
+		total += int64(len(raw))
+		if total > maxPlanTreeBytes || pipeline.FileDigest(raw) != member.SHA256 {
+			return nil, e.New(e.CodePipelineDrift, "runtime baseline member %q differs from its manifest", member.Path)
+		}
+		bundle.Files[member.Path] = raw
+	}
+	if err := checkGeneratedDirectoryContents(ctx, root, bundle); err != nil {
+		return nil, err
+	}
+	return bundle, nil
 }
 
 func readGitHubRuntimeInputSet(ctx context.Context, root string) (map[string][]byte, error) {

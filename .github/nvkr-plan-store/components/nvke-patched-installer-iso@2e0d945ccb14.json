@@ -1,0 +1,35 @@
+{
+  "artifactPath": "nvkr-output/installer.iso",
+  "buildCommand": [
+    "bash",
+    "/src/os-image/packer/scripts/patch-installer-iso.sh",
+    "/nvkr/inputs/materials/installer-source",
+    "/src/nvkr-output/installer.iso"
+  ],
+  "builderType": "oci-hermetic",
+  "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+  "fromSource": true,
+  "materials": {
+    "installer-source": "ubuntu-installer-iso"
+  },
+  "outputType": "raw",
+  "platforms": [
+    "linux/arm64"
+  ],
+  "repo": "https://github.com/dsx-ai-factory/nvke.git",
+  "sourceDateEpoch": 1793236039,
+  "tag": "v0.23.0",
+  "toolchainImages": {
+    "amd64": "sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd",
+    "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
+  },
+  "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+  "vendorCommand": [
+    "bash",
+    "-ec",
+    {
+      "file": ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
+    }
+  ],
+  "writeDir": "nvkr-output"
+}

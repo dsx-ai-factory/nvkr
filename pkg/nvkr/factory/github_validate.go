@@ -382,13 +382,15 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 					command = githubRuntimeGenerationCommand(plan) + " --check"
 				}
 				if len(plan.Environment.GitHubRuntimeSources) != 0 {
-					command = "./nvkr-exec factory github check-runtime-inputs --plan " + shellQuote(githubLayoutFor(plan).planPath)
+					command = "./nvkr-exec factory github stage-runtime-inputs --plan " + shellQuote(githubLayoutFor(plan).planPath)
 				}
 				if !strings.Contains(joinRuns(job.Steps), githubRuntimeInstallCommand(plan)) {
 					return e.New(e.CodeInvalidCatalog, "secondary GitHub bootstrap omits runtime input installation")
 				}
 			}
-			wantSteps++ // Stage the packed two-file carrier after bundle admission.
+			if runner == sortedKeys(bootstrap)[0] || len(plan.Environment.GitHubRuntimeSources) == 0 {
+				wantSteps++ // Otherwise the check step also stages the packed carrier.
+			}
 			if !strings.Contains(joinRuns(job.Steps), "./nvkr-exec factory github stage-runtime-inputs --plan "+shellQuote(githubLayoutFor(plan).planPath)) {
 				return e.New(e.CodeInvalidCatalog, "GitHub bootstrap omits packed runtime input staging")
 			}

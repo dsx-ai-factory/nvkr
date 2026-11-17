@@ -66,9 +66,10 @@ contracts remain local evidence; the renamed worker topology has no recorded hos
 
 GitHub runtime-input carriers contain exactly two files: a packed canonical Plan and the manifest.
 The bootstrap stages them separately from the committed Plan tree;
-the helper invokes the installer to admit and regenerate that tree. Installation renders the baseline
-and candidate once each and reuses them for comparison and publication checks; staging reuses its
-already checked bundle. Frozen JSON record addresses may change during a source-pin refresh,
+the helper invokes the installer to admit and regenerate that tree. Bootstrap installation renders
+the baseline and candidate once each. Stage installation verifies the saved baseline Plan and fixed
+checkout members, then renders only the candidate. Secondary multi-source bootstraps combine the
+runtime-input check and carrier staging in one render. Frozen JSON record addresses may change during a source-pin refresh,
 while target membership, script bytes, consumer cohorts and non-Plan members remain fixed.
 A vendor cohort split requires normal regeneration even when its script bytes and addresses are unchanged.
 Packed-carrier and cohort-split refusal fixtures exercise these boundaries locally. The retained

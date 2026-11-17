@@ -1,0 +1,50 @@
+[
+  {
+    "Name": "nvke-agent",
+    "file": ".github/nvkr-plan-store/components/nvke-agent@2366f6d25d07.json"
+  },
+  {
+    "Name": "nvke-cni-calico",
+    "file": ".github/nvkr-plan-store/components/nvke-cni-calico@f9b613220816.json"
+  },
+  {
+    "Name": "nvke-cni-ovn",
+    "file": ".github/nvkr-plan-store/components/nvke-cni-ovn@7f8a97beff95.json"
+  },
+  {
+    "Name": "nvke-doca-ovs",
+    "file": ".github/nvkr-plan-store/components/nvke-doca-ovs@9b3649ff45eb.json"
+  },
+  {
+    "Name": "nvke-image-inputs",
+    "file": ".github/nvkr-plan-store/components/nvke-image-inputs@71e09b0db544.json"
+  },
+  {
+    "Name": "nvke-kubeadm-distro",
+    "file": ".github/nvkr-plan-store/components/nvke-kubeadm-distro@9f7a6d3e2a35.json"
+  },
+  {
+    "Name": "nvke-node-fde-arm64",
+    "file": ".github/nvkr-plan-store/components/nvke-node-fde-arm64@0cf738d9b262.json"
+  },
+  {
+    "Name": "nvke-patched-installer-iso",
+    "file": ".github/nvkr-plan-store/components/nvke-patched-installer-iso@2e0d945ccb14.json"
+  },
+  {
+    "Name": "nvke-spire-agent",
+    "file": ".github/nvkr-plan-store/components/nvke-spire-agent@b22737b6361f.json"
+  },
+  {
+    "Name": "ovn-kube-ubuntu",
+    "file": ".github/nvkr-plan-store/components/ovn-kube-ubuntu@c36181ad1946.json"
+  },
+  {
+    "Name": "ovn-kubernetes-chart",
+    "file": ".github/nvkr-plan-store/components/ovn-kubernetes-chart@aa4eacc043b5.json"
+  },
+  {
+    "Name": "ubuntu-installer-iso",
+    "file": ".github/nvkr-plan-store/components/ubuntu-installer-iso@c77b96328054.json"
+  }
+]

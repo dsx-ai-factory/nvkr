@@ -1,0 +1,123 @@
+{
+  "buildDigest": "sha256:a026cd498411a94703b3657421e21db317e9b17cf151f9ece77a1a6e05a3a473",
+  "components": [
+    "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifactPath": "bin/nvkr-aicr/bundle.tar.gz",
+        "builderType": "oci-hermetic",
+        "command": [
+          "bash",
+          "-euo",
+          "pipefail",
+          "-c",
+          {
+            "file": ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build@569ec037bb57.sh"
+          },
+          "nvkr-aicr-bundle",
+          "nvke",
+          "gb200",
+          "kubeflow",
+          "argocd-helm"
+        ],
+        "component": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
+        "env": [
+          {
+            "name": "BUILD_VERSION",
+            "value": "1.2.0"
+          },
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GIT_VERSION",
+            "value": "935e0746dc54da890a23c1ecca998244b3a25de7"
+          },
+          {
+            "name": "GOARCH",
+            "value": "arm64"
+          },
+          {
+            "name": "GOARM64",
+            "value": "v8.0"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1793648938"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
+        "kind": "build",
+        "needs": [
+          "fetch-source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f"
+        ],
+        "network": "none",
+        "outputType": "tarball",
+        "platform": "linux/arm64",
+        "sourceCommit": "935e0746dc54da890a23c1ecca998244b3a25de7",
+        "sourceDest": "source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+        "toolchain": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
+        "vendorSpecDigest": "sha256:39683736c0edf5aea987963a51d570008b7f492c8daa8895f119aa0a445737e1",
+        "version": "1.2.0",
+        "workdir": "/src",
+        "writeDir": "bin/nvkr-aicr"
+      },
+      {
+        "commit": "935e0746dc54da890a23c1ecca998244b3a25de7",
+        "dest": "source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f",
+        "id": "fetch-source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/NVIDIA/aicr",
+        "treeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+        "vendorCmd": [
+          "bash",
+          "-euo",
+          "pipefail",
+          "-c",
+          {
+            "file": ".github/nvkr-plan-store/scripts/aicr/vendor@12c04982c41c.sh"
+          }
+        ],
+        "vendorImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
+        "vendorSpecDigest": "sha256:39683736c0edf5aea987963a51d570008b7f492c8daa8895f119aa0a445737e1"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "build-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
+  "platform": "linux/arm64"
+}

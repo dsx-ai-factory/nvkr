@@ -1,0 +1,86 @@
+{
+  "APIVersion": "nvkr.dev/catalog/v3",
+  "Actions": {},
+  "Components": {
+    "nvke-agent": {
+      "file": ".github/nvkr-plan-store/components/nvke-agent@2366f6d25d07.json"
+    },
+    "nvke-cni-calico": {
+      "file": ".github/nvkr-plan-store/components/nvke-cni-calico@f9b613220816.json"
+    },
+    "nvke-cni-ovn": {
+      "file": ".github/nvkr-plan-store/components/nvke-cni-ovn@7f8a97beff95.json"
+    },
+    "nvke-doca-ovs": {
+      "file": ".github/nvkr-plan-store/components/nvke-doca-ovs@9b3649ff45eb.json"
+    },
+    "nvke-image-inputs": {
+      "file": ".github/nvkr-plan-store/components/nvke-image-inputs@71e09b0db544.json"
+    },
+    "nvke-kubeadm-distro": {
+      "file": ".github/nvkr-plan-store/components/nvke-kubeadm-distro@9f7a6d3e2a35.json"
+    },
+    "nvke-node-fde-amd64": {
+      "file": ".github/nvkr-plan-store/components/nvke-node-fde-amd64@a5a98401a009.json"
+    },
+    "nvke-node-fde-arm64": {
+      "file": ".github/nvkr-plan-store/components/nvke-node-fde-arm64@0cf738d9b262.json"
+    },
+    "nvke-node-image": {
+      "file": ".github/nvkr-plan-store/components/nvke-node-image@59c2c88a6f5f.json"
+    },
+    "nvke-node-image-amd64": {
+      "file": ".github/nvkr-plan-store/components/nvke-node-image-amd64@bb17c1fb5d5c.json"
+    },
+    "nvke-patched-installer-iso": {
+      "file": ".github/nvkr-plan-store/components/nvke-patched-installer-iso@2e0d945ccb14.json"
+    },
+    "nvke-patched-installer-iso-amd64": {
+      "file": ".github/nvkr-plan-store/components/nvke-patched-installer-iso-amd64@fcf2571bbe12.json"
+    },
+    "nvke-spire-agent": {
+      "file": ".github/nvkr-plan-store/components/nvke-spire-agent@b22737b6361f.json"
+    },
+    "ovn-kube-ubuntu": {
+      "file": ".github/nvkr-plan-store/components/ovn-kube-ubuntu@c36181ad1946.json"
+    },
+    "ovn-kubernetes-chart": {
+      "file": ".github/nvkr-plan-store/components/ovn-kubernetes-chart@aa4eacc043b5.json"
+    },
+    "ubuntu-installer-iso": {
+      "file": ".github/nvkr-plan-store/components/ubuntu-installer-iso@c77b96328054.json"
+    },
+    "ubuntu-installer-iso-amd64": {
+      "file": ".github/nvkr-plan-store/components/ubuntu-installer-iso-amd64@28a4ba3f309a.json"
+    }
+  },
+  "Kind": "SourceBuildRegistry",
+  "Metadata": {
+    "description": "Non-FDE and public-bootstrap FDE NVKE node images from explicit authenticated component outputs.",
+    "name": "nvke-m2-os"
+  },
+  "Sources": {
+    "nvke-cni-calico-source": {
+      "file": ".github/nvkr-plan-store/sources/nvke-cni-calico-source@6579e942e429.json"
+    },
+    "nvke-cni-ovn-source": {
+      "file": ".github/nvkr-plan-store/sources/nvke-cni-ovn-source@c91739150824.json"
+    },
+    "nvke-doca-ovs-source": {
+      "file": ".github/nvkr-plan-store/sources/nvke-doca-ovs-source@186746b1bc5b.json"
+    },
+    "nvke-kubeadm-distro-source": {
+      "file": ".github/nvkr-plan-store/sources/nvke-kubeadm-distro-source@836fe264ea78.json"
+    },
+    "nvke-os": {
+      "file": ".github/nvkr-plan-store/sources/nvke-os@3653dda3279f.json"
+    },
+    "nvke-spire-agent-source": {
+      "file": ".github/nvkr-plan-store/sources/nvke-spire-agent-source@0b75d18a7517.json"
+    },
+    "ovn-kubernetes": {
+      "file": ".github/nvkr-plan-store/sources/ovn-kubernetes@14feb1c21406.json"
+    }
+  },
+  "Tools": {}
+}

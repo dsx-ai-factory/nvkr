@@ -1,0 +1,43 @@
+{
+  "APIVersion": "nvkr.dev/catalog/v3",
+  "Actions": {},
+  "Components": {
+    "helm": {
+      "file": ".github/nvkr-plan-store/components/helm@0a2d680a3df5.json"
+    },
+    "kubectl": {
+      "file": ".github/nvkr-plan-store/components/kubectl@2addeb828f2b.json"
+    }
+  },
+  "Kind": "SourceBuildRegistry",
+  "Metadata": {
+    "description": "Acquire operator executables from pinned upstream release assets, without rebuilding or installing their archives.",
+    "name": "nvke-operator-tools"
+  },
+  "Sources": {
+    "helm": {
+      "file": ".github/nvkr-plan-store/sources/helm@ba4881ada5a1.json"
+    },
+    "kubectl": {
+      "file": ".github/nvkr-plan-store/sources/kubectl@f184b235c4e6.json"
+    }
+  },
+  "Tools": {
+    "helm": {
+      "archiveDigest": "sha256:70b2c30a19da4db264dfd68c8a3664e05093a361cefd89572ffb36f8abfa3d09",
+      "executableDigest": "sha256:210d576a6dc04b7864af4b5d9a5af58860bbc03d19174ffeddbd29d01d1b59a9",
+      "executablePath": "linux-amd64/helm",
+      "format": "tar-gzip",
+      "platform": "linux/amd64",
+      "url": "https://get.helm.sh/helm-v4.1.4-linux-amd64.tar.gz"
+    },
+    "kubectl": {
+      "archiveDigest": "sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336",
+      "executableDigest": "sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336",
+      "executablePath": "kubectl",
+      "format": "raw",
+      "platform": "linux/amd64",
+      "url": "https://dl.k8s.io/release/v1.36.3/bin/linux/amd64/kubectl"
+    }
+  }
+}

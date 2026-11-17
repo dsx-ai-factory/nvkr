@@ -1,0 +1,29 @@
+{
+  "artifactPath": "charts/nktp-0.1.0.tgz",
+  "buildCommand": [
+    "sh",
+    "-euc",
+    ".nvkr-tools/helm package nktp --destination=charts/"
+  ],
+  "builderType": "oci-hermetic",
+  "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+  "fromSource": true,
+  "outputType": "tarball",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+  "sourceDateEpoch": 1793913052,
+  "tag": "nktp/v0.1.0",
+  "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+  "treeHash": "4125b283eacc8842210bf405e7dc5f04090e8b05",
+  "vendorCommand": [
+    "sh",
+    "-euc",
+    {
+      "file": ".github/nvkr-plan-store/scripts/nvke-telemetry-pipeline/vendor@51e05aaa25f5.sh"
+    }
+  ],
+  "writeDir": "charts"
+}

@@ -127,10 +127,7 @@ jobs:
           ./nvkr-exec factory github install-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
       - name: Verify committed Run generation is current
         id: validate-catalog
-        run: ./nvkr-exec factory github check-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
-      - name: 'Stage packed runtime inputs'
-        run: |
-          ./nvkr-exec factory github stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
+        run: ./nvkr-exec factory github stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
       - name: 'Upload NVKR runner'
         uses: ./.github/nvkr-run-nvke-nightly/actions/ci-upload
         with:
@@ -177,10 +174,7 @@ jobs:
           ./nvkr-exec factory github install-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
       - name: Verify committed Run generation is current
         id: validate-catalog
-        run: ./nvkr-exec factory github check-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
-      - name: 'Stage packed runtime inputs'
-        run: |
-          ./nvkr-exec factory github stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
+        run: ./nvkr-exec factory github stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
       - name: 'Upload NVKR runner'
         uses: ./.github/nvkr-run-nvke-nightly/actions/ci-upload
         with:
@@ -227,10 +221,7 @@ jobs:
           ./nvkr-exec factory github install-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
       - name: Verify committed Run generation is current
         id: validate-catalog
-        run: ./nvkr-exec factory github check-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
-      - name: 'Stage packed runtime inputs'
-        run: |
-          ./nvkr-exec factory github stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
+        run: ./nvkr-exec factory github stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
       - name: 'Upload NVKR runner'
         uses: ./.github/nvkr-run-nvke-nightly/actions/ci-upload
         with:

@@ -1,0 +1,6 @@
+[
+  {
+    "Name": "cert-manager-webhook-image",
+    "file": ".github/nvkr-plan-store/components/cert-manager-webhook-image@6b27f11a69d9.json"
+  }
+]

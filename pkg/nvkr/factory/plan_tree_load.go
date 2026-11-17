@@ -103,7 +103,7 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 		}
 		delete(build, "file")
 		if ref, ok := build["resolvedComponents"]; ok {
-			value, err := treeResolvedRecords(ref, files, true)
+			value, err := treeResolvedRecords(ref, files, true, "")
 			if err != nil {
 				return nil, nil, err
 			}
@@ -270,9 +270,6 @@ func loadPlanTree(ctx context.Context, filename string, rootBytes []byte) (*Plan
 	}
 	if !bytes.Equal(rootBytes, storedRoot) {
 		return nil, "", e.New(e.CodePipelineDrift, "Plan tree root changed during admission")
-	}
-	if err := checkPlanStore(ctx, root, bundle, false); err != nil {
-		return nil, "", err
 	}
 	// The private Plan tree contains only its root index. Reject stale or
 	// injected step directories without opening workflow or action contents.

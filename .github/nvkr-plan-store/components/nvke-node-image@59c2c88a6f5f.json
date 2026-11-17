@@ -1,0 +1,86 @@
+{
+  "artifactPath": "non-fde/nvke-node.qcow2",
+  "buildNetwork": "default",
+  "buildRequirements": {
+    "allowedHostPlatforms": [
+      "linux/arm64"
+    ],
+    "capabilities": [
+      {
+        "name": "kvm",
+        "policy": "required"
+      }
+    ],
+    "resources": {
+      "cpuMillis": 8000,
+      "ephemeralStorageMiB": 65536,
+      "memoryMiB": 10240
+    },
+    "timeoutSeconds": 21600
+  },
+  "builderType": "vm-image",
+  "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+  "disk": {
+    "encryption": "none",
+    "format": "qcow2"
+  },
+  "fromSource": true,
+  "materials": {
+    "image-inputs": "nvke-image-inputs",
+    "installer-iso": "nvke-patched-installer-iso"
+  },
+  "outputType": "disk-image",
+  "packer": {
+    "acceleratorVariable": "accelerator",
+    "acquisitionArchive": "non-fde/apt-acquisitions.tar",
+    "architectureVariable": "architecture",
+    "buildLogDirectoryVariable": "build_log_directory",
+    "buildName": "nvke-node-non-fde.qemu.nvke-non-fde",
+    "materialManifest": {
+      "kinds": {
+        "image-inputs": "archive",
+        "installer-iso": "disk-image"
+      },
+      "schemaVersion": "nvke.nvidia.com/os-image-materials/v1"
+    },
+    "materialManifestVariable": "material_manifest",
+    "outputDirectoryVariable": "output_directory",
+    "packerVersion": "1.16.2",
+    "projectPath": "os-image/packer",
+    "sshPrivateKeyVariable": "ssh_private_key_file",
+    "sshPublicKeyVariable": "ssh_public_key_file",
+    "variables": {
+      "capture_apt_acquisitions": "true",
+      "efi_firmware_code": "/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd",
+      "efi_firmware_vars": "/usr/share/AAVMF/AAVMF_VARS.fd",
+      "guest_memory_mib": "4096",
+      "ssh_timeout": "180m",
+      "ubuntu_series": "24.04"
+    }
+  },
+  "patches": [
+    {
+      "content": "--- a/os-image/packer/versions.pkr.hcl\n+++ b/os-image/packer/versions.pkr.hcl\n@@ -4,8 +4,8 @@\n packer {\n-  required_version = \"= 1.15.4\"\n+  required_version = \"= 1.16.2\"\n\n   required_plugins {\n     qemu = {\n       source  = \"github.com/hashicorp/qemu\"\n-      version = \"= 1.1.6\"\n+      version = \"= 1.1.8\"\n     }\n",
+      "name": "patches/packer-toolchain-version.patch",
+      "sha256": "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227"
+    }
+  ],
+  "platforms": [
+    "linux/arm64"
+  ],
+  "repo": "https://github.com/dsx-ai-factory/nvke.git",
+  "sourceDateEpoch": 1793236039,
+  "tag": "v0.23.0",
+  "toolchainImages": {
+    "amd64": "sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd",
+    "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
+  },
+  "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+  "vendorCommand": [
+    "bash",
+    "-ec",
+    {
+      "file": ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
+    }
+  ]
+}

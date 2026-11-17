@@ -113,7 +113,7 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 		}
 		record := planFields{"name": build["name"], "catalogDigest": build["catalogDigest"]}
 		if resolved, ok := build["resolvedComponents"]; ok {
-			record["resolvedComponents"], err = treeResolvedRecords(resolved, files, false)
+			record["resolvedComponents"], err = treeResolvedRecords(resolved, files, false, name)
 			if err != nil {
 				return nil, err
 			}
@@ -131,7 +131,10 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 		if err != nil {
 			return nil, err
 		}
-		stepPath := planStorePath(step, ".json")
+		stepPath, err := namedPlanStorePath("steps/"+name+"/build", step, ".json")
+		if err != nil {
+			return nil, err
+		}
 		files[stepPath] = step
 		record["file"], err = canonical.Marshal(stepPath)
 		if err != nil {
@@ -150,7 +153,21 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 	}
 	for _, field := range sharedPlanFields {
 		if value, ok := root[field]; ok {
-			root[field], err = storeTreeJSON(value, files)
+			kind := map[string]string{"appliedOverlays": "overlays", "internalTools": "tools", "lifecycleOutputs": "outputs", "runtimeInputs": "runtime-inputs"}[field]
+			if kind == "" {
+				kind = field
+			}
+			logical := plan.Definition.Metadata.Name
+			if field == "environment" {
+				logical = plan.Environment.Metadata.Name
+			}
+			if field == "actions" {
+				logical = "github"
+			}
+			if logical == "" {
+				logical = "plan"
+			}
+			root[field], err = storeTreeJSON(value, files, kind+"/"+logical)
 			if err != nil {
 				return nil, err
 			}

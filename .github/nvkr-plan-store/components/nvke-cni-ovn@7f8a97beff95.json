@@ -1,0 +1,31 @@
+{
+  "artifactPath": "nvkr-output/nvke-cni-ovn.tar",
+  "buildCommand": [
+    "bash",
+    "-ec",
+    {
+      "file": ".github/nvkr-plan-store/scripts/nvke-cni-ovn/build@1c0c429a8c54.sh"
+    }
+  ],
+  "builderType": "oci-hermetic",
+  "commit": "8af51273d52dfa07454435d18d37230e582d797a",
+  "fromSource": true,
+  "materials": {
+    "ovn-chart": "ovn-kubernetes-chart",
+    "ovn-image": "ovn-kube-ubuntu"
+  },
+  "outputType": "tarball",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "repo": "https://github.com/dsx-ai-factory/ovn-kubernetes",
+  "sourceDateEpoch": 1792137152,
+  "tag": "v2.4.2",
+  "toolchainImages": {
+    "amd64": "docker.io/library/golang@sha256:8aa2821993207ae840ce09e4223217efcd14e01f71525db734faf4232bd59999",
+    "arm64": "docker.io/library/golang@sha256:288557fbc328e4ef9a78bae2eb44f24447029ff08667be883d79eeaa9029cf0c"
+  },
+  "treeHash": "c4a54b0b3b615e5bd6df2d591451d7ab03dffc08",
+  "writeDir": "nvkr-output"
+}

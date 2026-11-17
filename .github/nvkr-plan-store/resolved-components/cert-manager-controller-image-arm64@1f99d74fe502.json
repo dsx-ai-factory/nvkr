@@ -1,0 +1,6 @@
+[
+  {
+    "Name": "cert-manager-controller-image",
+    "file": ".github/nvkr-plan-store/components/cert-manager-controller-image@4483c648c1d8.json"
+  }
+]

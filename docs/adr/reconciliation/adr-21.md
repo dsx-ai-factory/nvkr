@@ -79,12 +79,13 @@ The rename changes generated workflow bytes and ownership manifests, not Plan or
 Hosted execution of the renamed bundles remains unrecorded.
 
 GitHub Plan storage follows [ADR-21's shared-store contract](../0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold).
-Local contracts cover exact canonical round trips, malformed references, missing or altered objects, unowned objects, cross-bundle retirement, concurrent writers and runtime pin refresh.
+Local contracts cover exact canonical round trips, malformed references, missing or altered objects, unowned objects, cross-bundle retirement, whole-bundle removal and rename, interrupted-write recovery, concurrent writers and readers, aggregate bounds and runtime pin refresh.
 The loader does not render workflows or actions; complete closure checks remain with generation and runtime bootstrap.
 Packed inputs, CLI JSON and Tekton retain the canonical representation.
 The Plan schema and digest contracts are unchanged.
 The 2026-11-17 local cutover preserves the exact reconstructed canonical bytes, three Plan Digests and 261 named Build Digests of the retained development, NVKE and nightly NVKE bundles at `2291a2a5c336db993986376be96acc6715d051ef`.
-Their shared storage contains 335 files, 53,894 lines and 2,156,070 bytes, excluding workflow/action files, manifests and local locks.
+Their shared storage contains 377 files, 58,333 lines and 2,276,412 bytes, including the generated usage index and excluding workflow/action files, manifests and local locks.
+Named object paths remain unchanged when neighboring bundles are added, removed or reordered; the usage index groups variants and records their full hashes and bundle users.
 One graph object contains the unchanged 941 nodes and 1,537 artifacts shared by all three bundles.
 Hosted execution of the shared-store layout remains unrecorded.
 

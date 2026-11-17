@@ -1,0 +1,59 @@
+{
+  "APIVersion": "nvkr.dev/catalog/v3",
+  "Actions": {},
+  "Components": {
+    "aicr-gb300-generic-training-argocd": {
+      "file": ".github/nvkr-plan-store/components/aicr-gb300-generic-training-argocd@02975ec2a685.json"
+    },
+    "aicr-gb300-generic-training-argocd-helm": {
+      "file": ".github/nvkr-plan-store/components/aicr-gb300-generic-training-argocd-helm@c015181e006e.json"
+    },
+    "aicr-gb300-generic-training-flux": {
+      "file": ".github/nvkr-plan-store/components/aicr-gb300-generic-training-flux@6e8452b13e66.json"
+    },
+    "aicr-gb300-generic-training-helm": {
+      "file": ".github/nvkr-plan-store/components/aicr-gb300-generic-training-helm@c1f17d2c6e6c.json"
+    },
+    "aicr-gb300-generic-training-helmfile": {
+      "file": ".github/nvkr-plan-store/components/aicr-gb300-generic-training-helmfile@59c5e14bb80c.json"
+    },
+    "aicr-gb300-generic-training-recipe": {
+      "file": ".github/nvkr-plan-store/components/aicr-gb300-generic-training-recipe@583205c0fa25.json"
+    },
+    "aicr-gb300-generic-training-terraform": {
+      "file": ".github/nvkr-plan-store/components/aicr-gb300-generic-training-terraform@c4fae116a9ca.json"
+    },
+    "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm": {
+      "file": ".github/nvkr-plan-store/components/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm@958f7794220d.json"
+    },
+    "aicr-nvke-gb200-ubuntu-training-kubeflow-flux": {
+      "file": ".github/nvkr-plan-store/components/aicr-nvke-gb200-ubuntu-training-kubeflow-flux@4627f769de9b.json"
+    },
+    "aicr-nvke-gb200-ubuntu-training-kubeflow-helm": {
+      "file": ".github/nvkr-plan-store/components/aicr-nvke-gb200-ubuntu-training-kubeflow-helm@3754bdc884be.json"
+    }
+  },
+  "Kind": "SourceBuildRegistry",
+  "Metadata": {
+    "description": "Pinned AICR renders packaged as OCI deployment bundles; no cluster execution or hardware qualification.",
+    "name": "aicr-bundles"
+  },
+  "Sources": {
+    "aicr": {
+      "file": ".github/nvkr-plan-store/sources/aicr@69010e1e4063.json"
+    },
+    "aicr-tool-arm64": {
+      "file": ".github/nvkr-plan-store/sources/aicr-tool-arm64@6d56668ce3a8.json"
+    }
+  },
+  "Tools": {
+    "aicr-tool-arm64": {
+      "archiveDigest": "sha256:26824146cd0743229239899cb75d3b68e0bc262bcdb357fccc98eca0a5b75976",
+      "executableDigest": "sha256:16e5ac98250cdcdb0ecf18e6a9a05b041b3b3cc83aa3181f755aa0e5c5e0fe24",
+      "executablePath": "aicr",
+      "format": "tar-gzip",
+      "platform": "linux/arm64",
+      "url": "https://github.com/NVIDIA/aicr/releases/download/v1.2.0/aicr_1.2.0_linux_arm64.tar.gz"
+    }
+  }
+}

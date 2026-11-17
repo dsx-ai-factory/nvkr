@@ -5,6 +5,7 @@ publication routes before executing a Run. These read-only views explain the com
 its changes. They do not observe output bytes, verify a release, or authorize execution.
 
 The Plan in `.github/nvkr-run-nvke/plan.json` is a small index into the repository's shared `.github/nvkr-plan-store/`.
+Start with the store's `index.json` to find catalogs, target steps, graphs and scripts by name and see which bundles share each variant.
 Loading verifies the frozen objects and reconstructs the canonical Plan under [ADR-21's storage contract](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold). Keep human views
 outside `.github/nvkr-run-nvke/`: that directory admits only manifest-owned generated files. Inspection never
 updates the Plan or its ownership manifest.
@@ -33,7 +34,7 @@ nvkr run plan \
 ```
 
 Use either `--plan` or the pair `--definition` and `--environment`. Compilation can need access to pinned
-Git objects for catalog pin-set revalidation. Reading an existing generated Plan needs the generated indexes, manifests and shared store;
+Git objects for catalog pin-set revalidation. Reading an existing generated Plan needs its bundle index, its manifest and the store objects that manifest lists;
 a packed Plan exported with `--json` needs only that one file.
 Readers require the current schema, canonical bytes, safe bounded regular files, and complete graph and
 binding validation. Invalid input produces a coded error before any result bytes are emitted.
