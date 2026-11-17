@@ -12,15 +12,20 @@ import unittest
 class ToolVulnerabilityReports(unittest.TestCase):
     def test_results_and_collection_failures(self):
         root = Path(__file__).resolve().parents[1]
-        cases = [(0, 0, False), (3, 0, False), (0, 3, False),
-                 (1, 0, True), (0, 2, True), (127, 3, True)]
-        for first, second, incomplete in cases:
-            with self.subTest(first=first, second=second), tempfile.TemporaryDirectory() as tmp:
+        cases = [(0, 0, False, 0), (3, 0, False, 0), (0, 3, False, 0),
+                 (1, 0, True, 0), (0, 2, True, 0), (127, 3, True, 0),
+                 (0, 0, True, 42)]
+        for first, second, incomplete, install_status in cases:
+            with self.subTest(first=first, second=second, install_status=install_status), tempfile.TemporaryDirectory() as tmp:
                 work = Path(tmp)
                 (work / "bin").mkdir()
                 (work / ".go-version").write_text((root / ".go-version").read_text())
                 go = work / "bin/go"
-                go.write_text("#!/bin/sh\nif [ \"$1\" = env ]; then printf 'go%s\\n' \"$(cat .go-version)\"; fi\n")
+                go.write_text(
+                    "#!/bin/sh\nif [ \"$1\" = env ]; then printf 'go%s\\n' \"$(cat .go-version)\"; exit 0; fi\n"
+                    "printf '%s\\n' \"$*\" > install-calls\n"
+                    f"exit {install_status}\n"
+                )
                 go.chmod(0o755)
                 scanner = work / "bin/govulncheck"
                 scanner.write_text(
@@ -34,6 +39,14 @@ class ToolVulnerabilityReports(unittest.TestCase):
                     capture_output=True, text=True, timeout=10,
                 )
                 self.assertEqual(result.returncode != 0, incomplete, result.stdout + result.stderr)
+                self.assertEqual((work / "install-calls").read_text().strip(),
+                                 "-C toolchains/govulncheck install tool")
+                if install_status:
+                    self.assertFalse((work / "calls").exists(), "stale scanner ran after install failed")
+                    self.assertNotIn("Scanning", result.stdout)
+                    self.assertNotIn("complete, no reachable findings", result.stdout)
+                    self.assertNotIn("findings (report-only)", result.stdout)
+                    continue
                 self.assertEqual((work / "calls").read_text().splitlines(), [
                     "-C toolchains/actionlint github.com/rhysd/actionlint/cmd/actionlint",
                     "-C toolchains/govulncheck golang.org/x/vuln/cmd/govulncheck",
