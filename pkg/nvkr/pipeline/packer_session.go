@@ -16,6 +16,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
@@ -101,9 +102,7 @@ func (handle *NodeSession) AdmitVMImagePacker(
 	if len(selections) == 0 {
 		return nil, e.New(e.CodeUsage, "VM-image Packer admission requires selected Plan nodes")
 	}
-	if runtimeName == "" {
-		runtimeName = "docker"
-	}
+	runtimeName = containerruntime.Default(runtimeName)
 	ordered := append([]VMImagePackerSelection(nil), selections...)
 	sort.Slice(ordered, func(i, j int) bool { return ordered[i].Subject < ordered[j].Subject })
 	bound := make(map[string][]byte, len(ordered))

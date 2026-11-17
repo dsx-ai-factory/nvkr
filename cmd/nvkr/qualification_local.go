@@ -10,6 +10,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -29,7 +30,7 @@ func cmdRunQualifyLocalWith(qualify localQualifier) *cli.Command {
 			&cli.StringFlag{Name: "smoke-key", Usage: "distinct local smoke private-key file"},
 			&cli.StringFlag{Name: "qualifier-key", Usage: "distinct local qualifier private-key file"},
 			&cli.StringFlag{Name: "cosign", Usage: "cosign executable pinned by the policy"},
-			&cli.StringFlag{Name: "runtime", Value: "docker", Usage: "native isolated tool-smoke runtime"},
+			&cli.StringFlag{Name: "runtime", Value: containerruntime.Default(""), Usage: "native isolated tool-smoke runtime"},
 			&cli.StringFlag{Name: "repository", Usage: "canonical untagged registry namespace for local qualification artifacts and evidence"},
 			&cli.StringFlag{Name: "scratch", Usage: "existing disk-backed directory with capacity for export and read-back"},
 			&cli.StringFlag{Name: "evidence-out", Usage: "new evidence-bundle file in an existing directory"},

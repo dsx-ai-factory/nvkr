@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
@@ -189,9 +190,7 @@ func (plan Plan) validatePlanNodes(builds map[string]ir.Node) error {
 			return e.New(e.CodePipelineDrift, "operation %q has no selected producer instruction", node.ID)
 		}
 		if build.BuilderType == ir.BuilderBuildKit {
-			switch plan.Environment.RuntimeBinary() {
-			case "docker", "podman":
-			default:
+			if err := containerruntime.Validate(plan.Environment.RuntimeBinary()); err != nil {
 				return e.New(e.CodeEngineCapability,
 					"rootless BuildKit node %q requires Docker or Podman in its Environment", node.ID)
 			}

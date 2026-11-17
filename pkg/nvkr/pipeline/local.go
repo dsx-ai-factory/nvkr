@@ -8,6 +8,7 @@ import (
 	"io"
 	"path/filepath"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -34,9 +35,7 @@ func withDefaults(o RunOptions) RunOptions {
 	if o.SourceRoot == "" {
 		o.SourceRoot = filepath.Join(".nvkr", "work", "src")
 	}
-	if o.Runtime == "" {
-		o.Runtime = "docker"
-	}
+	o.Runtime = containerruntime.Default(o.Runtime)
 	if o.OCI == nil {
 		o.OCI = registryOCITransport{}
 	}

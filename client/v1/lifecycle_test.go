@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	client "github.com/dsx-ai-factory/nvkr/client/v1"
@@ -105,5 +106,54 @@ func requireLifecycleCode(t *testing.T, err error, expected nvkrerr.Code) {
 	var coded *nvkrerr.Error
 	if !errors.As(err, &coded) || coded.Code != expected {
 		t.Fatalf("error = %v; want %s", err, expected)
+	}
+}
+
+func TestSDKLocalRuntimeInheritsEnvironmentAndRejectsConflicts(t *testing.T) {
+	repo, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repo)
+	raw, err := os.ReadFile("docs/examples/nvke-module-tags/environment-local.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	for _, path := range []string{"docs/examples/nvke-module-tags", "inputs/catalogs/nvke", "inputs/catalogs/shared"} {
+		if err := os.CopyFS(filepath.Join(root, path), os.DirFS(filepath.Join(repo, path))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Chdir(root)
+	environment := "environment.yaml"
+	if !strings.Contains(string(raw), "runtime: docker") {
+		t.Fatal("fixture must explicitly select Docker")
+	}
+	if err := os.WriteFile(environment, []byte(strings.ReplaceAll(string(raw), "runtime: docker", "runtime: podman")), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, runtime string
+		conflict      bool
+	}{
+		{name: "inherit"}, {name: "match", runtime: "podman"}, {name: "conflict", runtime: "docker", conflict: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sdk := client.New()
+			if tc.runtime != "" {
+				sdk = client.New(client.WithRuntime(tc.runtime))
+			}
+			prepared, err := sdk.PrepareLifecycleRun(t.Context(), "docs/examples/nvke-module-tags/definition.yaml", environment, "test", "runtime-selection")
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = sdk.ExecuteLifecycleRun(t.Context(), prepared, client.LocalRunOptions{DryRun: true})
+			if tc.conflict {
+				requireLifecycleCode(t, err, nvkrerr.CodeEngineCapability)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

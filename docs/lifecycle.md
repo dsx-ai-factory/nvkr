@@ -34,6 +34,11 @@ planning input, not proof that a runtime supplied the declared capacity or capab
 admits only its supported requirement bindings; unsupported requests fail before execution. Local direct-Packer
 and the explicit native ARC route retain their own admission boundaries.
 
+Local Runs use the Environment's container runtime, defaulting to Docker when omitted. If an existing
+Environment relied on the previous Podman default, add `runtime: {runtime: podman}` to preserve that
+selection. An explicit local `--runtime` executable must match the Environment's selected runtime; omit
+the flag to inherit it.
+
 Environments also own the publication namespace, credentials, and signing identity policy. Catalog sources and
 locks own tool versions and byte pins; Definition selects the scanner, signer, and generators by name.
 Output-affecting build tools remain part of build identity.

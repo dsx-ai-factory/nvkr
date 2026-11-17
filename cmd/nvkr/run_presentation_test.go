@@ -402,3 +402,35 @@ func TestLocalJSONRejectedInputReportsNoInventedAttempt(t *testing.T) {
 		t.Fatalf("input failure invented execution: %+v", result)
 	}
 }
+
+func TestLocalPresentationForwardsVerbose(t *testing.T) {
+	lifecycleCommandRepo(t)
+	for _, verbose := range []bool{false, true} {
+		name := "default"
+		if verbose {
+			name = "verbose"
+		}
+		t.Run(name, func(t *testing.T) {
+			var out bytes.Buffer
+			called := false
+			execute := func(_ context.Context, prepared *lifecycle.PreparedRun, options lifecycle.LocalOptions) (*lifecycle.Run, error) {
+				called = true
+				if options.Verbose != verbose {
+					t.Fatalf("Verbose=%t, want %t", options.Verbose, verbose)
+				}
+				return completedPresentationRun(prepared), nil
+			}
+			flags := []string{"--ui=plain"}
+			if verbose {
+				flags = append(flags, "--verbose")
+			}
+			app := localPresentationTestApp(execute, &out, defaultRunPresentationServices())
+			if err := app.RunContext(t.Context(), localPresentationArgs(flags...)); err != nil {
+				t.Fatal(err)
+			}
+			if !called {
+				t.Fatal("local executor was not called")
+			}
+		})
+	}
+}
