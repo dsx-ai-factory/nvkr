@@ -62,7 +62,7 @@ func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 	}
 }
 
-func TestMaintainedM2NativeCaptureGraph(t *testing.T) {
+func TestMaintainedNVKENativeCaptureGraph(t *testing.T) {
 	const inputRoot = "../../../inputs/definitions/nvke"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(inputRoot, "definition.yaml"))
 	if err != nil {

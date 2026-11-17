@@ -53,7 +53,7 @@ Definitions, supplier overlays, per-output stacks and retained before/after Plan
 building `nvkr`; its supplier is explicitly a fixture, not a production NVKE package. It avoids inventing
 an unverified package URL or digest in this guide.
 
-The maintained-Definition test `TestMaintainedM2CustomerMaterialReplacement` applies catalog stacks and compiles both
+The maintained-Definition test `TestMaintainedNVKECustomerMaterialReplacement` applies catalog stacks and compiles both
 native disk graphs with fixture source and acquired Calico suppliers. It checks changed Build identity
 and exact material dependency edges. Its negative cases check Resolve selection errors for a missing
 material, an unknown component and a platform mismatch; they do not test supplier downloads, missing
@@ -65,9 +65,9 @@ contracts, not container or image-build tests.
 With authorized access to the exact private source objects:
 
 ```sh
-NVKR_TEST_M2_ALL_OUTPUT_GRAPHS=1 go test ./pkg/nvkr/buildgraph \
-  -run '^TestMaintainedM2AllOutputGraphs$' -count=1
-go test ./pkg/nvkr/buildgraph -run '^TestMaintainedM2CustomerMaterialReplacement$' -count=1
+NVKR_TEST_NVKE_ALL_OUTPUT_GRAPHS=1 go test ./pkg/nvkr/buildgraph \
+  -run '^TestMaintainedNVKEAllOutputGraphs$' -count=1
+go test ./pkg/nvkr/buildgraph -run '^TestMaintainedNVKECustomerMaterialReplacement$' -count=1
 ```
 
 The complete test invokes public `factory.CompileDocuments`, including production's ordered overlay

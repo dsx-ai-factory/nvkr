@@ -45,7 +45,7 @@ publications along the way. Smoke tables share authenticated artifact preparatio
 invocations and mutable runtime state. The FDE regression checks the complete authored output
 list, then compiles and renders its four native disks without rebuilding unrelated controllers and charts.
 That deliberately removes full-product compilation from the default FDE test; the existing opt-in
-`TestMaintainedM2AllOutputGraphs` and separate generated-bundle drift gate retain their broader scope.
+`TestMaintainedNVKEAllOutputGraphs` and separate generated-bundle drift gate retain their broader scope.
 
 Diagnostic operations now borrow one authenticated fixture, with source revocation last; joining and
 close admission retain their own destructive fixture. Executable-source revocation checks both the active

@@ -14,7 +14,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
-func TestMaintainedM2OSFetchIsAnonymous(t *testing.T) {
+func TestMaintainedNVKEOSFetchIsAnonymous(t *testing.T) {
 	const root = "../../../inputs/definitions/nvke"
 	const repository = "https://github.com/dsx-ai-factory/nvke.git"
 	const dsxRepository = "https://github.com/dsx-ai-factory/project-dsx-identity"

@@ -17,7 +17,7 @@ import (
 
 // Supplier URLs and digests below are deliberate contract fixtures. No download
 // or operational compatibility with NVKE's composition script is claimed.
-func TestMaintainedM2CustomerMaterialReplacement(t *testing.T) {
+func TestMaintainedNVKECustomerMaterialReplacement(t *testing.T) {
 	const root = "../../../inputs/definitions/nvke"
 	base, err := catalog.LoadContext(t.Context(), catalog.Dir(root+"/../../catalogs/node-images/release"))
 	if err != nil {

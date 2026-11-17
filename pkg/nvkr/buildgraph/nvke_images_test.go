@@ -19,7 +19,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func TestMaintainedM2EnvironmentUsesSupportedRuntimeControls(t *testing.T) {
+func TestMaintainedNVKEEnvironmentUsesSupportedRuntimeControls(t *testing.T) {
 	environment, err := definition.LoadEnvironment(t.Context(), "../../../inputs/environments/github-release.yaml")
 	if err != nil {
 		t.Fatal(err)
@@ -40,9 +40,9 @@ func TestMaintainedM2EnvironmentUsesSupportedRuntimeControls(t *testing.T) {
 
 // These isolated test catalogs exercise the unchanged tag-backed declarations
 // and native pins through their owning loader. They are not alternative product
-// inputs: TestMaintainedM2DeploymentImageMembership still requires the entire
+// inputs: TestMaintainedNVKEDeploymentImageMembership still requires the entire
 // actual catalog to retain all 69 outputs and compile all 24 original image subjects.
-func TestMaintainedM2TagImageResolveCompile(t *testing.T) {
+func TestMaintainedNVKETagImageResolveCompile(t *testing.T) {
 	provider := catalog.Dir("../../../inputs/catalogs/runtime-dependencies").(catalog.ContextDataProvider)
 	registryBytes, err := provider.ReadFileContext(t.Context(), catalog.RegistryFile)
 	if err != nil {
@@ -166,10 +166,10 @@ func TestMaintainedM2TagImageResolveCompile(t *testing.T) {
 }
 
 // coordinateImages points a failure at the inputs a release advance must coordinate by hand.
-const coordinateImages = "; a moving NVKE release must coordinate the deployment images first, see " +
+const coordinateImages = "; update pkg/nvkr/buildgraph/nvke_images_test.go with the selected images; a moving NVKE release must coordinate the deployment images first, see " +
 	"docs/catalog-maintenance.md \"Coordinate deployment images before a moving release\""
 
-func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
+func TestMaintainedNVKEDeploymentImageMembership(t *testing.T) {
 	const root = "../../../inputs/definitions/nvke"
 	// The deployment selection must come from the release the controller catalog
 	// pins. The image expectations below remain specific to that release: a bump

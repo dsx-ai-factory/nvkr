@@ -19,7 +19,7 @@ import (
 
 // These are maintained-input regression tests, not special engine requirements
 // for CAPNICo, NKTP, profiles or customer catalogs. Producers use generic routes.
-func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
+func TestMaintainedNVKEAdditionalReleaseComponents(t *testing.T) {
 	const root = "../../../inputs/definitions/nvke"
 	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "../../catalogs/nvke/release-components")))
 	if err != nil {

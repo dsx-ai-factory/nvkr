@@ -17,7 +17,7 @@ import (
 // actual Git acquisition. Static completeness is not runtime admission or a
 // successful runtime build. Ordinary tests still require 69 declared outputs and
 // independently load/resolve/compile all 24 native image rows.
-func TestMaintainedM2AllOutputGraphs(t *testing.T) {
+func TestMaintainedNVKEAllOutputGraphs(t *testing.T) {
 	t.Chdir("../../..")
 	const root = "inputs/definitions/nvke"
 	authored, err := definition.LoadDefinition(t.Context(), filepath.Join(root, "definition.yaml"))
@@ -50,7 +50,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	if declaredDisks != len(disks) {
 		t.Fatal("both native architectures must retain FDE and non-FDE outputs")
 	}
-	if os.Getenv("NVKR_TEST_M2_ALL_OUTPUT_GRAPHS") != "1" {
+	if os.Getenv("NVKR_TEST_NVKE_ALL_OUTPUT_GRAPHS") != "1" {
 		t.Skip("explicit pinned-source Git integration was not requested; native image graphs are tested separately")
 	}
 	environmentPath := filepath.Join(root, "../../environments/github-release.yaml")

@@ -442,7 +442,8 @@ moves only the `nvke` and `nvke-helm` pins and regenerates the bundles, so it ch
 Today the exact `v0.23.0` constraints keep refreshes a no-op. Before a constraint allows the NVKE release to
 move, review and update together, in one authored change: the selection source pin, the image references and
 their native digest locks, the Definition's image outputs, the qualification policy's `nonToolOutputs`, and the
-expected images in `pkg/nvkr/buildgraph/nvke_images_test.go`. That test fails, naming this section, when the
+expected images in `TestMaintainedNVKEDeploymentImageMembership` in `pkg/nvkr/buildgraph/nvke_images_test.go`.
+That test names its source file and this section when the
 selection commit and the controller's NVKE commit diverge. Maintenance does not perform or check this
 coordination; it is a documented limit, not a capability.
 
