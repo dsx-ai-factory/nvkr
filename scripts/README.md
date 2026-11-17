@@ -22,6 +22,12 @@ The launcher runs in a child shell, so failure does not change the caller's SSH 
 
 ## Repository CI tests
 
+`test-runtime-namespace.sh /absolute/evidence-directory` runs the opt-in native Linux AMD64 namespace
+fixtures on a VM kernel. It requires noninteractive sudo and systemd, creates its own executable tmpfs,
+and bounds the test service's CPU, memory, processes and lifetime. It preserves inherited mount restrictions
+and retains text diagnostics. The fork-only proof workflow invokes this script; it neither builds a VM
+runtime nor establishes disk equivalence or production-lane evidence.
+
 `test-tekton-kind.sh` runs the native AMD64 core Definition in an owned kind cluster with pinned Tekton
 and an in-cluster registry. The [Tekton guide](../docs/generate-pipeline.md#tekton-cluster-execution)
 lists prerequisites, trust scope and retained evidence. The GitHub acceptance workflow runs this same
