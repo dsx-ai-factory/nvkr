@@ -27,9 +27,24 @@ import (
 // not a signature, consumer-policy or release-acceptance receipt.
 type PulledOutput struct {
 	Output PublicationOutput `json:"output"`
-	Files  []PulledFile      `json:"files,omitempty"`
-	bundle BinaryBundle
+	// Payload says how the destination represents the output. Each supported kind
+	// sets it in its own pull arm, so a new kind cannot be materialized without
+	// choosing a shape; presenters never keep a parallel kind table.
+	Payload PulledPayload `json:"payload"`
+	Files   []PulledFile  `json:"files,omitempty"`
+	bundle  BinaryBundle
 }
+
+// PulledPayload names the destination representation of a pulled output.
+type PulledPayload string
+
+const (
+	// PulledPayloadFiles means Files lists every top-level payload file.
+	PulledPayloadFiles PulledPayload = "files"
+	// PulledPayloadDirectory means the destination holds a complete directory
+	// tree (an OCI layout or APT repository) with no per-file records.
+	PulledPayloadDirectory PulledPayload = "directory"
+)
 
 // PulledFile describes a top-level payload file, relative to the destination.
 // OCI layouts and APT repositories are represented by their complete directory.
@@ -136,19 +151,21 @@ func pullOutput(ctx context.Context, reference, output, out, workspace string, o
 		}
 	}
 	result := PulledOutput{Output: *selected}
+	// Unsupported kinds fail in the default arm before any destination write.
 	switch selected.Kind {
 	case outputFormatDebian:
 		file, err := pullDebianOutput(ctx, selected.Reference, out, layout, stage, object, options)
 		if err != nil {
 			return PulledOutput{}, err
 		}
-		result.Files = []PulledFile{file}
+		result.Payload, result.Files = PulledPayloadFiles, []PulledFile{file}
 	case "executable":
 		bundle, err := pullExecutableOutput(ctx, selected.Reference, out, layout, stage, object, options)
 		if err != nil {
 			return PulledOutput{}, err
 		}
 		result.bundle = bundle
+		result.Payload = PulledPayloadFiles
 		for _, entry := range bundle.Entries {
 			result.Files = append(result.Files, PulledFile{Path: entry.Name, SHA256: entry.SHA256, Size: entry.Size})
 		}
@@ -156,27 +173,30 @@ func pullOutput(ctx context.Context, reference, output, out, workspace string, o
 		if err := pullDiskOutput(ctx, selected.Reference, out, layout, stage, object, options); err != nil {
 			return PulledOutput{}, err
 		}
+		result.Payload = PulledPayloadFiles
 		result.Files = []PulledFile{{Path: output + ".qcow2", SHA256: object.BlobDigest, Size: selected.Disk.Size}}
 	case outputFormatHelm:
 		file, err := pullHelmOutput(ctx, selected.Reference, out, layout, stage, object, options)
 		if err != nil {
 			return PulledOutput{}, err
 		}
-		result.Files = []PulledFile{file}
+		result.Payload, result.Files = PulledPayloadFiles, []PulledFile{file}
 	case outputFormatBundle:
 		file, err := pullBundleOutput(ctx, selected.Reference, out, layout, stage, object, options)
 		if err != nil {
 			return PulledOutput{}, err
 		}
-		result.Files = []PulledFile{file}
+		result.Payload, result.Files = PulledPayloadFiles, []PulledFile{file}
 	case "apt-repository":
 		if err := pullAPTOutput(ctx, selected.Reference, out, layout, stage, object, options); err != nil {
 			return PulledOutput{}, err
 		}
+		result.Payload = PulledPayloadDirectory
 	case "oci":
 		if err := pullImageOutput(ctx, selected.Reference, out, object, options); err != nil {
 			return PulledOutput{}, err
 		}
+		result.Payload = PulledPayloadDirectory
 	default:
 		return PulledOutput{}, e.New(e.CodeEngineCapability, "release pull does not support format %q", selected.Kind)
 	}

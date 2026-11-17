@@ -141,6 +141,11 @@ integrity on macOS and Linux, without signature or policy verification, installa
 contracts do not establish GHCR interoperability, signing-service behavior,
 runtime compatibility, installation or external acceptance of the new format projections; earlier browsing
 and publication records do not establish that acceptance.
+`release pull --format json` presents the owner's returned output and file records as one versioned,
+detached result with explicit integrity-checked and signatures/policy-not-checked scope fields; command
+contracts with an injected operation cover executable, chart and OCI-directory shapes, format and TUI admission
+before the operation, and no JSON on operation failure. It writes no file or receipt and has not been exercised
+against an external registry.
 `release pull` layer downloads share the bounded HTTP/2 peer-reset reacquisition used by registry and
 checked-publication pulls: at most three attempts within the command deadline, each removing its partial
 download and re-hashing the complete layer. Resets after the declared size, integrity failures and

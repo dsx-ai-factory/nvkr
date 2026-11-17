@@ -164,6 +164,34 @@ fails with a coded error before payload or destination work. APT archives reject
 directories must be readable and searchable by their owner. Every file, including repository indexes, is bound
 to the downloaded archive by its digest.
 
+Add `--format json` for a script-readable result; `--format text` is the default and keeps its current text.
+The command writes exactly one JSON value to stdout after success. An unknown format, `--format json` with
+`--ui=tui`, or a failed pull emits no result. If writing the result to stdout itself fails, for example a closed
+pipe, the command exits with `NVKR-E-UNAVAILABLE` after the output was already written to `--out` and stdout may
+hold partial bytes; scripts must check the exit status and discard stdout on any failure. An unknown format or
+`--format json` with `--ui=tui` is a usage error before any download. The result is not a verification receipt
+and is not written to disk. Its `schemaVersion` is `nvkr.dev/release-pull-result/v1`:
+
+| Field | Meaning |
+|---|---|
+| `reference` | The `--reference` value as supplied |
+| `destination` | The `--out` value as supplied, not an absolute path |
+| `output.name`, `output.kind` | The selected output and its format |
+| `output.digest`, `output.buildDigest` | The same digests `release browse` reports for the output |
+| `output.os`, `output.arch` | Native platform, as in `release browse`; omitted when none is declared |
+| `output.imageIndex.requiredPlatforms` | Every platform an aggregate image declares, as in `release browse`; present only for such images |
+| `payload` | `files` when `files` lists the returned files, or `directory` for an `oci` or `apt-repository` output |
+| `files[].path`, `files[].sha256`, `files[].size` | Each file actually returned, relative to `destination`, in the order the pull produced them; always a list, empty for a directory payload |
+| `inspectionDetails.checks` | The same six checks `release browse` reports: `metadataIntegrity` and `payloadIntegrity` are `checked`; `signatures`, `consumerPolicy`, `registryAvailability` and `installationCompatibility` are `not-checked` |
+
+Every `files[].sha256` is an OCI-style `sha256:<hex>` string, never bare hex; strip the prefix before comparing
+with `sha256sum` output. A directory output has an empty `files` list and no invented checksum. For a
+`disk-image`, `output.digest` names the observed deliverable (the wrapping manifest when wrapped) while
+`files[0].sha256` is the digest of the raw QCOW2 file written. `inspectionDetails.checks` uses the same
+`checked` and `not-checked` values as browsing; pull validates the complete metadata and evidence closure before it
+downloads the payload, then binds the payload bytes to it. It authenticates no signature, applies no consumer
+policy, and establishes neither registry availability nor installation compatibility.
+
 `release pull` accepts only a registry reference. Use `publish extract` for an executable bundle already in a
 local layout. Registry credentials, `--anonymous`, `--plain-http`, `--workspace`, follow the browsing transport rules above. Pull retains its ten-minute default
 `--timeout` and does not use the metadata cache. `--workspace` selects the parent for private temporary registry
