@@ -38,8 +38,8 @@ demo Definitions and three Environments currently retain JSON; conversion to YAM
 | Target Definition | Purpose |
 |---|---|
 | `nvke/definition.yaml` | Main NVKE distribution; seed from the current 69-output candidate |
-| `demo/arm64-nvidia-kvm.yaml` | Complete ARM64 NVIDIA OVN demo on native KVM, including nightly production |
-| `demo/arm64-upstream-kvm.yaml` | Complete ARM64 upstream OVN diagnostic demo on native KVM |
+| Retired ARM64 NVIDIA nightly | Signed ARM64 producer removed; local diagnostics retain their own selections |
+| Retired ARM64 upstream nightly | Signed upstream-OVN producer removed; local TCG diagnostic retained |
 | `demo/arm64-nvidia-tcg.yaml` | Complete ARM64 NVIDIA OVN demo with local TCG disk production |
 | `demo/arm64-upstream-tcg.yaml` | Complete ARM64 upstream OVN diagnostic demo with local TCG disk production |
 | `diagnostics/os-amd64.yaml` | One native AMD64 plain disk and its required material closure |
@@ -76,9 +76,9 @@ test and demonstration has an accepted successor; it does not authorize silently
 
 | Original Definition | Relocated now | Conditional target or successor | Remaining disposition |
 |---|---|---|---|
-| `nvke-m2/definition.yaml` | `inputs/definitions/nvke/definition.yaml` | `nvke/definition.yaml` | Seed; retain all 69 outputs initially, including the explicitly named profile fixture |
-| `nvke-nightly-arm64/definition.json` | `inputs/definitions/demo/arm64-nvidia-kvm.json` | `demo/arm64-nvidia-kvm.yaml` | Merge; preserve 29-output membership, reconcile the stale embedded OVN producers explicitly |
-| `nvke-nightly-upstream-ovn-arm64/definition.json` | `inputs/definitions/demo/arm64-upstream-kvm.json` | `demo/arm64-upstream-kvm.yaml` | Merge; preserve 29-output membership and the downstream renderer's profile-output naming contract |
+| `nvke-m2/definition.yaml` | `inputs/definitions/nvke/gpu-site.composite.yaml` | `nvke/definition.yaml` | Seed; retain all 69 outputs initially, including the explicitly named profile fixture |
+| `nvke-nightly-arm64/definition.json` | Retired 2026-11-17 | `demo/arm64-nvidia-kvm.yaml` | Merge; preserve 29-output membership, reconcile the stale embedded OVN producers explicitly |
+| `nvke-nightly-upstream-ovn-arm64/definition.json` | Retired 2026-11-17 | `demo/arm64-upstream-kvm.yaml` | Merge; preserve 29-output membership and the downstream renderer's profile-output naming contract |
 | `nvke-local-dev-arm64/definition.json` | `inputs/definitions/demo/arm64-nvidia-tcg.json` | `demo/arm64-nvidia-tcg.yaml` | Merge; preserve the complete 29-output selection while reconciling its site/tool baseline with KVM |
 | `nvke-local-dev-arm64/definition-upstream-ovn.json` | `inputs/definitions/demo/arm64-upstream-tcg.json` | `demo/arm64-upstream-tcg.yaml` | Merge; retain the matched disk, image, chart and profile selection; review output-name convergence separately |
 | `nvke-os/definition-amd64-kvm.yaml` | `inputs/definitions/diagnostics/os-amd64.yaml` | `diagnostics/os-amd64.yaml` | Seed; retain its own catalog selection until OS producer convergence is reviewed |
@@ -113,7 +113,7 @@ publication, signing, credential or runtime policies interchangeable.
 
 | Original Environment | Relocated now | Conditional target or successor | Remaining disposition |
 |---|---|---|---|
-| `nvke-m2/environment-github.yaml` | `inputs/environments/github-release.yaml` | `github-release.yaml` | Seed; preserve main-only signer, namespace, credentials and both native execution classes |
+| `nvke-m2/environment-github.yaml` | `inputs/environments/github-nvke-gpu-site.yaml` | `github-release.yaml` | Seed; preserve main-only signer, namespace, credentials and both native execution classes |
 | `nvke-m2/environment-github-dev.yaml` | `inputs/environments/github-development.yaml` | `github-development.yaml` | Seed; preserve development mode and its distinct credentials, signer and namespace |
 | `nvke-nightly-arm64/environment-github.json` | `inputs/environments/github-nightly-nvidia.json` | `github-nightly-nvidia.yaml` | Seed; preserve named bundle and signing/publication identities |
 | `nvke-nightly-upstream-ovn-arm64/environment-github.json` | `inputs/environments/github-nightly-upstream.json` | `github-nightly-upstream.yaml` | Seed; preserve its separate named bundle and identities |

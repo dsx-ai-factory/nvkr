@@ -1,0 +1,10 @@
+{
+  "constraint": "1.36.3",
+  "repo": "https://github.com/kubernetes/kubernetes",
+  "tool": {
+    "executablePath": "kubectl",
+    "format": "raw",
+    "platform": "linux/arm64",
+    "url": "https://dl.k8s.io/release/{{.Tag}}/bin/linux/arm64/kubectl"
+  }
+}

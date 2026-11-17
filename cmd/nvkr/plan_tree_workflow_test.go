@@ -33,7 +33,14 @@ func TestNativeToolchainWorkflowSelectsPlanTreePins(t *testing.T) {
 	if script == "" {
 		t.Fatal("missing published-image selection step")
 	}
-	plan, err := factory.LoadPlanContext(t.Context(), filepath.Join(root, factory.FactoryPlanPath))
+	helperDirectory := t.TempDir()
+	build := exec.CommandContext(t.Context(), "go", "build", "-o", filepath.Join(helperDirectory, "nvkr-plan-inspect"), "./cmd/nvkr")
+	build.Dir = root
+	if raw, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build Plan inspection helper: %v: %s", err, raw)
+	}
+	const planPath = ".github/nvkr-run-nvke/plan.json"
+	plan, err := factory.LoadPlanContext(t.Context(), filepath.Join(root, planPath))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +49,7 @@ func TestNativeToolchainWorkflowSelectsPlanTreePins(t *testing.T) {
 			output := filepath.Join(t.TempDir(), "output")
 			command := exec.CommandContext(t.Context(), "bash", "-euc", script)
 			command.Dir = root
-			command.Env = append(os.Environ(), "NATIVE_ARCH="+arch, "GITHUB_OUTPUT="+output)
+			command.Env = append(os.Environ(), "NATIVE_ARCH="+arch, "GITHUB_OUTPUT="+output, "RUNNER_TEMP="+helperDirectory)
 			if raw, err := command.CombinedOutput(); err != nil {
 				t.Fatalf("pin selection failed: %v: %s", err, raw)
 			}
@@ -73,36 +80,43 @@ func TestNativeToolchainWorkflowSelectsPlanTreePins(t *testing.T) {
 			}
 		})
 	}
-	for _, test := range []struct{ name, step string }{
-		{"empty steps", ""},
-		{"mutable Packer pin", `{"platform":"linux/amd64","executionGraph":{"nodes":[{"toolchain":"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@latest"}]}}`},
-	} {
-		t.Run(test.name, func(t *testing.T) {
+	bundle, err := factory.RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, scenario := range []string{"missing frozen record", "altered frozen record"} {
+		t.Run(scenario, func(t *testing.T) {
 			root := t.TempDir()
-			steps := filepath.Join(root, ".github/nvkr-run/steps")
-			if err := os.MkdirAll(steps, 0755); err != nil {
+			if err := factory.WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
 				t.Fatal(err)
 			}
-			if test.step != "" {
-				if err := os.WriteFile(filepath.Join(steps, "step.json"), []byte(test.step), 0644); err != nil {
-					t.Fatal(err)
+			var member string
+			for name := range bundle.Files {
+				if strings.HasPrefix(name, factory.PlanStoreDirectory+"/") && strings.HasSuffix(name, ".json") {
+					member = filepath.Join(root, name)
+					break
 				}
 			}
-			// A valid inspector lets an empty Packer selection reach the output
-			// on xargs implementations that skip the command for empty input.
-			rootPlan := `{"environment":{"diskInspectionProfiles":{"linux/amd64":{"image":"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}}}`
-			if err := os.WriteFile(filepath.Join(root, factory.FactoryPlanPath), []byte(rootPlan), 0644); err != nil {
+			if member == "" {
+				t.Fatal("fixture has no frozen record")
+			}
+			if scenario == "missing frozen record" {
+				err = os.Rename(member, filepath.Join(root, "saved-object"))
+			} else {
+				err = os.WriteFile(member, []byte("{}\n"), 0644)
+			}
+			if err != nil {
 				t.Fatal(err)
 			}
 			output := filepath.Join(root, "output")
 			command := exec.CommandContext(t.Context(), "bash", "-euc", script)
 			command.Dir = root
-			command.Env = append(os.Environ(), "NATIVE_ARCH=amd64", "GITHUB_OUTPUT="+output)
+			command.Env = append(os.Environ(), "NATIVE_ARCH=amd64", "GITHUB_OUTPUT="+output, "RUNNER_TEMP="+helperDirectory)
 			if raw, err := command.CombinedOutput(); err == nil {
-				t.Fatalf("invalid Packer selection accepted: %s", raw)
+				t.Fatalf("invalid frozen Plan accepted: %s", raw)
 			}
 			if _, err := os.Stat(output); !os.IsNotExist(err) {
-				t.Fatalf("invalid Packer selection wrote output: %v", err)
+				t.Fatalf("invalid frozen Plan wrote output: %v", err)
 			}
 		})
 	}

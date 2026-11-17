@@ -1,0 +1,53 @@
+{
+  "APIVersion": "nvkr.dev/catalog/v3",
+  "Actions": {},
+  "Components": {
+    "csi-node-driver-registrar-image": {
+      "file": ".github/nvkr-plan-store/8584f06416fe766904fa5fb8e23e8601a2f6db6a737db3e79a89689d36c4d44c.json"
+    },
+    "postgresql-image": {
+      "file": ".github/nvkr-plan-store/6fc3f43601ef0d663c286e0ba92f1b53df13088f090898673f652ed99c6ed2e9.json"
+    },
+    "spiffe-csi-image": {
+      "file": ".github/nvkr-plan-store/2b81707bcca81d2c15e55826bf0792c158d753a4ca542a2fcf3bb16816a9aa06.json"
+    },
+    "spire-agent-image": {
+      "file": ".github/nvkr-plan-store/96fd6f69a8ab28c684376c4f77d4f573e212ee40616b2f4e1eea840c3b4fa176.json"
+    },
+    "spire-bash-image": {
+      "file": ".github/nvkr-plan-store/208993fbd08847d9e3af7e0de6ece75b98662631a3650119504a9ce9cfcb7bda.json"
+    },
+    "spire-controller-manager-image": {
+      "file": ".github/nvkr-plan-store/759bbc345e85a17d1598623404439bf4639d725046951106a4daae0b6ff6ce98.json"
+    },
+    "spire-oidc-image": {
+      "file": ".github/nvkr-plan-store/d9bc761cc192ca44aa8f21a13521ff80a74b0df3ad54d7989e1f4fb0387a11e6.json"
+    },
+    "spire-server-image": {
+      "file": ".github/nvkr-plan-store/55c0d46ffa13baf3bc8935d93dfb77fcde1aacf89eb4a3852b54277a3316cdf0.json"
+    },
+    "spire-tpm-server-image": {
+      "file": ".github/nvkr-plan-store/4d7e649c5f6a9c9097a63b4718a7a908b5c12d6389685ef9936f1fea5c41cf5f.json"
+    },
+    "temporal-admin-tools-image": {
+      "file": ".github/nvkr-plan-store/842c9db05443d01f78ac5c4fa983ed5ca8242c24c9c6788b0cf64eb15a0f69f0.json"
+    },
+    "temporal-server-image": {
+      "file": ".github/nvkr-plan-store/1b2a21e602ffb6ccaf7747893b848e8b8a081474434340b1011cba86723922b3.json"
+    },
+    "temporal-ui-image": {
+      "file": ".github/nvkr-plan-store/371016480e4afbf961e9c798a5945e4815ed13a564f3df2829a7d25c14205131.json"
+    }
+  },
+  "Kind": "SourceBuildRegistry",
+  "Metadata": {
+    "description": "Acquired runtime images selected by pinned NVKE deployment values and exact acquired chart payloads; not chart default deployment topology.",
+    "name": "nvke-m2-deployment-images"
+  },
+  "Sources": {
+    "nvke-deployment-selection": {
+      "file": ".github/nvkr-plan-store/c40fa8a86c2081ab2eaafe37d6202f27978a6a7535c46231fcc876d1d90735f3.json"
+    }
+  },
+  "Tools": {}
+}

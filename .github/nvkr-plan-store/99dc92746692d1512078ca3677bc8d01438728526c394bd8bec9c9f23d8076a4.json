@@ -1,0 +1,28 @@
+{
+  "commit": "0f29094e5b73085e3802ecc1298ecae13866bfe6",
+  "fromSource": false,
+  "outputType": "host-package",
+  "platforms": [
+    "linux/arm64"
+  ],
+  "prebuilt": {
+    "digests": {
+      "arm64": "sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62"
+    },
+    "evidence": {
+      "none": true
+    },
+    "executable": {
+      "archiveDigest": "sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62",
+      "executableDigest": "sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62",
+      "executablePath": "kubectl",
+      "format": "raw",
+      "platform": "linux/arm64",
+      "url": "https://dl.k8s.io/release/v1.36.3/bin/linux/arm64/kubectl"
+    },
+    "url": "https://dl.k8s.io/release/v1.36.3/bin/linux/arm64/kubectl"
+  },
+  "repo": "https://github.com/kubernetes/kubernetes",
+  "sourceDateEpoch": 1784743658,
+  "tag": "v1.36.3"
+}

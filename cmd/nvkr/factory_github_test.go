@@ -38,7 +38,7 @@ func TestGitHubFactoryCommandsKeepOperationDiagnosticsInLogs(t *testing.T) {
 				return test.err
 			})
 			app := &cli.App{Commands: []*cli.Command{command}}
-			err := app.RunContext(t.Context(), []string{"nvkr", "diagnostic-test", "--plan", filepath.Join("..", "..", factory.FactoryPlanPath)})
+			err := app.RunContext(t.Context(), []string{"nvkr", "diagnostic-test", "--plan", filepath.Join("..", "..", ".github/nvkr-run-nvke/plan.json")})
 			if !called || err != test.err {
 				t.Fatalf("operation result changed: called=%t, error=%v, want %v", called, err, test.err)
 			}
@@ -50,7 +50,7 @@ func TestGitHubFactoryCommandsKeepOperationDiagnosticsInLogs(t *testing.T) {
 }
 
 func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
-	plan, err := factory.LoadPlanContext(t.Context(), filepath.Join("..", "..", factory.FactoryPlanPath))
+	plan, err := factory.LoadPlanContext(t.Context(), filepath.Join("..", "..", ".github/nvkr-run-nvke/plan.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

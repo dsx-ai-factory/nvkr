@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# Retained comparison/authoring fixture; not enrolled in maintained generation.
+
 apiVersion: nvkr.dev/definition/v5
 kind: Definition
 metadata:

@@ -1,0 +1,22 @@
+{
+  "artifactPath": "bin/capnico-controller-{{.Arch}}.oci.tar",
+  "buildCommand": [
+    "sh",
+    "-ec",
+    "buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/. --local dockerfile=/src --opt platform=linux/{{.Arch}} --opt \"build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH\" --output type=oci,dest=/src/bin/capnico-controller-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true"
+  ],
+  "builderType": "buildkit-rootless",
+  "commit": "30882520888ab7bb75d125cb7bb9aa89e48acd6a",
+  "fromSource": true,
+  "outputType": "oci-image",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "repo": "https://github.com/dsx-ai-factory/cluster-api-provider-nico",
+  "sourceDateEpoch": 1789170151,
+  "tag": "v0.0.45",
+  "toolchainImage": "moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4",
+  "treeHash": "4bc81a40160d655bddaadc1b96f9413703351b0e",
+  "writeDir": "bin"
+}

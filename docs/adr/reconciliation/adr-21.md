@@ -83,6 +83,9 @@ Local contracts cover exact canonical round trips, malformed references, missing
 The loader does not render workflows or actions; complete closure checks remain with generation and runtime bootstrap.
 Packed inputs, CLI JSON and Tekton retain the canonical representation.
 The Plan schema and digest contracts are unchanged.
+The 2026-11-17 local cutover preserves the exact reconstructed canonical bytes, three Plan Digests and 261 named Build Digests of the retained development, NVKE and nightly NVKE bundles at `2291a2a5c336db993986376be96acc6715d051ef`.
+Their shared storage contains 335 files, 53,894 lines and 2,156,070 bytes, excluding workflow/action files, manifests and local locks.
+One graph object contains the unchanged 941 nodes and 1,537 artifacts shared by all three bundles.
 Hosted execution of the shared-store layout remains unrecorded.
 
 Invocation data is regenerated from the Plan and is not a bundle member;

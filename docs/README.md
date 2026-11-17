@@ -91,8 +91,9 @@ implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to t
 
 [Definition partitioning strategy](definition-partitioning-strategy.md) explains the NVKE family
 pilot, historical graph-capacity measurements, shared catalog ownership and related Release options.
-The [input instructions](../inputs/definitions/nvke/README.md#family-pilot) own generation and checking;
-the combined candidate remains available pending consumer and qualification cutover.
+The [input instructions](../inputs/definitions/nvke/README.md#generate-and-check-the-maintained-workflow) own generation and checking.
+The composite owns all three maintained bundles under the ADR-26 U10 cutover; the former combined input
+remains only a comparison fixture.
 
 [ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
 adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.

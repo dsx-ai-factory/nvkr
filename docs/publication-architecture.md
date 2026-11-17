@@ -318,14 +318,15 @@ claim, and none of these checks establishes qualified reproduction, vulnerabilit
 
 Use a trusted cosign installation and an externally selected workflow identity/issuer. Artifact signatures and
 SLSA attestations are standard Sigstore v0.3 bundles under the cosign 3.1.3 contract. Select each required
-predicate explicitly at the deliverable's exact manifest reference:
+predicate explicitly at the deliverable's exact manifest reference. The examples use the current NVKE
+producer identity; historical Releases require their original independently trusted signer identity:
 
 ```sh
 cosign verify-attestation --type https://sigstore.dev/cosign/sign/v1 \
-  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run-nvke.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$ARTIFACT_REF"
 cosign verify-attestation --type slsaprovenance1 \
-  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run-nvke.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$ARTIFACT_REF"
 ```
 
@@ -335,7 +336,7 @@ release. Fetch the single `application/vnd.dev.sigstore.bundle.v0.3+json` layer 
 ```sh
 cosign verify-blob-attestation --bundle sbom.bundle.json --type cyclonedx \
   --digest "$EXPECTED_SUBJECT_SHA256_HEX" --digestAlg sha256 \
-  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run-nvke.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 ```
 

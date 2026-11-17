@@ -1,54 +1,17 @@
 # Definition partitioning and related Releases
 
-The NVKE family pilot implements separate authored Definitions and named production bundles alongside
-the combined candidate. It reuses the current lifecycle and catalog owners; it adds no cross-Release import,
-automatic association file or qualification capability. Hosted family execution and consumer acceptance remain
-unrecorded. The [input instructions](../inputs/definitions/nvke/README.md#family-pilot) own commands and
-current selections; [reconciliation](adr/reconciliation/maintained-input-and-schema-boundaries.md#maintained-input-and-schema-boundaries) owns
-implementation and acceptance status.
+The five family Definition files now supply the maintained [NVKE composite](../inputs/definitions/nvke/README.md).
+Standalone family bundles and the combined producer are retired under the explicit ADR-26 U10 decision.
+Production, development and floating-source nightly all use that composite; member Release reuse remains
+unsupported. Generate/check production with `make nvke-generate` / `make nvke-check`, and all maintained
+bundles with `make workflows-generate` / `make workflows-check`.
 
-The pilot incorporates upstream `07181055` (2026-10-20), including `9857feed`'s current catalog pins,
-qualification metadata sessions and budgets, development retry support, and provisional CLI validator
-catalog, plus subsequent bootstrap-interface documentation and bounded formatting commands.
-[ADR-24](adr/0024-imported-validator-catalog.md) now records strict discovery/loading and local-plan profile
-dispatch as implemented; broader migration, published adapters and actual upstream/native-platform catalog
-acceptance remain deferred. Historical tables retain their stated source revisions; they do not describe
-current generated bundles.
-This document changes no ADR contract or organizational acceptance decision.
+The measurements below describe the earlier standalone-family pilot at their recorded revisions.
+They are historical contract evidence, not current commands, current generated-file counts or hosted
+consumer acceptance. The former combined input and family Environments remain comparison fixtures;
+[reconciliation](adr/reconciliation/maintained-input-and-schema-boundaries.md) owns current status.
 
-## Implemented pilot and retained path
-
-| Definition | Outputs | Native targets | Required family |
-| --- | ---: | ---: | --- |
-| [Core](../inputs/definitions/nvke/core.yaml) | 21 | 25 | CLI/operator tools, controller with its bound chart and `controller-profiles` image, providers, CAPI and cert-manager bootstrap images |
-| [Services](../inputs/definitions/nvke/services.yaml) | 34 | 34 | SPIRE, PostgreSQL, Temporal and local-path-provisioner charts and native runtime images |
-| [Telemetry](../inputs/definitions/nvke/telemetry.yaml) | 17 | 17 | NKTP chart and native runtime images |
-| [Disks](../inputs/definitions/nvke/disks.yaml) | 4 | 4 | Ubuntu 26.04 AMD64/ARM64 plain and public-bootstrap FDE disks with complete material closures |
-| [Disks Ubuntu 24](../inputs/definitions/nvke/disks-ubuntu24.yaml) | 4 | 4 | The same disks on Ubuntu 24.04 through the Ubuntu 24 overlay |
-| Total | 80 | 84 | 68 + 12 = 80: the combined candidate's 69 named outputs except `nico-reference-profiles-fixture`, which the core family delivers as `controller-profiles` because one Release cannot publish the same image twice, plus 12 family-only outputs, which are the core family's ARM64 operator tools and `controller-profiles` image, the services family's six local-path-provisioner outputs, and the four Ubuntu 24.04 disks |
-
-Each family selects `inputs/environments/github-nvke-<family>.yaml`, with
-`githubBundle: nvke-<family>`. Generation owns `.github/workflows/nvkr-run-nvke-<family>.yml`
-and `.github/nvkr-run-nvke-<family>/`. Explicit signer policy matches that workflow on `main`;
-publication uses `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. The resulting
-`<prefix>/releases@sha256:…` identifies only that family's Release.
-
-The family Environments preserve the combined candidate's independent production registry writer.
-The exact `disks` and `disks-ubuntu24` publication prefixes also retain preparation of the existing private M2 toolchain pins
-using the fixed registry reader, before source or producer execution. Namespace lookalikes, child prefixes,
-other families and foreign toolchain owners receive no exception. These are credential projection
-contracts, not evidence of provisioned package access or hosted disk execution.
-
-The combined [Definition](../inputs/definitions/nvke/definition.yaml), its production bundle and its
-production qualification path remain available; the fixed development bundle belongs to the GPU site composite. The families are a reversible pilot, not a recursive
-replacement for the combined Release. Existing consumer acceptance of the combined publication cannot be
-transferred to four independently produced roots.
-
-The family-only generation/check targets are `make nvke-split-generate` and
-`make nvke-split-check`; repository-wide workflow targets include them. These checks establish generation
-and drift contracts, not artifact production.
-
-### Current local validation
+### Historical local validation
 
 The integration of `9857feeda03d2e7f529e1baef2b4a331a011e54c` reproduced drift in all four family bundles
 before regeneration. `make nvke-split-generate` refreshed eleven generated JSON files through the existing

@@ -81,7 +81,7 @@ all byte-exact checks to pass. Keep excluded variants and downstream profile str
 lock-derived command values, use the catalog guide's opt-in `sourceMetadata` bindings; commit-only pins
 require explicit, chart-validated stream metadata. Report changed Build Digests when migrating bindings.
 
-Never hand-edit `pins.lock.yaml`, generated `.github/workflows/nvkr-run.yml`, or managed `.github/nvkr-run/`
+Never hand-edit `pins.lock.yaml`, generated `.github/workflows/nvkr-run-nvke.yml`, or managed `.github/nvkr-run-nvke/`
 members. Use the selected inputs and same CLI identity for generation and `--check`. Root generation is
 appropriate only when explicitly updating that root's owned bundle; alternate examples belong in a scratch
 root. Follow the maintained Definition's own instructions when its committed bundle uses a different generator

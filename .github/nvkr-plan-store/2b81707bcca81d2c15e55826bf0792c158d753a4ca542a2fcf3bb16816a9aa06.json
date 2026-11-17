@@ -1,0 +1,23 @@
+{
+  "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+  "fromSource": false,
+  "outputType": "oci-image",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "prebuilt": {
+    "digests": {
+      "amd64": "sha256:b98766c90387033702ef64a3a4dce1aae252cb741b3ac2ef13f271dd7660bb1e",
+      "arm64": "sha256:6bfd786d4ffd3f7435659a7b923d819a7a0bcc55cd05673908915d433e86c0a2"
+    },
+    "evidence": {
+      "none": true
+    },
+    "image": "ghcr.io/spiffe/spiffe-csi-driver:0.2.7",
+    "imageParentDigest": "sha256:9dfe4f0caff096164fd921aa7f15319804df2fc0325f1d90bc793ef3256ab1cd"
+  },
+  "repo": "https://github.com/dsx-ai-factory/nvke",
+  "sourceDateEpoch": 1793236039,
+  "tag": "v0.23.0"
+}

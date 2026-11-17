@@ -1,0 +1,5 @@
+{
+  "constraint": "0.0.45",
+  "repo": "https://github.com/dsx-ai-factory/cluster-api-provider-nico",
+  "toolchainImage": "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
+}

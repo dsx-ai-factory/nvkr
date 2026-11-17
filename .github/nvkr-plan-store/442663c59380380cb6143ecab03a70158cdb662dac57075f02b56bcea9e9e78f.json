@@ -1,0 +1,5 @@
+{
+  "constraint": "8.x",
+  "kind": "github-action",
+  "repo": "https://github.com/actions/download-artifact"
+}

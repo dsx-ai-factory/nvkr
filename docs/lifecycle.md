@@ -225,7 +225,7 @@ presentation flags.
 
 ```sh
 bin/nvkr definition inspect --definition docs/examples/nvke-module-tags/definition.yaml --ui=tui
-bin/nvkr run graph --plan .github/nvkr-run/plan.json --ui=tui
+bin/nvkr run graph --plan .github/nvkr-run-nvke/plan.json --ui=tui
 bin/nvkr catalog list --data inputs/catalogs/nvke/module-tags --ui=tui
 ```
 
@@ -502,7 +502,7 @@ never selects the latest retry implicitly. Configure the trusted producer and ve
 schemaVersion: nvkr.dev/qualification-policy/v1
 source:
   repository: OWNER/REPO
-  workflow: .github/workflows/nvkr-run.yml
+  workflow: .github/workflows/nvkr-run-nvke.yml
   defaultBranch: main
 cosign:
   # Replace this placeholder with the SHA-256 of the independently trusted executable.

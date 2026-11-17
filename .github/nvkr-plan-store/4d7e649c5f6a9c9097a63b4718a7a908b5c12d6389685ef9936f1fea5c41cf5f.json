@@ -1,0 +1,23 @@
+{
+  "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+  "fromSource": false,
+  "outputType": "oci-image",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "prebuilt": {
+    "digests": {
+      "amd64": "sha256:0ba43be0bd5cee7afc54fb351989692ddd07c106111ecda3cf6e9cbe23da137c",
+      "arm64": "sha256:d5a0bd84d06ce4a7cd8d0cc5f7f05ca041ed3e1cdd0f8fd129831d871669f2bf"
+    },
+    "evidence": {
+      "none": true
+    },
+    "image": "ghcr.io/spiffe/spire-tpm-plugin-tpm-attestor-server:v1.9.0",
+    "imageParentDigest": "sha256:9d3c69f9a9a59b274e7d6d9f8e75d89691d7d9204f2063d7917685a17b8828dc"
+  },
+  "repo": "https://github.com/dsx-ai-factory/nvke",
+  "sourceDateEpoch": 1793236039,
+  "tag": "v0.23.0"
+}

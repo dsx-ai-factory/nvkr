@@ -23,7 +23,7 @@ import (
 
 func maintainedPlan(t *testing.T) *factory.Plan {
 	t.Helper()
-	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestInspectionRejectsInvalidCompletePlans(t *testing.T) {
 		code   e.Code
 	}{
 		{"stale definition", func(p *factory.Plan) { p.Definition.Metadata.Description = "replaced" }, e.CodeUnverifiedRef},
-		{"dangling edge", func(p *factory.Plan) { p.Graph.Nodes[0].Inputs = []string{"absent"} }, e.CodePipelineDrift},
+		{"dangling edge", func(p *factory.Plan) { p.Graph.Nodes[0].Inputs = []string{"absent"} }, e.CodeInvalidCatalog},
 		{"producer substitution", func(p *factory.Plan) {
 			// Select a command-producing node by kind, not the first output:
 			// acquired outputs may legitimately precede source builds.
@@ -152,7 +152,7 @@ func TestLoadRejectsAlternateBytesAndUnsafeFiles(t *testing.T) {
 		raw     []byte
 		symlink bool
 	}{
-		{"pretty", pretty, false}, {"trailing newline", append(bytes.Clone(doc.raw), '\n'), false}, {"unknown version", bytes.ReplaceAll(doc.raw, []byte(factory.PlanSchemaVersion), []byte("nvkr.dev/run-plan/v99")), false},
+		{"pretty", pretty, false}, {"trailing newline", append(bytes.Clone(doc.raw), '\n'), false}, {"unknown version", bytes.ReplaceAll(doc.raw, []byte(doc.plan.SchemaVersion), []byte("nvkr.dev/run-plan/v99")), false},
 		{"unknown field", append([]byte(`{"unknown":true,`), doc.raw[1:]...), false}, {"duplicate key", append([]byte(`{"name":"duplicate",`), doc.raw[1:]...), false},
 		{"symlink", doc.raw, true}, {"oversize", bytes.Repeat([]byte(" "), int(factory.MaxPlanBytes+1)), false},
 	} {

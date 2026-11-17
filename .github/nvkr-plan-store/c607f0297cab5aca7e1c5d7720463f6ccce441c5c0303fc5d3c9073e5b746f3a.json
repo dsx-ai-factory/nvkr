@@ -1,0 +1,24 @@
+{
+  "artifactPath": "nvkr-output/ovn-kube-ubuntu.oci.tar",
+  "buildCommand": [
+    "sh",
+    "-ec",
+    {
+      "file": ".github/nvkr-plan-store/723677b2d9bd219a04590339631b3919d49a161f2677c4d6a2fa7bc960b940eb.sh"
+    }
+  ],
+  "builderType": "buildkit-rootless",
+  "commit": "8af51273d52dfa07454435d18d37230e582d797a",
+  "fromSource": true,
+  "outputType": "oci-image",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "repo": "https://github.com/dsx-ai-factory/ovn-kubernetes",
+  "sourceDateEpoch": 1792137152,
+  "tag": "v2.4.2",
+  "toolchainImage": "moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef",
+  "treeHash": "c4a54b0b3b615e5bd6df2d591451d7ab03dffc08",
+  "writeDir": "nvkr-output"
+}

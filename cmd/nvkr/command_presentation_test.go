@@ -215,7 +215,7 @@ func TestGraphAndComparisonProjectionExcludeTransportAndRawValues(t *testing.T) 
 
 func TestGraphDisplayShowsFocusedOutputAndItsItems(t *testing.T) {
 	lifecycleCommandRepo(t)
-	document, err := planview.Load(context.Background(), ".github/nvkr-run/plan.json")
+	document, err := planview.Load(context.Background(), ".github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,8 +243,8 @@ func TestRootCommandTypedResultsAndDefaultBytes(t *testing.T) {
 	for _, args := range [][]string{
 		{"definition", "validate", "--definition", "docs/examples/nvke-module-tags/definition.yaml"},
 		{"definition", "inspect", "--definition", "docs/examples/nvke-module-tags/definition.yaml"},
-		{"run", "graph", "--plan", ".github/nvkr-run/plan.json", "--view", "producers"},
-		{"run", "diff", "--before", ".github/nvkr-run/plan.json", "--after", ".github/nvkr-run/plan.json", "--exit-code"},
+		{"run", "graph", "--plan", ".github/nvkr-run-nvke/plan.json", "--view", "producers"},
+		{"run", "diff", "--before", ".github/nvkr-run-nvke/plan.json", "--after", ".github/nvkr-run-nvke/plan.json", "--exit-code"},
 		{"resolve", "--data", "testdata/catalogs/kubernetes-layered", "--component", "kubectl", "--platform", "linux/amd64"},
 	} {
 		t.Run(strings.Join(args[:2], " "), func(t *testing.T) {
@@ -293,7 +293,7 @@ func TestReadOnlyPlanAutoSelectsEligibleTerminalWithoutLiveWork(t *testing.T) {
 		}
 		return runpresenter.Result{}
 	}}}
-	out, err := runCLIWithCapturedStdout(t, app, "nvkr", "run", "plan", "--plan", ".github/nvkr-run/plan.json", "--ui=auto")
+	out, err := runCLIWithCapturedStdout(t, app, "nvkr", "run", "plan", "--plan", ".github/nvkr-run-nvke/plan.json", "--ui=auto")
 	if err != nil || !shown || len(out) != 0 {
 		t.Fatalf("read-only auto did not open eligible viewer: %v %s", err, out)
 	}
@@ -301,7 +301,7 @@ func TestReadOnlyPlanAutoSelectsEligibleTerminalWithoutLiveWork(t *testing.T) {
 
 func TestPlanDifferenceViewerRetainsRequestedExitStatus(t *testing.T) {
 	lifecycleCommandRepo(t)
-	before := ".github/nvkr-run/plan.json"
+	before := ".github/nvkr-run-nvke/plan.json"
 	plan, err := factory.LoadPlanContext(t.Context(), before)
 	if err != nil {
 		t.Fatal(err)

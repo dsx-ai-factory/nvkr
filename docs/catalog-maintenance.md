@@ -253,7 +253,7 @@ applies the patch to `catalog-maintenance/<definition>` and opens or updates the
 closes a stale PR and deletes its branch. The `refresh` job writes the PR body with `jq` from the `catalog
 refresh --json` result, so the body is part of the rendered workflow. Unlike `GITHUB_TOKEN` writes, the App's
 branch updates and PR events start the PR's own workflow runs without a maintainer approving them. Because the
-token can write workflows, a candidate whose closure regenerates a generated workflow file (`nvkr-run.yml` and,
+token can write workflows, a candidate whose closure regenerates a generated workflow file (`nvkr-run-nvke.yml` and,
 when named, `nvkr-dev.yml`, `nvkr-qualify.yml`, `nvkr-smoke.yml` or an additional Run's workflow) is published
 like any other generated file; patch admission still refuses every other workflow path. An ordinary source or
 artifact pin change leaves every generated workflow byte-identical (it updates the lock, Plans and manifests);
@@ -422,7 +422,7 @@ catalog-refresh-check`: it renders `catalog update-ci` with the canonical genera
 difference from `.github/workflows/catalog-refresh.yaml`. The merge gate's regeneration job runs it, and a
 change to the installed file triggers that job. The policy file is a CODEOWNERS trust root, because it decides
 which pins move and which bundles are regenerated. A changed shared lock is tested against the production and
-development bundles with real local Git fixtures, and a pin-only change is asserted to leave `nvkr-run.yml`
+development bundles with real local Git fixtures, and a pin-only change is asserted to leave the fixture workflow
 byte-identical. A runtime-Plan member whose committed Plan lags the lock passes the closure check through its
 own owner, an edited workflow byte in it is still refused before pin work, and its regeneration moves the Plan
 but not the workflow. An additional Run's colliding pin-set root is refused before compilation fetches it. A

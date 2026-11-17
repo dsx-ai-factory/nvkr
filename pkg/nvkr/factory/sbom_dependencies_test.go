@@ -21,7 +21,7 @@ import (
 func TestSBOMGraphRejectsUndeclaredForeignToolResult(t *testing.T) {
 	for _, requiredTool := range []bool{false, true} {
 		t.Run(fmt.Sprintf("tool_requirement=%t", requiredTool), func(t *testing.T) {
-			plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+			plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -73,7 +73,7 @@ func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
 			{"missing payload", "artifact/cwe/" + platform + "/nvke-controller", e.CodeProvenanceMissing},
 		} {
 			t.Run(platform+"/"+tc.name, func(t *testing.T) {
-				plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+				plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 				if err != nil {
 					t.Fatal(err)
 				}

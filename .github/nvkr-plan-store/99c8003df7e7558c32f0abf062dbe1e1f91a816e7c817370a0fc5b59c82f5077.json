@@ -1,0 +1,13 @@
+{
+  "constraint": "1.51.1",
+  "repo": "https://github.com/anchore/syft",
+  "tool": {
+    "executablePath": "syft",
+    "format": "tar-gzip",
+    "platforms": [
+      "linux/amd64",
+      "linux/arm64"
+    ],
+    "url": "https://github.com/anchore/syft/releases/download/{{.Tag}}/syft_{{.Version}}_{{.OS}}_{{.Arch}}.tar.gz"
+  }
+}

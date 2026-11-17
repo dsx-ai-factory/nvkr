@@ -16,7 +16,7 @@ import (
 // Exercise the actual maintained selections with synthetic pin changes. This
 // proves storage/refresh parity, not GitHub execution or source availability.
 func TestPlanTreeMaintainedRuntimeRefresh(t *testing.T) {
-	for _, name := range []string{"nvke-nightly-arm64", "nvke-nightly-gpu-site", "nvke-nightly-upstream-ovn-arm64"} {
+	for _, name := range []string{"nvke-nightly"} {
 		t.Run(name, func(t *testing.T) {
 			before, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-"+name+"/plan.json")
 			if err != nil {

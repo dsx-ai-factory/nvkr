@@ -1,0 +1,23 @@
+{
+  "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+  "fromSource": false,
+  "outputType": "oci-image",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "prebuilt": {
+    "digests": {
+      "amd64": "sha256:9d08603e52103e88c896a60fd42a7f660bd37566ec3de6f2b2c948d8b3a90119",
+      "arm64": "sha256:9054520faf548fe1b9fa5409bc3bee50be0c230d0e4cd7a1f12474c8e7b5704a"
+    },
+    "evidence": {
+      "none": true
+    },
+    "image": "registry.k8s.io/kubectl:v1.35.10",
+    "imageParentDigest": "sha256:4e1d541a3d62f74637974e4c71f3cea91b9a36ffd059ab45e355648898783837"
+  },
+  "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+  "sourceDateEpoch": 1793913052,
+  "tag": "nktp/v0.1.0"
+}

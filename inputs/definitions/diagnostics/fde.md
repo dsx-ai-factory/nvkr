@@ -65,7 +65,7 @@ The diagnostic branch contains its standalone bundle. Dispatch requires its
 exact branch to be admitted by the selected GitHub Environment:
 
 ```sh
-gh workflow run nvkr-run.yml --repo dsx-ai-factory/nvkr --ref codex/fde-image-pipeline
+gh workflow run nvkr-run-nvke.yml --repo dsx-ai-factory/nvkr --ref codex/fde-image-pipeline
 ```
 
 On October 13, 2026, [Run 38443178035](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)

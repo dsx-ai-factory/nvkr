@@ -1,0 +1,104 @@
+{
+  "buildDigest": "sha256:90e81cf62548d406d7bf3a984ac13c97ba4b0b46c15bd5353bcc84add23d52d0",
+  "components": [
+    "nktp-chart"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifactPath": "charts/nktp-0.1.0.tgz",
+        "builderType": "oci-hermetic",
+        "command": [
+          "sh",
+          "-euc",
+          ".nvkr-tools/helm package nktp --destination=charts/"
+        ],
+        "component": "nktp-chart",
+        "env": [
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GOAMD64",
+            "value": "v1"
+          },
+          {
+            "name": "GOARCH",
+            "value": "amd64"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1793913052"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-nktp-chart",
+        "kind": "build",
+        "needs": [
+          "fetch-source-73f02028752b13b5fab704ca87d95afe72462d68b6308011f3c02d2a04be1cf5"
+        ],
+        "network": "none",
+        "outputType": "tarball",
+        "platform": "linux/amd64",
+        "sourceCommit": "a97548c56d101b41740e8a00e273166c84b442e7",
+        "sourceDest": "source-73f02028752b13b5fab704ca87d95afe72462d68b6308011f3c02d2a04be1cf5",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "4125b283eacc8842210bf405e7dc5f04090e8b05",
+        "toolchain": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+        "vendorSpecDigest": "sha256:aefd174ff76b70001933879b50f840ce508210e9390ea0fa272d8cd210e1f0bb",
+        "version": "0.1.0",
+        "workdir": "/src",
+        "writeDir": "charts"
+      },
+      {
+        "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+        "dest": "source-73f02028752b13b5fab704ca87d95afe72462d68b6308011f3c02d2a04be1cf5",
+        "id": "fetch-source-73f02028752b13b5fab704ca87d95afe72462d68b6308011f3c02d2a04be1cf5",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+        "treeHash": "4125b283eacc8842210bf405e7dc5f04090e8b05",
+        "vendorCmd": [
+          "sh",
+          "-euc",
+          {
+            "file": ".github/nvkr-plan-store/51e05aaa25f587d57a10ba7410cacd26f73c85a1a1ca99c41aec1f931918598a.sh"
+          }
+        ],
+        "vendorImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+        "vendorSpecDigest": "sha256:aefd174ff76b70001933879b50f840ce508210e9390ea0fa272d8cd210e1f0bb"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "build-nktp-chart"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "nktp",
+  "platform": "linux/amd64"
+}

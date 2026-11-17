@@ -1,0 +1,12 @@
+{
+  "constraint": "v0.23.0",
+  "repo": "https://github.com/dsx-ai-factory/nvke",
+  "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+  "vendorCommand": [
+    "bash",
+    "-euc",
+    {
+      "file": ".github/nvkr-plan-store/093f880cf15a640275cdad54ab7042f863a1ac98a76c690024a4f78fb5bd53c6.sh"
+    }
+  ]
+}

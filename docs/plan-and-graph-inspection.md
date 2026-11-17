@@ -4,9 +4,9 @@ Use the validated Plan views to review required outputs, producer instructions, 
 publication routes before executing a Run. These read-only views explain the complete generated Plan and
 its changes. They do not observe output bytes, verify a release, or authorize execution.
 
-The Plan in `.github/nvkr-run/plan.json` is a small index into the repository's shared `.github/nvkr-plan-store/`.
+The Plan in `.github/nvkr-run-nvke/plan.json` is a small index into the repository's shared `.github/nvkr-plan-store/`.
 Loading verifies the frozen objects and reconstructs the canonical Plan under [ADR-21's storage contract](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold). Keep human views
-outside `.github/nvkr-run/`: that directory admits only manifest-owned generated files. Inspection never
+outside `.github/nvkr-run-nvke/`: that directory admits only manifest-owned generated files. Inspection never
 updates the Plan or its ownership manifest.
 
 ## Read the Plan
@@ -14,8 +14,8 @@ updates the Plan or its ownership manifest.
 Inspect the current generated Plan without resolving catalogs or contacting an external service:
 
 ```sh
-nvkr run plan --plan .github/nvkr-run/plan.json
-nvkr run plan --plan .github/nvkr-run/plan.json --pretty
+nvkr run plan --plan .github/nvkr-run-nvke/plan.json
+nvkr run plan --plan .github/nvkr-run-nvke/plan.json --pretty
 ```
 
 The text view lists required output slots and Build Digests, every producer instruction and dependency,
@@ -41,7 +41,7 @@ binding validation. Invalid input produces a coded error before any result bytes
 ## Browse in the terminal
 
 ```sh
-nvkr run plan --plan .github/nvkr-run/plan.json --ui=tui
+nvkr run plan --plan .github/nvkr-run-nvke/plan.json --ui=tui
 ```
 
 The explicit terminal explorer uses validated typed output/operation membership
@@ -65,10 +65,10 @@ and live Run presentation, see [Lifecycle](lifecycle.md#choose-local-run-present
 ## Follow linked graphs
 
 ```sh
-nvkr run graph --plan .github/nvkr-run/plan.json --format mermaid
-nvkr run graph --plan .github/nvkr-run/plan.json --format dot
-nvkr run graph --plan .github/nvkr-run/plan.json --format json
-nvkr run graph --plan .github/nvkr-run/plan.json --output controller-chart --format mermaid
+nvkr run graph --plan .github/nvkr-run-nvke/plan.json --format mermaid
+nvkr run graph --plan .github/nvkr-run-nvke/plan.json --format dot
+nvkr run graph --plan .github/nvkr-run-nvke/plan.json --format json
+nvkr run graph --plan .github/nvkr-run-nvke/plan.json --output controller-chart --format mermaid
 ```
 
 `--output NAME` focuses any view on one exact required output and its upstream dependencies, such as the
@@ -109,13 +109,13 @@ from a publication root or infer producer edges from matching artifact names.
 Save the previous exact Plan before regeneration, then compare it to the regenerated file:
 
 ```sh
-nvkr run plan --plan .github/nvkr-run/plan.json --json > /tmp/nvkr-plan-before.json
+nvkr run plan --plan .github/nvkr-run-nvke/plan.json --json > /tmp/nvkr-plan-before.json
 GOTOOLCHAIN=local go run ./cmd/nvkr run generate \
-  --definition inputs/definitions/nvke/definition.yaml \
-  --environment inputs/environments/github-release.yaml --engine github --root .
-nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run/plan.json
-nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run/plan.json --details
-nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run/plan.json --format json
+  --definition inputs/definitions/nvke/gpu-site.composite.yaml \
+  --environment inputs/environments/github-nvke-gpu-site.yaml --engine github --root .
+nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run-nvke/plan.json
+nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run-nvke/plan.json --details
+nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run-nvke/plan.json --format json
 ```
 
 The root regeneration uses the committed maintained NVKE inputs and the generator identity described in the

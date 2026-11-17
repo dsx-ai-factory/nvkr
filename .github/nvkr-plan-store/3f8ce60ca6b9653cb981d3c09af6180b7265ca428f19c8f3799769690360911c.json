@@ -1,0 +1,43 @@
+{
+  "APIVersion": "nvkr.dev/catalog/v3",
+  "Actions": {},
+  "Components": {
+    "helm": {
+      "file": ".github/nvkr-plan-store/3b89f633c3c2919d39e84b1d95c074500696a3d3f93e381848dfc5ce72418c77.json"
+    },
+    "kubectl": {
+      "file": ".github/nvkr-plan-store/99dc92746692d1512078ca3677bc8d01438728526c394bd8bec9c9f23d8076a4.json"
+    }
+  },
+  "Kind": "SourceBuildRegistry",
+  "Metadata": {
+    "description": "Native ARM64 assets at the same source-owned versions as the maintained M2 operator tools; machine-pinned before execution.",
+    "name": "nvke-operator-tools-arm64"
+  },
+  "Sources": {
+    "helm": {
+      "file": ".github/nvkr-plan-store/e576b4ef84fa2d0ce91ee75b2811e0171c3d3dba20a29ee7f5e4fbc2fec80e3c.json"
+    },
+    "kubectl": {
+      "file": ".github/nvkr-plan-store/b603d82b4fd728f61ff4a6c80290a458510afb978655d53e5eecd5c9851bb57d.json"
+    }
+  },
+  "Tools": {
+    "helm": {
+      "archiveDigest": "sha256:13d03672be289045d2ff00e4e345d61de1c6f21c1257a45955a30e8ae036d8f1",
+      "executableDigest": "sha256:4d6e3a69e6203094d564d5d4e94325b1f7209421dc7e832a96d2510295e03f1d",
+      "executablePath": "linux-arm64/helm",
+      "format": "tar-gzip",
+      "platform": "linux/arm64",
+      "url": "https://get.helm.sh/helm-v4.1.4-linux-arm64.tar.gz"
+    },
+    "kubectl": {
+      "archiveDigest": "sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62",
+      "executableDigest": "sha256:3d86f24401c41ae5a46ac50eef8865fe891d3647d324a0836f6c63757a126e62",
+      "executablePath": "kubectl",
+      "format": "raw",
+      "platform": "linux/arm64",
+      "url": "https://dl.k8s.io/release/v1.36.3/bin/linux/arm64/kubectl"
+    }
+  }
+}

@@ -13,7 +13,7 @@ and packages outputs. Helm binding embeds the selected image digest before packa
 signing/attestation, and signature verification have separate isolation and credentials.
 
 The top-level workflow shows jobs, dependencies, permissions and protected Environments in ordinary YAML.
-After native preflight and checkout, local composite calls point into `.github/nvkr-run/actions/` for shared
+After native preflight and checkout, local composite calls point into `.github/nvkr-run-nvke/actions/` for shared
 execution and transport interfaces. Calls such as `execute-node`, `execute-source` and `collect-node-outputs`
 name their operation. Grouped jobs repeat the same node interface; differing output counts use declared
 optional slots and further individual upload calls, without output-count or group-size action variants.
@@ -121,10 +121,10 @@ Source credentials likewise reach only the source step's environment, never the 
       - name: 'Build nvke-controller-chart (controller-chart)'
         id: nvkr-controller-chart-build-nvke-controller-chart
         run: |
-          ./nvkr-exec factory github run-node --plan .github/nvkr-run/plan.json --node controller-chart/build-nvke-controller-chart
+          ./nvkr-exec factory github run-node --plan .github/nvkr-run-nvke/plan.json --node controller-chart/build-nvke-controller-chart
       - name: 'Prepare output carriers: Build nvke-controller-chart (controller-chart)'
         run: |
-          ./nvkr-exec factory github pack-outputs --plan .github/nvkr-run/plan.json --node controller-chart/build-nvke-controller-chart
+          ./nvkr-exec factory github pack-outputs --plan .github/nvkr-run-nvke/plan.json --node controller-chart/build-nvke-controller-chart
 ```
 
 ```yaml
@@ -132,7 +132,7 @@ Source credentials likewise reach only the source step's environment, never the 
         id: recover-artifacts
         env:
           NVKR_JOB_RESULTS: ${{ toJSON(needs) }}
-        run: ./nvkr-exec factory github recover --plan .github/nvkr-run/plan.json
+        run: ./nvkr-exec factory github recover --plan .github/nvkr-run-nvke/plan.json
 ```
 
 The recovery helper bounds and validates the provider JSON before touching carriers. It requires exactly the

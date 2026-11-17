@@ -1,0 +1,10 @@
+{
+  "constraint": "1.2.0",
+  "repo": "https://github.com/NVIDIA/aicr",
+  "tool": {
+    "executablePath": "aicr",
+    "format": "tar-gzip",
+    "platform": "linux/arm64",
+    "url": "https://github.com/NVIDIA/aicr/releases/download/{{.Tag}}/aicr_{{.Version}}_linux_arm64.tar.gz"
+  }
+}

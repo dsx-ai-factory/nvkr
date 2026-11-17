@@ -76,7 +76,7 @@ signing. CWE uses upstream Dockerfile network dependencies; it is a wrapped, unq
 
 Use [the M2 README](../../../inputs/definitions/nvke/README.md#generate-and-check-the-maintained-workflow) for the maintained bundle
 and its source, runner, registry and signing requirements. Generating this deploy example into the repository
-root would replace that bundle and fail the M2 drift check. A dispatch of the committed `nvkr-run.yml` executes M2; dispatch does not select a different Definition.
+root would introduce an unenrolled default bundle and fail maintained-closure checks. A dispatch of the committed `nvkr-run-nvke.yml` executes M2; dispatch does not select a different Definition.
 This is the checked-in candidate configuration, not a ratified canonical-product/path or namespace decision.
 No parallel generated deploy workflow is maintained at that fixed path.
 

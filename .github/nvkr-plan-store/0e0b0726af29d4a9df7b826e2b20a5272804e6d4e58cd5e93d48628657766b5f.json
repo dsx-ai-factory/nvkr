@@ -1,0 +1,22 @@
+{
+  "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+  "fromSource": false,
+  "outputType": "raw",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "prebuilt": {
+    "digests": {
+      "amd64": "sha256:14a8efe1cc92c91befac151db91f20f9a13962788e9d710c86655add6d966d37",
+      "arm64": "sha256:14a8efe1cc92c91befac151db91f20f9a13962788e9d710c86655add6d966d37"
+    },
+    "evidence": {
+      "none": true
+    },
+    "url": "https://github.com/temporalio/helm-charts/releases/download/temporal-0.74.0/temporal-0.74.0.tgz"
+  },
+  "repo": "https://github.com/dsx-ai-factory/nvke",
+  "sourceDateEpoch": 1793236039,
+  "tag": "0.74.0"
+}

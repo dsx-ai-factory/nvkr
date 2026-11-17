@@ -1,0 +1,34 @@
+{
+  "artifactPath": "nvkr-output/nvke-cni-calico.tar",
+  "buildCommand": [
+    "bash",
+    "-ec",
+    {
+      "file": ".github/nvkr-plan-store/735a94f56245d3882e614374b4ba297aa587e1e981e3e615c8cd5fa3227c40ad.sh"
+    }
+  ],
+  "builderType": "oci-hermetic",
+  "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+  "fromSource": true,
+  "outputType": "tarball",
+  "platforms": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "repo": "https://github.com/dsx-ai-factory/nvke.git",
+  "sourceDateEpoch": 1793236039,
+  "tag": "v0.23.0",
+  "toolchainImages": {
+    "amd64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+    "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
+  },
+  "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+  "vendorCommand": [
+    "bash",
+    "-ec",
+    {
+      "file": ".github/nvkr-plan-store/57116243ba7d81bfe75a3b6130a9b204b7254424e85fbdb79c2143a9afa3c2fa.sh"
+    }
+  ],
+  "writeDir": "nvkr-output"
+}

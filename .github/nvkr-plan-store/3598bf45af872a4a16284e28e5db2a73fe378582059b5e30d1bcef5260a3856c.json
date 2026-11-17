@@ -1,0 +1,15 @@
+{
+  "constraint": "v0.23.0",
+  "repo": "https://github.com/dsx-ai-factory/nvke.git",
+  "toolchainImagesByArch": {
+    "amd64": "sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd",
+    "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
+  },
+  "vendorCommand": [
+    "bash",
+    "-ec",
+    {
+      "file": ".github/nvkr-plan-store/3c436b37fae5e2fd6e3a9e5359a7d6db026612ed08a45ede3788b77cc9e8b7c2.sh"
+    }
+  ]
+}

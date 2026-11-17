@@ -290,9 +290,11 @@ fixed native smoke worker. The qualifier uses `workflow_run`; the worker uses
 independent policy, credentials and ownership are separate from the producer
 bundle and the downstream nightly E2E adapter. They add no generated cron or
 general callable producer interface.
-Current qualification policy admission selects the default producer workflow,
-`.github/workflows/nvkr-run.yml`; named-producer qualification is not an admitted
-configuration. No maintained nightly dispatches the named nightly producers; the separate
+The maintained NVKE composite selects `githubBundle: nvke` for production and
+`githubBundle: nvke-nightly` for floating-source candidates. Their generated workflows are
+`nvkr-run-nvke.yml` and `nvkr-run-nvke-nightly.yml`; each has its own explicitly bound
+qualification policy and qualifier/smoke pair. See the [NVKE inputs](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md).
+No maintained nightly dispatches the named nightly producers; the separate
 downstream AMD64 E2E adapter builds its inputs locally.
 
 Read the top-level workflow to review which jobs can run, their dependency order, permissions, protected
