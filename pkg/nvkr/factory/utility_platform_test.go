@@ -232,6 +232,48 @@ func TestDiskProfileOwnsScannerForOtherCatalogPlatform(t *testing.T) {
 	}
 }
 
+func TestDiskProfileScannerFallbackStaysNarrow(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*Plan)
+		code e.Code
+	}{
+		{"competing pin forms", func(plan *Plan) {
+			pins := plan.CatalogSnapshot.ToolPlatforms["syft"][:1]
+			plan.CatalogSnapshot.ToolPlatforms["syft"] = pins
+			if plan.CatalogSnapshot.Tools == nil {
+				plan.CatalogSnapshot.Tools = map[string]catalog.ToolPin{}
+			}
+			plan.CatalogSnapshot.Tools["syft"] = pins[0]
+		}, e.CodeInvalidCatalog},
+		{"no pins", func(plan *Plan) {
+			plan.CatalogSnapshot.ToolPlatforms["syft"] = nil
+		}, e.CodeEngineCapability},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, plan := nativeUtilityFixture(t)
+			tc.edit(plan)
+			err := validateDiskScannerSelection(plan, "linux/arm64", "sha256:"+strings.Repeat("c", 64))
+			assertFactoryErrorCode(t, err, tc.code)
+		})
+	}
+}
+
+func TestInternalScannerPlatformAdmissionWithoutScanner(t *testing.T) {
+	_, plan := nativeUtilityFixture(t)
+	d, env := plan.Definition.Clone(), plan.Environment.Clone()
+	env.UtilityContainers = nil
+	d.SBOMTool = ""
+	first := authored.InternalTool{Name: "first", Platform: "linux/amd64", Format: authored.OutputExecutable,
+		Components: []string{"containerd"}, Result: "containerd"}
+	second := first
+	second.Name, second.Platform = "helper", "linux/arm64"
+	d.InternalTools = []authored.InternalTool{first, second}
+	if err := admitInputs(d, env); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestInternalScannerPlatformAdmission(t *testing.T) {
 	for _, tc := range []struct {
 		name, scanner, platform  string
