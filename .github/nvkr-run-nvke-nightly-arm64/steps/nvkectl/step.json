@@ -1,0 +1,118 @@
+{
+  "buildDigest": "sha256:cb038538ce0e4c0f7f46179c73e7cc3715da85cbc0c2c954ee99b3a28c29adf4",
+  "components": [
+    "nvkectl"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifactPath": "cli/bin/nvkectl",
+        "builderType": "oci-hermetic",
+        "command": [
+          "bash",
+          "-euc",
+          {
+            "file": "build-nvkectl.sh"
+          }
+        ],
+        "component": "nvkectl",
+        "env": [
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GOARCH",
+            "value": "arm64"
+          },
+          {
+            "name": "GOARM64",
+            "value": "v8.0"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "NVKECTL_COMMIT",
+            "value": "2cfd00081b468d85a4894ec17e9deac13c9d8169"
+          },
+          {
+            "name": "NVKECTL_DATE",
+            "value": "2026-10-29T01:07:19Z"
+          },
+          {
+            "name": "NVKECTL_VERSION",
+            "value": "git-2cfd00081b468d85a4894ec17e9deac13c9d8169"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1793236039"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-nvkectl",
+        "kind": "build",
+        "needs": [
+          "fetch-source-ec3a9d4557e6c35a9f278ee87101a792d2d36d55d4ee1d0b1936469f5a81a272"
+        ],
+        "network": "none",
+        "outputType": "host-package",
+        "platform": "linux/arm64",
+        "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "sourceDest": "source-ec3a9d4557e6c35a9f278ee87101a792d2d36d55d4ee1d0b1936469f5a81a272",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "toolchain": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+        "vendorSpecDigest": "sha256:30507a13859ef98790c69dc7b6704a41e7914598f1e5e4ccb6dbef355d637d6e",
+        "version": "0.23.0",
+        "workdir": "/src",
+        "writeDir": "cli/bin"
+      },
+      {
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "dest": "source-ec3a9d4557e6c35a9f278ee87101a792d2d36d55d4ee1d0b1936469f5a81a272",
+        "id": "fetch-source-ec3a9d4557e6c35a9f278ee87101a792d2d36d55d4ee1d0b1936469f5a81a272",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "vendorCmd": [
+          "bash",
+          "-euc",
+          {
+            "file": "vendor-nvkectl.sh"
+          }
+        ],
+        "vendorImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+        "vendorSpecDigest": "sha256:30507a13859ef98790c69dc7b6704a41e7914598f1e5e4ccb6dbef355d637d6e"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "build-nvkectl"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "nvkectl",
+  "platform": "linux/arm64"
+}

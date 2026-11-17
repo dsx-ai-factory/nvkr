@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:b568adb2be789f6f421cf11338bc01e3c101ff903791f7fa4e8d528bc10013ef",
+  "components": [
+    "nktp-target-allocator-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:0.161.0",
+        "component": "nktp-target-allocator-image",
+        "digest": "sha256:179b8353c5b14660b5e3bebe6e418a0622d0009f81d95bbacf0d0d9b9c94b8fa",
+        "id": "pull-nktp-target-allocator-image",
+        "imageParentDigest": "sha256:cf45770c658cf392618717043d9a478a8a9f97d3d5f79a31db54e85abc438718",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.1.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-nktp-target-allocator-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "nktp-target-allocator-image",
+  "platform": "linux/amd64"
+}

@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:1cd56e1c97e77c8f6022f085da172a43036e3f45adfdadd77636c88332cc2a3d",
+  "components": [
+    "native-capi-exec-plugin-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "ghcr.io/spiffe/k8s-spiffe-workload-jwt-exec-auth@sha256:e30e90774e5951f84eb6dfb36f972fead08b64c3bfdc0912c5b15f988e79de3a",
+        "component": "native-capi-exec-plugin-image",
+        "digest": "sha256:a8904bb463d669541a195ee013937e9a5a457dc999b3245da222858b526660fa",
+        "id": "pull-native-capi-exec-plugin-image",
+        "imageParentDigest": "sha256:e30e90774e5951f84eb6dfb36f972fead08b64c3bfdc0912c5b15f988e79de3a",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-native-capi-exec-plugin-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "capi-exec-plugin-image-arm64",
+  "platform": "linux/arm64"
+}

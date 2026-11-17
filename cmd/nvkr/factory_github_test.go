@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/urfave/cli/v2"
@@ -49,11 +50,11 @@ func TestGitHubFactoryCommandsKeepOperationDiagnosticsInLogs(t *testing.T) {
 }
 
 func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
-	raw, err := os.ReadFile(filepath.Join("..", "..", factory.FactoryPlanPath))
+	plan, err := factory.LoadPlanContext(t.Context(), filepath.Join("..", "..", factory.FactoryPlanPath))
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := factory.LoadPlanContext(t.Context(), filepath.Join("..", "..", factory.FactoryPlanPath))
+	raw, err := canonical.Marshal(plan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,6 +80,7 @@ func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
 		code e.Code
 	}{
 		{"missing node", []string{"github", "run-node", "--plan", "plan.json"}, e.CodeUsage},
+		{"runtime export not admitted", []string{"github", "stage-runtime-inputs", "--plan", "plan.json"}, e.CodeEngineCapability},
 		{"unknown node", []string{"github", "run-node", "--plan", "plan.json", "--node", "unknown"}, e.CodeInvalidCatalog},
 		{"unknown stage", []string{"github", "restore-inputs", "--plan", "plan.json", "--stage", "unknown"}, e.CodeInvalidCatalog},
 		{"unknown pack node", []string{"github", "pack-outputs", "--plan", "plan.json", "--node", "unknown"}, e.CodeInvalidCatalog},

@@ -112,6 +112,35 @@ Execution identity and transaction identity are separate. The Plan binds authore
 operation; the workflow has its own exact-byte digest. The commit manifest lists each owned file's safe relative path, mode and exact whole-file digest,
 plus plan and workflow identities. It is written last and never lists itself. No self-referential identity is permitted.
 
+GitHub stores that same Plan as a generated file tree. The root `plan.json` carries the
+`storage: nvkr-plan-tree-v1` discriminator, outside the executable Plan schema. It owns
+every top-level field except the extracted snapshots and per-target fields. Each distinct
+catalog snapshot appears once in `catalogSnapshots`, keyed by the existing `catalogDigest`;
+root build records retain `name`, `catalogDigest` and `resolvedComponents`. A generated
+`steps/<target>/step.json` owns `name`, `platform`, `buildDigest`, `components`,
+`appliedOverlays` and `executionGraph`. Full target names remain unchanged, including
+aggregate native targets such as `output/linux/arm64`, whose safe segments form directories.
+The duplicated name is only a checked join key. Built-in operations remain in the root graph.
+
+JSON members are the canonical codec's bytes indented with two spaces and one final LF.
+A command or vendor-command array with exactly one operand containing LF stores that
+operand in `build-<component>.sh` or `vendor-<first-consuming-component>.sh`, respectively,
+and uses a single-key `{ "file": "<name>" }` operand. Other operands remain strings;
+multiple multiline operands stay inline because no unambiguous component-scoped filename
+exists. Raw script bytes gain no header, shebang or newline. Unsafe names and file/directory
+collisions fail closed. Root snapshots and resolved components still contain their command
+copies, so editing a script also changes those root records.
+
+Loading a tree admits the bounded complete manifest inventory, safe regular files, modes,
+hashes and Plan digest, reconstructs and validates the complete existing Plan, and compares
+the exact regenerated tree. Duplicate or unknown fields, alternate encodings, missing,
+extra, symlinked, edited or mixed-generation members fail before execution. Execution uses
+the captured Plan without reopening command files. Storage has a 64 MiB aggregate bound,
+the existing 32 MiB member and 4,096-entry bounds, and the existing 4 MiB reconstructed
+Plan bound. Diagnostic `planSha256` denotes the reconstructed packed bytes. The tree adds
+no Plan schema, digest family, Build identity or execution authority. Packed canonical
+bytes remain the wire and non-GitHub storage form, including Tekton.
+
 Owned payloads are generated provider/configuration files and canonical graph/plan records. Catalogs, profiles,
 vectors, roots and credentials remain external inputs whose exact references/policies are recorded, not copied
 and silently claimed as generator-owned. Future artifact/result digests belong in runtime observations; the
@@ -169,10 +198,15 @@ current pinned inputs and distributes its exact data through same-Run helper art
 invocation data plus the derived manifest may change; every workflow/action byte, member path,
 Environment digest and authored input path stays fixed. Source-version updates within that contract need
 no regeneration commit. `--runtime --check` validates that contract without writes; ordinary `--check`
-still compares the complete current bundle. Secondary bootstraps restore the three runtime JSON files into
-a fresh staging directory, then admit their exact rendered bytes and current authored selection against
+still compares the complete current bundle. The three-file carrier contains the packed canonical Plan,
+unchanged invocation-data encoding and the manifest of the rendered tree. Secondary bootstraps and
+helper consumers restore these three runtime JSON files into a fresh staging directory, then admit
+their exact bytes and current authored selection against
 the complete committed baseline. The generation owner installs the admitted bundle using its existing
 lock, per-file atomic replacement and manifest-last semantics; this is not an atomic directory transaction.
+Root and step JSON are refreshable Plan data; script bytes remain fixed. A source pin that
+splits or merges a shared fetch cohort may change vendor script paths. That is a topology
+change and requires reviewed regeneration; the fixed-member-path check fails closed.
 Private transport never overwrites checked-out files. ADR-18 owns bootstrap ordering and transport. Neither an
 unchanged workflow nor runtime compilation establishes execution or publication acceptance.
 

@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:535b14b0960650e11840505d5861dc0968aeeae3859f3606a1a9addea0db3487",
+  "components": [
+    "nktp-lgtm-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "grafana/otel-lgtm:0.38.0",
+        "component": "nktp-lgtm-image",
+        "digest": "sha256:bf33fa01b1a0314edc88c5bc2a295067e65270cf9c3f678a943a4a2c2a2472fd",
+        "id": "pull-nktp-lgtm-image",
+        "imageParentDigest": "sha256:75cdf892daffadf3763ef61c16a6d7f8586216fce0b40bba7874a0b053121084",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.1.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-nktp-lgtm-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "nktp-lgtm-image",
+  "platform": "linux/amd64"
+}

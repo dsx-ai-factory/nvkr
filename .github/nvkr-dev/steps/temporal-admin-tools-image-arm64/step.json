@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:461cd1e07e520c160919a6ef851ceb25e7ae87cebcc4a45c1dba5e1cc0885392",
+  "components": [
+    "temporal-admin-tools-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "temporalio/admin-tools:1.30.3",
+        "component": "temporal-admin-tools-image",
+        "digest": "sha256:2f90b7c95151bb7a3ddf41749681918f70528fd6c90b160a89e05970b678144a",
+        "id": "pull-temporal-admin-tools-image",
+        "imageParentDigest": "sha256:2c2272b008f1af295b3719963e6feeef64f838d1105d895cf6acfcf96dd31741",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-temporal-admin-tools-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "temporal-admin-tools-image-arm64",
+  "platform": "linux/arm64"
+}

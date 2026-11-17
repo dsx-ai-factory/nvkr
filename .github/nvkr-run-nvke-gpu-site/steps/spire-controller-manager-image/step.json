@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:5ae18543dc467ebe778fd8a45ccbdd7f1d6254ad5e3c01943077c63972c97c8d",
+  "components": [
+    "spire-controller-manager-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "ghcr.io/spiffe/spire-controller-manager:0.7.0",
+        "component": "spire-controller-manager-image",
+        "digest": "sha256:fb3bfc8f98f24c769004543d6b760142380c8f2d3a0354391ee2bfdd48039e59",
+        "id": "pull-spire-controller-manager-image",
+        "imageParentDigest": "sha256:d7b9e710f5428ea25daa35a07083fe517ed70c23df902d21c54a0f444455a84b",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-spire-controller-manager-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "spire-controller-manager-image",
+  "platform": "linux/amd64"
+}

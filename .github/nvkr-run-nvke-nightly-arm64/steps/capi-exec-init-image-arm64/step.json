@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:9b4e551e9b11522e832460b73342cdb21fa941e6efe7caf722cbc3e5537a7649",
+  "components": [
+    "native-capi-exec-init-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "index.docker.io/library/alpine@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a",
+        "component": "native-capi-exec-init-image",
+        "digest": "sha256:e311ae748be7f56ae5cba304bc488f0786df68ee507513f654a5cc8597cffb42",
+        "id": "pull-native-capi-exec-init-image",
+        "imageParentDigest": "sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-native-capi-exec-init-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "capi-exec-init-image-arm64",
+  "platform": "linux/arm64"
+}

@@ -33,15 +33,19 @@ runs:
       id: validate-catalog
       run: ./nvkr-exec run generate --engine github --definition inputs/definitions/demo/arm64-upstream-kvm.json --environment inputs/environments/github-nightly-upstream.json --root . --check
       shell: bash -e {0}
+    - name: 'Stage packed runtime inputs'
+      run: |
+        ./nvkr-exec factory github stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json
+      shell: bash -e {0}
     - name: 'Upload NVKR runner'
       uses: ./.github/nvkr-run-nvke-nightly-upstream-ovn-arm64/actions/ci-upload
       with:
         name: ${{ inputs.runner-artifact }}
         path: |
           nvkr-exec
-          .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json
-          .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/action-data.json
-          .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/manifest.json
+          .nvkr/runtime-export/plan.json
+          .nvkr/runtime-export/action-data.json
+          .nvkr/runtime-export/manifest.json
         include-hidden-files: 'true'
         if-no-files-found: error
         retention-days: 7

@@ -134,9 +134,25 @@ class ComparisonTest(unittest.TestCase):
                 with patch.dict(os.environ, {"GITHUB_OUTPUT": str(output)}), patch("sys.argv", [
                     "report-native-toolchains.py", "compare", "--arch", arch,
                     "--plan", str(root / "plan"), "--proposal", str(root / "proposal"),
-                ]):
+                ]), patch.object(MODULE.subprocess, "run", return_value=subprocess.CompletedProcess(
+                    [], 0, stdout=json.dumps(plan), stderr="",
+                )) as run:
                     MODULE.main()
+                    run.assert_called_once_with(
+                        ["./nvkr-exec", "run", "plan", "--plan", str(root / "plan"), "--json"],
+                        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        check=True, timeout=60,
+                    )
                 self.assertEqual(output.read_text(), f"changed_{arch}=false\n")
+
+    def test_plan_admission_failure_has_no_raw_json_fallback(self):
+        with tempfile.TemporaryDirectory() as temp:
+            filename = Path(temp) / "plan.json"
+            filename.write_text(json.dumps(subjects("amd64")[0]))
+            with patch.object(MODULE.subprocess, "run", side_effect=subprocess.CalledProcessError(
+                1, ["./nvkr-exec"], stderr="rejected tree",
+            )), self.assertRaises(subprocess.CalledProcessError):
+                MODULE.load_plan(filename)
 
 
 class RoutingTest(unittest.TestCase):

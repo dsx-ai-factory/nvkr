@@ -379,6 +379,7 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 					return e.New(e.CodeInvalidCatalog, "secondary GitHub bootstrap omits runtime input installation")
 				}
 			}
+			wantSteps++ // Stage the packed three-file carrier after bundle admission.
 		}
 		wantCondition := "${{ " + githubDispatchCondition(plan) + " }}"
 		if !ok || job.RunsOn != githubBootstrapRunner(runner) || job.If != wantCondition || len(job.Steps) != wantSteps || job.Steps[0].Uses != actions.Checkout {

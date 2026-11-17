@@ -1,0 +1,103 @@
+{
+  "buildDigest": "sha256:2825310d642b3c2e7eac1686498e27106506c9b508132d59ec7142515d55d996",
+  "components": [
+    "ovn-kubernetes-chart"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifactPath": "nvkr-output/ovn-kubernetes-chart.tar",
+        "builderType": "oci-hermetic",
+        "command": [
+          "bash",
+          "-ec",
+          {
+            "file": "build-ovn-kubernetes-chart.sh"
+          }
+        ],
+        "component": "ovn-kubernetes-chart",
+        "env": [
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GOARCH",
+            "value": "arm64"
+          },
+          {
+            "name": "GOARM64",
+            "value": "v8.0"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "NVKR_SOURCE_STREAM",
+            "value": "1.4.0"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1788540677"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-ovn-kubernetes-chart",
+        "kind": "build",
+        "needs": [
+          "fetch-source-f22022c19ade7892168313c441da6b81f17a68ff093587a9214300823c91ae16"
+        ],
+        "network": "none",
+        "outputType": "tarball",
+        "platform": "linux/arm64",
+        "sourceCommit": "d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d",
+        "sourceDest": "source-f22022c19ade7892168313c441da6b81f17a68ff093587a9214300823c91ae16",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "ce0cb49cd14f2fc260457e61a5a222c027a07f79",
+        "toolchain": "docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b",
+        "vendorSpecDigest": "sha256:f3eda7db412a6b8c78d7645fc038d75b668a4f5c5e3501c043ea7d664d05af48",
+        "version": "1.4.0",
+        "workdir": "/src",
+        "writeDir": "nvkr-output"
+      },
+      {
+        "commit": "d6a3812d1bc1c36bf24c7eda0e86e9b13d84907d",
+        "dest": "source-f22022c19ade7892168313c441da6b81f17a68ff093587a9214300823c91ae16",
+        "id": "fetch-source-f22022c19ade7892168313c441da6b81f17a68ff093587a9214300823c91ae16",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/ovn-kubernetes/ovn-kubernetes",
+        "treeHash": "ce0cb49cd14f2fc260457e61a5a222c027a07f79",
+        "vendorImage": "docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b",
+        "vendorSpecDigest": "sha256:f3eda7db412a6b8c78d7645fc038d75b668a4f5c5e3501c043ea7d664d05af48"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "build-ovn-kubernetes-chart"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "upstream-ovn-chart-arm64",
+  "platform": "linux/arm64"
+}

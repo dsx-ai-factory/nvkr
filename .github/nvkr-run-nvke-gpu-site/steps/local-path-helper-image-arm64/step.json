@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:e4ab0b0bc322bfaf48e7833be9708810c5bc6a0023a47ffdcf55933a80a1f178",
+  "components": [
+    "local-path-helper-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "docker.io/library/busybox:1.37.0",
+        "component": "local-path-helper-image",
+        "digest": "sha256:d82c2ab94640ded77cf76514ce6a84870761105058a4a9e51b05a8a79be97a6c",
+        "id": "pull-local-path-helper-image",
+        "imageParentDigest": "sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.0.37"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-local-path-helper-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "local-path-helper-image-arm64",
+  "platform": "linux/arm64"
+}

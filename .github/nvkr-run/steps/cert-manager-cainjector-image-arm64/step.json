@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:4553b5321b7a7353428de7e779e8be9543d003d92c1a26af2168163b5eb8b792",
+  "components": [
+    "cert-manager-cainjector-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "quay.io/jetstack/cert-manager-cainjector:v1.21.1",
+        "component": "cert-manager-cainjector-image",
+        "digest": "sha256:0c5930d51b9acc07b1d1f6befa46bdc3591fc52c0254f6209bf595eb5fdb3b7c",
+        "id": "pull-cert-manager-cainjector-image",
+        "imageParentDigest": "sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "1.21.1"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-cert-manager-cainjector-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "cert-manager-cainjector-image-arm64",
+  "platform": "linux/arm64"
+}

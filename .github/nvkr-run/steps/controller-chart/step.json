@@ -1,0 +1,104 @@
+{
+  "buildDigest": "sha256:456d2d4697a8e36468e66fc7b16fb356f675b0deb617d7f86e1d6ac6f255af3b",
+  "components": [
+    "nvke-controller-chart"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifactPath": "charts/nvke-controller-0.23.0.tgz",
+        "builderType": "oci-hermetic",
+        "command": [
+          "package",
+          "controller/deploy/charts/controller",
+          "--version=0.23.0",
+          "--app-version=v0.23.0",
+          "--destination=charts/"
+        ],
+        "component": "nvke-controller-chart",
+        "env": [
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GOAMD64",
+            "value": "v1"
+          },
+          {
+            "name": "GOARCH",
+            "value": "amd64"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1793236039"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-nvke-controller-chart",
+        "kind": "build",
+        "needs": [
+          "fetch-source-1ccfbe41b28eaf40d7aef2c0435d4ddea55a3b56df96efd82219be97952f8063"
+        ],
+        "network": "none",
+        "outputType": "tarball",
+        "platform": "linux/amd64",
+        "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "sourceDest": "source-1ccfbe41b28eaf40d7aef2c0435d4ddea55a3b56df96efd82219be97952f8063",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "toolchain": "alpine/helm@sha256:a6cf54599ccb99d90cf0712b30f03fdb3cab062e6b94e0418cc4db7e8a1464b2",
+        "vendorSpecDigest": "sha256:6396eeb716af769bfa2f63b38b8c78299f8e98f1b605f79b06343e8bdca942a6",
+        "version": "0.23.0",
+        "workdir": "/src",
+        "writeDir": "charts"
+      },
+      {
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "dest": "source-1ccfbe41b28eaf40d7aef2c0435d4ddea55a3b56df96efd82219be97952f8063",
+        "id": "fetch-source-1ccfbe41b28eaf40d7aef2c0435d4ddea55a3b56df96efd82219be97952f8063",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/nvke",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "vendorCmd": [
+          "dependency",
+          "build",
+          "controller/deploy/charts/controller"
+        ],
+        "vendorImage": "alpine/helm@sha256:a6cf54599ccb99d90cf0712b30f03fdb3cab062e6b94e0418cc4db7e8a1464b2",
+        "vendorSpecDigest": "sha256:6396eeb716af769bfa2f63b38b8c78299f8e98f1b605f79b06343e8bdca942a6"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "build-nvke-controller-chart"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "controller-chart",
+  "platform": "linux/amd64"
+}

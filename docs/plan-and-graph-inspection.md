@@ -4,9 +4,11 @@ Use the validated Plan views to review required outputs, producer instructions, 
 publication routes before executing a Run. These read-only views explain the complete generated Plan and
 its changes. They do not observe output bytes, verify a release, or authorize execution.
 
-The Plan in `.github/nvkr-run/plan.json` remains canonical, compact JSON. Its exact bytes still participate
-in Plan identity and generated-file drift checks. Keep human views outside `.github/nvkr-run/`: that directory
-admits only manifest-owned generated files. Inspection never updates the Plan or its ownership manifest.
+The Plan in `.github/nvkr-run/plan.json` is the root of a generated file tree. Target records and command
+files live under `steps/`; the root stores distinct catalog snapshots once. Loading admits the complete
+manifest inventory and reconstructs the canonical Plan bytes that determine its identity. Keep human views
+outside `.github/nvkr-run/`: that directory admits only manifest-owned generated files. Inspection never
+updates the Plan or its ownership manifest.
 
 ## Read the Plan
 
@@ -32,7 +34,8 @@ nvkr run plan \
 ```
 
 Use either `--plan` or the pair `--definition` and `--environment`. Compilation can need access to pinned
-Git objects for catalog pin-set revalidation. Reading an existing generated Plan needs only its file.
+Git objects for catalog pin-set revalidation. Reading an existing generated Plan needs its complete bundle;
+a packed Plan exported with `--json` needs only that one file.
 Readers require the current schema, canonical bytes, safe bounded regular files, and complete graph and
 binding validation. Invalid input produces a coded error before any result bytes are emitted.
 
@@ -107,7 +110,7 @@ from a publication root or infer producer edges from matching artifact names.
 Save the previous exact Plan before regeneration, then compare it to the regenerated file:
 
 ```sh
-git show HEAD:.github/nvkr-run/plan.json > /tmp/nvkr-plan-before.json
+nvkr run plan --plan .github/nvkr-run/plan.json --json > /tmp/nvkr-plan-before.json
 GOTOOLCHAIN=local go run ./cmd/nvkr run generate \
   --definition inputs/definitions/nvke/definition.yaml \
   --environment inputs/environments/github-release.yaml --engine github --root .
@@ -153,7 +156,7 @@ checks their exact bytes. Workflow-only changes still require reviewing the gene
 `pkg/nvkr/planview` owns validated snapshots, display projections and comparisons. The CLI only selects inputs
 and formats. The module reuses factory-owned canonical loading and full Plan validation; it grants no
 artifact or execution authority. The Plan schema, canonical codec, typed digest families and generated
-bundle format are unchanged.
+wire representation are unchanged. GitHub bundle storage uses the generated file tree.
 
 Contract tests cover exact-byte JSON, display-only pretty JSON, caller-mutation isolation, invalid complete
 Plans, bounded/no-follow file loading, complete graph vertices and edges including the maintained controller

@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:bcf6a12e29fea4f68dd398645e263231b27afa6de632550eff2c37874834e6ee",
+  "components": [
+    "spire-crds-chart"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "https://github.com/spiffe/helm-charts-hardened/releases/download/spire-crds-0.6.1/spire-crds-0.6.1.tgz",
+        "artifactPath": "spire-crds-chart",
+        "component": "spire-crds-chart",
+        "digest": "sha256:ce982e63fc375e392b014fc99e621a55442ab886052413e9bb052f72d66580a8",
+        "id": "pull-spire-crds-chart",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "raw",
+        "platform": "linux/arm64",
+        "version": "0.6.1"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-spire-crds-chart"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "spire-crds",
+  "platform": "linux/arm64"
+}

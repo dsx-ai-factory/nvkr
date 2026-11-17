@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:d578cce6ed3619226148227cb7b62dc58a86657a313aedaac8d9d98375a8b22f",
+  "components": [
+    "local-path-provisioner-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "docker.io/rancher/local-path-provisioner:v0.0.37",
+        "component": "local-path-provisioner-image",
+        "digest": "sha256:c3f2c60ee2490eb83ac00101d7e239fd8c20a5b8b4038e2dfc36a7e66fe99c08",
+        "id": "pull-local-path-provisioner-image",
+        "imageParentDigest": "sha256:e757967a5ec338f6a9b371c5a9688bedaa8c3578ea3dd4db329ea0084be0a86f",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.0.37"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-local-path-provisioner-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "local-path-provisioner-image",
+  "platform": "linux/amd64"
+}

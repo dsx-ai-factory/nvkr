@@ -24,6 +24,14 @@ func TestRunPlanFileViewsRetainCanonicalBytes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	plan, err := factory.LoadPlanContext(t.Context(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	packed, err := canonical.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, test := range []struct {
 		name  string
 		flags []string
@@ -34,8 +42,8 @@ func TestRunPlanFileViewsRetainCanonicalBytes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if test.name == "canonical" && !bytes.Equal([]byte(output), original) {
-				t.Fatal("canonical CLI output is not exact stored bytes")
+			if test.name == "canonical" && !bytes.Equal([]byte(output), packed) {
+				t.Fatal("canonical CLI output is not exact reconstructed Plan bytes")
 			}
 			if test.name == "pretty" {
 				var plan factory.Plan

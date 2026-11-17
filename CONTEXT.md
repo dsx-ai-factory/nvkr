@@ -165,7 +165,9 @@ The complete generated closure of admitted Definition and Environment values, in
 packaging, routes and executable dependencies for a Run. Producer operations reference the single executable
 build instruction; observations are recorded separately. There is no authored compiler-handoff document.
 Readable views, linked graph exports and semantic comparisons describe the validated Plan; they do not replace
-its canonical stored bytes or grant execution or evidence authority.
+its canonical identity bytes or grant execution or evidence authority. GitHub bundle storage splits
+the Plan into a root, per-target JSON records and exact command files; the loader reconstructs the same
+canonical bytes before execution. Packed canonical bytes remain the wire and Tekton form.
 An opted-in dispatch-frozen Plan records an explicit repository/main allowlist's exact
 commits, trees and source timestamps together with captured authored inputs. Workers,
 retries and qualification reuse that selection; independent dependency and toolchain pins

@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:171978f56459e210849cb17743df4a7e7f3aa639624a4062adc1cf6b62c273f9",
+  "components": [
+    "nktp-kubectl-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "registry.k8s.io/kubectl:v1.35.10",
+        "component": "nktp-kubectl-image",
+        "digest": "sha256:9054520faf548fe1b9fa5409bc3bee50be0c230d0e4cd7a1f12474c8e7b5704a",
+        "id": "pull-nktp-kubectl-image",
+        "imageParentDigest": "sha256:4e1d541a3d62f74637974e4c71f3cea91b9a36ffd059ab45e355648898783837",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.1.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-nktp-kubectl-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "nktp-kubectl-image-arm64",
+  "platform": "linux/arm64"
+}

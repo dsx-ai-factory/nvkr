@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:3276928e5620f006b51f0dfaf36836279c8e208dcd2a7cd3428b9438e6430ceb",
+  "components": [
+    "spire-agent-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "ghcr.io/spiffe/spire-agent:1.15.3",
+        "component": "spire-agent-image",
+        "digest": "sha256:0d9c792d7f409b748d3a1fc93fe70b6d1450474c177d2a731ddc36e97a17e9fe",
+        "id": "pull-spire-agent-image",
+        "imageParentDigest": "sha256:41b0dcd8b258a69db9e2768292a060766fb76fd866e4bc925849981ea1b825ff",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-spire-agent-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "spire-agent-image",
+  "platform": "linux/amd64"
+}

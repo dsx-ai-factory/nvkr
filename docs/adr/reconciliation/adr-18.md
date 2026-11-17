@@ -54,3 +54,13 @@ and cross-worker exports use the lowest member job ID; capacity remains 64 jobs 
 `TestGitHubPartitionRootAdditionChurn` renders the maintained Plan before and after inserting one root
 and bounds the changed worker files to two. Split-boundary, namespace, exact bundle and inline-signer
 contracts remain local evidence; the renamed worker topology has no recorded hosted execution.
+
+GitHub runtime-input carriers continue to contain exactly three files: a packed canonical Plan,
+action data and the manifest. The bootstrap stages them separately from the committed Plan tree;
+the helper invokes the existing installer to admit and regenerate that tree. Root and step JSON may
+change during a source-pin refresh, while generated commands and every other member remain fixed.
+A vendor cohort split that changes a script pathname requires normal regeneration. Packed-carrier and
+cohort-split refusal fixtures exercise these boundaries locally. All three maintained nightly selections
+pass synthetic source-pin refresh with unchanged scripts and exact reconstructed Plan bytes. The local
+source fixture restores and replays the frozen commit through the packed carrier. No hosted carrier
+transfer with the tree layout has been recorded.

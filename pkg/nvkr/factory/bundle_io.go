@@ -65,8 +65,29 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 	if len(names) > maxGeneratedDirEntries {
 		return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run has too many members")
 	}
-	members := make([]GeneratedMember, 0, len(names))
+	// The reader's entry bound includes directories, the manifest and its lease.
+	// Admit that same inventory before creating a tree with many target folders.
+	privateRoot := filepath.ToSlash(filepath.Dir(bundle.ManifestPath))
+	entries := map[string]bool{bundle.ManifestPath: true, bundle.ManifestPath + ".lease": true}
 	for _, name := range names {
+		if !strings.HasPrefix(name, privateRoot+"/") {
+			continue
+		}
+		entries[name] = true
+		for parent := filepath.ToSlash(filepath.Dir(name)); parent != privateRoot; parent = filepath.ToSlash(filepath.Dir(parent)) {
+			entries[parent] = true
+		}
+		if len(entries) > maxGeneratedDirEntries {
+			return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run directory has too many entries")
+		}
+	}
+	members := make([]GeneratedMember, 0, len(names))
+	total := 0
+	for _, name := range names {
+		total += len(bundle.Files[name])
+		if bundle.Engine == EngineGitHub && total > maxPlanTreeBytes {
+			return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated GitHub bundle exceeds aggregate size bound")
+		}
 		if !safeGeneratedPath(name) || int64(len(bundle.Files[name])) > maxGeneratedFileBytes {
 			return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run member %q is unsafe or oversized", name)
 		}
@@ -494,7 +515,9 @@ func ensureGeneratedDirectory(root, relative string) error {
 func generatedDirectories(root string, members []string) []string {
 	set := map[string]bool{filepath.Clean(root): true}
 	for _, member := range members {
-		set[filepath.Join(root, filepath.Dir(filepath.FromSlash(member)))] = true
+		for parent := filepath.Dir(filepath.FromSlash(member)); parent != "."; parent = filepath.Dir(parent) {
+			set[filepath.Join(root, parent)] = true
+		}
 	}
 	directories := sortedKeys(set)
 	sort.Slice(directories, func(i, j int) bool {

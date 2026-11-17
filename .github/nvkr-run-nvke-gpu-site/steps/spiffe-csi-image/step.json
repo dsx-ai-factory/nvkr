@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:03c27701025845088eb5511ae703bba0aa2b61705c55b1333421778080bd939c",
+  "components": [
+    "spiffe-csi-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "ghcr.io/spiffe/spiffe-csi-driver:0.2.7",
+        "component": "spiffe-csi-image",
+        "digest": "sha256:b98766c90387033702ef64a3a4dce1aae252cb741b3ac2ef13f271dd7660bb1e",
+        "id": "pull-spiffe-csi-image",
+        "imageParentDigest": "sha256:9dfe4f0caff096164fd921aa7f15319804df2fc0325f1d90bc793ef3256ab1cd",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-spiffe-csi-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "spiffe-csi-image",
+  "platform": "linux/amd64"
+}

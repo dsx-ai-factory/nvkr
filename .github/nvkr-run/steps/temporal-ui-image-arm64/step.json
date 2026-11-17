@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:c2930be9df862350a1f5ec4bc1b9717ace8fdf6b1389192c5b5dd6f13ad4c85f",
+  "components": [
+    "temporal-ui-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "temporalio/ui:2.48.1",
+        "component": "temporal-ui-image",
+        "digest": "sha256:0e7478fad0eebac6d135a9c1efcc21f50f5026e017064b32f034585b13674788",
+        "id": "pull-temporal-ui-image",
+        "imageParentDigest": "sha256:edb5dd1b3e0ddb35611939dde9b573533afd6fbafbbf077b73c7131a30ca91ff",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-temporal-ui-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "temporal-ui-image-arm64",
+  "platform": "linux/arm64"
+}

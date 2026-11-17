@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:e8aa130bfdf139692426033c8f4b0aa4a450c26b3e94e7b39a307849185e1bf2",
+  "components": [
+    "temporal-server-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "temporalio/server:1.30.3",
+        "component": "temporal-server-image",
+        "digest": "sha256:1a71947754cd244b3e6f1beb61e2eb2408e9180f7f092fd30182849625db0ac7",
+        "id": "pull-temporal-server-image",
+        "imageParentDigest": "sha256:a3d0f727caad0ecca5dc6e94766135aab448551f2c6c0d33d3c67576458e6a0d",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-temporal-server-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "temporal-server-image",
+  "platform": "linux/amd64"
+}

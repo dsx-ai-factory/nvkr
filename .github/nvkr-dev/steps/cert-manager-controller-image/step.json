@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:58a84a3143bd2e0fe1e4149abd9c68a91d72033aa8793ec71daaea5baf0bdb5b",
+  "components": [
+    "cert-manager-controller-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "quay.io/jetstack/cert-manager-controller:v1.21.1",
+        "component": "cert-manager-controller-image",
+        "digest": "sha256:4c2b5201fd66085b777dc6b256d96d7d346b6445404cec34db5f8aea86182cc5",
+        "id": "pull-cert-manager-controller-image",
+        "imageParentDigest": "sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "1.21.1"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-cert-manager-controller-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "cert-manager-controller-image",
+  "platform": "linux/amd64"
+}

@@ -18,6 +18,52 @@ import (
 
 const githubRuntimeInputDirectory = ".nvkr/runtime-inputs"
 
+const githubRuntimeExportDirectory = ".nvkr/runtime-export"
+
+// StageGitHubRuntimeInputs prepares the three-file same-Run carrier. Its Plan is
+// packed canonical wire data; the manifest describes the reconstructed bundle.
+func StageGitHubRuntimeInputs(ctx context.Context, plan *Plan, root string) error {
+	if err := CheckGitHubRuntimeInputs(ctx, plan, root); err != nil {
+		return err
+	}
+	bundle, err := RenderGitHub(ctx, plan)
+	if err != nil {
+		return err
+	}
+	_, manifest, err := ManifestFor(bundle)
+	if err != nil {
+		return err
+	}
+	packed, err := canonical.Marshal(plan)
+	if err != nil {
+		return err
+	}
+	if err := ensureGeneratedDirectory(root, ".nvkr"); err != nil {
+		return err
+	}
+	directory := filepath.Join(root, githubRuntimeExportDirectory)
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		return e.Wrap(e.CodePipelineDrift, err, "runtime export requires a fresh staging directory")
+	}
+	files := map[string][]byte{"plan.json": packed, "manifest.json": manifest,
+		"action-data.json": bundle.Files[githubActionDataPathFor(plan)]}
+	for _, name := range sortedFileNames(files) {
+		if err := ctx.Err(); err != nil {
+			return e.Wrap(e.CodeTimeout, err, "runtime export canceled")
+		}
+		out, err := os.OpenFile(filepath.Join(directory, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+		if err != nil {
+			return e.Wrap(e.CodePipelineDrift, err, "creating runtime export")
+		}
+		_, writeErr := copyContext(ctx, out, bytes.NewReader(files[name]))
+		closeErr := out.Close()
+		if writeErr != nil || closeErr != nil {
+			return e.New(e.CodePipelineDrift, "writing runtime export failed")
+		}
+	}
+	return nil
+}
+
 // InstallGitHubRuntimeInputs admits the exact three-file, same-Run handoff in
 // the fixed staging directory before changing the committed bundle. Transport
 // authentication remains the caller's responsibility. The existing generator
@@ -61,7 +107,11 @@ func InstallGitHubRuntimeInputs(ctx context.Context, baseline *Plan, root string
 	if err != nil {
 		return err
 	}
-	expected := map[string][]byte{"plan.json": bundle.Files[bundle.PlanPath],
+	packed, err := canonical.Marshal(&fresh)
+	if err != nil {
+		return err
+	}
+	expected := map[string][]byte{"plan.json": packed,
 		"action-data.json": bundle.Files[githubActionDataPathFor(&fresh)], "manifest.json": manifest}
 	for _, name := range []string{"plan.json", "action-data.json", "manifest.json"} {
 		if !bytes.Equal(staged[name], expected[name]) {

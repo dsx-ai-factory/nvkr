@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:d72273b2730689d5099480ad873c0873bd391af818ebed625e2e62289e5bff14",
+  "components": [
+    "spire-tpm-server-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "ghcr.io/spiffe/spire-tpm-plugin-tpm-attestor-server:v1.9.0",
+        "component": "spire-tpm-server-image",
+        "digest": "sha256:0ba43be0bd5cee7afc54fb351989692ddd07c106111ecda3cf6e9cbe23da137c",
+        "id": "pull-spire-tpm-server-image",
+        "imageParentDigest": "sha256:9d3c69f9a9a59b274e7d6d9f8e75d89691d7d9204f2063d7917685a17b8828dc",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-spire-tpm-server-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "spire-tpm-server-image",
+  "platform": "linux/amd64"
+}

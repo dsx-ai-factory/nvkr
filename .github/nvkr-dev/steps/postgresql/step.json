@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:52f24a801a287763679c9cec540af6751c4fea63781922b45409af5a98dee20d",
+  "components": [
+    "postgresql-chart"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "oci-blob://registry-1.docker.io/bitnamicharts/postgresql@sha256:c350143d2e21c1e1a3670dd32ab64fd11d49198a66fae87c63a3112531c0cd17",
+        "artifactPath": "postgresql-chart",
+        "component": "postgresql-chart",
+        "digest": "sha256:c350143d2e21c1e1a3670dd32ab64fd11d49198a66fae87c63a3112531c0cd17",
+        "id": "pull-postgresql-chart",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "raw",
+        "platform": "linux/amd64",
+        "version": "18.5.15"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-postgresql-chart"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "postgresql",
+  "platform": "linux/amd64"
+}

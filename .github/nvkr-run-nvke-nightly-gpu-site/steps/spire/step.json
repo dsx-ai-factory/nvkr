@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:fd6fb5db96727b10307394ff1d158dfcf60fdfa0f7ea32d9a7a5bb9bf5b4dc12",
+  "components": [
+    "spire-chart"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "https://github.com/spiffe/helm-charts-hardened/releases/download/spire-0.30.1/spire-0.30.1.tgz",
+        "artifactPath": "spire-chart",
+        "component": "spire-chart",
+        "digest": "sha256:7c32126bb1909076cdf9fd0419dbf9e5b012f152bb09a96a4259917d70581fac",
+        "id": "pull-spire-chart",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "raw",
+        "platform": "linux/amd64",
+        "version": "0.30.1"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-spire-chart"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "spire",
+  "platform": "linux/amd64"
+}

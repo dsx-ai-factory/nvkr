@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:3dc9e7e1617d6c154265fa47490fabf381f83da9ade42411767ea0fd48956350",
+  "components": [
+    "capi-controller-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "registry.k8s.io/cluster-api/cluster-api-controller:v1.13.6",
+        "component": "capi-controller-image",
+        "digest": "sha256:d496c463f0f88fe80ff821e843013d4d441cf67a11e3b06573ab79a5be78578b",
+        "id": "pull-capi-controller-image",
+        "imageParentDigest": "sha256:e63aca1ca457d039253b55276944c40955893037600527de2f51339b2cc9fc3e",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "1.13.6"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-capi-controller-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "capi-controller-image-arm64",
+  "platform": "linux/arm64"
+}

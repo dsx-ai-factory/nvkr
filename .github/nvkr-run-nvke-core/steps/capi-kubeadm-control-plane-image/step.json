@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:89d6b6004a62168c566035552b88e772887bbf1ac6b1be98ea69f165dd95de30",
+  "components": [
+    "capi-kubeadm-control-plane-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.13.6",
+        "component": "capi-kubeadm-control-plane-image",
+        "digest": "sha256:98d120a9a3b8f6621e4e17c87d932a24db245929ee90a39ba8ffad35492c8eda",
+        "id": "pull-capi-kubeadm-control-plane-image",
+        "imageParentDigest": "sha256:13a5ba7c8e419c7fad740bb080674c33c40e6161d698a6cd5ab55f002edb00c8",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "1.13.6"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-capi-kubeadm-control-plane-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "capi-kubeadm-control-plane-image",
+  "platform": "linux/amd64"
+}

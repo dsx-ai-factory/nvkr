@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:bf71f635b11ba43d2aa5023da455f2dc7eeda3cceb3dd8dd808b63bfcb8a3ccc",
+  "components": [
+    "csi-node-driver-registrar-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.15.0",
+        "component": "csi-node-driver-registrar-image",
+        "digest": "sha256:1ca23bdbb1504e41233d527e826d02dac98571c45a6cd74c5fb28be485d680fa",
+        "id": "pull-csi-node-driver-registrar-image",
+        "imageParentDigest": "sha256:11f199f6bec47403b03cb49c79a41f445884b213b382582a60710b8c6fdc316a",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-csi-node-driver-registrar-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "csi-node-driver-registrar-image",
+  "platform": "linux/amd64"
+}

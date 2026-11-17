@@ -1,0 +1,428 @@
+{
+  "buildDigest": "sha256:db4db2a322897cf22a123ca753d1083e141624d903cb8ed0514e2405252b9634",
+  "components": [
+    "clusterctl",
+    "helm",
+    "kind",
+    "kubectl",
+    "oras"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifactPath": "nvkr-output/clusterctl",
+        "builderType": "oci-hermetic",
+        "command": [
+          "bash",
+          "-euc",
+          {
+            "file": "build-clusterctl.sh"
+          }
+        ],
+        "component": "clusterctl",
+        "env": [
+          {
+            "name": "BUILD_VERSION",
+            "value": "v1.13.6"
+          },
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GIT_VERSION",
+            "value": "bd8162edfe045c1bb490d431b3acddd568bdb887"
+          },
+          {
+            "name": "GOARCH",
+            "value": "arm64"
+          },
+          {
+            "name": "GOARM64",
+            "value": "v8.0"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "KUBE_GIT_MAJOR",
+            "value": "1"
+          },
+          {
+            "name": "KUBE_GIT_MINOR",
+            "value": "13"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1788866431"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-clusterctl",
+        "kind": "build",
+        "needs": [
+          "fetch-source-408014b0165a27aca697ceb05e30ec47fea550fcf82e01774763543a4ee4a7be"
+        ],
+        "network": "none",
+        "outputType": "host-package",
+        "platform": "linux/arm64",
+        "sourceCommit": "bd8162edfe045c1bb490d431b3acddd568bdb887",
+        "sourceDest": "source-408014b0165a27aca697ceb05e30ec47fea550fcf82e01774763543a4ee4a7be",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "8c584c260a47253fb8ebc5681a7eb894798ace7a",
+        "toolchain": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9",
+        "vendorSpecDigest": "sha256:7717fb91ff58d6437ef87063f9491f08c02164f3c2b129c171893252d7c57b5e",
+        "version": "1.13.6",
+        "workdir": "/src",
+        "writeDir": "nvkr-output"
+      },
+      {
+        "artifactPath": "nvkr-output/kind",
+        "builderType": "oci-hermetic",
+        "command": [
+          "bash",
+          "-euc",
+          {
+            "file": "build-kind.sh"
+          }
+        ],
+        "component": "kind",
+        "env": [
+          {
+            "name": "BUILD_VERSION",
+            "value": "0.32.0"
+          },
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GIT_VERSION",
+            "value": "cda67ef8588f6bfdac5358233f2471cb2149ecaf"
+          },
+          {
+            "name": "GOARCH",
+            "value": "arm64"
+          },
+          {
+            "name": "GOARM64",
+            "value": "v8.0"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1780417734"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-kind",
+        "kind": "build",
+        "needs": [
+          "fetch-source-bdadb40b95f119c8b28dda892407c1a1a9360dbe0b65330bfb11ffde47544709"
+        ],
+        "network": "none",
+        "outputType": "host-package",
+        "platform": "linux/arm64",
+        "sourceCommit": "cda67ef8588f6bfdac5358233f2471cb2149ecaf",
+        "sourceDest": "source-bdadb40b95f119c8b28dda892407c1a1a9360dbe0b65330bfb11ffde47544709",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "be4d44635ebcab72f70760c8e04684cbd98d3969",
+        "toolchain": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9",
+        "vendorSpecDigest": "sha256:7717fb91ff58d6437ef87063f9491f08c02164f3c2b129c171893252d7c57b5e",
+        "version": "0.32.0",
+        "workdir": "/src",
+        "writeDir": "nvkr-output"
+      },
+      {
+        "artifactPath": "nvkr-output/kubectl",
+        "builderType": "oci-hermetic",
+        "command": [
+          "bash",
+          "-euc",
+          {
+            "file": "build-kubectl.sh"
+          }
+        ],
+        "component": "kubectl",
+        "env": [
+          {
+            "name": "BUILD_VERSION",
+            "value": "v1.36.0"
+          },
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GIT_VERSION",
+            "value": "ecf6decece6a6de25a57aad9ba90b6ce580f6f78"
+          },
+          {
+            "name": "GOARCH",
+            "value": "arm64"
+          },
+          {
+            "name": "GOARM64",
+            "value": "v8.0"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "KUBE_GIT_MAJOR",
+            "value": "1"
+          },
+          {
+            "name": "KUBE_GIT_MINOR",
+            "value": "36"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1776865911"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-kubectl",
+        "kind": "build",
+        "needs": [
+          "fetch-source-c6b01e20bbd7d0f387bd240175c2ac28b0f7ce70425aa8af7d7cd153c118933f"
+        ],
+        "network": "none",
+        "outputType": "host-package",
+        "platform": "linux/arm64",
+        "sourceCommit": "ecf6decece6a6de25a57aad9ba90b6ce580f6f78",
+        "sourceDest": "source-c6b01e20bbd7d0f387bd240175c2ac28b0f7ce70425aa8af7d7cd153c118933f",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "5cd415ea43f3b052c5d1b97bbfa8870a4fc5d144",
+        "toolchain": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9",
+        "vendorSpecDigest": "sha256:83c6532fa1a583a28de8685783ffb867698d981ce4cb4c186a0e05b2c4dc2087",
+        "version": "1.36.0",
+        "workdir": "/src",
+        "writeDir": "nvkr-output"
+      },
+      {
+        "artifactPath": "nvkr-output/oras",
+        "builderType": "oci-hermetic",
+        "command": [
+          "bash",
+          "-euc",
+          {
+            "file": "build-oras.sh"
+          }
+        ],
+        "component": "oras",
+        "env": [
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GIT_VERSION",
+            "value": "210747c29c1d38732b3194878dfd8b5a6b9ad7eb"
+          },
+          {
+            "name": "GOARCH",
+            "value": "arm64"
+          },
+          {
+            "name": "GOARM64",
+            "value": "v8.0"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1783708065"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-oras",
+        "kind": "build",
+        "needs": [
+          "fetch-source-af93f9e3b992448ce9de5614a8a9fbb0c3674f67e0d8c8fb1931b526aa64170e"
+        ],
+        "network": "none",
+        "outputType": "host-package",
+        "platform": "linux/arm64",
+        "sourceCommit": "210747c29c1d38732b3194878dfd8b5a6b9ad7eb",
+        "sourceDest": "source-af93f9e3b992448ce9de5614a8a9fbb0c3674f67e0d8c8fb1931b526aa64170e",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "a4b0547c6e18c9abc9b1eac5fb8add27a7c4ce2f",
+        "toolchain": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9",
+        "vendorSpecDigest": "sha256:7717fb91ff58d6437ef87063f9491f08c02164f3c2b129c171893252d7c57b5e",
+        "version": "1.3.3",
+        "workdir": "/src",
+        "writeDir": "nvkr-output"
+      },
+      {
+        "commit": "bd8162edfe045c1bb490d431b3acddd568bdb887",
+        "dest": "source-408014b0165a27aca697ceb05e30ec47fea550fcf82e01774763543a4ee4a7be",
+        "id": "fetch-source-408014b0165a27aca697ceb05e30ec47fea550fcf82e01774763543a4ee4a7be",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/kubernetes-sigs/cluster-api",
+        "treeHash": "8c584c260a47253fb8ebc5681a7eb894798ace7a",
+        "vendorCmd": [
+          "bash",
+          "-euc",
+          {
+            "file": "vendor-clusterctl.sh"
+          }
+        ],
+        "vendorImage": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9",
+        "vendorSpecDigest": "sha256:7717fb91ff58d6437ef87063f9491f08c02164f3c2b129c171893252d7c57b5e"
+      },
+      {
+        "commit": "210747c29c1d38732b3194878dfd8b5a6b9ad7eb",
+        "dest": "source-af93f9e3b992448ce9de5614a8a9fbb0c3674f67e0d8c8fb1931b526aa64170e",
+        "id": "fetch-source-af93f9e3b992448ce9de5614a8a9fbb0c3674f67e0d8c8fb1931b526aa64170e",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/oras-project/oras",
+        "treeHash": "a4b0547c6e18c9abc9b1eac5fb8add27a7c4ce2f",
+        "vendorCmd": [
+          "bash",
+          "-euc",
+          {
+            "file": "vendor-oras.sh"
+          }
+        ],
+        "vendorImage": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9",
+        "vendorSpecDigest": "sha256:7717fb91ff58d6437ef87063f9491f08c02164f3c2b129c171893252d7c57b5e"
+      },
+      {
+        "commit": "cda67ef8588f6bfdac5358233f2471cb2149ecaf",
+        "dest": "source-bdadb40b95f119c8b28dda892407c1a1a9360dbe0b65330bfb11ffde47544709",
+        "id": "fetch-source-bdadb40b95f119c8b28dda892407c1a1a9360dbe0b65330bfb11ffde47544709",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/kubernetes-sigs/kind",
+        "treeHash": "be4d44635ebcab72f70760c8e04684cbd98d3969",
+        "vendorCmd": [
+          "bash",
+          "-euc",
+          {
+            "file": "vendor-kind.sh"
+          }
+        ],
+        "vendorImage": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9",
+        "vendorSpecDigest": "sha256:7717fb91ff58d6437ef87063f9491f08c02164f3c2b129c171893252d7c57b5e"
+      },
+      {
+        "commit": "ecf6decece6a6de25a57aad9ba90b6ce580f6f78",
+        "dest": "source-c6b01e20bbd7d0f387bd240175c2ac28b0f7ce70425aa8af7d7cd153c118933f",
+        "id": "fetch-source-c6b01e20bbd7d0f387bd240175c2ac28b0f7ce70425aa8af7d7cd153c118933f",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/kubernetes/kubernetes",
+        "treeHash": "5cd415ea43f3b052c5d1b97bbfa8870a4fc5d144",
+        "vendorImage": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9",
+        "vendorSpecDigest": "sha256:83c6532fa1a583a28de8685783ffb867698d981ce4cb4c186a0e05b2c4dc2087"
+      },
+      {
+        "artifact": "https://get.helm.sh/helm-v4.2.4-linux-arm64.tar.gz",
+        "artifactPath": "helm",
+        "component": "helm",
+        "digest": "sha256:0690653ac2aad19150f0c22383ceb8aaf4fd96666fcfabb9d4641fbf757e0490",
+        "env": [
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1786632363"
+          }
+        ],
+        "executableArchive": {
+          "digest": "sha256:564de2191b881e9f71b5606b25345821ea1682f06ab90499d3ab22b530176da1",
+          "member": "linux-arm64/helm"
+        },
+        "id": "pull-helm",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "host-package",
+        "platform": "linux/arm64",
+        "version": "4.2.4"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "build-clusterctl",
+          "build-kind",
+          "build-kubectl",
+          "build-oras",
+          "pull-helm"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "installer-tools-arm64",
+  "platform": "linux/arm64"
+}

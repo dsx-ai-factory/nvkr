@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:c1c903f32e37e478355cd42668c054ab4021e19e5e5e17e617f5b24d5a87b17d",
+  "components": [
+    "nktp-kube-state-metrics-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0",
+        "component": "nktp-kube-state-metrics-image",
+        "digest": "sha256:92b46557c71ecac53825772e4827dbcd9fca876b1950060f8fb2f2ef0d7a27af",
+        "id": "pull-nktp-kube-state-metrics-image",
+        "imageParentDigest": "sha256:42cfe3723a5f058171c627537fb57a3ea0f26e4380fa18555a95cb1a1b4cfc5b",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.1.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-nktp-kube-state-metrics-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "nktp-kube-state-metrics-image-arm64",
+  "platform": "linux/arm64"
+}

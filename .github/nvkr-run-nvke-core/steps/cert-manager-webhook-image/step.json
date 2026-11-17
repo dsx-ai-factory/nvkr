@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:c4a770ef1c797cc7cea102ff5181683acda34287da14ef798ae229f9cdee3ccb",
+  "components": [
+    "cert-manager-webhook-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "quay.io/jetstack/cert-manager-webhook:v1.21.1",
+        "component": "cert-manager-webhook-image",
+        "digest": "sha256:741084291faf115a2909bfe3515458b54926c67f039ac20effd821bac69817a4",
+        "id": "pull-cert-manager-webhook-image",
+        "imageParentDigest": "sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "1.21.1"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-cert-manager-webhook-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "cert-manager-webhook-image",
+  "platform": "linux/amd64"
+}

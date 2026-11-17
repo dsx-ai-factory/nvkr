@@ -763,6 +763,12 @@ succeed and report its complete Plan-derived membership before recovery; its agg
 individual producer outcomes. Execution partitioning, a fallback the Environment permits and the generator
 engages only when the flat workflow exceeds a provider size limit, moves jobs into same-commit callable workers
 within one complete Plan, finalizer, Run and Release.
+GitHub stores the complete Plan as a manifest-bound root, per-target JSON records and
+byte-exact command files. Catalog snapshots appear once under their existing digests.
+Admission reconstructs the same canonical Plan and compares the exact file tree before
+execution. Runtime carriers and Tekton retain the packed canonical form; helper consumers
+stage that form and let the generation owner reconstruct the GitHub bundle. This storage
+layout does not change Plan or Build identity (ADR-21).
 [ADR-18 §8](adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
 owns the grouping, the jobs that stay in the entry workflow, result forwarding and the proposed signer
 migration; [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold)

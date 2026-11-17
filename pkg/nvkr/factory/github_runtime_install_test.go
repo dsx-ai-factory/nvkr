@@ -29,7 +29,7 @@ func stageGitHubRuntimeInputs(t *testing.T, root string, plan *Plan) *GeneratedB
 	if err := os.MkdirAll(directory, 0755); err != nil {
 		t.Fatal(err)
 	}
-	for name, raw := range map[string][]byte{"plan.json": bundle.Files[bundle.PlanPath], "action-data.json": bundle.Files[githubActionDataPathFor(plan)], "manifest.json": manifest} {
+	for name, raw := range map[string][]byte{"plan.json": mustCanonical(t, plan), "action-data.json": bundle.Files[githubActionDataPathFor(plan)], "manifest.json": manifest} {
 		if err := os.WriteFile(filepath.Join(directory, name), raw, 0644); err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +76,8 @@ func TestInstallGitHubRuntimeInputsUsesGeneratedFileOwner(t *testing.T) {
 				t.Fatal(err)
 			}
 			for name, prior := range baseline.Files {
-				if name == baseline.PlanPath || name == githubActionDataPathFor(before) {
+				step := strings.HasPrefix(name, filepath.ToSlash(filepath.Dir(baseline.PlanPath))+"/steps/") && strings.HasSuffix(name, "/step.json")
+				if name == baseline.PlanPath || name == githubActionDataPathFor(before) || step {
 					continue
 				}
 				raw, err := os.ReadFile(filepath.Join(root, name))

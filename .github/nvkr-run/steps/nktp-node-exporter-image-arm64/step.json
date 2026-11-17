@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:f52766eb6c7875e38083f1b136af7a3c15d2b37e391e3e86aa1802a4becab6eb",
+  "components": [
+    "nktp-node-exporter-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "quay.io/prometheus/node-exporter:v1.12.1",
+        "component": "nktp-node-exporter-image",
+        "digest": "sha256:c9ef89f9464f09e7234decaae68a80ab856ff0014435677a99fd48b03dd410ea",
+        "id": "pull-nktp-node-exporter-image",
+        "imageParentDigest": "sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.1.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-nktp-node-exporter-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "nktp-node-exporter-image-arm64",
+  "platform": "linux/arm64"
+}

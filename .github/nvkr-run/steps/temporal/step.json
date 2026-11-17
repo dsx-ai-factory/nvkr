@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:e09c78f63d4bcdbf48bb19ccbd75395aba819a3d8dbd48f88bca8364ea11f6fe",
+  "components": [
+    "temporal-chart"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "https://github.com/temporalio/helm-charts/releases/download/temporal-0.74.0/temporal-0.74.0.tgz",
+        "artifactPath": "temporal-chart",
+        "component": "temporal-chart",
+        "digest": "sha256:14a8efe1cc92c91befac151db91f20f9a13962788e9d710c86655add6d966d37",
+        "id": "pull-temporal-chart",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "raw",
+        "platform": "linux/amd64",
+        "version": "0.74.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-temporal-chart"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "temporal",
+  "platform": "linux/amd64"
+}

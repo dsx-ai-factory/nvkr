@@ -6,6 +6,7 @@ package factory
 import (
 	"bytes"
 	"context"
+	"path"
 	"slices"
 	"strings"
 
@@ -65,7 +66,8 @@ func PrepareGitHubRuntimeBundle(ctx context.Context, freshPlan *Plan, root strin
 		return e.New(e.CodePipelineDrift, "runtime GitHub preparation cannot change generated member paths; regenerate the bundle")
 	}
 	for _, member := range sortedFileNames(baseline.Files) {
-		if member == layout.planPath || member == githubActionDataPathFor(freshPlan) {
+		if member == layout.planPath || member == githubActionDataPathFor(freshPlan) ||
+			(strings.HasPrefix(member, path.Dir(layout.planPath)+"/steps/") && strings.HasSuffix(member, "/step.json")) {
 			continue
 		}
 		if !bytes.Equal(baseline.Files[member], fresh.Files[member]) {

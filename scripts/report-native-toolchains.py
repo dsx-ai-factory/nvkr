@@ -21,6 +21,17 @@ JOBS = ("measure", "admit", "publish", "verify-candidate", "propose")
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 
 
+def load_plan(filename):
+    # The trusted helper is built before comparison by the maintenance workflow.
+    # Its shared loader admits either packed wire bytes or the complete tree.
+    result = subprocess.run(
+        ["./nvkr-exec", "run", "plan", "--plan", str(filename), "--json"],
+        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+        check=True, timeout=60,
+    )
+    return json.loads(result.stdout)
+
+
 def compare(plan, proposal, arch):
     """Compare the two described manifest subjects with the selected Plan pins."""
     if arch not in ARCHES:
@@ -157,7 +168,7 @@ def main():
     commands.add_parser("report")
     args = parser.parse_args()
     if args.command == "compare":
-        changed = compare(json.loads(args.plan.read_text()), json.loads(args.proposal.read_text()), args.arch)
+        changed = compare(load_plan(args.plan), json.loads(args.proposal.read_text()), args.arch)
         with Path(os.environ["GITHUB_OUTPUT"]).open("a") as output:
             output.write(f"changed_{args.arch}={str(changed).lower()}\n")
     else:

@@ -1,0 +1,33 @@
+{
+  "buildDigest": "sha256:7417629b1c8ad47479421d19d09caac586f0489befa33cf0c710d24473fbe81c",
+  "components": [
+    "postgresql-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "registry-1.docker.io/bitnami/postgresql@sha256:b74b23f091dcc87041bcae557d840c36458af46b955279cb13aedec4c32d7f71",
+        "component": "postgresql-image",
+        "digest": "sha256:9ca5fe8db49a439acdfda55fcbd6ff1c44bc84facf5e775b7e170434d61ce18c",
+        "id": "pull-postgresql-image",
+        "imageParentDigest": "sha256:b74b23f091dcc87041bcae557d840c36458af46b955279cb13aedec4c32d7f71",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-postgresql-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "postgresql-image",
+  "platform": "linux/amd64"
+}

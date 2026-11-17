@@ -76,7 +76,7 @@ func TestGitHubRuntimeTransportCompilesOnceAndRestoresEveryHelper(t *testing.T) 
 			}
 			bootstrap := runtimeTransportBootstraps(t, plan)
 			first := bootstrap[sortedKeys(bootstrap)[0]]
-			paths := []string{bundle.PlanPath, path.Join(path.Dir(bundle.PlanPath), "action-data.json"), bundle.ManifestPath}
+			paths := []string{".nvkr/runtime-export/plan.json", ".nvkr/runtime-export/action-data.json", ".nvkr/runtime-export/manifest.json"}
 			compileCount, runtimeUploads, runnerUploads, secondaryDownloads, installations := 0, 0, 0, 0, 0
 			for runner, id := range bootstrap {
 				job := document.Jobs[id]
@@ -101,7 +101,7 @@ func TestGitHubRuntimeTransportCompilesOnceAndRestoresEveryHelper(t *testing.T) 
 					case "Upload NVKR runtime inputs":
 						runtimeUploads++
 						want := map[string]string{"name": "nvkr-runtime-inputs", "path": strings.Join(paths, "\n") + "\n", "include-hidden-files": "true", "if-no-files-found": "error", "retention-days": "7"}
-						if id != first || step.Uses != plan.Actions["upload-artifact"].Uses() || !reflect.DeepEqual(step.With, want) || index == 0 || job.Steps[index-1].ID != "validate-catalog" {
+						if id != first || step.Uses != plan.Actions["upload-artifact"].Uses() || !reflect.DeepEqual(step.With, want) || index < 2 || job.Steps[index-1].Name != "Stage packed runtime inputs" || job.Steps[index-2].ID != "validate-catalog" {
 							t.Fatalf("planner does not upload exactly the checked flat three-file closure: %+v", step)
 						}
 					case "Download NVKR runtime inputs":
@@ -261,7 +261,8 @@ func TestGitHubRuntimeTransportSourcePinUpdatePreservesProviderPrograms(t *testi
 		t.Fatal("pin update did not refresh exact Plan and stage descriptor bytes")
 	}
 	for name, raw := range baseline.Files {
-		if name != baseline.PlanPath && name != githubActionDataPathFor(before) && !bytes.Equal(raw, fresh.Files[name]) {
+		step := strings.HasPrefix(name, path.Dir(baseline.PlanPath)+"/steps/") && strings.HasSuffix(name, "/step.json")
+		if name != baseline.PlanPath && name != githubActionDataPathFor(before) && !step && !bytes.Equal(raw, fresh.Files[name]) {
 			t.Fatalf("pin update changed the scheduled provider program %s", name)
 		}
 	}

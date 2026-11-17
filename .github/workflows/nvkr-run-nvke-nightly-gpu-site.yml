@@ -62,15 +62,18 @@ jobs:
       - name: Verify committed Run generation is current
         id: validate-catalog
         run: ./nvkr-exec run generate --engine github --definition inputs/definitions/nvke/gpu-site.composite.yaml --environment inputs/environments/github-nvke-nightly-gpu-site.yaml --root . --runtime
+      - name: 'Stage packed runtime inputs'
+        run: |
+          ./nvkr-exec factory github stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly-gpu-site/plan.json
       - name: Upload NVKR runtime inputs
         uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/ci-upload
         if: ${{ github.run_attempt == 1 }}
         with:
           name: nvkr-runtime-inputs
           path: |
-            .github/nvkr-run-nvke-nightly-gpu-site/plan.json
-            .github/nvkr-run-nvke-nightly-gpu-site/action-data.json
-            .github/nvkr-run-nvke-nightly-gpu-site/manifest.json
+            .nvkr/runtime-export/plan.json
+            .nvkr/runtime-export/action-data.json
+            .nvkr/runtime-export/manifest.json
           include-hidden-files: 'true'
           if-no-files-found: error
           retention-days: 14
@@ -81,9 +84,9 @@ jobs:
           name: 'nvkr-exec-arc-amd64-kvm'
           path: |
             nvkr-exec
-            .github/nvkr-run-nvke-nightly-gpu-site/plan.json
-            .github/nvkr-run-nvke-nightly-gpu-site/action-data.json
-            .github/nvkr-run-nvke-nightly-gpu-site/manifest.json
+            .nvkr/runtime-export/plan.json
+            .nvkr/runtime-export/action-data.json
+            .nvkr/runtime-export/manifest.json
           include-hidden-files: 'true'
           if-no-files-found: error
           retention-days: 14
@@ -127,15 +130,18 @@ jobs:
       - name: Verify committed Run generation is current
         id: validate-catalog
         run: ./nvkr-exec factory github check-runtime-inputs --plan .github/nvkr-run-nvke-nightly-gpu-site/plan.json
+      - name: 'Stage packed runtime inputs'
+        run: |
+          ./nvkr-exec factory github stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly-gpu-site/plan.json
       - name: 'Upload NVKR runner'
         uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/ci-upload
         with:
           name: 'nvkr-exec-arc-arm64-kvm'
           path: |
             nvkr-exec
-            .github/nvkr-run-nvke-nightly-gpu-site/plan.json
-            .github/nvkr-run-nvke-nightly-gpu-site/action-data.json
-            .github/nvkr-run-nvke-nightly-gpu-site/manifest.json
+            .nvkr/runtime-export/plan.json
+            .nvkr/runtime-export/action-data.json
+            .nvkr/runtime-export/manifest.json
           include-hidden-files: 'true'
           if-no-files-found: error
           retention-days: 14
@@ -175,15 +181,18 @@ jobs:
       - name: Verify committed Run generation is current
         id: validate-catalog
         run: ./nvkr-exec factory github check-runtime-inputs --plan .github/nvkr-run-nvke-nightly-gpu-site/plan.json
+      - name: 'Stage packed runtime inputs'
+        run: |
+          ./nvkr-exec factory github stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly-gpu-site/plan.json
       - name: 'Upload NVKR runner'
         uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/ci-upload
         with:
           name: 'nvkr-exec-ubuntu-24-04'
           path: |
             nvkr-exec
-            .github/nvkr-run-nvke-nightly-gpu-site/plan.json
-            .github/nvkr-run-nvke-nightly-gpu-site/action-data.json
-            .github/nvkr-run-nvke-nightly-gpu-site/manifest.json
+            .nvkr/runtime-export/plan.json
+            .nvkr/runtime-export/action-data.json
+            .nvkr/runtime-export/manifest.json
           include-hidden-files: 'true'
           if-no-files-found: error
           retention-days: 14
@@ -223,15 +232,18 @@ jobs:
       - name: Verify committed Run generation is current
         id: validate-catalog
         run: ./nvkr-exec factory github check-runtime-inputs --plan .github/nvkr-run-nvke-nightly-gpu-site/plan.json
+      - name: 'Stage packed runtime inputs'
+        run: |
+          ./nvkr-exec factory github stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly-gpu-site/plan.json
       - name: 'Upload NVKR runner'
         uses: ./.github/nvkr-run-nvke-nightly-gpu-site/actions/ci-upload
         with:
           name: 'nvkr-exec-ubuntu-24-04-arm'
           path: |
             nvkr-exec
-            .github/nvkr-run-nvke-nightly-gpu-site/plan.json
-            .github/nvkr-run-nvke-nightly-gpu-site/action-data.json
-            .github/nvkr-run-nvke-nightly-gpu-site/manifest.json
+            .nvkr/runtime-export/plan.json
+            .nvkr/runtime-export/action-data.json
+            .nvkr/runtime-export/manifest.json
           include-hidden-files: 'true'
           if-no-files-found: error
           retention-days: 14
