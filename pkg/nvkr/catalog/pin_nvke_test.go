@@ -175,7 +175,7 @@ func TestNVKEPinSetRejectsInvalidBetaLocalChartMetadata(t *testing.T) {
 		{"artifact mapping empty", controller, "artifact: controller-chart", "artifact: \"\""},
 		{"artifact mapping null", controller, "artifact: controller-chart", "artifact: null"},
 		{"artifact mapping numeric", controller, "artifact: controller-chart", "artifact: 1"},
-		{"image mapping whitespace", controller, "imageArtifact: nvke-controller", "imageArtifact: \"nvke-controller image\""},
+		{"image mapping whitespace", controller, "imageArtifact: cwe", "imageArtifact: \"nvke-controller image\""},
 		{"profiles mapping reference", controller, "profilesArtifact: controller-profiles", "profilesArtifact: registry.example/profiles"},
 		{"external artifact mapping", "deploy/nico/spire/release.yaml", "chart:\n", "chart:\n  artifact: spire\n"},
 	} {

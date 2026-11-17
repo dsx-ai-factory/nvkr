@@ -60,7 +60,7 @@ case "$1:$2" in
   printf 'generate\n' >> "$EVENTS"; printf '{}\n';;
  bootstrap:site)
   test -z "${NVKECTL_BOOTSTRAP_NODE_IMAGE+x}"
-  case " $* " in *" --controller-image "*|*" --nvke-controller-image "*) exit 55;; esac
+  case " $* " in *" --controller-image "*) exit 55;; esac
   case " $* " in *" --nvke-controller-image $EXPECTED_CONTROLLER_IMAGE "*) ;; *) exit 56;; esac
   case " $* " in *" --provisioned-provider-image docker.io/library/provider:fixture "*) ;; *) exit 57;; esac
   printf 'bootstrap\n' >> "$EVENTS"
