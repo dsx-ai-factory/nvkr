@@ -640,7 +640,7 @@ func extractNativeInstaller(ctx context.Context, archive, installer string, sele
 		"SOURCE_COMMIT", "CAPI_VERSION", nativeSiteSpecPath, "make/tool-versions.mk", "deploy/nvke-deploy.sh", "deploy/lib/nvke-deploy-items.py",
 		"deploy/lib/render-template.py", "deploy/nico/nvke-deploy.yaml",
 		"deploy/nico/capnico/release.yaml",
-		"controller/deploy/charts/controller/Chart.yaml", "nktp/deploy/charts/nktp/Chart.yaml",
+		"controller/deploy/charts/controller/Chart.yaml",
 		"controller/nico-sim/internal/seed/default-seed.yaml", "controller/nico-sim/ui/index.html",
 		"controller/deploy/k8s/capi-spiffe-exec-auth/capi-controller-manager.yaml",
 		releasePrefix + "machineimage.yaml",

@@ -356,14 +356,13 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 		t.Fatal(err)
 	}
 	versions := []byte("CAPI_VERSION ?= " + selected.capiVersion + "\n")
-	for _, scenario := range []string{"complete", "missing versions", "missing site specification", "missing CAPNICo release", "changed provider", "missing source marker", "changed source marker", "canceled"} {
+	for _, scenario := range []string{"complete", "missing versions", "missing site specification", "missing CAPNICo release", "changed provider", "missing source marker", "changed source marker", "canceled", "published NKTP chart"} {
 		t.Run(scenario, func(t *testing.T) {
 			entries := []assetEntry{
 				{"deploy/nvke-deploy.sh", tar.TypeReg, "installer", 0},
 				{"deploy/lib/nvke-deploy-items.py", tar.TypeReg, "items", 0},
 				{"deploy/lib/render-template.py", tar.TypeReg, "renderer", 0},
 				{"controller/deploy/charts/controller/Chart.yaml", tar.TypeReg, "name: nvke-controller\n", 0},
-				{"nktp/deploy/charts/nktp/Chart.yaml", tar.TypeReg, "nktp chart", 0},
 				{"controller/deploy/k8s/capi-spiffe-exec-auth/capi-controller-manager.yaml", tar.TypeReg, "capi overlay", 0},
 				{"controller/test/fixtures/releases/nvke-nico-vms-24.04-arm64-fde-machineimage.yaml", tar.TypeReg, "machineimage", 0},
 				{"controller/test/fixtures/releases/nvke-nico-vms-24.04-arm64-fde-clusterrelease.yaml", tar.TypeReg, "clusterrelease", 0},
@@ -376,6 +375,11 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 				if index < 3 {
 					entries = append(entries, assetEntry{nativeControllerSourceFiles[index], tar.TypeReg, raw, 0})
 				}
+			}
+			// NVKE releases before the in-tree chart's removal carry it; later
+			// ones install NKTP's published chart, so the archive has none.
+			if scenario != "published NKTP chart" {
+				entries = append(entries, assetEntry{"nktp/deploy/charts/nktp/Chart.yaml", tar.TypeReg, "nktp chart", 0})
 			}
 			if scenario != "missing site specification" {
 				entries = append(entries, assetEntry{nativeSiteSpecPath, tar.TypeReg, nativeInstallerSiteSpecFixture, 0})
@@ -407,10 +411,11 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 			}
 			before := *selected
 			extracted, err := extractNativeInstaller(ctx, writeAssetArchive(t, entries), privateTestDir(t), selected)
-			if (err == nil) != (scenario == "complete") {
+			admitted := scenario == "complete" || scenario == "published NKTP chart"
+			if (err == nil) != admitted {
 				t.Fatalf("unexpected extraction admission: %v", err)
 			}
-			if scenario == "complete" && (extracted == nil || extracted.controller.name != "nke-controller" || extracted.controller.digests == [4]string{}) {
+			if admitted && (extracted == nil || extracted.controller.name != "nke-controller" || extracted.controller.digests == [4]string{}) {
 				t.Fatal("valid extraction lost source controller selection")
 			}
 			if *selected != before {
