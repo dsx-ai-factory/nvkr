@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
@@ -534,10 +535,7 @@ func sortedUnique(label string, values []string) error {
 }
 
 func (profile Environment) RuntimeBinary() string {
-	if r := strings.TrimSpace(profile.Runtime.Runtime); r != "" {
-		return r
-	}
-	return "podman"
+	return containerruntime.Default(profile.Runtime.Runtime)
 }
 
 func (profile Runtime) validate() error {
@@ -566,8 +564,8 @@ func (profile Runtime) validate() error {
 	if profile.BuilderImage != "" {
 		return e.New(e.CodeEngineCapability, "runtime builderImage requires the retired GitLab bootstrap adapter")
 	}
-	if profile.Runtime != "" && profile.Runtime != "podman" && profile.Runtime != "docker" {
-		return e.New(e.CodeInvalidCatalog, "delivery runtime %q is unsupported (podman|docker)", profile.Runtime)
+	if _, err := containerruntime.Select(profile.Runtime, ""); err != nil {
+		return e.Wrap(e.CodeInvalidCatalog, err, "delivery runtime")
 	}
 	for label, image := range map[string]string{"runtimeImage": profile.RuntimeImage, "helperImage": profile.HelperImage} {
 		if image != "" && !strings.Contains(image, "@sha256:") {

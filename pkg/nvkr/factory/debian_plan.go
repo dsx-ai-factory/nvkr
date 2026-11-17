@@ -4,7 +4,6 @@
 package factory
 
 import (
-	"path/filepath"
 	"runtime"
 
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
@@ -29,9 +28,6 @@ func admitLocalDebianHost(plan *Plan, options LocalRunOptions) error {
 		}
 		if options.DryRun {
 			continue
-		}
-		if filepath.Base(options.Runtime) != plan.Environment.RuntimeBinary() {
-			return e.New(e.CodeEngineCapability, "raw Debian execution runtime differs from its Environment")
 		}
 		if runtime.GOOS != "linux" || output.Platform != "linux/"+runtime.GOARCH {
 			return e.New(e.CodeEngineCapability, "raw Debian execution requires its native Linux host")

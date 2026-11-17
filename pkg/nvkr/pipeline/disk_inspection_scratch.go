@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -55,7 +56,7 @@ func openDiskInspectionScratch(ctx context.Context, runtime packerContainerRunti
 	if err := validateDiskInspectionSelection(selection); err != nil {
 		return nil, err
 	}
-	if runtime == nil || (runtime.RuntimeName() != "docker" && runtime.RuntimeName() != "podman") ||
+	if runtime == nil || containerruntime.Validate(runtime.RuntimeName()) != nil ||
 		selection.MaxFilesystemBytes == 0 || selection.Resources.EphemeralStorageMiB == 0 ||
 		!canonical.IsDigest(imageID) || len(attempt) != 24 {
 		return nil, e.New(e.CodeEngineCapability, "inspection scratch requires its admitted image, runtime, storage request and private attempt")

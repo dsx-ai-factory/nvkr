@@ -366,8 +366,11 @@ thread-local before exec; a Go scheduler handoff must not change the thread that
 If the transition fails, its goroutine exits without unlocking so the runtime retires the possibly restricted
 thread instead of returning it to the scheduler.
 
-Environment selects the runtime and its pins. Rootless podman is the intended default, with docker an explicit
-operator-selected alternative. Admit the configured runtime before work; do not silently choose another sandbox
+Environment selects the runtime and its pins. Docker is the default for omitted runtime selections, matching
+the maintained hosted Environments; Podman remains an explicit alternative. Local Runs inherit the Environment
+runtime, and an explicit conflicting executable fails capability admission before workspace or execution work,
+including dry runs. Runtime selection describes the CLI dialect, not observed rootlessness; engine-observed
+container-user mapping remains deferred. Admit the configured runtime before work; do not silently choose another sandbox
 or weaker isolation. Rootless operation still depends on supported user namespaces, UID mapping, storage,
 cgroups and the provider's nesting policy. A mounted privileged Docker socket remains an explicit trust cost.
 Missing prerequisites fail capability admission. Arbitrary self-hosted labels are not admitted by the native disk route.

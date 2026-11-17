@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -31,7 +32,7 @@ func cmdExecNode() *cli.Command {
 			&cli.StringFlag{Name: "source-root", Usage: "where sources are checked out"},
 			&cli.StringFlag{Name: "result", Usage: "atomically write the producer's ArtifactResult JSON for cross-job verification"},
 			&cli.BoolFlag{Name: "launch", Usage: "ADR-18 §8: orchestrate the pinned toolchain container here (--network=none for builds) instead of assuming an engine-provided container"},
-			&cli.StringFlag{Name: "runtime", Aliases: []string{"docker"}, Value: "docker", Usage: "with --launch: container runtime binary (docker | podman)"},
+			&cli.StringFlag{Name: "runtime", Aliases: []string{"docker"}, Value: containerruntime.Default(""), Usage: "with --launch: container runtime binary (docker | podman)"},
 			&cli.BoolFlag{Name: "dry-run", Usage: "print the plan instead of executing"},
 		},
 		Action: func(c *cli.Context) error {

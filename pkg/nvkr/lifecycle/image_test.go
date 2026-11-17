@@ -41,7 +41,7 @@ func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 	}{
 		{name: "docker", authored: "docker", resolved: "docker"},
 		{name: "podman", authored: "podman", resolved: "podman"},
-		{name: "default", resolved: "podman"},
+		{name: "default", resolved: "docker"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			environment.Runtime.Runtime = tc.authored
