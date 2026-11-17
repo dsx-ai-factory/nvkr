@@ -751,13 +751,14 @@ admit no other committed workflow file. Lowering refuses worker or caller `id-to
 predates fragment forwarding, so hosted execution of the new forwarding, including failure and cancellation
 reporting, is unrecorded. Signer relocation remains an ADR-18 §8 design with no implementation.
 
-The maintained release Environment now also selects `githubExecutionPartitions`. The NVKE v0.23.0 DOCA OVS
+The former combined release Environment selected `githubExecutionPartitions`. The NVKE v0.23.0 DOCA OVS
 producer added one source fetch per release disk and took the flat release workflow to 47,731 events,
-above the 47,500 maintained threshold. Partitioned, the release entry has 272,696 bytes and 13,333 events;
-the largest of its 30 workers has 4,947. Every OIDC job stays in the entry, so the signer identity
-`nvkr-run.yml@refs/heads/main` is unchanged. The maintained bundle contract checks the private-image
-credential boundary on the flat reference that the workers must project exactly. These are local generation
-results. No partitioned release Run is recorded; the hosted development Run above is the closest evidence.
+above the 47,500 maintained threshold. Partitioned, that release entry had 272,696 bytes and 13,333 events;
+the largest of its 30 workers had 4,947. Every OIDC job stayed in the entry, so its signer identity
+`nvkr-run.yml@refs/heads/main` was unchanged. The bundle contract checked the private-image
+credential boundary on the flat reference that the workers had to project exactly. These are historical
+local generation results for the retired combined bundle, not measurements of `nvkr-run-nvke`.
+No partitioned release Run was recorded; the hosted development Run above was the closest evidence.
 
 Earlier flat-layout measurements recorded 564 original jobs and 16 collectors, down from
 596 original jobs and 16 collectors in the private-storage draft based on the same upstream code.
