@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 func stageGitHubRuntimeInputs(t *testing.T, root string, plan *Plan) *GeneratedBundle {
@@ -69,6 +70,25 @@ func testRuntimeInstallers(t *testing.T, test func(*testing.T, runtimeInputInsta
 
 func TestInstallGitHubRuntimeInputsUsesGeneratedFileOwner(t *testing.T) {
 	testRuntimeInstallers(t, testInstallGitHubRuntimeInputsUsesGeneratedFileOwner)
+}
+
+func TestInstallGitHubStageInputsComparesSavedWorkflowWithoutBaselineRender(t *testing.T) {
+	plan, baseline, root := runtimeInputsFixture(t)
+	stageGitHubRuntimeInputs(t, root, freshGitHubRuntimePins(t, plan))
+	baseline.Files[baseline.WorkflowPath] = append(baseline.Files[baseline.WorkflowPath], []byte("# different renderer\n")...)
+	baseline.WorkflowDigest = pipeline.FileDigest(baseline.Files[baseline.WorkflowPath])
+	if err := WriteGeneratedBundle(t.Context(), root, baseline); err != nil {
+		t.Fatal(err)
+	}
+	before := githubRuntimeTree(t, root)
+	err := InstallGitHubStageRuntimeInputs(t.Context(), plan, root)
+	assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+	if !strings.Contains(err.Error(), "cannot change workflow or action "+baseline.WorkflowPath) {
+		t.Fatal("stage must compare saved fixed members, not rerender its baseline", err)
+	}
+	if !reflect.DeepEqual(before, githubRuntimeTree(t, root)) {
+		t.Fatal("fixed-member refusal changed published bytes")
+	}
 }
 
 func testInstallGitHubRuntimeInputsUsesGeneratedFileOwner(t *testing.T, install runtimeInputInstaller) {

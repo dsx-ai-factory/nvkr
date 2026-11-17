@@ -512,6 +512,11 @@ also requires removing the old owner: generating a new name alone keeps both own
 sweeps only objects no remaining manifest lists. The same sweep recovers objects published before an
 interruption, even if the retry has different inputs, and abandoned store staging files. Loads of
 unaffected bundles continue to work while the drift check reports the incomplete repository inventory.
+A malformed ownership manifest blocks generation and repository-wide drift checks. Restore that manifest
+from version control, or remove that bundle's generated private directory and workflow closure together,
+then regenerate. Regenerating over the damaged manifest cannot recover its ownership information.
+Drift checks are read-only and take no store lock. Do not overlap them with generation in the same checkout:
+they can observe staging files or an unfinished sweep and report transient drift. Rerun after generation finishes.
 Symlinks, changed obsolete members and unlisted directory members fail closed before payload publication.
 Outside the shared store, a missing prior manifest grants no ownership over unexpected files. Empty directories made obsolete by
 retired members are removed nonrecursively; unknown files are never swept by a recursive cleanup.

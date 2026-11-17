@@ -633,3 +633,56 @@ func TestPlanStoreNamesAndIndexDoNotDependOnGenerationOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestPlanStoreRecoveryDiagnostics(t *testing.T) {
+	_, bundles := sharedPlanStoreFixtures(t)
+	original := t.TempDir()
+	for _, bundle := range bundles {
+		if err := WriteGeneratedBundle(t.Context(), original, bundle); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, damage := range []string{"manifest", "shared object", "empty directory"} {
+		t.Run(damage, func(t *testing.T) {
+			root := copyGitHubRuntimeRoot(t, original)
+			var want []string
+			switch damage {
+			case "manifest":
+				writeGeneratedFixture(t, filepath.Join(root, bundles[1].ManifestPath), []byte("{"))
+				want = []string{bundles[1].ManifestPath, "restore it from version control", "then regenerate"}
+			case "shared object":
+				for _, name := range sortedFileNames(bundles[0].Files) {
+					if isPlanStorePath(name) && bundles[1].Files[name] != nil {
+						if err := os.Remove(filepath.Join(root, name)); err != nil {
+							t.Fatal(err)
+						}
+						want = []string{name, "regenerate owning bundles", filepath.Base(filepath.Dir(bundles[0].ManifestPath)), filepath.Base(filepath.Dir(bundles[1].ManifestPath))}
+						break
+					}
+				}
+				if len(want) == 0 {
+					t.Fatal("fixture has no shared object")
+				}
+			case "empty directory":
+				if err := os.MkdirAll(filepath.Join(root, PlanStoreDirectory, "components", "unused"), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				want = []string{"components/unused", "run generate", "without --check"}
+			}
+			check := func(err error) {
+				t.Helper()
+				assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+				for _, text := range want {
+					if !strings.Contains(err.Error(), text) {
+						t.Fatalf("missing recovery detail %q: %v", text, err)
+					}
+				}
+			}
+			check(CheckGeneratedBundle(t.Context(), root, bundles[0]))
+			if damage == "manifest" {
+				check(WriteGeneratedBundle(t.Context(), root, bundles[0]))
+				check(WriteGeneratedBundle(t.Context(), root, bundles[1]))
+			}
+		})
+	}
+}

@@ -6,10 +6,12 @@ package factory
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -238,7 +240,9 @@ func inspectPlanStore(ctx context.Context, root string, bundle *GeneratedBundle,
 		}
 		raw, incoming := bundle.Files[name]
 		if !writing || !incoming {
-			return nil, e.New(e.CodePipelineDrift, "shared Plan member %q is missing; regenerate its owning bundle", name)
+			bundles := owners[name].Bundles
+			slices.Sort(bundles)
+			return nil, e.New(e.CodePipelineDrift, "shared Plan member %q is missing; regenerate owning bundles %q", name, bundles)
 		}
 		total += int64(len(raw))
 		if total > maxPlanTreeBytes {
@@ -265,7 +269,7 @@ func inspectPlanStore(ctx context.Context, root string, bundle *GeneratedBundle,
 			}
 		}
 		if err := checkGeneratedInventory(ctx, filepath.Join(root, PlanStoreDirectory), files, directories); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("%w; run generate with the same Definition and Environment without --check to prune empty directories", err)
 		}
 	}
 	return garbage, nil
