@@ -603,7 +603,7 @@ selects independently tagged modules in a monorepo. Outputs select exact compone
 platforms. Artifact kinds and producer metadata govern format admission directly (ADR-11/12/22).
 
 A Definition selects producers and output-affecting settings directly on named outputs. An Environment supplies
-runtime settings, runner routes and execution classes, required publication transports and namespace,
+runtime settings (Docker by default, with explicit Podman support), runner routes and execution classes, required publication transports and namespace,
 credential references, and signing identity/issuer policy. Image access declares private and
 anonymous roots independently of publication, with one reader for private roots. Every GitHub image consumer
 is inventoried before renderer grouping; unclassified images or unsupported private routes fail generation

@@ -1,5 +1,7 @@
 ## Support by owner
 
+Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
+
 Tekton implements ADR-18's explicit cluster trust contract. The provider authenticates
 complete PipelineRun, TaskRun and PVC bindings and binds carrier bytes to successful task results. Controlled
 TLS and carrier fixtures pass; a local kind v0.31.0 / Kubernetes v1.35.0 / Tekton v1.18.0 installation has

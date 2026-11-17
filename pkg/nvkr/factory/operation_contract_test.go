@@ -44,7 +44,7 @@ var operationEntries = []operationEntry{
 		return RunGitHubNode(ctx, plan, id, GitHubStepOptions{Stdout: log, Stderr: log})
 	}},
 	{name: "local", run: func(ctx context.Context, plan *Plan, id string, log io.Writer) error {
-		options := withLocalDefaults(LocalRunOptions{Stdout: log, Stderr: log})
+		options := withLocalDefaults(LocalRunOptions{Runtime: plan.Environment.RuntimeBinary(), Stdout: log, Stderr: log})
 		return executeLocalFactoryNode(ctx, plan, planNode(plan, id), options, map[string]string{"linux/amd64": "runner"})
 	}},
 }
@@ -58,12 +58,10 @@ func newOperationHarness(t *testing.T, script string) (*Plan, string) {
 	plan := githubTestPlan(t)
 	bin := t.TempDir()
 	calls := filepath.Join(bin, "runtime-calls")
-	// Shadow both maintained runtimes: hosted steps use the Environment's, local
-	// scheduling defaults to docker. No case may reach a real daemon.
-	for _, name := range []string{plan.Environment.RuntimeBinary(), "docker"} {
-		if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\nprintf '%s\\n' CALL \"$@\" >> \"$NVKR_TEST_RUNTIME_LOG\"\n"+preparedUtilityRuntimeProtocol(planNode(plan, "package/worker"), name)+script), 0o755); err != nil {
-			t.Fatal(err)
-		}
+	// Local and hosted execution use the Environment runtime; never reach a real daemon.
+	name := plan.Environment.RuntimeBinary()
+	if err := os.WriteFile(filepath.Join(bin, name), []byte("#!/bin/sh\nprintf '%s\\n' CALL \"$@\" >> \"$NVKR_TEST_RUNTIME_LOG\"\n"+preparedUtilityRuntimeProtocol(planNode(plan, "package/worker"), name)+script), 0o755); err != nil {
+		t.Fatal(err)
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("NVKR_TEST_RUNTIME_LOG", calls)
