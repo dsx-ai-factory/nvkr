@@ -646,7 +646,11 @@ func admitNativeNKTPChart(ctx context.Context, installer string) error {
 	if release.Chart.Repository != "" {
 		return nil
 	}
-	// nvke-deploy.sh resolves a chart path against the deploy path, deploy/nico.
+	// nvke-deploy.sh uses an absolute chart path as given, which the installer
+	// cannot carry, and resolves a relative one against the deploy path.
+	if strings.HasPrefix(release.Chart.Path, "/") || filepath.IsAbs(release.Chart.Path) {
+		return errors.New("native installer NKTP chart path must be relative to the deploy path")
+	}
 	chart := filepath.Join("deploy", "nico", filepath.FromSlash(release.Chart.Path), "Chart.yaml")
 	if !filepath.IsLocal(chart) {
 		return errors.New("native installer NKTP chart path leaves the installer")

@@ -356,7 +356,7 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 		t.Fatal(err)
 	}
 	versions := []byte("CAPI_VERSION ?= " + selected.capiVersion + "\n")
-	for _, scenario := range []string{"complete", "missing versions", "missing site specification", "missing CAPNICo release", "changed provider", "missing source marker", "changed source marker", "canceled", "published NKTP chart", "missing by-path NKTP chart"} {
+	for _, scenario := range []string{"complete", "missing versions", "missing site specification", "missing CAPNICo release", "changed provider", "missing source marker", "changed source marker", "canceled", "published NKTP chart", "missing by-path NKTP chart", "absolute NKTP chart path"} {
 		t.Run(scenario, func(t *testing.T) {
 			entries := []assetEntry{
 				{"deploy/nvke-deploy.sh", tar.TypeReg, "installer", 0},
@@ -381,6 +381,12 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 			release := "chart:\n  name: nktp\n  path: ../../nktp/deploy/charts/nktp\n"
 			if scenario == "published NKTP chart" {
 				release = "chart:\n  name: nktp\n  version: \"0.2.0\"\n  repository: https://helm.ngc.nvidia.com/nvidia\n"
+			}
+			// The executor installs an absolute path as given; a same-named file
+			// under the deploy path must not satisfy it.
+			if scenario == "absolute NKTP chart path" {
+				release = "chart:\n  name: nktp\n  path: /tmp/nktp\n"
+				entries = append(entries, assetEntry{"deploy/nico/tmp/nktp/Chart.yaml", tar.TypeReg, "nktp chart", 0})
 			}
 			entries = append(entries, assetEntry{"deploy/nico/nktp/release.yaml", tar.TypeReg, release, 0})
 			if scenario != "published NKTP chart" && scenario != "missing by-path NKTP chart" {
