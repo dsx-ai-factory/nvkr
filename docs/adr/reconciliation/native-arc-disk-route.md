@@ -1,15 +1,10 @@
 ## Native ARC disk route
-The single checked-in `nvkr-run.yml` selects the 69-output M2 Definition and its main-only publication
-Environment, including plain and public-bootstrap FDE disks on both native architectures. The Makefile drift
-gate uses the authored maintained generation inventory, whose Definition and Environment paths are
-contract-checked against the committed Plans. Dispatch does not
-choose among Definitions. Alternate selections can be generated into a scratch root with their matching
-byte-exact check. The standalone `codex/fde-image-pipeline` branch used the separate one-output FDE Definition
-and build-only Environment for the recorded diagnostic below. Neither candidate selection is a ratified
-canonical-product/path migration or publication-namespace decision; that named-decider governance remains
-pending. On October 13, 2026, the
-`nkd-arc` Environment admitted the exact FDE branch through deployment policy `62934956`, preserving its
-existing `main` and M2 validation-branch policies. That provider configuration is not execution evidence.
+The maintained `nvkr-run-nvke.yml` selects the 83-output composite, including eight plain and
+public-bootstrap FDE disks across both Ubuntu series and native architectures. The production,
+development and floating-source nightly selections are checked from the maintained inventory.
+ADR-26 U10 records the explicit 2026-11-17 product cutover; no new hosted acceptance is inferred.
+Alternate diagnostic selections can still be generated into scratch roots. The records below describe
+the earlier combined candidate and standalone FDE diagnostic at their exact revisions.
 
 The build-only finalizer uses the selected native ARC pool and matching helper with a two-hour bound,
 restoring and rehashing the complete raw-disk closure without publication authority. Comparable AMD64

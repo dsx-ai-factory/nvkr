@@ -26,12 +26,20 @@ import (
 
 func generationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPolicy) {
 	t.Helper()
-	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	policy := workerPolicyFixture()
 	policy.Source.Repository = "dsx-ai-factory/nvkr"
+	// Generic ownership tests exercise the unnamed layout on an in-memory fixture.
+	// The maintained named composite pair has its own production contract test.
+	plan.Environment.GitHubBundle = ""
+	plan.Environment.Signing.Identity = `^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run\.yml@refs/heads/main$`
+	plan.EnvironmentDigest, err = plan.Environment.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
 	policy.Source.Workflow = factory.GitHubWorkflowPath
 	policy.Cosign = lifecycle.QualificationCosignPolicy{Version: "v3.0.2", PlatformDigests: map[string]string{"linux/amd64": "sha256:" + strings.Repeat("a", 64), "linux/arm64": "sha256:" + strings.Repeat("b", 64)}}
 	policy.Smoke.Images = map[string]string{"linux/amd64": "ghcr.io/dsx-ai-factory/smoke@sha256:" + strings.Repeat("c", 64), "linux/arm64": "ghcr.io/dsx-ai-factory/smoke@sha256:" + strings.Repeat("d", 64)}
@@ -39,11 +47,14 @@ func generationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPoli
 	// the real maintained Plan's exact members; no payload or authority is faked.
 	policy.Smoke.Tools = map[string]string{"nvkectl": "nvkectl-version-json", "helm": "helm-version", "kubectl": "kubectl-client-version-json"}
 	for _, output := range plan.LifecycleOutputs {
+		if output.Kind == lifecycle.OutputBundle {
+			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: append([]string(nil), output.Components...), Reason: "bundle-archive"})
+		}
 		if output.Kind == lifecycle.OutputOCI {
 			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: append([]string(nil), output.Components...), Reason: "deployment-image"})
 		}
 	}
-	if len(policy.Smoke.NonToolOutputs) != 56 {
+	if len(policy.Smoke.NonToolOutputs) != 63 {
 		t.Fatal("maintained candidate fixture changed its declared OCI membership")
 	}
 	return plan, policy

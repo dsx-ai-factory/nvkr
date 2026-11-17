@@ -73,7 +73,7 @@ func TestCIRestrictsAutomaticSelectionOnly(t *testing.T) {
 // Only input-dependent identities and relocated catalog paths are adapted below.
 func TestDefaultLeafBytesMatchPreDashboardFixtures(t *testing.T) {
 	lifecycleCommandRepo(t)
-	const maintainedPlan = ".github/nvkr-run/plan.json"
+	const maintainedPlan = ".github/nvkr-run-nvke/plan.json"
 	for _, test := range []struct {
 		name, fixture string
 		args          []string

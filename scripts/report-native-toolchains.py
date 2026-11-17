@@ -153,7 +153,7 @@ def main():
     measurement = commands.add_parser("compare")
     measurement.add_argument("--arch", choices=ARCHES, required=True)
     measurement.add_argument("--proposal", type=Path, required=True)
-    measurement.add_argument("--plan", type=Path, default=Path(".github/nvkr-run/plan.json"))
+    measurement.add_argument("--plan", type=Path, default=Path(".github/nvkr-run-nvke/plan.json"))
     commands.add_parser("report")
     args = parser.parse_args()
     if args.command == "compare":

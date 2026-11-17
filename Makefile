@@ -305,7 +305,7 @@ license-header-check: ## Fail when a source file has no license header.
 .PHONY: workflow-generator
 workflow-generator: go-version-check
 	@# The generator version is an input to regeneration (ADR-21 §1) and is recorded
-	@# in .github/nvkr-run/plan.json as `generatorVersion`. Building via `make build`,
+	@# in .github/nvkr-run-nvke/plan.json as `generatorVersion`. Building via `make build`,
 	@# whose version comes from `git describe`, therefore always reports drift. Build
 	@# the generator with the same canonical version string the generated Run
 	@# workflow uses, so this target is reproducible locally and in CI.
@@ -314,7 +314,7 @@ workflow-generator: go-version-check
 		-o bin/nvkr-exec ./cmd/nvkr
 
 # Diagnostic: `make workflows-check PROJECTION_PILOT=in-process` checks the
-# production, development and NVKE family producer bundles through the reference projection
+# production and development producer bundles through the reference projection
 # plugin over that transport. Qualification workflows and runtime bundles stay core-only.
 PROJECTION_PILOT ?=
 PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION_PILOT))
@@ -356,23 +356,16 @@ workflows-generate: workflow-generator ## Regenerate all maintained bundles from
 	python3 scripts/generate-maintained.py
 	$(MAKE) catalog-refresh-generate
 
-.PHONY: nvke-split-generate nvke-split-check
-nvke-split-generate: workflow-generator ## Regenerate the independent NVKE family bundles.
-	python3 scripts/generate-maintained.py --group split
-
-nvke-split-check: workflow-generator ## Check the independent NVKE family bundles.
-	python3 scripts/generate-maintained.py --group split --check $(PROJECTION_PILOT_FLAG)
-
 # Composite member pin admission is independent of bundle inventory admission.
 NVKE_GPU_SITE := inputs/definitions/nvke/gpu-site.composite.yaml
 
-.PHONY: nvke-gpu-site-generate nvke-gpu-site-check
-nvke-gpu-site-generate: workflow-generator ## Regenerate the GPU site production bundle.
-	python3 scripts/generate-maintained.py --group gpu-site
+.PHONY: nvke-generate nvke-check
+nvke-generate: workflow-generator ## Regenerate the NVKE production bundle.
+	python3 scripts/generate-maintained.py --group main
 
-nvke-gpu-site-check: workflow-generator ## Check GPU site member pins and generation.
+nvke-check: workflow-generator ## Check NVKE member pins and generation.
 	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
-	python3 scripts/generate-maintained.py --group gpu-site --check $(PROJECTION_PILOT_FLAG)
+	python3 scripts/generate-maintained.py --group main --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-generate pipeline-dev-check
 pipeline-dev-generate: workflow-generator ## Regenerate the development bundle.

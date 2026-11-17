@@ -440,7 +440,7 @@ jobs:
 
       - name: Upload toolchain evidence
         if: always() && needs.select.outputs.commit == github.workflow_sha && steps.ci-helper.outcome == 'success'
-        uses: ./.github/nvkr-run/actions/ci-upload
+        uses: ./.github/nvkr-run-nvke/actions/ci-upload
         env:
           NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
         with:
@@ -518,7 +518,7 @@ jobs:
           echo "archive_digest=${digest}" >>"${GITHUB_OUTPUT}"
 
       - name: Upload one-day NVKE source handoff
-        uses: ./.github/nvkr-run/actions/ci-upload
+        uses: ./.github/nvkr-run-nvke/actions/ci-upload
         env:
           NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
         with:
@@ -561,7 +561,7 @@ jobs:
         run: CGO_ENABLED=0 go build -trimpath -o nvkr-exec ./cmd/nvkr
 
       - name: Download exact NVKE source handoff
-        uses: ./.github/nvkr-run/actions/ci-download
+        uses: ./.github/nvkr-run-nvke/actions/ci-download
         env:
           NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
         with:
@@ -772,7 +772,7 @@ jobs:
 
       - name: Upload full validation evidence
         if: always() && needs.select.outputs.commit == github.workflow_sha
-        uses: ./.github/nvkr-run/actions/ci-upload
+        uses: ./.github/nvkr-run-nvke/actions/ci-upload
         env:
           NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
         with:
@@ -790,7 +790,7 @@ jobs:
 
       - name: Upload retained QCOW2
         if: success() && needs.select.outputs.retain_qcow2 == 'true' && needs.select.outputs.commit == github.workflow_sha
-        uses: ./.github/nvkr-run/actions/ci-upload
+        uses: ./.github/nvkr-run-nvke/actions/ci-upload
         env:
           NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
         with:

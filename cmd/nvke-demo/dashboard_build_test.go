@@ -110,7 +110,7 @@ func TestDashboardProjectionFailureDoesNotInventCapReason(t *testing.T) {
 
 func TestDashboardSelectedPlansReplaceRunState(t *testing.T) {
 	t.Chdir("../..")
-	artifacts, err := factory.LoadPlanContext(t.Context(), ".github/nvkr-run/plan.json")
+	artifacts, err := factory.LoadPlanContext(t.Context(), ".github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}

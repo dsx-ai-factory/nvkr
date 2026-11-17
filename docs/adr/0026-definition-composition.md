@@ -18,8 +18,8 @@
   one complete Plan and produces one Run and one Release whose membership is the exact union of its members'
   named outputs, including production and development bundles. Reuse of already-published member Releases,
   nested composites and remote members are deferred and fail closed. Hosted pipeline-attested qualification
-  covers the complete composite; local qualification rehearsal and qualified-lane composites remain deferred. Replacing
-  the hand-maintained combined NVKE Definition is a separately gated cutover.
+  covers the complete composite; local qualification rehearsal and qualified-lane composites remain deferred. The maintained NVKE production path selects the composite under the U10 maintainer cutover below;
+  independent consumer acceptance remains a separate evidence requirement.
 
 ## Context
 
@@ -436,13 +436,23 @@ Negative cases on the same inputs:
   `unverified-ref`.
 - Adding a member whose top-level catalog is `../../catalogs/nvke/release` fails with `invalid-catalog`.
 
-Decided: once the composite exists, the hand-maintained combined `definition.yaml` becomes redundant, and
-retiring it is planned as a separate cutover (U10). The combined production and qualification paths depend
-on it; the fixed development bundle now belongs to the GPU site composite. The cutover is gated on the Hosted
-acceptance criterion below, followed by U10's output equivalence. The gate names no output count: a composite
-may deliver a combined output under a declared rename and may add outputs its families own, so equivalence is
-checked per output rather than by total. Composite qualification (U8) must exist before the combined
-qualification path can retire.
+Decided: the composite is the sole maintained NVKE product Definition. On 2026-11-17,
+njhensley explicitly approved replacing the combined production bundle with `nvkr-run-nvke`,
+retiring standalone family bundles and the two legacy ARM64 nightly producers, and naming the
+floating-source composite bundle `nvkr-run-nvke-nightly`. The fixed development bundle remains
+`nvkr-dev`. The six member Definitions remain the authored owners; the former combined Definition
+and family Environments are retained only as comparison/authoring fixtures, not maintained releases.
+
+The previous U10 gate required a complete hosted composite publication, independent consumer
+verification under explicit policy, and one-to-one equivalent output selections and Build Digests
+before retiring the combined path. The accepted historical 83-output publication supplies publication
+proof for that exact candidate. Consumer verification and current-candidate equivalence were not
+established by the naming decision. The maintainer explicitly supersedes those **retirement
+prerequisites**, choosing the existing composite product membership now; this does not waive
+verification, qualification or evidence requirements for any Run or Release. U8's complete-composite
+qualification remains implemented. New workflow names require their exact signer policies and new
+Environment, Plan, qualification-policy and generated-bundle identities; producer Build identities
+and composite/member Definition identities must remain unchanged by this migration.
 
 ## Implementation plan
 
@@ -460,7 +470,7 @@ not only failure, and are table-driven.
 | U7 Consumer view | `pkg/nvkr/lifecycle`, `client/v1` | Composite exact-input expectation, member-set requirement, cross-form refusal | U6 |
 | U8 Hosted qualification | ADR-16/21 owners | Bind complete composition into handoff, artifact checks, native smoke, qualification evidence and release manifest; explicit per-run policies and isolated workflow pairs | U6 |
 | U9 Follow-up: member Release reuse | result-reuse owner | Cross-workflow origin admission in the reuse decision, §6 and §7 | ADR-30 result-reuse implementation and cross-workflow origin admission |
-| U10 Cutover: retire combined `definition.yaml` | NVKE release owner | Move the combined production, development and qualification paths to the composite; retire the combined bundles and input | U5–U8; hosted composite Run and consumer verification |
+| U10 Maintained NVKE cutover | NVKE release owner | Replace combined and standalone family bundles with the existing composite production/development/nightly selections; retain comparison inputs outside maintained enrollment | U5–U8; explicit 2026-11-17 maintainer decision; acceptance evidence remains separately tracked |
 
 Acceptance tests per unit:
 
@@ -504,19 +514,20 @@ Acceptance tests per unit:
   capability and its description cannot restore authority.
 - **Hosted:** before reconciliation may claim external exercise, one hosted Run of the NVKE composite must
   complete with every output of its members and one root, followed by independent consumer verification under
-  explicit policy. The same evidence gates U10.
+  explicit policy. This remains an acceptance requirement, independent of U10 retirement.
 - **U9 (follow-up):** the reuse decision's matrix, extended with: family output reused only for its same-name
   composite output; an origin outside the authored allowlist refused; equal Build Digest sibling refused;
   composite lane recomputed as the minimum of §7; no composite production predicate for reused outputs.
-- **U10 (cutover):** before retirement, every output of the last combined candidate is present in the composite
-  Release under the same name or under a rename the cutover declares, with an equivalent selection and an equal
-  per-output Build Digest. The mapping is one-to-one: each combined output maps to a distinct composite output, so
-  two combined outputs with equal Build Digests cannot both be satisfied by one, and no composite output satisfies
-  more than one rename. The combined `nico-reference-profiles-fixture` is delivered as the `nvke-core` member's
-  `controller-profiles` and is recorded as that declared rename, not as a missing output. Every composite output
-  beyond the combined candidate is listed explicitly as a family-only output and attributed to its member through
-  the Release's composition record. The combined input and bundles are retired through ADR-21's exact retirement;
-  no maintained consumer, maintenance policy or qualification policy still names them.
+- **U10 (cutover):** the maintained inventory contains exactly `nvkr-dev`, `nvkr-run-nvke` and
+  `nvkr-run-nvke-nightly`, all selecting the same composite. Preserve all six member Definition digests,
+  all 83 named outputs and their per-output Build Digests against the pre-cutover composite Plans.
+  Production and nightly have new workflow-bound Environment and Plan identities; development stays
+  byte-identical. Retire only the confirmed generated namespaces and the two legacy ARM64 nightly
+  Definition files; migrate maintained consumers and maintenance/qualification enrollment. The generic
+  unnamed production layout remains an SDK/CLI capability, not an enrolled NVKE bundle.
+  The former combined `nico-reference-profiles-fixture` corresponds to `controller-profiles`; the
+  composite's added family outputs and GB200 bundles keep their existing attribution. This is a
+  product cutover to the existing composite, not a claim of verified equivalence to the old Release.
 
 ## Consequences
 
@@ -563,8 +574,8 @@ Acceptance tests per unit:
   bundles (U5).
 - **Result reuse (ADR-30):** after result-reuse implementation, add authored cross-workflow origin admission
   for member outputs (U9). Until then composites rebuild every output.
-- **NVKE cutover:** retire the combined `definition.yaml` and its bundles after a hosted composite Run and
-  independent consumer verification succeed (U10).
+- **NVKE cutover:** use the composite for all three maintained bundles under the explicit U10 decision;
+  consumer verification remains outstanding acceptance work, not a retirement prerequisite.
 
 ## Decisions recorded
 
@@ -575,7 +586,8 @@ The questions left open by the first draft were decided on 2026-10-29:
    members (§1, §3); every undeclared divergence fails.
 3. Cross-workflow reuse: a follow-up requiring ADR-30 result-reuse implementation and origin admission;
    composites rebuild everything until then (§6, U9).
-4. Combined `definition.yaml`: a separate cutover gated on a hosted composite Run and consumer verification (U10).
+4. Maintained NVKE cutover: the 2026-11-17 maintainer decision supersedes the former combined-bundle
+   retirement gate; product selection and external acceptance remain distinct (U10).
 5. Development bundles: pulled forward into U5 (§9). On 2026-11-04 the fixed development layout was opened to
    composites so the GPU site composite can use the already registered `nvkr-dev.yml` workflow (§9).
 

@@ -98,6 +98,9 @@ releases their named outputs through one Plan, Run and Release.
 units U1–U8, including complete-composite hosted qualification with independent policies, are implemented
 and contract-tested. The [evidence ledger](docs/adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
 owns hosted publication, qualification and independent consumer-acceptance status.
+The composite supplies all maintained NVKE production, development and floating-source nightly bundles.
+The explicit ADR-26 U10 maintainer cutover supersedes the former retirement prerequisites; it does not
+establish independent consumer acceptance or change member Build identities.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition**:

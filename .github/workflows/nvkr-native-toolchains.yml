@@ -110,7 +110,7 @@ jobs:
           --proposal ".nvkr/native-toolchains/$NATIVE_ARCH/proposal.json"
       - name: Retain native measurements
         if: always() && steps.ci-helper.outcome == 'success'
-        uses: ./.github/nvkr-run/actions/ci-upload
+        uses: ./.github/nvkr-run-nvke/actions/ci-upload
         env:
           NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
         with:
@@ -146,7 +146,7 @@ jobs:
           NATIVE_ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          plan=.github/nvkr-run/plan.json
+          plan=.github/nvkr-run-nvke/plan.json
           platform="linux/$NATIVE_ARCH"
           repository=ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains
           packer=$(jq -er --arg platform "$platform" \
@@ -238,7 +238,7 @@ jobs:
           GOTOOLCHAIN: local
         run: go build -trimpath -o nvkr-exec ./cmd/nvkr
       - name: Restore exact AMD64 preparation attempt
-        uses: ./.github/nvkr-run/actions/ci-download
+        uses: ./.github/nvkr-run-nvke/actions/ci-download
         env:
           NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
         with:
@@ -248,7 +248,7 @@ jobs:
           run-id: ${{ inputs.approval_run }}
           attempt: ${{ needs.admit.outputs.attempt }}
       - name: Restore exact ARM64 preparation attempt
-        uses: ./.github/nvkr-run/actions/ci-download
+        uses: ./.github/nvkr-run-nvke/actions/ci-download
         env:
           NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
         with:

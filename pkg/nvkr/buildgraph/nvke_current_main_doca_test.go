@@ -24,7 +24,6 @@ func TestNightlyDOCAClosurePreservesTaggedInputs(t *testing.T) {
 		file string
 		want int
 	}{
-		{"demo/arm64-nvidia-kvm.json", 1},
 		{"demo/arm64-nvidia-local-kvm.json", 0},
 		{"demo/amd64-nvidia-local-kvm.json", 0},
 		{"demo/arm64-nvidia-local-kvm-conformance.json", 0},
