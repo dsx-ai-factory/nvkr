@@ -327,7 +327,8 @@ installers, the agent, DOCA OVS and the four disk producers with their 24.04 dec
 passphrase, evidence mode and every other material producer are unchanged. The
 [Ubuntu 24 inputs](../diagnostics/ubuntu24/README.md) record the agent's libc contract and installer pins.
 The composite Environment keeps the native ARC route, execution classes, inspection profiles and
-`build-provenance-v1` disk evidence. The historical composite publication covers its exact Ubuntu 24.04 outputs; current-candidate guest boots remain unrecorded.
+`build-provenance-v1` disk evidence. The [Ubuntu 24 reconciliation record](../../../docs/adr/reconciliation/ubuntu-24-node-image-inputs.md)
+owns historical publication scope and current-candidate guest acceptance.
 
 The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)
 completed a standalone FDE bake and raw artifact retention. It did not exercise FDE publication, an ARM64

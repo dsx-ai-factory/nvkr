@@ -171,8 +171,9 @@ packaging, routes and executable dependencies for a Run. Producer operations ref
 build instruction; observations are recorded separately. There is no authored compiler-handoff document.
 Readable views, linked graph exports and semantic comparisons describe the validated Plan; they do not replace
 its canonical identity bytes or grant execution or evidence authority. GitHub bundle storage splits
-the Plan into a root, per-target JSON records and exact command files; the loader reconstructs the same
-canonical bytes before execution. Packed canonical bytes remain the wire and Tekton form.
+the Plan into a per-bundle index and shared frozen records and command files under
+[ADR-21's storage contract](docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold).
+The loader reconstructs the same canonical bytes before execution. Packed canonical bytes remain the wire and Tekton form.
 An opted-in dispatch-frozen Plan records an explicit repository/main allowlist's exact
 commits, trees and source timestamps together with captured authored inputs. Workers,
 retries and qualification reuse that selection; independent dependency and toolchain pins

@@ -5,7 +5,7 @@ publication routes before executing a Run. These read-only views explain the com
 its changes. They do not observe output bytes, verify a release, or authorize execution.
 
 The Plan in `.github/nvkr-run-nvke/plan.json` is a small index into the repository's shared `.github/nvkr-plan-store/`.
-Loading verifies the frozen objects and reconstructs the canonical Plan under [ADR-21's storage contract](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold). Keep human views
+Loading verifies the frozen objects and reconstructs the canonical Plan under [ADR-21's storage contract](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold). Keep human views
 outside `.github/nvkr-run-nvke/`: that directory admits only manifest-owned generated files. Inspection never
 updates the Plan or its ownership manifest.
 

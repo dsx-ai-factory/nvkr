@@ -318,6 +318,11 @@ func TestPlanTreeRejectsMalformedStorage(t *testing.T) {
 		{"missing step", func(files map[string][]byte) {
 			delete(files, treeStepPath(t, planPath, files, 0))
 		}},
+		{"extra addressed record", func(files map[string][]byte) {
+			if _, err := storeTreeJSON(map[string]string{"unexpected": "record"}, files); err != nil {
+				t.Fatal(err)
+			}
+		}},
 		{"extra step", func(files map[string][]byte) {
 			files[path.Dir(planPath)+"/steps/unexpected/step.json"] = []byte("{}\n")
 		}},

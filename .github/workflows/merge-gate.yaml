@@ -178,6 +178,7 @@ jobs:
               - 'inputs/**'
               - '.github/workflows/nvkr-run-*.yml'
               - '.github/nvkr-run-*/**'
+              - '.github/nvkr-plan-store/**'
               - '.github/workflows/nvkr-qualify-*.yml'
               - '.github/workflows/nvkr-smoke-*.yml'
               - '.github/nvkr-qualification-*/**'

@@ -1,12 +1,10 @@
 # ADR-26 — Definition composition
 
 - **Decision status:** Accepted (2026-11-14)
-- **Implementation maturity:** U1–U8 implemented; U9 waits on result-reuse implementation and cross-workflow origin
-  admission; U10 cut over by the 2026-11-17 UTC maintainer decision. Independent consumer verification and
-  combined-output equivalence remain unrecorded acceptance work. `reconciliation/README.md` records the implemented scope.
-- **Acceptance-test maturity:** Contract suites for U1–U8, including an opt-in extended identity-invariance
-  contract over the four NVKE families. The [hosted composite publication record](reconciliation/adr-26.md#hosted-gpu-site-publication)
-  owns external execution evidence and its consumer-acceptance and qualification limits.
+- **Implementation maturity:** [Reconciliation](reconciliation/adr-26.md#support-by-owner) owns implementation,
+  deferred capabilities and the U10 cutover scope.
+- **Acceptance-test maturity:** [Reconciliation](reconciliation/adr-26.md) owns contract coverage and external
+  execution evidence, including consumer-acceptance, combined-output equivalence and qualification limits.
 - **Deciders:** njhensley
 - **Index:** ADR-26 in the consolidated NVKR ADR set. It coordinates with the authenticated result-reuse decision,
   [ADR-30](0030-authenticated-result-reuse.md) (backlog item 4).
