@@ -66,12 +66,22 @@ func retiredGeneratedMembers(ctx context.Context, root string, bundle *Generated
 	for name, raw := range bundle.Files {
 		union.Files[name] = raw
 	}
+	others := map[string]bool{}
+	if bundle.Engine == EngineGitHub {
+		others, err = otherPlanStoreMembers(ctx, root, bundle)
+		if err != nil {
+			return nil, err
+		}
+	}
 	var retired []GeneratedMember
 	for _, member := range prior {
-		union.Files[member.Path] = nil
-		if _, retained := bundle.Files[member.Path]; !retained {
+		if _, retained := bundle.Files[member.Path]; !retained && !others[member.Path] {
+			union.Files[member.Path] = nil
 			retired = append(retired, member)
 		}
+	}
+	if err := checkPlanStore(ctx, root, &union, true); err != nil {
+		return nil, err
 	}
 	if err := checkGeneratedDirectoryContents(ctx, root, &union); err != nil {
 		return nil, err

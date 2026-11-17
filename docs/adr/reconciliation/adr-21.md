@@ -78,17 +78,12 @@ Stable worker paths are derived from the current Plan without previous-output in
 The rename changes generated workflow bytes and ownership manifests, not Plan or Build identity.
 Hosted execution of the renamed bundles remains unrecorded.
 
-GitHub bundles store their Plan as a root index, target-local step records and exact command files.
-Distinct catalog snapshots occur once per root, keyed by catalog digest. Loading verifies the manifest's Plan-tree members and exact steps inventory, reconstructs and validates
-the existing canonical Plan, and compares the exact tree without rendering workflows or actions.
-Generation and runtime bootstrap check the complete closure. Contracts cover loading with a different
-workflow renderer's bytes while the generation check still rejects that drift. Packed inputs, CLI JSON and Tekton retain the canonical representation.
-The cutover of all 11 enrolled bundles preserves their exact reconstructed canonical bytes, all 11 Plan
-Digests and all 481 named Build Digests. This includes the temporary combined bundle pending its separate
-retirement. Storage contracts cover malformed fields, unsafe references, undeclared and declared extra
-members, missing or changed files, symlinks, resource limits, and child-before-parent directory syncing.
-The Plan schema and digest contracts are unchanged. This is local generation and admission evidence;
-hosted execution of the tree layout remains unrecorded.
+GitHub Plan storage follows [ADR-21's shared-store contract](../0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold).
+Local contracts cover exact canonical round trips, malformed references, missing or altered objects, unowned objects, cross-bundle retirement, concurrent writers and runtime pin refresh.
+The loader does not render workflows or actions; complete closure checks remain with generation and runtime bootstrap.
+Packed inputs, CLI JSON and Tekton retain the canonical representation.
+The Plan schema and digest contracts are unchanged.
+Hosted execution of the shared-store layout remains unrecorded.
 
 Invocation data is regenerated from the Plan and is not a bundle member;
 `TestGitHubActionDataIsTransientAndRetired` covers omission, prior-owned retirement and refusal of

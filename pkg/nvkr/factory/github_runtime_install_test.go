@@ -76,7 +76,7 @@ func TestInstallGitHubRuntimeInputsUsesGeneratedFileOwner(t *testing.T) {
 				t.Fatal(err)
 			}
 			for name, prior := range baseline.Files {
-				step := strings.HasPrefix(name, filepath.ToSlash(filepath.Dir(baseline.PlanPath))+"/steps/") && strings.HasSuffix(name, "/step.json")
+				step := isPlanStoreRecord(name)
 				if name == baseline.PlanPath || step {
 					continue
 				}

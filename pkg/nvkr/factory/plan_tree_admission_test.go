@@ -134,7 +134,7 @@ func TestPlanTreeDiagnosticsEscapeUntrustedNames(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		stepPath := path.Join(path.Dir(planPath), "steps", plan.Builds[0].Name, "step.json")
+		stepPath := treeStepPath(t, planPath, files, 0)
 		var step planFields
 		if err := json.Unmarshal(files[stepPath], &step); err != nil {
 			t.Fatal(err)

@@ -545,7 +545,7 @@ func unsharedGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle,
 	changed := *bundle
 	changed.Files = files
 	for name, raw := range bundle.Files {
-		if name == bundle.PlanPath || strings.HasPrefix(name, path.Dir(bundle.PlanPath)+"/steps/") {
+		if name == bundle.PlanPath || isPlanStorePath(name) {
 			changed.Files[name] = append([]byte(nil), raw...)
 		}
 	}
@@ -601,7 +601,7 @@ func assertGeneratedGitHubMembers(t *testing.T, bundle *GeneratedBundle) {
 		if name == bundle.PlanPath || name == GitHubWorkflowPath {
 			continue
 		}
-		if strings.HasPrefix(name, ".github/nvkr-run/steps/") && (strings.HasSuffix(name, "/step.json") || strings.HasSuffix(name, ".sh")) {
+		if isPlanStorePath(name) {
 			continue
 		}
 		if !strings.HasPrefix(name, ".github/nvkr-run/actions/") || !strings.HasSuffix(name, "/action.yml") {

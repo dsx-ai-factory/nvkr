@@ -23,9 +23,9 @@ func TestPlanTreeDirectoryLimitAdmittedBeforeWrites(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i <= maxGeneratedDirEntries/2; i++ {
-		name := fmt.Sprintf("%s/steps/extra-%04d/step.json", path.Dir(bundle.PlanPath), i)
-		bundle.Files[name] = []byte("{}\n")
+	for i := 0; i <= maxGeneratedDirEntries; i++ {
+		raw := []byte(fmt.Sprintf("{\"extra\":%d}\n", i))
+		bundle.Files[planStorePath(raw, ".json")] = raw
 	}
 	root := t.TempDir()
 	assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), root, bundle), e.CodeInvalidCatalog)
@@ -123,32 +123,34 @@ func TestPlanTreeCommandBytes(t *testing.T) {
 		{"trailing LF", []string{"bash", "-euc", "printf x\n"}, true},
 		{"no trailing LF", []string{"sh", "-c", "printf x\nprintf y"}, true},
 		{"arbitrary argv", []string{"tool", "--data", "a\r\nb"}, true},
-		{"ambiguous", []string{"tool", "a\nb", "c\nd"}, false},
+		{"multiple multiline", []string{"tool", "a\nb", "c\nd"}, true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			graph := map[string]any{"nodes": []any{map[string]any{"id": "build/widget", "component": "widget", "command": test.argv}}}
 			step := planFields{"executionGraph": mustCanonical(t, graph)}
 			before := mustCanonical(t, step)
 			files := map[string][]byte{}
-			if err := sliceTreeCommands(step, "steps/target", files); err != nil {
+			if err := sliceTreeCommands(step, files); err != nil {
 				t.Fatal(err)
 			}
-			if (len(files) == 1) != test.extract {
+			if (len(files) > 0) != test.extract {
 				t.Fatal("wrong extraction decision")
 			}
 			if test.extract {
-				if !bytes.Equal(files["steps/target/build-widget.sh"], []byte(test.argv[2])) {
-					t.Fatal("script bytes changed")
-				}
-				var encoded map[string]json.RawMessage
-				if err := json.Unmarshal(step["executionGraph"], &encoded); err != nil {
-					t.Fatal(err)
-				}
-				if !bytes.Contains(encoded["nodes"], []byte(`{"file":"build-widget.sh"}`)) {
-					t.Fatal("missing file operand")
+				for _, arg := range test.argv {
+					if !strings.Contains(arg, "\n") {
+						continue
+					}
+					name := planStorePath([]byte(arg), ".sh")
+					if !bytes.Equal(files[name], []byte(arg)) {
+						t.Fatal("script bytes changed")
+					}
+					if !bytes.Contains(step["executionGraph"], mustCanonical(t, map[string]string{"file": name})) {
+						t.Fatal("missing file operand")
+					}
 				}
 			}
-			if err := expandTreeCommands(step, "steps/target", files, MaxPlanBytes); err != nil {
+			if err := expandTreeCommands(step, files, MaxPlanBytes); err != nil {
 				t.Fatal(err)
 			}
 			if !bytes.Equal(before, mustCanonical(t, step)) {
@@ -169,12 +171,12 @@ func TestPlanTreeRejectsUnsafeCommandReferences(t *testing.T) {
 		{"extra key", map[string]string{"file": "body.sh", "other": "x"}, MaxPlanBytes},
 		{"missing file", map[string]string{"file": "absent.sh"}, MaxPlanBytes},
 		{"null", nil, MaxPlanBytes},
-		{"expansion bound", map[string]string{"file": "body.sh"}, 1},
+		{"expansion bound", map[string]string{"file": planStorePath([]byte("hello\n"), ".sh")}, 1},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			graph := map[string]any{"nodes": []any{map[string]any{"command": []any{test.operand}}}}
 			step := planFields{"executionGraph": mustCanonical(t, graph)}
-			err := expandTreeCommands(step, "steps/target", map[string][]byte{"steps/target/body.sh": []byte("hello\n")}, test.budget)
+			err := expandTreeCommands(step, map[string][]byte{planStorePath([]byte("hello\n"), ".sh"): []byte("hello\n")}, test.budget)
 			assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 		})
 	}
@@ -233,14 +235,19 @@ func TestPlanTreeRuntimeCohortSplitRequiresRegeneration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newScript := false
+	sharedScripts := 0
 	for name := range fresh.Files {
-		if strings.HasSuffix(name, ".sh") && baseline.Files[name] == nil {
-			newScript = true
+		if isPlanStoreScript(name) && baseline.Files[name] != nil {
+			sharedScripts++
 		}
 	}
-	if !newScript {
-		t.Fatal("fixture did not split a vendor script cohort")
+	beforeBindings, err := runtimeScriptBindings(before)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterBindings, err := runtimeScriptBindings(after)
+	if err != nil || sharedScripts == 0 || bytes.Equal(beforeBindings, afterBindings) {
+		t.Fatal("fixture must split a cohort while retaining its shared script bytes", err)
 	}
 	err = PrepareGitHubRuntimeBundle(t.Context(), after, root, false)
 	assertFactoryErrorCode(t, err, e.CodePipelineDrift)
@@ -309,13 +316,13 @@ func TestPlanTreeRejectsMalformedStorage(t *testing.T) {
 		{"trailing document", func(files map[string][]byte) { files[planPath] = append(files[planPath], []byte("{}")...) }},
 		{"alternate whitespace", func(files map[string][]byte) { files[planPath] = append(files[planPath], '\n') }},
 		{"missing step", func(files map[string][]byte) {
-			delete(files, path.Join(path.Dir(planPath), "steps", plan.Builds[0].Name, "step.json"))
+			delete(files, treeStepPath(t, planPath, files, 0))
 		}},
 		{"extra step", func(files map[string][]byte) {
 			files[path.Dir(planPath)+"/steps/unexpected/step.json"] = []byte("{}\n")
 		}},
 		{"root-owned step field", func(files map[string][]byte) {
-			name := path.Join(path.Dir(planPath), "steps", plan.Builds[0].Name, "step.json")
+			name := treeStepPath(t, planPath, files, 0)
 			var step planFields
 			if err := json.Unmarshal(files[name], &step); err != nil {
 				t.Fatal(err)
@@ -341,7 +348,7 @@ func TestPlanTreeRejectsMalformedStorage(t *testing.T) {
 		}},
 
 		{"mismatched name", func(files map[string][]byte) {
-			name := path.Join(path.Dir(planPath), "steps", plan.Builds[0].Name, "step.json")
+			name := treeStepPath(t, planPath, files, 0)
 			files[name] = bytes.Replace(files[name], []byte(`"name": "`+plan.Builds[0].Name+`"`), []byte(`"name": "other"`), 1)
 		}},
 	} {
@@ -363,7 +370,7 @@ func TestPlanTreeLoadAdmitsCompleteInventory(t *testing.T) {
 		t.Run(mutation, func(t *testing.T) {
 			root := t.TempDir()
 			bundle := writeGitHubRuntimeBaseline(t, root, plan)
-			step := filepath.Join(root, filepath.Dir(bundle.PlanPath), "steps", plan.Builds[0].Name, "step.json")
+			step := filepath.Join(root, treeStepPath(t, bundle.PlanPath, bundle.Files, 0))
 			switch mutation {
 			case "extra":
 				if err := os.WriteFile(step+".extra", []byte("extra"), 0644); err != nil {
@@ -436,22 +443,8 @@ func TestPlanTreeRenderRejectsUnsafeLayout(t *testing.T) {
 		mutate func(*Plan)
 	}{
 		{"unsafe target", func(plan *Plan) { plan.Builds[0].Name = "../outside" }},
-		{"file directory collision", func(plan *Plan) {
+		{"duplicate target", func(plan *Plan) {
 			plan.Builds = append(plan.Builds[:1:1], plan.Builds[0])
-			plan.Builds[0].Name = "target"
-			plan.Builds[1].Name = "target/step.json"
-		}},
-		{"script collision", func(plan *Plan) {
-			graph := plan.Builds[0].Graph
-			for _, node := range graph.Nodes {
-				if node.Component == "" {
-					continue
-				}
-				node.Command = []string{"sh", "-c", "echo x\n"}
-				graph.Nodes = append(graph.Nodes[:0:0], node, node)
-				return
-			}
-			t.Fatal("fixture has no component instruction")
 		}},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -461,4 +454,16 @@ func TestPlanTreeRenderRejectsUnsafeLayout(t *testing.T) {
 			assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 		})
 	}
+}
+
+func treeStepPath(t *testing.T, planPath string, files map[string][]byte, index int) string {
+	t.Helper()
+	var root struct{ Builds []struct{ File string } }
+	if err := json.Unmarshal(files[planPath], &root); err != nil {
+		t.Fatal(err)
+	}
+	if index >= len(root.Builds) || !isPlanStoreRecord(root.Builds[index].File) {
+		t.Fatal("missing step reference")
+	}
+	return root.Builds[index].File
 }

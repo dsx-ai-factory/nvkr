@@ -98,6 +98,9 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 				return GeneratedManifest{}, nil, err
 			}
 		}
+		if isPlanStorePath(name) && planStorePath(bundle.Files[name], filepath.Ext(name)) != name {
+			return GeneratedManifest{}, nil, e.New(e.CodePipelineDrift, "shared Plan member differs from its content address")
+		}
 		members = append(members, GeneratedMember{Path: name, SHA256: pipeline.FileDigest(bundle.Files[name]), Mode: 0o644})
 	}
 	manifest := GeneratedManifest{SchemaVersion: generatedManifestSchema, Engine: bundle.Engine,
@@ -165,6 +168,13 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	if err := ensureGeneratedDirectory(root, filepath.ToSlash(filepath.Dir(bundle.ManifestPath))); err != nil {
 		return err
 	}
+	if bundle.Engine == EngineGitHub {
+		unlock, err := acquireBundleLock(ctx, filepath.Join(root, PlanStoreDirectory+".lease"))
+		if err != nil {
+			return err
+		}
+		defer unlock()
+	}
 	release, err := acquireBundleLock(ctx, filepath.Join(root, bundle.ManifestPath+".lease"))
 	if err != nil {
 		return err
@@ -178,7 +188,10 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		return err
 	}
 
-	type staged struct{ destination, temporary string }
+	type staged struct {
+		destination, temporary string
+		shared                 bool
+	}
 	names := sortedFileNames(bundle.Files)
 	stagedFiles := make([]staged, 0, len(names)+1)
 	cleanup := func() {
@@ -204,7 +217,7 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		if err != nil {
 			return e.Wrap(e.CodeInternal, err, "staging generated member %s", relative)
 		}
-		entry := staged{destination: destination, temporary: tmp.Name()}
+		entry := staged{destination: destination, temporary: tmp.Name(), shared: isPlanStorePath(relative)}
 		stagedFiles = append(stagedFiles, entry)
 		// Name the logical member; %w keeps the os.PathError and any owner code.
 		fail := func(err error) error {
@@ -226,6 +239,11 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		return nil
 	}
 	for _, name := range names {
+		if isPlanStorePath(name) {
+			if _, err := os.Lstat(filepath.Join(root, name)); err == nil {
+				continue
+			}
+		}
 		if err := stage(name, bundle.Files[name]); err != nil {
 			return err
 		}
@@ -248,7 +266,16 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 			}
 		}
 		entry := &stagedFiles[index]
-		if err := os.Rename(entry.temporary, entry.destination); err != nil {
+		publish := os.Rename
+		if entry.shared {
+			publish = func(old, new string) error {
+				if err := os.Link(old, new); err != nil {
+					return err
+				}
+				return os.Remove(old)
+			}
+		}
+		if err := publish(entry.temporary, entry.destination); err != nil {
 			return e.Wrap(e.CodeInternal, err, "publishing generated member %s", entry.destination)
 		}
 		entry.temporary = ""
@@ -281,6 +308,9 @@ func CheckGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	}
 	manifest, manifestBytes, err := ManifestFor(bundle)
 	if err != nil {
+		return err
+	}
+	if err := checkPlanStore(ctx, root, bundle, false); err != nil {
 		return err
 	}
 	if err := checkGeneratedDirectoryContents(ctx, root, bundle); err != nil {
@@ -510,9 +540,12 @@ func ensureGeneratedDirectory(root, relative string) error {
 		current = filepath.Join(current, component)
 		info, err := os.Lstat(current)
 		if errors.Is(err, os.ErrNotExist) {
-			if err := os.Mkdir(current, 0o755); err != nil {
+			if err := os.Mkdir(current, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
 				return e.Wrap(e.CodeImmutableViolation, err, "creating generated Run directory %s", current)
 			}
+			// Another bundle may create a shared ancestor before either writer
+			// acquires its lock. Admit the resulting directory through the same
+			// no-symlink check as an ancestor that already existed.
 			info, err = os.Lstat(current)
 		}
 		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {

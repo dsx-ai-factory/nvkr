@@ -11,7 +11,6 @@ import (
 	"maps"
 	"os"
 	"os/exec"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -693,7 +692,7 @@ func TestGitHubPrivateTransferProjectionRemainsStableAcrossSourcePins(t *testing
 	}
 	for name, raw := range first.Files {
 		if name == first.PlanPath ||
-			(strings.HasPrefix(name, path.Dir(first.PlanPath)+"/steps/") && strings.HasSuffix(name, "/step.json")) {
+			isPlanStoreRecord(name) {
 			continue
 		}
 		if !bytes.Equal(raw, second.Files[name]) {

@@ -193,8 +193,8 @@ func TestClosureAllowlistIsExactInBothPlaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const stage = `git add -- "$POLICY_CATALOG/pins.lock.yaml" '.github/nvkr-dev' '.github/nvkr-run' '.github/workflows/nvkr-dev.yml' '.github/workflows/nvkr-run.yml'`
-	const admit = `"$catalog/pins.lock.yaml" | '.github/nvkr-dev'/* | '.github/nvkr-run'/* | '.github/workflows/nvkr-dev.yml' | '.github/workflows/nvkr-run.yml') ;;`
+	const stage = `git add -- "$POLICY_CATALOG/pins.lock.yaml" '.github/nvkr-dev' '.github/nvkr-plan-store' '.github/nvkr-run' '.github/workflows/nvkr-dev.yml' '.github/workflows/nvkr-run.yml'`
+	const admit = `"$catalog/pins.lock.yaml" | '.github/nvkr-dev'/* | '.github/nvkr-plan-store'/* | '.github/nvkr-run'/* | '.github/workflows/nvkr-dev.yml' | '.github/workflows/nvkr-run.yml') ;;`
 	for _, want := range []string{stage, admit} {
 		if !bytes.Contains(raw, []byte(want)) {
 			t.Fatalf("rendered workflow lacks the exact closure allowlist %q", want)

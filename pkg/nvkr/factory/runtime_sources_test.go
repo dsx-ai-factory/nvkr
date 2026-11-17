@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"os"
 	"os/exec"
-	"path"
 	"reflect"
 	"strconv"
 	"strings"
@@ -78,7 +77,7 @@ func TestRuntimeSourcesFreezeCompositeAndReplayWithoutMain(t *testing.T) {
 	fresh := stageGitHubRuntimeInputs(t, root, after)
 	for name, raw := range baseline.Files {
 		if name == baseline.PlanPath ||
-			(strings.HasPrefix(name, path.Dir(baseline.PlanPath)+"/steps/") && strings.HasSuffix(name, "/step.json")) {
+			isPlanStoreRecord(name) {
 			continue
 		}
 		if !bytes.Equal(raw, fresh.Files[name]) {

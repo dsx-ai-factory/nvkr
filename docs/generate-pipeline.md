@@ -68,8 +68,8 @@ Under that scratch root, inspect:
 
 - `.github/workflows/nvkr-run.yml`: named GitHub Actions jobs, dependencies, runners and credential policies.
 - `.github/nvkr-run/actions/`: shared actions with fixed interfaces for execution, preparation and transport.
-- `.github/nvkr-run/plan.json`: the Plan root index and shared catalog snapshots.
-- `.github/nvkr-run/steps/`: per-target step records and exact command files; loading the tree reconstructs the canonical Plan.
+- `.github/nvkr-run/plan.json`: the per-bundle Plan index.
+- `.github/nvkr-plan-store/`: frozen Plan records and command files shared by generated bundles; [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold) owns the storage contract.
 - `.github/nvkr-run/manifest.json`: the generated bundle's ownership and content record.
 
 Those are the default production paths when the Environment omits `githubBundle`

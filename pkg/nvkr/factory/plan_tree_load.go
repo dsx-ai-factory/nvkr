@@ -35,6 +35,32 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 		return nil, nil, e.Wrap(e.CodePipelineDrift, err, "reading Plan snapshots")
 	}
 	delete(root, "catalogSnapshots")
+	catalogBytes := 0
+	for _, digest := range sortedKeys(catalogs) {
+		value, err := treeCatalogRecords(catalogs[digest], files, true)
+		if err != nil {
+			return nil, nil, err
+		}
+		catalogBytes += len(value)
+		if int64(catalogBytes) > MaxPlanBytes {
+			return nil, nil, e.New(e.CodePipelineDrift, "catalog snapshots exceed decoded size bound")
+		}
+		catalogs[digest] = value
+	}
+	fieldBytes := 0
+	for _, field := range sharedPlanFields {
+		if ref, ok := root[field]; ok {
+			value, err := readTreeJSON(ref, files)
+			if err != nil {
+				return nil, nil, err
+			}
+			fieldBytes += len(value)
+			if int64(fieldBytes) > MaxPlanBytes {
+				return nil, nil, e.New(e.CodePipelineDrift, "Plan fields exceed decoded size bound")
+			}
+			root[field] = value
+		}
+	}
 	restoreCatalog := func(record planFields) error {
 		var digest string
 		if err := json.Unmarshal(record["catalogDigest"], &digest); err != nil {
@@ -68,19 +94,29 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 		if err := ctx.Err(); err != nil {
 			return nil, nil, e.Wrap(e.CodeTimeout, err, "joining Plan canceled")
 		}
-		name, err := treeTargetName(build["name"])
-		if err != nil {
+		if _, err := treeTargetName(build["name"]); err != nil {
 			return nil, nil, err
 		}
-		directory := path.Join(path.Dir(planPath), "steps", name)
+		var stepPath string
+		if err := json.Unmarshal(build["file"], &stepPath); err != nil || !isPlanStoreRecord(stepPath) {
+			return nil, nil, e.New(e.CodePipelineDrift, "invalid Plan step reference")
+		}
+		delete(build, "file")
+		if ref, ok := build["resolvedComponents"]; ok {
+			value, err := treeResolvedRecords(ref, files, true)
+			if err != nil {
+				return nil, nil, err
+			}
+			build["resolvedComponents"] = value
+		}
 		var step planFields
-		if err := decodeTreeJSON(files[directory+"/step.json"], &step); err != nil {
+		if err := decodeTreeJSON(files[stepPath], &step); err != nil {
 			return nil, nil, err
 		}
 		if !bytes.Equal(step["name"], build["name"]) {
 			return nil, nil, e.New(e.CodePipelineDrift, "Plan step name differs from its root record")
 		}
-		if err := expandTreeCommands(step, directory, files, MaxPlanBytes-int64(size)); err != nil {
+		if err := expandTreeCommands(step, files, MaxPlanBytes-int64(size)); err != nil {
 			return nil, nil, err
 		}
 		for field, value := range step {
@@ -135,78 +171,15 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 		}
 	}
 	for name := range files {
-		if (name == planPath || strings.HasPrefix(name, path.Dir(planPath)+"/steps/")) && want[name] == nil {
+		if (name == planPath || isPlanStorePath(name) || strings.HasPrefix(name, path.Dir(planPath)+"/steps/")) && want[name] == nil {
 			return nil, nil, e.New(e.CodePipelineDrift, "unexpected Plan tree member %q", name)
 		}
 	}
 	return &plan, raw, nil
 }
 
-func expandTreeCommands(step planFields, directory string, files map[string][]byte, remaining int64) error {
-	var graph planFields
-	if err := json.Unmarshal(step["executionGraph"], &graph); err != nil {
-		return e.Wrap(e.CodePipelineDrift, err, "reading execution graph")
-	}
-	var nodes []planFields
-	if err := json.Unmarshal(graph["nodes"], &nodes); err != nil {
-		return e.Wrap(e.CodePipelineDrift, err, "reading execution nodes")
-	}
-	for _, node := range nodes {
-		for _, field := range []string{"command", "vendorCmd"} {
-			if node[field] == nil {
-				continue
-			}
-			var argv []json.RawMessage
-			if err := json.Unmarshal(node[field], &argv); err != nil {
-				return e.Wrap(e.CodePipelineDrift, err, "reading command")
-			}
-			for i, arg := range argv {
-				var literal string
-				if err := json.Unmarshal(arg, &literal); err == nil && string(arg) != "null" {
-					remaining -= int64(len(arg))
-					if remaining < 0 {
-						return e.New(e.CodePipelineDrift, "Plan commands exceed decoded size bound")
-					}
-					continue
-				}
-				var ref map[string]string
-				if err := json.Unmarshal(arg, &ref); err != nil || len(ref) != 1 || !canonicalName.MatchString(ref["file"]) {
-					return e.New(e.CodePipelineDrift, "invalid Plan command file operand")
-				}
-				body, ok := files[directory+"/"+ref["file"]]
-				if !ok {
-					return e.New(e.CodePipelineDrift, "missing Plan command file")
-				}
-				if int64(len(body)) > MaxPlanBytes {
-					return e.New(e.CodePipelineDrift, "oversized Plan command file")
-				}
-				if int64(len(body)) > remaining {
-					return e.New(e.CodePipelineDrift, "expanded Plan command exceeds size bound")
-				}
-				var err error
-				argv[i], err = canonical.Marshal(string(body))
-				if err != nil {
-					return err
-				}
-				remaining -= int64(len(argv[i]))
-				if remaining < 0 {
-					return e.New(e.CodePipelineDrift, "expanded Plan command exceeds size bound")
-				}
-			}
-			var err error
-			node[field], err = canonical.Marshal(argv)
-			if err != nil {
-				return err
-			}
-		}
-	}
-	var err error
-	graph["nodes"], err = canonical.Marshal(nodes)
-	if err != nil {
-		return err
-	}
-	step["executionGraph"], err = canonical.Marshal(graph)
-	return err
+func expandTreeCommands(step planFields, files map[string][]byte, remaining int64) error {
+	return treeGraphCommands(step, files, true, remaining)
 }
 
 // A path-based load admits only the Plan tree. Complete workflow/action drift
@@ -252,8 +225,7 @@ func loadPlanTree(ctx context.Context, filename string, rootBytes []byte) (*Plan
 		return nil, "", e.Wrap(e.CodePipelineDrift, err, "invalid Plan tree namespace")
 	}
 	files := map[string][]byte{}
-	steps := path.Dir(planPath) + "/steps"
-	allowedFiles, allowedDirectories := map[string]bool{}, map[string]bool{".": true}
+	bundle.Files = map[string][]byte{}
 	size, previous := 0, ""
 	for _, member := range manifest.Members {
 		// Refuse terminal controls before a path reaches filesystem diagnostics.
@@ -264,7 +236,8 @@ func loadPlanTree(ctx context.Context, filename string, rootBytes []byte) (*Plan
 			return nil, "", e.New(e.CodePipelineDrift, "invalid Plan tree manifest member")
 		}
 		previous = member.Path
-		if member.Path != planPath && !strings.HasPrefix(member.Path, steps+"/") {
+		bundle.Files[member.Path] = nil
+		if member.Path != planPath && !isPlanStorePath(member.Path) {
 			continue
 		}
 		if err := validateGeneratedDirectoryChain(root, path.Dir(member.Path)); err != nil {
@@ -290,13 +263,6 @@ func loadPlanTree(ctx context.Context, filename string, rootBytes []byte) (*Plan
 			return nil, "", e.New(e.CodePipelineDrift, "Plan tree member differs from manifest")
 		}
 		files[member.Path] = data
-		if member.Path != planPath {
-			relative := strings.TrimPrefix(member.Path, steps+"/")
-			allowedFiles[relative] = true
-			for parent := path.Dir(relative); parent != "."; parent = path.Dir(parent) {
-				allowedDirectories[parent] = true
-			}
-		}
 	}
 	storedRoot, listed := files[planPath]
 	if !listed {
@@ -305,13 +271,13 @@ func loadPlanTree(ctx context.Context, filename string, rootBytes []byte) (*Plan
 	if !bytes.Equal(rootBytes, storedRoot) {
 		return nil, "", e.New(e.CodePipelineDrift, "Plan tree root changed during admission")
 	}
-	stepsDirectory := filepath.Join(root, filepath.FromSlash(steps))
-	if len(allowedFiles) == 0 {
-		if _, err := os.Lstat(stepsDirectory); !os.IsNotExist(err) {
-			return nil, "", e.New(e.CodePipelineDrift, "unexpected empty Plan steps directory")
-		}
-	} else if err := checkGeneratedInventory(ctx, stepsDirectory, allowedFiles, allowedDirectories); err != nil {
+	if err := checkPlanStore(ctx, root, bundle, false); err != nil {
 		return nil, "", err
+	}
+	// The private Plan tree contains only its root index. Reject stale or
+	// injected step directories without opening workflow or action contents.
+	if _, err := os.Lstat(filepath.Join(directory, "steps")); !os.IsNotExist(err) {
+		return nil, "", e.New(e.CodePipelineDrift, "unexpected private Plan steps directory")
 	}
 	plan, packed, err := joinPlanTree(ctx, planPath, files)
 	if err != nil {

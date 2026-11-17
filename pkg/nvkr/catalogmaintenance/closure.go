@@ -204,6 +204,7 @@ func (members *closure) plans() []string {
 
 // paths returns the exact, sorted directories and files a candidate patch may touch.
 func (members *closure) paths() (directories, files []string) {
+	directories = append(directories, factory.PlanStoreDirectory)
 	add := func(bundle *factory.GeneratedBundle) {
 		directories = append(directories, path.Dir(bundle.ManifestPath))
 		files = append(files, bundle.WorkflowPath)

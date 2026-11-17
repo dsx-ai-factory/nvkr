@@ -94,8 +94,8 @@ ADR-26 §9 additionally admits, for composite Definitions only, a named signed d
 `development-<name>` namespace with a signer bound to that workflow; it never shares the fixed layout.
 The default production layout remains `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/`. Both use the same
 compiler, renderer, exact validation and writer. The admitted Environment selects these paths; callers
-cannot relocate one bundle into the other layout. Each manifest owns only its own payloads and lock, so
-regeneration or retirement of one leaves the other intact. Helper commands and container launches bind the
+cannot relocate one bundle into the other layout. Each manifest owns its private payloads and lock, and references shared frozen Plan objects under the storage contract below.
+Regeneration preserves objects still referenced by another bundle. Helper commands and container launches bind the
 Plan at that layout and recheck its digest. Development mode changes Environment/Plan identity, not
 transport-independent logical Build identity. Its execution and retention policy is owned by ADR-18.
 Signed development also binds the disposable namespace and signer policy in this immutable Plan. Actual
@@ -112,36 +112,37 @@ Execution identity and transaction identity are separate. The Plan binds authore
 operation; the workflow has its own exact-byte digest. The commit manifest lists each owned file's safe relative path, mode and exact whole-file digest,
 plus plan and workflow identities. It is written last and never lists itself. No self-referential identity is permitted.
 
-GitHub stores that same Plan as a generated file tree. The root `plan.json` carries the
-`storage: nvkr-plan-tree-v1` discriminator, outside the executable Plan schema. It owns
-every top-level field except the extracted snapshots and per-target fields. Each distinct
-catalog snapshot appears once in `catalogSnapshots`, keyed by the existing `catalogDigest`;
-root build records retain `name`, `catalogDigest` and `resolvedComponents`. A generated
-`steps/<target>/step.json` owns `name`, `platform`, `buildDigest`, `components`,
-`appliedOverlays` and `executionGraph`. Full target names remain unchanged, including
-aggregate native targets such as `output/linux/arm64`, whose safe segments form directories.
-The duplicated name is only a checked join key. Built-in operations remain in the root graph.
+GitHub stores that same Plan as a generated file tree.
+Each bundle's small `plan.json` index carries the `storage: nvkr-plan-tree-v1` discriminator, outside the executable Plan schema.
+Frozen JSON records and raw scripts live in one repository store, `.github/nvkr-plan-store/`, named by their exact-byte SHA-256 and a `.json` or `.sh` extension.
+These addresses are blob integrity checks, not new logical identities.
+The index retains scalar metadata, ordered build names and references, and a `catalogSnapshots` map keyed by the existing `catalogDigest`.
+Every distinct snapshot is stored once; identical snapshots across bundles share the same object.
+Snapshots reference component and source records, and build records reference their resolved-component lists and step records.
+A resolved component stores its name beside a reference to its exact frozen component value; values identical to a snapshot component reuse its object.
+Platform-specific resolutions keep distinct values rather than being resolved again when loading.
+A step contains its unchanged target name, platform, Build Digest, component selection, overlays and execution graph.
+Structured top-level fields, including the complete graph with its nodes and artifacts, are shared records too.
+Byte-identical graphs share one object across bundles; differing graphs retain distinct objects without changing graph or Plan identity.
+Full target names remain unchanged, including aggregate targets such as `output/linux/arm64`.
 
-JSON members are the canonical codec's bytes indented with two spaces and one final LF.
-A command or vendor-command array with exactly one operand containing LF stores that
-operand in `build-<component>.sh` or `vendor-<first-consuming-component>.sh`, respectively,
-and uses a single-key `{ "file": "<name>" }` operand. Other operands remain strings;
-multiple multiline operands stay inline because no unambiguous component-scoped filename
-exists. Raw script bytes gain no header, shebang or newline. Unsafe names and file/directory
-collisions fail closed. Root snapshots and resolved components still contain their command
-copies, so editing a script also changes those root records.
+JSON objects use the canonical codec's bytes indented with two spaces and one final LF.
+Every multiline command operand in a snapshot, resolved component or execution step references the same exact script bytes through a single-key `{ "file": "<store path>" }` operand.
+Other operands remain strings.
+Raw script bytes gain no header, shebang or newline.
+References admit only flat content-addressed members of the fixed store; arbitrary paths and symlinks fail closed.
 
-Loading a tree admits the manifest's Plan root and step/script members, their bounded inventory,
-safe regular files, modes, hashes and Plan digest. It reconstructs and validates the complete existing
-Plan and compares the exact regenerated tree without rendering or reading workflows and actions.
-Duplicate or unknown fields, alternate encodings, missing, extra, symlinked, edited or mixed-generation
-Plan-tree members fail admission. Complete workflow/action closure checks remain with generation
-and runtime bootstrap, so read-only inspection does not depend on the binary's workflow renderer. Execution uses
-the captured Plan without reopening command files. Storage has a 64 MiB aggregate bound,
-the existing 32 MiB member and 4,096-entry bounds, and the existing 4 MiB reconstructed
-Plan bound. Diagnostic `planSha256` denotes the reconstructed packed bytes. The tree adds
-no Plan schema, digest family, Build identity or execution authority. Packed canonical
-bytes remain the wire and non-GitHub storage form, including Tekton.
+Loading admits the manifest's root and shared objects, their bounded inventory, regular-file modes, hashes and Plan digest.
+It reconstructs and validates the complete existing Plan and compares the exact regenerated tree without rendering or reading workflows and actions, fetching catalogs, or resolving inputs again.
+Duplicate or unknown fields, alternate encodings, missing, extra, symlinked, edited or mixed-generation members fail admission.
+The union of producer manifests describes ownership of the shared store; a manifest does not grant executable authority over another bundle.
+Loading also checks that union's exact store inventory and byte addresses.
+Complete workflow/action closure checks remain with generation and runtime bootstrap, so read-only inspection does not depend on the binary's workflow renderer.
+Execution uses the captured Plan without reopening command files.
+The store has a 64 MiB aggregate bound and 4,096-object bound, with the existing 32 MiB member and 4 MiB reconstructed Plan bounds.
+Diagnostic `planSha256` denotes the reconstructed packed bytes.
+The tree adds no Plan schema, digest family, Build identity or execution authority.
+Packed canonical bytes remain the wire and non-GitHub storage form, including Tekton.
 
 Owned payloads are generated provider/configuration files and canonical graph/plan records. Catalogs, profiles,
 vectors, roots and credentials remain external inputs whose exact references/policies are recorded, not copied
@@ -198,7 +199,7 @@ defines the full boundary. Ordinary bundles require complete regeneration and th
 check after every input update. Named production Environments may explicitly select
 `githubRuntimePlan: true`: the first bootstrap admits the committed baseline, freezes a fresh Plan from
 current pinned inputs and distributes its exact data through same-Run helper artifacts. Only the Plan
-and derived manifest may change; every workflow/action byte, member path,
+and derived manifest may change; every workflow/action byte and path, script body and consumer binding,
 Environment digest and authored input path stays fixed. Source-version updates within that contract need
 no regeneration commit. `--runtime --check` validates that contract without writes; ordinary `--check`
 still compares the complete current bundle. The two-file carrier contains the packed canonical Plan
@@ -207,9 +208,9 @@ helper consumers restore these two runtime JSON files into a fresh staging direc
 their exact bytes and current authored selection against
 the complete committed baseline. The generation owner installs the admitted bundle using its existing
 lock, per-file atomic replacement and manifest-last semantics; this is not an atomic directory transaction.
-Root and step JSON are refreshable Plan data; script bytes remain fixed. A source pin that
-splits or merges a shared fetch cohort may change vendor script paths. That is a topology
-change and requires reviewed regeneration; the fixed-member-path check fails closed.
+The root and content-addressed JSON objects are refreshable Plan data; new pins may change their object paths.
+Target membership, script bytes and the scripts' logical consumer cohorts remain fixed.
+A source pin that splits or merges a shared fetch cohort requires reviewed regeneration even if both cohorts use identical script bytes.
 Private transport never overwrites checked-out files. ADR-18 owns bootstrap ordering and transport. Neither an
 unchanged workflow nor runtime compilation establishes execution or publication acceptance.
 
@@ -457,8 +458,10 @@ The legacy `--toolchain` spelling cannot alter component producer pins.
 ### 6. Serialized local writes and exact retirement of generated members
 
 Catalog lock writes use original-byte compare-and-swap, a persistent kernel lock inode, same-filesystem
-staging, fsync and atomic replacement (ADR-22). Generated Run writes acquire their per-bundle kernel lock,
-stage complete files and fsync them, publish payloads, retire obsolete members, and replace the manifest last.
+staging, fsync and atomic replacement (ADR-22).
+GitHub generation acquires the repository Plan-store kernel lock before its per-bundle kernel lock.
+Writers stage and fsync complete files, publish new shared objects with no-replace semantics, replace private payloads, retire obsolete members, and replace the manifest last.
+Existing shared objects must match their exact byte addresses and are reused without replacement.
 Each named namespace owns its distinct manifest and lock. Write and check reject mixed
 namespace paths or members before output work; retirement cannot claim another bundle's
 workflow or generated directory. Default and multiple named bundles may coexist. Changing
@@ -468,8 +471,9 @@ conflict for two separately compiled bundles.
 
 Retirement reads the previous generated-run/v1 manifest as a bounded ownership description. It validates
 its schema, engine, workflow path, sorted member paths, digests and modes. A member may be retired only
-inside the generator-owned directory or the exact owner's reserved legacy child workflow namespace, and
-only when it is a regular file whose current bytes and mode still match that manifest. Missing obsolete
+inside the generator-owned directory, the exact owner's reserved legacy child workflow namespace, or the shared Plan store,
+and only when it is a regular file whose current bytes and mode still match that manifest.
+A shared object is retired only when no other producer manifest references it; the store lock covers ownership inspection through manifest publication. Missing obsolete
 members are tolerated for retry after an interrupted retirement.
 Symlinks, changed obsolete members and unlisted directory members fail closed before payload publication.
 A missing prior manifest grants no ownership over unexpected files. Empty directories made obsolete by

@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"context"
 	"maps"
-	"path"
 	"reflect"
 	"slices"
 	"strings"
@@ -269,7 +268,7 @@ func TestGitHubRuntimeTransportSourcePinUpdatePreservesProviderPrograms(t *testi
 		t.Fatal("pin update did not refresh exact Plan and stage descriptor bytes")
 	}
 	for name, raw := range baseline.Files {
-		step := strings.HasPrefix(name, path.Dir(baseline.PlanPath)+"/steps/") && strings.HasSuffix(name, "/step.json")
+		step := isPlanStoreRecord(name)
 		if name != baseline.PlanPath && !step && !bytes.Equal(raw, fresh.Files[name]) {
 			t.Fatalf("pin update changed the scheduled provider program %s", name)
 		}
