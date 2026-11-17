@@ -499,7 +499,7 @@ func newNightlyInputsWithCapture(ctx context.Context, profile NightlyProfile, bu
 	if environment.GitHubRuntimePlan {
 		privateRequest.Name = names[2]
 		var restored map[string][]byte
-		restored, err = nightlyTransportMembers(ctx, archives[2], selected[2], map[string]int64{"plan.json": factory.MaxPlanBytes, "action-data.json": 32 << 20, "manifest.json": 32 << 20}, workspace, privateRequest, privateOptions, cistore.Download)
+		restored, err = nightlyTransportMembers(ctx, archives[2], selected[2], map[string]int64{"plan.json": factory.MaxPlanBytes, "manifest.json": 32 << 20}, workspace, privateRequest, privateOptions, cistore.Download)
 		if err != nil {
 			return nil, err
 		}

@@ -12,6 +12,8 @@ import (
 	"sort"
 	"testing"
 
+	"sigs.k8s.io/yaml"
+
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -52,31 +54,41 @@ func githubActionDataCommandFixture(t *testing.T) (planBytes []byte, selector, o
 	if err != nil {
 		t.Fatal(err)
 	}
-	var data struct {
-		Entries map[string]struct {
-			Template string            `json:"template"`
-			Values   map[string]string `json:"values"`
-		} `json:"entries"`
+	if _, exists := bundle.Files[factory.GitHubActionDataPath]; exists {
+		t.Fatal("generated bundle persists transient invocation data")
 	}
-	if err := canonical.UnmarshalExact(bundle.Files[factory.GitHubActionDataPath], &data); err != nil {
+	var workflow struct {
+		Jobs map[string]struct {
+			Steps []struct {
+				ID string `json:"id"`
+			} `json:"steps"`
+		} `json:"jobs"`
+	}
+	if err := yaml.Unmarshal(bundle.Files[bundle.WorkflowPath], &workflow); err != nil {
 		t.Fatal(err)
 	}
 	var selectors []string
-	for key, entry := range data.Entries {
-		if entry.Template != "" && len(entry.Values) > 0 {
-			selectors = append(selectors, key)
+	for id, job := range workflow.Jobs {
+		for _, step := range job.Steps {
+			if step.ID == "nvkr-context" {
+				selectors = append(selectors, id)
+			}
 		}
 	}
-	if len(selectors) == 0 {
-		t.Fatal("fixture Plan has no shared action descriptor")
-	}
 	sort.Strings(selectors)
+	if len(selectors) == 0 {
+		t.Fatal("fixture has no action context")
+	}
 	selector = selectors[0]
-	values, err := canonical.Marshal(data.Entries[selector].Values)
+	outputPath := filepath.Join(t.TempDir(), "output")
+	if err := factory.WriteGitHubActionData(t.Context(), plan, selector, outputPath); err != nil {
+		t.Fatal(err)
+	}
+	values, err := os.ReadFile(outputPath)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return planBytes, selector, "data=" + string(values) + "\n"
+	return planBytes, selector, string(values)
 }
 
 func TestDescribeActionCommandUsesGitHubOutputEnvironment(t *testing.T) {

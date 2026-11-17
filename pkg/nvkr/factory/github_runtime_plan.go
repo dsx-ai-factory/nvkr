@@ -13,7 +13,7 @@ import (
 )
 
 // PrepareGitHubRuntimeBundle admits a freshly compiled Plan against the complete
-// committed bundle. Only Plan and descriptive action data may change; every
+// committed bundle. Only the Plan and derived manifest may change; every
 // workflow/action byte, member path, Environment and input selection stays fixed.
 // This is generation admission, not a provider or publication authority receipt.
 // The caller owns compilation from the exact current repository inputs.
@@ -65,7 +65,7 @@ func PrepareGitHubRuntimeBundle(ctx context.Context, freshPlan *Plan, root strin
 		return e.New(e.CodePipelineDrift, "runtime GitHub preparation cannot change generated member paths; regenerate the bundle")
 	}
 	for _, member := range sortedFileNames(baseline.Files) {
-		if member == layout.planPath || member == githubActionDataPathFor(freshPlan) {
+		if member == layout.planPath {
 			continue
 		}
 		if !bytes.Equal(baseline.Files[member], fresh.Files[member]) {

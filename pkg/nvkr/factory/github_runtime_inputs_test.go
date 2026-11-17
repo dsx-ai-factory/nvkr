@@ -208,11 +208,11 @@ func TestCheckGitHubRuntimeInputsRejectsUnsupportedBeforeReading(t *testing.T) {
 
 func TestGitHubRuntimeInputPreparationRejectsPartialDeliveryBeforeMovingFiles(t *testing.T) {
 	plan, bundle, baseline := runtimeInputsFixture(t)
-	for _, member := range []string{"binary", "Plan", "action data", "manifest"} {
+	for _, member := range []string{"binary", "Plan", "manifest"} {
 		for _, damage := range []string{"missing", "symlink"} {
 			t.Run(member+"/"+damage, func(t *testing.T) {
 				root := copyGitHubRuntimeRoot(t, baseline)
-				members := map[string]string{"binary": "nvkr-exec", "Plan": bundle.PlanPath, "action data": githubActionDataPathFor(plan), "manifest": bundle.ManifestPath}
+				members := map[string]string{"binary": "nvkr-exec", "Plan": bundle.PlanPath, "manifest": bundle.ManifestPath}
 				for label, name := range members {
 					raw := bundle.Files[name]
 					switch label {

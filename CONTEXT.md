@@ -12,7 +12,7 @@ intent. An output directly selects components. Packaging intent may bind catalog
 deployment repository remains transport configuration. Catalog-owned digest representation
 may retain the full OCI digest or supply SHA-256 hex to a template that owns the algorithm prefix;
 this does not change the authenticated image identity or rewrite templates.
-A proposed composite Definition is a form of this object, not a seventh lifecycle object (below).
+A composite Definition is a form of this object, not a seventh lifecycle object (below).
 _Avoid_: Factory, FactoryDefinition, cluster definition
 
 **Environment**:
@@ -87,9 +87,9 @@ _Avoid_: Signing configuration, verification result, producer assertion
 
 ## Definition and production relationships
 
-**Composite Definition (proposed)**:
+**Composite Definition**:
 A Definition form that names complete member Definitions by locator and exact `nvkr.definition` digest and
-releases their named outputs through one Plan, Run and Release. Proposed
+releases their named outputs through one Plan, Run and Release.
 [ADR-26](docs/adr/0026-definition-composition.md) designs it and owns its
 [merge rules](docs/adr/0026-definition-composition.md#3-merge-rules-exact-union-never-precedence) and
 [member Release reuse](docs/adr/0026-definition-composition.md#6-reusing-already-published-member-releases-only-through-authenticated-acceptance-a-planned-follow-up);
@@ -98,15 +98,15 @@ and contract-tested. The [evidence ledger](docs/adr/reconciliation/adr-26.md#hos
 owns hosted publication, qualification and independent consumer-acceptance status.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
-**Effective Definition (proposed)**:
+**Effective Definition**:
 The derived ordinary Definition that composite admission produces by merging its members, with every output's
 catalog stack made explicit. It is an internal record, recorded by digest in the composite's Plan; it is never
 authored or selected as input.
 _Avoid_: Flattened file, combined candidate, authored Definition
 
-**Declared variant (proposed)**:
+**Declared variant**:
 A composite Definition's explicit permission for named members to select different effective producers of
-one component. Proposed ADR-26 binds it into the composite identity and composition record; any cross-member
+one component. ADR-26 binds it into the composite identity and composition record; any cross-member
 producer divergence it does not cover fails compilation.
 _Avoid_: Override, pin exception, allowlist
 
@@ -136,10 +136,10 @@ A frozen requirement established from resolved intent before execution and later
 bytes for the exact named output and target. A successful sibling cannot satisfy it through digest equality.
 _Avoid_: Successful output, observed inventory
 
-**Result reuse (proposed)**:
+**Result reuse**:
 Satisfying a required output slot with a complete, previously published output of the same name after the owning
 module authenticates it under the current policy. Discovery only finds candidates; an acceptance receipt binds
-the output into the current Run as reused, with its original origin and provenance. Proposed
+the output into the current Run as reused, with its original origin and provenance.
 [ADR-30](docs/adr/0030-authenticated-result-reuse.md) designs the pipeline-attested contract; it is not implemented.
 _Avoid_: Cache hit, Build Digest match, skipped job, sibling reuse
 
@@ -176,10 +176,10 @@ _Avoid_: Authored definition, execution observation
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
 GitHub uses hosted workflow identity; Tekton uses ADR-18's explicit cluster-authenticated execution and
 independent signer keys. No separate qualified renderer or authored transport-plan model is retained.
-The GitHub entry workflow, shared composite templates and generated invocation data share one ownership manifest and
+The GitHub entry workflow, Plan and shared composite templates share one ownership manifest and
 byte-exact drift gate. Actions expose fixed semantic interfaces for Plan operations; grouped work repeats those
 interfaces without generating group-size or output-count variants. Named invocation parameters are recomputed
-from the admitted Plan at runtime. Identical admitted step sequences can share descriptive YAML aliases;
+from the admitted Plan at runtime and are not committed or transported as a separate file. Identical admitted step sequences can share descriptive YAML aliases;
 expansion preserves independent job parameters, policies and exact result membership. Every job retains its
 ID, runner, timeout, permissions and condition. Redundant scheduling edges may be
 removed while preserving the prerequisite closure.
@@ -190,7 +190,7 @@ Execution partitioning is a fallback the Environment permits. When the flat work
 size limit, it moves original jobs into bounded same-commit worker workflows under the same
 manifest; [ADR-18 §8](docs/adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
 owns which jobs stay in the entry workflow and the proposed signer migration. A partition is generated
-scheduling structure, not a Definition, Run or Release, and never follows proposed composite member
+scheduling structure, not a Definition, Run or Release, and never follows composite member
 boundaries. It forwards original
 job results to the single finalizer; it does not authorize artifact acceptance. The complete Plan and required
 output set remain shared. The provider-independent execution graph owns membership, dependency conditions,
@@ -244,9 +244,9 @@ _Avoid_: Release publication root, native image manifest, qualification receipt
 An Artifact format containing exact executable files and their installation metadata.
 _Avoid_: Release, arbitrary archive
 
-**Executable image index (proposed)**:
+**Executable image index**:
 An Artifact format for an executable output that declares a `platforms` set: a standard OCI image index over
-minimal per-platform images. Proposed in [ADR-28](docs/adr/0028-multi-platform-executable-indexes.md), which
+minimal per-platform images. Defined in [ADR-28](docs/adr/0028-multi-platform-executable-indexes.md), which
 owns its [aggregate identity](docs/adr/0028-multi-platform-executable-indexes.md#5-aggregate-identity) and
 [child image contents](docs/adr/0028-multi-platform-executable-indexes.md#6-publication-a-standard-image-index-over-minimal-per-platform-images);
 not implemented.
@@ -282,27 +282,27 @@ Top-level `validate` runs diagnostics, whereas `definition validate` checks stat
 Outputs remain descriptive and cannot authorize qualification or promotion.
 _Avoid_: Recipe, test dispatcher framework, verification policy
 
-**Validator catalog (proposed)**:
+**Validator catalog**:
 An explicit index of reusable diagnostic validator entries, organized by project, artifact and suite.
-Proposed [ADR-24](docs/adr/0024-imported-validator-catalog.md) separates entries from profiles selecting named
+[ADR-24](docs/adr/0024-imported-validator-catalog.md) separates entries from profiles selecting named
 instances and artifact-role bindings. The provisional CLI slice implements strict discovery, local-plan
 admission and frozen dispatch for the existing process-contract and mixed CLI suites. Shared schemas remain
 provisional; published adapters, controller/chart checks and broader migration are deferred. Existing legacy
 validation routes retain their separate admission and capture contracts.
 _Avoid_: Producer catalog, upstream test implementation, executable plugin, qualification policy
 
-**Cluster observation (proposed)**:
+**Cluster observation**:
 A scoped, time-bounded record of discovered cluster facts, their sources and collection gaps. Raw AICR
 Snapshot inputs are distinct from this NVKR observation. Information gathering does not require a build
-baseline or test run. Lane none: unsigned and descriptive. Proposed in
+baseline or test run. Lane none: unsigned and descriptive. Defined in
 [ADR-29](docs/adr/0029-cluster-observation-and-artifact-attribution.md); the standalone route is not implemented.
 _Avoid_: Artifact comparison, authored lifecycle object, complete host attestation, test verdict
 
-**Artifact comparison (proposed)**:
+**Artifact comparison**:
 A descriptive comparison of a cluster observation with selected NVKR outputs and their evidence, under
 an explicit scope and comparison profile, distinct from the public Verification Policy. Reports produced/acquired
 identity, installation attribution and measured contents separately. Missing baselines or unsupported joins remain unverified; observations can
-still be useful without a comparison. Proposed in ADR-29; no qualification, signing or release authority.
+still be useful without a comparison. Defined in ADR-29; no qualification, signing or release authority.
 _Avoid_: Cluster observation, verified installation from a version label, qualification receipt
 
 **Release authenticity**:
@@ -397,7 +397,7 @@ issuance, or errored, with the source and qualifier Runs, attempt times, per-out
 text. It points at the qualification evidence and release manifest by digest and grants no qualification,
 manifest, release or publication authority. An errored outcome's source Run comes from the unauthenticated
 triggering event and says so. `run qualify --issue-manifest --out` writes one for each attempt it qualifies.
-The proposed qualification results index (ADR-31) publishes outcomes for TestGrid; no generated job runs it yet.
+The qualification results index (ADR-31) publishes outcomes for TestGrid; no generated job runs it yet.
 _Avoid_: Qualification record, qualification evidence, test result
 
 **Inventory**:
@@ -461,7 +461,7 @@ _Avoid_: Named output, artifact, authored build group
 **Pinned-tool producer**:
 A component producer that runs one released, digest-pinned executable inside a digest-pinned container. Its
 builder type is `pinned-tool` and it belongs to the existing `wrapped-build` source lane; it is not an
-acquisition of the tool. Proposed in [ADR-27](docs/adr/0027-pinned-tool-producers.md), which owns its
+acquisition of the tool. Defined in [ADR-27](docs/adr/0027-pinned-tool-producers.md), which owns its
 [Build identity](docs/adr/0027-pinned-tool-producers.md#2-logical-identity-covers-the-tool-its-arguments-and-its-inputs),
 [execution](docs/adr/0027-pinned-tool-producers.md#3-execution-offline-isolated-fixed),
 [inputs](docs/adr/0027-pinned-tool-producers.md#4-declared-inputs-are-typed-material-bindings) and
