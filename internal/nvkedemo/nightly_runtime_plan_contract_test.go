@@ -97,7 +97,7 @@ func nightlyRuntimeZIPFixture(t *testing.T, plan []byte, scenario string) []byte
 	entries := []struct {
 		name string
 		body []byte
-	}{{"plan.json", plan}, {"action-data.json", []byte("{}")}, {"manifest.json", []byte("{}")}}
+	}{{"plan.json", plan}, {"manifest.json", []byte("{}")}}
 	if scenario == "extra runtime member" {
 		entries = append(entries, struct {
 			name string
@@ -105,7 +105,7 @@ func nightlyRuntimeZIPFixture(t *testing.T, plan []byte, scenario string) []byte
 		}{"unexpected", []byte("unexpected")})
 	}
 	if scenario == "duplicate runtime member" {
-		entries[2].name = "plan.json"
+		entries[1].name = "plan.json"
 	}
 	for _, entry := range entries {
 		member, err := writer.Create(entry.name)

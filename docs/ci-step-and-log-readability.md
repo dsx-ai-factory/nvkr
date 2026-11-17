@@ -17,7 +17,8 @@ After native preflight and checkout, local composite calls point into `.github/n
 execution and transport interfaces. Calls such as `execute-node`, `execute-source` and `collect-node-outputs`
 name their operation. Grouped jobs repeat the same node interface; differing output counts use declared
 optional slots and further individual upload calls, without output-count or group-size action variants.
-Stable invocation keys select named node and carrier parameters in `.github/nvkr-run/action-data.json`.
+Stable invocation keys select named node and carrier parameters regenerated in memory from the Plan.
+No `action-data.json` is committed or transported.
 The helper admits the Plan and recomputes those values before the fixed operations use them. Parameters
 carry data, never shell scripts.
 A shared action prepares the downloaded helper. Operator setup
@@ -25,8 +26,8 @@ and timed producer execution retain their caller context inline. Controlled tran
 pinned upload/download; their conditions, timeouts and continue-on-error policy stay on the caller. Diagnostic
 paths from another step pass through explicit inputs. Referenced outcomes and outputs remain in caller
 scope, including the finalization step and final Run upload read by the closing summary. Recovery uses the
-shared `recover-inputs` action before inline finalization. These templates and invocation values are regenerated and checked with the workflow; they do not introduce another
-authored configuration surface.
+shared `recover-inputs` action before inline finalization. These templates are regenerated and checked with the workflow. Invocation values are derived at the point of use.
+Neither introduces another authored configuration surface.
 Repeated native preflight, pinned checkout, helper/parameter preparation and identical uncontrolled
 operation calls use descriptive aliases. Complete identical host sequences of preflight, credential-free
 checkout, current-job preparation and one or two node calls can share a `steps-<runner>-node` or

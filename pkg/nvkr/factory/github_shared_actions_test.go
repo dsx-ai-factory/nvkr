@@ -28,7 +28,7 @@ func sharedGitHubActionData(t *testing.T, bundle *GeneratedBundle) githubActionD
 	if bundle.PlanPath != "" {
 		dataPath = filepath.ToSlash(filepath.Join(filepath.Dir(bundle.PlanPath), "action-data.json"))
 	}
-	if err := canonical.UnmarshalExact(bundle.Files[dataPath], &data); err != nil {
+	if err := canonical.UnmarshalExact(githubTestExpansionFiles(bundle)[dataPath], &data); err != nil {
 		t.Fatal(err)
 	}
 	if len(data.Entries) == 0 {
@@ -420,7 +420,7 @@ func TestGitHubSharedActionsRejectDescriptorAndInterfaceTampering(t *testing.T) 
 		if err != nil {
 			t.Fatal(err)
 		}
-		changed.Files[GitHubActionDataPath] = raw
+		changed.githubActionData = raw
 	}
 	for _, test := range []struct {
 		name       string
@@ -428,11 +428,11 @@ func TestGitHubSharedActionsRejectDescriptorAndInterfaceTampering(t *testing.T) 
 		diagnostic string
 		mutate     func(*GeneratedBundle)
 	}{
-		{name: "missing data member", code: e.CodePipelineDrift, mutate: func(changed *GeneratedBundle) {
-			delete(changed.Files, GitHubActionDataPath)
+		{name: "empty transient data", code: e.CodePipelineDrift, mutate: func(changed *GeneratedBundle) {
+			changed.githubActionData = []byte{}
 		}},
 		{name: "noncanonical data", code: e.CodePipelineDrift, mutate: func(changed *GeneratedBundle) {
-			changed.Files[GitHubActionDataPath] = append(bytes.Clone(changed.Files[GitHubActionDataPath]), '\n')
+			changed.githubActionData = append(bytes.Clone(changed.githubActionData), '\n')
 		}},
 		{name: "missing job entry", code: e.CodePipelineDrift, mutate: func(changed *GeneratedBundle) {
 			rewriteData(changed, func(data *githubActionDataDocument) { delete(data.Entries, sortedKeys(data.Entries)[0]) })
@@ -587,7 +587,7 @@ func TestWriteGitHubActionDataDerivesBoundedOutputFromPlan(t *testing.T) {
 			}
 			retained, err := os.ReadFile(githubActionDataPathFor(plan))
 			if err != nil || !bytes.Equal(retained, untrusted) {
-				t.Fatalf("action description modified the checked-in data file: %v", err)
+				t.Fatalf("action description modified the unrelated data file: %v", err)
 			}
 		})
 	}
@@ -618,4 +618,18 @@ func TestWriteGitHubActionDataRejectsBeforeOutput(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Supply transient data only to the test's logical step expansion. Production
+// admission derives its own data from the Plan, independent of this field.
+func githubTestExpansionFiles(bundle *GeneratedBundle) map[string][]byte {
+	files := maps.Clone(bundle.Files)
+	if len(bundle.githubActionData) != 0 {
+		name := GitHubActionDataPath
+		if bundle.PlanPath != "" {
+			name = filepath.ToSlash(filepath.Join(filepath.Dir(bundle.PlanPath), "action-data.json"))
+		}
+		files[name] = bundle.githubActionData
+	}
+	return files
 }

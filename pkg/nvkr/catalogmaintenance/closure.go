@@ -173,7 +173,7 @@ func refuseUnnamedBundles(allowed map[string]bool) error {
 func (members *closure) check(ctx context.Context) error {
 	for _, run := range members.runs {
 		if run.runtime() {
-			// The runtime owner authenticates every committed byte, then admits only Plan and action-data changes.
+			// The runtime owner authenticates every committed byte, then admits only Plan and derived-manifest changes.
 			if err := factory.PrepareGitHubRuntimeBundle(ctx, run.plan, ".", true); err != nil {
 				return err
 			}
