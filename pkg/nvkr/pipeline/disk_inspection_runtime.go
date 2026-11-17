@@ -21,6 +21,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/diskdiagnostic"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/diskinspect"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -227,7 +228,7 @@ func validateDiskInspectionSelection(selection DiskInspectionSelection) error {
 	if err := selection.PodmanStorageDriver.Validate(filepath.Base(selection.RuntimeExecutable)); err != nil {
 		return err
 	}
-	if filepath.Base(selection.RuntimeExecutable) != "docker" && filepath.Base(selection.RuntimeExecutable) != "podman" {
+	if err := containerruntime.Validate(selection.RuntimeExecutable); err != nil {
 		return e.New(e.CodeEngineCapability, "disk inspection requires an explicit Docker or Podman runtime")
 	}
 	if !canonical.IsDigest(selection.Image) {

@@ -18,7 +18,8 @@ func TestPodmanStorageDriverSelection(t *testing.T) {
 	}{
 		{"default", "docker", "", true},
 		{"vfs", "podman", PodmanStorageVFS, true},
-		{"overlay", "", PodmanStorageOverlay, true},
+		{"overlay", "podman", PodmanStorageOverlay, true},
+		{"implicit Docker", "", PodmanStorageOverlay, false},
 		{"unknown", "podman", "custom", false},
 		{"wrong runtime", "docker", PodmanStorageVFS, false},
 	} {

@@ -60,6 +60,9 @@ func checkLocalSmokeFixture(t *testing.T, workspace string, inputs *localQualifi
 			opened := 0
 			receipt, err := runLocalToolSmokeWith(ctx, build, NativeToolSmokeOptions{}, platform, func(_ context.Context, selection pipeline.ToolSmokeSelection) (nativeSmokeRuntime, error) {
 				opened++
+				if selection.RuntimeExecutable != "docker" {
+					t.Fatalf("empty smoke options selected runtime %q, want docker", selection.RuntimeExecutable)
+				}
 				if selection.Image != policy.Smoke.Images[policy.Platform] || selection.Platform != policy.Platform {
 					t.Fatal("runtime selection escaped independent policy")
 				}

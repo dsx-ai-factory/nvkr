@@ -18,8 +18,8 @@ func (driver PodmanStorageDriver) Validate(runtimeName string) error {
 	if driver == "" {
 		return nil
 	}
-	if runtimeName != "" && runtimeName != "podman" {
-		return e.New(e.CodeInvalidCatalog, "Podman storage driver requires the Podman runtime")
+	if runtimeName != "podman" {
+		return e.New(e.CodeInvalidCatalog, "Podman storage driver requires explicit runtime: podman")
 	}
 	if driver != PodmanStorageVFS && driver != PodmanStorageOverlay {
 		return e.New(e.CodeInvalidCatalog, "unsupported Podman storage driver %q (vfs|overlay)", driver)

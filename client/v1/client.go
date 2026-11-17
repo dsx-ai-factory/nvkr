@@ -111,9 +111,9 @@ func WithCatalogIO(catalogIO CatalogIO) Option {
 	}
 }
 
-// WithRuntime sets the container runtime binary (docker | podman | …) supplied to runs
-// that do not set one. It is runtime-neutral: the local runner only ever emits the common
-// run/pull subcommands and flags, so podman is a near drop-in for docker.
+// WithRuntime supplies a Docker or Podman executable to runs without an explicit
+// override. It must match the Run Environment. Without this option, runs inherit
+// their Environment runtime.
 func WithRuntime(binary string) Option {
 	return func(c *Client) {
 		if binary == "" {
@@ -138,9 +138,7 @@ func WithAtomicOutput(output AtomicOutput) Option {
 // New constructs a client with authoritative default modules and no implicit output
 // destination.
 func New(options ...Option) *Client {
-	c := &Client{
-		runtime: "docker",
-	}
+	c := &Client{}
 	for _, option := range options {
 		if option == nil {
 			c.setConfigError("client option is nil")
