@@ -69,7 +69,6 @@ jobs:
           name: nvkr-runtime-inputs
           path: |
             .github/nvkr-run-nvke-nightly-gpu-site/plan.json
-            .github/nvkr-run-nvke-nightly-gpu-site/action-data.json
             .github/nvkr-run-nvke-nightly-gpu-site/manifest.json
           include-hidden-files: 'true'
           if-no-files-found: error
@@ -82,7 +81,6 @@ jobs:
           path: |
             nvkr-exec
             .github/nvkr-run-nvke-nightly-gpu-site/plan.json
-            .github/nvkr-run-nvke-nightly-gpu-site/action-data.json
             .github/nvkr-run-nvke-nightly-gpu-site/manifest.json
           include-hidden-files: 'true'
           if-no-files-found: error
@@ -134,7 +132,6 @@ jobs:
           path: |
             nvkr-exec
             .github/nvkr-run-nvke-nightly-gpu-site/plan.json
-            .github/nvkr-run-nvke-nightly-gpu-site/action-data.json
             .github/nvkr-run-nvke-nightly-gpu-site/manifest.json
           include-hidden-files: 'true'
           if-no-files-found: error
@@ -182,7 +179,6 @@ jobs:
           path: |
             nvkr-exec
             .github/nvkr-run-nvke-nightly-gpu-site/plan.json
-            .github/nvkr-run-nvke-nightly-gpu-site/action-data.json
             .github/nvkr-run-nvke-nightly-gpu-site/manifest.json
           include-hidden-files: 'true'
           if-no-files-found: error
@@ -230,7 +226,6 @@ jobs:
           path: |
             nvkr-exec
             .github/nvkr-run-nvke-nightly-gpu-site/plan.json
-            .github/nvkr-run-nvke-nightly-gpu-site/action-data.json
             .github/nvkr-run-nvke-nightly-gpu-site/manifest.json
           include-hidden-files: 'true'
           if-no-files-found: error

@@ -33,7 +33,6 @@ runs:
         name: nvkr-runtime-inputs
         path: |
           .github/nvkr-run-nvke-nightly-arm64/plan.json
-          .github/nvkr-run-nvke-nightly-arm64/action-data.json
           .github/nvkr-run-nvke-nightly-arm64/manifest.json
         include-hidden-files: 'true'
         if-no-files-found: error
@@ -46,7 +45,6 @@ runs:
         path: |
           nvkr-exec
           .github/nvkr-run-nvke-nightly-arm64/plan.json
-          .github/nvkr-run-nvke-nightly-arm64/action-data.json
           .github/nvkr-run-nvke-nightly-arm64/manifest.json
         include-hidden-files: 'true'
         if-no-files-found: error
