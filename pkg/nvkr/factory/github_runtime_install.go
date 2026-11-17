@@ -23,10 +23,7 @@ const githubRuntimeExportDirectory = ".nvkr/runtime-export"
 // StageGitHubRuntimeInputs prepares the three-file same-Run carrier. Its Plan is
 // packed canonical wire data; the manifest describes the reconstructed bundle.
 func StageGitHubRuntimeInputs(ctx context.Context, plan *Plan, root string) error {
-	if err := CheckGitHubRuntimeInputs(ctx, plan, root); err != nil {
-		return err
-	}
-	bundle, err := RenderGitHub(ctx, plan)
+	bundle, err := checkedGitHubRuntimeInputs(ctx, plan, root)
 	if err != nil {
 		return err
 	}
@@ -73,7 +70,8 @@ func InstallGitHubRuntimeInputs(ctx context.Context, baseline *Plan, root string
 	if err := admitGitHubRuntimeInputs(ctx, baseline, root); err != nil {
 		return err
 	}
-	if _, err := checkCoreGitHubBundle(ctx, baseline, root); err != nil {
+	baselineBundle, err := checkCoreGitHubBundle(ctx, baseline, root)
+	if err != nil {
 		return err
 	}
 	staged, err := readGitHubRuntimeInputSet(ctx, root)
@@ -118,13 +116,16 @@ func InstallGitHubRuntimeInputs(ctx context.Context, baseline *Plan, root string
 			return e.New(e.CodePipelineDrift, "staged runtime input %s differs from the complete generated bundle", name)
 		}
 	}
-	// This owner rechecks the complete baseline and unchanged executable members
-	// before publishing freshly rendered bytes. No staged pathname is moved over
-	// an existing member and no generic transport replacement policy is relaxed.
-	if err := PrepareGitHubRuntimeBundle(ctx, &fresh, root, false); err != nil {
+	// Reuse the checked baseline and rendered candidate. The generated-file owner
+	// still checks replacements and publishes the manifest last. No staged pathname
+	// is moved over an existing member.
+	if err := prepareGitHubRuntimeBundle(ctx, baseline, &fresh, baselineBundle, bundle, root, false); err != nil {
 		return err
 	}
-	return CheckGitHubRuntimeInputs(ctx, &fresh, root)
+	if err := checkGitHubRuntimeInputBindings(ctx, &fresh, root); err != nil {
+		return err
+	}
+	return CheckGeneratedBundle(ctx, root, bundle)
 }
 
 func readGitHubRuntimeInputSet(ctx context.Context, root string) (map[string][]byte, error) {

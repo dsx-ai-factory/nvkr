@@ -314,6 +314,32 @@ func TestPlanTreeRejectsMalformedStorage(t *testing.T) {
 		{"extra step", func(files map[string][]byte) {
 			files[path.Dir(planPath)+"/steps/unexpected/step.json"] = []byte("{}\n")
 		}},
+		{"root-owned step field", func(files map[string][]byte) {
+			name := path.Join(path.Dir(planPath), "steps", plan.Builds[0].Name, "step.json")
+			var step planFields
+			if err := json.Unmarshal(files[name], &step); err != nil {
+				t.Fatal(err)
+			}
+			step["catalogDigest"] = mustCanonical(t, plan.Builds[0].CatalogDigest)
+			raw, err := treeJSON(step)
+			if err != nil {
+				t.Fatal(err)
+			}
+			files[name] = raw
+		}},
+		{"missing catalog snapshot", func(files map[string][]byte) {
+			var root planFields
+			if err := json.Unmarshal(files[planPath], &root); err != nil {
+				t.Fatal(err)
+			}
+			root["catalogSnapshots"] = json.RawMessage(`{}`)
+			raw, err := treeJSON(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			files[planPath] = raw
+		}},
+
 		{"mismatched name", func(files map[string][]byte) {
 			name := path.Join(path.Dir(planPath), "steps", plan.Builds[0].Name, "step.json")
 			files[name] = bytes.Replace(files[name], []byte(`"name": "`+plan.Builds[0].Name+`"`), []byte(`"name": "other"`), 1)
@@ -333,7 +359,7 @@ func TestPlanTreeRejectsMalformedStorage(t *testing.T) {
 
 func TestPlanTreeLoadAdmitsCompleteInventory(t *testing.T) {
 	plan := githubRuntimePlanFixture(t)
-	for _, mutation := range []string{"none", "extra", "declared extra", "missing", "edited", "symlink", "manifest digest"} {
+	for _, mutation := range []string{"none", "extra", "extra directory", "missing", "missing directory", "missing manifest", "edited", "symlink", "manifest digest"} {
 		t.Run(mutation, func(t *testing.T) {
 			root := t.TempDir()
 			bundle := writeGitHubRuntimeBaseline(t, root, plan)
@@ -343,11 +369,19 @@ func TestPlanTreeLoadAdmitsCompleteInventory(t *testing.T) {
 				if err := os.WriteFile(step+".extra", []byte("extra"), 0644); err != nil {
 					t.Fatal(err)
 				}
-			case "declared extra":
-				bundle.Files[filepath.ToSlash(filepath.Dir(bundle.PlanPath))+"/unexpected.json"] = []byte("{}")
-				if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
+			case "extra directory":
+				if err := os.Mkdir(step+".extra", 0755); err != nil {
 					t.Fatal(err)
 				}
+			case "missing directory":
+				if err := os.Rename(filepath.Dir(step), filepath.Join(root, "saved-directory")); err != nil {
+					t.Fatal(err)
+				}
+			case "missing manifest":
+				if err := os.Rename(filepath.Join(root, bundle.ManifestPath), filepath.Join(root, "saved-manifest")); err != nil {
+					t.Fatal(err)
+				}
+
 			case "missing":
 				if err := os.Rename(step, filepath.Join(root, "saved.json")); err != nil {
 					t.Fatal(err)
@@ -385,6 +419,39 @@ func TestPlanTreeLoadAdmitsCompleteInventory(t *testing.T) {
 			} else {
 				assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 			}
+		})
+	}
+}
+
+func TestPlanTreeRenderRejectsUnsafeLayout(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		mutate func(*Plan)
+	}{
+		{"unsafe target", func(plan *Plan) { plan.Builds[0].Name = "../outside" }},
+		{"file directory collision", func(plan *Plan) {
+			plan.Builds = append(plan.Builds[:1:1], plan.Builds[0])
+			plan.Builds[0].Name = "target"
+			plan.Builds[1].Name = "target/step.json"
+		}},
+		{"script collision", func(plan *Plan) {
+			graph := plan.Builds[0].Graph
+			for _, node := range graph.Nodes {
+				if node.Component == "" {
+					continue
+				}
+				node.Command = []string{"sh", "-c", "echo x\n"}
+				graph.Nodes = append(graph.Nodes[:0:0], node, node)
+				return
+			}
+			t.Fatal("fixture has no component instruction")
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			plan := githubRuntimePlanFixture(t)
+			test.mutate(plan)
+			_, err := renderPlanTree(t.Context(), plan, githubLayoutFor(plan).planPath)
+			assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 		})
 	}
 }

@@ -220,6 +220,14 @@ func TestGitHubRuntimeTransportRejectsMissingOrSwappedCarrierContracts(t *testin
 		})
 		assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeInvalidCatalog)
 	})
+	t.Run("missing packed staging", func(t *testing.T) {
+		changed := mutateGitHubBundleYAML(t, bundle, firstMember, func(root *yamlv3.Node) {
+			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "name", "Stage packed runtime inputs")
+			githubYAMLSet(step, "run", githubYAMLString("true"))
+		})
+		assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, changed), e.CodeInvalidCatalog)
+	})
+
 	t.Run("changed installation command", func(t *testing.T) {
 		changed := mutateGitHubBundleYAML(t, bundle, secondMember, func(root *yamlv3.Node) {
 			step := githubTestYAMLStep(t, githubTestYAMLField(t, root, "runs", "steps"), "name", "Install NVKR runtime inputs")

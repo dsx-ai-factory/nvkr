@@ -697,7 +697,7 @@ func (actions githubActionRefs) writeUploadStep(out *bytes.Buffer, plan *Plan, l
 	}
 	if plan.Environment.GitHubRuntimePlan && label == "NVKR runner" {
 		fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        with:\n          name: %s\n          path: |\n            nvkr-exec\n", yamlSingle("Upload "+label), actions.Upload, yamlSingle(name))
-		for _, member := range githubRuntimeInputPaths(plan) {
+		for _, member := range githubRuntimeInputPaths() {
 			fmt.Fprintf(out, "            %s\n", member)
 		}
 		fmt.Fprintf(out, "          include-hidden-files: 'true'\n          if-no-files-found: error\n          retention-days: %d\n", days)
@@ -712,7 +712,7 @@ func githubRuntimeInstallCommand(plan *Plan) string {
 	return "./nvkr-exec factory github install-runtime-inputs --plan " + shellQuote(githubLayoutFor(plan).planPath)
 }
 
-func githubRuntimeInputPaths(_ *Plan) []string {
+func githubRuntimeInputPaths() []string {
 	return []string{githubRuntimeExportDirectory + "/plan.json", githubRuntimeExportDirectory + "/action-data.json", githubRuntimeExportDirectory + "/manifest.json"}
 }
 
@@ -730,7 +730,7 @@ func writeGitHubRuntimeInputsUpload(out *bytes.Buffer, plan *Plan, actions githu
 		fmt.Fprint(out, "        if: ${{ github.run_attempt == 1 }}\n")
 	}
 	fmt.Fprintf(out, "        with:\n          name: %s\n          path: |\n", githubRuntimeInputsArtifact)
-	for _, member := range githubRuntimeInputPaths(plan) {
+	for _, member := range githubRuntimeInputPaths() {
 		fmt.Fprintf(out, "            %s\n", member)
 	}
 	fmt.Fprintf(out, "          include-hidden-files: 'true'\n          if-no-files-found: error\n          retention-days: %d\n", plan.GitHubArtifactRetentionDays())
@@ -872,7 +872,7 @@ func prepareHelperRunFor(plan *Plan) string {
 	}
 	var command strings.Builder
 	fmt.Fprintln(&command, "set -eu")
-	members := append([]string{"nvkr-exec"}, githubRuntimeInputPaths(plan)...)
+	members := append([]string{"nvkr-exec"}, githubRuntimeInputPaths()...)
 	for _, member := range members {
 		source := shellQuote(githubHelperDownloadPath(plan) + "/" + member)
 		fmt.Fprintf(&command, "[ -f %s ] && [ ! -L %s ] || { printf 'nvkr: [NVKR-E-PIPELINE-DRIFT] incomplete runtime input carrier\\n' >&2; exit %d; }\n", source, source, e.ExitCode(e.New(e.CodePipelineDrift, "")))

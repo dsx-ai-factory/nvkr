@@ -11,6 +11,8 @@ inputs/catalogs/local-path-provisioner/patches/chart-image-digest.patch -whitesp
 # Generated workflow bundles collapse in pull request diffs. Regenerate them;
 # never edit them by hand.
 .github/nvkr-*/** linguist-generated
+# Keep exact generated command bodies visible for review.
+.github/nvkr-*/steps/**/*.sh -linguist-generated
 .github/workflows/nvkr-run*.yml linguist-generated
 .github/workflows/nvkr-dev.yml linguist-generated
 .github/workflows/nvkr-dev__partition-*.yml linguist-generated

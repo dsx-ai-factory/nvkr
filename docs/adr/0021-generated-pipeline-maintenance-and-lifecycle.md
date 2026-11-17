@@ -131,10 +131,12 @@ exists. Raw script bytes gain no header, shebang or newline. Unsafe names and fi
 collisions fail closed. Root snapshots and resolved components still contain their command
 copies, so editing a script also changes those root records.
 
-Loading a tree admits the bounded complete manifest inventory, safe regular files, modes,
-hashes and Plan digest, reconstructs and validates the complete existing Plan, and compares
-the exact regenerated tree. Duplicate or unknown fields, alternate encodings, missing,
-extra, symlinked, edited or mixed-generation members fail before execution. Execution uses
+Loading a tree admits the manifest's Plan root and step/script members, their bounded inventory,
+safe regular files, modes, hashes and Plan digest. It reconstructs and validates the complete existing
+Plan and compares the exact regenerated tree without rendering or reading workflows and actions.
+Duplicate or unknown fields, alternate encodings, missing, extra, symlinked, edited or mixed-generation
+Plan-tree members fail admission. Complete workflow/action closure checks remain with generation
+and runtime bootstrap, so read-only inspection does not depend on the binary's workflow renderer. Execution uses
 the captured Plan without reopening command files. Storage has a 64 MiB aggregate bound,
 the existing 32 MiB member and 4,096-entry bounds, and the existing 4 MiB reconstructed
 Plan bound. Diagnostic `planSha256` denotes the reconstructed packed bytes. The tree adds

@@ -380,6 +380,9 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 				}
 			}
 			wantSteps++ // Stage the packed three-file carrier after bundle admission.
+			if !strings.Contains(joinRuns(job.Steps), "./nvkr-exec factory github stage-runtime-inputs --plan "+shellQuote(githubLayoutFor(plan).planPath)) {
+				return e.New(e.CodeInvalidCatalog, "GitHub bootstrap omits packed runtime input staging")
+			}
 		}
 		wantCondition := "${{ " + githubDispatchCondition(plan) + " }}"
 		if !ok || job.RunsOn != githubBootstrapRunner(runner) || job.If != wantCondition || len(job.Steps) != wantSteps || job.Steps[0].Uses != actions.Checkout {

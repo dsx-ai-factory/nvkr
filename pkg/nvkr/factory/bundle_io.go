@@ -23,8 +23,10 @@ import (
 const (
 	GeneratedManifestPath   = ".github/nvkr-run/manifest.json"
 	generatedManifestSchema = "nvkr.dev/generated-run/v1"
-	maxGeneratedFileBytes   = int64(32 << 20)
-	maxGeneratedDirEntries  = 4096
+	// MaxGeneratedFileBytes bounds one generated storage member, including a Plan root.
+	MaxGeneratedFileBytes  = int64(32 << 20)
+	maxGeneratedFileBytes  = MaxGeneratedFileBytes
+	maxGeneratedDirEntries = 4096
 )
 
 type GeneratedManifest struct {
@@ -363,6 +365,14 @@ func checkGeneratedDirectoryContents(ctx context.Context, root string, bundle *G
 		return err
 	}
 
+	if err := checkGeneratedInventory(ctx, directory, allowedFiles, allowedDirectories); err != nil {
+		return err
+	}
+	return checkGeneratedWorkflowContents(ctx, root, bundle)
+}
+
+// Inspect a bounded directory inventory without interpreting member contents.
+func checkGeneratedInventory(ctx context.Context, directory string, allowedFiles, allowedDirectories map[string]bool) error {
 	seen := 0
 	var inspect func(string, string) error
 	inspect = func(path, relative string) error {
@@ -371,16 +381,16 @@ func checkGeneratedDirectoryContents(ctx context.Context, root string, bundle *G
 		}
 		before, err := os.Lstat(path)
 		if err != nil || !before.IsDir() || before.Mode()&os.ModeSymlink != 0 {
-			return e.New(e.CodePipelineDrift, "generated Run directory %s is missing or unsafe", path)
+			return e.New(e.CodePipelineDrift, "generated Run directory %q is missing or unsafe", path)
 		}
 		opened, err := os.Open(path)
 		if err != nil {
-			return e.Wrap(e.CodePipelineDrift, err, "opening generated Run directory %s", path)
+			return e.Wrap(e.CodePipelineDrift, err, "opening generated Run directory %q", path)
 		}
 		defer func() { _ = opened.Close() }()
 		openedInfo, err := opened.Stat()
 		if err != nil || !openedInfo.IsDir() || !os.SameFile(before, openedInfo) {
-			return e.New(e.CodePipelineDrift, "generated Run directory %s changed while opening", path)
+			return e.New(e.CodePipelineDrift, "generated Run directory %q changed while opening", path)
 		}
 		for {
 			entries, readErr := opened.ReadDir(128)
@@ -399,11 +409,11 @@ func checkGeneratedDirectoryContents(ctx context.Context, root string, bundle *G
 				childPath := filepath.Join(path, entry.Name())
 				info, statErr := os.Lstat(childPath)
 				if statErr != nil || info.Mode()&os.ModeSymlink != 0 {
-					return e.New(e.CodePipelineDrift, "generated Run member %s is missing or unsafe", childRelative)
+					return e.New(e.CodePipelineDrift, "generated Run member %q is missing or unsafe", childRelative)
 				}
 				if info.IsDir() {
 					if !allowedDirectories[childRelative] {
-						return e.New(e.CodePipelineDrift, "unexpected generated Run directory %s", childRelative)
+						return e.New(e.CodePipelineDrift, "unexpected generated Run directory %q", childRelative)
 					}
 					if err := inspect(childPath, childRelative); err != nil {
 						return err
@@ -411,33 +421,33 @@ func checkGeneratedDirectoryContents(ctx context.Context, root string, bundle *G
 					continue
 				}
 				if !info.Mode().IsRegular() || !allowedFiles[childRelative] {
-					return e.New(e.CodePipelineDrift, "unexpected generated Run member %s", childRelative)
+					return e.New(e.CodePipelineDrift, "unexpected generated Run member %q", childRelative)
 				}
 			}
 			if errors.Is(readErr, io.EOF) {
 				break
 			}
 			if readErr != nil {
-				return e.Wrap(e.CodePipelineDrift, readErr, "listing generated Run directory %s", path)
+				return e.Wrap(e.CodePipelineDrift, readErr, "listing generated Run directory %q", path)
 			}
 		}
 		after, err := os.Lstat(path)
 		if err != nil || !after.IsDir() || after.Mode()&os.ModeSymlink != 0 || !os.SameFile(before, after) {
-			return e.New(e.CodePipelineDrift, "generated Run directory %s changed during inspection", path)
+			return e.New(e.CodePipelineDrift, "generated Run directory %q changed during inspection", path)
 		}
 		return nil
 	}
 	if err := inspect(directory, "."); err != nil {
 		return err
 	}
-	return checkGeneratedWorkflowContents(ctx, root, bundle)
+	return nil
 }
 
 func validateGeneratedDirectoryChain(root, relative string) error {
 	current := filepath.Clean(root)
 	info, err := os.Lstat(current)
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return e.New(e.CodeImmutableViolation, "generated Run root %s is not a real directory", current)
+		return e.New(e.CodeImmutableViolation, "generated Run root %q is not a real directory", current)
 	}
 	for _, component := range strings.Split(filepath.ToSlash(relative), "/") {
 		if component == "." || component == "" {
@@ -446,7 +456,7 @@ func validateGeneratedDirectoryChain(root, relative string) error {
 		current = filepath.Join(current, component)
 		info, err = os.Lstat(current)
 		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-			return e.New(e.CodeImmutableViolation, "generated Run directory %s is not a real directory", current)
+			return e.New(e.CodeImmutableViolation, "generated Run directory %q is not a real directory", current)
 		}
 	}
 	return nil
@@ -491,7 +501,7 @@ func ensureGeneratedDirectory(root, relative string) error {
 	current := filepath.Clean(root)
 	rootInfo, err := os.Lstat(current)
 	if err != nil || !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 {
-		return e.New(e.CodeImmutableViolation, "generated Run root %s is not a real directory", current)
+		return e.New(e.CodeImmutableViolation, "generated Run root %q is not a real directory", current)
 	}
 	for _, component := range strings.Split(filepath.ToSlash(relative), "/") {
 		if component == "." || component == "" {
@@ -506,7 +516,7 @@ func ensureGeneratedDirectory(root, relative string) error {
 			info, err = os.Lstat(current)
 		}
 		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-			return e.New(e.CodeImmutableViolation, "generated Run directory %s is not a real directory", current)
+			return e.New(e.CodeImmutableViolation, "generated Run directory %q is not a real directory", current)
 		}
 	}
 	return nil

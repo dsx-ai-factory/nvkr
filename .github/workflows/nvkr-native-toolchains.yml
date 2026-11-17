@@ -149,15 +149,18 @@ jobs:
           plan=.github/nvkr-run/plan.json
           platform="linux/$NATIVE_ARCH"
           repository=ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains
-          packer=$(jq -er --arg platform "$platform" \
+          # jq evaluates variables inside its quoted program.
+          # shellcheck disable=SC2016
+          packer=$(find .github/nvkr-run/steps -name step.json -print0 |
+            xargs -0 jq -ers --arg platform "$platform" \
             --arg repository "$repository/packer-native@" '
-            [.builds[] | select(.platform == $platform) |
+            [.[] | select(.platform == $platform) |
              .executionGraph.nodes[] |
              .toolchain // empty |
              select(startswith($repository))] | unique |
             if length == 1 then .[0]
             else error("expected one selected Packer image") end
-          ' "$plan")
+          ')
           inspector=$(jq -er --arg platform "$platform" \
             '.environment.diskInspectionProfiles[$platform].image' "$plan")
           case "$inspector" in

@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -39,8 +41,11 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 			return e.Wrap(e.CodePipelineDrift, err, "reading catalogDigest")
 		}
 		snapshot, ok := catalogs[digest]
-		if !ok || record["catalogSnapshot"] != nil {
-			return e.New(e.CodePipelineDrift, "missing or duplicate Plan snapshot")
+		if !ok {
+			return e.New(e.CodePipelineDrift, "missing Plan snapshot")
+		}
+		if record["catalogSnapshot"] != nil {
+			return e.New(e.CodePipelineDrift, "duplicate Plan snapshot")
 		}
 		record["catalogSnapshot"] = snapshot
 		return nil
@@ -83,7 +88,7 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 				continue
 			}
 			if _, duplicate := build[field]; duplicate {
-				return nil, nil, e.New(e.CodePipelineDrift, "Plan field %s has two owners", field)
+				return nil, nil, e.New(e.CodePipelineDrift, "Plan field %q has two owners", field)
 			}
 			build[field] = value
 		}
@@ -131,7 +136,7 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 	}
 	for name := range files {
 		if (name == planPath || strings.HasPrefix(name, path.Dir(planPath)+"/steps/")) && want[name] == nil {
-			return nil, nil, e.New(e.CodePipelineDrift, "unexpected Plan tree member %s", name)
+			return nil, nil, e.New(e.CodePipelineDrift, "unexpected Plan tree member %q", name)
 		}
 	}
 	return &plan, raw, nil
@@ -169,8 +174,11 @@ func expandTreeCommands(step planFields, directory string, files map[string][]by
 					return e.New(e.CodePipelineDrift, "invalid Plan command file operand")
 				}
 				body, ok := files[directory+"/"+ref["file"]]
-				if !ok || int64(len(body)) > MaxPlanBytes {
-					return e.New(e.CodePipelineDrift, "missing or oversized Plan command file")
+				if !ok {
+					return e.New(e.CodePipelineDrift, "missing Plan command file")
+				}
+				if int64(len(body)) > MaxPlanBytes {
+					return e.New(e.CodePipelineDrift, "oversized Plan command file")
 				}
 				if int64(len(body)) > remaining {
 					return e.New(e.CodePipelineDrift, "expanded Plan command exceeds size bound")
@@ -201,9 +209,13 @@ func expandTreeCommands(step planFields, directory string, files map[string][]by
 	return err
 }
 
-// A path-based tree load admits the entire manifest inventory before returning
-// the captured Plan. No script pathname is reopened during execution.
+// A path-based load admits only the Plan tree. Complete workflow/action drift
+// belongs to CheckGeneratedBundle, not inspection or canonical Plan loading.
 func loadPlanTree(ctx context.Context, filename string, rootBytes []byte) (*Plan, string, error) {
+	filename, err := filepath.Abs(filename)
+	if err != nil {
+		return nil, "", e.Wrap(e.CodePipelineDrift, err, "locating Plan tree")
+	}
 	directory := filepath.Dir(filename)
 	root := filepath.Dir(filepath.Dir(directory))
 	planPath, err := filepath.Rel(root, filename)
@@ -213,73 +225,97 @@ func loadPlanTree(ctx context.Context, filename string, rootBytes []byte) (*Plan
 	planPath = filepath.ToSlash(planPath)
 	manifestPath := path.Dir(planPath) + "/manifest.json"
 	if err := validateGeneratedDirectoryChain(root, path.Dir(planPath)); err != nil {
-		return nil, "", err
+		return nil, "", classifyContext(ctx, e.Wrap(e.CodePipelineDrift, err, "Plan tree has unsafe parents"))
 	}
 	raw, err := readGeneratedContext(ctx, filepath.Join(root, manifestPath))
 	if err != nil {
-		return nil, "", err
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, "", e.Wrap(e.CodePipelineDrift, err, "Plan tree root has no bundle manifest; load the committed bundle path or export with run plan --json")
+		}
+		return nil, "", classifyContext(ctx, e.Wrap(e.CodePipelineDrift, err, "reading Plan tree manifest"))
 	}
 	var manifest GeneratedManifest
 	if err := canonical.UnmarshalExact(bytes.TrimSuffix(raw, []byte{'\n'}), &manifest); err != nil {
 		return nil, "", e.Wrap(e.CodePipelineDrift, err, "reading Plan tree manifest")
 	}
-	if manifest.SchemaVersion != generatedManifestSchema || manifest.Engine != EngineGitHub || len(manifest.Members) > maxGeneratedDirEntries {
+	encoded, err := canonical.Marshal(manifest)
+	if err != nil {
+		return nil, "", err
+	}
+	if manifest.SchemaVersion != generatedManifestSchema || manifest.Engine != EngineGitHub ||
+		len(manifest.Members) > maxGeneratedDirEntries || !bytes.Equal(raw, append(encoded, '\n')) {
 		return nil, "", e.New(e.CodePipelineDrift, "invalid Plan tree manifest")
 	}
 	bundle := &GeneratedBundle{Engine: manifest.Engine, WorkflowPath: manifest.WorkflowPath,
-		ManifestPath: manifestPath, PlanPath: planPath, PlanDigest: manifest.PlanDigest,
-		WorkflowDigest: manifest.WorkflowDigest, Files: map[string][]byte{}}
-	size := 0
+		ManifestPath: manifestPath, PlanPath: planPath}
+	if err := validateBundleNamespace(bundle); err != nil {
+		return nil, "", e.Wrap(e.CodePipelineDrift, err, "invalid Plan tree namespace")
+	}
+	files := map[string][]byte{}
+	steps := path.Dir(planPath) + "/steps"
+	allowedFiles, allowedDirectories := map[string]bool{}, map[string]bool{".": true}
+	size, previous := 0, ""
 	for _, member := range manifest.Members {
-		if !generatedMemberInNamespace(bundle, member.Path) || member.Mode != 0o644 || bundle.Files[member.Path] != nil {
+		// Refuse terminal controls before a path reaches filesystem diagnostics.
+		if strings.ContainsFunc(member.Path, func(r rune) bool { return unicode.IsControl(r) || unicode.Is(unicode.Cf, r) }) {
+			return nil, "", e.New(e.CodePipelineDrift, "Plan tree manifest path contains control characters")
+		}
+		if !generatedMemberInNamespace(bundle, member.Path) || member.Mode != 0o644 || member.Path <= previous {
 			return nil, "", e.New(e.CodePipelineDrift, "invalid Plan tree manifest member")
 		}
+		previous = member.Path
+		if member.Path != planPath && !strings.HasPrefix(member.Path, steps+"/") {
+			continue
+		}
 		if err := validateGeneratedDirectoryChain(root, path.Dir(member.Path)); err != nil {
-			return nil, "", err
+			return nil, "", classifyContext(ctx, e.Wrap(e.CodePipelineDrift, err, "Plan tree member %q has unsafe parents", member.Path))
 		}
 		name := filepath.Join(root, filepath.FromSlash(member.Path))
 		info, err := os.Lstat(name)
-		if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0o644 || info.Size() > int64(maxPlanTreeBytes-size) {
-			return nil, "", e.New(e.CodePipelineDrift, "unsafe or oversized Plan tree member")
+		if err != nil || !info.Mode().IsRegular() {
+			return nil, "", e.New(e.CodePipelineDrift, "Plan tree member %q is missing or not a regular file", member.Path)
+		}
+		if info.Mode().Perm() != 0o644 {
+			return nil, "", e.New(e.CodePipelineDrift, "Plan tree member %q has mode %04o; expected 0644", member.Path, info.Mode().Perm())
+		}
+		if info.Size() > int64(maxPlanTreeBytes-size) {
+			return nil, "", e.New(e.CodePipelineDrift, "Plan tree member %q exceeds the storage bound", member.Path)
 		}
 		data, err := readGeneratedContext(ctx, name)
 		if err != nil {
-			return nil, "", err
+			return nil, "", classifyContext(ctx, e.Wrap(e.CodePipelineDrift, err, "reading Plan tree member %q", member.Path))
 		}
 		size += len(data)
 		if size > maxPlanTreeBytes || pipeline.FileDigest(data) != member.SHA256 {
 			return nil, "", e.New(e.CodePipelineDrift, "Plan tree member differs from manifest")
 		}
-		bundle.Files[member.Path] = data
+		files[member.Path] = data
+		if member.Path != planPath {
+			relative := strings.TrimPrefix(member.Path, steps+"/")
+			allowedFiles[relative] = true
+			for parent := path.Dir(relative); parent != "."; parent = path.Dir(parent) {
+				allowedDirectories[parent] = true
+			}
+		}
 	}
-	_, expectedManifest, err := ManifestFor(bundle)
-	if err != nil {
+	if !bytes.Equal(rootBytes, files[planPath]) {
+		return nil, "", e.New(e.CodePipelineDrift, "Plan tree root changed during admission")
+	}
+	stepsDirectory := filepath.Join(root, filepath.FromSlash(steps))
+	if len(allowedFiles) == 0 {
+		if _, err := os.Lstat(stepsDirectory); !os.IsNotExist(err) {
+			return nil, "", e.New(e.CodePipelineDrift, "unexpected empty Plan steps directory")
+		}
+	} else if err := checkGeneratedInventory(ctx, stepsDirectory, allowedFiles, allowedDirectories); err != nil {
 		return nil, "", err
 	}
-	if !bytes.Equal(raw, expectedManifest) || !bytes.Equal(rootBytes, bundle.Files[planPath]) {
-		return nil, "", e.New(e.CodePipelineDrift, "Plan tree manifest or root changed during admission")
-	}
-	if err := checkGeneratedDirectoryContents(ctx, root, bundle); err != nil {
-		return nil, "", err
-	}
-	plan, packed, err := joinPlanTree(ctx, planPath, bundle.Files)
+	plan, packed, err := joinPlanTree(ctx, planPath, files)
 	if err != nil {
 		return nil, "", err
 	}
 	digest, err := plan.Digest()
 	if err != nil || digest != manifest.PlanDigest || githubLayoutFor(plan).planPath != planPath {
 		return nil, "", e.New(e.CodePipelineDrift, "reconstructed Plan differs from manifest identity or namespace")
-	}
-	expected, err := RenderGitHub(ctx, plan)
-	if err != nil {
-		return nil, "", err
-	}
-	_, expectedManifest, err = ManifestFor(expected)
-	if err != nil {
-		return nil, "", err
-	}
-	if !bytes.Equal(raw, expectedManifest) {
-		return nil, "", e.New(e.CodePipelineDrift, "Plan tree manifest differs from the complete generated closure")
 	}
 	return plan, pipeline.FileDigest(packed), nil
 }

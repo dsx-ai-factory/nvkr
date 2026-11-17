@@ -49,6 +49,17 @@ func PrepareGitHubRuntimeBundle(ctx context.Context, freshPlan *Plan, root strin
 	if err != nil {
 		return err
 	}
+	fresh, err := RenderGitHub(ctx, freshPlan)
+	if err != nil {
+		return err
+	}
+	return prepareGitHubRuntimeBundle(ctx, baselinePlan, freshPlan, baseline, fresh, root, check)
+}
+
+// Callers supply a baseline already checked against disk and a freshly rendered
+// bundle. Reuse those exact bytes rather than repeating either projection.
+func prepareGitHubRuntimeBundle(ctx context.Context, baselinePlan, freshPlan *Plan, baseline, fresh *GeneratedBundle, root string, check bool) error {
+	layout := githubLayoutFor(freshPlan)
 	if baselinePlan.EnvironmentDigest != freshPlan.EnvironmentDigest ||
 		baselinePlan.DefinitionPath != freshPlan.DefinitionPath || baselinePlan.EnvironmentPath != freshPlan.EnvironmentPath {
 		return e.New(e.CodePipelineDrift, "runtime GitHub preparation cannot change Environment or authored input paths; regenerate the bundle")
@@ -57,10 +68,6 @@ func PrepareGitHubRuntimeBundle(ctx context.Context, freshPlan *Plan, root strin
 		if err := CheckFrozenAuthoredInputs(ctx, freshPlan, root); err != nil {
 			return err
 		}
-	}
-	fresh, err := RenderGitHub(ctx, freshPlan)
-	if err != nil {
-		return err
 	}
 	if !slices.Equal(sortedFileNames(baseline.Files), sortedFileNames(fresh.Files)) {
 		return e.New(e.CodePipelineDrift, "runtime GitHub preparation cannot change generated member paths; regenerate the bundle")

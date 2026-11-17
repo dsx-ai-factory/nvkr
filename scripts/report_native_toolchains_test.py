@@ -151,8 +151,10 @@ class ComparisonTest(unittest.TestCase):
             filename.write_text(json.dumps(subjects("amd64")[0]))
             with patch.object(MODULE.subprocess, "run", side_effect=subprocess.CalledProcessError(
                 1, ["./nvkr-exec"], stderr="rejected tree",
-            )), self.assertRaises(subprocess.CalledProcessError):
+            )), patch.object(MODULE.sys, "stderr") as stderr, self.assertRaises(SystemExit) as refused:
                 MODULE.load_plan(filename)
+            self.assertEqual(refused.exception.code, 1)
+            self.assertEqual("".join(call.args[0] for call in stderr.write.call_args_list), "rejected tree")
 
 
 class RoutingTest(unittest.TestCase):

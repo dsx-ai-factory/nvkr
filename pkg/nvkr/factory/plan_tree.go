@@ -66,11 +66,6 @@ func treeTargetName(raw json.RawMessage) (string, error) {
 	if err := json.Unmarshal(raw, &name); err != nil || !safeGraphID(name) || !safeGeneratedPath(name) {
 		return "", e.New(e.CodePipelineDrift, "Plan storage requires a safe target name")
 	}
-	for _, segment := range strings.Split(name, "/") {
-		if !canonicalName.MatchString(segment) {
-			return "", e.New(e.CodePipelineDrift, "Plan storage requires safe target segments")
-		}
-	}
 	return name, nil
 }
 
@@ -164,7 +159,7 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 			}
 		}
 	}
-	return files, err
+	return files, nil
 }
 
 // One multiline operand has an unambiguous component-scoped filename. Multiple

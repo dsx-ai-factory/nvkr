@@ -274,12 +274,12 @@ func admitPlanStamp(ctx context.Context, plan, generatorVersion string) error {
 	if err := admitPath(plan); err != nil {
 		return e.Wrap(e.CodePipelineDrift, err, "admitting committed Plan %q", plan)
 	}
-	held, err := heldfile.OpenContext(ctx, plan, heldfile.Options{Label: "committed-plan", MaxBytes: factory.MaxPlanBytes})
+	held, err := heldfile.OpenContext(ctx, plan, heldfile.Options{Label: "committed-plan", MaxBytes: factory.MaxGeneratedFileBytes})
 	if err != nil {
 		return contextError(ctx, e.Wrap(e.CodePipelineDrift, err, "reading committed Plan %q", plan))
 	}
 	defer func() { _ = held.Close() }()
-	raw, err := held.ReadAllContext(ctx, factory.MaxPlanBytes)
+	raw, err := held.ReadAllContext(ctx, factory.MaxGeneratedFileBytes)
 	if err != nil {
 		return contextError(ctx, e.Wrap(e.CodePipelineDrift, err, "reading committed Plan %q", plan))
 	}

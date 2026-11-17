@@ -5,8 +5,7 @@ publication routes before executing a Run. These read-only views explain the com
 its changes. They do not observe output bytes, verify a release, or authorize execution.
 
 The Plan in `.github/nvkr-run/plan.json` is the root of a generated file tree. Target records and command
-files live under `steps/`; the root stores distinct catalog snapshots once. Loading admits the complete
-manifest inventory and reconstructs the canonical Plan bytes that determine its identity. Keep human views
+files live under `steps/`; the root stores distinct catalog snapshots once. Loading admits the manifest, root, step records and scripts and reconstructs the canonical Plan bytes that determine its identity. Keep human views
 outside `.github/nvkr-run/`: that directory admits only manifest-owned generated files. Inspection never
 updates the Plan or its ownership manifest.
 
@@ -34,7 +33,7 @@ nvkr run plan \
 ```
 
 Use either `--plan` or the pair `--definition` and `--environment`. Compilation can need access to pinned
-Git objects for catalog pin-set revalidation. Reading an existing generated Plan needs its complete bundle;
+Git objects for catalog pin-set revalidation. Reading an existing generated Plan needs its root, manifest and complete `steps/` directory;
 a packed Plan exported with `--json` needs only that one file.
 Readers require the current schema, canonical bytes, safe bounded regular files, and complete graph and
 binding validation. Invalid input produces a coded error before any result bytes are emitted.

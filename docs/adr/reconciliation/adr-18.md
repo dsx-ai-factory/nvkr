@@ -57,7 +57,9 @@ contracts remain local evidence; the renamed worker topology has no recorded hos
 
 GitHub runtime-input carriers continue to contain exactly three files: a packed canonical Plan,
 action data and the manifest. The bootstrap stages them separately from the committed Plan tree;
-the helper invokes the existing installer to admit and regenerate that tree. Root and step JSON may
+the helper invokes the installer to admit and regenerate that tree. Installation renders the baseline
+and candidate once each and reuses them for comparison and publication checks; staging reuses its
+already checked bundle. Root and step JSON may
 change during a source-pin refresh, while generated commands and every other member remain fixed.
 A vendor cohort split that changes a script pathname requires normal regeneration. Packed-carrier and
 cohort-split refusal fixtures exercise these boundaries locally. All three maintained nightly selections

@@ -24,11 +24,15 @@ DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
 def load_plan(filename):
     # The trusted helper is built before comparison by the maintenance workflow.
     # Its shared loader admits either packed wire bytes or the complete tree.
-    result = subprocess.run(
-        ["./nvkr-exec", "run", "plan", "--plan", str(filename), "--json"],
-        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-        check=True, timeout=60,
-    )
+    try:
+        result = subprocess.run(
+            ["./nvkr-exec", "run", "plan", "--plan", str(filename), "--json"],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            check=True, timeout=60,
+        )
+    except subprocess.CalledProcessError as error:
+        print(error.stderr, file=sys.stderr, end="")
+        raise SystemExit(error.returncode) from None
     return json.loads(result.stdout)
 
 

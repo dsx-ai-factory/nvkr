@@ -69,7 +69,8 @@ Under that scratch root, inspect:
 - `.github/workflows/nvkr-run.yml`: named GitHub Actions jobs, dependencies, runners and credential policies.
 - `.github/nvkr-run/actions/`: shared actions with fixed interfaces for execution, preparation and transport.
 - `.github/nvkr-run/action-data.json`: generated invocation parameters selected by stable job/segment keys.
-- `.github/nvkr-run/plan.json`: the canonical Plan consumed by the workflow.
+- `.github/nvkr-run/plan.json`: the Plan root index and shared catalog snapshots.
+- `.github/nvkr-run/steps/`: per-target step records and exact command files; loading the tree reconstructs the canonical Plan.
 - `.github/nvkr-run/manifest.json`: the generated bundle's ownership and content record.
 
 Those are the default production paths when the Environment omits `githubBundle`
