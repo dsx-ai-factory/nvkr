@@ -64,11 +64,14 @@ the existing loader and exact-source owner resolve these relative paths there.
 A fixed local attempt/output name is safe because each job gets a fresh
 workspace, runs once and publishes no build products.
 
-The explicit `small` profile selects a 7-GiB site, 3 GiB per tenant VM, four
-vCPUs per guest and 1 GiB headroom. The temporary 6-GiB bootstrap backend stops
-before tenant creation. Initial admission requires 14 GiB actually available:
+The nightly configuration selects the explicit `small` profile with a 7-GiB site,
+3 GiB per tenant VM, four vCPUs per guest and 512 MiB host/QEMU headroom.
+The temporary 6-GiB bootstrap backend stops before tenant creation.
+Initial admission requires 13,824 MiB (13.5 GiB) actually available:
 site plus the larger of bootstrap or two tenants, plus headroom. Tenant creation
-rechecks 7 GiB beside the existing site. These checks reserve no resources.
+rechecks 6,656 MiB (6.5 GiB) beside the existing site. Less memory or fewer than
+four host CPUs fails with `NVKR-E-ENGINE-CAPABILITY` before the associated work.
+These checks reserve no resources and do not guarantee freedom from later memory pressure.
 An unset profile retains the existing scheduling defaults. These allocations
 are functional-test settings, not proven hardware minima or performance qualification.
 The small profile also sets the site's system reservation and the tenant's
@@ -76,8 +79,8 @@ Reserved/SystemReserved/KubeReserved memory to 256Mi, appends the guest kubelet
 `--kube-reserved=cpu=1000m,memory=256Mi,ephemeral-storage=1Gi` override and restarts
 it, sets OVN control-plane/node-zone memory requests to 128Mi, and adds 64Mi
 memory requests to the seven site telemetry collector roles and three target
-allocators. Recorded small-profile runtime acceptance covers these settings,
-not the default reservations.
+allocators. Recorded small-profile guest-reservation evidence is scoped to the
+exact revisions in the [reconciliation record](adr/reconciliation/consumer-acceptance-scopes.md).
 
 The demo's default StorageClass has no dynamic provisioner. It supplies four
 1-GiB volumes and writable guest directories for NKTP's persistent queues, in

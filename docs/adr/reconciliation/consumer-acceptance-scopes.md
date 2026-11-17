@@ -36,16 +36,27 @@ ARM64 build/publish/consume nightly and its legacy consumer remain uninvoked.
 The six-hour job passes its remaining deadline to Go, which reserves two hours
 for independent cleanup. Live KVM, disk and available memory are prerequisites.
 The explicit small profile selects a 7-GiB site, 3 GiB per tenant, four vCPUs and
-1 GiB headroom. Initial admission requires 14 GiB; the temporary 6-GiB bootstrap
-backend joins before tenant creation rechecks 7 GiB beside the site. This is a
+512 MiB host/QEMU headroom in the nightly configuration. Initial admission requires
+13,824 MiB; the temporary 6-GiB bootstrap backend joins before tenant creation
+rechecks 6,656 MiB beside the site. This is a
 functional-test allocation, not a minimum hardware or OOM-causality claim.
+Four attempts of [Run 44166550042](https://github.com/njhensley/nvkr/actions/runs/44166550042)
+observed 14,064–14,289 MiB available and failed the former 14,336-MiB requirement
+before exercising the installer fix. Only the nightly headroom allowance changes:
+reducing tenants alone cannot reduce the initial 6-GiB bootstrap requirement,
+and a smaller site has no recorded acceptance. The observed range leaves
+752–977 MiB above the 13-GiB peak guest allocation. Admission still fails closed
+below its selected memory or CPU requirement and reserves nothing. Contract tests
+cover both boundaries and the observed range; hosted acceptance of the new allowance
+remains pending.
 The small profile also sets the site's system reservation and the tenant's
 Reserved/SystemReserved/KubeReserved memory to 256Mi, appends the guest kubelet
 `--kube-reserved=cpu=1000m,memory=256Mi,ephemeral-storage=1Gi` override and restarts
 it, sets OVN control-plane/node-zone memory requests to 128Mi, and adds 64Mi
 memory requests to the seven site telemetry collector roles and three target
-allocators. Recorded small-profile runtime acceptance covers these settings,
-not the default reservations.
+allocators. The historical small-profile runs below cover these guest settings
+with the former 1-GiB host/QEMU headroom, not the revised nightly allowance or
+the default reservations.
 
 The demo supplies four 1-GiB static volumes and writable guest directories for
 NKTP's persistent queues alongside the PostgreSQL and SPIRE volumes. The default

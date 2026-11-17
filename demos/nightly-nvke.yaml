@@ -16,5 +16,5 @@ run:
     profile: small
     siteMemoryGiB: 7
     tenantMemoryGiB: 3
-    headroomMiB: 1024
+    headroomMiB: 512
     vcpus: 4
