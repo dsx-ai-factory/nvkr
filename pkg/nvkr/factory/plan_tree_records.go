@@ -50,8 +50,8 @@ func readTreeJSON(ref json.RawMessage, files map[string][]byte) (json.RawMessage
 	return canonical.Marshal(value)
 }
 
-// Component and source records use the same command extraction as execution
-// nodes, so an identical script has one physical copy across all three forms.
+// Inline component and source data use the same script extraction as execution
+// nodes, so identical command bytes still share their named script object.
 func treeRecordCommands(record planFields, files map[string][]byte, expand bool, logical string) error {
 	for _, field := range []string{"command", "vendorCmd", "buildCommand", "vendorCommand"} {
 		if record[field] == nil {
@@ -158,12 +158,6 @@ func treeCatalogRecords(raw json.RawMessage, files map[string][]byte, expand boo
 		size := 0
 		for _, name := range sortedKeys(records) {
 			raw := records[name]
-			if expand {
-				raw, err = readTreeJSON(raw, files)
-				if err != nil {
-					return nil, err
-				}
-			}
 			var record planFields
 			if err := json.Unmarshal(raw, &record); err != nil {
 				return nil, e.Wrap(e.CodePipelineDrift, err, "reading catalog record")
@@ -171,11 +165,7 @@ func treeCatalogRecords(raw json.RawMessage, files map[string][]byte, expand boo
 			if err := treeRecordCommands(record, files, expand, name); err != nil {
 				return nil, err
 			}
-			if expand {
-				records[name], err = canonical.Marshal(record)
-			} else {
-				records[name], err = storeTreeJSON(record, files, strings.ToLower(field)+"/"+name)
-			}
+			records[name], err = canonical.Marshal(record)
 			if err != nil {
 				return nil, err
 			}
@@ -203,70 +193,26 @@ func treeCatalogRecords(raw json.RawMessage, files map[string][]byte, expand boo
 	if metadata.Name == "" {
 		metadata.Name = "catalog"
 	}
-	return storeTreeJSON(snapshot, files, "catalogs/"+metadata.Name)
+	return storeTreeJSON(snapshot, files, "plan/catalog-"+metadata.Name)
 }
 
-// Named resolved components add only a name to the frozen component value. Exact
-// matches reuse the snapshot's component object; platform-specific resolutions
-// retain their distinct bytes without invoking catalog resolution during load.
-func treeResolvedRecords(raw json.RawMessage, files map[string][]byte, expand bool, target string) (json.RawMessage, error) {
-	var err error
-	if expand {
-		raw, err = readTreeJSON(raw, files)
-		if err != nil {
-			return nil, err
-		}
-	}
+// Resolved configuration stays beside the execution graph and its source pins.
+// Only multiline command operands leave the build record.
+func treeResolvedRecords(raw json.RawMessage, files map[string][]byte, expand bool) (json.RawMessage, error) {
 	var records []planFields
 	if err := json.Unmarshal(raw, &records); err != nil {
 		return nil, e.Wrap(e.CodePipelineDrift, err, "reading resolved records")
 	}
 	size := 0
-	for i, record := range records {
-		name := record["Name"]
+	for _, record := range records {
 		var logical string
-		if err := json.Unmarshal(name, &logical); err != nil {
+		if err := json.Unmarshal(record["Name"], &logical); err != nil {
 			return nil, e.Wrap(e.CodePipelineDrift, err, "reading resolved component name")
 		}
-		if expand {
-			delete(record, "Name")
-			ref, err := canonical.Marshal(record)
-			if err != nil {
-				return nil, err
-			}
-			value, err := readTreeJSON(ref, files)
-			if err != nil {
-				return nil, err
-			}
-			record = nil
-			if err := json.Unmarshal(value, &record); err != nil {
-				return nil, e.Wrap(e.CodePipelineDrift, err, "reading resolved component")
-			}
-			if record["Name"] != nil {
-				return nil, e.New(e.CodePipelineDrift, "resolved component has duplicate name")
-			}
-			if err := treeRecordCommands(record, files, true, logical); err != nil {
-				return nil, err
-			}
-			record["Name"] = name
-			records[i] = record
-		} else {
-			delete(record, "Name")
-			if err := treeRecordCommands(record, files, false, logical); err != nil {
-				return nil, err
-			}
-			ref, err := storeTreeJSON(record, files, "components/"+logical)
-			if err != nil {
-				return nil, err
-			}
-			var index planFields
-			if err := json.Unmarshal(ref, &index); err != nil {
-				return nil, e.Wrap(e.CodePipelineDrift, err, "indexing resolved component")
-			}
-			index["Name"] = name
-			records[i] = index
+		if err := treeRecordCommands(record, files, expand, logical); err != nil {
+			return nil, err
 		}
-		value, err := canonical.Marshal(records[i])
+		value, err := canonical.Marshal(record)
 		if err != nil {
 			return nil, err
 		}
@@ -275,10 +221,7 @@ func treeResolvedRecords(raw json.RawMessage, files map[string][]byte, expand bo
 			return nil, e.New(e.CodePipelineDrift, "resolved records exceed size bound")
 		}
 	}
-	if expand {
-		return canonical.Marshal(records)
-	}
-	return storeTreeJSON(records, files, "resolved-components/"+target)
+	return canonical.Marshal(records)
 }
 
 func treeGraphCommands(step planFields, files map[string][]byte, expand bool, remaining int64) error {

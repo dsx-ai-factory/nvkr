@@ -191,6 +191,15 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	if err != nil {
 		return err
 	}
+	var storeIndex []byte
+	if bundle.Engine == EngineGitHub {
+		// Admit and compute the complete index before publication, while the
+		// store lock fixes the owner set. Commit those bytes after the manifest.
+		storeIndex, err = planStoreIndex(ctx, root, bundle)
+		if err != nil {
+			return err
+		}
+	}
 
 	type staged struct {
 		destination, temporary string
@@ -293,7 +302,7 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		names = append(names, member.Path)
 	}
 	if bundle.Engine == EngineGitHub {
-		if err := writePlanStoreIndex(context.WithoutCancel(ctx), root); err != nil {
+		if err := writePlanStoreIndex(context.WithoutCancel(ctx), root, storeIndex); err != nil {
 			return err
 		}
 		if err := prunePlanStoreDirectories(context.WithoutCancel(ctx), root); err != nil {

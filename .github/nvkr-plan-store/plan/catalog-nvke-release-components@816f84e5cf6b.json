@@ -1,0 +1,444 @@
+{
+  "APIVersion": "nvkr.dev/catalog/v3",
+  "Actions": {},
+  "Components": {
+    "capi-controller-image": {
+      "commit": "bd8162edfe045c1bb490d431b3acddd568bdb887",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:0bd9a073959ec3bf769ced2a5e0cde2d666f0be35ea03d334bb4529e851ce46a",
+          "arm64": "sha256:d496c463f0f88fe80ff821e843013d4d441cf67a11e3b06573ab79a5be78578b"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "registry.k8s.io/cluster-api/cluster-api-controller:v1.13.6",
+        "imageParentDigest": "sha256:e63aca1ca457d039253b55276944c40955893037600527de2f51339b2cc9fc3e"
+      },
+      "repo": "https://github.com/kubernetes-sigs/cluster-api",
+      "sourceDateEpoch": 1788866431,
+      "tag": "v1.13.6"
+    },
+    "capi-kubeadm-bootstrap-image": {
+      "commit": "bd8162edfe045c1bb490d431b3acddd568bdb887",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:90d6d0a0eca123164a7be5c35d4ea51541b0c7f2851a914224b7c733c622e4ed",
+          "arm64": "sha256:bde7f270a2d5aeb07fe9775017f0bd523fa2b3443c139fe4a71b622545e4570e"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "registry.k8s.io/cluster-api/kubeadm-bootstrap-controller:v1.13.6",
+        "imageParentDigest": "sha256:fc508bc9d2d0b2860dfc397c7c864230d135cd3b5505f40187d93570e4593884"
+      },
+      "repo": "https://github.com/kubernetes-sigs/cluster-api",
+      "sourceDateEpoch": 1788866431,
+      "tag": "v1.13.6"
+    },
+    "capi-kubeadm-control-plane-image": {
+      "commit": "bd8162edfe045c1bb490d431b3acddd568bdb887",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:98d120a9a3b8f6621e4e17c87d932a24db245929ee90a39ba8ffad35492c8eda",
+          "arm64": "sha256:c8a8b6619aa84e0d93e880a23468b0f4bcb7c5711741a398d7ddaaf787f5496c"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "registry.k8s.io/cluster-api/kubeadm-control-plane-controller:v1.13.6",
+        "imageParentDigest": "sha256:13a5ba7c8e419c7fad740bb080674c33c40e6161d698a6cd5ab55f002edb00c8"
+      },
+      "repo": "https://github.com/kubernetes-sigs/cluster-api",
+      "sourceDateEpoch": 1788866431,
+      "tag": "v1.13.6"
+    },
+    "capnico-controller": {
+      "artifactPath": "bin/capnico-controller-{{.Arch}}.oci.tar",
+      "buildCommand": [
+        "sh",
+        "-ec",
+        "buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src/. --local dockerfile=/src --opt platform=linux/{{.Arch}} --opt \"build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH\" --output type=oci,dest=/src/bin/capnico-controller-{{.Arch}}.oci.tar,oci-mediatypes=true,rewrite-timestamp=true"
+      ],
+      "builderType": "buildkit-rootless",
+      "commit": "30882520888ab7bb75d125cb7bb9aa89e48acd6a",
+      "fromSource": true,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/cluster-api-provider-nico",
+      "sourceDateEpoch": 1789170151,
+      "tag": "v0.0.45",
+      "toolchainImage": "moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4",
+      "treeHash": "4bc81a40160d655bddaadc1b96f9413703351b0e",
+      "writeDir": "bin"
+    },
+    "cert-manager-cainjector-image": {
+      "commit": "24e33194fb39488eff2bbf10c6dc640f407cad44",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:1910ad7e134880e27d229e07affb43da1b07841a77f70c364f17467cb4e49bd9",
+          "arm64": "sha256:0c5930d51b9acc07b1d1f6befa46bdc3591fc52c0254f6209bf595eb5fdb3b7c"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "quay.io/jetstack/cert-manager-cainjector:v1.21.1",
+        "imageParentDigest": "sha256:ccf6b919ec0500745a47a910118f834f9636d0aac1ff221245cd2557ed8c7c98"
+      },
+      "repo": "https://github.com/cert-manager/cert-manager",
+      "sourceDateEpoch": 1785322488,
+      "tag": "v1.21.1"
+    },
+    "cert-manager-controller-image": {
+      "commit": "24e33194fb39488eff2bbf10c6dc640f407cad44",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:4c2b5201fd66085b777dc6b256d96d7d346b6445404cec34db5f8aea86182cc5",
+          "arm64": "sha256:9a2807ada15c98aea85162bed3a9d602a5a4760206158661433be0b3ea133837"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "quay.io/jetstack/cert-manager-controller:v1.21.1",
+        "imageParentDigest": "sha256:416a2d76870d996460e62bd7f521bf14fa017be9e3e904aab92163a331fcb61a"
+      },
+      "repo": "https://github.com/cert-manager/cert-manager",
+      "sourceDateEpoch": 1785322488,
+      "tag": "v1.21.1"
+    },
+    "cert-manager-webhook-image": {
+      "commit": "24e33194fb39488eff2bbf10c6dc640f407cad44",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:741084291faf115a2909bfe3515458b54926c67f039ac20effd821bac69817a4",
+          "arm64": "sha256:f6ed5d53a40429c99a28b68ce0429f3d75ac9588403519c6772a76df35f37695"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "quay.io/jetstack/cert-manager-webhook:v1.21.1",
+        "imageParentDigest": "sha256:d8b3961b51c8c7320633f8208dc46bf88aa13804d0f7cbe48a096b2c523cee42"
+      },
+      "repo": "https://github.com/cert-manager/cert-manager",
+      "sourceDateEpoch": 1785322488,
+      "tag": "v1.21.1"
+    },
+    "nktp-chart": {
+      "artifactPath": "charts/nktp-0.1.0.tgz",
+      "buildCommand": [
+        "sh",
+        "-euc",
+        ".nvkr-tools/helm package nktp --destination=charts/"
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+      "fromSource": true,
+      "outputType": "tarball",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "sourceDateEpoch": 1793913052,
+      "tag": "nktp/v0.1.0",
+      "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+      "treeHash": "4125b283eacc8842210bf405e7dc5f04090e8b05",
+      "vendorCommand": [
+        "sh",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke-telemetry-pipeline/vendor@51e05aaa25f5.sh"
+        }
+      ],
+      "writeDir": "charts"
+    },
+    "nktp-collector-image": {
+      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:25510edb4dff3810d3dd7542db4d396ce0d870b2f57d32c93a8dcd6dde2677b6",
+          "arm64": "sha256:d02f91eae487d99cfad338ca4a7d12ac108c9dd18e8c3a80950d70dceabd87ec"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "otel/opentelemetry-collector-k8s:0.164.0",
+        "imageParentDigest": "sha256:8f7e5aaac0302f090164d5f9c14e4437d8037c5aaa2d025fc3ad74c1922602eb"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "sourceDateEpoch": 1793913052,
+      "tag": "nktp/v0.1.0"
+    },
+    "nktp-kube-state-metrics-image": {
+      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:01171220c7c059afc85034ffe687bfe7249e41c0cc46fbe9a5128503ceee3016",
+          "arm64": "sha256:92b46557c71ecac53825772e4827dbcd9fca876b1950060f8fb2f2ef0d7a27af"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0",
+        "imageParentDigest": "sha256:42cfe3723a5f058171c627537fb57a3ea0f26e4380fa18555a95cb1a1b4cfc5b"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "sourceDateEpoch": 1793913052,
+      "tag": "nktp/v0.1.0"
+    },
+    "nktp-kubectl-image": {
+      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:9d08603e52103e88c896a60fd42a7f660bd37566ec3de6f2b2c948d8b3a90119",
+          "arm64": "sha256:9054520faf548fe1b9fa5409bc3bee50be0c230d0e4cd7a1f12474c8e7b5704a"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "registry.k8s.io/kubectl:v1.35.10",
+        "imageParentDigest": "sha256:4e1d541a3d62f74637974e4c71f3cea91b9a36ffd059ab45e355648898783837"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "sourceDateEpoch": 1793913052,
+      "tag": "nktp/v0.1.0"
+    },
+    "nktp-lgtm-image": {
+      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:bf33fa01b1a0314edc88c5bc2a295067e65270cf9c3f678a943a4a2c2a2472fd",
+          "arm64": "sha256:61ffd7c074d354759207d7541a0361cc2b4a897f0e06003c9672384a6b8cc2f6"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "grafana/otel-lgtm:0.38.0",
+        "imageParentDigest": "sha256:75cdf892daffadf3763ef61c16a6d7f8586216fce0b40bba7874a0b053121084"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "sourceDateEpoch": 1793913052,
+      "tag": "nktp/v0.1.0"
+    },
+    "nktp-metrics-server-image": {
+      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:6231fb0a1ffab76c92ab880f51a0d11b290f688373647bcedff85af025dfd8a9",
+          "arm64": "sha256:9ece07f21cfaf3c2398bd4e0de1f127cfad23ec40d29ceffd8323b4f34744eb8"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "registry.k8s.io/metrics-server/metrics-server:v0.8.1",
+        "imageParentDigest": "sha256:b2d2efaf5ac3b366ed0f839d2412a2c4279d4fc2a2a733f12c52133faed36c41"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "sourceDateEpoch": 1793913052,
+      "tag": "nktp/v0.1.0"
+    },
+    "nktp-node-exporter-image": {
+      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:da83fae85603c4e47e6c68369a7d746e2dda683dc35ea2e234b4f171e0d92798",
+          "arm64": "sha256:c9ef89f9464f09e7234decaae68a80ab856ff0014435677a99fd48b03dd410ea"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "quay.io/prometheus/node-exporter:v1.12.1",
+        "imageParentDigest": "sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "sourceDateEpoch": 1793913052,
+      "tag": "nktp/v0.1.0"
+    },
+    "nktp-operator-image": {
+      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:623759f8e8495109c937b18ef017a7ad345e7f969f7b9cab79c8018c6d644547",
+          "arm64": "sha256:e7f68d72660d0dd7bd82c0b27d488d7c626bc645124ebb9befead9209221d0b0"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.161.0",
+        "imageParentDigest": "sha256:76ac4fa40512b60f85ff236c60c075ca3407858efe72e22d2e96a9cf1bc82dc2"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "sourceDateEpoch": 1793913052,
+      "tag": "nktp/v0.1.0"
+    },
+    "nktp-target-allocator-image": {
+      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:179b8353c5b14660b5e3bebe6e418a0622d0009f81d95bbacf0d0d9b9c94b8fa",
+          "arm64": "sha256:2c5349827083e9eac333f6777f1283a6d9d30bc07da28f959dafaaeb3358caef"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "ghcr.io/open-telemetry/opentelemetry-operator/target-allocator:0.161.0",
+        "imageParentDigest": "sha256:cf45770c658cf392618717043d9a478a8a9f97d3d5f79a31db54e85abc438718"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "sourceDateEpoch": 1793913052,
+      "tag": "nktp/v0.1.0"
+    },
+    "nvke-nico-reference-profiles": {
+      "artifactPath": "bin/nico-reference-profiles-fixture-{{.Arch}}.oci.tar",
+      "buildCommand": [
+        "sh",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke-nico-reference-profiles/build@1db1b1ef9b14.sh"
+        }
+      ],
+      "builderType": "buildkit-rootless",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": true,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0",
+      "toolchainImage": "moby/buildkit@sha256:f8a833b2de9d68e27f0815e4a737abdfaf8a2e4c615650557df11025101557b4",
+      "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+      "writeDir": "bin"
+    }
+  },
+  "Kind": "SourceBuildRegistry",
+  "Metadata": {
+    "description": "Source-built CAPNICo, NKTP chart and NICO reference-profile fixtures, plus digest-pinned acquired CAPI, cert-manager and NKTP runtime images. Deployment topology and site configuration remain consumer-owned.",
+    "name": "nvke-release-components"
+  },
+  "Sources": {
+    "capi": {
+      "constraint": "1.13.6",
+      "repo": "https://github.com/kubernetes-sigs/cluster-api",
+      "toolchainImage": "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
+    },
+    "capnico": {
+      "constraint": "0.0.45",
+      "repo": "https://github.com/dsx-ai-factory/cluster-api-provider-nico",
+      "toolchainImage": "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
+    },
+    "cert-manager": {
+      "constraint": "1.21.1",
+      "repo": "https://github.com/cert-manager/cert-manager",
+      "toolchainImage": "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
+    },
+    "nvke-content": {
+      "constraint": "v0.23.0",
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "toolchainImage": "alpine@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6"
+    },
+    "nvke-nktp": {
+      "constraint": "0.1.0",
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "tagPrefix": "nktp/v",
+      "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+      "vendorCommand": [
+        "sh",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke-telemetry-pipeline/vendor@51e05aaa25f5.sh"
+        }
+      ]
+    }
+  },
+  "Tools": {}
+}

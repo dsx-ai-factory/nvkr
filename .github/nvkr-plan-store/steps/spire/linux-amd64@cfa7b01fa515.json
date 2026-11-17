@@ -1,0 +1,59 @@
+{
+  "buildDigest": "sha256:fd6fb5db96727b10307394ff1d158dfcf60fdfa0f7ea32d9a7a5bb9bf5b4dc12",
+  "catalogDigest": "sha256:5f85e05a7738fe0d3b8f7a515d0b0e80974961579d0dbd53c1401b1ba6cb8d2b",
+  "components": [
+    "spire-chart"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "https://github.com/spiffe/helm-charts-hardened/releases/download/spire-0.30.1/spire-0.30.1.tgz",
+        "artifactPath": "spire-chart",
+        "component": "spire-chart",
+        "digest": "sha256:7c32126bb1909076cdf9fd0419dbf9e5b012f152bb09a96a4259917d70581fac",
+        "id": "pull-spire-chart",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "raw",
+        "platform": "linux/amd64",
+        "version": "0.30.1"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-spire-chart"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "spire",
+  "platform": "linux/amd64",
+  "resolvedComponents": [
+    {
+      "Name": "spire-chart",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": false,
+      "outputType": "raw",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:7c32126bb1909076cdf9fd0419dbf9e5b012f152bb09a96a4259917d70581fac",
+          "arm64": "sha256:7c32126bb1909076cdf9fd0419dbf9e5b012f152bb09a96a4259917d70581fac"
+        },
+        "evidence": {
+          "none": true
+        },
+        "url": "https://github.com/spiffe/helm-charts-hardened/releases/download/spire-0.30.1/spire-0.30.1.tgz"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "sourceDateEpoch": 1793236039,
+      "tag": "0.30.1"
+    }
+  ]
+}

@@ -102,19 +102,19 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 			return nil, nil, e.New(e.CodePipelineDrift, "invalid Plan step reference")
 		}
 		delete(build, "file")
-		if ref, ok := build["resolvedComponents"]; ok {
-			value, err := treeResolvedRecords(ref, files, true, "")
-			if err != nil {
-				return nil, nil, err
-			}
-			build["resolvedComponents"] = value
-		}
 		var step planFields
 		if err := decodeTreeJSON(files[stepPath], &step); err != nil {
 			return nil, nil, err
 		}
 		if !bytes.Equal(step["name"], build["name"]) {
 			return nil, nil, e.New(e.CodePipelineDrift, "Plan step name differs from its root record")
+		}
+		if resolved, ok := step["resolvedComponents"]; ok {
+			value, err := treeResolvedRecords(resolved, files, true)
+			if err != nil {
+				return nil, nil, err
+			}
+			step["resolvedComponents"] = value
 		}
 		if err := expandTreeCommands(step, files, MaxPlanBytes-int64(size)); err != nil {
 			return nil, nil, err

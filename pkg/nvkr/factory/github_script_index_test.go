@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -35,21 +37,21 @@ func TestGitHubScriptIndexConnectsJobsToExactCommands(t *testing.T) {
 			if !bytes.Equal(before, mustCanonical(t, plan)) {
 				t.Fatal("navigation changed Plan identity")
 			}
-			var index githubScriptIndex
-			if err := json.Unmarshal(bundle.Files[githubScriptIndexPath(plan)], &index); err != nil {
+			jobs, err := githubScriptNavigation(plan, bundle.Files)
+			if err != nil {
 				t.Fatal(err)
 			}
 			scriptPath := testNamedStorePath(t, "scripts/kubelet/build", []byte(script), ".sh")
 			found, worker := false, false
-			for jobID, job := range index.Jobs {
+			for jobID, job := range jobs {
 				workflow := string(bundle.Files[job.Workflow])
-				comment := "    # Producer commands: " + githubScriptIndexPath(plan) + " (job " + jobID + ")"
+				comment := "    # Producer commands: " + PlanStoreIndexPath + " (job " + jobID + ")"
 				if !strings.Contains(workflow, "\n  "+jobID+":\n"+comment+"\n") || strings.Count(workflow, comment+"\n") != 1 {
 					t.Fatal("job must have exactly one navigation pointer immediately below its key", jobID)
 				}
 				worker = worker || job.Workflow != bundle.WorkflowPath
 				for _, operation := range job.Operations {
-					if !bytes.Contains(operation.Command, []byte(scriptPath)) {
+					if !slices.Contains(operation.Scripts, scriptPath) {
 						continue
 					}
 					found = true
@@ -65,16 +67,25 @@ func TestGitHubScriptIndexConnectsJobsToExactCommands(t *testing.T) {
 			if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
 				t.Fatal(err)
 			}
-			raw, err := os.ReadFile(filepath.Join(root, index.StoreIndex))
+			raw, err := os.ReadFile(filepath.Join(root, PlanStoreIndexPath))
 			if err != nil {
 				t.Fatal(err)
 			}
-			var variants map[string][]planStoreVariant
-			if err := json.Unmarshal(raw, &variants); err != nil {
+			var index planStoreIndexDocument
+			if err := json.Unmarshal(raw, &index); err != nil {
 				t.Fatal(err)
 			}
+			for jobID, job := range jobs {
+				variants := index.Jobs[jobID]
+				if len(variants) != 1 || !reflect.DeepEqual(variants[0].Operations, job.Operations) || len(variants[0].Workflows) != 1 || variants[0].Workflows[0].File != job.Workflow {
+					t.Fatal("shared navigation differs from the emitted job", jobID)
+				}
+			}
+			if len(index.Jobs) != len(jobs) {
+				t.Fatal("shared navigation changed job membership")
+			}
 			matched := false
-			for _, variant := range variants["scripts/kubelet/build"] {
+			for _, variant := range index.Objects["scripts/kubelet/build"] {
 				if PlanStoreDirectory+"/"+variant.File == scriptPath && len(variant.Bundles) == 1 && variant.Bundles[0] == filepath.Base(filepath.Dir(bundle.PlanPath)) {
 					matched = true
 				}
@@ -83,7 +94,7 @@ func TestGitHubScriptIndexConnectsJobsToExactCommands(t *testing.T) {
 				t.Fatal("script has no bundle-user link")
 			}
 			// Navigation is covered by closure drift, but is not consulted by Plan loads.
-			writeGeneratedFixture(t, filepath.Join(root, githubScriptIndexPath(plan)), []byte("{}\n"))
+			writeGeneratedFixture(t, filepath.Join(root, PlanStoreIndexPath), []byte("{}\n"))
 			if _, err := LoadPlanContext(t.Context(), filepath.Join(root, bundle.PlanPath)); err != nil {
 				t.Fatal(err)
 			}

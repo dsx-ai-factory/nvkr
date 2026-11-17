@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -111,15 +112,13 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 		if err := storeCatalog(build); err != nil {
 			return nil, err
 		}
-		record := planFields{"name": build["name"], "catalogDigest": build["catalogDigest"]}
+		record := planFields{"name": build["name"]}
 		if resolved, ok := build["resolvedComponents"]; ok {
-			record["resolvedComponents"], err = treeResolvedRecords(resolved, files, false, name)
+			build["resolvedComponents"], err = treeResolvedRecords(resolved, files, false)
 			if err != nil {
 				return nil, err
 			}
 		}
-		delete(build, "catalogDigest")
-		delete(build, "resolvedComponents")
 		if names[name] {
 			return nil, e.New(e.CodePipelineDrift, "duplicate Plan target %s", name)
 		}
@@ -131,7 +130,14 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 		if err != nil {
 			return nil, err
 		}
-		stepPath, err := namedPlanStorePath("steps/"+name+"/build", step, ".json")
+		platform, err := treeTargetName(build["platform"])
+		if err != nil {
+			return nil, err
+		}
+		// The platform is a filename label; the exact full target remains in the
+		// record. Aggregate targets already end in that platform.
+		logical := strings.TrimSuffix(name, "/"+platform) + "/" + strings.ReplaceAll(platform, "/", "-")
+		stepPath, err := namedPlanStorePath("steps/"+logical, step, ".json")
 		if err != nil {
 			return nil, err
 		}
@@ -167,7 +173,7 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 			if logical == "" {
 				logical = "plan"
 			}
-			root[field], err = storeTreeJSON(value, files, kind+"/"+logical)
+			root[field], err = storeTreeJSON(value, files, "plan/"+kind+"-"+logical)
 			if err != nil {
 				return nil, err
 			}

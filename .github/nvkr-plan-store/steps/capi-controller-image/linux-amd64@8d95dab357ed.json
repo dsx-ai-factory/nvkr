@@ -1,0 +1,60 @@
+{
+  "buildDigest": "sha256:ae580cb13175ef4d68d0685f442e324cf77e57e3359849093efaccc9923c1661",
+  "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
+  "components": [
+    "capi-controller-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "registry.k8s.io/cluster-api/cluster-api-controller:v1.13.6",
+        "component": "capi-controller-image",
+        "digest": "sha256:0bd9a073959ec3bf769ced2a5e0cde2d666f0be35ea03d334bb4529e851ce46a",
+        "id": "pull-capi-controller-image",
+        "imageParentDigest": "sha256:e63aca1ca457d039253b55276944c40955893037600527de2f51339b2cc9fc3e",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "1.13.6"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-capi-controller-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "capi-controller-image",
+  "platform": "linux/amd64",
+  "resolvedComponents": [
+    {
+      "Name": "capi-controller-image",
+      "commit": "bd8162edfe045c1bb490d431b3acddd568bdb887",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:0bd9a073959ec3bf769ced2a5e0cde2d666f0be35ea03d334bb4529e851ce46a",
+          "arm64": "sha256:d496c463f0f88fe80ff821e843013d4d441cf67a11e3b06573ab79a5be78578b"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "registry.k8s.io/cluster-api/cluster-api-controller:v1.13.6",
+        "imageParentDigest": "sha256:e63aca1ca457d039253b55276944c40955893037600527de2f51339b2cc9fc3e"
+      },
+      "repo": "https://github.com/kubernetes-sigs/cluster-api",
+      "sourceDateEpoch": 1788866431,
+      "tag": "v1.13.6"
+    }
+  ]
+}

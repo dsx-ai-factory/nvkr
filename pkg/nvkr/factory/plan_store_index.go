@@ -16,6 +16,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
 // PlanStoreIndexPath is the generated, descriptive inventory of store variants
@@ -33,15 +34,34 @@ type planStoreVariant struct {
 	Bundles []string `json:"bundles"`
 }
 
-func planStoreIndex(ctx context.Context, root string) ([]byte, error) {
-	owners, err := planStoreOwners(ctx, root, "")
+func planStoreIndex(ctx context.Context, root string, incoming *GeneratedBundle) ([]byte, error) {
+	except := ""
+	if incoming != nil {
+		except = incoming.ManifestPath
+	}
+	owners, err := planStoreOwners(ctx, root, except)
 	if err != nil {
 		return nil, err
 	}
-	return encodePlanStoreIndex(owners)
+	if incoming != nil {
+		for name, raw := range incoming.Files {
+			if !isPlanStorePath(name) {
+				continue
+			}
+			owner := owners[name]
+			owner.Member = GeneratedMember{Path: name, SHA256: pipeline.FileDigest(raw), Mode: 0o644}
+			owner.Bundles = append(owner.Bundles, path.Base(path.Dir(incoming.ManifestPath)))
+			owners[name] = owner
+		}
+	}
+	jobs, err := planStoreNavigation(ctx, root, owners, incoming)
+	if err != nil {
+		return nil, err
+	}
+	return encodePlanStoreIndex(owners, jobs)
 }
 
-func encodePlanStoreIndex(owners map[string]planStoreOwner) ([]byte, error) {
+func encodePlanStoreIndex(owners map[string]planStoreOwner, jobs map[string][]planStoreJobVariant) ([]byte, error) {
 	groups := map[string][]planStoreVariant{}
 	for _, name := range sortedKeys(owners) {
 		owner := owners[name]
@@ -53,7 +73,7 @@ func encodePlanStoreIndex(owners map[string]planStoreOwner) ([]byte, error) {
 		}
 		groups[logical] = append(groups[logical], planStoreVariant{relative, owner.Member.SHA256, owner.Bundles})
 	}
-	raw, err := treeJSON(groups)
+	raw, err := treeJSON(planStoreIndexDocument{Objects: groups, Jobs: jobs})
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +84,7 @@ func encodePlanStoreIndex(owners map[string]planStoreOwner) ([]byte, error) {
 }
 
 func checkPlanStoreIndex(ctx context.Context, root string) error {
-	expected, err := planStoreIndex(ctx, root)
+	expected, err := planStoreIndex(ctx, root, nil)
 	if err != nil {
 		return err
 	}
@@ -82,11 +102,7 @@ func checkPlanStoreIndex(ctx context.Context, root string) error {
 
 // Publication follows the bundle manifests and sweep. An interruption leaves a
 // stale descriptive index; the next generation recomputes it from current owners.
-func writePlanStoreIndex(ctx context.Context, root string) error {
-	raw, err := planStoreIndex(ctx, root)
-	if err != nil {
-		return err
-	}
+func writePlanStoreIndex(ctx context.Context, root string, raw []byte) error {
 	if err := ensureGeneratedDirectory(root, PlanStoreDirectory); err != nil {
 		return err
 	}

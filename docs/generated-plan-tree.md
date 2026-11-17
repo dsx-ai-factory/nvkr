@@ -4,19 +4,19 @@ A generated Plan is a frozen record of the selected inputs and operations. GitHu
 
 ## Follow a job to its script
 
-Start at an execution job in `.github/workflows/nvkr-run-nvke.yml`. Its `Producer commands` comment names `.github/nvkr-run-nvke/script-index.json` and the job key. In that index:
+Start at an execution job in `.github/workflows/nvkr-run-nvke.yml`. Its `Producer commands` comment names `.github/nvkr-plan-store/index.json` and the job key. In that index:
 
-1. `workflow` locates the actual job, including a partition worker when selected.
+1. Find the job key under `jobs`. Each variant lists its `workflows`: bundle names and actual workflow files, including partition workers. Identical operations share one variant across bundles.
 2. Each `operations` entry names the factory `node` and execution `step`. A disk job has several operations under its shared `run-disk` step. Composite actions can contain the step; follow the workflow's local `uses` path to inspect its wrapper.
-3. `target`, `producer` and `record` identify the frozen producer instruction. `command` and `vendorCmd` preserve its argument order. A `{ "file": "..." }` operand names the exact raw script under `.github/nvkr-plan-store/scripts/`; other operands remain strings. Read the producer record for its environment, working directory, network, material and toolchain bindings. Operations without a producer execute NVKR's typed helpers rather than a catalog script.
-4. Find the script's store-relative `file` in `.github/nvkr-plan-store/index.json` to see its full SHA-256 and every bundle sharing those bytes. Different suffixes are different variants, even when their logical names match.
+3. `target`, `producer` and `record` identify the frozen producer instruction. `scripts` lists its exact raw script files. Open `record` for the ordered command operands, inline component configuration, source pins, environment, working directory, network, material and toolchain bindings. Operations without a producer execute NVKR's typed helpers rather than a catalog script.
+4. Find a script's store-relative `file` under `objects` in the same index to see its full SHA-256 and every bundle sharing those bytes. Different suffixes are different variants, even when their logical names match.
 
-For example, list the externalized command operands for one job, then find all users of a selected file:
+For example, inspect a job's variants, then find all users of a selected file:
 
 ```sh
-jq --arg job 'JOB_ID' '.jobs[$job]' .github/nvkr-run-nvke/script-index.json
+jq --arg job 'JOB_ID' '.jobs[$job]' .github/nvkr-plan-store/index.json
 jq --arg file 'scripts/COMPONENT/build@SUFFIX.sh' \
-  '.[][] | select(.file == $file)' .github/nvkr-plan-store/index.json
+  '.objects[][] | select(.file == $file)' .github/nvkr-plan-store/index.json
 ```
 
 The index describes producer commands; orchestration shell remains visible in workflow `run` fields and generated local actions. Read those wrappers too: they select the Plan, restore inputs and dispatch the executor. Runtime-refresh workflows may freeze newer admitted source pins at dispatch. Audit the exact Run's packed Plan for its commands; the committed tree describes the reviewed baseline, not a claim that every future Run uses those bytes.
@@ -27,17 +27,19 @@ The index describes producer commands; orchestration shell remains visible in wo
 |---|---|
 | `.github/<bundle>/plan.json` | Root index: scalar metadata, ordered build references and distinct catalogs keyed by catalogDigest |
 | `.github/<bundle>/manifest.json` | Owned paths, modes, full exact-byte hashes and Plan/workflow identities |
-| `.github/<bundle>/script-index.json` | Descriptive job and execution-step links to producer records and command operands |
-| `.github/nvkr-plan-store/<kind>/<name>@<12 hex>.json` | Shared catalogs, components, targets, execution graphs and other frozen records |
+| `.github/nvkr-plan-store/steps/<target>/<platform>@<12 hex>.json` | Build record with inline resolved configuration and execution graph, including source commits |
+| `.github/nvkr-plan-store/plan/<kind>-<name>@<12 hex>.json` | Catalog snapshots and remaining frozen Plan fields |
 | `.github/nvkr-plan-store/scripts/<name>/<operation>@<12 hex>.sh` | Exact multiline operand bytes, with no added shebang or newline |
-| `.github/nvkr-plan-store/index.json` | Descriptive variants and bundle users |
+| `.github/nvkr-plan-store/index.json` | Shared job-to-step-to-script navigation, variants and bundle users |
 
-The short suffix is a locator. Full manifest hashes check file integrity; the typed Plan Digest binds the reconstructed canonical Plan. Neither index is authorization. `nvkr run plan --plan .github/nvkr-run-nvke/plan.json --json` verifies the manifest-listed tree and returns canonical bytes without resolving catalogs or rendering workflows. Complete adapter-file drift is checked separately by `make workflows-check`; that check also covers both navigation indexes. Edit authored inputs or generator code, then regenerate. Do not edit frozen scripts or indexes.
+Only `scripts/`, `steps/` and `plan/` are store directories. A step filename uses a platform label such as `linux-arm64`; its record retains the full original target name and platform. Component and source configuration stay inline, so reading a build does not require separate pointer-only records. Each distinct catalog snapshot is stored once per catalogDigest and shared across bundles.
+
+The short suffix is a locator. Full manifest hashes check file integrity; the typed Plan Digest binds the reconstructed canonical Plan. The shared index is descriptive, not authorization. `nvkr run plan --plan .github/nvkr-run-nvke/plan.json --json` verifies the manifest-listed tree and returns canonical bytes without resolving catalogs or rendering workflows. Complete adapter-file drift is checked separately by `make workflows-check`; that check also covers the shared navigation index. Edit authored inputs or generator code, then regenerate. Do not edit frozen scripts or indexes.
 
 ## Consume from another CI adapter
 
-Use `factory.LoadPlanContext(ctx, path)` to load a tree or packed Plan, or export canonical JSON with `run plan --json`. Loading needs the root, its manifest and the shared objects that manifest lists; it does not require another bundle's manifest or the descriptive indexes. Transporting a packed Plan removes filesystem references and preserves Plan and Build Digests.
+Use `factory.LoadPlanContext(ctx, path)` to load a tree or packed Plan, or export canonical JSON with `run plan --json`. Loading needs the root, its manifest and the shared objects that manifest lists; it does not require another bundle's manifest or the descriptive index. Transporting a packed Plan removes filesystem references and preserves Plan and Build Digests.
 
-An adapter consumes the validated graph, named outputs and execution requirements. It must preserve dependency edges, exact operation membership, runner/tool capabilities, isolation, credentials and result/evidence bindings. Provider job grouping is an adapter choice: GitHub job and step names in `script-index.json` are navigation aids, not portable scheduling instructions. Do not execute stored `.sh` files as standalone jobs; their interpreter arguments, environment and authority come from the admitted Plan and executor.
+An adapter consumes the validated graph, named outputs and execution requirements. It must preserve dependency edges, exact operation membership, runner/tool capabilities, isolation, credentials and result/evidence bindings. Provider job grouping is an adapter choice: GitHub job and step names in the shared index are navigation aids, not portable scheduling instructions. Do not execute stored `.sh` files as standalone jobs; their interpreter arguments, environment and authority come from the admitted Plan and executor.
 
 The existing Tekton renderer consumes the canonical Plan representation through its own admitted Environment and adapter path. A new provider must implement and validate the ADR-18 adapter contract before execution; this file layout does not add a plugin-discovery mechanism or admit a new engine. See [pipeline generation](generate-pipeline.md) for supported entry points and [Plan inspection](plan-and-graph-inspection.md) for graph views.

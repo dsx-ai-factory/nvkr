@@ -116,25 +116,29 @@ GitHub stores that same Plan as a generated file tree.
 Each bundle's small `plan.json` index carries the `storage: nvkr-plan-tree-v1` discriminator, outside the executable Plan schema.
 Frozen JSON records and raw scripts live in one repository store, `.github/nvkr-plan-store/`.
 Paths identify kind and logical name, followed by `@` and the first 12 hex characters of the exact-byte
-SHA-256, then `.json` or `.sh`: for example `catalogs/nvke-v1@<digest>.json`,
-`steps/<target>/build@<digest>.json` and `scripts/<component>/build@<digest>.sh`.
+SHA-256, then `.json` or `.sh`. The store has three directories: `scripts/`, `steps/` and `plan/`.
+Examples are `plan/catalog-<name>@<digest>.json`, `steps/<target>/<platform>@<digest>.json`
+and `scripts/<component>/build@<digest>.sh`. Platform filename labels use `linux-arm64` form;
+when an aggregate target already ends in that platform, the path includes it only once.
+The frozen record retains the exact full target name and platform.
 Every object has a suffix, including a name with only one variant. A path depends only on that object's
 kind, logical name and bytes; adding, removing or reordering neighboring bundles cannot change it.
 Full digests in each owning manifest authenticate bytes. A short-suffix collision with different full
 bytes fails closed; the suffix is a locator, not a new logical identity.
-The generated `index.json` groups variants by kind and logical name, with each object's path, full digest
-and sorted bundle users. The drift check covers its exact bytes; loads do not consult this descriptive index.
-Each bundle also owns a descriptive `script-index.json` linking workflow jobs and execution steps to
-frozen producer records and command operands. Job comments point to that index; the shared index supplies
-the reverse script-to-bundle lookup. Generation and drift checks cover these navigation bytes, while Plan
-loads ignore them. Runtime pin refresh regenerates the navigation index alongside Plan records, retaining
-the existing target/script-binding and exact workflow/action checks. Neither index changes executable identity.
+The generated `index.json` groups object variants by logical name, with each object's path, full digest
+and sorted bundle users. Its job entries link workflow jobs and execution steps to frozen producer records
+and exact scripts. Identical job descriptions share one entry with their workflow and bundle users.
+Job comments point to this one index; no per-bundle script index is emitted. Generation and drift checks
+reconstruct navigation from each published manifest's records and workflows without rendering workflows
+or resolving catalogs. Plan loads do not consult the descriptive index or neighboring bundles.
+Runtime pin refresh retains the existing target/script-binding and exact workflow/action checks; the
+shared index is rebuilt when generation publishes changed records. Navigation does not change executable identity.
 Each bundle's `plan.json` retains scalar metadata, ordered build names and references, and a `catalogSnapshots` map keyed by the existing `catalogDigest`.
-Every distinct snapshot is stored once; identical snapshots across bundles share the same object.
-Snapshots reference component and source records, and build records reference their resolved-component lists and step records.
-A resolved component stores its name beside a reference to its exact frozen component value; values identical to a snapshot component reuse its object.
-Platform-specific resolutions keep distinct values rather than being resolved again when loading.
-A step contains its unchanged target name, platform, Build Digest, component selection, overlays and execution graph.
+Every distinct snapshot is stored once; identical snapshots across bundles share the same object under `plan/`.
+Snapshots keep component and source configuration inline. Each step record keeps its resolved component
+configuration inline beside the unchanged target name, platform, Build Digest, component selection,
+overlays and execution graph, whose source operations carry their exact source commits. There are no
+separate component, source or resolved-component pointer records. Loading never resolves them again.
 Structured top-level fields, including the complete graph with its nodes and artifacts, are shared records too.
 Byte-identical graphs share one object across bundles; differing graphs retain distinct objects without changing graph or Plan identity.
 Full target names remain unchanged, including aggregate targets such as `output/linux/arm64`.

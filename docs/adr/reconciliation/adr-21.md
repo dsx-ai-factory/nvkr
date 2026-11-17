@@ -83,21 +83,28 @@ Local contracts cover exact canonical round trips, malformed references, missing
 The loader does not render workflows or actions; complete closure checks remain with generation and runtime bootstrap.
 Packed inputs, CLI JSON and Tekton retain the canonical representation.
 The Plan schema and digest contracts are unchanged.
-The 2026-11-17 local cutover preserves the exact reconstructed canonical bytes, three Plan Digests and 261 named Build Digests of the retained development, NVKE and nightly NVKE bundles at `2291a2a5c336db993986376be96acc6715d051ef`.
-Their shared storage contains 377 files, 58,333 lines and 2,276,412 bytes, including the generated usage index and excluding workflow/action files, manifests and local locks.
-Named object paths remain unchanged when neighboring bundles are added, removed or reordered; the usage index groups variants and records their full hashes and bundle users.
+The 2026-11-17 three-folder simplification preserves the exact reconstructed canonical bytes, three Plan Digests and 261 named Build Digests of the retained development, NVKE and nightly NVKE bundles at `b5109e62dbf95de245669fafd3e76968bd90ac9a`.
+The store contains 22 Plan records, 87 step records with inline component configurations and source pins,
+62 byte-identical scripts and one shared navigation index. Its only object folders are `plan`, `steps` and `scripts`.
+Across the store and three private bundle directories, the change reduces files from 441 to 236,
+nested directories from 218 to 187 and bytes from 3,460,553 to 2,977,305 (excluding workflows and local locks).
+The store itself grows from 2,166,150 to 2,668,669 bytes because configurations are inline;
+removing duplicated per-bundle indexes and reducing manifest membership saves 985,767 bytes elsewhere.
+Named object paths remain unchanged when neighboring bundles are added, removed or reordered;
+the shared index groups variants and records their full hashes and bundle users.
 One graph object contains the unchanged 941 nodes and 1,537 artifacts shared by all three bundles.
-Hosted execution of the shared-store layout remains unrecorded.
+Hosted execution of the simplified layout remains unrecorded.
 
 Invocation data is regenerated from the Plan and is not a bundle member;
 `TestGitHubActionDataIsTransientAndRetired` covers omission, prior-owned retirement and refusal of
 modified or unowned copies. Hosted execution of the regenerated bundles remains unrecorded.
 
-Generated `script-index.json` navigation links each GitHub execution job/step to its frozen producer record
-and exact command operands; the shared store index supplies the reverse bundle-user lookup.
+The generated shared `index.json` links each GitHub execution job/step to its frozen producer record,
+exact script files and owning bundle workflows. Identical operations share one entry across bundles;
+exact command operands remain in the step record. Plan loads do not consult this descriptive index.
 `TestGitHubScriptIndexConnectsJobsToExactCommands` covers flat/partition routing, byte-exact script references,
-bundle-user lookup and navigation drift without adding a Plan-loader dependency. Runtime pin-refresh
-contracts retain exact executable programs while regenerating descriptive record links.
+shared job and bundle-user lookup, and navigation drift without adding a Plan-loader dependency.
+Runtime pin-refresh contracts retain exact executable programs while regenerating descriptive record links.
 `TestPlanStoreNamedPathGrammar` and `TestPlanStoreFullDigestDisagreementDoesNotPublish` directly cover the
 named-path predicate and both conflicting-full-digest refusal branches. These are local contracts;
 hosted execution of the navigation layout remains unrecorded.

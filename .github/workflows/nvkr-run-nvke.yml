@@ -177,7 +177,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-aicr-nvke-gb200-ubuntu-train-4f61b0c43b05:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-aicr-nvke-gb200-ubuntu-train-4f61b0c43b05)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-aicr-nvke-gb200-ubuntu-train-4f61b0c43b05)
     name: 'Build and prepare aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 360
@@ -239,7 +239,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-aicr-nvke-gb200-ubuntu-train-8a15a7128060:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-aicr-nvke-gb200-ubuntu-train-8a15a7128060)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-aicr-nvke-gb200-ubuntu-train-8a15a7128060)
     name: 'Build and prepare aicr-nvke-gb200-ubuntu-training-kubeflow-flux'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 360
@@ -259,7 +259,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-aicr-nvke-gb200-ubuntu-train-ae5a6b7e9d75:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-aicr-nvke-gb200-ubuntu-train-ae5a6b7e9d75)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-aicr-nvke-gb200-ubuntu-train-ae5a6b7e9d75)
     name: 'Build and prepare aicr-nvke-gb200-ubuntu-training-kubeflow-helm'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 360
@@ -279,7 +279,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-capi-controller-image-arm64-7b5dfbda4bd3:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-capi-controller-image-arm64-7b5dfbda4bd3)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-capi-controller-image-arm64-7b5dfbda4bd3)
     name: 'Acquire and prepare capi-controller-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -298,7 +298,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-capi-controller-image-pull-c-2451b8875be5:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-capi-controller-image-pull-c-2451b8875be5)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-capi-controller-image-pull-c-2451b8875be5)
     name: 'Acquire and prepare capi-controller-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -323,7 +323,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-capi-kubeadm-bootstrap-image-8aa2795ece39:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-capi-kubeadm-bootstrap-image-8aa2795ece39)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-capi-kubeadm-bootstrap-image-8aa2795ece39)
     name: 'Acquire and prepare capi-kubeadm-bootstrap-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -342,7 +342,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-capi-kubeadm-bootstrap-image-d042c444642a:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-capi-kubeadm-bootstrap-image-d042c444642a)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-capi-kubeadm-bootstrap-image-d042c444642a)
     name: 'Acquire and prepare capi-kubeadm-bootstrap-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -361,7 +361,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-capi-kubeadm-control-plane-i-d24ae27786c0:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-capi-kubeadm-control-plane-i-d24ae27786c0)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-capi-kubeadm-control-plane-i-d24ae27786c0)
     name: 'Acquire and prepare capi-kubeadm-control-plane-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -380,7 +380,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-capi-kubeadm-control-plane-i-ddad2ab73e3e:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-capi-kubeadm-control-plane-i-ddad2ab73e3e)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-capi-kubeadm-control-plane-i-ddad2ab73e3e)
     name: 'Acquire and prepare capi-kubeadm-control-plane-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -399,7 +399,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-capnico-controller-linux-amd-a5f07f346eaa:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-capnico-controller-linux-amd-a5f07f346eaa)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-capnico-controller-linux-amd-a5f07f346eaa)
     name: 'Build and prepare capnico-controller/linux/amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -417,7 +417,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-capnico-controller-linux-arm-ae87ca23780c:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-capnico-controller-linux-arm-ae87ca23780c)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-capnico-controller-linux-arm-ae87ca23780c)
     name: 'Build and prepare capnico-controller/linux/arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 240
@@ -435,7 +435,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-cert-manager-cainjector-imag-9a88bd1a12d4:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-cert-manager-cainjector-imag-9a88bd1a12d4)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-cert-manager-cainjector-imag-9a88bd1a12d4)
     name: 'Acquire and prepare cert-manager-cainjector-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -454,7 +454,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-cert-manager-cainjector-imag-9615473948ed:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-cert-manager-cainjector-imag-9615473948ed)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-cert-manager-cainjector-imag-9615473948ed)
     name: 'Acquire and prepare cert-manager-cainjector-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -473,7 +473,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-cert-manager-controller-imag-6f36b646a9f0:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-cert-manager-controller-imag-6f36b646a9f0)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-cert-manager-controller-imag-6f36b646a9f0)
     name: 'Acquire and prepare cert-manager-controller-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -492,7 +492,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-cert-manager-controller-imag-98c7fa7fe320:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-cert-manager-controller-imag-98c7fa7fe320)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-cert-manager-controller-imag-98c7fa7fe320)
     name: 'Acquire and prepare cert-manager-controller-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -511,7 +511,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-cert-manager-webhook-image-a-6c727f1095d4:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-cert-manager-webhook-image-a-6c727f1095d4)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-cert-manager-webhook-image-a-6c727f1095d4)
     name: 'Acquire and prepare cert-manager-webhook-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -530,7 +530,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-cert-manager-webhook-image-p-59f9d902f4a4:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-cert-manager-webhook-image-p-59f9d902f4a4)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-cert-manager-webhook-image-p-59f9d902f4a4)
     name: 'Acquire and prepare cert-manager-webhook-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -549,7 +549,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-cluster-api-provider-provisi-5d22804caf69:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-cluster-api-provider-provisi-5d22804caf69)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-cluster-api-provider-provisi-5d22804caf69)
     name: 'Build and prepare cluster-api-provider-provisioned/linux/amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -567,7 +567,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-cluster-api-provider-provisi-4b71356d87da:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-cluster-api-provider-provisi-4b71356d87da)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-cluster-api-provider-provisi-4b71356d87da)
     name: 'Build and prepare cluster-api-provider-provisioned/linux/arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 240
@@ -585,7 +585,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-controller-chart-fetch-nvke-80a1df89e6ae:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-controller-chart-fetch-nvke-80a1df89e6ae)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-controller-chart-fetch-nvke-80a1df89e6ae)
     name: 'Build and prepare controller-chart'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -603,7 +603,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-controller-profiles-linux-am-0594064517bf:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-controller-profiles-linux-am-0594064517bf)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-controller-profiles-linux-am-0594064517bf)
     name: 'Build and prepare controller-profiles/linux/amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -621,7 +621,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-controller-profiles-linux-ar-337ab3a17e54:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-controller-profiles-linux-ar-337ab3a17e54)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-controller-profiles-linux-ar-337ab3a17e54)
     name: 'Build and prepare controller-profiles/linux/arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 240
@@ -639,7 +639,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-csi-node-driver-registrar-im-1d460e812187:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-csi-node-driver-registrar-im-1d460e812187)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-csi-node-driver-registrar-im-1d460e812187)
     name: 'Acquire and prepare csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -658,7 +658,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-csi-node-driver-registrar-im-68f54e676223:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-csi-node-driver-registrar-im-68f54e676223)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-csi-node-driver-registrar-im-68f54e676223)
     name: 'Acquire and prepare csi-node-driver-registrar-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -677,7 +677,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-local-path-helper-image-arm6-ee133d2fe086:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-local-path-helper-image-arm6-ee133d2fe086)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-local-path-helper-image-arm6-ee133d2fe086)
     name: 'Acquire and prepare local-path-helper-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -696,7 +696,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-local-path-helper-image-pull-88d610813b7e:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-local-path-helper-image-pull-88d610813b7e)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-local-path-helper-image-pull-88d610813b7e)
     name: 'Acquire and prepare local-path-helper-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -715,7 +715,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-local-path-provisioner-arm64-a4a16230d525:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-local-path-provisioner-arm64-a4a16230d525)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-local-path-provisioner-arm64-a4a16230d525)
     name: 'Build and prepare local-path-provisioner-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 240
@@ -733,7 +733,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-local-path-provisioner-image-cb6b563d128f:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-local-path-provisioner-image-cb6b563d128f)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-local-path-provisioner-image-cb6b563d128f)
     name: 'Acquire and prepare local-path-provisioner-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -752,7 +752,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-local-path-provisioner-image-e7b7f89ebfe0:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-local-path-provisioner-image-e7b7f89ebfe0)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-local-path-provisioner-image-e7b7f89ebfe0)
     name: 'Acquire and prepare local-path-provisioner-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -771,7 +771,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-local-path-provisioner-fetch-7b3d66c673de:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-local-path-provisioner-fetch-7b3d66c673de)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-local-path-provisioner-fetch-7b3d66c673de)
     name: 'Build and prepare local-path-provisioner'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -789,7 +789,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-collector-image-arm64-p-254a213ce332:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-collector-image-arm64-p-254a213ce332)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-collector-image-arm64-p-254a213ce332)
     name: 'Acquire and prepare nktp-collector-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -808,7 +808,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-collector-image-pull-nk-1b2717680e5c:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-collector-image-pull-nk-1b2717680e5c)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-collector-image-pull-nk-1b2717680e5c)
     name: 'Acquire and prepare nktp-collector-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -827,7 +827,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-kube-state-metrics-imag-e0532701e664:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-kube-state-metrics-imag-e0532701e664)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-kube-state-metrics-imag-e0532701e664)
     name: 'Acquire and prepare nktp-kube-state-metrics-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -846,7 +846,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-kube-state-metrics-imag-9237b3d3c42d:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-kube-state-metrics-imag-9237b3d3c42d)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-kube-state-metrics-imag-9237b3d3c42d)
     name: 'Acquire and prepare nktp-kube-state-metrics-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -865,7 +865,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-kubectl-image-arm64-pul-c601d6089765:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-kubectl-image-arm64-pul-c601d6089765)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-kubectl-image-arm64-pul-c601d6089765)
     name: 'Acquire and prepare nktp-kubectl-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -884,7 +884,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-kubectl-image-pull-nktp-7a5465c5ace2:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-kubectl-image-pull-nktp-7a5465c5ace2)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-kubectl-image-pull-nktp-7a5465c5ace2)
     name: 'Acquire and prepare nktp-kubectl-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -903,7 +903,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-lgtm-image-arm64-pull-n-290430591175:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-lgtm-image-arm64-pull-n-290430591175)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-lgtm-image-arm64-pull-n-290430591175)
     name: 'Acquire and prepare nktp-lgtm-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -922,7 +922,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-lgtm-image-pull-nktp-lg-0ce720331605:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-lgtm-image-pull-nktp-lg-0ce720331605)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-lgtm-image-pull-nktp-lg-0ce720331605)
     name: 'Acquire and prepare nktp-lgtm-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -941,7 +941,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-metrics-server-image-ar-757d08c35161:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-metrics-server-image-ar-757d08c35161)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-metrics-server-image-ar-757d08c35161)
     name: 'Acquire and prepare nktp-metrics-server-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -960,7 +960,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-metrics-server-image-pu-4d0ea0695597:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-metrics-server-image-pu-4d0ea0695597)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-metrics-server-image-pu-4d0ea0695597)
     name: 'Acquire and prepare nktp-metrics-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -979,7 +979,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-node-exporter-image-arm-66bf6c6556d1:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-node-exporter-image-arm-66bf6c6556d1)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-node-exporter-image-arm-66bf6c6556d1)
     name: 'Acquire and prepare nktp-node-exporter-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -998,7 +998,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-node-exporter-image-pul-68a771ea8298:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-node-exporter-image-pul-68a771ea8298)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-node-exporter-image-pul-68a771ea8298)
     name: 'Acquire and prepare nktp-node-exporter-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -1017,7 +1017,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-operator-image-arm64-pu-b99a053f47f2:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-operator-image-arm64-pu-b99a053f47f2)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-operator-image-arm64-pu-b99a053f47f2)
     name: 'Acquire and prepare nktp-operator-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -1036,7 +1036,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-operator-image-pull-nkt-61fc7278e4c5:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-operator-image-pull-nkt-61fc7278e4c5)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-operator-image-pull-nkt-61fc7278e4c5)
     name: 'Acquire and prepare nktp-operator-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -1055,7 +1055,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-target-allocator-image-722bca1a145d:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-target-allocator-image-722bca1a145d)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-target-allocator-image-722bca1a145d)
     name: 'Acquire and prepare nktp-target-allocator-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -1074,7 +1074,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-target-allocator-image-112efff693b7:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-target-allocator-image-112efff693b7)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-target-allocator-image-112efff693b7)
     name: 'Acquire and prepare nktp-target-allocator-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -1093,7 +1093,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nktp-fetch-nktp-chart-nktp-b-409641394abc:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nktp-fetch-nktp-chart-nktp-b-409641394abc)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nktp-fetch-nktp-chart-nktp-b-409641394abc)
     name: 'Build and prepare nktp'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 360
@@ -1113,7 +1113,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nvke-controller-linux-amd64-b158142d479a:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-controller-linux-amd64-b158142d479a)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-controller-linux-amd64-b158142d479a)
     name: 'Build and prepare nvke-controller/linux/amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -1131,7 +1131,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nvke-controller-linux-arm64-1d0d8d62a607:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-controller-linux-arm64-1d0d8d62a607)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-controller-linux-arm64-1d0d8d62a607)
     name: 'Build and prepare nvke-controller/linux/arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 240
@@ -1149,7 +1149,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nvke-node-fde-amd64-fetch-nv-f8c224795476:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-fde-amd64-fetch-nv-f8c224795476)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-fde-amd64-fetch-nv-f8c224795476)
     name: 'Fetch pinned sources for nvke-node-fde-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 360
@@ -1176,7 +1176,7 @@ jobs:
       - *operation-execute-node-part-5
       - *operation-execute-node-part-6
   nvkr-disk-nvke-node-fde-amd64:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-disk-nvke-node-fde-amd64)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-fde-amd64)
     name: 'Build and package producer evidence for nvke-node-fde-amd64'
     runs-on: 'arc-amd64-kvm'
     timeout-minutes: 1105
@@ -1333,7 +1333,7 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-17'] }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-process-nvke-node-fde-amd64-fetch-ov-9b482bbb2e2f:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-fde-amd64-fetch-ov-9b482bbb2e2f)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-fde-amd64-fetch-ov-9b482bbb2e2f)
     name: 'Fetch pinned sources for nvke-node-fde-amd64 (part 2)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
@@ -1349,7 +1349,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nvke-node-fde-arm64-fetch-nv-64dff97482f1:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-fde-arm64-fetch-nv-64dff97482f1)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-fde-arm64-fetch-nv-64dff97482f1)
     name: 'Fetch pinned sources for nvke-node-fde-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 360
@@ -1376,7 +1376,7 @@ jobs:
       - *operation-execute-node-part-5
       - *operation-execute-node-part-6
   nvkr-disk-nvke-node-fde-arm64:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-disk-nvke-node-fde-arm64)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-fde-arm64)
     name: 'Build and package producer evidence for nvke-node-fde-arm64'
     runs-on: 'arc-arm64-kvm'
     timeout-minutes: 1105
@@ -1447,7 +1447,7 @@ jobs:
       - *operation-collect-node-outputs-part-16
       - *operation-collect-node-outputs-part-17
   nvkr-process-nvke-node-fde-arm64-fetch-ov-464ac8f0f11b:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-fde-arm64-fetch-ov-464ac8f0f11b)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-fde-arm64-fetch-ov-464ac8f0f11b)
     name: 'Fetch pinned sources for nvke-node-fde-arm64 (part 2)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 120
@@ -1463,7 +1463,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nvke-node-fde-ubuntu24-amd64-1d015a140907:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-fde-ubuntu24-amd64-1d015a140907)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-fde-ubuntu24-amd64-1d015a140907)
     name: 'Fetch pinned sources for nvke-node-fde-ubuntu24-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 360
@@ -1490,7 +1490,7 @@ jobs:
       - *operation-execute-node-part-5
       - *operation-execute-node-part-6
   nvkr-disk-nvke-node-fde-ubuntu24-amd64:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-disk-nvke-node-fde-ubuntu24-amd64)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-fde-ubuntu24-amd64)
     name: 'Build and package producer evidence for nvke-node-fde-ubuntu24-amd64'
     runs-on: 'arc-amd64-kvm'
     timeout-minutes: 1105
@@ -1555,7 +1555,7 @@ jobs:
       - *operation-collect-node-outputs-part-16
       - *operation-collect-node-outputs-part-17
   nvkr-process-nvke-node-fde-ubuntu24-amd64-68929548ea3f:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-fde-ubuntu24-amd64-68929548ea3f)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-fde-ubuntu24-amd64-68929548ea3f)
     name: 'Fetch pinned sources for nvke-node-fde-ubuntu24-amd64 (part 2)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 180
@@ -1579,7 +1579,7 @@ jobs:
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
   nvkr-process-nvke-node-fde-ubuntu24-arm64-a56b24fa4b5a:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-fde-ubuntu24-arm64-a56b24fa4b5a)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-fde-ubuntu24-arm64-a56b24fa4b5a)
     name: 'Fetch pinned sources for nvke-node-fde-ubuntu24-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 360
@@ -1606,7 +1606,7 @@ jobs:
       - *operation-execute-node-part-5
       - *operation-execute-node-part-6
   nvkr-disk-nvke-node-fde-ubuntu24-arm64:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-disk-nvke-node-fde-ubuntu24-arm64)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-fde-ubuntu24-arm64)
     name: 'Build and package producer evidence for nvke-node-fde-ubuntu24-arm64'
     runs-on: 'arc-arm64-kvm'
     timeout-minutes: 1105
@@ -1671,7 +1671,7 @@ jobs:
       - *operation-collect-node-outputs-part-16
       - *operation-collect-node-outputs-part-17
   nvkr-process-nvke-node-fde-ubuntu24-arm64-dde6af2e8bf0:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-fde-ubuntu24-arm64-dde6af2e8bf0)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-fde-ubuntu24-arm64-dde6af2e8bf0)
     name: 'Fetch pinned sources for nvke-node-fde-ubuntu24-arm64 (part 2)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 180
@@ -1695,7 +1695,7 @@ jobs:
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
   nvkr-process-nvke-node-image-amd64-fetch-da60ac6eb51c:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-image-amd64-fetch-da60ac6eb51c)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-image-amd64-fetch-da60ac6eb51c)
     name: 'Fetch pinned sources for nvke-node-image-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 360
@@ -1722,7 +1722,7 @@ jobs:
       - *operation-execute-node-part-5
       - *operation-execute-node-part-6
   nvkr-disk-nvke-node-image-amd64:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-disk-nvke-node-image-amd64)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-image-amd64)
     name: 'Build and package producer evidence for nvke-node-image-amd64'
     runs-on: 'arc-amd64-kvm'
     timeout-minutes: 1105
@@ -1787,7 +1787,7 @@ jobs:
       - *operation-collect-node-outputs-part-16
       - *operation-collect-node-outputs-part-17
   nvkr-process-nvke-node-image-amd64-fetch-a0e20b2b6193:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-image-amd64-fetch-a0e20b2b6193)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-image-amd64-fetch-a0e20b2b6193)
     name: 'Fetch pinned sources for nvke-node-image-amd64 (part 2)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
@@ -1798,7 +1798,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nvke-node-image-arm64-fetch-9eb6f62464bb:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-image-arm64-fetch-9eb6f62464bb)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-image-arm64-fetch-9eb6f62464bb)
     name: 'Fetch pinned sources for nvke-node-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 360
@@ -1825,7 +1825,7 @@ jobs:
       - *operation-execute-node-part-5
       - *operation-execute-node-part-6
   nvkr-disk-nvke-node-image-arm64:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-disk-nvke-node-image-arm64)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-image-arm64)
     name: 'Build and package producer evidence for nvke-node-image-arm64'
     runs-on: 'arc-arm64-kvm'
     timeout-minutes: 1105
@@ -1890,7 +1890,7 @@ jobs:
       - *operation-collect-node-outputs-part-16
       - *operation-collect-node-outputs-part-17
   nvkr-process-nvke-node-image-arm64-fetch-d7223cad4f91:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-image-arm64-fetch-d7223cad4f91)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-image-arm64-fetch-d7223cad4f91)
     name: 'Fetch pinned sources for nvke-node-image-arm64 (part 2)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 120
@@ -1901,7 +1901,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nvke-node-image-ubuntu24-amd-414a3d348ba5:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-image-ubuntu24-amd-414a3d348ba5)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-image-ubuntu24-amd-414a3d348ba5)
     name: 'Fetch pinned sources for nvke-node-image-ubuntu24-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 360
@@ -1928,7 +1928,7 @@ jobs:
       - *operation-execute-node-part-5
       - *operation-execute-node-part-6
   nvkr-disk-nvke-node-image-ubuntu24-amd64:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-disk-nvke-node-image-ubuntu24-amd64)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-image-ubuntu24-amd64)
     name: 'Build and package producer evidence for nvke-node-image-ubuntu24-amd64'
     runs-on: 'arc-amd64-kvm'
     timeout-minutes: 1105
@@ -1993,7 +1993,7 @@ jobs:
       - *operation-collect-node-outputs-part-16
       - *operation-collect-node-outputs-part-17
   nvkr-process-nvke-node-image-ubuntu24-amd-309e0b0b668e:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-image-ubuntu24-amd-309e0b0b668e)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-image-ubuntu24-amd-309e0b0b668e)
     name: 'Fetch pinned sources for nvke-node-image-ubuntu24-amd64 (part 2)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 180
@@ -2017,7 +2017,7 @@ jobs:
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
   nvkr-process-nvke-node-image-ubuntu24-arm-e2b6ca37b5c9:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-image-ubuntu24-arm-e2b6ca37b5c9)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-image-ubuntu24-arm-e2b6ca37b5c9)
     name: 'Fetch pinned sources for nvke-node-image-ubuntu24-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 360
@@ -2044,7 +2044,7 @@ jobs:
       - *operation-execute-node-part-5
       - *operation-execute-node-part-6
   nvkr-disk-nvke-node-image-ubuntu24-arm64:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-disk-nvke-node-image-ubuntu24-arm64)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-image-ubuntu24-arm64)
     name: 'Build and package producer evidence for nvke-node-image-ubuntu24-arm64'
     runs-on: 'arc-arm64-kvm'
     timeout-minutes: 1105
@@ -2109,7 +2109,7 @@ jobs:
       - *operation-collect-node-outputs-part-16
       - *operation-collect-node-outputs-part-17
   nvkr-process-nvke-node-image-ubuntu24-arm-d06d399d5548:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvke-node-image-ubuntu24-arm-d06d399d5548)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvke-node-image-ubuntu24-arm-d06d399d5548)
     name: 'Fetch pinned sources for nvke-node-image-ubuntu24-arm64 (part 2)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 180
@@ -2133,7 +2133,7 @@ jobs:
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
   nvkr-process-nvkectl-linux-arm64-fetch-nv-43a0c94d77a4:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvkectl-linux-arm64-fetch-nv-43a0c94d77a4)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvkectl-linux-arm64-fetch-nv-43a0c94d77a4)
     name: 'Build and prepare nvkectl-linux-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 360
@@ -2153,7 +2153,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-nvkectl-fetch-nvkectl-nvkect-97c4aeeb013f:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-nvkectl-fetch-nvkectl-nvkect-97c4aeeb013f)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-nvkectl-fetch-nvkectl-nvkect-97c4aeeb013f)
     name: 'Build and prepare nvkectl'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 360
@@ -2173,7 +2173,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-operator-tools-linux-arm64-p-0b5c60be08f9:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-operator-tools-linux-arm64-p-0b5c60be08f9)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-operator-tools-linux-arm64-p-0b5c60be08f9)
     name: 'Acquire and prepare operator-tools-linux-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 360
@@ -2193,7 +2193,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-operator-tools-pull-helm-ope-a18b8dd506d8:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-operator-tools-pull-helm-ope-a18b8dd506d8)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-operator-tools-pull-helm-ope-a18b8dd506d8)
     name: 'Acquire and prepare operator-tools'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 360
@@ -2213,7 +2213,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-package-local-path-provision-123346265e26:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-package-local-path-provision-123346265e26)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-package-local-path-provision-123346265e26)
     name: 'Verify and package outputs with Helm image binding: local-path-provisioner, publication-local-path-provisioner'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
@@ -2224,7 +2224,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-package-local-path-provision-bba011a459b5:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-package-local-path-provision-bba011a459b5)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-package-local-path-provision-bba011a459b5)
     name: 'Verify and package outputs with Helm image binding: local-path-provisioner-arm64, publication-local-path-provisioner-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 120
@@ -2235,7 +2235,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-postgresql-image-arm64-pull-6ec425b8d034:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-postgresql-image-arm64-pull-6ec425b8d034)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-postgresql-image-arm64-pull-6ec425b8d034)
     name: 'Acquire and prepare postgresql-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -2254,7 +2254,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-postgresql-image-pull-postgr-d4b5512a9048:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-postgresql-image-pull-postgr-d4b5512a9048)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-postgresql-image-pull-postgr-d4b5512a9048)
     name: 'Acquire and prepare postgresql-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2273,7 +2273,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-postgresql-pull-postgresql-c-d1405b5f9a79:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-postgresql-pull-postgresql-c-d1405b5f9a79)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-postgresql-pull-postgresql-c-d1405b5f9a79)
     name: 'Acquire and prepare postgresql'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2292,7 +2292,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spiffe-csi-image-arm64-pull-f9c57454985a:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spiffe-csi-image-arm64-pull-f9c57454985a)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spiffe-csi-image-arm64-pull-f9c57454985a)
     name: 'Acquire and prepare spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -2311,7 +2311,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spiffe-csi-image-pull-spiffe-4c94c6cbef8b:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spiffe-csi-image-pull-spiffe-4c94c6cbef8b)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spiffe-csi-image-pull-spiffe-4c94c6cbef8b)
     name: 'Acquire and prepare spiffe-csi-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2330,7 +2330,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-agent-image-arm64-pull-66c5fa643afb:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-agent-image-arm64-pull-66c5fa643afb)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-agent-image-arm64-pull-66c5fa643afb)
     name: 'Acquire and prepare spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -2349,7 +2349,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-agent-image-pull-spire-c76ada642d98:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-agent-image-pull-spire-c76ada642d98)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-agent-image-pull-spire-c76ada642d98)
     name: 'Acquire and prepare spire-agent-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2368,7 +2368,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-bash-image-arm64-pull-42dd6bbb0f7a:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-bash-image-arm64-pull-42dd6bbb0f7a)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-bash-image-arm64-pull-42dd6bbb0f7a)
     name: 'Acquire and prepare spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -2387,7 +2387,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-bash-image-pull-spire-91f74df55b1c:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-bash-image-pull-spire-91f74df55b1c)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-bash-image-pull-spire-91f74df55b1c)
     name: 'Acquire and prepare spire-bash-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2406,7 +2406,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-controller-manager-ima-6092c1a95230:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-controller-manager-ima-6092c1a95230)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-controller-manager-ima-6092c1a95230)
     name: 'Acquire and prepare spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -2425,7 +2425,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-controller-manager-ima-7a2ceaffb086:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-controller-manager-ima-7a2ceaffb086)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-controller-manager-ima-7a2ceaffb086)
     name: 'Acquire and prepare spire-controller-manager-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2444,7 +2444,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-crds-pull-spire-crds-c-ab0b4a82912f:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-crds-pull-spire-crds-c-ab0b4a82912f)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-crds-pull-spire-crds-c-ab0b4a82912f)
     name: 'Acquire and prepare spire-crds'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2463,7 +2463,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-oidc-image-arm64-pull-1a91ecc8fde1:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-oidc-image-arm64-pull-1a91ecc8fde1)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-oidc-image-arm64-pull-1a91ecc8fde1)
     name: 'Acquire and prepare spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -2482,7 +2482,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-oidc-image-pull-spire-ae0d2f0a3d80:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-oidc-image-pull-spire-ae0d2f0a3d80)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-oidc-image-pull-spire-ae0d2f0a3d80)
     name: 'Acquire and prepare spire-oidc-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2501,7 +2501,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-server-image-arm64-pul-c821b1c6d638:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-server-image-arm64-pul-c821b1c6d638)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-server-image-arm64-pul-c821b1c6d638)
     name: 'Acquire and prepare spire-server-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -2520,7 +2520,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-server-image-pull-spir-2014c4fe9a1b:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-server-image-pull-spir-2014c4fe9a1b)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-server-image-pull-spir-2014c4fe9a1b)
     name: 'Acquire and prepare spire-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2539,7 +2539,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-tpm-server-image-arm64-095a8bd3e346:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-tpm-server-image-arm64-095a8bd3e346)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-tpm-server-image-arm64-095a8bd3e346)
     name: 'Acquire and prepare spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -2558,7 +2558,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-tpm-server-image-pull-5ae8c8eba120:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-tpm-server-image-pull-5ae8c8eba120)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-tpm-server-image-pull-5ae8c8eba120)
     name: 'Acquire and prepare spire-tpm-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2577,7 +2577,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-spire-pull-spire-chart-spire-eefb94154fba:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-spire-pull-spire-chart-spire-eefb94154fba)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-spire-pull-spire-chart-spire-eefb94154fba)
     name: 'Acquire and prepare spire'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2596,7 +2596,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-temporal-admin-tools-image-a-64b6c9dc6020:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-temporal-admin-tools-image-a-64b6c9dc6020)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-temporal-admin-tools-image-a-64b6c9dc6020)
     name: 'Acquire and prepare temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -2615,7 +2615,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-temporal-admin-tools-image-p-c68600141d47:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-temporal-admin-tools-image-p-c68600141d47)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-temporal-admin-tools-image-p-c68600141d47)
     name: 'Acquire and prepare temporal-admin-tools-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2634,7 +2634,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-temporal-server-image-arm64-bb94023fcab8:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-temporal-server-image-arm64-bb94023fcab8)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-temporal-server-image-arm64-bb94023fcab8)
     name: 'Acquire and prepare temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -2653,7 +2653,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-temporal-server-image-pull-t-198e0d1f2c8e:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-temporal-server-image-pull-t-198e0d1f2c8e)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-temporal-server-image-pull-t-198e0d1f2c8e)
     name: 'Acquire and prepare temporal-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2672,7 +2672,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-temporal-ui-image-arm64-pull-4a75ae62b2bc:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-temporal-ui-image-arm64-pull-4a75ae62b2bc)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-temporal-ui-image-arm64-pull-4a75ae62b2bc)
     name: 'Acquire and prepare temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
@@ -2691,7 +2691,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-temporal-ui-image-pull-tempo-ae3207201e38:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-temporal-ui-image-pull-tempo-ae3207201e38)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-temporal-ui-image-pull-tempo-ae3207201e38)
     name: 'Acquire and prepare temporal-ui-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2710,7 +2710,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-temporal-pull-temporal-chart-054215f9d85b:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-temporal-pull-temporal-chart-054215f9d85b)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-temporal-pull-temporal-chart-054215f9d85b)
     name: 'Acquire and prepare temporal'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -2729,7 +2729,7 @@ jobs:
       actions: read
       contents: read
   nvkr-tool-cosign:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-tool-cosign)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-tool-cosign)
     name: 'Acquire pinned cosign'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
@@ -2744,7 +2744,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-attest-sboms-output-nvke-nod-d860882864cf:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nvke-nod-d860882864cf)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nvke-nod-d860882864cf)
     name: 'Attest, publish, sign and verify output-nvke-node-fde-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -2788,7 +2788,7 @@ jobs:
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
   nvkr-process-attest-sboms-output-nvke-nod-1e0439c01f2c:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nvke-nod-1e0439c01f2c)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nvke-nod-1e0439c01f2c)
     name: 'Attest, publish, sign and verify output-nvke-node-fde-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -2808,7 +2808,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nvke-nod-f8e29abf6a17:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nvke-nod-f8e29abf6a17)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nvke-nod-f8e29abf6a17)
     name: 'Attest, publish, sign and verify output-nvke-node-fde-ubuntu24-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -2828,7 +2828,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nvke-nod-6c5f57895380:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nvke-nod-6c5f57895380)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nvke-nod-6c5f57895380)
     name: 'Attest, publish, sign and verify output-nvke-node-fde-ubuntu24-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -2848,7 +2848,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nvke-nod-f91992abc2a0:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nvke-nod-f91992abc2a0)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nvke-nod-f91992abc2a0)
     name: 'Attest, publish, sign and verify output-nvke-node-image-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -2868,7 +2868,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nvke-nod-c77e5f67a080:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nvke-nod-c77e5f67a080)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nvke-nod-c77e5f67a080)
     name: 'Attest, publish, sign and verify output-nvke-node-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -2888,7 +2888,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nvke-nod-49ea879f4e2d:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nvke-nod-49ea879f4e2d)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nvke-nod-49ea879f4e2d)
     name: 'Attest, publish, sign and verify output-nvke-node-image-ubuntu24-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -2908,7 +2908,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nvke-nod-1bc709ca4460:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nvke-nod-1bc709ca4460)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nvke-nod-1bc709ca4460)
     name: 'Attest, publish, sign and verify output-nvke-node-image-ubuntu24-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -2928,7 +2928,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-tool-syft:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-tool-syft)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-tool-syft)
     name: 'Acquire pinned syft'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
@@ -2939,7 +2939,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-attest-sboms-output-capi-con-c3e2faf63100:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-capi-con-c3e2faf63100)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-capi-con-c3e2faf63100)
     name: 'Attest, publish, sign and verify output-capi-controller-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -2959,7 +2959,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-capi-kub-192145434453:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-capi-kub-192145434453)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-capi-kub-192145434453)
     name: 'Attest, publish, sign and verify output-capi-kubeadm-bootstrap-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -2979,7 +2979,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-capi-kub-aacc41887f04:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-capi-kub-aacc41887f04)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-capi-kub-aacc41887f04)
     name: 'Attest, publish, sign and verify output-capi-kubeadm-control-plane-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -2999,7 +2999,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-cert-man-9a7a8eb4fbc5:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-cert-man-9a7a8eb4fbc5)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-cert-man-9a7a8eb4fbc5)
     name: 'Attest, publish, sign and verify output-cert-manager-cainjector-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3019,7 +3019,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-cert-man-d217422a8ef7:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-cert-man-d217422a8ef7)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-cert-man-d217422a8ef7)
     name: 'Attest, publish, sign and verify output-cert-manager-controller-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3039,7 +3039,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-cert-man-674719c99ce6:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-cert-man-674719c99ce6)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-cert-man-674719c99ce6)
     name: 'Attest, publish, sign and verify output-cert-manager-webhook-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3059,7 +3059,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-csi-node-c1d6d7794703:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-csi-node-c1d6d7794703)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-csi-node-c1d6d7794703)
     name: 'Attest, publish, sign and verify output-csi-node-driver-registrar-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3079,7 +3079,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-local-pa-09c88c4868d7:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-local-pa-09c88c4868d7)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-local-pa-09c88c4868d7)
     name: 'Attest, publish, sign and verify output-local-path-helper-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3099,7 +3099,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-local-pa-676708a1ad07:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-local-pa-676708a1ad07)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-local-pa-676708a1ad07)
     name: 'Attest, publish, sign and verify output-local-path-provisioner'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3119,7 +3119,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-local-pa-70815c6f5354:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-local-pa-70815c6f5354)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-local-pa-70815c6f5354)
     name: 'Attest, publish, sign and verify output-local-path-provisioner-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3139,7 +3139,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-pub-10938e2cfef1:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-pub-10938e2cfef1)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-pub-10938e2cfef1)
     name: 'Attest, publish, sign and verify output-nktp'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3159,7 +3159,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7)
     name: 'Attest, publish, sign and verify output-nktp-collector-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3179,7 +3179,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-kub-c8449a367a99:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-kub-c8449a367a99)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-kub-c8449a367a99)
     name: 'Attest, publish, sign and verify output-nktp-kube-state-metrics-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3199,7 +3199,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-kub-c9a4d1b91ba8:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-kub-c9a4d1b91ba8)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-kub-c9a4d1b91ba8)
     name: 'Attest, publish, sign and verify output-nktp-kubectl-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3219,7 +3219,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851)
     name: 'Attest, publish, sign and verify output-nktp-lgtm-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3239,7 +3239,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-met-5bfa54ed25c3:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-met-5bfa54ed25c3)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-met-5bfa54ed25c3)
     name: 'Attest, publish, sign and verify output-nktp-metrics-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3259,7 +3259,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-nod-a5920c5bad6d:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-nod-a5920c5bad6d)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-nod-a5920c5bad6d)
     name: 'Attest, publish, sign and verify output-nktp-node-exporter-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3279,7 +3279,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0)
     name: 'Attest, publish, sign and verify output-nktp-operator-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3299,7 +3299,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d)
     name: 'Attest, publish, sign and verify output-nktp-target-allocator-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3319,7 +3319,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12)
     name: 'Attest, publish, sign and verify output-nvkectl'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3339,7 +3339,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-operator-2fd8456da854:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-operator-2fd8456da854)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-operator-2fd8456da854)
     name: 'Attest, publish, sign and verify output-operator-tools'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3359,7 +3359,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-postgres-69dd756da415:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-postgres-69dd756da415)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-postgres-69dd756da415)
     name: 'Attest, publish, sign and verify output-postgresql-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3379,7 +3379,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-postgres-6a2db7baf6de:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-postgres-6a2db7baf6de)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-postgres-6a2db7baf6de)
     name: 'Attest, publish, sign and verify output-postgresql'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3399,7 +3399,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spiffe-c-428ae4518b33:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spiffe-c-428ae4518b33)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spiffe-c-428ae4518b33)
     name: 'Attest, publish, sign and verify output-spiffe-csi-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3419,7 +3419,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-ag-dfb26f54c9e7:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-ag-dfb26f54c9e7)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-ag-dfb26f54c9e7)
     name: 'Attest, publish, sign and verify output-spire-agent-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3439,7 +3439,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-ba-0a23387d1b9d:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-ba-0a23387d1b9d)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-ba-0a23387d1b9d)
     name: 'Attest, publish, sign and verify output-spire-bash-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3459,7 +3459,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-co-f24ec18705d2:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-co-f24ec18705d2)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-co-f24ec18705d2)
     name: 'Attest, publish, sign and verify output-spire-controller-manager-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3479,7 +3479,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-cr-3c298e3f69d6:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-cr-3c298e3f69d6)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-cr-3c298e3f69d6)
     name: 'Attest, publish, sign and verify output-spire-crds'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3499,7 +3499,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-oi-139ce0805f21:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-oi-139ce0805f21)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-oi-139ce0805f21)
     name: 'Attest, publish, sign and verify output-spire-oidc-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3519,7 +3519,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-se-9d1b0bc84ce8:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-se-9d1b0bc84ce8)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-se-9d1b0bc84ce8)
     name: 'Attest, publish, sign and verify output-spire-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3539,7 +3539,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-tp-671d9f2c0ee8:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-tp-671d9f2c0ee8)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-tp-671d9f2c0ee8)
     name: 'Attest, publish, sign and verify output-spire-tpm-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3559,7 +3559,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-pu-94c0dc5d203b:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-pu-94c0dc5d203b)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-pu-94c0dc5d203b)
     name: 'Attest, publish, sign and verify output-spire'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3579,7 +3579,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-temporal-50a38a9f05f0:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-temporal-50a38a9f05f0)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-temporal-50a38a9f05f0)
     name: 'Attest, publish, sign and verify output-temporal-admin-tools-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3599,7 +3599,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-temporal-2b42edeb4497:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-temporal-2b42edeb4497)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-temporal-2b42edeb4497)
     name: 'Attest, publish, sign and verify output-temporal-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3619,7 +3619,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-temporal-55456dc4a7c9:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-temporal-55456dc4a7c9)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-temporal-55456dc4a7c9)
     name: 'Attest, publish, sign and verify output-temporal-ui-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3639,7 +3639,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-temporal-3db248c12d7d:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-temporal-3db248c12d7d)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-temporal-3db248c12d7d)
     name: 'Attest, publish, sign and verify output-temporal'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3659,7 +3659,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-tool-syft-linux-arm64:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-tool-syft-linux-arm64)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-tool-syft-linux-arm64)
     name: 'Acquire pinned syft/linux/arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
@@ -3674,7 +3674,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-package-capnico-controller-p-5cbfb2d0ddf9:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-package-capnico-controller-p-5cbfb2d0ddf9)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-package-capnico-controller-p-5cbfb2d0ddf9)
     name: 'Verify and package outputs: capnico-controller, publication-capnico-controller'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
@@ -3685,7 +3685,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-package-cluster-api-provider-0b87890035a6:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-package-cluster-api-provider-0b87890035a6)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-package-cluster-api-provider-0b87890035a6)
     name: 'Verify and package outputs: cluster-api-provider-provisioned, publication-cluster-api-provider-provisioned'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
@@ -3696,7 +3696,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-package-controller-profiles-1771df7d565d:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-package-controller-profiles-1771df7d565d)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-package-controller-profiles-1771df7d565d)
     name: 'Verify and package outputs: controller-profiles, publication-controller-profiles'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
@@ -3707,7 +3707,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-package-nvke-controller-pack-0055177c76e7:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-package-nvke-controller-pack-0055177c76e7)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-package-nvke-controller-pack-0055177c76e7)
     name: 'Verify and package outputs: nvke-controller, publication-nvke-controller'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
@@ -3718,7 +3718,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-package-controller-chart-pac-f9fd13dcc99f:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-package-controller-chart-pac-f9fd13dcc99f)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-package-controller-chart-pac-f9fd13dcc99f)
     name: 'Verify and package outputs with Helm image binding: controller-chart, publication-controller-chart'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
@@ -3729,7 +3729,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-attest-sboms-output-aicr-nvk-21253a0aa17b:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-aicr-nvk-21253a0aa17b)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-aicr-nvk-21253a0aa17b)
     name: 'Attest, publish, sign and verify output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3749,7 +3749,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-aicr-nvk-b9c99a8a62d9:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-aicr-nvk-b9c99a8a62d9)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-aicr-nvk-b9c99a8a62d9)
     name: 'Attest, publish, sign and verify output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3769,7 +3769,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-aicr-nvk-4cb36545db33:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-aicr-nvk-4cb36545db33)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-aicr-nvk-4cb36545db33)
     name: 'Attest, publish, sign and verify output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3789,7 +3789,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-capi-con-6535e3245e96:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-capi-con-6535e3245e96)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-capi-con-6535e3245e96)
     name: 'Attest, publish, sign and verify output-capi-controller-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3809,7 +3809,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-capi-kub-a0163af701ab:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-capi-kub-a0163af701ab)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-capi-kub-a0163af701ab)
     name: 'Attest, publish, sign and verify output-capi-kubeadm-bootstrap-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3829,7 +3829,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-capi-kub-0b857b2a2e2f:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-capi-kub-0b857b2a2e2f)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-capi-kub-0b857b2a2e2f)
     name: 'Attest, publish, sign and verify output-capi-kubeadm-control-plane-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3849,7 +3849,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-capnico-c614f5167e54:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-capnico-c614f5167e54)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-capnico-c614f5167e54)
     name: 'Attest, publish, sign and verify output-capnico-controller'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3869,7 +3869,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-cert-man-070fcfa57ec9:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-cert-man-070fcfa57ec9)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-cert-man-070fcfa57ec9)
     name: 'Attest, publish, sign and verify output-cert-manager-cainjector-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3889,7 +3889,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-cert-man-694b532ec2bb:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-cert-man-694b532ec2bb)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-cert-man-694b532ec2bb)
     name: 'Attest, publish, sign and verify output-cert-manager-controller-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3909,7 +3909,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-cert-man-e0cbc5b6ab19:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-cert-man-e0cbc5b6ab19)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-cert-man-e0cbc5b6ab19)
     name: 'Attest, publish, sign and verify output-cert-manager-webhook-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3929,7 +3929,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-cluster-0f08e4d1d2b1:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-cluster-0f08e4d1d2b1)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-cluster-0f08e4d1d2b1)
     name: 'Attest, publish, sign and verify output-cluster-api-provider-provisioned'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3949,7 +3949,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-controll-a838a306b212:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-controll-a838a306b212)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-controll-a838a306b212)
     name: 'Attest, publish, sign and verify output-controller-chart'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3969,7 +3969,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-controll-fbd4b2247bcf:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-controll-fbd4b2247bcf)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-controll-fbd4b2247bcf)
     name: 'Attest, publish, sign and verify output-controller-profiles'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -3989,7 +3989,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-csi-node-c8bbad40ca65:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-csi-node-c8bbad40ca65)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-csi-node-c8bbad40ca65)
     name: 'Attest, publish, sign and verify output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4009,7 +4009,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-local-pa-2ae6dde17516:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-local-pa-2ae6dde17516)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-local-pa-2ae6dde17516)
     name: 'Attest, publish, sign and verify output-local-path-helper-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4029,7 +4029,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-local-pa-076932f39eb0:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-local-pa-076932f39eb0)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-local-pa-076932f39eb0)
     name: 'Attest, publish, sign and verify output-local-path-provisioner-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4049,7 +4049,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-local-pa-7cd55fb2cf05:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-local-pa-7cd55fb2cf05)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-local-pa-7cd55fb2cf05)
     name: 'Attest, publish, sign and verify output-local-path-provisioner-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4069,7 +4069,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81)
     name: 'Attest, publish, sign and verify output-nktp-collector-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4089,7 +4089,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a)
     name: 'Attest, publish, sign and verify output-nktp-kube-state-metrics-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4109,7 +4109,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-kub-38a63daab836:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-kub-38a63daab836)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-kub-38a63daab836)
     name: 'Attest, publish, sign and verify output-nktp-kubectl-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4129,7 +4129,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688)
     name: 'Attest, publish, sign and verify output-nktp-lgtm-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4149,7 +4149,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71)
     name: 'Attest, publish, sign and verify output-nktp-metrics-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4169,7 +4169,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f)
     name: 'Attest, publish, sign and verify output-nktp-node-exporter-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4189,7 +4189,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2)
     name: 'Attest, publish, sign and verify output-nktp-operator-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4209,7 +4209,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3)
     name: 'Attest, publish, sign and verify output-nktp-target-allocator-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4229,7 +4229,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nvke-con-86fdfe2b96be:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nvke-con-86fdfe2b96be)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nvke-con-86fdfe2b96be)
     name: 'Attest, publish, sign and verify output-nvke-controller'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4249,7 +4249,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-nvkectl-33326ff307d8:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-nvkectl-33326ff307d8)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-nvkectl-33326ff307d8)
     name: 'Attest, publish, sign and verify output-nvkectl-linux-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4269,7 +4269,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-operator-4656296c5495:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-operator-4656296c5495)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-operator-4656296c5495)
     name: 'Attest, publish, sign and verify output-operator-tools-linux-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4289,7 +4289,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-postgres-0c397fe911fc:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-postgres-0c397fe911fc)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-postgres-0c397fe911fc)
     name: 'Attest, publish, sign and verify output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4309,7 +4309,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spiffe-c-6b62394cb783:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spiffe-c-6b62394cb783)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spiffe-c-6b62394cb783)
     name: 'Attest, publish, sign and verify output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4329,7 +4329,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-ag-0b9313969a96:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-ag-0b9313969a96)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-ag-0b9313969a96)
     name: 'Attest, publish, sign and verify output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4349,7 +4349,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-ba-e270b70f09ef:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-ba-e270b70f09ef)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-ba-e270b70f09ef)
     name: 'Attest, publish, sign and verify output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4369,7 +4369,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-co-e87f47677f39:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-co-e87f47677f39)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-co-e87f47677f39)
     name: 'Attest, publish, sign and verify output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4389,7 +4389,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-oi-6df09148b189:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-oi-6df09148b189)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-oi-6df09148b189)
     name: 'Attest, publish, sign and verify output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4409,7 +4409,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-se-0ec9aa4ebdf4:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-se-0ec9aa4ebdf4)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-se-0ec9aa4ebdf4)
     name: 'Attest, publish, sign and verify output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4429,7 +4429,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-spire-tp-8fd6cf5eb45c:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-spire-tp-8fd6cf5eb45c)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-spire-tp-8fd6cf5eb45c)
     name: 'Attest, publish, sign and verify output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4449,7 +4449,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-temporal-efbcb1393aa1:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-temporal-efbcb1393aa1)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-temporal-efbcb1393aa1)
     name: 'Attest, publish, sign and verify output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4469,7 +4469,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-temporal-60a568433da4:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-temporal-60a568433da4)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-temporal-60a568433da4)
     name: 'Attest, publish, sign and verify output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4489,7 +4489,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-temporal-9e0e8c356a7b:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-attest-sboms-output-temporal-9e0e8c356a7b)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-attest-sboms-output-temporal-9e0e8c356a7b)
     name: 'Attest, publish, sign and verify output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
@@ -4509,7 +4509,7 @@ jobs:
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
   nvkr-process-package-release-publish-rele-e70edb401cae:
-    # Producer commands: .github/nvkr-run-nvke/script-index.json (job nvkr-process-package-release-publish-rele-e70edb401cae)
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-package-release-publish-rele-e70edb401cae)
     name: 'Assemble, publish, sign and verify release'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240

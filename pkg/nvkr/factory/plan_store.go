@@ -50,7 +50,7 @@ func isPlanStorePath(name string) bool {
 	}
 	kind, _, _ := strings.Cut(strings.TrimPrefix(name, PlanStoreDirectory+"/"), "/")
 	switch kind {
-	case "catalogs", "components", "sources", "steps", "resolved-components", "scripts", "graph", "definition", "composition", "environment", "actions", "overlays", "tools", "outputs", "routes", "runtime-inputs", "targets", "records":
+	case "plan", "catalogs", "components", "sources", "steps", "resolved-components", "scripts", "graph", "definition", "composition", "environment", "actions", "overlays", "tools", "outputs", "routes", "runtime-inputs", "targets", "records":
 	default:
 		return false
 	}
@@ -163,9 +163,6 @@ func inspectPlanStore(ctx context.Context, root string, bundle *GeneratedBundle,
 			owners[name] = owner
 		}
 	}
-	if _, err := encodePlanStoreIndex(owners); err != nil {
-		return nil, err
-	}
 	if len(allowed) > maxGeneratedDirEntries {
 		return nil, e.New(e.CodePipelineDrift, "shared Plan store exceeds member bound")
 	}
@@ -256,6 +253,7 @@ func inspectPlanStore(ctx context.Context, root string, bundle *GeneratedBundle,
 		}
 		return nil, e.New(e.CodePipelineDrift, "unreferenced shared Plan members %q; run generate with the same Definition and Environment without --check to sweep them", names)
 	}
+
 	if !writing {
 		if err := checkPlanStoreIndex(ctx, root); err != nil {
 			return nil, err

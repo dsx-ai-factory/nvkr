@@ -113,7 +113,7 @@ func testInstallGitHubRuntimeInputsUsesGeneratedFileOwner(t *testing.T, install 
 			}
 			for name, prior := range baseline.Files {
 				step := isPlanStoreRecord(name)
-				if name == baseline.PlanPath || name == githubScriptIndexPath(fresh) || step {
+				if name == baseline.PlanPath || step {
 					continue
 				}
 				raw, err := os.ReadFile(filepath.Join(root, name))

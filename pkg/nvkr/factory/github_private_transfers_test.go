@@ -691,7 +691,7 @@ func TestGitHubPrivateTransferProjectionRemainsStableAcrossSourcePins(t *testing
 		t.Fatal(err)
 	}
 	for name, raw := range first.Files {
-		if name == first.PlanPath || name == githubScriptIndexPath(before) ||
+		if name == first.PlanPath ||
 			isPlanStoreRecord(name) {
 			continue
 		}

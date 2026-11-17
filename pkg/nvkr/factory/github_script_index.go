@@ -5,41 +5,36 @@ package factory
 
 import (
 	"encoding/json"
-	"path"
+	"slices"
 	"strings"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	yamlv3 "go.yaml.in/yaml/v3"
 )
 
-// This navigation index describes the emitted adapter, not Plan identity or
-// execution authority. Commands come from the already sliced producer records.
-type githubScriptIndex struct {
-	Plan       string                     `json:"plan"`
-	StoreIndex string                     `json:"storeIndex"`
-	Jobs       map[string]githubScriptJob `json:"jobs"`
-}
-
+// Navigation describes emitted jobs, never Plan identity or execution authority.
 type githubScriptJob struct {
 	Workflow   string                  `json:"workflow"`
 	Operations []githubScriptOperation `json:"operations"`
 }
 
 type githubScriptOperation struct {
-	Node          string          `json:"node"`
-	Step          string          `json:"step"`
-	Target        string          `json:"target,omitempty"`
-	Producer      string          `json:"producer,omitempty"`
-	Record        string          `json:"record,omitempty"`
-	Command       json.RawMessage `json:"command,omitempty"`
-	VendorCommand json.RawMessage `json:"vendorCmd,omitempty"`
-}
-
-func githubScriptIndexPath(plan *Plan) string {
-	return path.Join(path.Dir(githubLayoutFor(plan).planPath), "script-index.json")
+	Node     string   `json:"node"`
+	Step     string   `json:"step"`
+	Target   string   `json:"target,omitempty"`
+	Producer string   `json:"producer,omitempty"`
+	Record   string   `json:"record,omitempty"`
+	Scripts  []string `json:"scripts,omitempty"`
 }
 
 func addGitHubScriptIndex(plan *Plan, files map[string][]byte) error {
+	_, err := githubScriptNavigation(plan, files)
+	return err
+}
+
+// Comments point to the one store-wide index. The returned job records are
+// grouped across bundles when generation computes the descriptive index.
+func githubScriptNavigation(plan *Plan, files map[string][]byte) (map[string]githubScriptJob, error) {
 	layout := githubLayoutFor(plan)
 	var root struct {
 		Builds []struct {
@@ -48,7 +43,7 @@ func addGitHubScriptIndex(plan *Plan, files map[string][]byte) error {
 		} `json:"builds"`
 	}
 	if err := json.Unmarshal(files[layout.planPath], &root); err != nil {
-		return e.Wrap(e.CodePipelineDrift, err, "reading producer index for script navigation")
+		return nil, e.Wrap(e.CodePipelineDrift, err, "reading producer index for script navigation")
 	}
 	records := map[string]string{}
 	producers := map[string]map[string]planFields{}
@@ -59,21 +54,21 @@ func addGitHubScriptIndex(plan *Plan, files map[string][]byte) error {
 			} `json:"executionGraph"`
 		}
 		if err := json.Unmarshal(files[build.File], &record); err != nil {
-			return e.Wrap(e.CodePipelineDrift, err, "reading producer commands for script navigation")
+			return nil, e.Wrap(e.CodePipelineDrift, err, "reading producer commands for script navigation")
 		}
 		records[build.Name] = build.File
 		producers[build.Name] = map[string]planFields{}
 		for _, node := range record.Graph.Nodes {
 			var id string
 			if err := json.Unmarshal(node["id"], &id); err != nil {
-				return e.Wrap(e.CodePipelineDrift, err, "reading producer identity for script navigation")
+				return nil, e.Wrap(e.CodePipelineDrift, err, "reading producer identity for script navigation")
 			}
 			producers[build.Name][id] = node
 		}
 	}
 	stages, _, err := githubStages(plan)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	jobs := map[string]githubScriptJob{}
 	for _, stage := range stages {
@@ -87,31 +82,34 @@ func addGitHubScriptIndex(plan *Plan, files map[string][]byte) error {
 			if node.IRNode != "" {
 				producer := producers[node.BuildTarget][node.IRNode]
 				if producer == nil {
-					return e.New(e.CodePipelineDrift, "script navigation cannot find producer %s/%s", node.BuildTarget, node.IRNode)
+					return nil, e.New(e.CodePipelineDrift, "script navigation cannot find producer %s/%s", node.BuildTarget, node.IRNode)
 				}
 				operation.Record = records[node.BuildTarget]
-				operation.Command, operation.VendorCommand = producer["command"], producer["vendorCmd"]
+				operation.Scripts, err = githubCommandScripts(producer["command"], producer["vendorCmd"])
+				if err != nil {
+					return nil, err
+				}
 			}
 			job.Operations = append(job.Operations, operation)
 		}
 		jobs[stage.ID] = job
 	}
-	index := githubScriptIndex{Plan: layout.planPath, StoreIndex: PlanStoreIndexPath, Jobs: map[string]githubScriptJob{}}
-	indexPath := githubScriptIndexPath(plan)
+	index := map[string]githubScriptJob{}
+	indexPath := PlanStoreIndexPath
 	for _, filename := range sortedKeys(files) {
 		if !strings.HasPrefix(filename, ".github/workflows/") || !strings.HasSuffix(filename, ".yml") {
 			continue
 		}
 		var document yamlv3.Node
 		if err := yamlv3.Unmarshal(files[filename], &document); err != nil {
-			return e.Wrap(e.CodePipelineDrift, err, "reading workflow for script navigation")
+			return nil, e.Wrap(e.CodePipelineDrift, err, "reading workflow for script navigation")
 		}
 		if len(document.Content) != 1 {
-			return e.New(e.CodePipelineDrift, "script navigation requires one workflow document")
+			return nil, e.New(e.CodePipelineDrift, "script navigation requires one workflow document")
 		}
 		mapping := githubYAMLField(document.Content[0], "jobs")
 		if mapping == nil {
-			return e.New(e.CodePipelineDrift, "script navigation requires workflow jobs")
+			return nil, e.New(e.CodePipelineDrift, "script navigation requires workflow jobs")
 		}
 		comments := map[int]string{}
 		raw := string(files[filename])
@@ -121,11 +119,11 @@ func addGitHubScriptIndex(plan *Plan, files map[string][]byte) error {
 			if !ok {
 				continue
 			}
-			if _, duplicate := index.Jobs[key.Value]; duplicate {
-				return e.New(e.CodePipelineDrift, "duplicate script navigation job %s", key.Value)
+			if _, duplicate := index[key.Value]; duplicate {
+				return nil, e.New(e.CodePipelineDrift, "duplicate script navigation job %s", key.Value)
 			}
 			job.Workflow = filename
-			index.Jobs[key.Value] = job
+			index[key.Value] = job
 			comment := "    # Producer commands: " + indexPath + " (job " + key.Value + ")"
 			if !strings.Contains(raw, comment+"\n") {
 				comments[key.Line] = comment
@@ -140,9 +138,34 @@ func addGitHubScriptIndex(plan *Plan, files map[string][]byte) error {
 		}
 		files[filename] = []byte(out.String())
 	}
-	if len(index.Jobs) != len(jobs) {
-		return e.New(e.CodePipelineDrift, "script navigation omits an execution job")
+	if len(index) != len(jobs) {
+		return nil, e.New(e.CodePipelineDrift, "script navigation omits an execution job")
 	}
-	files[indexPath], err = treeJSON(index)
-	return err
+	return index, nil
+}
+
+func githubCommandScripts(commands ...json.RawMessage) ([]string, error) {
+	var scripts []string
+	for _, command := range commands {
+		if len(command) == 0 {
+			continue
+		}
+		var argv []json.RawMessage
+		if err := json.Unmarshal(command, &argv); err != nil {
+			return nil, e.Wrap(e.CodePipelineDrift, err, "reading navigation command")
+		}
+		for _, operand := range argv {
+			var literal string
+			if json.Unmarshal(operand, &literal) == nil {
+				continue
+			}
+			var ref map[string]string
+			if json.Unmarshal(operand, &ref) != nil || len(ref) != 1 || !isPlanStoreScript(ref["file"]) {
+				return nil, e.New(e.CodePipelineDrift, "invalid navigation script reference")
+			}
+			scripts = append(scripts, ref["file"])
+		}
+	}
+	slices.Sort(scripts)
+	return slices.Compact(scripts), nil
 }

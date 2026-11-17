@@ -64,28 +64,47 @@ func TestPlanStoreSharesFrozenRecords(t *testing.T) {
 	if string(bundle.Files[scriptPath]) != body {
 		t.Fatal("exact script bytes were not stored")
 	}
-	componentPath := ""
+	snapshotInline, resolvedInline := false, false
 	for name, raw := range bundle.Files {
+		if !isPlanStorePath(name) {
+			continue
+		}
+		relative := strings.TrimPrefix(name, PlanStoreDirectory+"/")
+		kind, _, _ := strings.Cut(relative, "/")
+		if kind != "scripts" && kind != "steps" && kind != "plan" {
+			t.Fatal("frozen layout emitted another directory", name)
+		}
 		if !isPlanStoreRecord(name) {
 			continue
 		}
 		if bytes.Contains(raw, mustCanonical(t, body)) {
 			t.Fatal("a frozen JSON object retained an inline copy of the script")
 		}
+		if kind != "steps" && !strings.HasPrefix(relative, "plan/catalog-") {
+			continue
+		}
 		var record planFields
-		if json.Unmarshal(raw, &record) == nil && bytes.Contains(record["buildCommand"], []byte(scriptPath)) {
-			componentPath = name
+		if err := json.Unmarshal(raw, &record); err != nil {
+			t.Fatal(err)
+		}
+		if strings.HasPrefix(relative, "plan/catalog-") && bytes.Contains(record["Components"], []byte(scriptPath)) {
+			snapshotInline = true
+		}
+		if kind == "steps" && bytes.Contains(record["resolvedComponents"], []byte(scriptPath)) {
+			var components []planFields
+			if err := json.Unmarshal(record["resolvedComponents"], &components); err != nil {
+				t.Fatal(err)
+			}
+			for _, component := range components {
+				if component["file"] != nil || component["Name"] == nil {
+					t.Fatal("resolved configuration is not inline")
+				}
+			}
+			resolvedInline = true
 		}
 	}
-	if componentPath == "" {
-		t.Fatal("snapshot component did not reference the script")
-	}
-	references := 0
-	for _, raw := range bundle.Files {
-		references += strings.Count(string(raw), componentPath)
-	}
-	if references < 2 {
-		t.Fatal("snapshot and resolved-component list did not share the component record")
+	if !snapshotInline || !resolvedInline {
+		t.Fatal("snapshot and step must inline configuration while sharing script bytes")
 	}
 	_, packed, err := joinPlanTree(t.Context(), bundle.PlanPath, bundle.Files)
 	if err != nil || !bytes.Equal(packed, mustCanonical(t, plan)) {
@@ -589,12 +608,32 @@ func TestPlanStoreNamesAndIndexDoNotDependOnGenerationOrder(t *testing.T) {
 	if err != nil || !bytes.Equal(first, second) {
 		t.Fatal("generation order changed the index", err)
 	}
-	var groups map[string][]planStoreVariant
-	if err := json.Unmarshal(first, &groups); err != nil {
+	var index planStoreIndexDocument
+	if err := json.Unmarshal(first, &index); err != nil {
 		t.Fatal(err)
 	}
+	sharedJob, divergedJob := false, false
+	for _, variants := range index.Jobs {
+		divergedJob = divergedJob || len(variants) > 1
+		for _, variant := range variants {
+			if len(variant.Workflows) == 2 {
+				sharedJob = true
+			}
+			for _, workflow := range variant.Workflows {
+				if workflow.Bundle == "" || (bundles[0].Files[workflow.File] == nil && bundles[1].Files[workflow.File] == nil) {
+					t.Fatal("job variant lost its workflow owner", workflow)
+				}
+			}
+		}
+	}
+	if !sharedJob {
+		t.Fatal("shared job operations were duplicated instead of grouping workflow users")
+	}
+	if !divergedJob {
+		t.Fatal("shared index collapsed jobs with different producer records")
+	}
 	diverged := false
-	for logical, variants := range groups {
+	for logical, variants := range index.Objects {
 		if strings.HasPrefix(logical, "steps/") && len(variants) > 1 {
 			diverged = true
 		}

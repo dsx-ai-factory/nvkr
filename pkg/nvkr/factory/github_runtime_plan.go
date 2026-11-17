@@ -87,7 +87,7 @@ func prepareGitHubRuntimeBundle(ctx context.Context, baselinePlan, freshPlan *Pl
 		return e.New(e.CodePipelineDrift, "runtime GitHub preparation cannot change generated member paths; regenerate the bundle")
 	}
 	for _, member := range sortedFileNames(baseline.Files) {
-		if member == layout.planPath || isPlanStoreRecord(member) || member == githubScriptIndexPath(freshPlan) {
+		if member == layout.planPath || isPlanStoreRecord(member) {
 			continue
 		}
 		if !bytes.Equal(baseline.Files[member], fresh.Files[member]) {

@@ -269,7 +269,7 @@ func TestGitHubRuntimeTransportSourcePinUpdatePreservesProviderPrograms(t *testi
 	}
 	for name, raw := range baseline.Files {
 		step := isPlanStoreRecord(name)
-		if name != baseline.PlanPath && name != githubScriptIndexPath(after) && !step && !bytes.Equal(raw, fresh.Files[name]) {
+		if name != baseline.PlanPath && !step && !bytes.Equal(raw, fresh.Files[name]) {
 			t.Fatalf("pin update changed the scheduled provider program %s", name)
 		}
 	}
