@@ -17,7 +17,7 @@ import (
 
 // localNodeLabel is a display projection only. The Plan and recorded node IDs
 // remain unchanged. Verbose output retains the operation identifier with
-// terminal controls escaped.
+// non-printable characters, quotes and backslashes escaped.
 func localNodeLabel(plan *Plan, node Node, verbose bool) string {
 	if verbose {
 		return githubDisplayText(node.ID + " (" + node.Kind + ")")

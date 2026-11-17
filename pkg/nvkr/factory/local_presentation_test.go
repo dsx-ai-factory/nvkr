@@ -72,6 +72,7 @@ func TestLocalNodeLabel(t *testing.T) {
 		want    string
 	}{
 		{"utility", Node{ID: "tool/go", Kind: NodeAcquire}, false, "tool/go: acquire"},
+		{"utility control", Node{ID: "tool/\x1b[31m", Kind: NodeAcquire}, false, `tool/\x1b[31m: acquire`},
 		{"target control", Node{ID: "build", Kind: NodeBuild, BuildTarget: "output\nforged"}, false, `output\nforged: build`},
 		{"verbose control", Node{ID: "tool/\x1b[31m", Kind: NodeAcquire}, true, `tool/\x1b[31m (acquire)`},
 	} {

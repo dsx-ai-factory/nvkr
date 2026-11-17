@@ -32,9 +32,9 @@ class ShellHeartbeat(unittest.TestCase):
                 work = Path(tmp)
                 timer_pids, child_pid = work / "timers", work / "child"
                 release, output = work / "release", work / "output"
-                # Record both the owned sleep and heartbeat shell, then run the real timer.
+                # Record ownership and the requested interval, but shorten the test timer.
                 timer = work / "sleep"
-                timer.write_text('#!/bin/sh\nprintf "%s %s\\n" "$$" "$PPID" >> "$TIMER_PIDS"\nexec /bin/sleep "$@"\n')
+                timer.write_text('#!/bin/sh\nprintf "%s %s %s\\n" "$$" "$PPID" "$1" >> "$TIMER_PIDS"\nexec /bin/sleep 0.2\n')
                 timer.chmod(0o755)
                 env = {**os.environ, "PATH": str(work) + os.pathsep + os.environ["PATH"],
                        "TIMER_PIDS": str(timer_pids), "CHILD_PID": str(child_pid),
@@ -61,14 +61,16 @@ class ShellHeartbeat(unittest.TestCase):
                             release.touch()
                         self.assertEqual(process.wait(timeout=5), status, output.read_text())
                         self.assertIn("[start] build", output.read_text())
-                        for pid in {int(value) for value in timer_pids.read_text().split()}:
+                        timers = [line.split() for line in timer_pids.read_text().splitlines()]
+                        self.assertTrue(all(len(timer) == 3 and timer[2] == "10" for timer in timers), timers)
+                        for pid in {int(value) for timer in timers for value in timer[:2]}:
                             with self.assertRaises(ProcessLookupError, msg=f"timer process {pid} survived return"):
                                 os.kill(pid, 0)
                     finally:
                         # Also own cleanup if an assertion or the wrapper fails.
                         try:
                             os.killpg(process.pid, signal.SIGKILL)
-                        except ProcessLookupError:
+                        except (ProcessLookupError, PermissionError):
                             pass
                         process.wait(timeout=5)
 
