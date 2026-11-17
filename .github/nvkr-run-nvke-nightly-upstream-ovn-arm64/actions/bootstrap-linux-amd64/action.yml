@@ -40,7 +40,6 @@ runs:
         path: |
           nvkr-exec
           .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json
-          .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/action-data.json
           .github/nvkr-run-nvke-nightly-upstream-ovn-arm64/manifest.json
         include-hidden-files: 'true'
         if-no-files-found: error

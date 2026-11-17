@@ -29,7 +29,7 @@ func stageGitHubRuntimeInputs(t *testing.T, root string, plan *Plan) *GeneratedB
 	if err := os.MkdirAll(directory, 0755); err != nil {
 		t.Fatal(err)
 	}
-	for name, raw := range map[string][]byte{"plan.json": bundle.Files[bundle.PlanPath], "action-data.json": bundle.Files[githubActionDataPathFor(plan)], "manifest.json": manifest} {
+	for name, raw := range map[string][]byte{"plan.json": bundle.Files[bundle.PlanPath], "manifest.json": manifest} {
 		if err := os.WriteFile(filepath.Join(directory, name), raw, 0644); err != nil {
 			t.Fatal(err)
 		}
@@ -76,7 +76,7 @@ func TestInstallGitHubRuntimeInputsUsesGeneratedFileOwner(t *testing.T) {
 				t.Fatal(err)
 			}
 			for name, prior := range baseline.Files {
-				if name == baseline.PlanPath || name == githubActionDataPathFor(before) {
+				if name == baseline.PlanPath {
 					continue
 				}
 				raw, err := os.ReadFile(filepath.Join(root, name))
@@ -98,8 +98,8 @@ func TestInstallGitHubRuntimeInputsRejectsIncompleteOrMixedHandoff(t *testing.T)
 	// Old bytes exercise every same-Run binding. Missing/type admission is a
 	// common directory reader; corrupt Plan bytes additionally cover decoding.
 	for _, test := range []struct{ member, damage string }{
-		{"plan.json", "old bytes"}, {"action-data.json", "old bytes"}, {"manifest.json", "old bytes"},
-		{"plan.json", "corrupt"}, {"action-data.json", "missing"}, {"manifest.json", "symlink"},
+		{"plan.json", "old bytes"}, {"manifest.json", "old bytes"},
+		{"plan.json", "corrupt"}, {"manifest.json", "missing"}, {"manifest.json", "symlink"},
 	} {
 		member, damage := test.member, test.damage
 		t.Run(member+"/"+damage, func(t *testing.T) {
@@ -125,8 +125,6 @@ func TestInstallGitHubRuntimeInputsRejectsIncompleteOrMixedHandoff(t *testing.T)
 			case "old bytes":
 				name := baseline.PlanPath
 				switch member {
-				case "action-data.json":
-					name = githubActionDataPathFor(before)
 				case "manifest.json":
 					name = baseline.ManifestPath
 				}

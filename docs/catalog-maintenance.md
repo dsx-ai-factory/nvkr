@@ -31,7 +31,7 @@ checks every named member before it resolves a pin, regenerates each through its
 or the qualification generator for each producer plus its pair), and repeats every check. A named Run whose
 Environment sets `githubRuntimePlan` (the nightly bundles) compiles current pins when it is dispatched, so its
 committed Plan may lag the lock: refresh checks and regenerates it through the runtime-Plan owner, which
-authenticates every committed byte and then admits only Plan and action-data changes, never a workflow or action
+authenticates every committed byte and then admits only Plan and derived-manifest changes, never a workflow or action
 change. An owner's coded failure
 is preserved: drift stays `NVKR-E-PIPELINE-DRIFT` and a stage conflict stays `NVKR-E-WRITE-CONFLICT`. A
 committed `.github/nvkr-*/manifest.json` bundle the policy does not name, including a qualification manifest

@@ -34,7 +34,11 @@ File operands in build/vendor argv expand through bounded context-aware catalog 
 catalog contracts cover byte preservation, platform overrides, confinement and resource limits.
 `TestCompileSnapshotCapturesCommandFiles` covers registry/fragment script capture and replay after
 working-file mutation, with missing captured files rejected. These are local contracts, not hosted
-execution evidence. Migration of maintained inline scripts is a separate follow-up.
+execution evidence. Authored YAML command operands under `inputs/catalogs/` of at least
+3,000 UTF-8 bytes now use adjacent command-template files: 25 expanded operands share six bodies. Byte comparison
+reconstructs the complete original decoded catalogs, and fresh compilation of all 11 maintained
+Plans preserves all 481 Build records, including their digests and resolved argv. These checks
+do not execute the migrated commands or establish hosted acceptance.
 Before migrating sibling-fragment scripts, toolchain repinning's edited-fragment provider must capture
 those files as well; its current tracked edit set contains YAML/JSON declarations only and fails closed
 for other sibling inputs. Directory loading and factory snapshot capture/replay support these files.

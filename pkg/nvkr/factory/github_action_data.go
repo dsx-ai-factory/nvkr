@@ -15,8 +15,8 @@ import (
 const maxGitHubActionDataOutputBytes = 200_000
 
 // WriteGitHubActionData publishes the selected shared action's descriptive data
-// from the admitted Plan. The checked-in data file is never execution authority:
-// its entries are regenerated, and neither credentials nor expressions are
+// from the admitted Plan. Invocation data is generated in memory at the point
+// of use; neither credentials nor expressions are
 // resolved from the process environment. Complete validation precedes output.
 func WriteGitHubActionData(ctx context.Context, plan *Plan, selector, outputPath string) error {
 	if err := admitGitHubPlan(ctx, plan); err != nil {
@@ -29,8 +29,8 @@ func WriteGitHubActionData(ctx context.Context, plan *Plan, selector, outputPath
 	if err != nil {
 		return err
 	}
-	raw, ok := bundle.Files[githubActionDataPathFor(plan)]
-	if !ok {
+	raw := bundle.githubActionData
+	if len(raw) == 0 {
 		return e.New(e.CodePipelineDrift, "generated GitHub bundle omits shared action data")
 	}
 	var document githubActionDataDocument
