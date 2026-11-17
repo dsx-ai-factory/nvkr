@@ -704,8 +704,8 @@ GitHub keeps named jobs, prerequisite closure and conditions visible, and every 
 permissions and time bounds. [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold)
 owns which bundle workflow carries each job, including the fallback partition workers described below. Manifest-owned composite actions expose fixed interfaces
 for node/source execution, preparation, output collection and transport. Grouped jobs reuse the node interface; optional slots and
-individual transfer calls preserve arbitrary admitted output counts without new action variants. One canonical
-invocation-data member holds parameters with named operation roles. The runtime descriptor operation
+individual transfer calls preserve arbitrary admitted output counts without new action variants. Transient invocation data holds parameters with named operation roles and is neither committed nor
+transported as a separate file. The runtime descriptor operation
 recomputes selected values from the admitted Plan; templates contain fixed commands and pinned actions,
 with no executable script inputs. Controlled transport
 wrappers contain one upload/download and retain their

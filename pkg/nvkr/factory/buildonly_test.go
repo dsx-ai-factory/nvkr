@@ -25,7 +25,7 @@ func TestCommittedPlanMatchesGeneratedExecution(t *testing.T) {
 			}
 			assertGeneratedGitHubMembers(t, bundle)
 			var actionData githubActionDataDocument
-			if err := canonical.UnmarshalExact(bundle.Files[GitHubActionDataPath], &actionData); err != nil {
+			if err := canonical.UnmarshalExact(bundle.githubActionData, &actionData); err != nil {
 				t.Fatal(err)
 			}
 			decoded, _, err := joinPlanTree(t.Context(), bundle.PlanPath, bundle.Files)

@@ -263,7 +263,7 @@ func expandedGitHubWorkflow(t *testing.T, bundle *GeneratedBundle) []byte {
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := expandGitHubActions(plan, bundle.Files[bundle.WorkflowPath], bundle.Files)
+	raw, err := expandGitHubActions(plan, bundle.Files[bundle.WorkflowPath], githubTestExpansionFiles(bundle))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -443,7 +443,7 @@ func githubTestBootstrap(t *testing.T, bundle *GeneratedBundle) (jobID, member s
 func githubTestSharedInvocation(t *testing.T, bundle *GeneratedBundle, jobID, role, selector string) (member, part string) {
 	t.Helper()
 	var data githubActionDataDocument
-	if err := canonical.UnmarshalExact(bundle.Files[path.Join(path.Dir(bundle.PlanPath), "action-data.json")], &data); err != nil {
+	if err := canonical.UnmarshalExact(githubTestExpansionFiles(bundle)[path.Join(path.Dir(bundle.PlanPath), "action-data.json")], &data); err != nil {
 		t.Fatal(err)
 	}
 	job, exists := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath]).Jobs[jobID]
@@ -480,7 +480,9 @@ func githubTestSharedInvocation(t *testing.T, bundle *GeneratedBundle, jobID, ro
 
 func mutateGitHubActionParameters(t *testing.T, bundle *GeneratedBundle, jobID, part string, mutate func(map[string]string)) *GeneratedBundle {
 	t.Helper()
-	return mutateGitHubBundleFile(t, bundle, path.Join(path.Dir(bundle.PlanPath), "action-data.json"), func(raw []byte) []byte {
+	copy := *bundle
+	copy.Files = githubTestExpansionFiles(bundle)
+	changedBundle := mutateGitHubBundleFile(t, &copy, path.Join(path.Dir(bundle.PlanPath), "action-data.json"), func(raw []byte) []byte {
 		var data githubActionDataDocument
 		if err := canonical.UnmarshalExact(raw, &data); err != nil {
 			t.Fatal(err)
@@ -502,6 +504,10 @@ func mutateGitHubActionParameters(t *testing.T, bundle *GeneratedBundle, jobID, 
 		}
 		return changed
 	})
+	dataPath := path.Join(path.Dir(bundle.PlanPath), "action-data.json")
+	changedBundle.githubActionData = changedBundle.Files[dataPath]
+	delete(changedBundle.Files, dataPath)
+	return changedBundle
 }
 
 // Lower a deliberately hostile logical workflow through the same action boundary
@@ -519,6 +525,8 @@ func relowerGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle, 
 	}
 	changed.Files[bundle.WorkflowPath] = workflow
 	changed.WorkflowDigest = pipeline.FileDigest(workflow)
+	changed.githubActionData = changed.Files[githubActionDataPathFor(plan)]
+	delete(changed.Files, githubActionDataPathFor(plan))
 	return changed
 }
 
@@ -585,12 +593,12 @@ func lowerGitHubTestNeeds(t *testing.T, plan *Plan, raw []byte) []byte {
 
 func assertGeneratedGitHubMembers(t *testing.T, bundle *GeneratedBundle) {
 	t.Helper()
-	if len(bundle.Files[bundle.PlanPath]) == 0 || len(bundle.Files[GitHubWorkflowPath]) == 0 || len(bundle.Files[GitHubActionDataPath]) == 0 {
+	if len(bundle.Files[bundle.PlanPath]) == 0 || len(bundle.Files[GitHubWorkflowPath]) == 0 || len(bundle.githubActionData) == 0 {
 		t.Fatal("generated bundle omits its Plan, workflow, or action data")
 	}
 	actions := 0
 	for name := range bundle.Files {
-		if name == bundle.PlanPath || name == GitHubWorkflowPath || name == GitHubActionDataPath {
+		if name == bundle.PlanPath || name == GitHubWorkflowPath {
 			continue
 		}
 		if strings.HasPrefix(name, ".github/nvkr-run/steps/") && (strings.HasSuffix(name, "/step.json") || strings.HasSuffix(name, ".sh")) {

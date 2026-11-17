@@ -191,7 +191,7 @@ func testGitHubRetentionTampering(t *testing.T, plan *Plan) {
 func githubTestSharedUpload(t *testing.T, bundle *GeneratedBundle, jobID, stepName string) (member, part, role string) {
 	t.Helper()
 	var data githubActionDataDocument
-	if err := canonical.UnmarshalExact(bundle.Files[path.Join(path.Dir(bundle.PlanPath), "action-data.json")], &data); err != nil {
+	if err := canonical.UnmarshalExact(githubTestExpansionFiles(bundle)[path.Join(path.Dir(bundle.PlanPath), "action-data.json")], &data); err != nil {
 		t.Fatal(err)
 	}
 	job, exists := decodeGitHubWorkflow(t, bundle.Files[bundle.WorkflowPath]).Jobs[jobID]

@@ -95,7 +95,16 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 	if err != nil {
 		return err
 	}
-	expanded, err := expandGitHubActions(plan, workflow, bundle.Files)
+	// Invocation data is transient. A projection may retain it for semantic
+	// diagnostics; exact comparison below authenticates it against the Plan.
+	// No generated file supplies invocation data.
+	expansionFiles := maps.Clone(bundle.Files)
+	data := bundle.githubActionData
+	if data == nil {
+		data = expected.githubActionData
+	}
+	expansionFiles[githubActionDataPathFor(plan)] = data
+	expanded, err := expandGitHubActions(plan, workflow, expansionFiles)
 	if err != nil {
 		return err
 	}
@@ -379,7 +388,7 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 					return e.New(e.CodeInvalidCatalog, "secondary GitHub bootstrap omits runtime input installation")
 				}
 			}
-			wantSteps++ // Stage the packed three-file carrier after bundle admission.
+			wantSteps++ // Stage the packed two-file carrier after bundle admission.
 			if !strings.Contains(joinRuns(job.Steps), "./nvkr-exec factory github stage-runtime-inputs --plan "+shellQuote(githubLayoutFor(plan).planPath)) {
 				return e.New(e.CodeInvalidCatalog, "GitHub bootstrap omits packed runtime input staging")
 			}
@@ -559,6 +568,9 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 }
 
 func validateGitHubExactMembers(bundle, expected *GeneratedBundle) error {
+	if bundle.githubActionData != nil && !bytes.Equal(bundle.githubActionData, expected.githubActionData) {
+		return e.New(e.CodeEngineCapability, "GitHub transient action data differs from its exact admitted rendering")
+	}
 	if len(bundle.Files) != len(expected.Files) {
 		return e.New(e.CodePipelineDrift, "GitHub bundle member set differs from its admitted rendering")
 	}

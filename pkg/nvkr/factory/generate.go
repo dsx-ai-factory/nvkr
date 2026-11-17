@@ -29,6 +29,9 @@ type GeneratedBundle struct {
 	Files          map[string][]byte
 	WorkflowDigest string
 	PlanDigest     string
+
+	// Transient projection data; never a generated member or authority input.
+	githubActionData []byte
 }
 
 // ValidateGenerationEngine performs capability admission without reading factory

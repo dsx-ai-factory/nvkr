@@ -76,7 +76,7 @@ func TestGitHubRuntimeTransportCompilesOnceAndRestoresEveryHelper(t *testing.T) 
 			}
 			bootstrap := runtimeTransportBootstraps(t, plan)
 			first := bootstrap[sortedKeys(bootstrap)[0]]
-			paths := []string{".nvkr/runtime-export/plan.json", ".nvkr/runtime-export/action-data.json", ".nvkr/runtime-export/manifest.json"}
+			paths := []string{".nvkr/runtime-export/plan.json", ".nvkr/runtime-export/manifest.json"}
 			compileCount, runtimeUploads, runnerUploads, secondaryDownloads, installations := 0, 0, 0, 0, 0
 			for runner, id := range bootstrap {
 				job := document.Jobs[id]
@@ -102,7 +102,7 @@ func TestGitHubRuntimeTransportCompilesOnceAndRestoresEveryHelper(t *testing.T) 
 						runtimeUploads++
 						want := map[string]string{"name": "nvkr-runtime-inputs", "path": strings.Join(paths, "\n") + "\n", "include-hidden-files": "true", "if-no-files-found": "error", "retention-days": "7"}
 						if id != first || step.Uses != plan.Actions["upload-artifact"].Uses() || !reflect.DeepEqual(step.With, want) || index < 2 || job.Steps[index-1].Name != "Stage packed runtime inputs" || job.Steps[index-2].ID != "validate-catalog" {
-							t.Fatalf("planner does not upload exactly the checked flat three-file closure: %+v", step)
+							t.Fatalf("planner does not upload exactly the checked flat two-file closure: %+v", step)
 						}
 					case "Download NVKR runtime inputs":
 						secondaryDownloads++
@@ -198,8 +198,8 @@ func TestGitHubRuntimeTransportRejectsMissingOrSwappedCarrierContracts(t *testin
 		name, member, step, key, value string
 		code                           e.Code
 	}{
-		{"missing Plan", firstMember, "Upload NVKR runtime inputs", "path", path.Join(path.Dir(bundle.PlanPath), "action-data.json") + "\n" + bundle.ManifestPath + "\n", e.CodeEngineCapability},
-		{"other namespace", firstMember, "Upload NVKR runtime inputs", "path", ".github/nvkr-run-other/plan.json\n.github/nvkr-run-other/action-data.json\n.github/nvkr-run-other/manifest.json\n", e.CodeEngineCapability},
+		{"missing Plan", firstMember, "Upload NVKR runtime inputs", "path", bundle.ManifestPath + "\n", e.CodeEngineCapability},
+		{"other namespace", firstMember, "Upload NVKR runtime inputs", "path", ".github/nvkr-run-other/plan.json\n.github/nvkr-run-other/manifest.json\n", e.CodeEngineCapability},
 		{"hidden files excluded", firstMember, "Upload NVKR runtime inputs", "include-hidden-files", "false", e.CodeEngineCapability},
 		{"other carrier", secondMember, "Download NVKR runtime inputs", "name", "nvkr-runtime-inputs-other", e.CodeEngineCapability},
 		{"wrong restore root", secondMember, "Download NVKR runtime inputs", "path", ".", e.CodeEngineCapability},
@@ -265,12 +265,12 @@ func TestGitHubRuntimeTransportSourcePinUpdatePreservesProviderPrograms(t *testi
 	if err := CheckGeneratedBundle(t.Context(), root, fresh); err != nil {
 		t.Fatal(err)
 	}
-	if bytes.Equal(baseline.Files[baseline.PlanPath], fresh.Files[fresh.PlanPath]) || bytes.Equal(baseline.Files[githubActionDataPathFor(before)], fresh.Files[githubActionDataPathFor(after)]) {
+	if bytes.Equal(baseline.Files[baseline.PlanPath], fresh.Files[fresh.PlanPath]) || bytes.Equal(baseline.githubActionData, fresh.githubActionData) {
 		t.Fatal("pin update did not refresh exact Plan and stage descriptor bytes")
 	}
 	for name, raw := range baseline.Files {
 		step := strings.HasPrefix(name, path.Dir(baseline.PlanPath)+"/steps/") && strings.HasSuffix(name, "/step.json")
-		if name != baseline.PlanPath && name != githubActionDataPathFor(before) && !step && !bytes.Equal(raw, fresh.Files[name]) {
+		if name != baseline.PlanPath && !step && !bytes.Equal(raw, fresh.Files[name]) {
 			t.Fatalf("pin update changed the scheduled provider program %s", name)
 		}
 	}

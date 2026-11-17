@@ -20,7 +20,7 @@ const githubRuntimeInputDirectory = ".nvkr/runtime-inputs"
 
 const githubRuntimeExportDirectory = ".nvkr/runtime-export"
 
-// StageGitHubRuntimeInputs prepares the three-file same-Run carrier. Its Plan is
+// StageGitHubRuntimeInputs prepares the two-file same-Run carrier. Its Plan is
 // packed canonical wire data; the manifest describes the reconstructed bundle.
 func StageGitHubRuntimeInputs(ctx context.Context, plan *Plan, root string) error {
 	bundle, err := checkedGitHubRuntimeInputs(ctx, plan, root)
@@ -42,8 +42,7 @@ func StageGitHubRuntimeInputs(ctx context.Context, plan *Plan, root string) erro
 	if err := os.Mkdir(directory, 0o755); err != nil {
 		return e.Wrap(e.CodePipelineDrift, err, "runtime export requires a fresh staging directory")
 	}
-	files := map[string][]byte{"plan.json": packed, "manifest.json": manifest,
-		"action-data.json": bundle.Files[githubActionDataPathFor(plan)]}
+	files := map[string][]byte{"plan.json": packed, "manifest.json": manifest}
 	for _, name := range sortedFileNames(files) {
 		if err := ctx.Err(); err != nil {
 			return e.Wrap(e.CodeTimeout, err, "runtime export canceled")
@@ -61,7 +60,7 @@ func StageGitHubRuntimeInputs(ctx context.Context, plan *Plan, root string) erro
 	return nil
 }
 
-// InstallGitHubRuntimeInputs admits the exact three-file, same-Run handoff in
+// InstallGitHubRuntimeInputs admits the exact two-file, same-Run handoff in
 // the fixed staging directory before changing the committed bundle. Transport
 // authentication remains the caller's responsibility. The existing generator
 // owner preserves its lock, per-file atomic replacement and manifest-last
@@ -109,9 +108,8 @@ func InstallGitHubRuntimeInputs(ctx context.Context, baseline *Plan, root string
 	if err != nil {
 		return err
 	}
-	expected := map[string][]byte{"plan.json": packed,
-		"action-data.json": bundle.Files[githubActionDataPathFor(&fresh)], "manifest.json": manifest}
-	for _, name := range []string{"plan.json", "action-data.json", "manifest.json"} {
+	expected := map[string][]byte{"plan.json": packed, "manifest.json": manifest}
+	for _, name := range []string{"plan.json", "manifest.json"} {
 		if !bytes.Equal(staged[name], expected[name]) {
 			return e.New(e.CodePipelineDrift, "staged runtime input %s differs from the complete generated bundle", name)
 		}
@@ -138,11 +136,11 @@ func readGitHubRuntimeInputSet(ctx context.Context, root string) (map[string][]b
 		return nil, e.Wrap(e.CodePipelineDrift, err, "holding staged runtime input directory")
 	}
 	defer func() { _ = directory.Close() }()
-	entries, err := directory.ReadDir(4)
-	if (err != nil && err != io.EOF) || len(entries) != 3 {
-		return nil, e.New(e.CodePipelineDrift, "staged runtime inputs require exactly three regular files")
+	entries, err := directory.ReadDir(3)
+	if (err != nil && err != io.EOF) || len(entries) != 2 {
+		return nil, e.New(e.CodePipelineDrift, "staged runtime inputs require exactly two regular files")
 	}
-	limits := map[string]int64{"plan.json": MaxPlanBytes, "action-data.json": maxGeneratedFileBytes, "manifest.json": maxGeneratedFileBytes}
+	limits := map[string]int64{"plan.json": MaxPlanBytes, "manifest.json": maxGeneratedFileBytes}
 	result := make(map[string][]byte, len(limits))
 	for _, entry := range entries {
 		limit, expected := limits[entry.Name()]

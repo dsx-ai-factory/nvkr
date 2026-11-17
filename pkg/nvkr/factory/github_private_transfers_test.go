@@ -692,7 +692,7 @@ func TestGitHubPrivateTransferProjectionRemainsStableAcrossSourcePins(t *testing
 		t.Fatal(err)
 	}
 	for name, raw := range first.Files {
-		if name == first.PlanPath || name == githubActionDataPathFor(before) ||
+		if name == first.PlanPath ||
 			(strings.HasPrefix(name, path.Dir(first.PlanPath)+"/steps/") && strings.HasSuffix(name, "/step.json")) {
 			continue
 		}

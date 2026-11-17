@@ -80,7 +80,7 @@ func TestRuntimeSourceGenerationReplaysFrozenSourceAfterRestore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Model the secondary checkout: committed bundle plus the three exact
+	// Model the secondary checkout: committed bundle plus the two exact
 	// same-attempt files restored by the existing transport contract.
 	if err := factory.WriteGeneratedBundle(t.Context(), ".", baselineBundle); err != nil {
 		t.Fatal(err)
@@ -97,7 +97,7 @@ func TestRuntimeSourceGenerationReplaysFrozenSourceAfterRestore(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for name, raw := range map[string][]byte{"plan.json": packed, "action-data.json": freshBundle.Files[filepath.ToSlash(filepath.Join(filepath.Dir(freshBundle.PlanPath), "action-data.json"))], "manifest.json": manifest} {
+	for name, raw := range map[string][]byte{"plan.json": packed, "manifest.json": manifest} {
 		if err := os.WriteFile(filepath.Join(staging, name), raw, 0644); err != nil {
 			t.Fatal(err)
 		}

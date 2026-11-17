@@ -208,16 +208,21 @@ func TestCheckGitHubRuntimeInputsRejectsUnsupportedBeforeReading(t *testing.T) {
 
 func TestGitHubRuntimeInputPreparationRejectsPartialDeliveryBeforeMovingFiles(t *testing.T) {
 	plan, bundle, baseline := runtimeInputsFixture(t)
-	for _, member := range []string{"binary", "Plan", "action data", "manifest"} {
-		for _, damage := range []string{"missing", "symlink"} {
+	for _, member := range []string{"binary", "Plan", "manifest"} {
+		for _, damage := range []string{"none", "missing", "symlink"} {
+			if damage == "none" && member != "binary" {
+				continue
+			}
 			t.Run(member+"/"+damage, func(t *testing.T) {
 				root := copyGitHubRuntimeRoot(t, baseline)
-				members := map[string]string{"binary": "nvkr-exec", "Plan": bundle.PlanPath, "action data": githubActionDataPathFor(plan), "manifest": bundle.ManifestPath}
+				members := map[string]string{"binary": "nvkr-exec", "Plan": githubRuntimeExportDirectory + "/plan.json", "manifest": githubRuntimeExportDirectory + "/manifest.json"}
 				for label, name := range members {
 					raw := bundle.Files[name]
 					switch label {
 					case "binary":
 						raw = []byte("#!/bin/sh\n: > runtime-check-called\n")
+					case "Plan":
+						raw = mustCanonical(t, plan)
 					case "manifest":
 						_, manifest, err := ManifestFor(bundle)
 						if err != nil {
@@ -232,7 +237,7 @@ func TestGitHubRuntimeInputPreparationRejectsPartialDeliveryBeforeMovingFiles(t 
 					if label == member && damage == "missing" {
 						continue
 					}
-					if label == member {
+					if label == member && damage == "symlink" {
 						target := filepath.Join(t.TempDir(), "delivered-member")
 						if err := os.WriteFile(target, raw, 0644); err != nil {
 							t.Fatal(err)
@@ -248,6 +253,15 @@ func TestGitHubRuntimeInputPreparationRejectsPartialDeliveryBeforeMovingFiles(t 
 				command := exec.CommandContext(t.Context(), "bash", "-c", prepareHelperRunFor(plan))
 				command.Dir = root
 				output, err := command.CombinedOutput()
+				if damage == "none" {
+					if err != nil {
+						t.Fatalf("complete delivery failed: %v %s", err, output)
+					}
+					if _, err := os.Stat(filepath.Join(root, "runtime-check-called")); err != nil {
+						t.Fatalf("complete delivery did not execute the helper: %v", err)
+					}
+					return
+				}
 				if err == nil || command.ProcessState == nil || command.ProcessState.ExitCode() != e.ExitCode(e.New(e.CodePipelineDrift, "")) {
 					t.Fatalf("partial delivery did not fail with pipeline drift before execution: %v %s", err, output)
 				}

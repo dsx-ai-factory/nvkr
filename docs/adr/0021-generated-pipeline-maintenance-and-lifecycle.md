@@ -26,7 +26,7 @@ This ADR fixes maintenance.
 
 ### 1. The emitted pipeline is a generated artifact, not an owned scaffold
 
-`run generate` is the normal owner of committed workflows, generated local actions and invocation data, complete plans and
+`run generate` is the normal owner of committed workflows, generated local actions, complete plans and
 manifests. Every owned file regenerates byte-for-byte from exact Definition, Environment, catalog pins, generator version and
 engine. Drift checks repeat the recorded Definition and Environment inputs without substituting a different
 catalog, path or engine. Definition v5 outputs select exact producers directly, with either a native `platform`
@@ -149,15 +149,16 @@ and silently claimed as generator-owned. Future artifact/result digests belong i
 generator must not invent them. Changes to input mode, environment or output graph regenerate in one reviewed
 change. Generated files are not editable scaffolds.
 
-The GitHub bundle includes shared composite templates beneath `.github/nvkr-run/actions/` and canonical
-invocation values in `.github/nvkr-run/action-data.json`, with corresponding members in the development
-layout. The generator selects fixed semantic interfaces for
+The GitHub bundle includes shared composite templates beneath `.github/nvkr-run/actions/`, with corresponding members in the development
+layout. Invocation values are regenerated in memory from the committed or admitted runtime Plan at their point of use.
+`action-data.json` is not emitted, committed or transported; regeneration retires a prior-owned copy through
+the existing exact-byte retirement contract. The generator selects fixed semantic interfaces for
 execution, preparation, collection and transfer. Grouped jobs repeat those calls; declared optional slots
 and further individual transfer calls handle differing output counts without shape-specific or numbered
 variant actions. Invocation values use named operation roles rather than step positions. These interfaces
 lower Plan-derived steps without introducing another executable Plan or authored extension surface.
 The helper-preparation, execution, bootstrap and controlled-transfer
-families and their invocation-data member appear in the same commit manifest as the top-level workflow and
+families appear in the same commit manifest as the top-level workflow and
 Plan. Their exact bytes, safe relative paths and modes participate in regeneration, drift
 checks and prior-manifest retirement. The workflow digest still describes the top-level workflow bytes;
 it is not a substitute for validating the complete manifest-owned execution closure.
@@ -187,7 +188,7 @@ The entry workflow references the fixed Plan and manifest paths without repeatin
 provider source-fetch IDs and scheduling order describe the target and actual consumer cohort rather than
 changing source pins. Exact executable identities remain in the Plan and generated invocation data.
 Templates contain fixed helper operations and pinned provider actions; the runtime descriptor operation
-admits the Plan and regenerates the selected values rather than trusting the checked-in data as authority.
+admits the Plan and regenerates the selected values directly into the bounded provider output.
 Routine pin or Plan changes can therefore leave the workflow bytes unchanged while the complete bundle
 and ownership manifest change. This stability is conditional on unchanged topology, labels, action
 interfaces and visible execution policy; checkout pins, pins of required inline transports and inline
@@ -196,13 +197,13 @@ the final Run upload inline, so an upload-action pin change affects the maintain
 defines the full boundary. Ordinary bundles require complete regeneration and the same all-member drift
 check after every input update. Named production Environments may explicitly select
 `githubRuntimePlan: true`: the first bootstrap admits the committed baseline, freezes a fresh Plan from
-current pinned inputs and distributes its exact data through same-Run helper artifacts. Only Plan and
-invocation data plus the derived manifest may change; every workflow/action byte, member path,
+current pinned inputs and distributes its exact data through same-Run helper artifacts. Only the Plan
+and derived manifest may change; every workflow/action byte, member path,
 Environment digest and authored input path stays fixed. Source-version updates within that contract need
 no regeneration commit. `--runtime --check` validates that contract without writes; ordinary `--check`
-still compares the complete current bundle. The three-file carrier contains the packed canonical Plan,
-unchanged invocation-data encoding and the manifest of the rendered tree. Secondary bootstraps and
-helper consumers restore these three runtime JSON files into a fresh staging directory, then admit
+still compares the complete current bundle. The two-file carrier contains the packed canonical Plan
+and the manifest of the rendered tree. Secondary bootstraps and
+helper consumers restore these two runtime JSON files into a fresh staging directory, then admit
 their exact bytes and current authored selection against
 the complete committed baseline. The generation owner installs the admitted bundle using its existing
 lock, per-file atomic replacement and manifest-last semantics; this is not an atomic directory transaction.
@@ -337,7 +338,7 @@ A pin or catalog change moves the IR, which moves the emitted pipeline. The two 
   candidate keeps a PR from being recreated, even after its branch is deleted, and every PR lookup ignores PRs
   from fork branches with the same name. The policy names the dependent generated bundles (a development Run, a
   production and development qualification pairs and additional named Runs). Each is checked before any pin update, regenerated through its
-  own owner (the runtime-Plan owner for a `githubRuntimePlan` Run, which admits only Plan and action-data
+  own owner (the runtime-Plan owner for a `githubRuntimePlan` Run, which admits only Plan and derived-manifest
   changes) with that owner's coded failure preserved, and transported on an exact path allowlist; a committed
   generated bundle the policy does not name is refused with `CodeEngineCapability` before pin mutation or
   workflow output. `catalog update-ci` also refuses a generator stamp that differs from the committed Plans

@@ -18,12 +18,10 @@ runs:
         set -eu
         [ -f .nvkr/runtime-runner/nvkr-exec ] && [ ! -L .nvkr/runtime-runner/nvkr-exec ] || { printf 'nvkr: [NVKR-E-PIPELINE-DRIFT] incomplete runtime input carrier\n' >&2; exit 51; }
         [ -f .nvkr/runtime-runner/.nvkr/runtime-export/plan.json ] && [ ! -L .nvkr/runtime-runner/.nvkr/runtime-export/plan.json ] || { printf 'nvkr: [NVKR-E-PIPELINE-DRIFT] incomplete runtime input carrier\n' >&2; exit 51; }
-        [ -f .nvkr/runtime-runner/.nvkr/runtime-export/action-data.json ] && [ ! -L .nvkr/runtime-runner/.nvkr/runtime-export/action-data.json ] || { printf 'nvkr: [NVKR-E-PIPELINE-DRIFT] incomplete runtime input carrier\n' >&2; exit 51; }
         [ -f .nvkr/runtime-runner/.nvkr/runtime-export/manifest.json ] && [ ! -L .nvkr/runtime-runner/.nvkr/runtime-export/manifest.json ] || { printf 'nvkr: [NVKR-E-PIPELINE-DRIFT] incomplete runtime input carrier\n' >&2; exit 51; }
         mkdir -- .nvkr/runtime-inputs
         mv -- .nvkr/runtime-runner/nvkr-exec nvkr-exec
         mv -- .nvkr/runtime-runner/.nvkr/runtime-export/plan.json .nvkr/runtime-inputs/plan.json
-        mv -- .nvkr/runtime-runner/.nvkr/runtime-export/action-data.json .nvkr/runtime-inputs/action-data.json
         mv -- .nvkr/runtime-runner/.nvkr/runtime-export/manifest.json .nvkr/runtime-inputs/manifest.json
         chmod +x ./nvkr-exec
         ./nvkr-exec factory github install-runtime-inputs --plan .github/nvkr-run-nvke-nightly-arm64/plan.json

@@ -68,7 +68,6 @@ Under that scratch root, inspect:
 
 - `.github/workflows/nvkr-run.yml`: named GitHub Actions jobs, dependencies, runners and credential policies.
 - `.github/nvkr-run/actions/`: shared actions with fixed interfaces for execution, preparation and transport.
-- `.github/nvkr-run/action-data.json`: generated invocation parameters selected by stable job/segment keys.
 - `.github/nvkr-run/plan.json`: the Plan root index and shared catalog snapshots.
 - `.github/nvkr-run/steps/`: per-target step records and exact command files; loading the tree reconstructs the canonical Plan.
 - `.github/nvkr-run/manifest.json`: the generated bundle's ownership and content record.
@@ -108,7 +107,7 @@ inputs and regenerate instead of editing generated files.
 Named production Environments can opt into `githubRuntimePlan: true`. Generate their initial complete
 bundle normally. On each dispatch the first bootstrap compiles the repository's current catalog pins
 with `run generate --runtime`, freezes the resulting Plan, and carries that exact data to every job.
-Secondary helper bootstraps restore the three JSON files into fresh staging, validate them against the
+Secondary helper bootstraps restore the Plan and manifest JSON files into fresh staging, validate them against the
 committed bundle and current authored inputs, then install them through the generated-file writer.
 Routine source-version updates therefore do not require a regenerated bundle commit. CI uses the same
 inputs with `--runtime --check`: it checks baseline integrity and unchanged workflow/action bytes,
@@ -298,12 +297,12 @@ downstream AMD64 E2E adapter builds its inputs locally.
 
 Read the top-level workflow to review which jobs can run, their dependency order, permissions, protected
 Environments and time limits. Follow a job's local `uses: ./.github/nvkr-run/actions/...` reference to inspect
-the shared operations it calls, then find its invocation key in `action-data.json` for exact node and carrier
-values. Calls such as `execute-node`, `execute-source` and `collect-node-outputs` name the operation rather
+the shared operations it calls. The helper derives exact node and carrier values from the Plan for each job;
+`action-data.json` is not a committed bundle member. Calls such as `execute-node`, `execute-source` and `collect-node-outputs` name the operation rather
 than a generated shape. Grouped jobs reuse the node interface for each operation; optional slots and further
 individual upload calls preserve every output without adding output-count variants. Invocation parameters
 have named roles. The helper recomputes those values from the admitted Plan at runtime; this data is generated,
-not another file to author. Templates contain fixed commands
+not another file to author or commit. Templates contain fixed commands
 and pinned actions, not scripts supplied as parameters. Native preflight, checkout, operator setup and timed
 producer execution remain inline. A controlled transfer delegates to an action containing one upload or
 download, with its condition, timeout and failure policy still visible on the caller. Steps whose outcomes
@@ -325,8 +324,8 @@ outside the workflow only when their calls can be extracted; the required inline
 upload-action pin updates visible in the maintained workflow. Always regenerate
 and check the complete bundle after an input change, even when the workflow file has no diff.
 
-The shared actions and invocation data are part of the same bundle: commit them with the workflow, Plan and
-manifest when adopting a generated pipeline. `--check` covers every template and data file, and regeneration
+The shared actions are part of the same bundle: commit them with the workflow, Plan and
+manifest when adopting a generated pipeline. `--check` covers every template, and regeneration
 retires unchanged obsolete actions through the previous manifest. Editing an action directly produces drift just like editing the
 workflow. Producer jobs retain explicit dependencies and separate results; producer matrices and general
 callable workflows remain deferred. The optional qualification bundle has its own fixed reusable native

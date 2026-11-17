@@ -77,7 +77,7 @@ func TestRuntimeSourcesFreezeCompositeAndReplayWithoutMain(t *testing.T) {
 	}
 	fresh := stageGitHubRuntimeInputs(t, root, after)
 	for name, raw := range baseline.Files {
-		if name == baseline.PlanPath || name == githubActionDataPathFor(before) ||
+		if name == baseline.PlanPath ||
 			(strings.HasPrefix(name, path.Dir(baseline.PlanPath)+"/steps/") && strings.HasSuffix(name, "/step.json")) {
 			continue
 		}

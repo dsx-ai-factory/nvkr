@@ -213,7 +213,7 @@ func TestGitHubWorkflowPinUpdateBoundaries(t *testing.T) {
 				spliced.Files[spliceAction] = before.Files[spliceAction]
 				assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), afterPlan, &spliced), test.spliceCode)
 			}
-			changedData := !bytes.Equal(before.Files[GitHubActionDataPath], after.Files[GitHubActionDataPath])
+			changedData := !bytes.Equal(before.githubActionData, after.githubActionData)
 			if test.wantData && !changedData {
 				t.Fatal("updated exact source selectors were not regenerated into action data")
 			}
@@ -223,7 +223,7 @@ func TestGitHubWorkflowPinUpdateBoundaries(t *testing.T) {
 				for path, raw := range after.Files {
 					spliced.Files[path] = raw
 				}
-				spliced.Files[GitHubActionDataPath] = before.Files[GitHubActionDataPath]
+				spliced.githubActionData = before.githubActionData
 				assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), afterPlan, &spliced), e.CodeEngineCapability)
 			}
 		})
