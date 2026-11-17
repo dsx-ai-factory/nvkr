@@ -233,7 +233,7 @@ var (
 	// bytes, add it to the seam-trap table above. Remove a command here when
 	// generation stops emitting it.
 	generatedStageCommands = map[string]bool{
-		"factory github check-runtime-inputs": true, "factory github ci-download": true,
+		"factory github ci-download":       true,
 		"factory github ci-fetch-locators": true, "factory github ci-upload": true,
 		"factory github describe-action": true, "factory github install-runtime-inputs": true,
 		"factory github stage-runtime-inputs": true, "factory github install-stage-runtime-inputs": true,
