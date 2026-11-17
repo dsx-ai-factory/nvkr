@@ -25,9 +25,10 @@ type releaseExportOperation func(context.Context, string, lifecycle.InspectionOp
 
 func releaseExportCmdWithOperation(export releaseExportOperation) *cli.Command {
 	return &cli.Command{
-		Name: "export", Usage: "export a versioned release description (metadata only; all outputs and platforms)",
+		Name: "export", Usage: "export a versioned release description (metadata only; all outputs by default)",
 		Flags: append([]cli.Flag{
 			&cli.StringFlag{Name: "format", Value: "json", Usage: "description encoding: json or aicr-inventory"},
+			&cli.StringSliceFlag{Name: "output", Usage: "include only this exact output in aicr-inventory (repeatable or comma-separated; default: all charts/images)"},
 			&cli.StringFlag{Name: "reference", Required: true, Usage: "published release repository@sha256:digest"},
 			&cli.StringFlag{Name: "layout", Usage: "inspect a cached publication layout with --reference"},
 			&cli.DurationFlag{Name: "timeout", Value: time.Hour, Usage: "bound the entire export"},
@@ -42,6 +43,9 @@ func releaseExportCmdWithOperation(export releaseExportOperation) *cli.Command {
 			}
 			if c.NArg() != 0 || (c.String("format") != "json" && c.String("format") != "aicr-inventory") || c.Duration("timeout") <= 0 {
 				return e.New(e.CodeUsage, "release export takes flags only, format json or aicr-inventory and a positive timeout")
+			}
+			if c.IsSet("output") && c.String("format") != "aicr-inventory" {
+				return e.New(e.CodeUsage, "--output requires --format aicr-inventory")
 			}
 			if c.String("format") == "aicr-inventory" {
 				if c.String("ui") == "tui" {
@@ -89,7 +93,7 @@ func releaseExportCmdWithOperation(export releaseExportOperation) *cli.Command {
 				if err := json.Unmarshal(raw, &description); err != nil {
 					return e.Wrap(e.CodeInternal, err, "decoding release description")
 				}
-				raw, err = releaseview.ArtifactInventory(description)
+				raw, err = releaseview.ArtifactInventory(description, c.StringSlice("output")...)
 				if err != nil {
 					return err
 				}
