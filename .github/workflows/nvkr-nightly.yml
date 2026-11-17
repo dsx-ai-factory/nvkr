@@ -118,10 +118,13 @@ jobs:
         timeout-minutes: 20
         run: timeout --kill-after=10s 1100s make build demo
       - name: Build NVKE and run the existing Go site and tenant E2E with cleanup
+        id: nvke_e2e
         env:
           NVKR_NVKE_E2E: '1'
           NVKR_NVKE_E2E_TENANT: '1'
           NVKR_NVKE_E2E_CONFIG: demos/nightly-nvke.yaml
+          # TEMPORARY: the capture hook also admits only this exact fork/ref/event.
+          NVKR_NKTP_DEBUG: '1'
         run: |
           set -euo pipefail
           timeout --kill-after=10s 180s go test ./internal/nvkedemo -list '^TestEndToEnd$' | grep -Fx TestEndToEnd
@@ -130,3 +133,26 @@ jobs:
           (( remaining > 125 * 60 ))
           go test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -v \
             -exec "env --chdir \"$GITHUB_WORKSPACE\"" -timeout "${remaining}s"
+      # TEMPORARY FORK-ONLY DIAGNOSTICS. Revert before review.
+      - name: Encrypt temporary fork deploy diagnostics
+        id: encrypt_deploy_debug
+        if: >-
+          failure() && github.repository == 'njhensley/nvkr' &&
+          github.ref == 'refs/heads/fix/nvkr-nktp-chart-source' &&
+          steps.nvke_e2e.outcome == 'failure' && env.NVKR_HOST_DEPLOY_FAILED == '1'
+        timeout-minutes: 3
+        run: bash scripts/fork-nktp-debug-encrypt.sh >/dev/null 2>&1
+      - name: Upload only temporary fork ciphertext
+        if: >-
+          failure() && github.repository == 'njhensley/nvkr' &&
+          github.ref == 'refs/heads/fix/nvkr-nktp-chart-source' &&
+          steps.nvke_e2e.outcome == 'failure' && steps.encrypt_deploy_debug.outcome == 'success'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nktp-deploy-debug
+          path: |
+            ${{ runner.temp }}/nktp-deploy-debug-encrypted/deploy.tar.enc
+            ${{ runner.temp }}/nktp-deploy-debug-encrypted/key.enc
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0

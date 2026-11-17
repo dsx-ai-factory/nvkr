@@ -268,7 +268,14 @@ func (s *nativeSiteAttempt) deployFromHost(ctx context.Context, runner Runner, c
 	}
 	args = append(args, helmArgs...)
 	deployment.output = nil
+	deployment, debug, err := temporaryForkDeployDebug(deployment)
+	if err != nil {
+		return err
+	}
 	if _, err := deployment.Capture(ctx, args, "host-nvke-deploy", 0); err != nil {
+		if debug && !errors.Is(err, ErrUnjoined) {
+			temporaryForkDeployFailure(ctx, deployment, tools, filepath.Join(out, "site.kubeconfig"))
+		}
 		return err
 	}
 	// Both source commands remain under the original work deadline.
