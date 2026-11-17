@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // nvkr-disk-inspect is the fixed entrypoint inside the inspection toolchain. All
-// subject authentication, inspection and result binding lives in pkg/nvkr/sbom;
+// subject authentication, inspection and result binding lives in pkg/nvkr/diskinspect;
 // the execution owner authenticates kernel resource limits before subject reads.
 package main
 
@@ -16,9 +16,9 @@ import (
 	"syscall"
 
 	"github.com/dsx-ai-factory/nvkr/internal/diskdiagnostic"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/diskinspect"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
 func main() {
@@ -31,7 +31,7 @@ func main() {
 	}
 }
 
-// run maps flags and the owning SBOM operation to the frozen CLI exit table.
+// run maps flags and the owning inspection operation to the frozen CLI exit table.
 func run(ctx context.Context, args []string, input io.Reader, output, diagnostic io.Writer) int {
 	return runWithLimitCheck(ctx, args, input, output, diagnostic, execution.VerifyCurrentCgroupLimits)
 }
@@ -39,11 +39,11 @@ func run(ctx context.Context, args []string, input io.Reader, output, diagnostic
 // The private seam tests that admission precedes subject reads. Production always
 // invokes the kernel owner above; no caller can replace its enforcement check.
 func runWithLimitCheck(ctx context.Context, args []string, input io.Reader, output, diagnostic io.Writer, verify func(context.Context, uint64, uint64, uint64) error) int {
-	return runWithContentHelper(ctx, args, input, output, diagnostic, verify, sbom.RunDiskContentHelper)
+	return runWithContentHelper(ctx, args, input, output, diagnostic, verify, diskinspect.RunDiskContentHelper)
 }
 
 // Only the command's positional mapping is replaceable in tests. Production
-// always delegates to the concrete SBOM owner after kernel-limit admission.
+// always delegates to the concrete inspection owner after kernel-limit admission.
 func runWithContentHelper(ctx context.Context, args []string, input io.Reader, output, diagnostic io.Writer,
 	verify func(context.Context, uint64, uint64, uint64) error,
 	content func(context.Context, string, string, string, int64, string, string, string, string, uint64, string, io.Reader, io.Writer) error,
@@ -79,7 +79,7 @@ func runWithContentHelper(ctx context.Context, args []string, input io.Reader, o
 			err = content(ctx, args[0], args[1], args[2], size, args[5], args[6], args[7], args[8], budget, args[10], input, output)
 		}
 	} else {
-		err = sbom.RunDiskInspectionHelper(ctx, args[0], args[1], args[2], size, input, output)
+		err = diskinspect.RunDiskInspectionHelper(ctx, args[0], args[1], args[2], size, input, output)
 	}
 	if err != nil {
 		fmt.Fprintln(diagnostic, err)

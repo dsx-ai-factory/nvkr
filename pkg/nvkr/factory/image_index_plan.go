@@ -76,6 +76,12 @@ func (plan Plan) selectionForBuild(name string) (authored.DefinitionOutput, bool
 			}
 		}
 	}
+	for _, tool := range plan.Definition.InternalTools {
+		selection := internalToolSelection(tool)
+		if selection.Name == name {
+			return selection, true
+		}
+	}
 	return authored.DefinitionOutput{}, false
 }
 

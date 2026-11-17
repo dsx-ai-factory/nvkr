@@ -81,6 +81,16 @@ func compileDocumentsFor(ctx context.Context, definitionPath string, definition 
 		}
 		targetStacks[target.Name] = targetStack
 	}
+	for _, tool := range definition.InternalTools {
+		if tool.Catalog == nil {
+			continue
+		}
+		selected, err := loadStack(ctx, *tool.Catalog)
+		if err != nil {
+			return nil, e.Wrap(e.CodeInvalidCatalog, err, "loading internal tool %q catalog", tool.Name)
+		}
+		targetStacks[internalToolSelection(tool).Name] = selected
+	}
 	return compileWithTargetStacksFor(ctx, definition, delivery, stack, targetStacks, generatorVersion,
 		filepath.ToSlash(filepath.Clean(definitionPath)), filepath.ToSlash(filepath.Clean(environmentPath)), record, runtimeSourceCommit...)
 
@@ -121,6 +131,11 @@ func Compile(ctx context.Context, definition authored.Definition, delivery autho
 		if target.Catalog != nil {
 			return nil, e.New(e.CodeUsage,
 				"factory build target %q has a catalog override; compile it through CompileDocuments", target.Name)
+		}
+	}
+	for _, tool := range definition.InternalTools {
+		if tool.Catalog != nil {
+			return nil, e.New(e.CodeUsage, "internal tool %q has a catalog override; compile it through CompileDocuments", tool.Name)
 		}
 	}
 	return compileWithTargetStacks(ctx, definition, delivery, stack, nil, generatorVersion, "", "")
@@ -164,10 +179,6 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 	if err != nil {
 		return nil, err
 	}
-	tools, err := selectedTools(definition, delivery, stack.Catalog)
-	if err != nil {
-		return nil, err
-	}
 	plan := &Plan{Actions: cloneActionPins(stack.Catalog.Actions), SchemaVersion: PlanSchemaVersion, Name: definition.Metadata.Name,
 		GeneratorVersion: generatorVersion, Qualification: planTier(delivery.Signing),
 		DefinitionDigest: definitionDigest, EnvironmentDigest: environmentDigest, Definition: definition, Environment: delivery,
@@ -196,6 +207,26 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 			}
 			plan.Builds = append(plan.Builds, build)
 		}
+	}
+	for _, tool := range definition.InternalTools {
+		selection := internalToolSelection(tool)
+		selectedStack := stack
+		if selected := targetStacks[selection.Name]; selected != nil {
+			selectedStack = selected
+		}
+		build, err := compileOutputBuild(selection, delivery, selectedStack)
+		if err != nil {
+			return nil, err
+		}
+		plan.Builds = append(plan.Builds, build)
+	}
+	tools, err := selectedTools(definition, delivery, plan.CatalogSnapshot, plan.Builds)
+	if err != nil {
+		return nil, err
+	}
+	plan.InternalTools, err = requiredInternalTools(definition, plan.Builds)
+	if err != nil {
+		return nil, err
 	}
 	builds := make(map[string]BuildPlan, len(plan.Builds))
 	for _, build := range plan.Builds {

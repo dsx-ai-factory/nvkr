@@ -32,7 +32,11 @@ func archiveAssetPlan(t *testing.T) *Plan {
 			base = *build.CatalogSnapshot
 		}
 	}
-	base.Tools = map[string]catalog.ToolPin{"syft": maintained.CatalogSnapshot.Tools["syft"]}
+	scanner, err := maintained.CatalogSnapshot.SelectTool("syft", "linux/amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	base.Tools = map[string]catalog.ToolPin{"syft": scanner}
 	stack, err := catalog.ApplyStack(&base)
 	if err != nil {
 		t.Fatal(err)

@@ -726,7 +726,7 @@ jobs:
     timeout-minutes: 60
     needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: &steps-ubuntu-24-04-node
+    steps:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
@@ -859,16 +859,6 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-tool-syft:
-    name: 'Acquire pinned syft'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 60
-    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: *steps-ubuntu-24-04-node
-    permissions:
-      actions: read
-      contents: read
   nvkr-process-package-release-publish-rele-e70edb401cae:
     name: 'Assemble, publish, sign and verify release'
     runs-on: 'ubuntu-24.04'
@@ -899,7 +889,7 @@ jobs:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-disk-nvke-node-fde-ubuntu24-amd64, nvkr-disk-nvke-node-fde-ubuntu24-arm64, nvkr-disk-nvke-node-image-ubuntu24-amd64, nvkr-disk-nvke-node-image-ubuntu24-arm64, nvkr-process-attest-sboms-output-nvke-nod-1bc709ca4460, nvkr-process-attest-sboms-output-nvke-nod-49ea879f4e2d, nvkr-process-attest-sboms-output-nvke-nod-6c5f57895380, nvkr-process-attest-sboms-output-nvke-nod-f8e29abf6a17, nvkr-process-nvke-node-fde-ubuntu24-amd64-1d015a140907, nvkr-process-nvke-node-fde-ubuntu24-amd64-68929548ea3f, nvkr-process-nvke-node-fde-ubuntu24-arm64-a56b24fa4b5a, nvkr-process-nvke-node-fde-ubuntu24-arm64-dde6af2e8bf0, nvkr-process-nvke-node-image-ubuntu24-amd-309e0b0b668e, nvkr-process-nvke-node-image-ubuntu24-amd-414a3d348ba5, nvkr-process-nvke-node-image-ubuntu24-arm-d06d399d5548, nvkr-process-nvke-node-image-ubuntu24-arm-e2b6ca37b5c9, nvkr-process-package-release-publish-rele-e70edb401cae, nvkr-tool-cosign, nvkr-tool-syft, preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-disk-nvke-node-fde-ubuntu24-amd64, nvkr-disk-nvke-node-fde-ubuntu24-arm64, nvkr-disk-nvke-node-image-ubuntu24-amd64, nvkr-disk-nvke-node-image-ubuntu24-arm64, nvkr-process-attest-sboms-output-nvke-nod-1bc709ca4460, nvkr-process-attest-sboms-output-nvke-nod-49ea879f4e2d, nvkr-process-attest-sboms-output-nvke-nod-6c5f57895380, nvkr-process-attest-sboms-output-nvke-nod-f8e29abf6a17, nvkr-process-nvke-node-fde-ubuntu24-amd64-1d015a140907, nvkr-process-nvke-node-fde-ubuntu24-amd64-68929548ea3f, nvkr-process-nvke-node-fde-ubuntu24-arm64-a56b24fa4b5a, nvkr-process-nvke-node-fde-ubuntu24-arm64-dde6af2e8bf0, nvkr-process-nvke-node-image-ubuntu24-amd-309e0b0b668e, nvkr-process-nvke-node-image-ubuntu24-amd-414a3d348ba5, nvkr-process-nvke-node-image-ubuntu24-arm-d06d399d5548, nvkr-process-nvke-node-image-ubuntu24-arm-e2b6ca37b5c9, nvkr-process-package-release-publish-rele-e70edb401cae, nvkr-tool-cosign, preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     env:
@@ -987,7 +977,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 27 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 26 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {

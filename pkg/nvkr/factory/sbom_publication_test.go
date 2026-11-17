@@ -136,6 +136,20 @@ func TestPublicationContainsExactBoundSBOMBytes(t *testing.T) {
 	}
 }
 
+func TestPublicationRejectsInternalToolOnUnsupportedConsumer(t *testing.T) {
+	plan, artifacts, node := publicationSBOMFixture(t)
+	set := artifacts["sbom/node-worker"]
+	for i := range plan.Graph.Nodes {
+		if plan.Graph.Nodes[i].ID == set.Producer {
+			plan.Graph.Nodes[i].InternalTools = []string{"helper"}
+		}
+	}
+	assertFactoryErrorCode(t, executePackage(t.Context(), plan, node, artifacts, io.Discard), e.CodeEngineCapability)
+	if _, err := os.Stat(artifacts[node.Outputs[0]].Path); !os.IsNotExist(err) {
+		t.Fatal("unsupported helper use wrote a publication")
+	}
+}
+
 func TestPublicationRejectsInvalidSBOMBeforeWriting(t *testing.T) {
 	plan, original, node := publicationSBOMFixture(t)
 	for _, tc := range []struct {

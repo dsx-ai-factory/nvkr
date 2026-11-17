@@ -28,7 +28,8 @@ import (
 type ToolSource struct {
 	Format         string   `json:"format"`
 	URL            string   `json:"url"`
-	Platform       string   `json:"platform"`
+	Platform       string   `json:"platform,omitempty"`
+	Platforms      []string `json:"platforms,omitempty"`
 	ExecutablePath string   `json:"executablePath"`
 	Companions     []string `json:"companions,omitempty"`
 }
@@ -70,6 +71,9 @@ func toolArchiveLimits() releaseasset.Limits {
 }
 
 func validateToolSource(tool ToolSource) error {
+	if tool.Platforms != nil {
+		return validatePlatformToolSource(tool)
+	}
 	if tool.Format != "raw" && tool.Format != "tar-gzip" && tool.Format != "zip" {
 		return e.New(e.CodeInvalidCatalog, "unsupported tool format %q", tool.Format)
 	}
@@ -178,6 +182,9 @@ func (pin ToolPin) ArchiveMember(ctx context.Context, archive []byte, member str
 }
 
 func checkToolPin(source *ToolSource, pin Pin) error {
+	if source != nil && source.Platforms != nil || pin.Tools != nil {
+		return checkPlatformToolPins(source, pin)
+	}
 	if source == nil {
 		if pin.Tool != nil {
 			return e.New(e.CodeInvalidCatalog, "orphan tool pin")
@@ -197,14 +204,13 @@ func checkToolPin(source *ToolSource, pin Pin) error {
 	}
 	return validateToolPin(*pin.Tool)
 }
-func resolveToolPin(ctx context.Context, source ToolSource, pin Pin) (ToolPin, error) {
-	client := &http.Client{Timeout: 5 * time.Minute, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+func toolHTTPClient() *http.Client {
+	return &http.Client{Timeout: 5 * time.Minute, CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if req.URL.Scheme != "https" || len(via) >= 10 {
 			return e.New(e.CodeFetchFailed, "unsafe tool redirect")
 		}
 		return nil
 	}}
-	return resolveToolWithClient(ctx, source, pin, client)
 }
 func resolveToolWithClient(ctx context.Context, source ToolSource, pin Pin, client *http.Client) (ToolPin, error) {
 	if err := pinContextError(ctx); err != nil {

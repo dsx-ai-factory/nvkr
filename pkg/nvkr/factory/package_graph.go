@@ -187,9 +187,18 @@ func publicationSBOMInputs(inputs []string, nodes map[string]Node, artifacts map
 		}
 		set := "sbom/" + artifact.BuildTarget
 		result = append(result, set)
-		for _, input := range nodes[artifacts[set].Producer].Inputs {
+		consumer := nodes[artifacts[set].Producer]
+		for _, input := range consumer.Inputs {
 			if artifacts[input].Kind == "producer-result" {
 				result = append(result, input)
+			}
+			// Carry the original helper evidence into the publication job so its
+			// exact use can be checked before any root is packaged or signed.
+			// These Build-owned inputs do not become delivery members.
+			for _, tool := range consumer.InternalTools {
+				if artifacts[input].BuildTarget == "internal/"+tool {
+					result = append(result, input)
+				}
 			}
 		}
 	}

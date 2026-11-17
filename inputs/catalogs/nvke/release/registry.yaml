@@ -187,6 +187,6 @@ imports:
   path: "../../shared/nvke.yaml"
   sha256: 90dbe40c5ce58b88c2722343db8a12f8f2ea4ad7f853fd20a8f69fb908994def
 - sources:
-    syft: syft
+    syft: syft-native
   path: "../../shared/syft.yaml"
-  sha256: f52faff48638dde1ee3b2c6ff7e71501739cefbed502fe80ad296b9de370a897
+  sha256: 17aaf50bd52ce3e979d6bdd7aaed43c23f363862028c30a3834d2d44128e6207

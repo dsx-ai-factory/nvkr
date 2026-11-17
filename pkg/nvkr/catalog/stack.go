@@ -79,6 +79,7 @@ type Stack struct {
 type catalogSnapshot struct {
 	Actions       map[string]ActionPin `json:"actions,omitempty"`
 	Tools         map[string]ToolPin   `json:"tools,omitempty"`
+	ToolPlatforms map[string][]ToolPin `json:"toolPlatforms,omitempty"`
 	SchemaVersion string               `json:"schemaVersion"`
 	APIVersion    string               `json:"apiVersion"`
 	Kind          string               `json:"kind"`
@@ -96,7 +97,7 @@ func (cat *Catalog) SnapshotDigest() (string, error) {
 	}
 	return canonical.Digest(canonical.KindCatalogSnapshot, catalogSnapshot{
 		SchemaVersion: "nvkr.dev/catalog-snapshot/v3", APIVersion: cat.APIVersion,
-		Kind: cat.Kind, Metadata: cat.Metadata, Sources: cat.Sources, Tools: cat.Tools, Actions: cat.Actions,
+		Kind: cat.Kind, Metadata: cat.Metadata, Sources: cat.Sources, Tools: cat.Tools, ToolPlatforms: cat.ToolPlatforms, Actions: cat.Actions,
 		Components: cat.Components,
 	})
 }

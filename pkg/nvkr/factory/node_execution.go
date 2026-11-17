@@ -60,9 +60,7 @@ func (plan Plan) executionForProducer(node Node) (Node, error) {
 	// Ordinary native ARM64 producers need a matching generic hosted runner.
 	// The explicit ARC route owns its projection, including existing utility jobs.
 	// Explicit Environment routes and VM execution bindings remain authoritative.
-	if plan.Environment.RunsOn == "" && plan.Environment.GitHubARC == "" && node.Platform == "linux/arm64" {
-		node.RunsOn = "ubuntu-24.04-arm"
-	}
+	node.RunsOn = defaultHostedRunner(plan.Environment, node.Platform, node.RunsOn)
 	switch instruction.Kind {
 	case ir.KindFetch:
 		node.Network = ir.NetworkDefault
