@@ -12,7 +12,7 @@ PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
 # Bound each package explicitly; the local unsharded suite can exceed Go's
-# implicit 10-minute default. Hosted shards have a separate five-minute job budget.
+# implicit 10-minute default. Hosted shards have a separate ten-minute job budget.
 GO_TEST_TIMEOUT ?= 20m
 # CI splits the ordinary suite; reproduce any matrix entry with make test-shard.
 TEST_SHARD_GROUP ?=

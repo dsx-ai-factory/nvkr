@@ -27,7 +27,7 @@ and an in-cluster registry. The [Tekton guide](../docs/generate-pipeline.md#tekt
 lists prerequisites, trust scope and retained evidence. The GitHub acceptance workflow runs this same
 command; it needs no publishing secrets. This explicit integration test fails when prerequisites are absent.
 
-`ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's eleven
+`ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's fifteen
 test jobs. It includes examples and fuzz seed tests, and requires exact completion of the discovered
 selection. New packages and tests need no allowlist update. `make test-shard` reproduces one matrix
 entry; `make test` still runs the full suite. Each child command may retain at most 32 MiB of stdout;

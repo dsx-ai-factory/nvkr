@@ -343,7 +343,7 @@ exceptions and completed Runs are scoped in [reconciliation](docs/adr/reconcilia
 ## Test timing and cache use
 
 Use `make test GO_TEST_FLAGS="-json -count=1"` to capture uncached ordinary test events. CI runs the same
-ordinary suite in eleven shards: four divide factory tests, two divide lifecycle tests, and five divide
+ordinary suite in fifteen shards: eight divide factory tests, two divide lifecycle tests, and five divide
 the remaining packages. Heavy-package selections come from Go's compiled test inventory, including
 examples and fuzz seeds; all other packages run whole. New packages and tests are assigned automatically.
 Each test runs in one shard, and the gate requires every shard plus the independent static, lint and
@@ -352,8 +352,8 @@ vulnerability checks to succeed. `make test` and `make check` retain the complet
 Reproduce a shard with `make test-shard TEST_SHARD_GROUP=factory TEST_SHARD_INDEX=0`; group/index values
 match the workflow matrix. CI retains each shard's event stream for seven days and summarizes slow
 packages/tests, including failures. Compiled-output and lint caches remain disabled under the repository's
-private-storage policy. Local build caching still works normally. Five minutes is the job budget for these
-repository checks; end-to-end hosted performance, including runner queues and cold compilation, must be
+private-storage policy. Local build caching still works normally. Ten minutes is the job budget for each
+test shard; end-to-end hosted performance, including runner queues and cold compilation, must be
 measured in an actual Run.
 
 [CI test performance](docs/ci-test-performance.md) owns the measured Merge Gate follow-up and focused

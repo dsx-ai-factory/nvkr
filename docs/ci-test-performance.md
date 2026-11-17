@@ -67,7 +67,7 @@ into this branch unchanged.
 The five-minute CI target also requires shortening the critical path: the linked job spent 70 seconds
 in vet and 160 seconds in lint before starting tests. Its other jobs already finished within three minutes
 (generated-bundle checks: 2m14s; CodeQL: 2m50s). Repository checks therefore separate static checks, lint,
-vulnerability scanning and ordinary tests into concurrent jobs. Eleven deterministic test shards split
+vulnerability scanning and ordinary tests into concurrent jobs. The initial eleven-shard distribution split
 factory across four jobs, lifecycle across two, and the remaining packages across five. Discovery includes
 new tests automatically; sharding must preserve each ordinary test exactly once and propagate failures.
 The existing local `make test` and `make check` remain available without sharding or new opt-in conditions.
