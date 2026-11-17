@@ -148,8 +148,13 @@ contain the in-tree chart retain those bytes and skip the external fetch. An
 absent chart with a different deployment version or repository fails before
 fetching. The independently built nightly NKTP chart uses the same source pin;
 the shared release catalogs retain their existing NKTP selection.
+An NVKE-side NKTP version bump requires a matching overlay update. On the retained
+v0.23.0 baseline, this overlay builds an NKTP 0.2.0 chart that the baseline does
+not deploy. Current NVKE installs NKTP 0.2.0 from NGC at deploy time; the vendored
+source satisfies the extractor's required-file check and is not deployed either.
 
 The scheduled workflow captures NVKE's commit from a shallow checkout, then
 fetches pinned sources from their public repositories. It does not pass that
 checkout through `NVKE_LOCAL_CLONE`: the bare NVKE Git URL rewrite would also
 match `nvke-telemetry-pipeline` and send NKTP's fetch to a nonexistent local path.
+Local launchers still have that limitation when `NVKE_LOCAL_CLONE` is set.

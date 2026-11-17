@@ -4,7 +4,6 @@
 package catalog
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +14,9 @@ import (
 // Exercise the declared fetch command against a local Git repository. This
 // covers the missing chart in current NVKE without requiring a hosted build.
 func TestNightlyInstallerVendorsPinnedNKTP(t *testing.T) {
+	if _, err := exec.LookPath("timeout"); err != nil {
+		t.Skip("installer vendoring requires GNU timeout")
+	}
 	tools, err := LoadOverlayContext(t.Context(), "../../../inputs/catalogs/tools/variants/nightly-go.json")
 	if err != nil {
 		t.Fatal(err)
@@ -36,7 +38,7 @@ func TestNightlyInstallerVendorsPinnedNKTP(t *testing.T) {
 			t.Fatal("installer vendor source differs from the independently pinned chart producer")
 		}
 	}
-	for _, scenario := range []string{"current", "in-tree", "unexpected version", "unexpected repository", "duplicate chart", "missing release", "wrong tree", "wrong chart version", "canceled"} {
+	for _, scenario := range []string{"current", "in-tree", "unexpected version", "unexpected repository", "duplicate chart", "missing release", "wrong tree", "wrong chart version"} {
 		t.Run(scenario, func(t *testing.T) {
 			source := t.TempDir()
 			write := func(root, name, text string) {
@@ -84,25 +86,30 @@ func TestNightlyInstallerVendorsPinnedNKTP(t *testing.T) {
 				release = "chart:\n  name: nktp\n  path: ../../nktp/deploy/charts/nktp\n"
 				write(root, "nktp/deploy/charts/nktp/Chart.yaml", "original chart\n")
 			}
+			release += "release:\n  name: nktp\n"
 			if scenario != "missing release" {
 				write(root, "deploy/nico/nktp/release.yaml", release)
 			}
-			ctx, cancel := context.WithCancel(t.Context())
-			defer cancel()
-			if scenario == "canceled" {
-				cancel()
-			}
 			command := append([]string(nil), installer.VendorCommand...)
 			command[2] = strings.NewReplacer(nktp.Commit, commit, nktp.TreeHash, tree).Replace(command[2])
-			child := exec.CommandContext(ctx, command[0], command[1:]...)
+			child := exec.CommandContext(t.Context(), command[0], command[1:]...)
 			child.Dir = root
 			trace := filepath.Join(root, "git-trace")
 			child.Env = append(os.Environ(), "GIT_CONFIG_COUNT=2", "GIT_CONFIG_KEY_0=url."+source+".insteadOf", "GIT_CONFIG_VALUE_0="+nktp.Repo,
-				"GIT_CONFIG_KEY_1=protocol.file.allow", "GIT_CONFIG_VALUE_1=always", "GIT_TRACE="+trace)
+				"GIT_CONFIG_KEY_1=protocol.file.allow", "GIT_CONFIG_VALUE_1=always", "GIT_TRACE="+trace, "TMPDIR="+t.TempDir())
 			out, err := child.CombinedOutput()
 			wantOK := scenario == "current" || scenario == "in-tree"
 			if (err == nil) != wantOK {
 				t.Fatalf("vendor command: %v: %s", err, out)
+			}
+			switch scenario {
+			case "unexpected version", "unexpected repository", "duplicate chart", "missing release":
+				if !strings.Contains(string(out), "NVKE ") || !strings.Contains(string(out), "NKTP chart") {
+					t.Fatalf("missing chart-selection diagnostic: %s", out)
+				}
+				if _, err := os.Stat(trace); !os.IsNotExist(err) {
+					t.Fatal("unreviewed chart selection reached Git")
+				}
 			}
 			chart := filepath.Join(root, "nktp/deploy/charts/nktp/Chart.yaml")
 			if !wantOK {

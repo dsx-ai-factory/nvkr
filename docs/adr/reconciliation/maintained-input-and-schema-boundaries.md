@@ -169,12 +169,15 @@ Native children are locked separately from source-owned index parents, and mater
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
 scanner acceptance or complete production input approval. The
 [acquisition observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain the historical mixed-source candidate and HTTP-403 limits.
-The maintained release and native demo inputs now select the same stock NVKE `v0.23.0`
+The maintained release and retained native demo baseline select the same stock NVKE `v0.23.0`
 source, `2cfd00081b468d85a4894ec17e9deac13c9d8169`, for OS assembly, agent, Calico,
 kubeadm, SPIRE packaging and DOCA OVS acquisition, including the renamed Packer targets, disk filenames,
 material schema and required Ubuntu-series input. NVKE telemetry pipelines is packaged from its own repository,
 `dsx-ai-factory/nvke-telemetry-pipeline`, at `nktp/v0.1.0`, the release that `v0.23.0`'s site values target.
-The native installer bundle still installs `v0.23.0`'s in-tree chart until NVKR selects an NVKE release without it
+The retained native installer uses `v0.23.0`'s in-tree chart. The AMD64 nightly overlays instead package
+NKTP `nktp/v0.2.0` and vendor its pinned source into installers whose NVKE source lacks the chart;
+current NVKE installs NKTP 0.2.0 from NGC at deploy time, so the vendored source only satisfies the
+extractor's required-file check and the packaged chart is not deployed
 ([#465](https://github.com/dsx-ai-factory/nvkr/issues/465)). SPIRE uses that release's revision-4
 package and source-owned public acquisition/packaging commands; no pre-DSX source
 rollback is selected. The default package's removal of DSX IMDS is an upstream release

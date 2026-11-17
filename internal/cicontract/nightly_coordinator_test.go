@@ -67,6 +67,9 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 		built, tenant, source, host, deadline, kvm := false, false, false, false, false, false
 		nvkrCheckouts, nvkeCheckouts := 0, 0
 		for _, step := range job.Steps {
+			if strings.Contains(step.Run, "NVKE_LOCAL_CLONE") || step.Env["NVKE_LOCAL_CLONE"] != "" {
+				t.Fatal("nightly must fetch public sources without NVKE prefix rewrites")
+			}
 			for _, line := range strings.Split(step.Run, "\n") {
 				if strings.Contains(line, "/dev/kvm") && (strings.Contains(line, "chmod") || strings.Contains(line, "setfacl")) {
 					t.Fatal("nightly KVM access must use its single udev rule")
