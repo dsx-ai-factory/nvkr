@@ -2,7 +2,8 @@
 
 - **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** U1–U8 implemented; U9 waits on result-reuse implementation and cross-workflow origin
-  admission; U10 waits on the publication, consumer-verification and equivalence gates below. `reconciliation/README.md` records the implemented scope.
+  admission; U10 cut over by the 2026-11-17 UTC maintainer decision. Independent consumer verification and
+  combined-output equivalence remain unrecorded acceptance work. `reconciliation/README.md` records the implemented scope.
 - **Acceptance-test maturity:** Contract suites for U1–U8, including an opt-in extended identity-invariance
   contract over the four NVKE families. The [hosted composite publication record](reconciliation/adr-26.md#hosted-gpu-site-publication)
   owns external execution evidence and its consumer-acceptance and qualification limits.
@@ -436,7 +437,7 @@ Negative cases on the same inputs:
   `unverified-ref`.
 - Adding a member whose top-level catalog is `../../catalogs/nvke/release` fails with `invalid-catalog`.
 
-Decided: the composite is the sole maintained NVKE product Definition. On 2026-11-17,
+Decided: the composite is the sole maintained NVKE product Definition. On 2026-11-17 UTC,
 njhensley explicitly approved replacing the combined production bundle with `nvkr-run-nvke`,
 retiring standalone family bundles and the two legacy ARM64 nightly producers, and naming the
 floating-source composite bundle `nvkr-run-nvke-nightly`. The fixed development bundle remains

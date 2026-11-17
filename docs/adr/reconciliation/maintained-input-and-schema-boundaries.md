@@ -18,6 +18,11 @@ workflow, root and acceptance scope. Independent consumer verification and Ubunt
 outstanding. The remaining paragraphs retain their dated scope; standalone-family references describe
 the retired pilot, not current maintained workflows.
 
+Actions history retrieved on November 14, 2026 recorded one successful standalone
+[core Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/40641309939), with older membership, and no Runs
+for services, telemetry or either disk family. That historical pilot evidence retains its scope after
+retirement; it does not establish current composite execution or independent consumer acceptance.
+
 The [GPU system matrix](../../../inputs/definitions/nvke/README.md#gpu-system-matrix) maps GB200, GB300, VR200
 and the site controller to family outputs in documentation only. It adds no Definition axis, input or
 generated file. NVKR records no GPU driver, fabric or runtime acceptance for any of them; that evidence
@@ -47,7 +52,7 @@ build records and 69 output records against the updated combined Plan. The exten
 contract passed in 4.05 seconds and the complete focused family/credential suite in 32.747 seconds on
 2026-10-20, with Go 1.27.2 on Darwin ARM64 and recorded staged tree
 `e9187e1e6ce5e5fda6d26e04b912d10622f559c0`. The
-[current measurements](../../definition-partitioning-strategy.md#current-local-validation) record each family.
+[current measurements](../../definition-partitioning-strategy.md#historical-local-validation) record each family.
 The full local gate passed at 21:54:35 UTC on 2026-10-20 on staged tree
 `2ff2a400055ae9cfe429b5c0bcfeb55bfaaedb41`, with Go 1.27.2 on Darwin ARM64 and golangci-lint 2.14.0:
 `make check GO_TEST_FLAGS='-count=1 -json -p=1'`, `make build` and both diff checks. All 58 default Go

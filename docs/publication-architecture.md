@@ -356,7 +356,7 @@ builder identity used above:
 
 ```sh
 cosign verify-attestation --type https://nvkr.dev/qualification-evidence/v2 \
-  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-qualify.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-qualify-nvke.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$ARTIFACT_REF"
 ```
 

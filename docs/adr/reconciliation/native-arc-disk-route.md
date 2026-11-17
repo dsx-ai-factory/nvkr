@@ -6,6 +6,11 @@ ADR-26 U10 records the explicit 2026-11-17 product cutover; no new hosted accept
 Alternate diagnostic selections can still be generated into scratch roots. The records below describe
 the earlier combined candidate and standalone FDE diagnostic at their exact revisions.
 
+The standalone `codex/fde-image-pipeline` branch used the separate one-output FDE Definition
+and build-only Environment for the recorded diagnostic below. On October 13, 2026, the
+`nkd-arc` Environment admitted that exact branch through deployment policy `62934956`, preserving its
+existing `main` and M2 validation-branch policies. That provider configuration is not execution evidence.
+
 The build-only finalizer uses the selected native ARC pool and matching helper with a two-hour bound,
 restoring and rehashing the complete raw-disk closure without publication authority. Comparable AMD64
 material, source and disk-package carriers in [Run 37533806963](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963)
