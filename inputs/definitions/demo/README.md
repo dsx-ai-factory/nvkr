@@ -78,9 +78,10 @@ uncommitted checkout bytes; omit it for canonical remote fetch. Compilation can
 require authenticated Git access because NVKE chart pin sets are checked against
 the pinned tree. Dry-run/preflight are not runtime acceptance.
 
-The site catalog pins CLI, controller and charts to one exact NVKE candidate;
+The site catalog pins CLI, controller and its chart to one exact NVKE candidate;
 the installer and every NVKE source, including SPIRE, select v0.23.0 at
-`2cfd00081b468d85a4894ec17e9deac13c9d8169`. The demo uses its site-spec renderer
+`2cfd00081b468d85a4894ec17e9deac13c9d8169`. Its separate NKTP 0.1.0 pin preserves
+compatibility with that NVKE release's telemetry values. The demo uses its site-spec renderer
 and deployment entrypoint with verified local charts and image digests. Tenant
 setup creates MachineImage, ClusterRelease and NodePoolRelease resources from
 the observed profiles container and selected disk before requesting the tenant.
@@ -147,3 +148,8 @@ contain the in-tree chart retain those bytes and skip the external fetch. An
 absent chart with a different deployment version or repository fails before
 fetching. The independently built nightly NKTP chart uses the same source pin;
 the shared release catalogs retain their existing NKTP selection.
+
+The scheduled workflow captures NVKE's commit from a shallow checkout, then
+fetches pinned sources from their public repositories. It does not pass that
+checkout through `NVKE_LOCAL_CLONE`: the bare NVKE Git URL rewrite would also
+match `nvke-telemetry-pipeline` and send NKTP's fetch to a nonexistent local path.

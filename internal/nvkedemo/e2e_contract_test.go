@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -344,10 +345,26 @@ func TestHostedE2EUsesAuthoredConfiguration(t *testing.T) {
 	if _, err := freshDestination(cfg.Out); err != nil {
 		t.Fatalf("authored output must admit a fresh hosted workspace: %v", err)
 	}
-	if build.Repository != repository || build.NVKEClone != filepath.Join(repository, "nvke-source") || cfg.Out != filepath.Join(repository, "nightly-site") ||
+	if build.Repository != repository || cfg.Out != filepath.Join(repository, "nightly-site") ||
 		!tenant || !cfg.Cleanup || cfg.Conformance || cfg.TenantWorkers != 1 || build.Jobs != 1 || cfg.Runs != (RunInputs{}) || cfg.NVKR != "" ||
 		cfg.Resources != (NativeResources{SiteMemoryGiB: 7, TenantMemoryGiB: 3, HeadroomMiB: 1024, VCPUs: 4, Profile: "small"}) {
 		t.Fatalf("authored hosted configuration changed required inputs or lifecycle: build=%+v run=%+v", build, cfg)
+	}
+	// The frozen commit selects NVKE. A checkout-wide prefix rewrite would also
+	// redirect its independent NKTP sibling into a nonexistent local repository.
+	env, err := preparedBuildEnvironment([]string{"PATH=" + os.Getenv("PATH"), "NVKE_LOCAL_CLONE=" + build.NVKEClone,
+		"GIT_CONFIG_GLOBAL=" + os.DevNull, "GIT_CONFIG_NOSYSTEM=1"}, build)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, source := range []string{"nvke-telemetry-pipeline", "nvke"} {
+		repo := "https://github.com/dsx-ai-factory/" + source + ".git"
+		command := exec.CommandContext(t.Context(), "git", "ls-remote", "--get-url", repo)
+		command.Env = env
+		out, err := command.CombinedOutput()
+		if err != nil || strings.TrimSpace(string(out)) != repo {
+			t.Fatalf("nightly source URL was rewritten: %s: %s: %v", repo, out, err)
+		}
 	}
 }
 

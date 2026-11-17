@@ -8,7 +8,6 @@ build:
   repo: .
   attempt: nightly-e2e
   jobs: 1
-  nvkeClone: nvke-source
 run:
   out: nightly-site
   timeoutSeconds: 3600
