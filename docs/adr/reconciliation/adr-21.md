@@ -92,3 +92,12 @@ Hosted execution of the shared-store layout remains unrecorded.
 Invocation data is regenerated from the Plan and is not a bundle member;
 `TestGitHubActionDataIsTransientAndRetired` covers omission, prior-owned retirement and refusal of
 modified or unowned copies. Hosted execution of the regenerated bundles remains unrecorded.
+
+Generated `script-index.json` navigation links each GitHub execution job/step to its frozen producer record
+and exact command operands; the shared store index supplies the reverse bundle-user lookup.
+`TestGitHubScriptIndexConnectsJobsToExactCommands` covers flat/partition routing, byte-exact script references,
+bundle-user lookup and navigation drift without adding a Plan-loader dependency. Runtime pin-refresh
+contracts retain exact executable programs while regenerating descriptive record links.
+`TestPlanStoreNamedPathGrammar` and `TestPlanStoreFullDigestDisagreementDoesNotPublish` directly cover the
+named-path predicate and both conflicting-full-digest refusal branches. These are local contracts;
+hosted execution of the navigation layout remains unrecorded.

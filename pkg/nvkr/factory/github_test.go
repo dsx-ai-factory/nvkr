@@ -545,7 +545,7 @@ func unsharedGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle,
 	changed := *bundle
 	changed.Files = files
 	for name, raw := range bundle.Files {
-		if name == bundle.PlanPath || isPlanStorePath(name) {
+		if name == bundle.PlanPath || name == githubScriptIndexPath(plan) || isPlanStorePath(name) {
 			changed.Files[name] = append([]byte(nil), raw...)
 		}
 	}
@@ -598,7 +598,7 @@ func assertGeneratedGitHubMembers(t *testing.T, bundle *GeneratedBundle) {
 	}
 	actions := 0
 	for name := range bundle.Files {
-		if name == bundle.PlanPath || name == GitHubWorkflowPath {
+		if name == bundle.PlanPath || name == path.Join(path.Dir(bundle.PlanPath), "script-index.json") || name == GitHubWorkflowPath {
 			continue
 		}
 		if isPlanStorePath(name) {

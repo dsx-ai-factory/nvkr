@@ -269,7 +269,7 @@ func inspectPlanStore(ctx context.Context, root string, bundle *GeneratedBundle,
 			}
 		}
 		if err := checkGeneratedInventory(ctx, filepath.Join(root, PlanStoreDirectory), files, directories); err != nil {
-			return nil, fmt.Errorf("%w; run generate with the same Definition and Environment without --check to prune empty directories", err)
+			return nil, fmt.Errorf("%w; if this is unexpected empty-directory drift, run generate with the same Definition and Environment without --check to prune empty directories", err)
 		}
 	}
 	return garbage, nil

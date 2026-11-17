@@ -19,6 +19,7 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | Build and run the native Ubuntu ARM64 or Mac demo | [Shared build-and-demo guide and validation limits](local-nvke-demo.md) |
 | Understand native Linux/Mac execution with one QEMU site and two tenant guests | [Shared native topology and validation scope](local-nvke-demo.md#native-linux-and-mac-path) |
 | Inspect my first Plan | [Plan and graph inspection](plan-and-graph-inspection.md) |
+| Trace workflow jobs to frozen scripts or understand the adapter boundary | [Generated Plan tree](generated-plan-tree.md) |
 | Browse public command results | [Command result browser](lifecycle.md#browse-public-command-results) |
 | Watch a local Run or inspect its recorded outcome | [Lifecycle dashboard and read-only inspection](lifecycle.md#choose-local-run-presentation) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |

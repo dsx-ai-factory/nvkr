@@ -76,7 +76,7 @@ func TestRuntimeSourcesFreezeCompositeAndReplayWithoutMain(t *testing.T) {
 	}
 	fresh := stageGitHubRuntimeInputs(t, root, after)
 	for name, raw := range baseline.Files {
-		if name == baseline.PlanPath ||
+		if name == baseline.PlanPath || name == githubScriptIndexPath(after) ||
 			isPlanStoreRecord(name) {
 			continue
 		}

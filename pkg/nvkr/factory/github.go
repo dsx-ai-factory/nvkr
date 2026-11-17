@@ -109,6 +109,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			bundle.Files[path] = raw
 		}
 		bundle.Files[bundle.WorkflowPath] = entry
+		if err := addGitHubScriptIndex(plan, bundle.Files); err != nil {
+			return nil, err
+		}
 		data := bundle.githubActionData
 		bundle = newGeneratedBundle(EngineGitHub, githubLayoutFor(plan), bundle.Files, bundle.PlanDigest)
 		bundle.githubActionData = data
@@ -532,6 +535,14 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 		}
 	}
 	files[layout.workflowPath] = append([]byte(nil), workflow...)
+	if err := addGitHubScriptIndex(plan, files); err != nil {
+		return nil, err
+	}
+	if !plan.Environment.GitHubExecutionPartitions {
+		if err := validateGitHubWorkflowSize(files[layout.workflowPath]); err != nil {
+			return nil, err
+		}
+	}
 	data := files[githubActionDataPathFor(plan)]
 	delete(files, githubActionDataPathFor(plan))
 	bundle := newGeneratedBundle(EngineGitHub, layout, files, planDigest)

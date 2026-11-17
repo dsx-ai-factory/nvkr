@@ -686,3 +686,63 @@ func TestPlanStoreRecoveryDiagnostics(t *testing.T) {
 		})
 	}
 }
+
+func TestPlanStoreNamedPathGrammar(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		valid bool
+	}{
+		{"steps/output/linux/arm64/build@abcdef012345.json", true},
+		{"scripts/Uppercase/nested/build@abcdef012345.sh", true},
+		{"unknown/name@abcdef012345.json", false},
+		{"steps/name.json", false},
+		{"steps/name@abcdef0123456.json", false},
+		{"steps/name@ABCDEF012345.json", false},
+		{"steps/a/../name@abcdef012345.json", false},
+		{"steps/name\x1b@abcdef012345.json", false},
+		{"steps/name\u200b@abcdef012345.json", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isPlanStorePath(PlanStoreDirectory + "/" + tc.name); got != tc.valid {
+				t.Fatalf("accepted=%t, want %t", got, tc.valid)
+			}
+		})
+	}
+}
+
+func TestPlanStoreFullDigestDisagreementDoesNotPublish(t *testing.T) {
+	const body = "printf existing\n"
+	name := testNamedStorePath(t, "scripts/fixture/build", []byte(body), ".sh")
+	for _, betweenOwners := range []bool{false, true} {
+		t.Run(map[bool]string{false: "incoming object", true: "neighboring owners"}[betweenOwners], func(t *testing.T) {
+			root := t.TempDir()
+			writeGeneratedFixture(t, filepath.Join(root, name), []byte(body))
+			writeOwner := func(bundleName, digest string) {
+				layout := githubBundleLayout(bundleName)
+				manifest := GeneratedManifest{SchemaVersion: generatedManifestSchema, Engine: EngineGitHub, WorkflowPath: layout.workflowPath,
+					Members: []GeneratedMember{{Path: name, SHA256: digest, Mode: 0o644}}}
+				writeGeneratedFixture(t, filepath.Join(root, layout.manifestPath), mustCanonical(t, manifest))
+			}
+			// Syntactically valid full hashes deliberately disagree at one valid locator.
+			// No brute-force short-hash collision or executable receipt is fabricated.
+			writeOwner("first", "sha256:"+strings.Repeat("a", 64))
+			if betweenOwners {
+				writeOwner("second", "sha256:"+strings.Repeat("b", 64))
+			}
+			before := mustCanonical(t, githubRuntimeTree(t, root))
+			incoming := &GeneratedBundle{Engine: EngineGitHub, ManifestPath: ".github/nvkr-run-incoming/manifest.json", Files: map[string][]byte{name: []byte(body)}}
+			_, err := inspectPlanStore(t.Context(), root, incoming, true)
+			assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+			want := "short Plan address collision"
+			if betweenOwners {
+				want = "owners disagree on full digest"
+			}
+			if !strings.Contains(err.Error(), want) {
+				t.Fatal("wrong refusal branch", err)
+			}
+			if !bytes.Equal(before, mustCanonical(t, githubRuntimeTree(t, root))) {
+				t.Fatal("conflicting description changed existing bytes")
+			}
+		})
+	}
+}

@@ -124,6 +124,11 @@ Full digests in each owning manifest authenticate bytes. A short-suffix collisio
 bytes fails closed; the suffix is a locator, not a new logical identity.
 The generated `index.json` groups variants by kind and logical name, with each object's path, full digest
 and sorted bundle users. The drift check covers its exact bytes; loads do not consult this descriptive index.
+Each bundle also owns a descriptive `script-index.json` linking workflow jobs and execution steps to
+frozen producer records and command operands. Job comments point to that index; the shared index supplies
+the reverse script-to-bundle lookup. Generation and drift checks cover these navigation bytes, while Plan
+loads ignore them. Runtime pin refresh regenerates the navigation index alongside Plan records, retaining
+the existing target/script-binding and exact workflow/action checks. Neither index changes executable identity.
 Each bundle's `plan.json` retains scalar metadata, ordered build names and references, and a `catalogSnapshots` map keyed by the existing `catalogDigest`.
 Every distinct snapshot is stored once; identical snapshots across bundles share the same object.
 Snapshots reference component and source records, and build records reference their resolved-component lists and step records.

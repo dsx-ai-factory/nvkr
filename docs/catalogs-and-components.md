@@ -12,6 +12,11 @@ and dependency graphs; actual builds and output checks validate the declared pro
 The example packages two application tools: `app-cli` for users and `config-cli` for administrators.
 The `client-bundle` contains `app-cli`; the `admin-bundle` contains both tools.
 
+GitHub tree generation uses `metadata.name` in a readable frozen-record path. Catalog validation alone
+need not reject a name that storage cannot represent: generation refuses parent segments, control/format
+characters and other unsafe path spellings with `NVKR-E-PIPELINE-DRIFT`. It does not normalize names.
+Uppercase letters and safe nested names are permitted. See the [tree layout](generated-plan-tree.md).
+
 ## Author declarations; generate pins
 
 The catalog has two files:
