@@ -8,6 +8,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -21,6 +22,10 @@ import (
 )
 
 func TestQualifyLocalCommand(t *testing.T) {
+	want, err := os.ReadFile(filepath.Join("..", "..", "testdata", "contracts", "local-qualification-result.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, mode := range []string{"exact", "missing", "positional", "failure", "progress", "invalid progress"} {
 		t.Run(mode, func(t *testing.T) {
 			calls := 0
@@ -97,8 +102,11 @@ func TestQualifyLocalCommand(t *testing.T) {
 				}
 				return
 			}
-			// Keep the producer's exact wire framing covered without importing the
-			// downstream module. Its reader contract is tested in demos/nvke.
+			// The downstream reader consumes this same golden record. Comparing
+			// the real command output joins both contracts across module boundaries.
+			if !bytes.Equal(output.Bytes(), want) {
+				t.Fatalf("local qualification output differs from shared contract:\n got %q\nwant %q", output.Bytes(), want)
+			}
 			var result lifecycle.LocalQualificationResult
 			if !bytes.HasSuffix(output.Bytes(), []byte{'\n'}) {
 				t.Fatal("local qualification output lacks its single trailing newline")

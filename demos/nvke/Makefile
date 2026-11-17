@@ -10,7 +10,7 @@ BIN_DIR ?= ../../bin
 GOSRC := cmd internal pkg
 .DEFAULT_GOAL := build
 
-.PHONY: build test test-deps vet lint fmt-check vulncheck tidy check
+.PHONY: build test test-deps context-roots vet lint fmt-check vulncheck tidy check
 build:
 	go build -o $(BIN_DIR)/nvke-demo ./cmd/nvke-demo
 	go build -o $(BIN_DIR)/nvkr-site-identity-helper ./cmd/nvkr-site-identity-helper
@@ -23,6 +23,9 @@ test: test-deps
 test-deps:
 	go -C ../.. mod download
 	go mod download
+
+context-roots:
+	go -C ../.. test ./internal/architecture -run '^TestDemoContextRootsMatchExactInventory$$' -count=1
 
 vet:
 	go vet ./...
@@ -42,4 +45,4 @@ tidy:
 	gofmt -s -w $(GOSRC)
 	go mod tidy
 
-check: fmt-check vet build test lint vulncheck
+check: fmt-check context-roots vet build test lint vulncheck

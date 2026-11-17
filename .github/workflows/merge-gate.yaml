@@ -132,6 +132,7 @@ jobs:
               - 'inputs/**'
               - 'scripts/**'
               - 'docs/examples/**'
+              - 'testdata/contracts/**'
               - '.github/nvkr-run/**'
               - 'toolchains/govulncheck/**'
               - 'go.mod'

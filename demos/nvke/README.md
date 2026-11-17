@@ -30,6 +30,8 @@ them for demo/input, root-library or build-control changes and on every main
 push/manual run. Root-library PRs still need that separate compatibility check
 until the binary-only boundary replaces the temporary imports.
 The existing shared third-party notice file covers binaries from both modules.
+The demo check also runs the shared source-only context-root scanner with its own
+exact exception inventory; this does not compile demo packages into core tests.
 
 The test target downloads dependencies from both module graphs before running
 the offline external-consumer and release-dependency boundary checks. For a direct

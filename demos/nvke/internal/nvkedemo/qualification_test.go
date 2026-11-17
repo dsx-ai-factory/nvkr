@@ -178,20 +178,14 @@ func TestDemoQualificationConfigRequiresCompleteExplicitInputs(t *testing.T) {
 	}
 }
 
-// This consumer contract moved out of cmd/nvkr with the demo module. The CLI
-// command tests retain flag, progress and result-emission coverage in core.
+// The real CLI command must emit this same fixture byte-for-byte in its tests.
+// Read it directly so producer/reader compatibility cannot drift independently.
 func TestLocalQualificationResultContract(t *testing.T) {
-	result := lifecycle.LocalQualificationResult{
-		SchemaVersion: "nvkr.dev/local-qualification-result/v1", Status: "passed",
-		Lane: "unqualified-local-execution", Attempt: "attempt",
-		ContentSubject: "sha256:" + strings.Repeat("a", 64),
-		Publication:    lifecycle.LocalQualificationReferences{Evidence: "localhost:5000/demo@sha256:" + strings.Repeat("b", 64)},
-	}
-	raw, err := canonical.Marshal(result)
+	raw, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "testdata", "contracts", "local-qualification-result.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := ValidateLocalQualificationResult(append(raw, '\n'), "attempt"); err != nil {
+	if err := ValidateLocalQualificationResult(raw, "attempt"); err != nil {
 		t.Fatalf("local qualification result refused by demo reader: %v", err)
 	}
 }
