@@ -1,0 +1,53 @@
+{
+  "APIVersion": "nvkr.dev/catalog/v3",
+  "Actions": {},
+  "Components": {
+    "csi-node-driver-registrar-image": {
+      "file": ".github/nvkr-plan-store/components/csi-node-driver-registrar-image@8584f06416fe.json"
+    },
+    "postgresql-image": {
+      "file": ".github/nvkr-plan-store/components/postgresql-image@6fc3f43601ef.json"
+    },
+    "spiffe-csi-image": {
+      "file": ".github/nvkr-plan-store/components/spiffe-csi-image@2b81707bcca8.json"
+    },
+    "spire-agent-image": {
+      "file": ".github/nvkr-plan-store/components/spire-agent-image@96fd6f69a8ab.json"
+    },
+    "spire-bash-image": {
+      "file": ".github/nvkr-plan-store/components/spire-bash-image@208993fbd088.json"
+    },
+    "spire-controller-manager-image": {
+      "file": ".github/nvkr-plan-store/components/spire-controller-manager-image@759bbc345e85.json"
+    },
+    "spire-oidc-image": {
+      "file": ".github/nvkr-plan-store/components/spire-oidc-image@d9bc761cc192.json"
+    },
+    "spire-server-image": {
+      "file": ".github/nvkr-plan-store/components/spire-server-image@55c0d46ffa13.json"
+    },
+    "spire-tpm-server-image": {
+      "file": ".github/nvkr-plan-store/components/spire-tpm-server-image@4d7e649c5f6a.json"
+    },
+    "temporal-admin-tools-image": {
+      "file": ".github/nvkr-plan-store/components/temporal-admin-tools-image@842c9db05443.json"
+    },
+    "temporal-server-image": {
+      "file": ".github/nvkr-plan-store/components/temporal-server-image@1b2a21e602ff.json"
+    },
+    "temporal-ui-image": {
+      "file": ".github/nvkr-plan-store/components/temporal-ui-image@371016480e4a.json"
+    }
+  },
+  "Kind": "SourceBuildRegistry",
+  "Metadata": {
+    "description": "Acquired runtime images selected by pinned NVKE deployment values and exact acquired chart payloads; not chart default deployment topology.",
+    "name": "nvke-deployment-images"
+  },
+  "Sources": {
+    "nvke-deployment-selection": {
+      "file": ".github/nvkr-plan-store/sources/nvke-deployment-selection@c40fa8a86c20.json"
+    }
+  },
+  "Tools": {}
+}

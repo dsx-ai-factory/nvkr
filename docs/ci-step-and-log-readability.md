@@ -54,7 +54,7 @@ These diagnostic messages support investigation; authenticated records establish
 Start with the closing Run summary for required-job counts and the finalization outcome, then open the failed
 job's named step. Each executed operation logs its result, exit status, elapsed seconds
 and last phase. For example, `execute package/controller-chart` identifies the failed logical operation;
-`restore sbom/cwe` identifies a transport failure before the consumer could execute. Expected outputs are
+`restore sbom/nvke-controller` identifies a transport failure before the consumer could execute. Expected outputs are
 explicitly labeled; only a successful operation prints `Produced` for its outputs.
 
 The corresponding named step retains child-process output and the helper's original error. Stable execution
@@ -143,7 +143,7 @@ failure to persist outcomes stops recovery. The finalizer still authenticates co
 ## Historical six-output workflow comparison
 
 The October 4 compact-helper review used the six-output `nke-deploy` Definition (now `nvke-deploy`) and identical canonical Plan bytes.
-These measurements describe that review, rather than the current M2 workflow:
+These measurements describe that review, rather than the current NVKE workflow:
 
 | Item | Initial PR #90 (`582ab01`) | Compact helper |
 |---|---:|---:|

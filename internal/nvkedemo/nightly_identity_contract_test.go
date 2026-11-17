@@ -110,8 +110,8 @@ func TestNightlyControllerOutputUsesCanonicalLogicalName(t *testing.T) {
 		name  string
 		valid bool
 	}{
-		{"", true}, {"cwe", true}, {"controller.v2_arm64", true},
-		{"../cwe", false}, {"CWE", false}, {"cwe-", false}, {"cwe/site", false}, {" cwe", false},
+		{"", true}, {"nvke-controller", true}, {"controller.v2_arm64", true},
+		{"../nvke-controller", false}, {"NVKE-CONTROLLER", false}, {"nvke-controller-", false}, {"nvke-controller/site", false}, {" nvke-controller", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			selected := profile

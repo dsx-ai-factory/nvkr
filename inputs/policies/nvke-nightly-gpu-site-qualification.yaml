@@ -110,7 +110,7 @@ smoke:
       kind: oci
       components: [csi-node-driver-registrar-image]
       reason: deployment-image
-    - output: cwe
+    - output: nvke-controller
       kind: oci
       components: [nvke-controller]
       reason: deployment-image

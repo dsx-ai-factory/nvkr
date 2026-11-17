@@ -256,7 +256,7 @@ the workflow is not an untrusted-code sandbox. The generator does not provision 
 The development signing policy accepts this repository's `nvkr-dev.yml` branch identities only, using the
 GitHub OIDC issuer. Production consumer policies pinned to `nvkr-run-nvke.yml` do not accept those identities.
 A real signed development result is `pipeline-attested` under that development policy, with the same explicit
-producer-only disk-evidence scope as M2; it is neither production acceptance nor qualified reproduction.
+producer-only disk-evidence scope as NVKE; it is neither production acceptance nor qualified reproduction.
 Keyless signatures use the existing transparency services, whose records are not erased by registry cleanup.
 
 ### Inspect results and repeat

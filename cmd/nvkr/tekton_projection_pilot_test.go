@@ -53,7 +53,7 @@ func tektonCLIEnvironment(t *testing.T, root string) string {
 		RunnerImage: env.UtilityContainer, RuntimeImage: env.UtilityContainer, StorageClass: "standard", WorkspaceGiB: 20,
 		PublisherPublicKey: key(), QualifierPublicKey: key(), SmokePublicKey: key(),
 		Smoke: qualificationpolicy.Smoke{Images: map[string]string{"linux/amd64": "index.docker.io/library/" + env.UtilityContainer}, Tools: map[string]string{"nvkectl": "nvkectl-version-json"},
-			NonToolOutputs: []qualificationpolicy.NonToolOutput{{Output: "cwe", Kind: "oci", Components: []string{"cwe"}, Reason: "deployment-image"}}}}
+			NonToolOutputs: []qualificationpolicy.NonToolOutput{{Output: "nvke-controller", Kind: "oci", Components: []string{"nvke-controller"}, Reason: "deployment-image"}}}}
 	env.Signing.Issuer = env.Tekton.APIServer
 	env.Signing.Identity = "^" + regexp.QuoteMeta(env.Tekton.APIServer+"/api/v1/namespaces/nvkr/serviceaccounts/nvkr-publisher") + "$"
 	raw, err := canonical.Marshal(env)

@@ -187,7 +187,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 			for _, output := range plan.LifecycleOutputs {
 				names = append(names, output.Name)
 			}
-			if !slices.Equal(names, []string{"controller-chart", "controller-profiles", "cwe", "nktp", "nvkectl"}) {
+			if !slices.Equal(names, []string{"controller-chart", "controller-profiles", "nktp", "nvke-controller", "nvkectl"}) {
 				t.Fatalf("not the declared five-output site subset: %v", names)
 			}
 			for _, build := range plan.Builds {
@@ -230,7 +230,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 						}
 					case ir.KindBuild:
 						producers++
-						if build.Name == "cwe" {
+						if build.Name == "nvke-controller" {
 							command := strings.Join(node.Command, " ")
 							if node.BuilderType != ir.BuilderBuildKit || node.Network != ir.NetworkDefault || !strings.Contains(command, "--local dockerfile=/src/controller") {
 								t.Fatal("controller must use its source-owned Dockerfile with declared build networking")
@@ -260,7 +260,7 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 			found := false
 			for _, node := range plan.Graph.Nodes {
 				if node.ID == "package/controller-chart" {
-					found = node.HelmImage != nil && slices.Contains(node.Inputs, "package/cwe")
+					found = node.HelmImage != nil && slices.Contains(node.Inputs, "package/nvke-controller")
 				}
 				if node.Kind == "publish" || node.Kind == "sign" {
 					t.Fatal("local candidate must not imply publication or signing")

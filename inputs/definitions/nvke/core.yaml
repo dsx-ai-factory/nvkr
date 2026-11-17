@@ -106,7 +106,7 @@ outputs:
       - nvke-controller-chart
     helm:
       images:
-        controller: cwe
+        controller: nvke-controller
   # NVKE's --release render requires this name. The combined Definition's nico-reference-profiles-fixture build:
   # reference test data, not fleet configuration. One Release cannot publish the same image under two outputs.
   - name: controller-profiles
@@ -116,7 +116,7 @@ outputs:
     format: oci
     components:
       - nvke-nico-reference-profiles
-  - name: cwe
+  - name: nvke-controller
     platforms: [linux/amd64, linux/arm64]
     catalog:
       base: ../../catalogs/nvke/release

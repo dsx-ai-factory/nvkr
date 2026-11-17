@@ -81,7 +81,7 @@ func TestInspectionPreservesCanonicalIdentityAndOwnsSnapshot(t *testing.T) {
 					t.Fatal("pretty view became an accepted canonical Plan")
 				}
 			} else {
-				for _, want := range []string{"Producer instructions", "Artifact operations", "Publication routes", "controller-chart", "cwe", "argv:", "image bindings:", "no runtime observations"} {
+				for _, want := range []string{"Producer instructions", "Artifact operations", "Publication routes", "controller-chart", "nvke-controller", "argv:", "image bindings:", "no runtime observations"} {
 					if !strings.Contains(string(raw), want) {
 						t.Fatalf("view omits %q", want)
 					}

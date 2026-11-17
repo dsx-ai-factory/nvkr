@@ -2,7 +2,7 @@
 
 The release index and its metadata live in `<publication.repositoryPrefix>/releases`. Deliverables and their
 SBOM attestations live in sibling repositories named after the Definition outputs. For NVKE these are
-`<publication.repositoryPrefix>/nvkectl`, `…/cwe`, and `…/nvke-helm`.
+`<publication.repositoryPrefix>/nvkectl`, `…/nvke-controller`, and `…/nvke-helm`.
 
 ## Required publication transports
 
@@ -209,7 +209,7 @@ flowchart TB
     CB --> CD["Sigstore bundle: verification material and signed DSSE statement containing CycloneDX; exact binary subject"]
     CS["Artifact signature and SLSA attestation"] -. authenticates .-> C
   end
-  subgraph image["…/cwe"]
+  subgraph image["…/nvke-controller"]
     I["Native image manifest"] --> IC["Native image config"]
     I --> IL["Native image layers"]
     IB["SBOM referrer manifest"] -. "OCI subject" .-> I
@@ -245,7 +245,7 @@ carries its canonical config. That config alone owns output names, sibling repos
 manifest identities, build bindings, and evidence membership. No deliverable or SBOM payload
 is copied into the release repository, and no separate lifecycle-binding object is published.
 
-The CLI retains its file/platform config for extraction. The management-plane image (`cwe`) retains its native manifest, config and layers.
+The CLI retains its file/platform config for extraction. The management-plane image (`nvke-controller`) retains its native manifest, config and layers.
 Helm has one artifact manifest, its real Chart.yaml-derived config, and one chart-archive layer — a
 standards-conformant Helm OCI chart, without a nested publication root.
 

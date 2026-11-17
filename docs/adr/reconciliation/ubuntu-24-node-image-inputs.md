@@ -1,6 +1,6 @@
 ## Ubuntu 24 node-image inputs
 
-The opt-in `inputs/definitions/diagnostics/ubuntu24` selections reuse M2's NVKE source, now
+The opt-in `inputs/definitions/diagnostics/ubuntu24` selections reuse NVKE's NVKE source, now
 `v0.23.0` at `2cfd00081b468d85a4894ec17e9deac13c9d8169`, including upstream Ubuntu 24 support from
 `96ccc50cb7f8ed8bb08f7cf8655906982774f809`. A predecessor-bound whole-producer overlay
 selects Ubuntu 24.04.5 installer bytes for each native architecture, the 24.04 DOCA OVS packages and a
@@ -9,7 +9,7 @@ OS; no new Packer variable or NVKR platform axis is introduced. Preparation chec
 nFPM archive and executable pins; the agent stays dynamically linked and must pass the
 pinned upstream ELF checker for the Ubuntu loader and GLIBC <= 2.39. Its updater must
 remain a static ELF without a program interpreter, matching the pinned upstream check.
-Other M2 materials and the Packer host runtime retain their existing scope and exceptions.
+Other NVKE materials and the Packer host runtime retain their existing scope and exceptions.
 
 Single-output hosted Definitions cover plain and public-bootstrap FDE on AMD64 and ARM64;
 the existing native local wrapper also selects the two plain variants. Hosted build-only
@@ -26,7 +26,7 @@ or qualification is established by these tests. ADR-10/11/18/22 own the unchange
 Maintained publication selects `nvke-node-image-ubuntu24-<arch>` and `nvke-node-fde-ubuntu24-<arch>` for
 AMD64 and ARM64 through `inputs/definitions/nvke/disks-ubuntu24.yaml`, the composite's
 `nvke-disks-ubuntu24` member. Production uses the main-only `nvkr-run-nvke.yml` signer and
-`m2-candidate/gpu-site` prefix. The standalone `github-nvke-disks-ubuntu24` Environment remains an
+`candidate/gpu-site` prefix. The standalone `github-nvke-disks-ubuntu24` Environment remains an
 unenrolled comparison fixture. ADR-26 admits both series as separate composite members only when the composite declares
 each component the overlay replaces as a variant of the two disk families; an opt-in extended contract compiles
 that composite. The maintained [GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite)

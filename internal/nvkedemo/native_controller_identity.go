@@ -85,6 +85,8 @@ func selectNativeControllerIdentity(ctx context.Context, installer string) (iden
 	}
 	// Both admitted sources already publish the chart as nvke-controller. The
 	// retained 400c release still declares the old runtime name explicitly.
+	// ImageArtifact below is an external source-metadata key, retained verbatim;
+	// NVKR's controller output is independently named nvke-controller.
 	if release.Release.Namespace != identity.name || release.Chart.Name != identity.name || chart.Name != "nvke-controller" ||
 		release.Chart.Path != "../../controller/deploy/charts/controller" || release.Chart.Artifact != "controller-chart" ||
 		release.Chart.ImageArtifact != "cwe" || release.Chart.ProfilesArtifact != "controller-profiles" ||

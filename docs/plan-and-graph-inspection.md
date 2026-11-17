@@ -138,8 +138,8 @@ descriptive JSON report retains every complete before/after value, including add
 | Named output added or removed | Its independent required slot and Build entry appear as additions/removals |
 
 Named schema collections are matched by their keys, so inserting an output does not present every later
-output as replaced. Paths use JSON Pointer escaping plus selectors such as `/builds/@name=cwe` and
-`/graph/nodes/@id=package~1cwe`. Text paths use Go string quoting to escape control characters; JSON retains
+output as replaced. Paths use JSON Pointer escaping plus selectors such as `/builds/@name=nvke-controller` and
+`/graph/nodes/@id=package~1nvke-controller`. Text paths use Go string quoting to escape control characters; JSON retains
 the exact paths. Ordered arrays, including command arguments and patches, remain positional.
 A changed ordering among surviving named entries is reported as `@order`. Generated IDs that change with
 pins appear as removed and added references; no heuristic guesses that two different producer identities

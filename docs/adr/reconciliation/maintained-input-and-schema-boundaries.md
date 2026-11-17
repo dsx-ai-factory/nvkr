@@ -110,7 +110,7 @@ named-runtime helpers. No hosted family execution of this boundary is recorded.
 [bootstrap dispatch tests](../../../pkg/nvkr/factory/github_bootstrap_dispatch_test.go) cover refusal.
 
 All five family Environments retain the maintained production `NVKR_REGISTRY_WRITE` publication policy.
-The exact `m2-candidate/disks` and `m2-candidate/disks-ubuntu24` prefixes also admit the existing pinned M2 toolchains for separate preparation
+The exact `candidate/disks` and `candidate/disks-ubuntu24` prefixes also admit the existing pinned NVKE toolchains for separate preparation
 with the fixed independent registry reader. Focused contracts reproduce and fix the previously omitted
 preparation, require it before each family's four disk producers and source-vendor execution, and reject lookalike,
 child, other-family and foreign-owner exceptions. Credential projection and cleanup contracts pass; they
@@ -150,7 +150,7 @@ family matrix passed in 34.227 seconds, including the 73/69 identity comparison 
 disks-family credential regression in 0.83 seconds. These are local
 contracts, not evidence of private registry access, hosted family execution or consumer acceptance.
 
-The [M2 Definition instructions](../../../inputs/definitions/nvke/README.md) own example-specific selection and input
+The [NVKE Definition instructions](../../../inputs/definitions/nvke/README.md) own example-specific selection and input
 preparation. The candidate requires 69 named outputs. It retains the previous 37 and adds source-built
 CAPNICo and explicitly named reference-profile fixtures, the existing provisioned infrastructure provider, source-packaged NVKE telemetry pipelines,
 and fourteen acquired runtime-image components delivered separately for both native architectures.

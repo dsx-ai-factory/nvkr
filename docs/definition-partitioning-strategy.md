@@ -206,7 +206,7 @@ architecture is similarly an operational choice, not a prerequisite.
 
 ### Boundaries retained in each Definition
 
-- The controller chart remains with `cwe`; its image slot resolves inside the same Definition.
+- The controller chart remains with `nvke-controller`; its image slot resolves inside the same Definition.
   Cross-Release chart binding is not an admitted input shape.
 - Every disk retains its one root and complete selected transitive material closure. Another Run cannot
   implicitly provide a missing material.

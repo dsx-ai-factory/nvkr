@@ -3,7 +3,7 @@
 Candidate, selectable CNI producer catalog for the
 `[dsx-ai-factory/ovn-kubernetes](https://github.com/dsx-ai-factory/ovn-kubernetes)` fork.
 It does not remove Calico or change the maintained
-OS/M2 Definitions. The maintained release node-image catalog now selects the same
+OS/NVKE Definitions. The maintained release node-image catalog now selects the same
 fork pin with `nvke-*` Debian package names; this catalog keeps the earlier `nke-*` packaging. Do not stack it blindly with the old OS catalog: `ovn-kube-ubuntu`
 and `nvke-cni-ovn` are authored component names; packaged Debian names remain source-owned. A maintained
 replacement must use the predecessor-digest-bound catalog overlay contract and
@@ -137,13 +137,13 @@ inputs. Deployment overrides are not enforcement of the signed chart's defaults.
 
 [environment-github.yaml](../../environments/github-ovn-diagnostics.yaml) uses the existing native OCI/Helm
 publisher, SBOM/provenance and signing flow, not a separate OVN push script. Routes
-are `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<output-name>@sha256:<digest>`.
+are `ghcr.io/dsx-ai-factory/nvkr/candidate/<output-name>@sha256:<digest>`.
 Helm also receives its chart-version discovery tag; digest references and signed
 Release membership remain authoritative. These are configured routes, not proof
 that those OVN outputs have been pushed.
 
 Generate and check the candidate in a disposable output root from the repository
-root, without replacing the maintained M2 workflow:
+root, without replacing the maintained NVKE workflow:
 
 ```sh
 ovn_bundle_root=$(mktemp -d /tmp/nvkr-ovn-bundle.XXXXXX)

@@ -21,7 +21,7 @@ githubRunners:
 publication:
   mode: per-output-v1
   credentialRef: github:NVKR_REGISTRY_WRITE
-  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/services
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/candidate/services
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared

@@ -652,40 +652,6 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-process-cwe-linux-amd64-fetch-nvke-c-366fa374bc31:
-    name: 'Build and prepare cwe/linux/amd64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-tool-syft]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-node-part-2
-      - *operation-execute-node-part-3
-      - *operation-execute-node-part-4
-    permissions:
-      actions: read
-      contents: read
-  nvkr-process-cwe-linux-arm64-fetch-nvke-c-420dcdb96553:
-    name: 'Build and prepare cwe/linux/arm64'
-    runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 240
-    needs: [nvkr-tool-syft-linux-arm64]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps:
-      - *check-native-linux-arm64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-node-part-1
-      - *operation-execute-node-part-2
-      - *operation-execute-node-part-3
-      - *operation-execute-node-part-4
-    permissions:
-      actions: read
-      contents: read
   nvkr-process-local-path-helper-image-arm6-ee133d2fe086:
     name: 'Acquire and prepare local-path-helper-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
@@ -1096,6 +1062,40 @@ jobs:
       - *operation-execute-node-part-4
       - *operation-execute-node-part-5
       - *operation-execute-node-part-6
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-nvke-controller-linux-amd64-b158142d479a:
+    name: 'Build and prepare nvke-controller/linux/amd64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 240
+    needs: [nvkr-tool-syft]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
+      - *operation-execute-node-part-3
+      - *operation-execute-node-part-4
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-nvke-controller-linux-arm64-1d0d8d62a607:
+    name: 'Build and prepare nvke-controller/linux/arm64'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 240
+    needs: [nvkr-tool-syft-linux-arm64]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
+      - *operation-execute-node-part-2
+      - *operation-execute-node-part-3
+      - *operation-execute-node-part-4
     permissions:
       actions: read
       contents: read
@@ -3551,11 +3551,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-process-package-cwe-package-publication-cwe:
-    name: 'Verify and package outputs: cwe, publication-cwe'
+  nvkr-process-package-nvke-controller-pack-0055177c76e7:
+    name: 'Verify and package outputs: nvke-controller, publication-nvke-controller'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [nvkr-process-cwe-linux-amd64-fetch-nvke-c-366fa374bc31, nvkr-process-cwe-linux-arm64-fetch-nvke-c-420dcdb96553]
+    needs: [nvkr-process-nvke-controller-linux-amd64-b158142d479a, nvkr-process-nvke-controller-linux-arm64-1d0d8d62a607]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -3565,7 +3565,7 @@ jobs:
     name: 'Verify and package outputs with Helm image binding: controller-chart, publication-controller-chart'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [nvkr-process-controller-chart-fetch-nvke-80a1df89e6ae, nvkr-process-package-cwe-package-publication-cwe]
+    needs: [nvkr-process-controller-chart-fetch-nvke-80a1df89e6ae, nvkr-process-package-nvke-controller-pack-0055177c76e7]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -3837,25 +3837,6 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-cwe-publ-2917dd670a5b:
-    name: 'Attest, publish, sign and verify output-cwe'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-package-cwe-package-publication-cwe, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-local-pa-2ae6dde17516:
     name: 'Attest, publish, sign and verify output-local-path-helper-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -4051,6 +4032,25 @@ jobs:
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
     needs: [nvkr-process-nktp-target-allocator-image-722bca1a145d, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-publication-part-2
+      - *operation-execute-registry-part-3
+      - *operation-execute-registry-part-4
+  nvkr-process-attest-sboms-output-nvke-con-86fdfe2b96be:
+    name: 'Attest, publish, sign and verify output-nvke-controller'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 240
+    needs: [nvkr-process-package-nvke-controller-pack-0055177c76e7, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -4316,7 +4316,7 @@ jobs:
     name: 'Assemble, publish, sign and verify release'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-attest-sboms-output-aicr-nvk-21253a0aa17b, nvkr-process-attest-sboms-output-aicr-nvk-4cb36545db33, nvkr-process-attest-sboms-output-aicr-nvk-b9c99a8a62d9, nvkr-process-attest-sboms-output-capi-con-6535e3245e96, nvkr-process-attest-sboms-output-capi-con-c3e2faf63100, nvkr-process-attest-sboms-output-capi-kub-0b857b2a2e2f, nvkr-process-attest-sboms-output-capi-kub-192145434453, nvkr-process-attest-sboms-output-capi-kub-a0163af701ab, nvkr-process-attest-sboms-output-capi-kub-aacc41887f04, nvkr-process-attest-sboms-output-capnico-c614f5167e54, nvkr-process-attest-sboms-output-cert-man-070fcfa57ec9, nvkr-process-attest-sboms-output-cert-man-674719c99ce6, nvkr-process-attest-sboms-output-cert-man-694b532ec2bb, nvkr-process-attest-sboms-output-cert-man-9a7a8eb4fbc5, nvkr-process-attest-sboms-output-cert-man-d217422a8ef7, nvkr-process-attest-sboms-output-cert-man-e0cbc5b6ab19, nvkr-process-attest-sboms-output-cluster-0f08e4d1d2b1, nvkr-process-attest-sboms-output-controll-a838a306b212, nvkr-process-attest-sboms-output-controll-fbd4b2247bcf, nvkr-process-attest-sboms-output-csi-node-c1d6d7794703, nvkr-process-attest-sboms-output-csi-node-c8bbad40ca65, nvkr-process-attest-sboms-output-cwe-publ-2917dd670a5b, nvkr-process-attest-sboms-output-local-pa-076932f39eb0, nvkr-process-attest-sboms-output-local-pa-09c88c4868d7, nvkr-process-attest-sboms-output-local-pa-2ae6dde17516, nvkr-process-attest-sboms-output-local-pa-676708a1ad07, nvkr-process-attest-sboms-output-local-pa-70815c6f5354, nvkr-process-attest-sboms-output-local-pa-7cd55fb2cf05, nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81, nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7, nvkr-process-attest-sboms-output-nktp-kub-38a63daab836, nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a, nvkr-process-attest-sboms-output-nktp-kub-c8449a367a99, nvkr-process-attest-sboms-output-nktp-kub-c9a4d1b91ba8, nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688, nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851, nvkr-process-attest-sboms-output-nktp-met-5bfa54ed25c3, nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71, nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f, nvkr-process-attest-sboms-output-nktp-nod-a5920c5bad6d, nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2, nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0, nvkr-process-attest-sboms-output-nktp-pub-10938e2cfef1, nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3, nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d, nvkr-process-attest-sboms-output-nvke-nod-1bc709ca4460, nvkr-process-attest-sboms-output-nvke-nod-1e0439c01f2c, nvkr-process-attest-sboms-output-nvke-nod-49ea879f4e2d, nvkr-process-attest-sboms-output-nvke-nod-6c5f57895380, nvkr-process-attest-sboms-output-nvke-nod-c77e5f67a080, nvkr-process-attest-sboms-output-nvke-nod-d860882864cf, nvkr-process-attest-sboms-output-nvke-nod-f8e29abf6a17, nvkr-process-attest-sboms-output-nvke-nod-f91992abc2a0, nvkr-process-attest-sboms-output-nvkectl-33326ff307d8, nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12, nvkr-process-attest-sboms-output-operator-2fd8456da854, nvkr-process-attest-sboms-output-operator-4656296c5495, nvkr-process-attest-sboms-output-postgres-0c397fe911fc, nvkr-process-attest-sboms-output-postgres-69dd756da415, nvkr-process-attest-sboms-output-postgres-6a2db7baf6de, nvkr-process-attest-sboms-output-spiffe-c-428ae4518b33, nvkr-process-attest-sboms-output-spiffe-c-6b62394cb783, nvkr-process-attest-sboms-output-spire-ag-0b9313969a96, nvkr-process-attest-sboms-output-spire-ag-dfb26f54c9e7, nvkr-process-attest-sboms-output-spire-ba-0a23387d1b9d, nvkr-process-attest-sboms-output-spire-ba-e270b70f09ef, nvkr-process-attest-sboms-output-spire-co-e87f47677f39, nvkr-process-attest-sboms-output-spire-co-f24ec18705d2, nvkr-process-attest-sboms-output-spire-cr-3c298e3f69d6, nvkr-process-attest-sboms-output-spire-oi-139ce0805f21, nvkr-process-attest-sboms-output-spire-oi-6df09148b189, nvkr-process-attest-sboms-output-spire-pu-94c0dc5d203b, nvkr-process-attest-sboms-output-spire-se-0ec9aa4ebdf4, nvkr-process-attest-sboms-output-spire-se-9d1b0bc84ce8, nvkr-process-attest-sboms-output-spire-tp-671d9f2c0ee8, nvkr-process-attest-sboms-output-spire-tp-8fd6cf5eb45c, nvkr-process-attest-sboms-output-temporal-2b42edeb4497, nvkr-process-attest-sboms-output-temporal-3db248c12d7d, nvkr-process-attest-sboms-output-temporal-50a38a9f05f0, nvkr-process-attest-sboms-output-temporal-55456dc4a7c9, nvkr-process-attest-sboms-output-temporal-60a568433da4, nvkr-process-attest-sboms-output-temporal-9e0e8c356a7b, nvkr-process-attest-sboms-output-temporal-efbcb1393aa1]
+    needs: [nvkr-process-attest-sboms-output-aicr-nvk-21253a0aa17b, nvkr-process-attest-sboms-output-aicr-nvk-4cb36545db33, nvkr-process-attest-sboms-output-aicr-nvk-b9c99a8a62d9, nvkr-process-attest-sboms-output-capi-con-6535e3245e96, nvkr-process-attest-sboms-output-capi-con-c3e2faf63100, nvkr-process-attest-sboms-output-capi-kub-0b857b2a2e2f, nvkr-process-attest-sboms-output-capi-kub-192145434453, nvkr-process-attest-sboms-output-capi-kub-a0163af701ab, nvkr-process-attest-sboms-output-capi-kub-aacc41887f04, nvkr-process-attest-sboms-output-capnico-c614f5167e54, nvkr-process-attest-sboms-output-cert-man-070fcfa57ec9, nvkr-process-attest-sboms-output-cert-man-674719c99ce6, nvkr-process-attest-sboms-output-cert-man-694b532ec2bb, nvkr-process-attest-sboms-output-cert-man-9a7a8eb4fbc5, nvkr-process-attest-sboms-output-cert-man-d217422a8ef7, nvkr-process-attest-sboms-output-cert-man-e0cbc5b6ab19, nvkr-process-attest-sboms-output-cluster-0f08e4d1d2b1, nvkr-process-attest-sboms-output-controll-a838a306b212, nvkr-process-attest-sboms-output-controll-fbd4b2247bcf, nvkr-process-attest-sboms-output-csi-node-c1d6d7794703, nvkr-process-attest-sboms-output-csi-node-c8bbad40ca65, nvkr-process-attest-sboms-output-local-pa-076932f39eb0, nvkr-process-attest-sboms-output-local-pa-09c88c4868d7, nvkr-process-attest-sboms-output-local-pa-2ae6dde17516, nvkr-process-attest-sboms-output-local-pa-676708a1ad07, nvkr-process-attest-sboms-output-local-pa-70815c6f5354, nvkr-process-attest-sboms-output-local-pa-7cd55fb2cf05, nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81, nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7, nvkr-process-attest-sboms-output-nktp-kub-38a63daab836, nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a, nvkr-process-attest-sboms-output-nktp-kub-c8449a367a99, nvkr-process-attest-sboms-output-nktp-kub-c9a4d1b91ba8, nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688, nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851, nvkr-process-attest-sboms-output-nktp-met-5bfa54ed25c3, nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71, nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f, nvkr-process-attest-sboms-output-nktp-nod-a5920c5bad6d, nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2, nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0, nvkr-process-attest-sboms-output-nktp-pub-10938e2cfef1, nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3, nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d, nvkr-process-attest-sboms-output-nvke-con-86fdfe2b96be, nvkr-process-attest-sboms-output-nvke-nod-1bc709ca4460, nvkr-process-attest-sboms-output-nvke-nod-1e0439c01f2c, nvkr-process-attest-sboms-output-nvke-nod-49ea879f4e2d, nvkr-process-attest-sboms-output-nvke-nod-6c5f57895380, nvkr-process-attest-sboms-output-nvke-nod-c77e5f67a080, nvkr-process-attest-sboms-output-nvke-nod-d860882864cf, nvkr-process-attest-sboms-output-nvke-nod-f8e29abf6a17, nvkr-process-attest-sboms-output-nvke-nod-f91992abc2a0, nvkr-process-attest-sboms-output-nvkectl-33326ff307d8, nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12, nvkr-process-attest-sboms-output-operator-2fd8456da854, nvkr-process-attest-sboms-output-operator-4656296c5495, nvkr-process-attest-sboms-output-postgres-0c397fe911fc, nvkr-process-attest-sboms-output-postgres-69dd756da415, nvkr-process-attest-sboms-output-postgres-6a2db7baf6de, nvkr-process-attest-sboms-output-spiffe-c-428ae4518b33, nvkr-process-attest-sboms-output-spiffe-c-6b62394cb783, nvkr-process-attest-sboms-output-spire-ag-0b9313969a96, nvkr-process-attest-sboms-output-spire-ag-dfb26f54c9e7, nvkr-process-attest-sboms-output-spire-ba-0a23387d1b9d, nvkr-process-attest-sboms-output-spire-ba-e270b70f09ef, nvkr-process-attest-sboms-output-spire-co-e87f47677f39, nvkr-process-attest-sboms-output-spire-co-f24ec18705d2, nvkr-process-attest-sboms-output-spire-cr-3c298e3f69d6, nvkr-process-attest-sboms-output-spire-oi-139ce0805f21, nvkr-process-attest-sboms-output-spire-oi-6df09148b189, nvkr-process-attest-sboms-output-spire-pu-94c0dc5d203b, nvkr-process-attest-sboms-output-spire-se-0ec9aa4ebdf4, nvkr-process-attest-sboms-output-spire-se-9d1b0bc84ce8, nvkr-process-attest-sboms-output-spire-tp-671d9f2c0ee8, nvkr-process-attest-sboms-output-spire-tp-8fd6cf5eb45c, nvkr-process-attest-sboms-output-temporal-2b42edeb4497, nvkr-process-attest-sboms-output-temporal-3db248c12d7d, nvkr-process-attest-sboms-output-temporal-50a38a9f05f0, nvkr-process-attest-sboms-output-temporal-55456dc4a7c9, nvkr-process-attest-sboms-output-temporal-60a568433da4, nvkr-process-attest-sboms-output-temporal-9e0e8c356a7b, nvkr-process-attest-sboms-output-temporal-efbcb1393aa1]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -4381,7 +4381,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-03'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-disk-nvke-node-image-ubuntu24-amd64, nvkr-process-attest-sboms-output-cert-man-d217422a8ef7, nvkr-process-attest-sboms-output-local-pa-2ae6dde17516, nvkr-process-attest-sboms-output-spire-ba-e270b70f09ef, nvkr-process-capi-kubeadm-control-plane-i-d24ae27786c0, nvkr-process-controller-chart-fetch-nvke-80a1df89e6ae, nvkr-process-local-path-helper-image-pull-88d610813b7e, nvkr-process-local-path-provisioner-arm64-a4a16230d525, nvkr-process-package-controller-profiles-1771df7d565d, nvkr-process-package-local-path-provision-123346265e26, nvkr-process-spire-agent-image-arm64-pull-66c5fa643afb, nvkr-tool-cosign, preflight-images-ubuntu-24-04]
+    needs: [nvkr-disk-nvke-node-image-ubuntu24-amd64, nvkr-process-attest-sboms-output-cert-man-d217422a8ef7, nvkr-process-attest-sboms-output-local-pa-2ae6dde17516, nvkr-process-attest-sboms-output-nvke-con-86fdfe2b96be, nvkr-process-attest-sboms-output-spire-ba-e270b70f09ef, nvkr-process-capi-kubeadm-control-plane-i-d24ae27786c0, nvkr-process-controller-chart-fetch-nvke-80a1df89e6ae, nvkr-process-local-path-helper-image-pull-88d610813b7e, nvkr-process-local-path-provisioner-arm64-a4a16230d525, nvkr-process-nvke-controller-linux-amd64-b158142d479a, nvkr-process-package-controller-profiles-1771df7d565d, nvkr-process-package-local-path-provision-123346265e26, nvkr-process-spire-agent-image-arm64-pull-66c5fa643afb, nvkr-tool-cosign, preflight-images-ubuntu-24-04]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -4394,7 +4394,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-04'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-process-attest-sboms-output-controll-fbd4b2247bcf, nvkr-process-attest-sboms-output-csi-node-c1d6d7794703, nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688, nvkr-process-attest-sboms-output-nvke-nod-d860882864cf, nvkr-process-attest-sboms-output-spire-ba-0a23387d1b9d, nvkr-process-attest-sboms-output-spire-co-e87f47677f39, nvkr-process-cert-manager-webhook-image-a-6c727f1095d4, nvkr-process-cert-manager-webhook-image-p-59f9d902f4a4, nvkr-process-cluster-api-provider-provisi-4b71356d87da, nvkr-process-nktp-collector-image-pull-nk-1b2717680e5c, nvkr-process-nktp-lgtm-image-arm64-pull-n-290430591175, nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-process-attest-sboms-output-controll-fbd4b2247bcf, nvkr-process-attest-sboms-output-csi-node-c1d6d7794703, nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688, nvkr-process-attest-sboms-output-nvke-nod-d860882864cf, nvkr-process-attest-sboms-output-spire-ba-0a23387d1b9d, nvkr-process-attest-sboms-output-spire-co-e87f47677f39, nvkr-process-cert-manager-webhook-image-a-6c727f1095d4, nvkr-process-cert-manager-webhook-image-p-59f9d902f4a4, nvkr-process-cluster-api-provider-provisi-4b71356d87da, nvkr-process-nktp-collector-image-pull-nk-1b2717680e5c, nvkr-process-nktp-lgtm-image-arm64-pull-n-290430591175, nvkr-process-nvke-controller-linux-arm64-1d0d8d62a607, nvkr-tool-syft-linux-arm64]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -4420,7 +4420,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-06'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-process-attest-sboms-output-cwe-publ-2917dd670a5b, nvkr-process-attest-sboms-output-local-pa-09c88c4868d7, nvkr-process-attest-sboms-output-local-pa-676708a1ad07, nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3, nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d, nvkr-process-attest-sboms-output-nvke-nod-1e0439c01f2c, nvkr-process-attest-sboms-output-operator-2fd8456da854, nvkr-process-attest-sboms-output-postgres-69dd756da415, nvkr-process-attest-sboms-output-spire-oi-139ce0805f21, nvkr-process-attest-sboms-output-spire-se-9d1b0bc84ce8, nvkr-process-capnico-controller-linux-arm-ae87ca23780c, nvkr-process-controller-profiles-linux-ar-337ab3a17e54, nvkr-process-nktp-kube-state-metrics-imag-e0532701e664, nvkr-process-temporal-ui-image-pull-tempo-ae3207201e38]
+    needs: [nvkr-process-attest-sboms-output-local-pa-09c88c4868d7, nvkr-process-attest-sboms-output-local-pa-676708a1ad07, nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3, nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d, nvkr-process-attest-sboms-output-nvke-nod-1e0439c01f2c, nvkr-process-attest-sboms-output-operator-2fd8456da854, nvkr-process-attest-sboms-output-postgres-69dd756da415, nvkr-process-attest-sboms-output-spire-oi-139ce0805f21, nvkr-process-attest-sboms-output-spire-se-9d1b0bc84ce8, nvkr-process-capnico-controller-linux-arm-ae87ca23780c, nvkr-process-controller-profiles-linux-ar-337ab3a17e54, nvkr-process-nktp-kube-state-metrics-imag-e0532701e664, nvkr-process-temporal-ui-image-pull-tempo-ae3207201e38]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -4433,7 +4433,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-07'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [build-runner-ubuntu-24-04-arm, nvkr-process-attest-sboms-output-cert-man-e0cbc5b6ab19, nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7, nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a, nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851, nvkr-process-cert-manager-cainjector-imag-9615473948ed, nvkr-process-cert-manager-controller-imag-98c7fa7fe320, nvkr-process-nvke-node-image-ubuntu24-arm-d06d399d5548, nvkr-process-package-local-path-provision-bba011a459b5, nvkr-process-postgresql-image-pull-postgr-d4b5512a9048]
+    needs: [build-runner-ubuntu-24-04-arm, nvkr-process-attest-sboms-output-cert-man-e0cbc5b6ab19, nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7, nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a, nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851, nvkr-process-cert-manager-cainjector-imag-9615473948ed, nvkr-process-cert-manager-controller-imag-98c7fa7fe320, nvkr-process-nvke-node-image-ubuntu24-arm-d06d399d5548, nvkr-process-package-local-path-provision-bba011a459b5, nvkr-process-package-nvke-controller-pack-0055177c76e7, nvkr-process-postgresql-image-pull-postgr-d4b5512a9048]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -4446,7 +4446,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-08'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0, nvkr-process-attest-sboms-output-nvke-nod-6c5f57895380, nvkr-process-attest-sboms-output-nvke-nod-f91992abc2a0, nvkr-process-attest-sboms-output-temporal-60a568433da4, nvkr-process-cwe-linux-amd64-fetch-nvke-c-366fa374bc31, nvkr-process-local-path-provisioner-image-e7b7f89ebfe0, nvkr-process-nvke-node-fde-ubuntu24-amd64-68929548ea3f, nvkr-process-nvke-node-image-amd64-fetch-da60ac6eb51c, nvkr-process-package-release-publish-rele-e70edb401cae]
+    needs: [nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0, nvkr-process-attest-sboms-output-nvke-nod-6c5f57895380, nvkr-process-attest-sboms-output-nvke-nod-f91992abc2a0, nvkr-process-attest-sboms-output-temporal-60a568433da4, nvkr-process-local-path-provisioner-image-e7b7f89ebfe0, nvkr-process-nvke-node-fde-ubuntu24-amd64-68929548ea3f, nvkr-process-nvke-node-image-amd64-fetch-da60ac6eb51c, nvkr-process-package-release-publish-rele-e70edb401cae]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -4498,7 +4498,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0c'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-process-attest-sboms-output-local-pa-7cd55fb2cf05, nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f, nvkr-process-attest-sboms-output-postgres-6a2db7baf6de, nvkr-process-attest-sboms-output-spire-cr-3c298e3f69d6, nvkr-process-controller-profiles-linux-am-0594064517bf, nvkr-process-cwe-linux-arm64-fetch-nvke-c-420dcdb96553, nvkr-process-nktp-fetch-nktp-chart-nktp-b-409641394abc, nvkr-process-nktp-kube-state-metrics-imag-9237b3d3c42d, nvkr-process-nktp-kubectl-image-arm64-pul-c601d6089765, nvkr-process-nvke-node-image-amd64-fetch-a0e20b2b6193, nvkr-process-nvke-node-image-ubuntu24-amd-309e0b0b668e, nvkr-process-spire-server-image-pull-spir-2014c4fe9a1b, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-process-attest-sboms-output-local-pa-7cd55fb2cf05, nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f, nvkr-process-attest-sboms-output-postgres-6a2db7baf6de, nvkr-process-attest-sboms-output-spire-cr-3c298e3f69d6, nvkr-process-controller-profiles-linux-am-0594064517bf, nvkr-process-nktp-fetch-nktp-chart-nktp-b-409641394abc, nvkr-process-nktp-kube-state-metrics-imag-9237b3d3c42d, nvkr-process-nktp-kubectl-image-arm64-pul-c601d6089765, nvkr-process-nvke-node-image-amd64-fetch-a0e20b2b6193, nvkr-process-nvke-node-image-ubuntu24-amd-309e0b0b668e, nvkr-process-spire-server-image-pull-spir-2014c4fe9a1b, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -4537,7 +4537,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0f'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-disk-nvke-node-fde-ubuntu24-amd64, nvkr-disk-nvke-node-fde-ubuntu24-arm64, nvkr-process-attest-sboms-output-capi-kub-0b857b2a2e2f, nvkr-process-attest-sboms-output-nvke-nod-1bc709ca4460, nvkr-process-attest-sboms-output-spiffe-c-6b62394cb783, nvkr-process-attest-sboms-output-spire-se-0ec9aa4ebdf4, nvkr-process-attest-sboms-output-temporal-3db248c12d7d, nvkr-process-cert-manager-cainjector-imag-9a88bd1a12d4, nvkr-process-package-capnico-controller-p-5cbfb2d0ddf9, nvkr-process-package-cwe-package-publication-cwe, nvkr-process-spire-controller-manager-ima-7a2ceaffb086, nvkr-process-spire-oidc-image-pull-spire-ae0d2f0a3d80]
+    needs: [nvkr-disk-nvke-node-fde-ubuntu24-amd64, nvkr-disk-nvke-node-fde-ubuntu24-arm64, nvkr-process-attest-sboms-output-capi-kub-0b857b2a2e2f, nvkr-process-attest-sboms-output-nvke-nod-1bc709ca4460, nvkr-process-attest-sboms-output-spiffe-c-6b62394cb783, nvkr-process-attest-sboms-output-spire-se-0ec9aa4ebdf4, nvkr-process-attest-sboms-output-temporal-3db248c12d7d, nvkr-process-cert-manager-cainjector-imag-9a88bd1a12d4, nvkr-process-package-capnico-controller-p-5cbfb2d0ddf9, nvkr-process-spire-controller-manager-ima-7a2ceaffb086, nvkr-process-spire-oidc-image-pull-spire-ae0d2f0a3d80]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:

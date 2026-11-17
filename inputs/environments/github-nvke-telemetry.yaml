@@ -21,7 +21,7 @@ githubRunners:
 publication:
   mode: per-output-v1
   credentialRef: github:NVKR_REGISTRY_WRITE
-  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/telemetry
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/candidate/telemetry
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared

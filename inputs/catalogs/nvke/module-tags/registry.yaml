@@ -3,15 +3,15 @@
 
 apiVersion: nvkr.dev/catalog/v3
 components:
-  cwe:
-    artifactPath: bin/cwe.oci.tar
+  nvke-controller:
+    artifactPath: bin/nvke-controller.oci.tar
     buildCommand:
     - sh
     - -ec
     - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src --local
       dockerfile=/src/controller --opt platform=linux/amd64 --opt "build-arg:BUILD_VERSION=$BUILD_VERSION"
       --opt "build-arg:GIT_VERSION=$GIT_VERSION" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
-      --output type=oci,dest=/src/bin/cwe.oci.tar,oci-mediatypes=true
+      --output type=oci,dest=/src/bin/nvke-controller.oci.tar,oci-mediatypes=true
     builderType: buildkit-rootless
     fromSource: true
     outputType: oci-image
@@ -44,7 +44,7 @@ components:
     writeDir: bin
 kind: SourceBuildRegistry
 metadata:
-  description: NVKE components from the release v0.23.0 at 2cfd00081b468d85a4894ec17e9deac13c9d8169. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
+  description: NVKE components from the release v0.23.0 at 2cfd00081b468d85a4894ec17e9deac13c9d8169. The CLI uses an offline Go build; nvke-controller wraps the upstream Dockerfile in digest-pinned
     rootless BuildKit.
   name: nvke-v1
 sources:

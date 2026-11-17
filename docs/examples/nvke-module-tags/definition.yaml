@@ -7,21 +7,21 @@ catalog:
 cosignTool: cosign
 kind: Definition
 metadata:
-  description: Build the NVKE CLI, CWE runtime image and upstream controller Helm chart from
+  description: Build the NVKE CLI, nvke-controller runtime image and upstream controller Helm chart from
     pinned source.
   name: nvke-v1
 outputs:
 - components:
-  - cwe
+  - nvke-controller
   format: oci
-  name: cwe
+  name: nvke-controller
   platform: linux/amd64
 - components:
   - nvke-helm
   format: helm-oci
   helm:
     images:
-      controller: cwe
+      controller: nvke-controller
   name: nvke-helm
   platform: linux/amd64
 - components:

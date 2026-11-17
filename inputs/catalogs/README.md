@@ -48,16 +48,16 @@ Former paths below were relative to `definitions/` at upstream commit
 | `nvke-local-dev-arm64/cli-catalog` | [`nvke/module-cli-arm64`](nvke/module-cli-arm64/registry.yaml) | Historical ARM64 CLI selection and local utility tools |
 | `nvke-local-dev-arm64/site-catalog` | [`nvke/local-site-arm64`](nvke/local-site-arm64/registry.yaml) | Local CLI, controller and chart source/interface baseline |
 | `nvke-nightly-arm64/site-catalog` | [`nvke/nightly-site-arm64`](nvke/nightly-site-arm64/registry.yaml) | Nightly site producers aligned with the selected downstream suite |
-| `nvke-m2/release-catalog` | [`nvke/release-components`](nvke/release-components/registry.yaml) | Mixed CAPNICo, NKTP, reference profiles and runtime-image cohort awaiting a deliberate split |
+| Combined release catalog | [`nvke/release-components`](nvke/release-components/registry.yaml) | Mixed CAPNICo, NKTP, reference profiles and runtime-image cohort awaiting a deliberate split |
 | `nvke-local-dev-arm64/capnico-catalog` | [`capnico/local`](capnico/local/registry.yaml) | Local/nightly native CAPNICo producer |
-| `nvke-m2/os-catalog` | [`node-images/release`](node-images/release/registry.yaml) | Plain/FDE disk roots and complete material closure |
+| Combined OS catalog | [`node-images/release`](node-images/release/registry.yaml) | Plain/FDE disk roots and complete material closure |
 | `nvke-os/catalog` | [`node-images/diagnostic`](node-images/diagnostic/registry.yaml) | Existing plain-disk diagnostic baseline |
 | `nvke-ovn-source/catalog` | [`ovn-nvidia`](ovn-nvidia/registry.yaml) | NVIDIA OVN standalone image/chart and package producers |
 | `nvke-local-dev-arm64/upstream-ovn-catalog` | [`ovn-upstream`](ovn-upstream/registry.yaml) | Upstream OVN diagnostic alternatives |
 | `nvke-local-dev-arm64/profiles-catalog` | [`controller-profiles/nvidia-arm64`](controller-profiles/nvidia-arm64/registry.yaml) | NVIDIA local/nightly diagnostic profile payload |
 | `nvke-local-dev-arm64/upstream-ovn-profiles-catalog` | [`controller-profiles/upstream-arm64`](controller-profiles/upstream-arm64/registry.yaml) | Matching upstream OVN diagnostic payload |
-| `nvke-m2/image-catalog` | [`runtime-dependencies`](runtime-dependencies/registry.yaml) | Acquired native runtime images |
-| `nvke-m2/catalog` | [`tools/operator-amd64`](tools/operator-amd64/registry.yaml) | Acquired AMD64 operator tools |
+| Combined runtime-image catalog | [`runtime-dependencies`](runtime-dependencies/registry.yaml) | Acquired native runtime images |
+| Combined operator-tool catalog | [`tools/operator-amd64`](tools/operator-amd64/registry.yaml) | Acquired AMD64 operator tools |
 | `nvke-local-dev-arm64/operator-catalog` | [`tools/operator-arm64`](tools/operator-arm64/registry.yaml) | Acquired ARM64 operator tools |
 | `nvke-local-dev-arm64/tools-catalog` | [`tools/installer-local-arm64`](tools/installer-local-arm64/registry.yaml) | Local source-built installer tools |
 | `nvke-nightly-arm64/installer-tools-catalog` | [`tools/installer-hosted-arm64`](tools/installer-hosted-arm64/registry.yaml) | Hosted installer-tool packaging and acquired Helm |

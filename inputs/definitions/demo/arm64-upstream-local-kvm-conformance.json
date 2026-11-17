@@ -1,83 +1,81 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "../../catalogs/nvke/module-cli-arm64"
+  },
   "kind": "Definition",
   "metadata": {
     "name": "nvke-local-dev-arm64-upstream-ovn-kvm-conformance",
     "description": "Native Linux ARM64 KVM build of the local demo; retains the selected source pins, materials and network artifacts. Adds version-matched Kubernetes conformance tools in the same fresh Run."
   },
-  "catalog": {
-    "base": "../../catalogs/nvke/module-cli-arm64"
-  },
   "outputs": [
     {
-      "name": "busybox-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/kubernetes-conformance/images"
       },
       "components": [
         "busybox-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "busybox-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "capi-exec-init-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/tools/native"
       },
       "components": [
         "native-capi-exec-init-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "capi-exec-init-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "capi-exec-plugin-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/tools/native"
       },
       "components": [
         "native-capi-exec-plugin-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "capi-exec-plugin-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "capnico-controller-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/capnico/local"
       },
       "components": [
         "capnico-controller"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "capnico-controller-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "cluster-api-provider-provisioned-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/nvke/release"
       },
       "components": [
         "cluster-api-provider-provisioned"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "cluster-api-provider-provisioned-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "conformance-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/kubernetes-conformance/images-1.36"
       },
       "components": [
         "conformance-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "conformance-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "controller-chart",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/nvke/local-site-arm64"
       },
@@ -87,68 +85,57 @@
       "format": "helm-oci",
       "helm": {
         "images": {
-          "controller": "cwe"
+          "controller": "nvke-controller"
         }
-      }
+      },
+      "name": "controller-chart",
+      "platform": "linux/arm64"
     },
     {
-      "name": "controller-profiles-upstream-ovn",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/controller-profiles/upstream-arm64"
       },
       "components": [
         "nvke-local-profiles"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "controller-profiles-upstream-ovn",
+      "platform": "linux/arm64"
     },
     {
-      "name": "csi-node-driver-registrar-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "csi-node-driver-registrar-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "csi-node-driver-registrar-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "cwe",
-      "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/nvke/local-site-arm64"
+        "base": "../../catalogs/kubernetes-conformance/hydrophone"
       },
       "components": [
-        "nvke-controller"
+        "hydrophone"
       ],
-      "format": "oci"
-    },
-    {
+      "format": "executable",
       "name": "hydrophone-arm64",
-      "platform": "linux/arm64",
+      "platform": "linux/arm64"
+    },
+    {
       "catalog": {
         "base": "../../catalogs/kubernetes-conformance/hydrophone"
       },
       "components": [
         "hydrophone"
       ],
-      "format": "executable"
-    },
-    {
+      "format": "executable",
       "name": "hydrophone-darwin-arm64",
-      "platform": "darwin/arm64",
-      "catalog": {
-        "base": "../../catalogs/kubernetes-conformance/hydrophone"
-      },
-      "components": [
-        "hydrophone"
-      ],
-      "format": "executable"
+      "platform": "darwin/arm64"
     },
     {
-      "name": "installer-tools-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/tools/installer-local-arm64"
       },
@@ -159,33 +146,33 @@
         "kubectl",
         "oras"
       ],
-      "format": "executable"
+      "format": "executable",
+      "name": "installer-tools-arm64",
+      "platform": "linux/arm64"
     },
     {
+      "catalog": {
+        "base": "../../catalogs/kubernetes-conformance/kubectl"
+      },
+      "components": [
+        "kubectl"
+      ],
+      "format": "executable",
       "name": "kubectl-arm64",
-      "platform": "linux/arm64",
+      "platform": "linux/arm64"
+    },
+    {
       "catalog": {
         "base": "../../catalogs/kubernetes-conformance/kubectl"
       },
       "components": [
         "kubectl"
       ],
-      "format": "executable"
-    },
-    {
+      "format": "executable",
       "name": "kubectl-darwin-arm64",
-      "platform": "darwin/arm64",
-      "catalog": {
-        "base": "../../catalogs/kubernetes-conformance/kubectl"
-      },
-      "components": [
-        "kubectl"
-      ],
-      "format": "executable"
+      "platform": "darwin/arm64"
     },
     {
-      "name": "nicosim-tools-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/tools/native"
       },
@@ -194,22 +181,33 @@
         "nico-sim-runtime-assets",
         "nico-simctl"
       ],
-      "format": "executable"
+      "format": "executable",
+      "name": "nicosim-tools-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "nktp",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/nvke/local-site-arm64"
       },
       "components": [
         "nktp-chart"
       ],
-      "format": "helm-oci"
+      "format": "helm-oci",
+      "name": "nktp",
+      "platform": "linux/arm64"
     },
     {
-      "name": "nvke-node-image-upstream-ovn-arm64",
-      "platform": "linux/arm64",
+      "catalog": {
+        "base": "../../catalogs/nvke/local-site-arm64"
+      },
+      "components": [
+        "nvke-controller"
+      ],
+      "format": "oci",
+      "name": "nvke-controller",
+      "platform": "linux/arm64"
+    },
+    {
       "catalog": {
         "base": "../../catalogs/node-images/release",
         "overlays": [
@@ -232,22 +230,22 @@
         "ovn-kubernetes-chart",
         "ubuntu-installer-iso"
       ],
-      "format": "disk-image"
+      "format": "disk-image",
+      "name": "nvke-node-image-upstream-ovn-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "nvkectl",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/nvke/local-site-arm64"
       },
       "components": [
         "nvkectl"
       ],
-      "format": "executable"
+      "format": "executable",
+      "name": "nvkectl",
+      "platform": "linux/arm64"
     },
     {
-      "name": "operator-tools",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/tools/operator-arm64"
       },
@@ -255,176 +253,176 @@
         "helm",
         "kubectl"
       ],
-      "format": "executable"
+      "format": "executable",
+      "name": "operator-tools",
+      "platform": "linux/arm64"
     },
     {
-      "name": "postgresql",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/nvke/release"
       },
       "components": [
         "postgresql-chart"
       ],
-      "format": "helm-oci"
+      "format": "helm-oci",
+      "name": "postgresql",
+      "platform": "linux/arm64"
     },
     {
-      "name": "postgresql-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "postgresql-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "postgresql-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "spiffe-csi-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spiffe-csi-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "spiffe-csi-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "spire",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/nvke/release"
       },
       "components": [
         "spire-chart"
       ],
-      "format": "helm-oci"
+      "format": "helm-oci",
+      "name": "spire",
+      "platform": "linux/arm64"
     },
     {
-      "name": "spire-agent-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spire-agent-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "spire-agent-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "spire-bash-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spire-bash-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "spire-bash-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "spire-controller-manager-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spire-controller-manager-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "spire-controller-manager-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "spire-crds",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/nvke/release"
       },
       "components": [
         "spire-crds-chart"
       ],
-      "format": "helm-oci"
+      "format": "helm-oci",
+      "name": "spire-crds",
+      "platform": "linux/arm64"
     },
     {
-      "name": "spire-oidc-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spire-oidc-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "spire-oidc-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "spire-server-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spire-server-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "spire-server-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "spire-tpm-server-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "spire-tpm-server-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "spire-tpm-server-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "temporal",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/nvke/release"
       },
       "components": [
         "temporal-chart"
       ],
-      "format": "helm-oci"
+      "format": "helm-oci",
+      "name": "temporal",
+      "platform": "linux/arm64"
     },
     {
-      "name": "temporal-admin-tools-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "temporal-admin-tools-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "temporal-admin-tools-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "temporal-server-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "temporal-server-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "temporal-server-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "temporal-ui-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/runtime-dependencies"
       },
       "components": [
         "temporal-ui-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "temporal-ui-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "upstream-ovn-chart-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/ovn-upstream"
       },
@@ -436,29 +434,31 @@
         "images": {
           "ovn": "upstream-ovn-image-arm64"
         }
-      }
+      },
+      "name": "upstream-ovn-chart-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "upstream-ovn-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/ovn-upstream"
       },
       "components": [
         "ovn-kube-ubuntu"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "upstream-ovn-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "workload-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
         "base": "../../catalogs/tools/native"
       },
       "components": [
         "native-workload-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "workload-image-arm64",
+      "platform": "linux/arm64"
     }
   ]
 }

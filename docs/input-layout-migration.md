@@ -76,7 +76,7 @@ test and demonstration has an accepted successor; it does not authorize silently
 
 | Original Definition | Relocated now | Conditional target or successor | Remaining disposition |
 |---|---|---|---|
-| `nvke-m2/definition.yaml` | `inputs/definitions/nvke/definition.yaml` | `nvke/definition.yaml` | Seed; retain all 69 outputs initially, including the explicitly named profile fixture |
+| Combined NVKE Definition | `inputs/definitions/nvke/definition.yaml` | `nvke/definition.yaml` | Seed; retain all 69 outputs initially, including the explicitly named profile fixture |
 | `nvke-nightly-arm64/definition.json` | Retired 2026-11-17 | `demo/arm64-nvidia-kvm.yaml` | Merge; preserve 29-output membership, reconcile the stale embedded OVN producers explicitly |
 | `nvke-nightly-upstream-ovn-arm64/definition.json` | Retired 2026-11-17 | `demo/arm64-upstream-kvm.yaml` | Merge; preserve 29-output membership and the downstream renderer's profile-output naming contract |
 | `nvke-local-dev-arm64/definition.json` | `inputs/definitions/demo/arm64-nvidia-tcg.json` | `demo/arm64-nvidia-tcg.yaml` | Merge; preserve the complete 29-output selection while reconciling its site/tool baseline with KVM |
@@ -113,8 +113,8 @@ publication, signing, credential or runtime policies interchangeable.
 
 | Original Environment | Relocated now | Conditional target or successor | Remaining disposition |
 |---|---|---|---|
-| `nvke-m2/environment-github.yaml` | `inputs/environments/github-release.yaml` | `github-release.yaml` | Seed; preserve main-only signer, namespace, credentials and both native execution classes |
-| `nvke-m2/environment-github-dev.yaml` | `inputs/environments/github-development.yaml` | `github-development.yaml` | Seed; preserve development mode and its distinct credentials, signer and namespace |
+| Combined production Environment | `inputs/environments/github-release.yaml` | `github-release.yaml` | Seed; preserve main-only signer, namespace, credentials and both native execution classes |
+| Combined development Environment | `inputs/environments/github-development.yaml` | `github-development.yaml` | Seed; preserve development mode and its distinct credentials, signer and namespace |
 | `nvke-nightly-arm64/environment-github.json` | `inputs/environments/github-nightly-nvidia.json` | `github-nightly-nvidia.yaml` | Seed; preserve named bundle and signing/publication identities |
 | `nvke-nightly-upstream-ovn-arm64/environment-github.json` | `inputs/environments/github-nightly-upstream.json` | `github-nightly-upstream.yaml` | Seed; preserve its separate named bundle and identities |
 | `nvke-local-dev-arm64/environment-local-docker.json` | `inputs/environments/local-arm64-tcg.json` | `local-arm64-tcg.yaml` | Seed; preserve native ARM64, TCG capacity and no-publication policy |
@@ -142,7 +142,7 @@ Run subset flag to reduce file count.
 `definitions/nightly-profiles.json` moved to `inputs/testing/nightly-profiles.json`: it is downstream
 coordinator configuration, not a Definition or Environment. Its Definition/Environment references move
 without changing suite revisions, output names, bundle names or workflow identities.
-`definitions/nvke-m2/qualification.yaml` moved to `inputs/policies/nvke-qualification.yaml`; its
+The combined NVKE qualification policy moved to `inputs/policies/nvke-qualification.yaml`; its
 independently authored trust selections and exact output scope are preserved. Neither counts toward
 the eight/eight target. Teaching-only inputs now reside in `docs/examples/nvke-tutorial/` and
 `docs/examples/nvke-deploy/`; their current distinct payloads and Environments remain explicit.

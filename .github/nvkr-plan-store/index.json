@@ -43,46 +43,15 @@
       "sha256": "sha256:4d3f6978217cf98cdcbf730101f06d1a30fbd8ffebcf70d7c60dc30baae9fa55"
     }
   ],
-  "catalogs/nvke-m2-deployment-images": [
+  "catalogs/nvke-deployment-images": [
     {
       "bundles": [
         "nvkr-dev",
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "catalogs/nvke-m2-deployment-images@8c16b2f2cae1.json",
-      "sha256": "sha256:8c16b2f2cae1d2622cfc2890b8ad99bace006fd701a7f3b8fc609401a5583f68"
-    }
-  ],
-  "catalogs/nvke-m2-os": [
-    {
-      "bundles": [
-        "nvkr-dev",
-        "nvkr-run-nvke",
-        "nvkr-run-nvke-nightly"
-      ],
-      "file": "catalogs/nvke-m2-os@0b952d67ebee.json",
-      "sha256": "sha256:0b952d67ebeedc4a47ec017ded9430b5999923104c0e4e17ce84b1d1ae973dfd"
-    },
-    {
-      "bundles": [
-        "nvkr-dev",
-        "nvkr-run-nvke",
-        "nvkr-run-nvke-nightly"
-      ],
-      "file": "catalogs/nvke-m2-os@fe774d802506.json",
-      "sha256": "sha256:fe774d802506f09614713053fc2ead7ebd2287fa7c889d8ce4b307e879f6cf63"
-    }
-  ],
-  "catalogs/nvke-m2-release-components": [
-    {
-      "bundles": [
-        "nvkr-dev",
-        "nvkr-run-nvke",
-        "nvkr-run-nvke-nightly"
-      ],
-      "file": "catalogs/nvke-m2-release-components@18cd4ebd28af.json",
-      "sha256": "sha256:18cd4ebd28aff5488f93423f160c199ee8e0ee360b3c3110670d0685f4577327"
+      "file": "catalogs/nvke-deployment-images@73b2e59e63a9.json",
+      "sha256": "sha256:73b2e59e63a91f547840a051a21dbbd342dff813a350c189a5bfdf5c454dee77"
     }
   ],
   "catalogs/nvke-operator-tools": [
@@ -103,8 +72,39 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "catalogs/nvke-operator-tools-arm64@85e48b7fa83b.json",
-      "sha256": "sha256:85e48b7fa83b57fb6f3551b81ed22dc3a4ca67ef289acdfdf0c3b0d712eebfba"
+      "file": "catalogs/nvke-operator-tools-arm64@2ad9b9fde3f0.json",
+      "sha256": "sha256:2ad9b9fde3f0db529401bee7c96867343bcb88b9626f197fb7e98d1a9145337a"
+    }
+  ],
+  "catalogs/nvke-os": [
+    {
+      "bundles": [
+        "nvkr-dev",
+        "nvkr-run-nvke",
+        "nvkr-run-nvke-nightly"
+      ],
+      "file": "catalogs/nvke-os@55579cba5bd9.json",
+      "sha256": "sha256:55579cba5bd9a1c050c585a3a7bc6c077ec736990dbef1c3f03edc53110e19ce"
+    },
+    {
+      "bundles": [
+        "nvkr-dev",
+        "nvkr-run-nvke",
+        "nvkr-run-nvke-nightly"
+      ],
+      "file": "catalogs/nvke-os@ac9d60f1942b.json",
+      "sha256": "sha256:ac9d60f1942bc4ddd799ad9635277c04d50dc4c1c6bc87d3d21200b903d6afd9"
+    }
+  ],
+  "catalogs/nvke-release-components": [
+    {
+      "bundles": [
+        "nvkr-dev",
+        "nvkr-run-nvke",
+        "nvkr-run-nvke-nightly"
+      ],
+      "file": "catalogs/nvke-release-components@509e2841cbf6.json",
+      "sha256": "sha256:509e2841cbf6ea02446e47ff02eb82d8db5ed1007ea65e2c06e65d606d6e3456"
     }
   ],
   "catalogs/nvke-v1": [
@@ -114,8 +114,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "catalogs/nvke-v1@ec9ba6474b8f.json",
-      "sha256": "sha256:ec9ba6474b8f4eae1d4ca4a2e9a43425ccf7c793996ab081a813d76d533aeae9"
+      "file": "catalogs/nvke-v1@602184c9bc5c.json",
+      "sha256": "sha256:602184c9bc5c890c8fa4836319e48abebe879cd60b0bb435fe9dffc737f31203"
     }
   ],
   "components/aicr-gb300-generic-training-argocd": [
@@ -325,17 +325,6 @@
       ],
       "file": "components/csi-node-driver-registrar-image@8584f06416fe.json",
       "sha256": "sha256:8584f06416fe766904fa5fb8e23e8601a2f6db6a737db3e79a89689d36c4d44c"
-    }
-  ],
-  "components/cwe": [
-    {
-      "bundles": [
-        "nvkr-dev",
-        "nvkr-run-nvke",
-        "nvkr-run-nvke-nightly"
-      ],
-      "file": "components/cwe@8630e46cbd67.json",
-      "sha256": "sha256:8630e46cbd67273dbba8db1f35678290c74d6be34354c05ca04e102b407263e6"
     }
   ],
   "components/helm": [
@@ -561,6 +550,15 @@
       ],
       "file": "components/nvke-controller@1fb29258e1a0.json",
       "sha256": "sha256:1fb29258e1a02fb14c2e9ef2259fe00f9dbb7fb8848c5c58a7e7d35149f79f57"
+    },
+    {
+      "bundles": [
+        "nvkr-dev",
+        "nvkr-run-nvke",
+        "nvkr-run-nvke-nightly"
+      ],
+      "file": "components/nvke-controller@988bff52ddf2.json",
+      "sha256": "sha256:988bff52ddf24a99783a4ee404b368b3c42861df38f40165c0101dfd99059cee"
     }
   ],
   "components/nvke-controller-chart": [
@@ -1007,8 +1005,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "composition/nvke-gpu-site@b9a9e25dd5fb.json",
-      "sha256": "sha256:b9a9e25dd5fbd7f5268b9cb6bf8fe0ee9b1b1a407455542f1e0185b52915fd28"
+      "file": "composition/nvke-gpu-site@f01babed5c27.json",
+      "sha256": "sha256:f01babed5c27fcbaf06b2e9919b8e1d02f1532f5748d58c885a1189637e07615"
     }
   ],
   "definition/nvke-gpu-site": [
@@ -1018,8 +1016,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "definition/nvke-gpu-site@437851d84edc.json",
-      "sha256": "sha256:437851d84edc0b272f23dfa638286d8a96c2d986d8aaa82ab82fb2cc66f604b2"
+      "file": "definition/nvke-gpu-site@ae5139893506.json",
+      "sha256": "sha256:ae513989350610aefdb3f8bdffdbc50d09a5d181f5f033aabfd105abec2be61b"
     }
   ],
   "environment/nvke-github": [
@@ -1027,17 +1025,17 @@
       "bundles": [
         "nvkr-run-nvke"
       ],
-      "file": "environment/nvke-github@3bab19b21e66.json",
-      "sha256": "sha256:3bab19b21e66fd474ddac8db5dc592faa748de7b33cdfc92860615ebf23a6099"
+      "file": "environment/nvke-github@05bbd75616a5.json",
+      "sha256": "sha256:05bbd75616a5bebc9d293b7c97001b6cee0e466daa7388a4afffb4ddd254cfc3"
     }
   ],
-  "environment/nvke-m2-github-dev": [
+  "environment/nvke-github-dev": [
     {
       "bundles": [
         "nvkr-dev"
       ],
-      "file": "environment/nvke-m2-github-dev@025739daa34e.json",
-      "sha256": "sha256:025739daa34e59d5435e3150bf3d60fe1e4c0caca6e2a9efb79600e83fa8dd12"
+      "file": "environment/nvke-github-dev@ba7cef0162c0.json",
+      "sha256": "sha256:ba7cef0162c0130e91cd733a2d2cca3bc9acd1e73eeca09a1463ac0c31843c04"
     }
   ],
   "environment/nvke-nightly-github": [
@@ -1056,8 +1054,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "graph/nvke-gpu-site@4e9a96c2584a.json",
-      "sha256": "sha256:4e9a96c2584a12c6d8ab2d0e496babcb2469e461e0675f382d5a60903745153e"
+      "file": "graph/nvke-gpu-site@492d6a9deb0b.json",
+      "sha256": "sha256:492d6a9deb0b4494a837fd78d12515345702b03bff1bf64ab5ff37c9b82cb61f"
     }
   ],
   "outputs/nvke-gpu-site": [
@@ -1067,8 +1065,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "outputs/nvke-gpu-site@58b51b7dbb8c.json",
-      "sha256": "sha256:58b51b7dbb8ce43f1ae2bf24448e7e2c93c4aee05362015ce6d73f0a0f9f3ccc"
+      "file": "outputs/nvke-gpu-site@3322244d4a9c.json",
+      "sha256": "sha256:3322244d4a9c916f2a3114b5c5bf22ab4e0cdbe1018c09a9e5b913c6107fa291"
     }
   ],
   "resolved-components/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm": [
@@ -1335,28 +1333,6 @@
       "sha256": "sha256:05b26e76f91f873348b588e67e512a39700b357640313baea99989dd0f8c0e6c"
     }
   ],
-  "resolved-components/cwe/linux/amd64": [
-    {
-      "bundles": [
-        "nvkr-dev",
-        "nvkr-run-nvke",
-        "nvkr-run-nvke-nightly"
-      ],
-      "file": "resolved-components/cwe/linux/amd64@5d283dfbf6b5.json",
-      "sha256": "sha256:5d283dfbf6b5b7c3e8603ec922397dc6b4c914cb32dc415dd68343776ede5bf7"
-    }
-  ],
-  "resolved-components/cwe/linux/arm64": [
-    {
-      "bundles": [
-        "nvkr-dev",
-        "nvkr-run-nvke",
-        "nvkr-run-nvke-nightly"
-      ],
-      "file": "resolved-components/cwe/linux/arm64@5d283dfbf6b5.json",
-      "sha256": "sha256:5d283dfbf6b5b7c3e8603ec922397dc6b4c914cb32dc415dd68343776ede5bf7"
-    }
-  ],
   "resolved-components/local-path-helper-image": [
     {
       "bundles": [
@@ -1608,6 +1584,28 @@
       ],
       "file": "resolved-components/nktp-target-allocator-image-arm64@e69b0fbf21c6.json",
       "sha256": "sha256:e69b0fbf21c615a2af9aec2a6e2aa1b54abe8addc204419b25484630bd8b3270"
+    }
+  ],
+  "resolved-components/nvke-controller/linux/amd64": [
+    {
+      "bundles": [
+        "nvkr-dev",
+        "nvkr-run-nvke",
+        "nvkr-run-nvke-nightly"
+      ],
+      "file": "resolved-components/nvke-controller/linux/amd64@5d283dfbf6b5.json",
+      "sha256": "sha256:5d283dfbf6b5b7c3e8603ec922397dc6b4c914cb32dc415dd68343776ede5bf7"
+    }
+  ],
+  "resolved-components/nvke-controller/linux/arm64": [
+    {
+      "bundles": [
+        "nvkr-dev",
+        "nvkr-run-nvke",
+        "nvkr-run-nvke-nightly"
+      ],
+      "file": "resolved-components/nvke-controller/linux/arm64@5d283dfbf6b5.json",
+      "sha256": "sha256:5d283dfbf6b5b7c3e8603ec922397dc6b4c914cb32dc415dd68343776ede5bf7"
     }
   ],
   "resolved-components/nvke-node-fde-amd64": [
@@ -2035,8 +2033,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "routes/nvke-gpu-site@2e9b7994d503.json",
-      "sha256": "sha256:2e9b7994d503098ebb26596d1e55fa8f836de80a0e985eda4238a9255f60026e"
+      "file": "routes/nvke-gpu-site@0ad15842cec4.json",
+      "sha256": "sha256:0ad15842cec4a702879ee87d6d0b4d068e25738b0ad37466090aaada5d4243fa"
     }
   ],
   "scripts/aicr-gb300-generic-training-argocd-helm/build": [
@@ -3258,28 +3256,6 @@
       "sha256": "sha256:ba46673b7b730121ec6ae61e656ea6acd575771e810ac7fe10330881b810a0d6"
     }
   ],
-  "steps/cwe/linux/amd64/build": [
-    {
-      "bundles": [
-        "nvkr-dev",
-        "nvkr-run-nvke",
-        "nvkr-run-nvke-nightly"
-      ],
-      "file": "steps/cwe/linux/amd64/build@4acbde1c6831.json",
-      "sha256": "sha256:4acbde1c68316ccca72e4e52c5a5aee8b9a63806e51edd6183b2e882138d0f80"
-    }
-  ],
-  "steps/cwe/linux/arm64/build": [
-    {
-      "bundles": [
-        "nvkr-dev",
-        "nvkr-run-nvke",
-        "nvkr-run-nvke-nightly"
-      ],
-      "file": "steps/cwe/linux/arm64/build@54f644163eba.json",
-      "sha256": "sha256:54f644163eba66a74a6b0c3723ef54968e99508b1cc0f75aee9f5b0f0d4eed5e"
-    }
-  ],
   "steps/local-path-helper-image-arm64/build": [
     {
       "bundles": [
@@ -3533,6 +3509,28 @@
       "sha256": "sha256:563d4513c3d725aae1e342426ed05ceb8e927bd3580804cb1e6c1d84b83e4e89"
     }
   ],
+  "steps/nvke-controller/linux/amd64/build": [
+    {
+      "bundles": [
+        "nvkr-dev",
+        "nvkr-run-nvke",
+        "nvkr-run-nvke-nightly"
+      ],
+      "file": "steps/nvke-controller/linux/amd64/build@c95bccd0c84b.json",
+      "sha256": "sha256:c95bccd0c84bb7a81a4901e2c1118a0264053e51b90e3ba122f9431582436433"
+    }
+  ],
+  "steps/nvke-controller/linux/arm64/build": [
+    {
+      "bundles": [
+        "nvkr-dev",
+        "nvkr-run-nvke",
+        "nvkr-run-nvke-nightly"
+      ],
+      "file": "steps/nvke-controller/linux/arm64/build@bd70b2fd1453.json",
+      "sha256": "sha256:bd70b2fd1453cd56a443dc63fcb309037df3cb7facc5b6c7229219818b564a0d"
+    }
+  ],
   "steps/nvke-node-fde-amd64/build": [
     {
       "bundles": [
@@ -3540,8 +3538,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "steps/nvke-node-fde-amd64/build@c9908987a333.json",
-      "sha256": "sha256:c9908987a3336d49796c51dadabd4e1918eb80fe14d96ea164c63794e3ad85a3"
+      "file": "steps/nvke-node-fde-amd64/build@bbde62336236.json",
+      "sha256": "sha256:bbde62336236349cbc73bd8b1081684514ebd5a7be224a4bc2af26d91def6b08"
     }
   ],
   "steps/nvke-node-fde-arm64/build": [
@@ -3551,8 +3549,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "steps/nvke-node-fde-arm64/build@b53313347e74.json",
-      "sha256": "sha256:b53313347e748ebe5244d689048911e475bb118f4e8dbecd35da1aeecaf47c51"
+      "file": "steps/nvke-node-fde-arm64/build@c1ca723f2891.json",
+      "sha256": "sha256:c1ca723f2891e0d76e3a3a63345b1412bd057f1995ab3ff5049ee3ce4f4a07cf"
     }
   ],
   "steps/nvke-node-fde-ubuntu24-amd64/build": [
@@ -3562,8 +3560,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "steps/nvke-node-fde-ubuntu24-amd64/build@92e562ec3923.json",
-      "sha256": "sha256:92e562ec392356a279725f254fde712fc5ab47942db3ccedbc4d332cb1f140ff"
+      "file": "steps/nvke-node-fde-ubuntu24-amd64/build@022c9ff5ff2b.json",
+      "sha256": "sha256:022c9ff5ff2b046142c156875c4a603fe8bea1360b577a30df37edaec4c83775"
     }
   ],
   "steps/nvke-node-fde-ubuntu24-arm64/build": [
@@ -3573,8 +3571,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "steps/nvke-node-fde-ubuntu24-arm64/build@a7bd268ffdbe.json",
-      "sha256": "sha256:a7bd268ffdbe11ed4b57fa867725f1c631dcd79ef376f873d4387da5a8c39318"
+      "file": "steps/nvke-node-fde-ubuntu24-arm64/build@18ead28eaa5b.json",
+      "sha256": "sha256:18ead28eaa5b6817eac37daca9d8df960de99170956c00f6ef0ca718006b28b8"
     }
   ],
   "steps/nvke-node-image-amd64/build": [
@@ -3584,8 +3582,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "steps/nvke-node-image-amd64/build@52506d21c179.json",
-      "sha256": "sha256:52506d21c17973e993658abb9e246f64c9e90167d68f7508221015f868498299"
+      "file": "steps/nvke-node-image-amd64/build@9f6fb5fb53b1.json",
+      "sha256": "sha256:9f6fb5fb53b12704477826512eb46e46a5612d5ccbd0f44d1b80d8dfed1951b3"
     }
   ],
   "steps/nvke-node-image-arm64/build": [
@@ -3595,8 +3593,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "steps/nvke-node-image-arm64/build@d0e82b61289e.json",
-      "sha256": "sha256:d0e82b61289e83b7b05dbc814c8d5f1432ea92c74bddc1d0bc21461c7dc441b7"
+      "file": "steps/nvke-node-image-arm64/build@4721f3922d02.json",
+      "sha256": "sha256:4721f3922d02c7186b3abcb84be3d60a564a6199338d753fa60ededa0e208f9f"
     }
   ],
   "steps/nvke-node-image-ubuntu24-amd64/build": [
@@ -3606,8 +3604,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "steps/nvke-node-image-ubuntu24-amd64/build@4b422d7983e7.json",
-      "sha256": "sha256:4b422d7983e7c978a8a45b787c43772e7da406dc123f7af92c357619cf2ddbc3"
+      "file": "steps/nvke-node-image-ubuntu24-amd64/build@2a8fe40565d0.json",
+      "sha256": "sha256:2a8fe40565d02125dd8fe924248be9474011ff3457a6c6260d2d55279c918296"
     }
   ],
   "steps/nvke-node-image-ubuntu24-arm64/build": [
@@ -3617,8 +3615,8 @@
         "nvkr-run-nvke",
         "nvkr-run-nvke-nightly"
       ],
-      "file": "steps/nvke-node-image-ubuntu24-arm64/build@94ceaae46eeb.json",
-      "sha256": "sha256:94ceaae46eeb7f24b68b68aa9430bc2a030150ba698efa9f3902dd97abbd767d"
+      "file": "steps/nvke-node-image-ubuntu24-arm64/build@4617c96bebdc.json",
+      "sha256": "sha256:4617c96bebdcdc73dd9d3f806edcbf76faf6d1812d7769a4370972ac3ded9bf1"
     }
   ],
   "steps/nvkectl-linux-arm64/build": [
@@ -3954,24 +3952,24 @@
   "targets/nvke-gpu-site": [
     {
       "bundles": [
-        "nvkr-run-nvke-nightly"
+        "nvkr-run-nvke"
       ],
-      "file": "targets/nvke-gpu-site@02501a500e81.json",
-      "sha256": "sha256:02501a500e81c8508279e2d1fee6c393447c15f54a3f13f58c395e4ba615231e"
+      "file": "targets/nvke-gpu-site@3fadceecf5ff.json",
+      "sha256": "sha256:3fadceecf5ff313fc0a261e0f5b70aa16090dd47c7687461a62fef085ede3847"
     },
     {
       "bundles": [
         "nvkr-dev"
       ],
-      "file": "targets/nvke-gpu-site@46a816c1b07a.json",
-      "sha256": "sha256:46a816c1b07a22e78b87af968cd3957c0f866f34efffd3d2d9aa56ab80a9974c"
+      "file": "targets/nvke-gpu-site@481ca7239d1d.json",
+      "sha256": "sha256:481ca7239d1d3ad9f142a72d38c9f6267db95afa3ab76df87ca3507fb6745e3e"
     },
     {
       "bundles": [
-        "nvkr-run-nvke"
+        "nvkr-run-nvke-nightly"
       ],
-      "file": "targets/nvke-gpu-site@c39cea0d2093.json",
-      "sha256": "sha256:c39cea0d20930c6decab467d509faf08c169bc107e4c9669fe6b023168404cf4"
+      "file": "targets/nvke-gpu-site@980ae1d636e7.json",
+      "sha256": "sha256:980ae1d636e7f52d526d9bee15a27a9cd6ffa38aa510d209bbaf7f8caca06d11"
     }
   ]
 }

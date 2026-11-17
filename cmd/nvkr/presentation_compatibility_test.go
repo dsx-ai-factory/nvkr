@@ -70,7 +70,8 @@ func TestCIRestrictsAutomaticSelectionOnly(t *testing.T) {
 
 // These fixed bytes were captured with the pre-dashboard base executable at
 // 3558650e986cd7600558e4e38b77da5b89d780f0, not regenerated from this implementation.
-// Only input-dependent identities and relocated catalog paths are adapted below.
+// Input-dependent identities and relocated catalog paths are adapted below.
+// The Definition inspection fixture was regenerated after its input names changed.
 func TestDefaultLeafBytesMatchPreDashboardFixtures(t *testing.T) {
 	lifecycleCommandRepo(t)
 	const maintainedPlan = ".github/nvkr-run-nvke/plan.json"
@@ -103,7 +104,7 @@ func TestDefaultLeafBytesMatchPreDashboardFixtures(t *testing.T) {
 					}
 					want = bytes.ReplaceAll(want, []byte(capturedDigest), []byte(digest))
 				} else {
-					const capturedCatalog = `"base":"./catalog"`
+					const capturedCatalog = `"base":"../../../inputs/catalogs/nvke/module-tags"`
 					if bytes.Count(want, []byte(capturedCatalog)) != 1 {
 						t.Fatal("Definition fixture lost its captured catalog path")
 					}

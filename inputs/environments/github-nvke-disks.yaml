@@ -45,7 +45,7 @@ executionClasses:
     maxTimeoutSeconds: 21600
     capabilities: [kvm]
 # Executable pins are native measurements. Budgets cover the existing 8 GiB
-# subject / 16 GiB filesystem limits, not a measured full M2 execution.
+# subject / 16 GiB filesystem limits, not a measured full NVKE execution.
 # Private-volume admission requires 12*filesystem + 2*subject + 2 GiB scratch;
 # memory covers 2*subject + appliance + scanner/report headroom. Host capacity
 # includes the additional held subject snapshot.
@@ -81,7 +81,7 @@ diskInspectionProfiles:
 publication:
   mode: per-output-v1
   credentialRef: github:NVKR_REGISTRY_WRITE
-  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/disks
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/candidate/disks
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared

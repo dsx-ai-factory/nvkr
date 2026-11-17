@@ -54,4 +54,4 @@ The local Run is unsigned and publishes nothing. For hosted builds, signing and
 publication, continue with [pipeline generation](../../generate-pipeline.md).
 
 The separate [module-tags example](../nvke-module-tags/README.md) retains the
-older `cwe` and `nvke-helm` output names for scratch hosted generation.
+older `nvke-controller` and `nvke-helm` output names for scratch hosted generation.

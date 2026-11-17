@@ -28,7 +28,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/capi-controller-image/build@3dfde80746a3.json",
       "name": "capi-controller-image",
       "resolvedComponents": {
@@ -36,7 +36,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/capi-controller-image-arm64/build@2e362ff892e6.json",
       "name": "capi-controller-image-arm64",
       "resolvedComponents": {
@@ -44,7 +44,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/capi-kubeadm-bootstrap-image/build@c6ee5e7ee132.json",
       "name": "capi-kubeadm-bootstrap-image",
       "resolvedComponents": {
@@ -52,7 +52,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/capi-kubeadm-bootstrap-image-arm64/build@b0d03d666c2d.json",
       "name": "capi-kubeadm-bootstrap-image-arm64",
       "resolvedComponents": {
@@ -60,7 +60,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/capi-kubeadm-control-plane-image/build@0ab0c55931dc.json",
       "name": "capi-kubeadm-control-plane-image",
       "resolvedComponents": {
@@ -68,7 +68,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/capi-kubeadm-control-plane-image-arm64/build@61aa5f7a7ffb.json",
       "name": "capi-kubeadm-control-plane-image-arm64",
       "resolvedComponents": {
@@ -76,7 +76,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/capnico-controller/linux/amd64/build@87ae07a8d620.json",
       "name": "capnico-controller/linux/amd64",
       "resolvedComponents": {
@@ -84,7 +84,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/capnico-controller/linux/arm64/build@b27d16958279.json",
       "name": "capnico-controller/linux/arm64",
       "resolvedComponents": {
@@ -92,7 +92,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/cert-manager-cainjector-image/build@5abf616f3519.json",
       "name": "cert-manager-cainjector-image",
       "resolvedComponents": {
@@ -100,7 +100,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/cert-manager-cainjector-image-arm64/build@dee35558f648.json",
       "name": "cert-manager-cainjector-image-arm64",
       "resolvedComponents": {
@@ -108,7 +108,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/cert-manager-controller-image/build@3e579bf7bdc8.json",
       "name": "cert-manager-controller-image",
       "resolvedComponents": {
@@ -116,7 +116,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/cert-manager-controller-image-arm64/build@013eeed47e87.json",
       "name": "cert-manager-controller-image-arm64",
       "resolvedComponents": {
@@ -124,7 +124,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/cert-manager-webhook-image/build@ecd5ef71c150.json",
       "name": "cert-manager-webhook-image",
       "resolvedComponents": {
@@ -132,7 +132,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/cert-manager-webhook-image-arm64/build@45866d50eebf.json",
       "name": "cert-manager-webhook-image-arm64",
       "resolvedComponents": {
@@ -164,7 +164,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/controller-profiles/linux/amd64/build@dfbac00f0734.json",
       "name": "controller-profiles/linux/amd64",
       "resolvedComponents": {
@@ -172,7 +172,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/controller-profiles/linux/arm64/build@6ecf8eb40649.json",
       "name": "controller-profiles/linux/arm64",
       "resolvedComponents": {
@@ -180,7 +180,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/csi-node-driver-registrar-image/build@ba46673b7b73.json",
       "name": "csi-node-driver-registrar-image",
       "resolvedComponents": {
@@ -188,27 +188,11 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/csi-node-driver-registrar-image-arm64/build@0347831ac4df.json",
       "name": "csi-node-driver-registrar-image-arm64",
       "resolvedComponents": {
         "file": ".github/nvkr-plan-store/resolved-components/csi-node-driver-registrar-image-arm64@05b26e76f91f.json"
-      }
-    },
-    {
-      "catalogDigest": "sha256:5f85e05a7738fe0d3b8f7a515d0b0e80974961579d0dbd53c1401b1ba6cb8d2b",
-      "file": ".github/nvkr-plan-store/steps/cwe/linux/amd64/build@4acbde1c6831.json",
-      "name": "cwe/linux/amd64",
-      "resolvedComponents": {
-        "file": ".github/nvkr-plan-store/resolved-components/cwe/linux/amd64@5d283dfbf6b5.json"
-      }
-    },
-    {
-      "catalogDigest": "sha256:5f85e05a7738fe0d3b8f7a515d0b0e80974961579d0dbd53c1401b1ba6cb8d2b",
-      "file": ".github/nvkr-plan-store/steps/cwe/linux/arm64/build@54f644163eba.json",
-      "name": "cwe/linux/arm64",
-      "resolvedComponents": {
-        "file": ".github/nvkr-plan-store/resolved-components/cwe/linux/arm64@5d283dfbf6b5.json"
       }
     },
     {
@@ -260,7 +244,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp/build@563d4513c3d7.json",
       "name": "nktp",
       "resolvedComponents": {
@@ -268,7 +252,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-collector-image/build@c2027c610188.json",
       "name": "nktp-collector-image",
       "resolvedComponents": {
@@ -276,7 +260,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-collector-image-arm64/build@417d91612cab.json",
       "name": "nktp-collector-image-arm64",
       "resolvedComponents": {
@@ -284,7 +268,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-kube-state-metrics-image/build@57cd2ff8a38a.json",
       "name": "nktp-kube-state-metrics-image",
       "resolvedComponents": {
@@ -292,7 +276,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-kube-state-metrics-image-arm64/build@09124b08983f.json",
       "name": "nktp-kube-state-metrics-image-arm64",
       "resolvedComponents": {
@@ -300,7 +284,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-kubectl-image/build@d1ea7c2245d0.json",
       "name": "nktp-kubectl-image",
       "resolvedComponents": {
@@ -308,7 +292,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-kubectl-image-arm64/build@a3d8382c36dd.json",
       "name": "nktp-kubectl-image-arm64",
       "resolvedComponents": {
@@ -316,7 +300,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-lgtm-image/build@9ab72e2a92fc.json",
       "name": "nktp-lgtm-image",
       "resolvedComponents": {
@@ -324,7 +308,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-lgtm-image-arm64/build@491b2899fc31.json",
       "name": "nktp-lgtm-image-arm64",
       "resolvedComponents": {
@@ -332,7 +316,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-metrics-server-image/build@bc743647b219.json",
       "name": "nktp-metrics-server-image",
       "resolvedComponents": {
@@ -340,7 +324,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-metrics-server-image-arm64/build@a6aa580f302d.json",
       "name": "nktp-metrics-server-image-arm64",
       "resolvedComponents": {
@@ -348,7 +332,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-node-exporter-image/build@8d3a6e9196bf.json",
       "name": "nktp-node-exporter-image",
       "resolvedComponents": {
@@ -356,7 +340,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-node-exporter-image-arm64/build@6da57c70faab.json",
       "name": "nktp-node-exporter-image-arm64",
       "resolvedComponents": {
@@ -364,7 +348,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-operator-image/build@e0c4a3f736c6.json",
       "name": "nktp-operator-image",
       "resolvedComponents": {
@@ -372,7 +356,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-operator-image-arm64/build@e0dd13b033ac.json",
       "name": "nktp-operator-image-arm64",
       "resolvedComponents": {
@@ -380,7 +364,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-target-allocator-image/build@e35e0deeb23e.json",
       "name": "nktp-target-allocator-image",
       "resolvedComponents": {
@@ -388,7 +372,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d",
+      "catalogDigest": "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c",
       "file": ".github/nvkr-plan-store/steps/nktp-target-allocator-image-arm64/build@ee089f80eaa0.json",
       "name": "nktp-target-allocator-image-arm64",
       "resolvedComponents": {
@@ -396,71 +380,87 @@
       }
     },
     {
-      "catalogDigest": "sha256:dbf463be36e3f54a556ee68b664722f93e7ba0555c98c12baafe9f5215db501a",
-      "file": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/build@c9908987a333.json",
+      "catalogDigest": "sha256:5f85e05a7738fe0d3b8f7a515d0b0e80974961579d0dbd53c1401b1ba6cb8d2b",
+      "file": ".github/nvkr-plan-store/steps/nvke-controller/linux/amd64/build@c95bccd0c84b.json",
+      "name": "nvke-controller/linux/amd64",
+      "resolvedComponents": {
+        "file": ".github/nvkr-plan-store/resolved-components/nvke-controller/linux/amd64@5d283dfbf6b5.json"
+      }
+    },
+    {
+      "catalogDigest": "sha256:5f85e05a7738fe0d3b8f7a515d0b0e80974961579d0dbd53c1401b1ba6cb8d2b",
+      "file": ".github/nvkr-plan-store/steps/nvke-controller/linux/arm64/build@bd70b2fd1453.json",
+      "name": "nvke-controller/linux/arm64",
+      "resolvedComponents": {
+        "file": ".github/nvkr-plan-store/resolved-components/nvke-controller/linux/arm64@5d283dfbf6b5.json"
+      }
+    },
+    {
+      "catalogDigest": "sha256:38359f8b4f141245fca52e8e67084501e456b1b09152de9cee85743fee67b764",
+      "file": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/build@bbde62336236.json",
       "name": "nvke-node-fde-amd64",
       "resolvedComponents": {
         "file": ".github/nvkr-plan-store/resolved-components/nvke-node-fde-amd64@55903129509d.json"
       }
     },
     {
-      "catalogDigest": "sha256:dbf463be36e3f54a556ee68b664722f93e7ba0555c98c12baafe9f5215db501a",
-      "file": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/build@b53313347e74.json",
+      "catalogDigest": "sha256:38359f8b4f141245fca52e8e67084501e456b1b09152de9cee85743fee67b764",
+      "file": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/build@c1ca723f2891.json",
       "name": "nvke-node-fde-arm64",
       "resolvedComponents": {
         "file": ".github/nvkr-plan-store/resolved-components/nvke-node-fde-arm64@a32e642bc9a2.json"
       }
     },
     {
-      "catalogDigest": "sha256:ba66e53fe4bbefa7171c5cb8c91ac900fa2357ac09a94a10e7f30157aaf6ff1c",
-      "file": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/build@92e562ec3923.json",
+      "catalogDigest": "sha256:b8a3eba14e38ed4cfd3f51e40aa52035e1c5b17c73c1772b3139152e22027b27",
+      "file": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/build@022c9ff5ff2b.json",
       "name": "nvke-node-fde-ubuntu24-amd64",
       "resolvedComponents": {
         "file": ".github/nvkr-plan-store/resolved-components/nvke-node-fde-ubuntu24-amd64@89c773d2abdc.json"
       }
     },
     {
-      "catalogDigest": "sha256:ba66e53fe4bbefa7171c5cb8c91ac900fa2357ac09a94a10e7f30157aaf6ff1c",
-      "file": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/build@a7bd268ffdbe.json",
+      "catalogDigest": "sha256:b8a3eba14e38ed4cfd3f51e40aa52035e1c5b17c73c1772b3139152e22027b27",
+      "file": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/build@18ead28eaa5b.json",
       "name": "nvke-node-fde-ubuntu24-arm64",
       "resolvedComponents": {
         "file": ".github/nvkr-plan-store/resolved-components/nvke-node-fde-ubuntu24-arm64@cdb7aee368d8.json"
       }
     },
     {
-      "catalogDigest": "sha256:dbf463be36e3f54a556ee68b664722f93e7ba0555c98c12baafe9f5215db501a",
-      "file": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/build@52506d21c179.json",
+      "catalogDigest": "sha256:38359f8b4f141245fca52e8e67084501e456b1b09152de9cee85743fee67b764",
+      "file": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/build@9f6fb5fb53b1.json",
       "name": "nvke-node-image-amd64",
       "resolvedComponents": {
         "file": ".github/nvkr-plan-store/resolved-components/nvke-node-image-amd64@25e53442b151.json"
       }
     },
     {
-      "catalogDigest": "sha256:dbf463be36e3f54a556ee68b664722f93e7ba0555c98c12baafe9f5215db501a",
-      "file": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/build@d0e82b61289e.json",
+      "catalogDigest": "sha256:38359f8b4f141245fca52e8e67084501e456b1b09152de9cee85743fee67b764",
+      "file": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/build@4721f3922d02.json",
       "name": "nvke-node-image-arm64",
       "resolvedComponents": {
         "file": ".github/nvkr-plan-store/resolved-components/nvke-node-image-arm64@1eaf7a9c7daa.json"
       }
     },
     {
-      "catalogDigest": "sha256:ba66e53fe4bbefa7171c5cb8c91ac900fa2357ac09a94a10e7f30157aaf6ff1c",
-      "file": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/build@4b422d7983e7.json",
+      "catalogDigest": "sha256:b8a3eba14e38ed4cfd3f51e40aa52035e1c5b17c73c1772b3139152e22027b27",
+      "file": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/build@2a8fe40565d0.json",
       "name": "nvke-node-image-ubuntu24-amd64",
       "resolvedComponents": {
         "file": ".github/nvkr-plan-store/resolved-components/nvke-node-image-ubuntu24-amd64@4a09b0b2f7e5.json"
       }
     },
     {
-      "catalogDigest": "sha256:ba66e53fe4bbefa7171c5cb8c91ac900fa2357ac09a94a10e7f30157aaf6ff1c",
-      "file": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/build@94ceaae46eeb.json",
+      "catalogDigest": "sha256:b8a3eba14e38ed4cfd3f51e40aa52035e1c5b17c73c1772b3139152e22027b27",
+      "file": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/build@4617c96bebdc.json",
       "name": "nvke-node-image-ubuntu24-arm64",
       "resolvedComponents": {
         "file": ".github/nvkr-plan-store/resolved-components/nvke-node-image-ubuntu24-arm64@43710bded7b5.json"
       }
     },
     {
-      "catalogDigest": "sha256:186e4c0ca5d3cee528d84173be1a9b95e995e9af43e93190a086c968c1581631",
+      "catalogDigest": "sha256:a9c349c402059fca6ae5e694d24b9d295329c4469efd0380e8ea17cc3f5f5007",
       "file": ".github/nvkr-plan-store/steps/nvkectl/build@eaab9a8cc451.json",
       "name": "nvkectl",
       "resolvedComponents": {
@@ -468,7 +468,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:186e4c0ca5d3cee528d84173be1a9b95e995e9af43e93190a086c968c1581631",
+      "catalogDigest": "sha256:a9c349c402059fca6ae5e694d24b9d295329c4469efd0380e8ea17cc3f5f5007",
       "file": ".github/nvkr-plan-store/steps/nvkectl-linux-arm64/build@8b25254f8469.json",
       "name": "nvkectl-linux-arm64",
       "resolvedComponents": {
@@ -484,7 +484,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:6c0e07a0ca64ab8431bbd993b9e6afd784efc6e395a7aced9821678a3109b790",
+      "catalogDigest": "sha256:4a47b379382e89795c620bac8351aef237dcb3573ef87bc2b252b592b5ddc639",
       "file": ".github/nvkr-plan-store/steps/operator-tools-linux-arm64/build@41dc18fd4d00.json",
       "name": "operator-tools-linux-arm64",
       "resolvedComponents": {
@@ -500,7 +500,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/postgresql-image/build@a1ca96444582.json",
       "name": "postgresql-image",
       "resolvedComponents": {
@@ -508,7 +508,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/postgresql-image-arm64/build@97b0f538f450.json",
       "name": "postgresql-image-arm64",
       "resolvedComponents": {
@@ -516,7 +516,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spiffe-csi-image/build@7767a97c77da.json",
       "name": "spiffe-csi-image",
       "resolvedComponents": {
@@ -524,7 +524,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spiffe-csi-image-arm64/build@b98ed2bf790c.json",
       "name": "spiffe-csi-image-arm64",
       "resolvedComponents": {
@@ -540,7 +540,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spire-agent-image/build@b5b6158bc9f5.json",
       "name": "spire-agent-image",
       "resolvedComponents": {
@@ -548,7 +548,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spire-agent-image-arm64/build@e31ad7d165a0.json",
       "name": "spire-agent-image-arm64",
       "resolvedComponents": {
@@ -556,7 +556,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spire-bash-image/build@94ff74d2f847.json",
       "name": "spire-bash-image",
       "resolvedComponents": {
@@ -564,7 +564,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spire-bash-image-arm64/build@8ab22325e00e.json",
       "name": "spire-bash-image-arm64",
       "resolvedComponents": {
@@ -572,7 +572,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spire-controller-manager-image/build@c210fd9e96a5.json",
       "name": "spire-controller-manager-image",
       "resolvedComponents": {
@@ -580,7 +580,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spire-controller-manager-image-arm64/build@545e582e86de.json",
       "name": "spire-controller-manager-image-arm64",
       "resolvedComponents": {
@@ -596,7 +596,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spire-oidc-image/build@71d5213e5d23.json",
       "name": "spire-oidc-image",
       "resolvedComponents": {
@@ -604,7 +604,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spire-oidc-image-arm64/build@6744aff9700f.json",
       "name": "spire-oidc-image-arm64",
       "resolvedComponents": {
@@ -612,7 +612,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spire-server-image/build@3642e6b741fe.json",
       "name": "spire-server-image",
       "resolvedComponents": {
@@ -620,7 +620,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spire-server-image-arm64/build@2df32913bf82.json",
       "name": "spire-server-image-arm64",
       "resolvedComponents": {
@@ -628,7 +628,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spire-tpm-server-image/build@300b1a048708.json",
       "name": "spire-tpm-server-image",
       "resolvedComponents": {
@@ -636,7 +636,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/spire-tpm-server-image-arm64/build@c83e4e6b8ca3.json",
       "name": "spire-tpm-server-image-arm64",
       "resolvedComponents": {
@@ -652,7 +652,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/temporal-admin-tools-image/build@ed8ceea96b38.json",
       "name": "temporal-admin-tools-image",
       "resolvedComponents": {
@@ -660,7 +660,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/temporal-admin-tools-image-arm64/build@8756797f5885.json",
       "name": "temporal-admin-tools-image-arm64",
       "resolvedComponents": {
@@ -668,7 +668,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/temporal-server-image/build@91b5363a3aa1.json",
       "name": "temporal-server-image",
       "resolvedComponents": {
@@ -676,7 +676,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/temporal-server-image-arm64/build@de9e115053e4.json",
       "name": "temporal-server-image-arm64",
       "resolvedComponents": {
@@ -684,7 +684,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/temporal-ui-image/build@9393a8f6c1e5.json",
       "name": "temporal-ui-image",
       "resolvedComponents": {
@@ -692,7 +692,7 @@
       }
     },
     {
-      "catalogDigest": "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7",
+      "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
       "file": ".github/nvkr-plan-store/steps/temporal-ui-image-arm64/build@220fa98700bb.json",
       "name": "temporal-ui-image-arm64",
       "resolvedComponents": {
@@ -700,67 +700,67 @@
       }
     }
   ],
-  "catalogDigest": "sha256:186e4c0ca5d3cee528d84173be1a9b95e995e9af43e93190a086c968c1581631",
+  "catalogDigest": "sha256:a9c349c402059fca6ae5e694d24b9d295329c4469efd0380e8ea17cc3f5f5007",
   "catalogSnapshots": {
-    "sha256:186e4c0ca5d3cee528d84173be1a9b95e995e9af43e93190a086c968c1581631": {
-      "file": ".github/nvkr-plan-store/catalogs/nvke-v1@ec9ba6474b8f.json"
-    },
     "sha256:30b79b6e3464d0c48ca549e2fe966433bc57de1c1f6f9a43e3b5f491bb905370": {
       "file": ".github/nvkr-plan-store/catalogs/nvke-operator-tools@e36918818bb7.json"
     },
-    "sha256:4a62c161547037f581bb86f596adc6c04543fbcdd27a17113a9299080358655d": {
-      "file": ".github/nvkr-plan-store/catalogs/nvke-m2-release-components@18cd4ebd28af.json"
+    "sha256:38359f8b4f141245fca52e8e67084501e456b1b09152de9cee85743fee67b764": {
+      "file": ".github/nvkr-plan-store/catalogs/nvke-os@ac9d60f1942b.json"
+    },
+    "sha256:4a47b379382e89795c620bac8351aef237dcb3573ef87bc2b252b592b5ddc639": {
+      "file": ".github/nvkr-plan-store/catalogs/nvke-operator-tools-arm64@2ad9b9fde3f0.json"
     },
     "sha256:5f85e05a7738fe0d3b8f7a515d0b0e80974961579d0dbd53c1401b1ba6cb8d2b": {
       "file": ".github/nvkr-plan-store/catalogs/nvke-controller@4d3f6978217c.json"
     },
-    "sha256:6c0e07a0ca64ab8431bbd993b9e6afd784efc6e395a7aced9821678a3109b790": {
-      "file": ".github/nvkr-plan-store/catalogs/nvke-operator-tools-arm64@85e48b7fa83b.json"
+    "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99": {
+      "file": ".github/nvkr-plan-store/catalogs/nvke-deployment-images@73b2e59e63a9.json"
+    },
+    "sha256:78032b42efa45823ac1bd4accf3d47a8b3d2641b3b1a49219f35acd95c24f04c": {
+      "file": ".github/nvkr-plan-store/catalogs/nvke-release-components@509e2841cbf6.json"
     },
     "sha256:9bc477c5d41d1a66c9cb5aca4e5e5b58d0f09a65ed0939b6a32f37ae971daa9e": {
       "file": ".github/nvkr-plan-store/catalogs/local-path-provisioner@6ec92eecee0c.json"
     },
-    "sha256:ba66e53fe4bbefa7171c5cb8c91ac900fa2357ac09a94a10e7f30157aaf6ff1c": {
-      "file": ".github/nvkr-plan-store/catalogs/nvke-m2-os@0b952d67ebee.json"
+    "sha256:a9c349c402059fca6ae5e694d24b9d295329c4469efd0380e8ea17cc3f5f5007": {
+      "file": ".github/nvkr-plan-store/catalogs/nvke-v1@602184c9bc5c.json"
+    },
+    "sha256:b8a3eba14e38ed4cfd3f51e40aa52035e1c5b17c73c1772b3139152e22027b27": {
+      "file": ".github/nvkr-plan-store/catalogs/nvke-os@55579cba5bd9.json"
     },
     "sha256:bcf357d65377e8eff2766ff6c12a060e1d37f722cebe269918090073f367231c": {
       "file": ".github/nvkr-plan-store/catalogs/aicr-bundles@9ac1f6968638.json"
-    },
-    "sha256:dbf463be36e3f54a556ee68b664722f93e7ba0555c98c12baafe9f5215db501a": {
-      "file": ".github/nvkr-plan-store/catalogs/nvke-m2-os@fe774d802506.json"
-    },
-    "sha256:fe2615cbe025fc49eb3cb326b0e978c700cd6ca031465a42f3c01a70eb4ed8f7": {
-      "file": ".github/nvkr-plan-store/catalogs/nvke-m2-deployment-images@8c16b2f2cae1.json"
     }
   },
   "composition": {
-    "file": ".github/nvkr-plan-store/composition/nvke-gpu-site@b9a9e25dd5fb.json"
+    "file": ".github/nvkr-plan-store/composition/nvke-gpu-site@f01babed5c27.json"
   },
   "definition": {
-    "file": ".github/nvkr-plan-store/definition/nvke-gpu-site@437851d84edc.json"
+    "file": ".github/nvkr-plan-store/definition/nvke-gpu-site@ae5139893506.json"
   },
-  "definitionDigest": "sha256:fcf147a347ee9b6559d98a20d9a09d5208e3d33b9167961bd9b281319b6944ba",
+  "definitionDigest": "sha256:cce26880ee054ef6ccd9af8102d784e1aaa77015358843192f4ead845c815707",
   "definitionPath": "inputs/definitions/nvke/gpu-site.composite.yaml",
   "environment": {
-    "file": ".github/nvkr-plan-store/environment/nvke-github@3bab19b21e66.json"
+    "file": ".github/nvkr-plan-store/environment/nvke-github@05bbd75616a5.json"
   },
-  "environmentDigest": "sha256:3fec66631cf1ac74e02d268133d7ce9fe97897469bb63c24768fb1bdb842669b",
+  "environmentDigest": "sha256:a3e77adadba297627afbabe934580bc9e00b15ffa47420c505ea0ae7659b76d6",
   "environmentPath": "inputs/environments/github-nvke-gpu-site.yaml",
   "generatorVersion": "dev (unknown)",
   "graph": {
-    "file": ".github/nvkr-plan-store/graph/nvke-gpu-site@4e9a96c2584a.json"
+    "file": ".github/nvkr-plan-store/graph/nvke-gpu-site@492d6a9deb0b.json"
   },
   "lifecycleOutputs": {
-    "file": ".github/nvkr-plan-store/outputs/nvke-gpu-site@58b51b7dbb8c.json"
+    "file": ".github/nvkr-plan-store/outputs/nvke-gpu-site@3322244d4a9c.json"
   },
   "name": "nvke-gpu-site",
   "qualification": "pipeline-attested",
   "routes": {
-    "file": ".github/nvkr-plan-store/routes/nvke-gpu-site@2e9b7994d503.json"
+    "file": ".github/nvkr-plan-store/routes/nvke-gpu-site@0ad15842cec4.json"
   },
   "schemaVersion": "nvkr.dev/run-plan/v6",
   "storage": "nvkr-plan-tree-v1",
   "targets": {
-    "file": ".github/nvkr-plan-store/targets/nvke-gpu-site@c39cea0d2093.json"
+    "file": ".github/nvkr-plan-store/targets/nvke-gpu-site@3fadceecf5ff.json"
   }
 }

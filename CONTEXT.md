@@ -346,7 +346,7 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
-documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 and the M3 MVP
+documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. NVKE and the M3 MVP
 retain producer-only disk evidence. Strict inspection and material reconciliation are deferred hardening.
 Embedded-component declarations are optional: omission is not applicable, while any authored declaration must
 match its referenced pinned upstream metadata. That comparison does not establish effective customized or

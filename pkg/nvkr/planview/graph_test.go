@@ -101,10 +101,10 @@ func TestGraphsCoverEveryDeclaredNodeEdgeAndJoin(t *testing.T) {
 				for _, route := range plan.Routes {
 					requireEdge("artifact/"+route.Input, "route/"+route.Name, "publication route")
 				}
-				// Real maintained Helm binding has a dataflow edge from the CWE package.
+				// Real maintained Helm binding has a dataflow edge from the nvke-controller package.
 				found := false
 				for _, edge := range graph.Edges {
-					if edge.From == "artifact/package/cwe" && strings.Contains(edge.To, "controller-chart") {
+					if edge.From == "artifact/package/nvke-controller" && strings.Contains(edge.To, "controller-chart") {
 						found = true
 					}
 				}

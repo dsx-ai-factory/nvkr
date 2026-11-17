@@ -24,7 +24,7 @@ that checkout is distinct from the PR head. CI durations below identify prioriti
 
 | Expensive work in the linked CI run | Seconds | Decision |
 |---|---:|---|
-| Maintained M2 private-image credential mutations | 103.05 | Keep one maintained positive check; exercise mutations with one native disk and its vendor fetch. Remove repeated caller substitutions already covered by the owning validator, retaining one composed substitution. |
+| Maintained NVKE private-image credential mutations | 103.05 | Keep one maintained positive check; exercise mutations with one native disk and its vendor fetch. Remove repeated caller substitutions already covered by the owning validator, retaining one composed substitution. |
 | Output addition/removal matrix | 54.77 | Reduce 15 combinations to seven: all three insertion positions once, plus each distinct execution policy and the real collector boundary. Retain exact restoration and existing-job comparisons. |
 | Maintained inline-job checks | 42.22 | Share the same four maintained renders with credential checks; consolidate three additional default-bundle regeneration tests into that parent. Retain byte-exact drift, input selection and size headroom. |
 | Qualification evidence mutations | 36.43 | Assemble the release once, then copy its files for every mutation. Keep all eight rejection cases and no-partial-evidence assertions. |

@@ -17,7 +17,7 @@ const nvkeV1CatalogDir = "../../../inputs/catalogs/nvke/module-tags"
 
 // The nvkectl binary this catalog builds must report the SAME version string as a binary
 // built by NVKE's own cli/Makefile, including the leading v. The retained v1
-// selection now follows the same repository release as the maintained M2 selection.
+// selection now follows the same repository release as the maintained NVKE selection.
 //
 // This is a regression guard with a real failure behind it: the catalog originally
 // rendered {{.Version}}, which also strips the v, so the published CLI reported

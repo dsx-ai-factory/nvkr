@@ -54,7 +54,7 @@ func nightlyRuntimeCompiledFixture(t *testing.T, profile NightlyProfile, build N
 		t.Fatal(err)
 	}
 	declared := definition.Definition{APIVersion: definition.DefinitionAPIVersion, Kind: definition.DefinitionKind, Metadata: definition.Metadata{Name: profile.Name}, Catalog: definition.Catalog{Base: root}, SBOMTool: "syft", CosignTool: "cosign"}
-	for _, role := range []struct{ name, component string }{{"controller-chart", "nvke-controller-chart"}, {"cwe", "nvke-controller"}, {"nktp", "nktp-chart"}, {"nvkectl", "nvkectl"}} {
+	for _, role := range []struct{ name, component string }{{"controller-chart", "nvke-controller-chart"}, {"nvke-controller", "nvke-controller"}, {"nktp", "nktp-chart"}, {"nvkectl", "nvkectl"}} {
 		declared.Outputs = append(declared.Outputs, definition.DefinitionOutput{Name: role.name, Platform: "linux/arm64", Format: definition.OutputExecutable, Components: []string{role.component}})
 	}
 	environment, err := definition.LoadEnvironment(t.Context(), "../../docs/examples/nvke-module-tags/environment-github.yaml")

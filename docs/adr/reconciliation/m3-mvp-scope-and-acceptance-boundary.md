@@ -351,7 +351,7 @@ actionable issue.
 
 No successful hosted worker/qualifier OIDC signing transcript, subject-bound qualification attachment/read-back
 or independent complete-set consumer verification is recorded here. M3-D
-retains positive/negative external acceptance and independent review; the earlier M2 candidate cannot satisfy
+retains positive/negative external acceptance and independent review; the earlier NVKE candidate cannot satisfy
 it. Successful hosted/consumer exercises remain required before claiming
 production readiness or closing operational acceptance. Acceptance must capture the actual reusable worker
 REST job names, native execution on both architectures, worker and qualifier certificate SAN/issuer, same-leaf caller-workflow commit and Run-attempt claims, exact

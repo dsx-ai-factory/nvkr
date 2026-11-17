@@ -45,7 +45,7 @@ The [demo index](../demos/README.md) lists presentations, runnable journeys, and
 
 Experimental [public OS source producers](../inputs/experiments/public-os-sources/README.md) and the
 [OVN source-build option](../inputs/catalogs/ovn-nvidia/README.md) are separate candidates, not full OS
-migration or maintained M2 membership. The [v0.21.0 dependency inventory](nvke-v0.21.0-os-dependency-inventory.md)
+migration or maintained NVKE membership. The [v0.21.0 dependency inventory](nvke-v0.21.0-os-dependency-inventory.md)
 records source availability and remaining gaps.
 
 ## Detailed references
@@ -155,4 +155,4 @@ own current user instructions.
 
 [NVKE customer choices](nvke-customer-choices.md) explains supplier replacement and its current validation scope.
 
-[Multiarch CWE delivery](multiarch-cwe-delivery.md) describes aggregate image membership, evidence and current validation limits.
+[Multiarch nvke-controller delivery](multiarch-nvke-controller-delivery.md) describes aggregate image membership, evidence and current validation limits.

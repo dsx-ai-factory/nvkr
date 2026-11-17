@@ -385,7 +385,7 @@ func TestM2CLINativeRoutesPreserveDiskGroups(t *testing.T) {
 		t.Fatal("authored Definition lost the explicit ARM64 CLI output")
 	}
 	if !PerOutputPublication(plan) {
-		t.Fatal("M2 lost per-output publication")
+		t.Fatal("NVKE lost per-output publication")
 	}
 	found := map[string]bool{}
 	for _, node := range plan.Graph.Nodes {

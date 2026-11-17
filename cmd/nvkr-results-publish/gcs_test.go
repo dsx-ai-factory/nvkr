@@ -37,7 +37,7 @@ import (
 )
 
 const (
-	objectName    = "groups/nvkr/nvke/nvke-m2/0000000000000000001-101-1-202-1/started.json"
+	objectName    = "groups/nvkr/nvke/nvke/0000000000000000001-101-1-202-1/started.json"
 	sentinelToken = "sentinel-access-token"
 )
 

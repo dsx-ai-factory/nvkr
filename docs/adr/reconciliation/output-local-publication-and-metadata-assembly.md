@@ -649,7 +649,7 @@ are consistent with partitioning that changes only execution organization.
 
 `release pull --reference <root> --output <name> --out <new dir>` then retrieved and integrity-checked five
 selected payload closures. They were `nvkectl-linux-arm64` (executable), `controller-chart` (Helm),
-`capi-controller-image` (Docker schema-2 image), `cwe` (two-platform aggregate index) and
+`capi-controller-image` (Docker schema-2 image), `nvke-controller` (two-platform aggregate index) and
 `nvke-node-image-arm64` (plain QCOW2 disk). An independent standard-library re-hash outside NVKR
 reproduced each byte identity against the exported description:
 

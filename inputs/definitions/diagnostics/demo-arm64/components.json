@@ -33,7 +33,7 @@
       "format": "helm-oci",
       "helm": {
         "images": {
-          "controller": "cwe"
+          "controller": "nvke-controller"
         }
       },
       "name": "controller-chart",
@@ -58,7 +58,7 @@
         "nvke-controller"
       ],
       "format": "oci",
-      "name": "cwe",
+      "name": "nvke-controller",
       "platform": "linux/arm64"
     },
     {

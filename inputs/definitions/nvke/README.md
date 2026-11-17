@@ -25,7 +25,7 @@ acceptance work in [reconciliation](../../../docs/adr/reconciliation/adr-26.md).
 
 | Purpose | Environment | Workflow | Publication prefix |
 |---|---|---|---|
-| Pinned production | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | `nvkr-run-nvke.yml` | `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site` |
+| Pinned production | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | `nvkr-run-nvke.yml` | `ghcr.io/dsx-ai-factory/nvkr/candidate/gpu-site` |
 | Branch development | [github-development.yaml](../../environments/github-development.yaml) | `nvkr-dev.yml` | `ghcr.io/dsx-ai-factory/nvkr/development/runs/<run>/attempts/<attempt>` |
 | Floating-source candidate | [github-nvke-nightly-gpu-site.yaml](../../environments/github-nvke-nightly-gpu-site.yaml) | `nvkr-run-nvke-nightly.yml` | `ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site` |
 
@@ -95,7 +95,7 @@ selects their outputs.
 | Output group | Owning inputs | Selection |
 |---|---|---|
 | CLI | `../../catalogs/nvke/module-tags` | AMD64 `nvkectl` and ARM64 `nvkectl-linux-arm64`, from their shared NVKE v0.23.0 source pin |
-| Controller and charts | `../../catalogs/nvke/release` | AMD64/ARM64 aggregate `cwe`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
+| Controller and charts | `../../catalogs/nvke/release` | AMD64/ARM64 aggregate `nvke-controller`, image-bound `controller-chart`, PostgreSQL, SPIRE, SPIRE CRDs and Temporal chart packages |
 | Operator tools | `../../catalogs/tools/operator-amd64`, `../../catalogs/tools/operator-arm64` | AMD64 `operator-tools` and, in the core family only, ARM64 `operator-tools-linux-arm64` Helm and kubectl executables, at the same pinned versions |
 | Node images | `../../catalogs/node-images/release`, `../../catalogs/node-images/variants/native-toolchains.yaml` | Separate native AMD64 and ARM64 plain and public-bootstrap FDE QCOW2s, with explicit material producers; the Disks Ubuntu 24 family adds `../../catalogs/node-images/variants/ubuntu24.json` |
 | Deployment images | `../../catalogs/runtime-dependencies` | Twelve non-test runtime images for each native architecture: PostgreSQL, eight SPIRE images and three Temporal images |
@@ -227,7 +227,7 @@ under `nvke.nvidia.com/os-image-materials/v1`; every selected material and disk 
 
 This composite remains a candidate; its selection does not complete product acceptance. The production target Environment reuses
 the existing registry credential, source access and workflow signing policy, but publishes only under
-the separately authored `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site` prefix. The maintained signer identity
+the separately authored `ghcr.io/dsx-ai-factory/nvkr/candidate/gpu-site` prefix. The maintained signer identity
 admits only `main`; the temporary branch-test exception has been removed after the
 cancelled attempt. Candidate execution is not organizational publication acceptance. Native disk
 execution classes select the two ARC KVM pools under `githubARC: native-kvm-v1`. They describe requested
@@ -237,7 +237,7 @@ The OS catalog directly retains its published ARM64 Docker Packer pin.
 The two inspector profiles use measured executable hashes and published native image manifests.
 Their bounded budgets cover up to an 8 GiB subject and 16 GiB filesystem: 28 GiB inspection memory,
 224 GiB private scratch and a ten-minute deadline. Execution classes request 36 GiB memory to
-include the held subject snapshot. These are admission budgets, not measured full-M2 usage.
+include the held subject snapshot. These are admission budgets, not measured full-NVKE usage.
 The inspector and Packer source locks retain their outstanding organizational approval gates;
 the [candidate exception and publication evidence](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md)
 records the narrower authorization and exact registry read-back.
@@ -285,7 +285,7 @@ read-only image preparation with `NVKR_REGISTRY_READ` and `NVKR_REGISTRY_READ_US
 independently of the repository token, as described in the
 [production credential setup](../../../docs/generate-pipeline.md). Maintained manual dispatch and
 production signing admit only `main`. The October 7 branch attempt at `562a609` used a temporary exact
-`codex/m2-native-arc-foundation` authored exception; it was cancelled after GitHub environment
+`codex/nvke-native-arc-foundation` authored exception; it was cancelled after GitHub environment
 protection rejected that branch before attestation, disk execution and finalization steps ran
 ([run 37661490433](https://github.com/dsx-ai-factory/nvkr/actions/runs/37661490433)).
 That exception is removed from the authored inputs and regenerated bundle. No deployment-policy
@@ -341,7 +341,7 @@ budgets, not observed allocation or general runner-capacity guarantees. Docker u
 and producer-declared build-network controls; no ambient storage-driver workaround is selected.
 
 `../../catalogs/node-images/release` directly retains the historical published ARM64 Docker Packer candidate.
-`../../catalogs/node-images/variants/native-toolchains.yaml` substitutes the measured published AMD64 Packer pin for its nine M2
+`../../catalogs/node-images/variants/native-toolchains.yaml` substitutes the measured published AMD64 Packer pin for its nine NVKE
 source-map consumers and the FDE root, preserving OVN's separate BuildKit pin. These historical images do not establish
 reproduction of the current Dockerfile or bootstrap compiler. Internal Packer/inspector images were
 published under the user's scoped candidate exception. Their source locks retain unresolved general
@@ -351,9 +351,9 @@ and [inspector measurement](../../../toolchains/nvkr-disk-inspect/README.md#loca
 
 Strict profiles contain actual native image/executable pins and conservative bounds: up to an 8 GiB
 subject, 16 GiB filesystem, 28 GiB inspection memory, 224 GiB private scratch and a ten-minute deadline.
-These retained profiles do not demonstrate a successful full M2 inspection or measured peak usage.
+These retained profiles do not demonstrate a successful full NVKE inspection or measured peak usage.
 
-Publication uses the separate `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/gpu-site` prefix and
+Publication uses the separate `ghcr.io/dsx-ai-factory/nvkr/candidate/gpu-site` prefix and
 `publication.mode: per-output-v1`. Each output is packaged, published, signed and verified independently.
 Assembly authenticates same-Plan, same-workflow metadata and evidence; it does not download payload layers.
 The release remains one signed entry point. Retry assembly may retain earlier attempt identities;

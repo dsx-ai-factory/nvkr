@@ -23,7 +23,7 @@ func TestDeclarativeHelmAdmission(t *testing.T) {
 		{name: "wrong platform", change: func(d *Definition) { d.Outputs[1].Platform = "linux/arm64" }},
 		{name: "wrong format", change: func(d *Definition) { d.Outputs[1].Format = OutputExecutable }},
 		{name: "empty slots", change: func(d *Definition) { d.Outputs[0].Helm.Images = nil }},
-		{name: "invalid slot", change: func(d *Definition) { d.Outputs[0].Helm.Images = map[string]string{"bad slot": "cwe"} }},
+		{name: "invalid slot", change: func(d *Definition) { d.Outputs[0].Helm.Images = map[string]string{"bad slot": "nvke-controller"} }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			d, err := LoadDefinition(t.Context(), filepath.Join("..", "..", "..", "docs", "examples", "nvke-controller-bindings", "definition.yaml"))
@@ -49,10 +49,10 @@ func TestDeclarativeHelmAdmission(t *testing.T) {
 }
 
 func TestHelmRelationshipsClone(t *testing.T) {
-	original := Definition{Outputs: []DefinitionOutput{{Helm: &HelmOutput{Images: map[string]string{"controller": "cwe"}}}}}
+	original := Definition{Outputs: []DefinitionOutput{{Helm: &HelmOutput{Images: map[string]string{"controller": "nvke-controller"}}}}}
 	cloned := original.Clone()
 	cloned.Outputs[0].Helm.Images["controller"] = "other"
-	if original.Outputs[0].Helm.Images["controller"] != "cwe" {
+	if original.Outputs[0].Helm.Images["controller"] != "nvke-controller" {
 		t.Fatal("cloned relationships alias original")
 	}
 }

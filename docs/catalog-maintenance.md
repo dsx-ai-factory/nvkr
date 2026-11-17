@@ -317,7 +317,7 @@ interruption between the two converges on the next run. The one file matching
 prefix `<d>` only names the review branch `catalog-maintenance/<d>`. Adding or removing such a file is a reviewed
 change. Exactly one policy can be enrolled until each Definition owns a generated bundle root, because
 `catalog refresh` always checks the bundle at the repository root; rendering and the `discover` job both fail on
-a second policy. Today only `nvke` is enrolled, for the `nvke-m2` Definition. Its policy selects the NVKE
+a second policy. Today only `nvke` is enrolled, for the `nvke` Definition. Its policy selects the NVKE
 umbrella and `nvke-helm`, so the NVKE release and its derived chart pins move together within the registry
 constraints. It cannot widen them.
 
@@ -377,7 +377,7 @@ constraints. It cannot widen them.
   `pull_request` runs, and the required checks are a merge precondition; they are repository settings and are
   not enforced by this workflow. The maintained
   Run stays manual and default-branch-only, so candidate execution and qualification are separate runs that
-  nothing here performs or claims. A `static` policy such as `nvke-m2` is validated by the PR checks only;
+  nothing here performs or claims. A `static` policy such as `nvke` is validated by the PR checks only;
   `local-run` cannot execute its Environment.
 - **Repository settings the workflow does not enforce.** These are hard prerequisites. The release owner or a
   repository administrator must validate them before anyone relies on scheduled writes; this repository does
@@ -442,7 +442,7 @@ moves only the `nvke` and `nvke-helm` pins and regenerates the bundles, so it ch
 Today the exact `v0.23.0` constraints keep refreshes a no-op. Before a constraint allows the NVKE release to
 move, review and update together, in one authored change: the selection source pin, the image references and
 their native digest locks, the Definition's image outputs, the qualification policy's `nonToolOutputs`, and the
-expected images in `pkg/nvkr/buildgraph/nvke_m2_images_test.go`. That test fails, naming this section, when the
+expected images in `pkg/nvkr/buildgraph/nvke_images_test.go`. That test fails, naming this section, when the
 selection commit and the controller's NVKE commit diverge. Maintenance does not perform or check this
 coordination; it is a documented limit, not a capability.
 

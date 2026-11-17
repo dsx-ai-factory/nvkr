@@ -377,7 +377,7 @@ metadata:
 githubBundle: nvke-composite
 githubExecutionPartitions: true
 publication:
-  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/composite
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/candidate/composite
 signing:
   identity: ^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run-nvke-composite\.yml@refs/heads/main$
 ```
@@ -424,7 +424,7 @@ Expected results, which unit U3 must prove rather than assume:
 - Every output's Build Digest and native build records equal those in the corresponding family Plan and in the
   retained combined `definition.yaml` Plan.
 - One Plan with a composition record; one Run; one Release at
-  `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/composite/releases@sha256:…` whose 69 outputs are each attributed to
+  `ghcr.io/dsx-ai-factory/nvkr/candidate/composite/releases@sha256:…` whose 69 outputs are each attributed to
   one family.
 
 Negative cases on the same inputs:
