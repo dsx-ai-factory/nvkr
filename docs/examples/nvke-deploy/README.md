@@ -2,7 +2,7 @@
 
 This nine-output Definition builds CWE, a runnable fixture profiles image, and its controller chart and acquires the four external charts
 selected by NVKE `v0.23.0`. It remains available for local execution. The committed GitHub workflow uses
-[the combined M2 Definition](../../../inputs/definitions/nvke/README.md), which has its own output selection and additional artifacts.
+[the NVKE composite](../../../inputs/definitions/nvke/README.md), which has its own output selection and additional artifacts.
 
 | Output | Selected input |
 |---|---|
@@ -76,7 +76,7 @@ signing. CWE uses upstream Dockerfile network dependencies; it is a wrapped, unq
 
 Use [the M2 README](../../../inputs/definitions/nvke/README.md#generate-and-check-the-maintained-workflow) for the maintained bundle
 and its source, runner, registry and signing requirements. Generating this deploy example into the repository
-root would introduce an unenrolled default bundle and fail maintained-closure checks. A dispatch of the committed `nvkr-run-nvke.yml` executes M2; dispatch does not select a different Definition.
+root would introduce an unenrolled default bundle and fail maintained-closure checks. A dispatch of the committed `nvkr-run-nvke.yml` executes the NVKE composite; dispatch does not select a different Definition.
 This is the checked-in candidate configuration, not a ratified canonical-product/path or namespace decision.
 No parallel generated deploy workflow is maintained at that fixed path.
 

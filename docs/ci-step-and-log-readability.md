@@ -111,7 +111,7 @@ The generated invocation data is not an authored transport manifest or an altern
 `pack-outputs` remains a separate step.
 
 These excerpts illustrate the expanded controller-chart operations and finalizer. Exact names and node IDs
-come from the selected Plan; the repository currently selects the 69-output M2 Definition.
+come from the selected Plan; the repository currently selects the 83-output NVKE composite.
 Composite shell steps preserve the original default with `bash -e {0}` on
 the host or `sh -e {0}` in a job container. Caller-only
 expressions such as `toJSON(needs)` are passed as explicit inputs and mapped to the original consuming field.

@@ -502,7 +502,7 @@ never selects the latest retry implicitly. Configure the trusted producer and ve
 schemaVersion: nvkr.dev/qualification-policy/v1
 source:
   repository: OWNER/REPO
-  workflow: .github/workflows/nvkr-run-nvke.yml
+  workflow: .github/workflows/nvkr-run.yml
   defaultBranch: main
 cosign:
   # Replace this placeholder with the SHA-256 of the independently trusted executable.
@@ -676,8 +676,8 @@ publishes outcomes to the results index of ADR-31, but no generated job runs it 
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
 Actions workflow; the operator does not write or maintain a separate worker implementation. The maintained
-candidate supplies `inputs/policies/nvke-qualification.yaml` and emits `.github/workflows/nvkr-qualify.yml`
-and `.github/workflows/nvkr-smoke.yml`. The same invocation with `--check` compares
+candidate supplies `inputs/policies/nvke-gpu-site-qualification.yaml` and emits `.github/workflows/nvkr-qualify-nvke.yml`
+and `.github/workflows/nvkr-smoke-nvke.yml`. The same invocation with `--check` compares
 all owned bytes without writing. The separately owned qualification manifest records both workflow files;
 hand edits and unowned files are not silently overwritten. The worker is a fixed same-repository reusable
 workflow at the caller's exact commit. It is generated plumbing, not another operator command to configure
@@ -697,7 +697,7 @@ The independent policy extends the artifact-check policy with these decisions:
 | `smoke.nonToolMembers` | Exact output/member pairs for non-executable runtime-assets archives in mixed executable bundles |
 | `outsideMVPSuites` / `requiredSuites` | Unevaluated external suites, or a requirement that currently blocks qualification |
 
-The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-qualification.yaml)
+The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-gpu-site-qualification.yaml)
 contains concrete verifier/native-image pins and exact output scope. Review those independent trust selections
 with the generated workflows before merge. Other Definitions need their own matching scope and native pins;
 the candidate policy is not a wildcard approval. The trust policy belongs to the operator, not the producing

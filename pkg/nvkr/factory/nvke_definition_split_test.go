@@ -419,6 +419,7 @@ func nvkeSplitCatalogLoader(t *testing.T, combined *Plan) func(context.Context, 
 	// catalogs, without fetching private pin sets in a local regression test.
 	// CLI generation and workflows-check separately authenticate current inputs;
 	// CheckGeneratedBundle above checks the scratch bundle produced by this comparison.
+	// Standalone family bytes are no longer committed; maintained drift is checked separately.
 	stacks := map[string]*catalog.Stack{
 		string(nvkeSplitCanonical(t, combined.Definition.Catalog)): {
 			Catalog: combined.CatalogSnapshot, Digest: combined.CatalogDigest, Applied: combined.AppliedOverlays,

@@ -1,11 +1,14 @@
 # NVKE inputs and customer choices
 
-The [maintained NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/definition.yaml) selects 69 named outputs, including independent
+The [maintained NVKE composite](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/gpu-site.composite.yaml) selects 83 named outputs, including independent
 `linux/amd64` and `linux/arm64` plain and public-bootstrap FDE disks. FDE publication carries build provenance
 without inspected-content or deployed-confidentiality claims; see the [candidate's FDE scope](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md#native-execution-and-publication).
 The catalog owns producer commands, material edges and
 component-exposed Packer variables. The Environment owns runner, runtime, registry and signing choices.
 There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriting.
+
+The M2 tests below retain the former combined Definition as a comparison fixture; they do not exercise
+the complete maintained composite. Its current membership is owned by the pinned family Definitions.
 
 ## Input evidence map
 

@@ -254,7 +254,7 @@ closes a stale PR and deletes its branch. The `refresh` job writes the PR body w
 refresh --json` result, so the body is part of the rendered workflow. Unlike `GITHUB_TOKEN` writes, the App's
 branch updates and PR events start the PR's own workflow runs without a maintainer approving them. Because the
 token can write workflows, a candidate whose closure regenerates a generated workflow file (`nvkr-run-nvke.yml` and,
-when named, `nvkr-dev.yml`, `nvkr-qualify.yml`, `nvkr-smoke.yml` or an additional Run's workflow) is published
+when named, `nvkr-dev.yml`, `nvkr-qualify-nvke.yml`, `nvkr-smoke-nvke.yml` or an additional Run's workflow) is published
 like any other generated file; patch admission still refuses every other workflow path. An ordinary source or
 artifact pin change leaves every generated workflow byte-identical (it updates the lock, Plans and manifests);
 the pin-only fixtures assert this for the production, development and qualification workflows. A topology,

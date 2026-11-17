@@ -149,7 +149,7 @@ the required platform/build vector. Exact per-platform evidence remains separate
 
 The delivery module owns the image-index bytes and binding checks; factory and lifecycle own frozen work,
 observations and completeness. Release navigation projects these bindings without adding authority.
-The combined M2 pipeline retains ownership of ARC disk execution and per-output publication. Native image
+The NVKE composite pipeline retains ownership of ARC disk execution and per-output publication. Native image
 builds use hosted AMD64 and ARM64 runners; disk stages retain their admitted ARC routes. Metadata-only
 assembly carries the exact aggregate index, native manifests/configs and platform-scoped evidence without
 reading image layers. Loopback transport contracts cover export, publication, metadata browsing, missing

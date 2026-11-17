@@ -176,13 +176,11 @@ jobs:
               # define the check itself, so a change to the gate cannot skip the
               # gate it changes.
               - 'inputs/**'
-              - '.github/workflows/nvkr-run-nvke.yml'
-              - '.github/nvkr-run-nvke/**'
               - '.github/workflows/nvkr-run-*.yml'
               - '.github/nvkr-run-*/**'
-              - '.github/workflows/nvkr-qualify.yml'
-              - '.github/workflows/nvkr-smoke.yml'
-              - '.github/nvkr-qualification/**'
+              - '.github/workflows/nvkr-qualify-*.yml'
+              - '.github/workflows/nvkr-smoke-*.yml'
+              - '.github/nvkr-qualification-*/**'
               - '.github/workflows/nvkr-dev.yml'
               - '.github/nvkr-dev/**'
               - '.github/workflows/nvkr-dev-qualify.yml'

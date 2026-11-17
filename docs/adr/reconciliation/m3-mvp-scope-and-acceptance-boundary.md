@@ -165,8 +165,8 @@ Scheduling does not relax provider job success, worker signature or complete-set
 workflow contracts and actionlint cover the condition; actual hosted failure scheduling remains part of
 external acceptance. The runtime checks the pair against the independent loaded policy before candidate work.
 The maintained candidate records concrete verifier/native-image selections and exact smoke scope in
-`inputs/policies/nvke-qualification.yaml`. Its generated pair is `.github/workflows/nvkr-qualify.yml` and
-`.github/workflows/nvkr-smoke.yml`, with the separately owned qualification manifest. These inputs and workflows
+`inputs/policies/nvke-gpu-site-qualification.yaml`. Its generated pair is `.github/workflows/nvkr-qualify-nvke.yml` and
+`.github/workflows/nvkr-smoke-nvke.yml`, with the separately owned qualification manifest. These inputs and workflows
 are configuration for post-merge acceptance, not evidence of production readiness or organizational approval.
 The user has accepted merging the reviewed implementation/configuration before a complete producer run with
 its successful-attempt handoff and hosted/independent positive and negative acceptance runs. Authenticated

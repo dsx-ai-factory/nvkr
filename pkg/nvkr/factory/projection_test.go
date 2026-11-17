@@ -120,8 +120,8 @@ func recordProjectionCalls(t *testing.T) *projectionCalls {
 func projectionEquivalencePlans(t *testing.T, repo string) map[string]*Plan {
 	t.Helper()
 	committed, err := filepath.Glob(filepath.Join(repo, ".github", "nvkr*", "plan.json"))
-	if err != nil || len(committed) != 11 {
-		t.Fatalf("committed maintained Plans = %v, %v; want the eleven .github/nvkr*/plan.json", committed, err)
+	if err != nil || len(committed) != 3 {
+		t.Fatalf("committed maintained Plans = %v, %v; want the three .github/nvkr*/plan.json", committed, err)
 	}
 	plans := map[string]*Plan{}
 	for _, path := range committed {
@@ -153,7 +153,7 @@ func TestProjectionTransportsMatchInBinaryGenerator(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// One maintained Plan keeps real-product coverage in the default
 			// suite; the whole committed matrix is an extended integration check.
-			if strings.HasPrefix(name, "committed/") && name != "committed/nvkr-run-nvke-telemetry" {
+			if strings.HasPrefix(name, "committed/") && name != "committed/nvkr-run-nvke" {
 				testutil.RequireExtended(t)
 			}
 			oracle, err := RenderGitHub(t.Context(), plan)

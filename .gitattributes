@@ -18,6 +18,6 @@ inputs/catalogs/local-path-provisioner/patches/chart-image-digest.patch -whitesp
 .github/workflows/nvkr-dev__partition-*.yml linguist-generated
 .github/workflows/nvkr-dev-qualify.yml linguist-generated
 .github/workflows/nvkr-dev-smoke.yml linguist-generated
-.github/workflows/nvkr-qualify.yml linguist-generated
-.github/workflows/nvkr-smoke.yml linguist-generated
+.github/workflows/nvkr-qualify*.yml linguist-generated
+.github/workflows/nvkr-smoke*.yml linguist-generated
 .github/workflows/catalog-refresh.yaml linguist-generated

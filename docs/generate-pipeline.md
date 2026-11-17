@@ -294,8 +294,8 @@ The maintained NVKE composite selects `githubBundle: nvke` for production and
 `githubBundle: nvke-nightly` for floating-source candidates. Their generated workflows are
 `nvkr-run-nvke.yml` and `nvkr-run-nvke-nightly.yml`; each has its own explicitly bound
 qualification policy and qualifier/smoke pair. See the [NVKE inputs](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md).
-No maintained nightly dispatches the named nightly producers; the separate
-downstream AMD64 E2E adapter builds its inputs locally.
+The NVKE nightly producer is manually dispatched. The separate scheduled AMD64 E2E adapter builds
+its inputs locally.
 
 Read the top-level workflow to review which jobs can run, their dependency order, permissions, protected
 Environments and time limits. Follow a job's local `uses: ./.github/nvkr-run/actions/...` reference to inspect
