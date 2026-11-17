@@ -95,6 +95,7 @@ var mergeGatePairs = []struct {
 	pullRequestOnly bool
 }{
 	{"check-skip", "code", []string{"check", "lint", "vulnerabilities", "tests", "hello"}, false, false},
+	{"demo-skip", "demo", []string{"demo"}, false, false},
 	{"actionlint-skip", "actions", []string{"actionlint"}, false, false},
 	{"workflows-regen-skip", "pipeline", []string{"workflows-regen"}, true, false},
 	{"notices-regen-skip", "notices", []string{"notices-regen"}, false, false},
@@ -194,7 +195,7 @@ func TestMergeGateRequiresCompleteCheckPairs(t *testing.T) {
 	}
 
 	allTrue := func(overrides map[string]string) map[string]string {
-		outputs := map[string]string{"code": "true", "actions": "true", "pipeline": "true", "notices": "true", "docs": "true"}
+		outputs := map[string]string{"demo": "true", "code": "true", "actions": "true", "pipeline": "true", "notices": "true", "docs": "true"}
 		for name, value := range overrides {
 			outputs[name] = value
 		}
@@ -240,7 +241,7 @@ func TestMergeGateRequiresCompleteCheckPairs(t *testing.T) {
 			}
 		}
 	}
-	for _, output := range []string{"code", "actions", "pipeline", "notices", "docs"} {
+	for _, output := range []string{"demo", "code", "actions", "pipeline", "notices", "docs"} {
 		cases = append(cases, gateCase{"unknown " + output + " classification", newMergeGateInputs(allTrue(map[string]string{output: ""}), false), false})
 	}
 	for _, result := range []string{"failure", "cancelled", "skipped"} { //nolint:misspell // GitHub result enum spelling.
@@ -276,7 +277,7 @@ func TestMergeGateRequiresCompleteCheckPairs(t *testing.T) {
 func TestMergeGateJobConditionsMatchGate(t *testing.T) {
 	jobs := readMergeGateJobs(t)
 	step := jobs["gate"].Steps[0]
-	outputNames := []string{"code", "actions", "pipeline", "notices", "docs"}
+	outputNames := []string{"demo", "code", "actions", "pipeline", "notices", "docs"}
 	events := []struct {
 		name, eventName, headRepository, fork string
 	}{

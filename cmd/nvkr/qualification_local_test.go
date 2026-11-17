@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
 	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/urfave/cli/v2"
@@ -97,8 +97,17 @@ func TestQualifyLocalCommand(t *testing.T) {
 				}
 				return
 			}
-			if err := nvkedemo.ValidateLocalQualificationResult(output.Bytes(), "attempt"); err != nil {
-				t.Fatalf("actual CLI output refused by demo reader: %v", err)
+			// Keep the producer's exact wire framing covered without importing the
+			// downstream module. Its reader contract is tested in demos/nvke.
+			var result lifecycle.LocalQualificationResult
+			if !bytes.HasSuffix(output.Bytes(), []byte{'\n'}) {
+				t.Fatal("local qualification output lacks its single trailing newline")
+			}
+			if err := canonical.UnmarshalExact(bytes.TrimSuffix(output.Bytes(), []byte{'\n'}), &result); err != nil {
+				t.Fatalf("local qualification output is not exactly canonical: %v", err)
+			}
+			if result.SchemaVersion != "nvkr.dev/local-qualification-result/v1" || result.Attempt != "attempt" || result.Status != "passed" {
+				t.Fatalf("local qualification result changed: %+v", result)
 			}
 			if err != nil || !strings.Contains(output.String(), `"lane":"unqualified-local-execution"`) {
 				t.Fatal("local result missing", err)

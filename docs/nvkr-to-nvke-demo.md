@@ -76,7 +76,7 @@ that reader requires Python. Chart tests are adapter contracts, not proof of
 deployment:
 
 ```sh
-go test ./internal/nvkedemo -run 'TestChart' -count=1
+go -C demos/nvke test ./internal/nvkedemo -run 'TestChart' -count=1
 ```
 
 ## Registry transport

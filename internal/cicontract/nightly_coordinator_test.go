@@ -104,8 +104,8 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 					}
 				}
 			}
-			if strings.Contains(step.Run, "go test ./internal/nvkedemo -run '^TestEndToEnd$'") {
-				guard := "timeout --kill-after=10s 180s go test ./internal/nvkedemo -list '^TestEndToEnd$' | grep -Fx TestEndToEnd"
+			if strings.Contains(step.Run, "go -C demos/nvke test ./internal/nvkedemo -run '^TestEndToEnd$'") {
+				guard := "timeout --kill-after=10s 180s go -C demos/nvke test ./internal/nvkedemo -list '^TestEndToEnd$' | grep -Fx TestEndToEnd"
 				guardAt := strings.Index(step.Run, guard)
 				guardLines := 0
 				for _, line := range strings.Split(step.Run, "\n") {

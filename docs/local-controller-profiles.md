@@ -52,7 +52,7 @@ first-boot/network behavior remain NVKE-owned integration gaps.
 
 [Factory tests](../pkg/nvkr/factory/nvke_laptop_profiles_test.go) authenticate the
 additive overlay, compile the native image output and check staging/build inputs.
-[Consumer tests](../internal/nvkedemo/site_test.go) check exact image selection,
+[Consumer tests](../demos/nvke/internal/nvkedemo/site_test.go) check exact image selection,
 init completion and shared mounts. The source-chart rendering test is opt-in and
 skipped without its chart input. An isolated native ARM64 test built the pinned
 Dockerfile with rootless BuildKit, copied its OCI layout through ORAS, read back

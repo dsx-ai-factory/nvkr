@@ -27,6 +27,9 @@ rejects commit-mode pins; update it explicitly with `catalog pin --commit` after
 the helper changes. Preserve the pinned commit when updating a PR branch. After a
 squash merge, re-pin it to that commit on `main` in a follow-up change so the helper
 has canonical-main provenance. A PR-branch self-pin does not establish that provenance.
+When advancing past the demo-module extraction, update both the helper build path
+and its `vendorCommand` to use `demos/nvke` in the same pin change; the current
+pinned revision still uses the original root-module paths.
 
 Packer 1.15.4 and its QEMU plugin 1.1.6 have separate Darwin and Linux ARM64 acquisitions in this same catalog, using the versions already selected by the Packer toolchain lock. Their ZIP carriers and selected executable bytes have independent CLI-managed pins. These acquisitions do not by themselves admit native Mac image execution or establish a successful QCOW build. They do not install tools globally or publish artifacts.
 
