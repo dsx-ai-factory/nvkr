@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -39,10 +40,23 @@ class ShellHeartbeat(unittest.TestCase):
                 env = {**os.environ, "PATH": str(work) + os.pathsep + os.environ["PATH"],
                        "TIMER_PIDS": str(timer_pids), "CHILD_PID": str(child_pid),
                        "RELEASE": str(release), "CHILD_STATUS": str(status)}
-                command = 'echo $$ > "$CHILD_PID"; while [ ! -f "$RELEASE" ]; do /bin/sleep 0.05; done; exit "$CHILD_STATUS"'
+                # Announce readiness after installing native signal behavior. A shell
+                # loop spawning sleep can defer SIGINT across foreground-child races.
+                command = """
+import os
+from pathlib import Path
+import signal
+import time
+
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+Path(os.environ["CHILD_PID"]).write_text(str(os.getpid()))
+while not Path(os.environ["RELEASE"]).exists():
+    time.sleep(0.02)
+raise SystemExit(int(os.environ["CHILD_STATUS"]))
+"""
                 with output.open("w") as log:
                     process = subprocess.Popen(
-                        ["bash", str(wrapper), "build", "bash", "-c", command],
+                        ["bash", str(wrapper), "build", sys.executable, "-c", command],
                         env=env, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
                     )
                     try:
@@ -63,9 +77,18 @@ class ShellHeartbeat(unittest.TestCase):
                         self.assertIn("[start] build", output.read_text())
                         timers = [line.split() for line in timer_pids.read_text().splitlines()]
                         self.assertTrue(all(len(timer) == 3 and timer[2] == "10" for timer in timers), timers)
-                        for pid in {int(value) for timer in timers for value in timer[:2]}:
-                            with self.assertRaises(ProcessLookupError, msg=f"timer process {pid} survived return"):
-                                os.kill(pid, 0)
+                        def timers_reaped():
+                            for pid in {int(value) for timer in timers for value in timer[:2]}:
+                                try:
+                                    os.kill(pid, 0)
+                                except ProcessLookupError:
+                                    continue
+                                return False
+                            return True
+
+                        # Group interruption can leave an exited timer briefly visible
+                        # until the OS reaps it. Require disappearance within a bound.
+                        self.wait_for(timers_reaped, "timer processes to be reaped")
                     finally:
                         # Also own cleanup if an assertion or the wrapper fails.
                         try:
