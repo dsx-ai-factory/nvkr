@@ -4,11 +4,13 @@
 package factory
 
 import (
+	"io"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -125,5 +127,64 @@ func TestDerivedInventoryProvenancePrefixNamesAndRootCompleteness(t *testing.T) 
 				}
 			}
 		})
+	}
+}
+
+func TestOrdinaryPublicationPredicateWithDerivedSibling(t *testing.T) {
+	plan, artifacts := derivedInventoryWorkspace(t, func(environment *authored.Environment) { environment.Publication.Mode = "per-output-v1" })
+	if err := executeSBOM(t.Context(), plan, planNode(plan, "chart/sbom"), artifacts, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	if err := executePackage(t.Context(), plan, planNode(plan, "package/publication-chart"), artifacts, io.Discard); err != nil {
+		t.Fatal(err)
+	}
+	inspection, err := delivery.Inspect(t.Context(), artifacts["package/publication-chart"].Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dependencies, err := publicationDerivedDependencies(inspection)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dependencies) != 0 {
+		t.Fatal("ordinary publication acquired sibling derived materials")
+	}
+	description, err := delivery.InspectMetadataDescription(t.Context(), artifacts["package/publication-chart"].Path, plan.Targets[outputPublicationRoute("chart")].Ref+"@"+inspection.RootDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputs := description.Outputs
+	if len(outputs) != 1 || outputs[0].Name != "chart" || outputs[0].Derived != nil {
+		t.Fatal("fixture is not an ordinary output-local publication")
+	}
+	run := hostedPredicateRun{builderID: "https://github.com/example/nvkr/.github/workflows/nvkr-factory.yml@refs/heads/main", invocationID: "https://github.com/example/nvkr/actions/runs/42/attempts/2", startedOn: time.Unix(100, 0).UTC(), finishedOn: time.Unix(101, 0).UTC()}
+	raw, err := productionPredicateForRun(plan, plan.Environment.Signing, run, dependencies...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, err := range []error{
+		ValidateProductionPredicate(raw, plan, run.builderID, run.invocationID),
+		validatePublicationDerivedMaterials(raw, plan, inspection),
+		validateDerivedPredicateMaterials(raw, plan, outputs[0]),
+	} {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	required := plan.LifecycleOutputs[1]
+	if required.Derived == nil {
+		t.Fatal("fixture lost derived sibling")
+	}
+	derived := delivery.PublicationOutput{Output: delivery.Output{Name: required.Name, Kind: required.Kind, BuildDigest: required.BuildDigest, Derived: required.Derived}, DerivedMaterials: []derivedoutput.Material{{Name: "chart", Digest: "sha256:" + strings.Repeat("a", 64)}}}
+	for _, tc := range []struct {
+		name     string
+		validate func() error
+	}{
+		{"derived output", func() error { return validateDerivedPredicateMaterials(raw, plan, derived) }},
+		{"aggregate root", func() error {
+			return ValidateQualificationRootMaterials(raw, plan, delivery.PublicationDescription{Outputs: []delivery.PublicationOutput{outputs[0], derived}})
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) { assertFactoryErrorCode(t, tc.validate(), e.CodeVerifyFailed) })
 	}
 }

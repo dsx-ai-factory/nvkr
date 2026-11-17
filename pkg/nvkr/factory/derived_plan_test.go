@@ -4,12 +4,14 @@
 package factory
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -99,6 +101,51 @@ func TestDerivedInventoryAdmission(t *testing.T) {
 			tc.change(&definition, &environment)
 			_, err := Compile(t.Context(), definition, environment, stack, "test")
 			assertFactoryErrorCode(t, err, tc.code)
+		})
+	}
+}
+
+func TestDerivedInventoryDevelopmentAdmissionBeforeCatalog(t *testing.T) {
+	for _, derived := range []bool{true, false} {
+		name := "ordinary output control"
+		if derived {
+			name = "derived output refused"
+		}
+		t.Run(name, func(t *testing.T) {
+			definition, environment, stack := derivedTestInputs(t)
+			if !derived {
+				definition.Outputs = definition.Outputs[:1]
+			}
+			environment.GitHubDevelopment = true
+			environment.GitHubDispatchBranches = nil
+			environment.Publication = &authored.Publication{Mode: "per-output-v1", RepositoryPrefix: "ghcr.io/example/nvkr/development", CredentialRef: development.WriteCredentialRef}
+			namespace, err := development.ParseNamespace(environment.Publication.RepositoryPrefix)
+			if err != nil {
+				t.Fatal(err)
+			}
+			environment.Signing.Identity, environment.Signing.Issuer = namespace.Identity(), development.Issuer
+			if err := definition.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			if err := environment.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			loads := 0
+			plan, err := compileDocumentsWithLoader(t.Context(), "definition.yaml", definition, "environment.yaml", environment, "test",
+				func(context.Context, authored.Catalog) (*catalog.Stack, error) { loads++; return stack, nil })
+			if derived {
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+				if plan != nil || loads != 0 {
+					t.Fatalf("admission accessed catalog or returned Plan: loads=%d", loads)
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if plan == nil || loads != 1 {
+					t.Fatalf("ordinary development compilation did not load catalog once: loads=%d", loads)
+				}
+			}
 		})
 	}
 }

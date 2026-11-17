@@ -136,3 +136,102 @@ func TestInventoryArchiveVerification(t *testing.T) {
 		})
 	}
 }
+
+func TestInventoryArchiveEnvelopeAndBounds(t *testing.T) {
+	inventory := []byte("inventory bytes\n")
+	compress := func(raw []byte, level int) []byte {
+		t.Helper()
+		var buffer bytes.Buffer
+		writer, err := gzip.NewWriterLevel(&buffer, level)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := writer.Write(raw); err != nil {
+			t.Fatal(err)
+		}
+		if err := writer.Close(); err != nil {
+			t.Fatal(err)
+		}
+		return buffer.Bytes()
+	}
+	for _, tc := range []struct {
+		name   string
+		change func(*tar.Header)
+		extra  *tar.Header
+	}{
+		{name: "changed mode", change: func(h *tar.Header) { h.Mode = 0o600 }},
+		{name: "changed owner", change: func(h *tar.Header) { h.Uid = 1 }},
+		{name: "PAX metadata", change: func(h *tar.Header) { h.Format = tar.FormatPAX; h.PAXRecords = map[string]string{"comment": "extra"} }},
+		{name: "extra regular member", extra: &tar.Header{Name: "extra", Mode: 0o644, Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}},
+		{name: "extra link", extra: &tar.Header{Name: "alias", Linkname: "artifacts/inventory.yaml", Typeflag: tar.TypeLink, Format: tar.FormatUSTAR}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var buffer bytes.Buffer
+			writer := tar.NewWriter(&buffer)
+			header := &tar.Header{Name: "artifacts/inventory.yaml", Mode: 0o644, Size: int64(len(inventory)), Typeflag: tar.TypeReg, Format: tar.FormatUSTAR}
+			if tc.change != nil {
+				tc.change(header)
+			}
+			if err := writer.WriteHeader(header); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := writer.Write(inventory); err != nil {
+				t.Fatal(err)
+			}
+			if tc.extra != nil {
+				if err := writer.WriteHeader(tc.extra); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := writer.Close(); err != nil {
+				t.Fatal(err)
+			}
+			err := ValidateInventoryArchive(t.Context(), compress(buffer.Bytes(), gzip.DefaultCompression), inventory)
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed || !strings.Contains(err.Error(), "differs from final Release re-projection") {
+				t.Fatalf("altered canonical envelope: %v", err)
+			}
+		})
+	}
+	t.Run("maximum document with alternate compression", func(t *testing.T) {
+		expected := bytes.Repeat([]byte("a"), 8<<20)
+		archive, err := InventoryArchive(t.Context(), expected)
+		if err != nil {
+			t.Fatal(err)
+		}
+		reader, err := gzip.NewReader(bytes.NewReader(archive))
+		if err != nil {
+			t.Fatal(err)
+		}
+		payload, err := io.ReadAll(reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := reader.Close(); err != nil {
+			t.Fatal(err)
+		}
+		for _, raw := range [][]byte{archive, compress(payload, gzip.NoCompression)} {
+			if err := ValidateInventoryArchive(t.Context(), raw, expected); err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
+	for _, tc := range []struct {
+		name        string
+		size, level int
+		message     string
+	}{
+		{"transport exceeds bound", 9 << 20, gzip.NoCompression, "exceeds its transport bound"},
+		{"expanded at bound", (8 << 20) + 4096, gzip.DefaultCompression, "differs from final Release re-projection"},
+		{"expanded exceeds bound", (8 << 20) + 4097, gzip.DefaultCompression, "oversized or trailing content"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := compress(make([]byte, tc.size), tc.level)
+			err := ValidateInventoryArchive(t.Context(), raw, inventory)
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed || !strings.Contains(err.Error(), tc.message) {
+				t.Fatalf("archive size admission: %v", err)
+			}
+		})
+	}
+}
