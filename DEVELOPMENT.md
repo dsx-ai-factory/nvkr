@@ -128,6 +128,51 @@ pairs so a pin update regenerates every affected bundle in the same refresh. The
 production qualification baseline until named qualification is supported and independently exercised; the
 [GPU site composite](inputs/definitions/nvke/README.md#gpu-site-composite) owns the development bundle.
 
+## Quick machinery E2E locally and in a fork
+
+With the pinned Go version, Git, Make and a running Docker engine:
+
+```sh
+make e2e-quick
+# Select Podman through the shared container-runtime owner:
+CONTAINER_RUNTIME=podman make e2e-quick
+```
+
+The [quick workflow](.github/workflows/e2e-quick.yml) calls the same target on push and manual dispatch,
+including in a fork. It uses a stock Ubuntu runner and needs no organization secrets, environments,
+ARC/KVM or private registry. The target creates and stops its own digest-pinned loopback registry.
+Enable Actions in the fork; manual dispatch requires the workflow to be registered on its default branch.
+Public image/module downloads need network access. Compiler parallelism is bounded to two; the harness
+has a twelve-minute deadline and the hosted job has a fifteen-minute budget. These are limits, not
+measured performance guarantees; [reconciliation](docs/adr/reconciliation/adr-18.md) records exercised scope.
+
+The scenario derives scratch inputs from the maintained [hello example](demos/hello/README.md). It keeps
+hello's output catalog, uses the NVKE module-tags base for action pins, and selects the native platform,
+matching runner label, runtime, loopback publication and dry-run signing. It pins a disposable Git source,
+compiles a Plan, renders the GitHub bundle twice and requires identical bytes, then executes the real local
+graph through build, SBOM, packaging, publication and dry-run signing/verification. The render comparison
+checks determinism for this input, not workflow correctness. Registry traffic stays on the host.
+Inputs, logs and artifacts remain in the printed `.nvkr/e2e-quick-*` directory beneath the checkout,
+so the container runtime can mount them on macOS. Each invocation uses a fresh directory and port.
+The target rebuilds and reuses `bin/nvkr`; retained attempt directories still accumulate and are not pruned
+automatically. Archive or remove only completed attempts after reviewing their diagnostics.
+
+Its **unsigned quick artifact qualification** checks complete operation/output membership, Run/Plan and
+SBOM/payload bindings, publication/signing/verification subjects, predicate bytes and their Plan/Definition/
+Environment identities, and a byte-identical
+registry round-trip. It executes the recovered greeting in a native, offline, read-only container and checks
+the expected output. The negative test changes the predicate's Plan identity and updates the dry-run record's
+byte hash to match; the harness must reject the wrong input identity. Both original records are restored and
+checked again. `qualification.txt` records the diagnostic outcome. This is not the three-key signed
+[`run qualify-local` rehearsal](docs/local-development.md#qualify-local-artifacts), release authorization,
+or qualified reproduction. No signatures or real attestations are produced or authenticated.
+
+**This test does not catch generated-job `needs`, carrier transport or real attestation failures.**
+The emitted GitHub jobs are not executed. It also excludes saved compiler-input capture/reverification, disk/KVM builds,
+ARC specifics, private-storage authentication, production identities, image-output builds and multi-output
+fan-in. Use the full development workflow below for those hosted boundaries. A separate hosted Podman
+leg remains follow-up; selectable runtime support alone is not proof that a particular engine was exercised.
+
 ## Test pipeline changes on a feature branch
 
 The committed `nvkr-dev.yml` runs the **83-output NVKE GPU site composite**, the five NVKE family Definitions and the GB200 AICR bundle

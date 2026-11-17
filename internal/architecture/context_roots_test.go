@@ -53,6 +53,8 @@ var contextRootExceptions = map[contextRoot]contextRootException{
 	{"cmd/nvkr-site-identity-helper/main.go", "main", "Background"}:                                                   {1, processRoot},
 	{"cmd/nvkr/main.go", "main", "Background"}:                                                                        {1, processRoot},
 	{"internal/nvkedemo/support.go", "(*OwnedProcess).finish", "Background"}:                                          {3, boundedCleanup},
+	{"internal/quicke2e/main.go", "main", "Background"}:                                                               {1, processRoot},
+	{"internal/quicke2e/runner.go", "(*runner).cleanupContainer", "Background"}:                                       {1, boundedCleanup},
 	{"pkg/nvkr/conformance/run.go", "(*Producer).produce", "Background"}:                                              {3, boundedRecovery},
 	{"pkg/nvkr/factory/utility_runner.go", "executeUtilityNode", "Background"}:                                        {1, boundedCleanup},
 	{"pkg/nvkr/pipeline/container_lifecycle.go", "(*reaper).cleanup", "Background"}:                                   {1, boundedCleanup},
