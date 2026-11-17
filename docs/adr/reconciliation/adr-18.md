@@ -2,9 +2,10 @@
 
 Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
 
-The quick machinery E2E's initial [fork Run](https://github.com/njhensley/nvkr/actions/runs/44039644070)
-at `14b6d213` reached registry read-back but failed Linux smoke because the unprivileged user could not
-traverse the extracted directory; the harness now grants traversal before smoke, with a corrected hosted run pending.
+The quick machinery E2E [fork Run](https://github.com/njhensley/nvkr/actions/runs/44043009475)
+at `ee807779f8122a0cce1105853a0a82c88dbb4c56` passed on stock Ubuntu in 91 seconds (71 seconds
+for the shared Make target): real hello build, registry round-trip, unprivileged smoke and harness
+rejection of a self-consistent wrong-Plan predicate, with signing and verification in dry-run mode.
 Its unsigned diagnostics do not exercise generated-job dependencies, carrier transport, real signing,
 saved compiler-input reverification, disk/KVM, private-storage authentication or ARC; Podman remains unexercised.
 
