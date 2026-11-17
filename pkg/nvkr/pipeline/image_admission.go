@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/name"
 )
@@ -55,7 +56,7 @@ func PrepareContainerImage(ctx context.Context, runtimeBinary, image, platform s
 	if err := validateImageAccess(image, platform, access); err != nil {
 		return nil, err
 	}
-	if name := filepath.Base(runtimeBinary); name != "docker" && name != "podman" {
+	if err := containerruntime.Validate(runtimeBinary); err != nil {
 		return nil, e.New(e.CodeEngineCapability, "image admission requires Docker or Podman")
 	}
 	output := func(ctx context.Context, args ...string) ([]byte, error) {

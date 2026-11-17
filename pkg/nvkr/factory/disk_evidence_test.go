@@ -304,13 +304,13 @@ func TestDiskEvidenceRuntimeMatchesFrozenEnvironmentBeforeWork(t *testing.T) {
 		{name: "Podman exact", frozen: "podman", selected: "podman", matching: true},
 		{name: "Docker absolute", frozen: "docker", selected: "/nonexistent/nvkr-runtime/docker", matching: true},
 		{name: "Podman absolute", frozen: "podman", selected: "/nonexistent/nvkr-runtime/podman", matching: true},
-		{name: "default Podman", selected: "/nonexistent/nvkr-runtime/podman", matching: true},
+		{name: "default Docker", selected: "/nonexistent/nvkr-runtime/docker", matching: true},
 		{name: "Docker substitutes Podman", frozen: "podman", selected: "docker"},
 		{name: "Podman substitutes Docker", frozen: "docker", selected: "podman"},
 		{name: "absolute wrong runtime", frozen: "docker", selected: "/nonexistent/nvkr-runtime/podman"},
-		{name: "default substitutes Docker", selected: "docker"},
+		{name: "default substitutes Podman", selected: "podman"},
 		{name: "wrong name", frozen: "docker", selected: "does-not-exist"},
-		{name: "empty name", frozen: "podman"},
+		{name: "inherit Podman", frozen: "podman", matching: true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			definition, environment, stack := vmFactoryInputs(t, "linux/amd64", execution.CapabilityPreferred)
@@ -322,7 +322,10 @@ func TestDiskEvidenceRuntimeMatchesFrozenEnvironmentBeforeWork(t *testing.T) {
 			// No native profile and no workspace: a matching logical name
 			// reaches the pure profile gate, never executable lookup or work.
 			inspection, err := OpenDiskEvidenceRuntime(t.Context(), plan, tt.selected, nil)
-			want := "disk inspector runtime differs from frozen Environment runtime"
+			want := "conflicts with Environment runtime"
+			if tt.name == "wrong name" {
+				want = "unsupported container runtime"
+			}
 			if tt.matching {
 				want = "no native disk inspection profile"
 			}

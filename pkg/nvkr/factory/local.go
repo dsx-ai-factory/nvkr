@@ -22,6 +22,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
@@ -146,6 +147,11 @@ func AdmitLocal(ctx context.Context, plan *Plan, options LocalRunOptions) error 
 	if err := admitLocalPlanBase(ctx, plan); err != nil {
 		return err
 	}
+	var runtimeErr error
+	options.Runtime, runtimeErr = containerruntime.Select(plan.Environment.Runtime.Runtime, options.Runtime)
+	if runtimeErr != nil {
+		return runtimeErr
+	}
 	if err := admitLocalDebianHost(plan, options); err != nil {
 		return err
 	}
@@ -202,9 +208,6 @@ func withLocalDefaults(options LocalRunOptions) LocalRunOptions {
 	if options.Jobs <= 0 {
 		options.Jobs = 1
 	}
-	if options.Runtime == "" {
-		options.Runtime = "docker"
-	}
 	if options.Go == "" {
 		options.Go = "go"
 	}
@@ -236,6 +239,11 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 ) {
 	if err := admitLocalPlanBase(ctx, plan); err != nil {
 		return nil, err
+	}
+	var runtimeErr error
+	options.Runtime, runtimeErr = containerruntime.Select(plan.Environment.Runtime.Runtime, options.Runtime)
+	if runtimeErr != nil {
+		return nil, runtimeErr
 	}
 	if err := admitLocalDebianHost(plan, options); err != nil {
 		return nil, err

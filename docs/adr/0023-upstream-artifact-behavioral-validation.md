@@ -1,10 +1,10 @@
 # ADR-23 — Upstream-owned artifact test interfaces
 
-- **Decision status:** Proposed (pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; draft code is not acceptance.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; local checks do not establish broader acceptance.
-- **Deciders:** Pending; owners must be named before ratification.
-- **Index:** Proposed ADR-23 supplements ADR-01–22; it remains outside the consolidated contract set until accepted.
+- **Deciders:** njhensley
+- **Index:** ADR-23 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-03 (coded errors), ADR-13 (evidence), ADR-16 (conformance boundary),
   ADR-17 (resource lifetimes), ADR-18 (execution), ADR-19 (downstream ownership), ADR-20 (artifact subjects),
   ADR-21 (generation), ADR-22 (source pins).

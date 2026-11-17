@@ -31,7 +31,6 @@ JOBS=${JOBS:-1}
 REGISTRY_CONTAINER=${REGISTRY_CONTAINER:-nvkr-m1-registry}
 REGISTRY_IMAGE=${REGISTRY_IMAGE:-registry:3}
 REGISTRY_HOSTPORT=${REGISTRY_HOSTPORT:-127.0.0.1:5000}
-RUNTIME=${RUNTIME:-docker}
 KEEP_REGISTRY=1
 
 # The same pinned toolchain image the catalog builds nvkectl with, reused here as the
@@ -186,7 +185,7 @@ demo_section "4/8  Build and publish all three outputs in one immutable Run"
 run_started=$SECONDS
 "$NVKR" run local --definition "$DEFINITIONS/definition.yaml" \
   --environment "$DEFINITIONS/environment-local.yaml" --attempts-root "$ATTEMPTS_ROOT" --attempt "$ATTEMPT" \
-  --runtime "$RUNTIME" --jobs "$JOBS" --publish --ui=plain
+  --jobs "$JOBS" --publish --ui=plain
 run_seconds=$((SECONDS - run_started))
 
 reference_file="$WORKSPACE/publications/$ROUTE.txt"

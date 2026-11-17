@@ -46,3 +46,27 @@ func TestLocalCommandCapturedPreparation(t *testing.T) {
 		})
 	}
 }
+
+func TestLocalRuntimeOverrideRemainsOptional(t *testing.T) {
+	lifecycleCommandRepo(t)
+	for _, override := range []string{"", "podman", "/opt/bin/docker"} {
+		t.Run(override, func(t *testing.T) {
+			called := false
+			execute := func(_ context.Context, prepared *lifecycle.PreparedRun, options lifecycle.LocalOptions) (*lifecycle.Run, error) {
+				called = true
+				if options.Runtime != override {
+					t.Fatalf("runtime=%q, want %q", options.Runtime, override)
+				}
+				return completedPresentationRun(prepared), nil
+			}
+			app := localPresentationTestApp(execute, io.Discard, defaultRunPresentationServices())
+			args := localPresentationArgs("--ui=plain")
+			if override != "" {
+				args = append(args, "--runtime="+override)
+			}
+			if err := app.RunContext(t.Context(), args); err != nil || !called {
+				t.Fatalf("called=%t err=%v", called, err)
+			}
+		})
+	}
+}

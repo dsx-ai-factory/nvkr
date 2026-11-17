@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -229,9 +230,7 @@ func executeNativeSmoke(ctx context.Context, checks *ArtifactCheckReceipt, invoc
 			projectNativeSmokeFailure(report, native, completed, active, resultErr)
 		}
 	}()
-	if options.RuntimeExecutable == "" {
-		options.RuntimeExecutable = "docker"
-	}
+	options.RuntimeExecutable = containerruntime.Default(options.RuntimeExecutable)
 	owner, err := open(ctx, pipeline.ToolSmokeSelection{RuntimeExecutable: options.RuntimeExecutable, Image: report.Image, Platform: platform})
 	if err != nil {
 		return nil, report, err

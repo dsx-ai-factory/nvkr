@@ -566,7 +566,7 @@ func githubEmittedWorkflows(t *testing.T, plan *Plan, bundle *GeneratedBundle) m
 				t.Fatal(err)
 			}
 		}
-		expanded, err := expandGitHubActions(plan, raw, bundle.Files)
+		expanded, err := expandGitHubActions(plan, raw, githubTestExpansionFiles(bundle))
 		if err != nil {
 			t.Fatal(err)
 		}

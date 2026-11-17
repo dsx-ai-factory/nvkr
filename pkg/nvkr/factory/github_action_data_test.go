@@ -5,6 +5,7 @@ package factory
 
 import (
 	"bytes"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -165,4 +166,79 @@ func githubActionDataPadding(size int, unicode bool) string {
 		return strings.Repeat("é", size/2) + strings.Repeat("x", size%2)
 	}
 	return strings.Repeat("x", size)
+}
+
+func TestGitHubActionDataIsTransientAndRetired(t *testing.T) {
+	plan := githubTestPlan(t)
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	name := githubActionDataPathFor(plan)
+	if _, exists := bundle.Files[name]; exists {
+		t.Fatal("invocation data is a generated member")
+	}
+	_, manifest, err := ManifestFor(bundle)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(manifest, []byte("action-data.json")) {
+		t.Fatal("manifest owns transient data")
+	}
+	for _, damage := range []string{"unchanged", "modified", "unowned"} {
+		t.Run(damage, func(t *testing.T) {
+			root := t.TempDir()
+			prior := *bundle
+			prior.Files = maps.Clone(bundle.Files)
+			if damage != "unowned" {
+				prior.Files[name] = bundle.githubActionData
+			}
+			if err := WriteGeneratedBundle(t.Context(), root, &prior); err != nil {
+				t.Fatal(err)
+			}
+			filename := filepath.Join(root, name)
+			if damage != "unchanged" {
+				if err := os.WriteFile(filename, []byte("operator bytes"), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			err := WriteGeneratedBundle(t.Context(), root, bundle)
+			if damage != "unchanged" {
+				assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+				got, err := os.ReadFile(filename)
+				if err != nil || string(got) != "operator bytes" {
+					t.Fatal("retirement changed unadmitted bytes", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filename); !os.IsNotExist(err) {
+				t.Fatal("retired data remains", err)
+			}
+			if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
+				t.Fatal(err)
+			}
+			data := sharedGitHubActionData(t, bundle)
+			for selector, entry := range data.Entries {
+				output := filepath.Join(t.TempDir(), "output")
+				if err := WriteGitHubActionData(t.Context(), plan, selector, output); err != nil {
+					t.Fatal(err)
+				}
+				want, err := canonical.Marshal(entry.Values)
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := os.ReadFile(output)
+				if err != nil || string(got) != "data="+string(want)+"\n" {
+					t.Fatalf("%s changed point-of-use bytes: %v", selector, err)
+				}
+			}
+		})
+	}
+	injected := *bundle
+	injected.Files = maps.Clone(bundle.Files)
+	injected.Files[name] = []byte(`{"entries":{}}`)
+	assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), plan, &injected), e.CodePipelineDrift)
 }
