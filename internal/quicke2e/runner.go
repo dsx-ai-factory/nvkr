@@ -73,6 +73,8 @@ func cleanEnvironment() []string {
 }
 
 func (r *runner) source(ctx context.Context, platform string) error {
+	// Keep the fixture pin, platform substitution and greeting expectation in
+	// sync with demos/demo-local.sh; both consume demos/hello/source/hello.sh.
 	for _, dir := range []string{"catalog", "source"} {
 		if err := os.Mkdir(filepath.Join(r.work, dir), 0o755); err != nil {
 			return err
@@ -147,7 +149,7 @@ func (r *runner) cleanupContainer(path, label string, stop bool) error {
 	defer cancel()
 	args := []string{"rm", "--force", id}
 	if stop {
-		args = []string{"stop", "--time", "5", id}
+		args = []string{"stop", "-t", "5", id}
 	}
 	_, err = r.command(cleanup, r.work, label, r.engine, args...)
 	return err

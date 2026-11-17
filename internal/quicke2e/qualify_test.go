@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
@@ -36,8 +37,34 @@ func TestPublicationBinding(t *testing.T) {
 			v := sign.VerificationRecord{Ref: reference, Digest: digest, DryRun: true,
 				Identity: s.Identity, Issuer: s.Issuer, PredicateType: s.PredicateType}
 			tc.change(&s, &v)
-			if err := checkPublication(reference, predicate, s, v); (err == nil) != tc.valid {
+			err := checkPublication(reference, predicate, s, v)
+			if (err == nil) != tc.valid {
 				t.Fatalf("valid=%v: %v", tc.valid, err)
+			}
+			if tc.name == "changed predicate binding" && !errors.Is(err, errPredicateBinding) {
+				t.Fatalf("expected predicate byte binding refusal, got %v", err)
+			}
+		})
+	}
+}
+
+func TestPredicateInputBinding(t *testing.T) {
+	for _, tc := range []struct {
+		name, predicate string
+		valid           bool
+	}{
+		{"matching inputs", `{"buildDefinition":{"externalParameters":{"planDigest":"plan","definitionDigest":"definition","environmentDigest":"environment"}}}`, true},
+		{"forged document", `{"forged":true}`, false},
+		{"wrong plan", `{"buildDefinition":{"externalParameters":{"planDigest":"other","definitionDigest":"definition","environmentDigest":"environment"}}}`, false},
+		{"wrong definition", `{"buildDefinition":{"externalParameters":{"planDigest":"plan","definitionDigest":"other","environmentDigest":"environment"}}}`, false},
+		{"wrong environment", `{"buildDefinition":{"externalParameters":{"planDigest":"plan","definitionDigest":"definition","environmentDigest":"other"}}}`, false},
+		{"missing inputs", `{"buildDefinition":{}}`, false},
+		{"duplicate plan", `{"buildDefinition":{"externalParameters":{"planDigest":"plan","planDigest":"other","definitionDigest":"definition","environmentDigest":"environment"}}}`, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := checkPredicateInputs([]byte(tc.predicate), "plan", "definition", "environment")
+			if tc.valid && err != nil || !tc.valid && !errors.Is(err, errPredicateInputs) {
+				t.Fatalf("valid=%v: expected input-binding refusal for invalid inputs, got %v", tc.valid, err)
 			}
 		})
 	}

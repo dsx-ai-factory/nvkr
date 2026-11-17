@@ -2,19 +2,11 @@
 
 Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
 
-The quick machinery E2E uses the maintained hello source/output and the maintained base catalog's
-GitHub action pins. On 2026-11-17, `make e2e-quick` completed on Darwin ARM64 with Docker in
-43.37 seconds including the harness compilation, with warm Go/image caches and another validation
-process running. Its local graph generated/checked a GitHub bundle, built and packaged hello, published
-to an owned loopback registry, recovered identical bytes and ran the recovered greeting in an offline
-read-only container. The unsigned diagnostic qualification checked complete operation/output membership,
-Run/Plan/publication content identities, SBOM/payload and dry-run signing/verification bindings. Altering
-the predicate bytes failed that binding check; restoring them passed again. The retained local attempt was
-`e2e-quick-806466873`; its `qualification.txt` and invocation log record the scope and timing.
-This does not exercise generated GitHub job dependencies, carrier transport, real signing/attestations,
-disk/KVM, private-storage authentication or ARC. It is not ADR-16's three-key local qualification rehearsal.
-The new fork workflow calls the same target, but hosted execution, cold-cache runtime and Podman execution
-remain unrecorded. No production execution or trust path was changed.
+The quick machinery E2E's initial [fork Run](https://github.com/njhensley/nvkr/actions/runs/44039644070)
+at `14b6d213` reached registry read-back but failed Linux smoke because the unprivileged user could not
+traverse the extracted directory; the harness now grants traversal before smoke, with a corrected hosted run pending.
+Its unsigned diagnostics do not exercise generated-job dependencies, carrier transport, real signing,
+saved compiler-input reverification, disk/KVM, private-storage authentication or ARC; Podman remains unexercised.
 
 Tekton implements ADR-18's explicit cluster trust contract. The provider authenticates
 complete PipelineRun, TaskRun and PVC bindings and binds carrier bytes to successful task results. Controlled

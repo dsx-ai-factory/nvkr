@@ -18,11 +18,13 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/provenance"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 )
 
 var errPredicateBinding = errors.New("dry-run predicate byte binding differs")
+var errPredicateInputs = errors.New("dry-run predicate input identities differ from compiled Plan")
 
 // qualifyBindings checks diagnostic records; it issues no receipt or trust claim.
 func qualifyBindings(ctx context.Context, work, reference string) error {
@@ -106,7 +108,25 @@ func qualifyBindings(ctx context.Context, work, reference string) error {
 	if err != nil {
 		return err
 	}
-	return checkPublication(reference, predicate, signed, verified)
+	if err := checkPublication(reference, predicate, signed, verified); err != nil {
+		return err
+	}
+	return checkPredicateInputs(predicate, digest, plan.DefinitionDigest, plan.EnvironmentDigest)
+}
+
+func checkPredicateInputs(raw []byte, planDigest, definitionDigest, environmentDigest string) error {
+	if err := canonical.ValidateJSONDocument(raw); err != nil {
+		return fmt.Errorf("%w: %v", errPredicateInputs, err)
+	}
+	var predicate provenance.Predicate
+	if err := json.Unmarshal(raw, &predicate); err != nil {
+		return fmt.Errorf("%w: %v", errPredicateInputs, err)
+	}
+	inputs := predicate.BuildDefinition.ExternalParameters
+	if inputs["planDigest"] != planDigest || inputs["definitionDigest"] != definitionDigest || inputs["environmentDigest"] != environmentDigest {
+		return errPredicateInputs
+	}
+	return nil
 }
 
 func checkPublication(reference string, predicate []byte, signed sign.SigningRecord, verified sign.VerificationRecord) error {
@@ -129,21 +149,48 @@ func checkPublication(reference string, predicate []byte, signed sign.SigningRec
 
 func rejectChangedPredicate(ctx context.Context, work, reference string) (resultErr error) {
 	path := filepath.Join(work, ".nvkr/runs/quick/predicates/release.json")
+	signaturePath := filepath.Join(work, ".nvkr/runs/quick/signatures/release.json")
 	original, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
+	originalSignature, err := os.ReadFile(signaturePath)
+	if err != nil {
+		return err
+	}
+	var predicate provenance.Predicate
+	var signed sign.SigningRecord
+	if err := json.Unmarshal(original, &predicate); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(originalSignature, &signed); err != nil {
+		return err
+	}
+	// Model signing the wrong Plan, even when the dry-run record correctly
+	// hashes those wrong bytes. This must fail the harness's independent join.
+	predicate.BuildDefinition.ExternalParameters["planDigest"] = "sha256:" + strings.Repeat("0", 64)
+	changed, err := canonical.Marshal(predicate)
+	if err != nil {
+		return err
+	}
+	signed.PredicateSHA256 = pipeline.FileDigest(changed)
+	restore := func() error {
+		return errors.Join(os.WriteFile(path, original, 0o644), os.WriteFile(signaturePath, originalSignature, 0o644))
+	}
 	// Restore even when the diagnostic rejects for an unexpected reason.
-	defer func() { resultErr = errors.Join(resultErr, os.WriteFile(path, original, 0o644)) }()
-	if err := os.WriteFile(path, append(bytes.Clone(original), '\n'), 0o644); err != nil {
+	defer func() { resultErr = errors.Join(resultErr, restore()) }()
+	if err := os.WriteFile(path, changed, 0o644); err != nil {
+		return err
+	}
+	if err := writeJSON(signaturePath, signed); err != nil {
 		return err
 	}
 	err = qualifyBindings(ctx, work, reference)
-	if !errors.Is(err, errPredicateBinding) {
-		return fmt.Errorf("changed predicate was not rejected at its byte binding: %v", err)
+	if !errors.Is(err, errPredicateInputs) {
+		return fmt.Errorf("wrong-Plan predicate was not rejected at its input binding: %v", err)
 	}
-	fmt.Printf("[quick] negative proof: %v\n", err)
-	if err := os.WriteFile(path, original, 0o644); err != nil {
+	fmt.Printf("[quick] negative proof: harness rejected self-consistent wrong-Plan predicate: %v\n", err)
+	if err := restore(); err != nil {
 		return err
 	}
 	return qualifyBindings(ctx, work, reference)

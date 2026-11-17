@@ -54,10 +54,10 @@ func run(ctx context.Context) (resultErr error) {
 	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" && runtime.GOARCH != "amd64" {
 		return fmt.Errorf("quick E2E requires Linux/macOS AMD64 or ARM64")
 	}
-	// The same owner admits the executable override and authored Environment.
-	requested := containerruntime.Default(os.Getenv("CONTAINER_RUNTIME"))
-	engine, err := containerruntime.Select(filepath.Base(requested), requested)
-	if err != nil {
+	// The shared owner admits the executable. run local also checks that its
+	// dialect agrees with the scratch Environment through containerruntime.Select.
+	engine := containerruntime.Default(os.Getenv("CONTAINER_RUNTIME"))
+	if err := containerruntime.Validate(engine); err != nil {
 		return err
 	}
 	input, err := definition.LoadDefinition(ctx, filepath.Join(root, "demos/hello/definition.yaml"))
@@ -80,7 +80,7 @@ func run(ctx context.Context) (resultErr error) {
 		return err
 	}
 	fmt.Printf("Quick E2E workspace: %s\n", work)
-	r := &runner{root: root, work: work, engine: engine, env: cleanEnvironment()}
+	r := &runner{root: root, work: work, engine: engine, nvkr: filepath.Join(root, "bin/nvkr"), env: cleanEnvironment()}
 	if err := os.Mkdir(filepath.Join(work, "logs"), 0o755); err != nil {
 		return err
 	}
@@ -88,10 +88,6 @@ func run(ctx context.Context) (resultErr error) {
 		fmt.Printf("Quick E2E elapsed: %s; retained workspace: %s\n", time.Since(started).Round(time.Second), work)
 	}()
 	if _, err := r.command(ctx, root, "runtime", engine, "info"); err != nil {
-		return err
-	}
-	r.nvkr = filepath.Join(work, "nvkr")
-	if _, err := r.command(ctx, root, "build-cli", "go", "build", "-p", "2", "-o", r.nvkr, "./cmd/nvkr"); err != nil {
 		return err
 	}
 	// --rm removes only this owned container after stop, including failed runs.
@@ -147,7 +143,8 @@ func run(ctx context.Context) (resultErr error) {
 	if err := os.WriteFile(filepath.Join(work, "plan.json"), plan, 0o644); err != nil {
 		return err
 	}
-	// These execute the real renderer and byte-drift check, not the emitted jobs.
+	// Render twice and require identical bytes; this does not execute the jobs
+	// or establish their correctness.
 	if err := os.Mkdir(filepath.Join(work, "generated"), 0o755); err != nil {
 		return err
 	}
@@ -184,6 +181,11 @@ func run(ctx context.Context) (resultErr error) {
 	if err := qualifyBindings(ctx, work, reference); err != nil {
 		return err
 	}
+	// Extraction stages a private 0700 directory. The isolated non-root smoke
+	// user needs traversal permission on Linux, including rootless engines.
+	if err := os.Chmod(filepath.Join(work, "extracted"), 0o755); err != nil {
+		return err
+	}
 	// Execute only the recovered payload, offline with a read-only filesystem.
 	if err := r.smoke(ctx, platform, environment.UtilityContainer); err != nil {
 		return err
@@ -191,7 +193,7 @@ func run(ctx context.Context) (resultErr error) {
 	if err := rejectChangedPredicate(ctx, work, reference); err != nil {
 		return err
 	}
-	report := fmt.Sprintf("PASS: unsigned quick artifact qualification\nplatform: %s\nruntime: %s\nreference: %s\nelapsed: %s\ncomplete Run and Plan, exact SBOM and publication bindings, registry read-back, isolated greeting: pass\nnegative predicate binding: rejected, original restored and rechecked\nNo signatures, real attestations, generated-job needs or carrier transport were verified.\n", platform, engine, reference, time.Since(started).Round(time.Second))
+	report := fmt.Sprintf("PASS: unsigned quick artifact qualification\nplatform: %s\nruntime: %s\nreference: %s\nelapsed: %s\ncomplete Run and Plan, exact SBOM/publication/predicate input bindings, registry read-back, isolated greeting: pass\nnegative proof: harness rejected wrong-Plan predicate with matching byte hash; originals restored and rechecked\nNo signatures, real attestations, generated-job needs, carrier transport or saved compiler inputs were verified.\n", platform, engine, reference, time.Since(started).Round(time.Second))
 	if err := os.WriteFile(filepath.Join(work, "qualification.txt"), []byte(report), 0o644); err != nil {
 		return err
 	}

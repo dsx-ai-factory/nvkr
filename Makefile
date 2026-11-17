@@ -412,5 +412,7 @@ demo-hello: ## Build and verify the hello demo (requires running Docker).
 	bash demos/demo-local.sh --out "$$(mktemp -d)/hello"
 
 .PHONY: e2e-quick
-e2e-quick: go-version-check ## Build, publish, recover and smoke hello; unsigned qualification (Docker or CONTAINER_RUNTIME=podman).
-	GOMAXPROCS=2 go run -p 2 ./internal/quicke2e
+e2e-quick: export GOMAXPROCS := 2
+e2e-quick: export GOFLAGS := -p=2
+e2e-quick: build ## Build, publish, recover and smoke hello; unsigned qualification (Docker or CONTAINER_RUNTIME=podman).
+	go run ./internal/quicke2e
