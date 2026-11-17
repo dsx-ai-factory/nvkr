@@ -77,18 +77,25 @@ raise SystemExit(int(os.environ["CHILD_STATUS"]))
                         self.assertIn("[start] build", output.read_text())
                         timers = [line.split() for line in timer_pids.read_text().splitlines()]
                         self.assertTrue(all(len(timer) == 3 and timer[2] == "10" for timer in timers), timers)
+                        remaining_pids = set()
+
                         def timers_reaped():
+                            remaining_pids.clear()
                             for pid in {int(value) for timer in timers for value in timer[:2]}:
                                 try:
                                     os.kill(pid, 0)
                                 except ProcessLookupError:
                                     continue
-                                return False
-                            return True
+                                remaining_pids.add(pid)
+                            return not remaining_pids
 
                         # Group interruption can leave an exited timer briefly visible
                         # until the OS reaps it. Require disappearance within a bound.
-                        self.wait_for(timers_reaped, "timer processes to be reaped")
+                        try:
+                            self.wait_for(timers_reaped, "timer processes to be reaped")
+                        except self.failureException as error:
+                            self.fail(f"{error}; remaining timer/owner PIDs: {sorted(remaining_pids)}; "
+                                      f"recorded PID/PPID/interval: {timers}")
                     finally:
                         # Also own cleanup if an assertion or the wrapper fails.
                         try:
