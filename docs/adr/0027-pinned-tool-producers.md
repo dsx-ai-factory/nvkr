@@ -116,11 +116,16 @@ source's lock record. The contract is:
 - **Catalog owns producers.** A Definition selects pinned-tool components by name exactly as it selects any
   producer (ADR-11 §1). There is no Definition-level tool, recipe, criteria or argument field.
 
+#### Auxiliary tools in source builds
+
 An offline `oci-hermetic` source producer may also select one auxiliary static release executable with
 `buildTool`, a map from each declared native platform to its ADR-22 source name. The loader requires a
-matching archive and executable pin for every platform. `{{.BuildTool}}` in its build command resolves to
+matching archive and executable pin for every platform. Each `tool/<name>` acquisition carries one
+exact platform pin, so simultaneous native architectures use distinct source names. `{{.BuildTool}}` in its build command resolves to
 the executor's inherited sealed descriptor, `/proc/self/fd/200`. That address is an invocation argument,
-not a tool identity; the separate binding carries the source name, platform, archive format/member and both
+not a tool identity; changing this rendered address still changes the command and hence Build identity.
+Source scripts must preserve descriptor 200; reusing it (for example `200>lockfile`) replaces the tool
+address and can fail the build. The separate binding carries the source name, platform, archive format/member and both
 digests in logical Build identity. Its release URL remains transport. The source producer retains its
 source fetch, read-only source snapshot and explicit writable output directory. It may invoke the same
 bound tool repeatedly; the one-invocation/no-shell rules above govern `builderType: pinned-tool`.
@@ -128,8 +133,11 @@ bound tool repeatedly; the one-invocation/no-shell rules above govern `builderTy
 The factory acquires the auxiliary tool as one shared Run-only `tool/<name>` artifact, with an explicit
 edge to each consuming producer. It is not a delivered output or Release member. Before source/output
 work, the launched Linux executor authenticates a bounded native static ELF snapshot and the selected
-image. The image's interpreter copies the exact executable stream into a sealed anonymous file, verifies
-its digest, and inherits its descriptor into the source command. No executable host path is mounted and
+image. The image must provide a 64-bit `/usr/bin/perl` with core `Config`, `Digest::SHA`, `Fcntl` and
+`POSIX` modules; missing interpreter support currently fails at launch, not during image admission.
+Perl starts with `-f` to skip site customization and cleared interpreter/loader variables applied after
+catalog variables. The interpreter copies the exact executable stream into a sealed anonymous file, verifies
+its digest, reopens stdin on `/dev/null`, and inherits its descriptor into the source command. No executable host path is mounted and
 no PATH lookup selects the tool. Missing bytes, wrong architecture, changed executable bytes, changed
 image admission, truncated streams or unavailable kernel sealing fail the producer. Cancellation retains
 the existing owned subprocess and container cleanup contract. The observed producer result binds the
@@ -309,7 +317,8 @@ Admission runs before tool acquisition, staging, subprocess or output work.
 | `run local` on Linux | Supported once implemented; `static-unqualified` |
 | `run local` on another host | `engine-capability`; held executable capabilities are Linux-only |
 | `run generate`, hosted GitHub Run | Supported once implemented; `pipeline-attested`, on ADR-18 §3 default hosted routing |
-| Native ARC disk route | Not admitted; `engine-capability`, as ADR-18 limits it to disk producers |
+| Native ARC disk route for a `pinned-tool` producer | Not admitted; `engine-capability`, as ADR-18 limits it to disk producers |
+| Auxiliary tool in an offline source producer | Admitted wherever that producer is admitted, including the native ARC disk group; `tool/<name>` acquisition stays on default hosted routing |
 | Qualified execution, `run check-artifacts`, `run qualify` over a pinned-tool output | Deferred; `engine-capability` |
 | Directory output form, companion staging, authored-file inputs | Deferred; `engine-capability`, or `invalid-catalog` for a malformed declaration (§11) |
 | Networked tool modes | Not admitted. An authored network request fails with `invalid-catalog`; a tool flag that needs network is not parsed (§3), so network denial stops it at run time with `build-failed` |

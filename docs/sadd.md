@@ -97,6 +97,8 @@ their [logical identity](adr/0027-pinned-tool-producers.md#2-logical-identity-co
 [outputs](adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout).
 The file form and one layout root with an explicit regular-file material closure are implemented. The AICR
 path uses a fixed post-render integrity gate before packaging; current evidence is recorded in ADR-27 reconciliation.
+Offline source producers can also bind one auxiliary native release executable as a Run-only input,
+with its archive and executable pins in logical Build identity and injection through a sealed descriptor.
 
 Proposed [ADR-28](adr/0028-multi-platform-executable-indexes.md) designs multi-platform executables. ADR-28 owns
 when [one tool source covers several platforms](adr/0028-multi-platform-executable-indexes.md#1-one-tool-source-declares-every-platform),

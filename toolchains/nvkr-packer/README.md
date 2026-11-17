@@ -150,7 +150,7 @@ mutable tag as the catalog pin.
 The Packer executable remains an external subprocess under the repository's
 license policy; it is not linked into `nvkr`. The image preserves the release
 archives' Packer BUSL-1.1 and QEMU-plugin MPL-2.0 license texts. Ubuntu package
-copyright records remain under `/usr/share/doc`; the Go BSD-3-Clause, crane
+copyright records remain under `/usr/share/doc`; the Go BSD-3-Clause and crane
 Apache-2.0 texts are retained with the toolchain notices.
 
 This repository does not record NVIDIA approval to redistribute Packer under
@@ -223,3 +223,7 @@ The [M2 README](../../inputs/definitions/nvke/README.md) owns current source sel
 and generated execution requirements; the machine-managed locks and overlay own their exact values.
 Native preparation and registry read-back do not establish source-owner release acceptance, runtime
 isolation, a full image bake, organizational approval or independent consumer acceptance.
+
+Offline source builds that bind an auxiliary catalog tool require a 64-bit `/usr/bin/perl` with
+core `Config`, `Digest::SHA`, `Fcntl` and `POSIX` modules for the sealed-descriptor bootstrap
+(ADR-27). Replacement runtime images must preserve this requirement; missing support fails at launch.

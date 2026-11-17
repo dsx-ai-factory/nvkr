@@ -78,6 +78,7 @@ Each section lives in its own file; edit only the file that owns the affected ro
 - [Feature-branch pipeline development](feature-branch-pipeline-development.md)
 - [Ubuntu 24 node-image inputs](ubuntu-24-node-image-inputs.md)
 - [Native disk execution and inspection](native-disk-execution-and-inspection.md)
+- [nfpm native tool review](nfpm-tool.md)
 - [Local ARM64 development inputs](local-arm64-development-inputs.md)
 - [ADR-17 CLI presentation and inspection](adr-17-cli-presentation-and-inspection.md)
 - [Local ARM64 demo presentation](local-arm64-demo-presentation.md)

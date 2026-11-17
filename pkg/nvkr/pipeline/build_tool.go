@@ -58,6 +58,6 @@ func captureBuildTool(node ir.Node, opts RunOptions) (*heldfile.File, error) {
 }
 
 func buildToolCommand(node ir.Node, file *heldfile.File) []string {
-	args := []string{"-e", buildToolBootstrap, "--", node.Platform, file.Digest(), strconv.FormatInt(file.Size(), 10)}
+	args := []string{"-f", "-e", buildToolBootstrap, "--", node.Platform, file.Digest(), strconv.FormatInt(file.Size(), 10)}
 	return append(args, node.Command...)
 }

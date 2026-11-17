@@ -116,8 +116,7 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 	cname := containerName(n)
 	args := []string{"run", "--rm", "--name", cname}
 	if opts.buildTool != nil {
-		args = append(args, "--interactive", "--entrypoint", "/usr/bin/perl",
-			"-e", "PERL5OPT=", "-e", "PERL5LIB=", "-e", "PERLLIB=", "-e", "LD_PRELOAD=", "-e", "LD_LIBRARY_PATH=")
+		args = append(args, "--interactive", "--entrypoint", "/usr/bin/perl")
 	}
 	if buildKit != nil {
 		args = []string{"create", "--name", cname}
@@ -147,6 +146,10 @@ func (l Local) build(n ir.Node, opts RunOptions) (result *ArtifactResult, return
 	}
 	for _, ev := range n.Env {
 		args = append(args, "-e", ev.Name+"="+ev.Value)
+	}
+	if opts.buildTool != nil {
+		// The interpreter must not load code from catalog or image environment.
+		args = append(args, "-e", "PERL5OPT=", "-e", "PERL5LIB=", "-e", "PERLLIB=", "-e", "LD_PRELOAD=", "-e", "LD_LIBRARY_PATH=")
 	}
 	if n.BuilderType == ir.BuilderBuildKit {
 		args = append(args, buildKitRuntimeArgs(opts.Runtime)...)

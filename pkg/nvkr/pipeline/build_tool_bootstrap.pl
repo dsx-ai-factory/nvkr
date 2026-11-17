@@ -53,6 +53,6 @@ my $hash = Digest::SHA->new(256);
 $hash->addfile($mem);
 "sha256:" . $hash->hexdigest eq $expected or die "build tool digest mismatch\n";
 fcntl($mem, F_SETFD, 0) or die "cannot inherit executable\n";
-close(STDIN) or die "cannot close tool stream\n";
+open(STDIN, "<", "/dev/null") or die "cannot detach tool stream\n";
 exec {$ARGV[0]} @ARGV;
 die "cannot execute source build: $!\n";

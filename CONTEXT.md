@@ -468,6 +468,8 @@ acquisition of the tool. Proposed in [ADR-27](docs/adr/0027-pinned-tool-producer
 [outputs](docs/adr/0027-pinned-tool-producers.md#5-outputs-one-file-or-a-producer-written-oci-layout);
 the file form and one layout root with its explicit regular-file material closure are implemented.
 AICR layouts pass a fixed, separately owned post-render integrity check before packaging.
+ADR-27 also admits one auxiliary native release tool in an offline source producer; its explicit
+Run-only acquisition and exact pin are bound into the consuming Build identity.
 Execution and acceptance evidence are scoped in the ADR-27 reconciliation.
 _Avoid_: Run-wide pipeline tool, release executable output, build script
 

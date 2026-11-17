@@ -24,6 +24,9 @@ func TestBuildToolBootstrapRefusesSubstitution(t *testing.T) {
 		t.Skip("Linux sealed descriptor bootstrap")
 	}
 	if _, err := os.Stat("/usr/bin/perl"); err != nil {
+		if os.Getenv("CI") != "" {
+			t.Fatalf("required bootstrap interpreter is unavailable: %v", err)
+		}
 		t.Skip("Perl is unavailable")
 	}
 	raw := producedExecutableELFFixture()
@@ -53,8 +56,8 @@ func TestBuildToolBootstrapRefusesSubstitution(t *testing.T) {
 			marker := filepath.Join(t.TempDir(), "command-started")
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
-			cmd := exec.CommandContext(ctx, "/usr/bin/perl", "-e", buildToolBootstrap, "--", platform, FileDigest(raw), size,
-				"/bin/sh", "-ec", `"$1"; "$1"; touch "$2"`, "--", ir.BuildToolPath, marker)
+			cmd := exec.CommandContext(ctx, "/usr/bin/perl", "-f", "-e", buildToolBootstrap, "--", platform, FileDigest(raw), size,
+				"/bin/sh", "-ec", `[ "$(readlink /proc/self/fd/0)" = /dev/null ]; [ -z "$(cat)" ]; "$1"; "$1"; touch "$2"`, "--", ir.BuildToolPath, marker)
 			cmd.Stdin = bytes.NewReader(input)
 			output, err := cmd.CombinedOutput()
 			if (err == nil) != test.succeeds {

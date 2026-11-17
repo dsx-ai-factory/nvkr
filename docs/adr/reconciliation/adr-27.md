@@ -41,11 +41,9 @@ in the producer result. It retains the existing source-build sandbox and cancell
 Acquisition stays daemonless and injection adds no image-ID, save/load or Buildx dependency. Podman
 execution of this new bootstrap remains unexercised; existing runtime admission and hosted policy apply.
 
-On November 16, a small native ARM64 Docker comparison used nfpm 2.48.0 from the maintained Packer
-image and the same executable supplied through the new sealed-descriptor bootstrap. Both produced
+A local diagnostic on 2026-11-16, with no retained external execution record, compared nfpm 2.48.0
+from the maintained Packer image and the same executable supplied through the new sealed-descriptor bootstrap. Both produced
 Debian artifact `sha256:74f8c14d72c51bd9e359149161dc70ebba75f0b652951cbca0a711fe570ec4f4`.
-The container ran as UID/GID 65534, without network, with a read-only root, all capabilities dropped,
-no-new-privileges, 128 MiB memory, one CPU, 64 processes and 32 MiB scratch. Task records are
-`data/toolchain-images-retire/step2-nfpm-byte-proof.py`, `step2-nfpm-byte-proof.json` and the baseline/injected
-logs, retained outside Git. This exercises the bootstrap and one small package; it is not a complete
-NVKE Run, AMD64 execution, hosted evidence, publication acceptance or a qualification upgrade.
+The diagnostic harness ran as UID/GID 65534, without network, with a read-only root, all capabilities dropped,
+no-new-privileges, 128 MiB memory, one CPU, 64 processes and 32 MiB scratch. This exercises the
+bootstrap and one small package; it is not a complete NVKE Run, AMD64 execution, hosted evidence, publication acceptance or a qualification upgrade.
