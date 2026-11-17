@@ -6,7 +6,7 @@ its changes. They do not observe output bytes, verify a release, or authorize ex
 
 The Plan in `.github/nvkr-run-nvke/plan.json` is a small index into the repository's shared `.github/nvkr-plan-store/`.
 Start with the store's `index.json` to find catalogs, target steps, graphs and scripts by name and see which bundles share each variant.
-The [generated tree guide](generated-plan-tree.md) traces workflow job comments through each bundle's `script-index.json` to exact producer commands and explains the CI adapter boundary.
+The [generated tree guide](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/generated-plan-tree.md) traces workflow job comments through each bundle's `script-index.json` to exact producer commands and explains the CI adapter boundary.
 Loading verifies the frozen objects and reconstructs the canonical Plan under [ADR-21's storage contract](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold). Keep human views
 outside `.github/nvkr-run-nvke/`: that directory admits only manifest-owned generated files. Inspection never
 updates the Plan or its ownership manifest.
