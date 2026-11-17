@@ -31,6 +31,11 @@ push/manual run. Root-library PRs still need that separate compatibility check
 until the binary-only boundary replaces the temporary imports.
 The existing shared third-party notice file covers binaries from both modules.
 
+The test target downloads dependencies from both module graphs before running
+the offline external-consumer and release-dependency boundary checks. For a direct
+`go test` run from a fresh module cache, first run `make -C demos/nvke test-deps`.
+After that preparation, the boundary test can run with `GOPROXY=off`.
+
 External Go tests import `github.com/dsx-ai-factory/nvkr/demos/nvke/pkg/nvkr/demo`.
 Until separately versioned, local consumers must replace both the root and demo
 modules with their matching checkout directories; Go does not inherit a dependency's

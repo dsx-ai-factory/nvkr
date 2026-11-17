@@ -10,13 +10,19 @@ BIN_DIR ?= ../../bin
 GOSRC := cmd internal pkg
 .DEFAULT_GOAL := build
 
-.PHONY: build test vet lint fmt-check vulncheck tidy check
+.PHONY: build test test-deps vet lint fmt-check vulncheck tidy check
 build:
 	go build -o $(BIN_DIR)/nvke-demo ./cmd/nvke-demo
 	go build -o $(BIN_DIR)/nvkr-site-identity-helper ./cmd/nvkr-site-identity-helper
 
-test:
+test: test-deps
 	go test -count=1 -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) ./...
+
+# Boundary tests run a fresh external consumer and inspect the root CLI offline.
+# Their module graph needs more than the packages compiled by this module alone.
+test-deps:
+	go -C ../.. mod download
+	go mod download
 
 vet:
 	go vet ./...
