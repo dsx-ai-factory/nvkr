@@ -356,7 +356,7 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 		t.Fatal(err)
 	}
 	versions := []byte("CAPI_VERSION ?= " + selected.capiVersion + "\n")
-	for _, scenario := range []string{"complete", "missing versions", "missing site specification", "missing CAPNICo release", "changed provider", "missing source marker", "changed source marker", "canceled", "published NKTP chart"} {
+	for _, scenario := range []string{"complete", "missing versions", "missing site specification", "missing CAPNICo release", "changed provider", "missing source marker", "changed source marker", "canceled", "published NKTP chart", "missing by-path NKTP chart"} {
 		t.Run(scenario, func(t *testing.T) {
 			entries := []assetEntry{
 				{"deploy/nvke-deploy.sh", tar.TypeReg, "installer", 0},
@@ -376,9 +376,14 @@ func TestNativeInstallerRejectsMissingOrChangedCAPISelectionAtExtraction(t *test
 					entries = append(entries, assetEntry{nativeControllerSourceFiles[index], tar.TypeReg, raw, 0})
 				}
 			}
-			// NVKE releases before the in-tree chart's removal carry it; later
-			// ones install NKTP's published chart, so the archive has none.
-			if scenario != "published NKTP chart" {
+			// NVKE releases before the in-tree chart's removal install it by path
+			// from the archive; later ones name NKTP's published chart instead.
+			release := "chart:\n  name: nktp\n  path: ../../nktp/deploy/charts/nktp\n"
+			if scenario == "published NKTP chart" {
+				release = "chart:\n  name: nktp\n  version: \"0.2.0\"\n  repository: https://helm.ngc.nvidia.com/nvidia\n"
+			}
+			entries = append(entries, assetEntry{"deploy/nico/nktp/release.yaml", tar.TypeReg, release, 0})
+			if scenario != "published NKTP chart" && scenario != "missing by-path NKTP chart" {
 				entries = append(entries, assetEntry{"nktp/deploy/charts/nktp/Chart.yaml", tar.TypeReg, "nktp chart", 0})
 			}
 			if scenario != "missing site specification" {
