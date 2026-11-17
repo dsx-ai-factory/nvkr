@@ -2,8 +2,28 @@
 
 The combined [Definition](definition.yaml) is used by the committed `nvkr-run.yml`. It joins independently pinned NVKE CLI,
 controller and chart builds, operator executables, native node images and third-party deployment images
-into one release with **69 named outputs**. This remains a candidate; completed pipeline delivery and
+into one release with **70 named outputs**, including the derived AICR inventory. This remains a candidate; completed pipeline delivery and
 full product acceptance are separate facts.
+
+## Release-derived inventory
+
+The combined Definition selects `aicr-inventory`, a `bundle-oci` archive containing only
+`artifacts/inventory.yaml`. Its `derived.encoding: aicr-inventory-v1` declaration selects seven exact sibling
+outputs: `controller-chart`, `cwe`, `nktp`, `postgresql`, `spire`, `spire-crds` and `temporal`. It declares no
+source components or catalog override. NVKR authenticates their completed packages, projects the inventory
+with the publication prefix, and wraps it before publication. Chart entries retain the final archive digest
+used by `helm.defaultDigest`; the controller image retains its aggregate manifest digest.
+
+This is a required signed member, with packaging file inventory and sibling package subjects in provenance.
+Qualification re-projects final Release metadata and compares the inventory document and canonical tar envelope from the verified archive. The same selection
+can be inspected with `release export --format aicr-inventory` and repeated `--output` flags
+([inventory export](../../../docs/release-navigation.md#export-selected-aicr-inventory-entries)).
+The inventory is bound to this Environment's publication namespace. Another destination requires a new Run;
+rewriting or relocating the file does not preserve its signed meaning. Build-only and development-attempt
+Environments are refused for this derivation. No Environment or signer policy changes are required.
+
+This addition does not render NVKE's catalog, seed or site bundles. Those producers and their offline tool
+input remain the next steps. Local contract tests do not establish hosted publication or deployment acceptance.
 
 ## Working Definitions for an NVKE GPU site
 
@@ -129,8 +149,8 @@ belongs to AICR and NVKE evidence, and NVKR records none ([reconciliation](../..
 
 ## Family pilot
 
-Five independent Definitions partition 68 of the combined candidate's 69 named outputs, and together add 12
-family-only outputs, for 80 in all. The core family delivers the 69th, `nico-reference-profiles-fixture`, as `controller-profiles`:
+Five independent Definitions partition 68 of the combined candidate's 70 named outputs, and together add 12
+family-only outputs, for 80 in all. They omit `aicr-inventory`. The core family delivers `nico-reference-profiles-fixture` as `controller-profiles`:
 one Release cannot publish the same image under two output names. The core family also
 selects the ARM64 operator tools and the `controller-profiles` image, and the services family selects local-path-provisioner, which the combined Definition omits; they were added while its flat workflow had no remaining YAML
 parsing headroom. The Disks Ubuntu 24 family's four outputs are also absent from the combined Definition. They reuse the
@@ -442,7 +462,7 @@ The family's Environment keeps this candidate's native ARC route, execution clas
 
 The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)
 completed a standalone FDE bake and raw artifact retention. It did not exercise FDE publication, an ARM64
-FDE bake, or this combined 69-output pipeline. Those operational acceptance checks remain outstanding.
+FDE bake, or this combined 70-output pipeline. Those operational acceptance checks remain outstanding.
 
 `../../environments/github-release.yaml` admits only ADR-18's `githubARC: native-kvm-v1` route on
 `arc-amd64-kvm` and `arc-arm64-kvm`, with required native KVM. Each execution class requests 8 CPUs,

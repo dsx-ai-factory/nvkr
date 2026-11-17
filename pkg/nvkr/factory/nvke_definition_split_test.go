@@ -29,10 +29,9 @@ var nvkeSplitFamilies = []struct {
 	{"disks-ubuntu24", 4, 4},
 }
 
-// Combined-only outputs belong to no family. Each maps to the family output that
-// delivers the same selection under another name: one Release cannot publish the
-// same image under two outputs, and NVKE requires the controller-profiles name.
-var nvkeCombinedOnlyOutputs = map[string]string{"nico-reference-profiles-fixture": "controller-profiles"}
+// Combined-only outputs belong to no family. A nonempty replacement maps an
+// ordinary output to its family name. The inventory spans multiple families.
+var nvkeCombinedOnlyOutputs = map[string]string{"aicr-inventory": "", "nico-reference-profiles-fixture": "controller-profiles"}
 
 // Family-only outputs are not in the combined Definition. Each declaration is
 // pinned exactly so a valid but unintended selection fails here rather than only
@@ -180,6 +179,12 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 	for name, replacement := range nvkeCombinedOnlyOutputs {
 		if family, exists := seen[name]; exists {
 			t.Fatalf("combined-only output %q is required by %s", name, family)
+		}
+		if replacement == "" {
+			if original[name] == nil {
+				t.Fatalf("combined-only output %q is absent", name)
+			}
+			continue
 		}
 		pinned, ok := nvkeFamilyOnlyOutputs[replacement]
 		if !ok {

@@ -11,6 +11,12 @@ catalog:
 sbomTool: syft
 cosignTool: cosign
 outputs:
+  - name: aicr-inventory
+    platform: linux/amd64
+    format: bundle-oci
+    derived:
+      encoding: aicr-inventory-v1
+      outputs: [controller-chart, cwe, nktp, postgresql, spire, spire-crds, temporal]
   - name: capi-controller-image
     platform: linux/amd64
     catalog:

@@ -71,6 +71,9 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 	if inspection.RootDigest != subject.Digest {
 		return fail(e.New(e.CodeVerifyFailed, "metadata differs from signed publication"))
 	}
+	if err := validatePublicationDerivedMaterials(predicate, plan, inspection); err != nil {
+		return fail(err)
+	}
 	digest, err := plan.IdentityDigest()
 	if err != nil {
 		return fail(err)

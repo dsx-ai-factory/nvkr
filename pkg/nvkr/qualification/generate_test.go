@@ -39,12 +39,14 @@ func generationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPoli
 	// the real maintained Plan's exact members; no payload or authority is faked.
 	policy.Smoke.Tools = map[string]string{"nvkectl": "nvkectl-version-json", "helm": "helm-version", "kubectl": "kubectl-client-version-json"}
 	for _, output := range plan.LifecycleOutputs {
-		if output.Kind == lifecycle.OutputOCI {
+		if output.Derived != nil {
+			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: []string{}, Reason: "derived-inventory"})
+		} else if output.Kind == lifecycle.OutputOCI {
 			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: append([]string(nil), output.Components...), Reason: "deployment-image"})
 		}
 	}
-	if len(policy.Smoke.NonToolOutputs) != 56 {
-		t.Fatal("maintained candidate fixture changed its declared OCI membership")
+	if len(policy.Smoke.NonToolOutputs) != 57 {
+		t.Fatal("maintained candidate fixture must name 56 images and the derived inventory")
 	}
 	return plan, policy
 }
@@ -486,11 +488,11 @@ func TestQualificationGenerationAdmission(t *testing.T) {
 		{"extra tool", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
 			p.Smoke.Tools["unselected"] = "helm-version"
 		}, e.CodeReleaseIncomplete},
-		{"missing image exemption", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
+		{"missing inventory exemption", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
 			p.Smoke.NonToolOutputs = p.Smoke.NonToolOutputs[1:]
 		}, e.CodeGateUnmet},
 		{"wrong image membership", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
-			p.Smoke.NonToolOutputs[0].Components = []string{"unselected"}
+			p.Smoke.NonToolOutputs[1].Components = []string{"unselected"}
 		}, e.CodeGateUnmet},
 		{"extra image exemption", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
 			p.Smoke.NonToolOutputs = append(p.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: "unselected", Kind: lifecycle.OutputOCI, Components: []string{"image"}, Reason: "deployment-image"})

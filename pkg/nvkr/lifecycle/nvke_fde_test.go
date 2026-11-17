@@ -91,6 +91,7 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		t.Fatal(err)
 	}
 	wantNames := strings.Fields(`
+		aicr-inventory
 		capi-controller-image capi-controller-image-arm64
 		capi-kubeadm-bootstrap-image capi-kubeadm-bootstrap-image-arm64
 		capi-kubeadm-control-plane-image capi-kubeadm-control-plane-image-arm64 capnico-controller
@@ -120,7 +121,7 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		}
 	}
 	if !slices.Equal(names, wantNames) || len(diskOutputs) != 4 {
-		t.Fatalf("maintained M2 must retain all 69 outputs and four native disks: names=%v, disks=%d", names, len(diskOutputs))
+		t.Fatalf("maintained M2 must retain all 70 outputs and four native disks: names=%v, disks=%d", names, len(diskOutputs))
 	}
 	// This contract concerns the four native disk closures. Compiling unrelated
 	// controllers and charts adds no FDE signal and requires a synthetic Git source.

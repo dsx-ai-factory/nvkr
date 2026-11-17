@@ -2,7 +2,7 @@
 
 The NVKE four-family pilot adds independent core (21 outputs), services (34), telemetry (17) and disks (4)
 Definitions under `inputs/definitions/nvke/`, with corresponding `github-nvke-<family>` Environments and
-named production bundles. Their selected output union is the combined candidate's 69 outputs, except `nico-reference-profiles-fixture`, plus 8
+named production bundles. Their selected output union is the combined candidate's 70 outputs, except `nico-reference-profiles-fixture` and the publication-bound `aicr-inventory`, plus 8
 family-only outputs (two core, six services) that the combined Definition omits for workflow headroom, retaining
 aggregate native children, bound chart/image relationships and complete disk material selections. They
 reuse shared catalog/pin owners and publish into separate family prefixes beneath the existing candidate
@@ -158,7 +158,7 @@ disks-family credential regression in 0.83 seconds. These are local
 contracts, not evidence of private registry access, hosted family execution or consumer acceptance.
 
 The [M2 Definition instructions](../../../inputs/definitions/nvke/README.md) own example-specific selection and input
-preparation. The candidate requires 69 named outputs. It retains the previous 37 and adds source-built
+preparation. The candidate requires 70 named outputs, including the publication-bound AICR inventory. It retains the previous 37 and adds source-built
 CAPNICo and explicitly named reference-profile fixtures, the existing provisioned infrastructure provider, source-packaged NVKE telemetry pipelines,
 and fourteen acquired runtime-image components delivered separately for both native architectures.
 The selected NVKE/CAPI sources and NVKE telemetry pipelines dependency charts own their versions; Helm test-only images are

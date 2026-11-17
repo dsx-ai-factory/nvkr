@@ -193,6 +193,11 @@ twice, produced for another platform or not a regular file fails before work.
 Authored files from the Definition repository, remote inputs and Environment-supplied inputs are not admitted.
 Adding them needs its own content-addressed input decision.
 
+ADR-19/20 admit one separate package-time derivation: an in-process AICR inventory from authenticated
+sibling packages and the compiled publication namespace. This is not a pinned-tool producer, a fetched
+`prebuilt` input, or permission to read its own Release. Source-built consumers of this material and injected
+AICR execution remain deferred; the existing pinned-tool material restrictions above are unchanged.
+
 ### 5. Outputs: one file or a producer-written OCI layout
 
 The producer's private output directory must contain exactly one declared form when the tool exits successfully:

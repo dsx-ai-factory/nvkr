@@ -228,7 +228,11 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 			return err
 		}
 	}
-	predicate, err := productionPredicateFor(plan, signing, startedOn, time.Now().UTC())
+	materials, err := publicationDerivedDependencies(inspection)
+	if err != nil {
+		return err
+	}
+	predicate, err := productionPredicateFor(plan, signing, startedOn, time.Now().UTC(), materials...)
 	if err != nil {
 		return err
 	}
@@ -346,13 +350,15 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 		return e.New(e.CodeInternal, "factory verification node %q resolved no signing adapter", node.ID)
 	}
 	policy := sign.VerifyPolicy{IdentityRegexp: signing.Identity, Issuer: signing.Issuer, RequireAttestation: true}
-	if PerOutputPublication(plan) {
+	if PerOutputPublication(plan) || hasDerivedOutputs(plan) {
 		raw, err := readSmallFactoryFile(ctx, artifacts["predicate/"+strings.TrimPrefix(node.ID, NodeVerifyPublication+"/")].Path, "production predicate")
 		if err != nil {
 			return err
 		}
-		if err := validateHostedProductionPredicate(raw, plan, signing); err != nil {
-			return err
+		if PerOutputPublication(plan) {
+			if err := validateHostedProductionPredicate(raw, plan, signing); err != nil {
+				return err
+			}
 		}
 		policy.ExpectedPredicate = raw
 	}
@@ -380,6 +386,11 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 	inspection, err := pull(ctx, subject.Ref, filepath.Join(workspace, "closure"), registryOptions)
 	if err != nil {
 		return err
+	}
+	if policy.ExpectedPredicate != nil {
+		if err := validatePublicationDerivedMaterials(policy.ExpectedPredicate, plan, inspection); err != nil {
+			return err
+		}
 	}
 	if signing.Mode == SigningModeCosign && inspection.Root.Release != nil {
 		verifyEvidence := verifySBOMAttestations
@@ -422,7 +433,7 @@ func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifa
 
 // productionPredicateFor renders the exact SLSA v1 production predicate for this
 // run. Every identity in it is taken from the plan; nothing is discovered here.
-func productionPredicateFor(plan *Plan, _ *definition.Signing, startedOn, finishedOn time.Time) ([]byte, error) {
+func productionPredicateFor(plan *Plan, signing *definition.Signing, startedOn, finishedOn time.Time, materials ...provenance.Dependency) ([]byte, error) {
 	// IdentityDigest, not Digest: this predicate outlives the run, so it must name the
 	// plan as compiled rather than as relocated into whatever local workspace produced it.
 	planDigest, err := plan.IdentityDigest()
@@ -433,7 +444,10 @@ func productionPredicateFor(plan *Plan, _ *definition.Signing, startedOn, finish
 	if err != nil {
 		return nil, err
 	}
-	return ProductionPredicate(plan, run)
+	if err := plan.Validate(); err != nil {
+		return nil, err
+	}
+	return productionPredicateForRun(plan, signing, run, materials...)
 }
 
 // ProductionPredicate builds the exact descriptive SLSA predicate for one
@@ -456,7 +470,7 @@ func ProductionPredicate(plan *Plan, run provenance.RunContext) ([]byte, error) 
 // admitted plan and an authenticated provider run context. Keeping this join in
 // factory lets hosted finalization reconstruct and compare the exact predicate
 // semantics instead of trusting a matching file hash.
-func productionPredicateForRun(plan *Plan, signing *definition.Signing, run provenance.RunContext) ([]byte, error) {
+func productionPredicateForRun(plan *Plan, signing *definition.Signing, run provenance.RunContext, materials ...provenance.Dependency) ([]byte, error) {
 	if plan.Environment.GitHubDevelopment {
 		if _, _, _, err := developmentRun(plan, run); err != nil {
 			return nil, err
@@ -471,11 +485,19 @@ func productionPredicateForRun(plan *Plan, signing *definition.Signing, run prov
 			"run plan carries no definition digest to attest; recompile it with signing configured")
 	}
 	dependencies := resolvedDependencies(plan)
+	if _, err := declaredDerivedDependencies(plan, materials); err != nil {
+		return nil, err
+	}
+	dependencies = append(dependencies, materials...)
 	if err := requirePinnedToolDependencies(plan, dependencies); err != nil {
 		return nil, err
 	}
+	buildType := productionBuildType(plan)
+	if len(materials) != 0 {
+		buildType = provenance.BuildTypeWrappedBuild
+	}
 	return provenance.MarshalProduction(provenance.ProductionPredicate(run, provenance.ProductionInputs{
-		BuildType:            productionBuildType(plan),
+		BuildType:            buildType,
 		PlanDigest:           planDigest,
 		RunPlanReference:     plan.Name,
 		DefinitionDigest:     plan.DefinitionDigest,
@@ -498,7 +520,8 @@ func factoryRunContext(planDigest string, startedOn, finishedOn time.Time) (prov
 	return provenance.NewGitHubRunContext(provenance.OSEnvLookup, startedOn, finishedOn)
 }
 
-// productionBuildType classifies the whole plan. A wrapped/networked build
+// productionBuildType classifies the ordinary producer set. Derived materials
+// separately classify their own publication predicate as wrapped. A wrapped/networked build
 // prevents a hermetic claim even when another build builds offline; a pinned-tool
 // build runs an upstream release entrypoint, so it is wrapped too (ADR-27 §7). A
 // plan without build nodes only acquired existing artifacts.

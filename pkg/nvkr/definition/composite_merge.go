@@ -77,7 +77,9 @@ func mergeComposite(compositePath string, metadata Metadata, admitted []Admitted
 					return Definition{}, nil, e.Wrap(e.CodeInvalidCatalog, err, "composite member %q output %q catalog", member.Name, output.Name)
 				}
 			}
-			output.Catalog = &outputStack
+			if output.Derived == nil {
+				output.Catalog = &outputStack
+			}
 			effective.Outputs = append(effective.Outputs, output)
 		}
 	}

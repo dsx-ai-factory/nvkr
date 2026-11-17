@@ -78,7 +78,9 @@ structured identity hashed through the ADR-01 codec under a new family, proposed
 | Publication mode, repository, workflow identity and production/development class | Environment via Plan | Origin admissibility; development never satisfies production or the reverse |
 | Signer identity and issuer policy | Environment | The prior output must verify under the current signer policy |
 
-The key excludes the Run ID, attempt, timestamps, runner hostnames, transport locators and registry hosts. Any
+For release-derived outputs, the key additionally binds the derivation encoding, publication prefix and
+exact described sibling identities and reuse keys. A different destination cannot reuse derived bytes.
+For ordinary payloads the key excludes the Run ID, attempt, timestamps, runner hostnames, transport locators and registry hosts. Any
 unrecognized or missing field makes the output ineligible. Equality of two reuse keys is necessary for
 eligibility and never sufficient for acceptance (§3).
 

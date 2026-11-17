@@ -15,7 +15,7 @@ import (
 
 // This opt-in integration authenticates the source-owned chart pin set through
 // actual Git acquisition. Static completeness is not runtime admission or a
-// successful runtime build. Ordinary tests still require 69 declared outputs and
+// successful runtime build. Ordinary tests still require 70 declared outputs and
 // independently load/resolve/compile all 24 native image rows.
 func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	t.Chdir("../../..")
@@ -24,7 +24,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(authored.Outputs) != 69 {
+	if len(authored.Outputs) != 70 {
 		t.Fatal("required output membership changed")
 	}
 	declaredImages := 0
@@ -82,6 +82,12 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	graphs := 0
 	for _, output := range authored.Outputs {
 		t.Run(output.Name, func(t *testing.T) {
+			if output.Derived != nil {
+				if _, found := builds[output.Name]; found {
+					t.Fatal("derived inventory must not invent a source Build")
+				}
+				return
+			}
 			if len(output.Platforms) != 0 {
 				for _, platform := range output.Platforms {
 					build, ok := builds[output.Name+"/"+platform]

@@ -51,7 +51,7 @@ func addSigningDataflow(plan *Plan, runsOn string, route Route,
 		signInputs = []string{id, referenceID}
 	}
 	verifyInputs := []string{referenceID, "signature/" + route.Name}
-	if PerOutputPublication(plan) {
+	if PerOutputPublication(plan) || hasDerivedOutputs(plan) {
 		verifyInputs = append(verifyInputs, "predicate/"+route.Name)
 	}
 	if signing.Mode == SigningModeCosign {

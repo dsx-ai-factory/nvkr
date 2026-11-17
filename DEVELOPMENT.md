@@ -97,7 +97,7 @@ resume capabilities. The [demo index](demos/README.md) provides bounded generati
 journeys with their prerequisites.
 
 The bundle records its selected Definition and Environment in `.github/nvkr-run/plan.json`.
-The maintained release selection is the 69-output [M2 candidate](inputs/definitions/nvke/README.md), including
+The maintained release selection is the 70-output [M2 candidate](inputs/definitions/nvke/README.md), including
 plain and public-bootstrap FDE disks for both native architectures. The separate
 [FDE diagnostic workflow](inputs/definitions/diagnostics/fde.md) selects one build-only disk for branch iteration.
 Regenerate with the intended selection after changing its inputs or generator code:

@@ -24,13 +24,27 @@ This ADR fixes the target-configuration surface and the emitted publish phase.
 
 ## Decision
 
-### 1. Targets are operator/transport configuration — never part of the build identity
+### 1. Payload identity is destination-free; derived outputs are publication-bound
 
 Publishing the same verified artifact bytes to *different* registries preserves their **artifact digests**;
 only the location differs. This makes no claim that two executions reproduce identical bytes. Target registries
 and repositories are **environment configuration**, declared **outside producer instructions** and **excluded from `buildDigest`**,
 because they are transport rather than a build input. This preserves define-once / publish-many and
-cross-environment byte-identity.
+cross-environment byte-identity for ordinary payload outputs.
+
+The bounded exception is an explicitly declared release-derived inventory (`aicr-inventory-v1`), delivered as
+`bundle-oci`. Its `nvkr.build` identity hashes a tagged canonical derivation binding: encoding, exact
+publication repository prefix and sorted sibling names, formats and logical Build Digests. Observed package
+digests are runtime dataflow, not retroactive logical identity. Derivation authenticates every named sibling
+package and uses the same inventory projection as release export, then emits a deterministic archive with
+one regular `artifacts/inventory.yaml` file. It reads neither the registry nor the Release.
+
+A publication block is mandatory; missing publication and development attempt relocation fail capability
+admission before work. The destination must be fixed at Plan compilation. A different prefix requires a new
+derivation, Build Digest, evidence and publication; copying or rewriting an old inventory does not authorize
+new locations. Other Environment changes remain bound by Environment and Plan identity. This exception
+does not change source producer identities, signing policy, credentials or the downstream deployment boundary.
+Catalog and installer derivations are deferred. This member is artifact bytes, not an ADR-31 description.
 
 ### 2. Target configuration surface
 

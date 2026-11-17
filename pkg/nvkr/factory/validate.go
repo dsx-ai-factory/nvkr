@@ -138,6 +138,9 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 
 	requiredBuilds := len(plan.Definition.InternalTools)
 	for _, output := range plan.Definition.Outputs {
+		if output.Derived != nil {
+			continue
+		}
 		requiredBuilds += len(nativeOutputSelections(output))
 	}
 	if len(plan.Builds) != requiredBuilds {

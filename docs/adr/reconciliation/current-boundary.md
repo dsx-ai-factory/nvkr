@@ -85,7 +85,7 @@ contracts and retained-disk diagnostics exist, but a successful real native NVKE
 has not been demonstrated. Qualified release authorization, full v1 qualification/tag/revocation automation,
 qualified provider adapters, secret-valued encrypted VM execution and air-gap operation remain unavailable.
 
-The maintained M2 candidate selects 69 named outputs, retaining the previous 37 and adding CAPNICo,
+The maintained M2 candidate selects 70 named outputs, including the release-derived inventory, retaining the previous 37 and adding CAPNICo,
 explicitly named reference-profile fixtures, the provisioned infrastructure provider, NVKE telemetry pipelines and native bootstrap/telemetry
 images. Both native architectures retain plain and public-bootstrap FDE disks. Native ARC publication admits those disks only with explicit
 `build-provenance-v1`: actual producer encryption, wrapper annotations, signed disk metadata and expected

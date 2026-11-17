@@ -141,6 +141,7 @@ func PrepareExactInputs(definition Definition, environment Environment, plan *fa
 	frozenOutputs := make([]factory.LifecycleOutputPlan, len(plan.LifecycleOutputs))
 	for index, output := range plan.LifecycleOutputs {
 		frozenOutputs[index] = output
+		frozenOutputs[index].Derived = output.Derived.Clone()
 		frozenOutputs[index].Components = append([]string(nil), output.Components...)
 		frozenOutputs[index].ImageIndex = output.ImageIndex.Clone()
 	}

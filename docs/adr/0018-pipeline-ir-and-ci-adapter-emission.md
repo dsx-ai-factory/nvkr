@@ -58,7 +58,11 @@ retains its own producer results and evidence obligations; the aggregate binds t
 No authored reusable producer group, recipe selection, criteria matcher, mixin or recipe layer participates. The BuildDigest
 identifies the selected executable producer closure and excludes the output name, packaging and transport.
 Two named outputs with equal BuildDigest retain independent executions, results and evidence obligations.
-Existing Helm image-output dependencies remain explicit packaging edges. Run-plan and artifact-graph v5 contain no cluster-composition nodes or records. Compiler handoff documents
+Existing Helm image-output dependencies remain explicit packaging edges. ADR-20 inventory derivation adds
+a package node downstream of every selected sibling package. Its transferred inputs include the exact
+sibling packages and producer records needed to authenticate them independently. It runs in process without
+network access or a new runner class. Derived outputs use ADR-20 publication-bound identity; ordinary
+producer Build Digests retain the exclusions above. Run-plan and artifact-graph v5 contain no cluster-composition nodes or records. Compiler handoff documents
 are removed; the complete Plan retains the exact authored Definition and Environment.
 
 The Plan retains its base catalog snapshot and each output's selected catalog snapshot, checked against their

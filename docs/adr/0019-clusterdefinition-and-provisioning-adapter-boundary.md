@@ -22,7 +22,7 @@ an implemented provisioning consumer or runtime-compatibility proof.
 ### 1. Definition owns required outputs
 
 A Definition selects named outputs, their exact producers, concrete target platforms, artifact formats and
-byte-changing packaging relationships. There is no authored cluster view, tenant/operator type, node role,
+byte-changing packaging relationships, including an explicit inventory describing named sibling outputs. There is no authored cluster view, tenant/operator type, node role,
 role affinity, deployment category, cluster context, CNI declaration or cluster validation-requirement list.
 Different deliverable sets can use separate Definitions. No replacement grouping object is introduced.
 [ADR-26](0026-definition-composition.md) designs a composite Definition, implemented and contract-tested only,
@@ -48,6 +48,11 @@ cannot appear as one of its own content members. Consumers authenticate and reco
 before accepting outputs. Diagnostic output pulling separately checks the complete metadata membership and
 selected payload integrity without granting signature or policy acceptance (ADR-20). Names inside publication
 records cannot select arbitrary destination paths.
+
+A release-derived inventory is a required artifact member. It embeds references and digests of explicitly
+selected ordinary chart and image siblings after authenticating their packages, before publication. It never
+describes itself, another derived member, the release index or the publication root. The enclosing Release
+remains noncircular, and failure to derive, publish or verify the inventory fails completeness.
 
 No cluster composition or realization is emitted or published. Definition v5, Run/Release v4 and publication
 root v4 reject earlier topology-bearing fields rather than dropping them during decoding. Retired cluster
@@ -124,9 +129,11 @@ records are retained without translating component names into deployment roles o
 Multiple repositories and revisions remain distinct facts; a consumer decides which combination it accepts.
 No Plan, mapping file or producer workspace is required alongside the pinned publication reference.
 
-Consumers own artifact selection, deployment-role mapping, installer formats, source compatibility and
-offline dependency completeness. These concerns do not become new Definition fields or an NVKR-owned
-installation schema. The description reports metadata inspection separately from the publisher's declared
+Consumers own deployment-role mapping, installer formats, source compatibility and offline dependency
+completeness. NVKR admits an explicit named-output selection and the versioned AICR inventory encoding as
+a byte-changing packaging relationship. This inventory contains artifact facts, not topology, values or
+installation order. Fully rendered catalogs and seed/site bundles remain deferred; their deployment content
+belongs to pinned downstream source. These concerns do not become an NVKR-owned installation schema. The description reports metadata inspection separately from the publisher's declared
 qualification and establishes no payload, signature, installation or release-policy acceptance. It owns no
 new build or release identity. See [release navigation](../release-navigation.md) for the data contract and
 the [NVKE handoff reference](../nvkr-to-nvke-demo.md) for that consumer's separate deployment boundary.

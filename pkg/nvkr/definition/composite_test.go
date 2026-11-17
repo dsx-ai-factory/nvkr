@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -25,6 +26,27 @@ func compositeMemberFixture(name string, outputs ...string) Definition {
 		definition.Outputs = append(definition.Outputs, DefinitionOutput{Name: output, Platform: "linux/amd64", Components: []string{output}, Format: OutputExecutable})
 	}
 	return definition
+}
+
+func TestCompositeDerivedInventoryMember(t *testing.T) {
+	root, composite := compositeFixture(t)
+	member := compositeMemberFixture("alpha", "alpha-image")
+	member.Outputs[0].Format = OutputOCI
+	member.Outputs = append(member.Outputs, DefinitionOutput{Name: "inventory", Platform: "linux/amd64", Format: OutputBundle, Derived: &derivedoutput.Selection{Encoding: derivedoutput.InventoryV1, Outputs: []string{"alpha-image"}}})
+	writeCompositeFile(t, filepath.Join(root, "defs", "alpha.yaml"), member)
+	composite.Members[0] = memberPin(t, "alpha", "alpha.yaml", member)
+	writeCompositeFile(t, filepath.Join(root, "defs", "composite.yaml"), composite)
+	admitted, err := LoadComposite(t.Context(), root, "defs/composite.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	effective := admitted.Effective()
+	if err := effective.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if effective.Outputs[2].Derived == nil || effective.Outputs[2].Catalog != nil {
+		t.Fatal("composition changed the source-less derivation")
+	}
 }
 
 func writeCompositeFile(t *testing.T, name string, value any) {

@@ -55,7 +55,10 @@ must be covered by the terminal node, and the full graph is validated before ide
 The generated graph uses `nvkr.dev/ir/v4`; its transport-independent logical projection is identified under
 `nvkr.build` (ADR-01/02). An unrelated catalog producer cannot change the selected graph's identity. Changing
 selected membership, target, pins or output-affecting instructions must change it.
-Output labels, packaging and Environment settings remain outside build identity and inside their owning records.
+For ordinary payloads, output labels, packaging and Environment settings remain outside build identity
+and inside their owning records. ADR-20 separately binds the encoding, prefix and named sibling Build
+identities of a release-derived inventory. Its declared package dependencies are explicit acyclic Plan edges;
+resolution cannot add a sibling or treat an equal-digest sibling as the selected use.
 Deployment categories, node roles and cluster composition are removed rather than transported as unused metadata.
 
 For an image index, the compiler expands the single named output into independent native producer uses

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# Maintained policy for the 69-output candidate, reviewed with the generated workflows.
+# Maintained policy for the 70-output candidate, reviewed with the generated workflows.
 # Pins are independent of producer artifacts. Real producer/hosted acceptance follows merge.
 # cosign v3.1.3 binaries match the official release assets and cosign_checksums.txt:
 # https://github.com/sigstore/cosign/releases/tag/v3.1.3
@@ -32,6 +32,10 @@ smoke:
   # Their signatures, provenance and membership remain required; any authored embedded metadata is checked strictly.
   # Helm and disk outputs have their own fixed non-tool format rule and are not listed here.
   nonToolOutputs:
+    - output: aicr-inventory
+      kind: bundle-oci
+      components: []
+      reason: derived-inventory
     - output: capi-controller-image
       kind: oci
       components: [capi-controller-image]

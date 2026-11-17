@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/name"
 )
@@ -35,10 +36,11 @@ type PublicationDescription struct {
 
 type PublicationOutput struct {
 	Output
-	Publication      *PublicationOrigin `json:"publication,omitempty"`
-	ArtifactType     string             `json:"artifactType"`
-	DescriptorDigest string             `json:"descriptorDigest"`
-	BuildSubjects    []BuildSubject     `json:"buildSubjects"`
+	DerivedMaterials []derivedoutput.Material `json:"derivedMaterials,omitempty"`
+	Publication      *PublicationOrigin       `json:"publication,omitempty"`
+	ArtifactType     string                   `json:"artifactType"`
+	DescriptorDigest string                   `json:"descriptorDigest"`
+	BuildSubjects    []BuildSubject           `json:"buildSubjects"`
 	// ChartArchiveDigest is the Helm content-layer digest checked against the
 	// publication binding. It describes the compressed .tgz, not the manifest.
 	ChartArchiveDigest string `json:"chartArchiveDigest,omitempty"`
@@ -141,7 +143,8 @@ func publicationDescription(reference string, inspection Inspection, outputs []O
 			chartArchiveDigest = object.BlobDigest
 		}
 		view.Outputs = append(view.Outputs, PublicationOutput{
-			Output: output, Publication: origin, ArtifactType: object.ArtifactType, DescriptorDigest: object.DescriptorDigest,
+			DerivedMaterials: append([]derivedoutput.Material(nil), object.Output.DerivedMaterials...),
+			Output:           output, Publication: origin, ArtifactType: object.ArtifactType, DescriptorDigest: object.DescriptorDigest,
 			BuildSubjects:      append([]BuildSubject{}, object.Output.BuildSubjects...),
 			ChartArchiveDigest: chartArchiveDigest,
 		})
