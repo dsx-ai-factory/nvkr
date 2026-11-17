@@ -684,60 +684,70 @@ func TestRunLocalVMDryRunRemainsStaticAndSideEffectFree(t *testing.T) {
 }
 
 func TestLocalVMAdmissionPrecedesRuntimePreparationAndNodeWork(t *testing.T) {
-	root := t.TempDir()
-	t.Chdir(root)
-	plan, vmNode := compiledPackerVMNode(t)
-	options := withLocalDefaults(LocalRunOptions{Workspace: ".nvkr/vm-order", Jobs: 1})
-	var events []string
-	resolver := &fakeVMDriverResolver{executor: new(fakeVMDriverExecutor)}
-	resolver.onAdmit = func() {
-		if _, err := os.Stat(options.Workspace); !os.IsNotExist(err) {
-			t.Fatalf("resolver ran after workspace mutation: %v", err)
-		}
-		events = append(events, "driver-admission")
-	}
-	options.vmResolver = resolver
-	deps := localRunDeps{
-		makeDisk: admittedLocalDiskProducer,
-		admitVMBuilds: func(_ context.Context, admitted *Plan, workspace string) (map[string]vmAdmission, error) {
-			events = append(events, "vm-admission")
-			if admitted.workspace != workspace || workspace != options.Workspace {
-				t.Fatalf("admitted workspace = %q/%q", admitted.workspace, workspace)
+	for _, runtimeName := range []string{"", "podman"} {
+		t.Run("runtime="+runtimeName, func(t *testing.T) {
+			root := t.TempDir()
+			t.Chdir(root)
+			plan, vmNode := compiledPackerVMNode(t)
+			plan.Environment.Runtime.Runtime = runtimeName
+			digest, err := plan.Environment.Digest()
+			if err != nil {
+				t.Fatal(err)
 			}
-			return map[string]vmAdmission{vmNode.ID: new(fakeVMAdmission)}, nil
-		},
-		admitRunners: func(context.Context, *Plan, LocalRunOptions, []string) error {
-			events = append(events, "runner-admission")
-			return nil
-		},
-		prepareRunner: func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error) {
-			events = append(events, "runner-preparation")
-			return map[string]string{}, nil
-		},
-		executeNode: func(context.Context, *Plan, Node, LocalRunOptions, map[string]string) error {
-			events = append(events, "node-work")
-			return nil
-		},
-	}
-	result, err := runLocal(t.Context(), plan, options, deps)
-	if result != nil || factoryErrorCode(err) != e.CodeVerifyFailed || !strings.Contains(err.Error(), "invalid held disk payload identity") {
-		t.Fatalf("local VM result/error = %#v/%v", result, err)
-	}
-	wantPrefix := []string{"driver-admission", "vm-admission", "runner-admission", "runner-preparation", "node-work"}
-	if len(events) < len(wantPrefix) {
-		t.Fatalf("local VM events = %v", events)
-	}
-	for index, want := range wantPrefix {
-		if events[index] != want {
-			t.Fatalf("local VM event[%d] = %q, want %q; all events %v", index, events[index], want, events)
-		}
-	}
-	if _, err := os.Stat(filepath.Join(options.Workspace, "run.json")); !os.IsNotExist(err) {
-		t.Fatalf("failed local VM unexpectedly wrote run record: %v", err)
-	}
-	if resolver.calls != 1 || resolver.session == nil || resolver.plan == nil ||
-		resolver.config.Runtime != options.Runtime || !resolver.executor.closed {
-		t.Fatalf("VM resolver lifecycle = %#v", resolver)
+			plan.EnvironmentDigest = digest
+			options := withLocalDefaults(LocalRunOptions{Workspace: ".nvkr/vm-order", Jobs: 1})
+			var events []string
+			resolver := &fakeVMDriverResolver{executor: new(fakeVMDriverExecutor)}
+			resolver.onAdmit = func() {
+				if _, err := os.Stat(options.Workspace); !os.IsNotExist(err) {
+					t.Fatalf("resolver ran after workspace mutation: %v", err)
+				}
+				events = append(events, "driver-admission")
+			}
+			options.vmResolver = resolver
+			deps := localRunDeps{
+				makeDisk: admittedLocalDiskProducer,
+				admitVMBuilds: func(_ context.Context, admitted *Plan, workspace string) (map[string]vmAdmission, error) {
+					events = append(events, "vm-admission")
+					if admitted.workspace != workspace || workspace != options.Workspace {
+						t.Fatalf("admitted workspace = %q/%q", admitted.workspace, workspace)
+					}
+					return map[string]vmAdmission{vmNode.ID: new(fakeVMAdmission)}, nil
+				},
+				admitRunners: func(context.Context, *Plan, LocalRunOptions, []string) error {
+					events = append(events, "runner-admission")
+					return nil
+				},
+				prepareRunner: func(context.Context, *Plan, LocalRunOptions, []string) (map[string]string, error) {
+					events = append(events, "runner-preparation")
+					return map[string]string{}, nil
+				},
+				executeNode: func(context.Context, *Plan, Node, LocalRunOptions, map[string]string) error {
+					events = append(events, "node-work")
+					return nil
+				},
+			}
+			result, err := runLocal(t.Context(), plan, options, deps)
+			if result != nil || factoryErrorCode(err) != e.CodeVerifyFailed || !strings.Contains(err.Error(), "invalid held disk payload identity") {
+				t.Fatalf("local VM result/error = %#v/%v", result, err)
+			}
+			wantPrefix := []string{"driver-admission", "vm-admission", "runner-admission", "runner-preparation", "node-work"}
+			if len(events) < len(wantPrefix) {
+				t.Fatalf("local VM events = %v", events)
+			}
+			for index, want := range wantPrefix {
+				if events[index] != want {
+					t.Fatalf("local VM event[%d] = %q, want %q; all events %v", index, events[index], want, events)
+				}
+			}
+			if _, err := os.Stat(filepath.Join(options.Workspace, "run.json")); !os.IsNotExist(err) {
+				t.Fatalf("failed local VM unexpectedly wrote run record: %v", err)
+			}
+			if resolver.calls != 1 || resolver.session == nil || resolver.plan == nil ||
+				resolver.config.Runtime != plan.Environment.RuntimeBinary() || !resolver.executor.closed {
+				t.Fatalf("VM resolver lifecycle = %#v", resolver)
+			}
+		})
 	}
 }
 

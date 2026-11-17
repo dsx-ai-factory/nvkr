@@ -1,11 +1,6 @@
 ## Support by owner
 
-Container runtime selection shares one owner (`containerruntime`): omitted selection uses Docker,
-local Runs inherit their Environment, and conflicting overrides fail before workspace creation,
-including dry runs. Contract tests cover both dialects, executable paths, unsupported names and
-conflicting selections. Hosted helper tests cover omitted and explicit Docker/Podman selection;
-they use fake executables and establish no new runtime or provider acceptance. Engine-observed
-rootless user mapping remains deferred; existing dialect-specific user handling is unchanged.
+Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
 
 Tekton implements ADR-18's explicit cluster trust contract. The provider authenticates
 complete PipelineRun, TaskRun and PVC bindings and binds carrier bytes to successful task results. Controlled

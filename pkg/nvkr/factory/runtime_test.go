@@ -175,6 +175,9 @@ func TestRuntimeSelectionIdentityBoundaries(t *testing.T) {
 	if implicit.Environment.RuntimeBinary() != "docker" || implicit.Environment.Runtime.Runtime != "" {
 		t.Fatal("default must resolve without rewriting authored bytes")
 	}
+	if err := AdmitLocal(t.Context(), implicit, LocalRunOptions{Workspace: ".nvkr/runtime-identity", DryRun: true}); err != nil {
+		t.Fatal(err)
+	}
 	after, err := implicit.Digest()
 	if err != nil || before != after {
 		t.Fatalf("selection mutated Plan identity: %v", err)
