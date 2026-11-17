@@ -553,6 +553,12 @@ func generationOperatorToolsFixture(t *testing.T, publicationMode string) (*fact
 	for name, pin := range maintained.CatalogSnapshot.Tools {
 		base.Tools[name] = pin
 	}
+	base.ToolPlatforms = maps.Clone(maintained.CatalogSnapshot.ToolPlatforms)
+	base.Sources = maps.Clone(base.Sources)
+	for name := range base.ToolPlatforms {
+		delete(base.Tools, name)
+		base.Sources[name] = maintained.CatalogSnapshot.Sources[name]
+	}
 	base.Actions = maps.Clone(maintained.Actions)
 	stack, err := catalog.ApplyStack(&base)
 	if err != nil {

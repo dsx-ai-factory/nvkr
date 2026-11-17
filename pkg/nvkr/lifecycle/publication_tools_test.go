@@ -35,7 +35,11 @@ func TestCatalogToolsAndDerivedPublication(t *testing.T) {
 	}{
 		{"valid", func(_ *Definition, _ *Environment) {}, ""},
 		{"unknown scanner", func(d *Definition, _ *Environment) { d.SBOMTool = "missing-scanner" }, e.CodeUnpinnedSource},
-		{"wrong platform", func(_ *Definition, v *Environment) { v.UtilityPlatform = "linux/arm64" }, e.CodeEngineCapability},
+		{"arm64 scanner", func(_ *Definition, v *Environment) { v.UtilityPlatform = "linux/arm64" }, ""},
+		{"signer missing platform", func(_ *Definition, v *Environment) {
+			v.UtilityPlatform = "linux/arm64"
+			v.Signing = &Signing{Mode: "cosign", Identity: "builder", Issuer: "issuer"}
+		}, e.CodeEngineCapability},
 		{"missing signer selection", func(d *Definition, v *Environment) {
 			d.CosignTool = ""
 			v.Signing = &Signing{Mode: "cosign", Identity: "builder", Issuer: "issuer"}
@@ -75,6 +79,10 @@ func TestCatalogToolsAndDerivedPublication(t *testing.T) {
 				}
 				if node.ID == "tool/"+d.SBOMTool {
 					found = true
+					pin, err := plan.CatalogSnapshot.SelectTool(d.SBOMTool, v.UtilityPlatform)
+					if err != nil || node.ExecutableDigest != pin.ExecutableDigest {
+						t.Fatalf("scanner does not bind %s pin: %+v, %v", v.UtilityPlatform, node, err)
+					}
 				}
 			}
 			if !found {

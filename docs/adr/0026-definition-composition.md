@@ -1,16 +1,14 @@
 # ADR-26 — Definition composition
 
-- **Decision status:** Proposed (design only; pending named-decider ratification)
-- **Implementation maturity:** U1–U8 implemented; U9 waits on the result-reuse decision and U10
-  on the publication, consumer-verification and equivalence gates below. `reconciliation/README.md` records the implemented scope.
+- **Decision status:** Accepted (2026-11-14)
+- **Implementation maturity:** U1–U8 implemented; U9 waits on result-reuse implementation and cross-workflow origin
+  admission; U10 waits on the publication, consumer-verification and equivalence gates below. `reconciliation/README.md` records the implemented scope.
 - **Acceptance-test maturity:** Contract suites for U1–U8, including an opt-in extended identity-invariance
   contract over the four NVKE families. The [hosted composite publication record](reconciliation/adr-26.md#hosted-gpu-site-publication)
   owns external execution evidence and its consumer-acceptance and qualification limits.
-- **Deciders:** Pending; release-engineering, publication, catalog and qualification owners must be named before
-  ratification.
-- **Index:** Proposed ADR-26 supplements ADR-01–22 and proposed ADR-23/24; it remains outside the consolidated
-  contract set until accepted. It coordinates with the separately drafted authenticated result-reuse decision,
-  proposed [ADR-30](0030-authenticated-result-reuse.md) (backlog item 4).
+- **Deciders:** njhensley
+- **Index:** ADR-26 in the consolidated NVKR ADR set. It coordinates with the authenticated result-reuse decision,
+  [ADR-30](0030-authenticated-result-reuse.md) (backlog item 4).
 - **Relates to:** ADR-01 (canonical codec and digest families), ADR-03 (coded errors), ADR-04 §5 (consumer
   verification), ADR-09 (production provenance), ADR-11 §1–§2 (direct selection, independent output uses),
   ADR-12 (target platforms), ADR-16 §5 (evidence lanes and qualification), ADR-17 §1 and §6 (public lifecycle,
@@ -205,17 +203,17 @@ one is the existing coded failure, admitted before output work wherever the exis
 
 ### 6. Reusing already-published member Releases: only through authenticated acceptance, a planned follow-up
 
-Decided: composites rebuild every output until the authenticated result-reuse decision (draft ADR-30,
-backlog item 4) lands. Cross-workflow reuse of member outputs is then planned as follow-up unit U9.
+Decided: composites rebuild every output until authenticated result reuse under ADR-30 is implemented and
+admitted. Cross-workflow origin admission for member outputs remains planned as follow-up unit U9.
 
 In this decision every composite Run builds every output. No member Release, family Run or prior publication
 supplies a composite output, and no authored field selects one. A future authored reuse selection fails with
 `engine-capability` before work until the conditions below are implemented.
 
-Reuse of a member's published outputs must go through the authenticated result-reuse decision being drafted as
-backlog item 4, never through a composite-specific shortcut. That draft keys reuse on the exact named output,
+Reuse of a member's published outputs must go through the authenticated result-reuse decision,
+ADR-30 (backlog item 4), never through a composite-specific shortcut. ADR-30 keys reuse on the exact named output,
 binds the publication repository, workflow identity and signer policy into the key, and issues an owner-held
-acceptance receipt only after re-authenticating the complete payload and evidence closure. As drafted, a family
+acceptance receipt only after re-authenticating the complete payload and evidence closure. Under ADR-30, a family
 Release is therefore **incompatible** with a composite Run: its workflow, signer identity and namespace differ.
 Composite reuse requires that decision to admit an explicit, authored cross-workflow origin, and it must keep:
 
@@ -461,7 +459,7 @@ not only failure, and are table-driven.
 | U6 Run and publication records | `pkg/nvkr/lifecycle`, `pkg/nvkr/delivery` | Run-record and publication-root schema majors with composition binding and per-output attribution; release description export | U3 |
 | U7 Consumer view | `pkg/nvkr/lifecycle`, `client/v1` | Composite exact-input expectation, member-set requirement, cross-form refusal | U6 |
 | U8 Hosted qualification | ADR-16/21 owners | Bind complete composition into handoff, artifact checks, native smoke, qualification evidence and release manifest; explicit per-run policies and isolated workflow pairs | U6 |
-| U9 Follow-up: member Release reuse | result-reuse owner | Cross-workflow origin admission in the reuse decision, §6 and §7 | draft ADR-30 (backlog item 4) landing |
+| U9 Follow-up: member Release reuse | result-reuse owner | Cross-workflow origin admission in the reuse decision, §6 and §7 | ADR-30 result-reuse implementation and cross-workflow origin admission |
 | U10 Cutover: retire combined `definition.yaml` | NVKE release owner | Move the combined production, development and qualification paths to the composite; retire the combined bundles and input | U5–U8; hosted composite Run and consumer verification |
 
 Acceptance tests per unit:
@@ -563,7 +561,7 @@ Acceptance tests per unit:
 - **ADR-20:** record the composition binding in publication-root metadata (U6).
 - **ADR-21:** enroll composite bundles in maintenance and drift checks, and admit named composite development
   bundles (U5).
-- **Result reuse (draft ADR-30, backlog item 4):** once it lands, add authored cross-workflow origin admission
+- **Result reuse (ADR-30):** after result-reuse implementation, add authored cross-workflow origin admission
   for member outputs (U9). Until then composites rebuild every output.
 - **NVKE cutover:** retire the combined `definition.yaml` and its bundles after a hosted composite Run and
   independent consumer verification succeed (U10).
@@ -575,7 +573,8 @@ The questions left open by the first draft were decided on 2026-10-29:
 1. Error codes: reuse `invalid-catalog`, `unverified-ref`, `engine-capability` and `timeout`; no new ADR-03 band (§11).
 2. Cross-member pin divergence: rejected unless the composite declares a variant naming the component and both
    members (§1, §3); every undeclared divergence fails.
-3. Cross-workflow reuse: a follow-up after draft ADR-30 lands; composites rebuild everything until then (§6, U9).
+3. Cross-workflow reuse: a follow-up requiring ADR-30 result-reuse implementation and origin admission;
+   composites rebuild everything until then (§6, U9).
 4. Combined `definition.yaml`: a separate cutover gated on a hosted composite Run and consumer verification (U10).
 5. Development bundles: pulled forward into U5 (§9). On 2026-11-04 the fixed development layout was opened to
    composites so the GPU site composite can use the already registered `nvkr-dev.yml` workflow (§9).

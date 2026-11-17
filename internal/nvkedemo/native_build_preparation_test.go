@@ -385,7 +385,7 @@ printf '%s\n' clang`,
 	for _, tool := range []string{"jq", "git", "bash"} {
 		writeTenantFixture(t, filepath.Join(bin, tool), []byte("#!/bin/sh\nexit 99\n"), 0700)
 	}
-	pluginPin, err := loaded.ToolForPlatform("packer-plugin-qemu", "darwin/arm64")
+	pluginPin, err := loaded.SelectTool("packer-plugin-qemu", "darwin/arm64")
 	if err != nil {
 		t.Fatal(err)
 	}

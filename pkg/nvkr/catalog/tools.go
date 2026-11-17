@@ -182,17 +182,14 @@ func (pin ToolPin) ArchiveMember(ctx context.Context, archive []byte, member str
 }
 
 func checkToolPin(source *ToolSource, pin Pin) error {
+	if source != nil && source.Platforms != nil || pin.Tools != nil {
+		return checkPlatformToolPins(source, pin)
+	}
 	if source == nil {
-		if pin.Tool != nil || pin.Tools != nil {
+		if pin.Tool != nil {
 			return e.New(e.CodeInvalidCatalog, "orphan tool pin")
 		}
 		return nil
-	}
-	if source.Platforms != nil {
-		return checkPlatformToolPins(*source, pin)
-	}
-	if pin.Tools != nil {
-		return e.New(e.CodeInvalidCatalog, "single-platform source cannot carry platform tool pins")
 	}
 	if pin.Tool == nil {
 		return e.New(e.CodeUnpinnedSource, "tool source %q requires release asset pinning", pin.Tag)
@@ -207,14 +204,13 @@ func checkToolPin(source *ToolSource, pin Pin) error {
 	}
 	return validateToolPin(*pin.Tool)
 }
-func resolveToolPin(ctx context.Context, source ToolSource, pin Pin) (ToolPin, error) {
-	client := &http.Client{Timeout: 5 * time.Minute, CheckRedirect: func(req *http.Request, via []*http.Request) error {
+func toolHTTPClient() *http.Client {
+	return &http.Client{Timeout: 5 * time.Minute, CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if req.URL.Scheme != "https" || len(via) >= 10 {
 			return e.New(e.CodeFetchFailed, "unsafe tool redirect")
 		}
 		return nil
 	}}
-	return resolveToolWithClient(ctx, source, pin, client)
 }
 func resolveToolWithClient(ctx context.Context, source ToolSource, pin Pin, client *http.Client) (ToolPin, error) {
 	if err := pinContextError(ctx); err != nil {

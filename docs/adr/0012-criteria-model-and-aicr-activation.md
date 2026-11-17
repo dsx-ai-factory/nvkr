@@ -1,11 +1,11 @@
 # ADR-12 — Target platforms
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-12 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-11 (direct producer selection), ADR-05 (ReleaseSet / Inventory), ADR-14 (delivery), ADR-10 (builder
   types), ADR-19 (deployment topology boundary).
@@ -29,8 +29,21 @@ An OCI output may instead declare `platforms`, a nonempty sorted unique subset o
 domain. It is mutually exclusive with `platform` and selects exactly one image component. The single public
 output is a standard OCI image index whose concrete native children exhaust that frozen set; no
 `platform: multi`, architecture inference, or extra attestation descriptor is admitted. A chart referring to
-this output must declare a platform contained in the required set. Executable outputs remain separate named
-native artifacts; the image-index contract does not create an executable aggregate.
+this output must declare a platform contained in the required set.
+
+A `format: executable` output may also declare `platforms`: a nonempty, sorted, unique subset of
+`linux/amd64` and `linux/arm64`, mutually exclusive with `platform`. Every selected component must support
+every platform in the set. Each platform derives the same native closure as a single-platform output;
+one index package node joins every child's exact results and evidence. Each child retains its own Build
+Digest, producer results, observations and evidence obligations. Several components may be selected, with
+all selected components delivered in each child. Equal child Build Digests across named outputs authorize
+no reuse. A one-element `platforms` set still selects an index; `platform` retains the Binary Bundle.
+
+This executable-index contract applies to `static-unqualified` and `pipeline-attested`; its implementation
+is deferred under ADR-28 E1–E8. The current runtime continues to reject executable `platforms` with
+`invalid-catalog`; accepting the contract does not enable it. Darwin children are excluded, qualification
+over an index requires E7, and the qualified lane remains deferred. See ADR-28 for packaging, identity,
+evidence and consumption, and [the ledger](reconciliation/adr-28.md) for implementation status.
 
 The Darwin exception admits HTTPS executable acquisition and CGO-free `oci-hermetic` host-package or
 tarball producers. Its payload target is `darwin/arm64`; its explicit `toolchainPlatform` is `linux/arm64`.

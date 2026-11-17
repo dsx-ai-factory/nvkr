@@ -240,14 +240,35 @@ func TestGitHubPartitionMaintainedCapacity(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertGitHubPartitionMembership(t, plan, entry, workers)
+	if err := validateGitHubWorkflowSize(entry); err != nil {
+		t.Fatal(err)
+	}
 	maxBytes := len(entry)
-	for _, child := range workers {
+	flatEvents, err := countGitHubWorkflowYAMLNodes(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	maxEvents, err := countGitHubWorkflowYAMLNodes(entry)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, child := range workers {
+		if err := validateGitHubWorkflowSize(child); err != nil {
+			t.Fatalf("worker %s: %v", name, err)
+		}
 		maxBytes = max(maxBytes, len(child))
+		events, err := countGitHubWorkflowYAMLNodes(child)
+		if err != nil {
+			t.Fatalf("worker %s: %v", name, err)
+		}
+		maxEvents = max(maxEvents, events)
 	}
-	t.Logf("single Run: entry %d bytes, %d workers, largest file %d bytes", len(entry), len(workers), maxBytes)
-	if maxBytes >= len(raw) {
-		t.Fatal("partitioning did not reduce maximum workflow size")
+	// Native grouping can make a worker larger in bytes than the flat file.
+	// Partitioning must still reduce the parser-event count that binds first.
+	if maxEvents >= flatEvents {
+		t.Fatalf("partitioning did not reduce maximum parsing events: flat %d, partitioned %d", flatEvents, maxEvents)
 	}
+	t.Logf("single Run: flat %d bytes/%d events, entry %d bytes, %d workers, maximum bytes %d, maximum events %d", len(raw), flatEvents, len(entry), len(workers), maxBytes, maxEvents)
 }
 
 func TestGitHubPartitionDependenciesCrossSigningBoundary(t *testing.T) {

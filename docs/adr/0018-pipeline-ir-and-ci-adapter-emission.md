@@ -1,11 +1,11 @@
 # ADR-18 — Pipeline IR & CI-adapter emission (hermetic execution)
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-18 in the consolidated NVKR ADR set (added to close the Definition→realized-pipeline gap).
 - **Relates to:** ADR-02 (IR), ADR-10 (builder types), ADR-07 (builder profile / runner-digest pin), ADR-04
   (verify), ADR-19 (deployment ownership boundary).
@@ -197,7 +197,13 @@ execute a producer reference from the complete Plan through `factory execute-nod
 
 Jobs use generic hosted runners except the explicit native ARC disk policy below. With `runsOn`
 unset and no ARC policy selected, ordinary native ARM64 producer fetch/acquisition/build operations select `ubuntu-24.04-arm`;
-AMD64 producers and utility operations retain `ubuntu-latest`. An explicit `runsOn` overrides
+AMD64 producers and legacy single-platform utility operations retain `ubuntu-latest`.
+An Environment may enable native output utilities with `utilityContainers`, a platform-to-digest-pinned-image
+map covering every output platform and the default `utilityPlatform`. The default entry must equal
+`utilityContainer`. Observation, SBOM generation, packaging and publication-package preparation select
+the output platform; aggregate packages, attestation, signing and publication retain `utilityPlatform`.
+Missing platforms fail capability admission before catalog resolution or output. The omitted map preserves
+legacy Plan bytes. Native utility operations use the same default hosted platform routing as producers. An explicit `runsOn` overrides
 this default; a VM execution binding and the complete native ARC routing projection keep their existing
 precedence. This is deterministic hosted routing, not runtime platform/capacity proof or
 qualified execution. The same-Run, source-bootstrapped `nvkr-exec` helper launches each pinned toolchain container
@@ -573,7 +579,7 @@ yet project that setting. Empty preserves the runtime's existing store selection
 
 The observed Podman identity includes UID/GID mappings, remote-service status and OCI runtime name in
 addition to the existing host, storage, security and version fields. Adding these fields changes the
-`nvkr.runtime-identity/v1` preimage; this pre-ratification implementation does not translate older identities
+`nvkr.runtime-identity/v1` preimage; this implementation does not translate older identities
 or prove compatibility with previously recorded qualification profiles.
 
 For native multi-architecture pipeline-attested Runs, `Environment.githubRunners` maps each explicit
@@ -586,8 +592,13 @@ and `ubuntu-24.04` for AMD64, and `ubuntu-22.04-arm` and `ubuntu-24.04-arm` for 
 
 The adapter resolves routes from the already admitted execution view without changing producer IR or logical
 Build identity. Route selections remain bound to Environment and complete Plan identity. Producer jobs use
-their target-platform route; utility, acquisition-tool, signing and publication operations use their utility
-platform route. Each configured native job checks its realized kernel OS/architecture before checkout or
+their target-platform route. With `utilityContainers`, output utility operations use that same native
+route and a separately pinned scanner acquisition for each required platform. Signing, attestation and
+publication retain the default utility platform route. Scanner selection is checked again when executing
+and authenticating SBOMs; a same-name scanner for another architecture cannot satisfy the edge.
+Catalog and Environment changes alter the Plan identity, while producer instructions and Build Digests
+remain unchanged. ARM64 dependency SBOMs record the ARM64 scanner executable digest; scanner inventory
+equivalence and payload-byte equivalence require separate execution evidence. Each configured native job checks its realized kernel OS/architecture before checkout or
 helper use. Bootstrap builds a separate static Linux helper with explicit `GOOS`/`GOARCH` for each route;
 transport pairs each job with that route's helper. The execution entrypoint checks its own native helper
 platform against the exact Plan before work. Before build execution, the pipeline owner checks the
@@ -1023,7 +1034,7 @@ Every admitted Run retains component operations and an **unconditional terminal 
 same failure behavior before it is admitted. Equal logical build identities do not collapse named output executions
 or their evidence slots. The current Definition path performs no general reuse of prior builds or verification;
 any future reuse needs an authenticated prior result bound to the exact output, members, policy, status and time.
-Proposed ADR-30 designs that pipeline-attested contract, including a distinct `reused` execution outcome and one
+ADR-30 designs that pipeline-attested contract, including a distinct `reused` execution outcome and one
 frozen reuse decision set shared by every partition; it is not implemented.
 
 The terminal signature verifier is itself an authenticated execution input. An emitted qualified pipeline must

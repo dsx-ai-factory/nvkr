@@ -71,7 +71,7 @@ func discoverMacPackerFiles(ctx context.Context, runner Runner, repository strin
 	if err != nil {
 		return request, err
 	}
-	pluginPin, err := loaded.ToolForPlatform("packer-plugin-qemu", "darwin/arm64")
+	pluginPin, err := loaded.SelectTool("packer-plugin-qemu", "darwin/arm64")
 	if err != nil {
 		return request, err
 	}

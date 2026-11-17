@@ -204,6 +204,19 @@ records each companion digest, and observation and packaging check it against th
 delivers `aicr-attestation.sigstore.json` beside `aicr` this way. A companion is pinned bytes, not verified
 upstream evidence.
 
+## Tools on multiple platforms
+
+One tool source may declare `platforms: [linux/amd64, linux/arm64]` instead of `platform`.
+Use `{{.OS}}` and `{{.Arch}}` in the URL and, when needed, the executable or companion paths.
+`catalog pin` resolves every declared platform into one sorted `tools` lock list atomically.
+The existing single-platform form stays valid. A missing platform is an error; there is no emulation fallback.
+
+For native output utilities, an Environment may add `utilityContainers`, mapping each output platform
+to a digest-pinned image. Include the default `utilityPlatform` with the exact `utilityContainer` value.
+Observation, SBOM generation and packaging follow the output platform; aggregate packaging and release
+signing use the default utility platform. Regenerate all consuming bundles after either input changes.
+A different scanner executable changes its digest in dependency SBOMs even when inventory is identical.
+
 ## Pinned-tool producers
 
 A `builderType: pinned-tool` component runs a source's pinned tool once, offline, inside a digest-pinned

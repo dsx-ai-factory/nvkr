@@ -70,10 +70,7 @@ func validatePinLockShape(lock *PinLock) error {
 
 	for _, name := range sortedPinNames(lock.Pins) {
 		pin := lock.Pins[name]
-		if pin.Tool != nil && pin.Tools != nil {
-			return e.New(e.CodeInvalidCatalog, "tool and tools lock entries are exclusive")
-		}
-		if err := validateToolPins(pin.Tools); err != nil {
+		if err := validateToolPinsShape(pin); err != nil {
 			return err
 		}
 		if pin.Tool != nil {
@@ -320,11 +317,12 @@ func sortedPinNames(m map[string]Pin) []string {
 func clonePinLock(lock *PinLock) *PinLock {
 	out := &PinLock{APIVersion: lockAPIVersion, Kind: lockKind, Pins: make(map[string]Pin, len(lock.Pins))}
 	for name, pin := range lock.Pins {
-		pin.Tools = cloneTools(pin.Tools)
+		pin.Tools = cloneToolPins(pin.Tools)
 		if pin.Tool != nil {
 			copy := pin.Tool.clone()
 			pin.Tool = &copy
 		}
+		pin.Tools = cloneToolPins(pin.Tools)
 		out.Pins[name] = pin
 	}
 	if len(lock.Artifacts) > 0 {

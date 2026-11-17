@@ -104,7 +104,7 @@ func indexObservationFixture(t *testing.T) (*Plan, Node, map[string]Artifact) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		bom, err = sbom.WithDependencies(bom, []sbom.Component{{Type: "library", Name: "synthetic-image-library", Version: "1"}}, "syft-cyclonedx/v1", toolExecutableDigest(plan, plan.Definition.SBOMTool))
+		bom, err = sbom.WithDependencies(bom, []sbom.Component{{Type: "library", Name: "synthetic-image-library", Version: "1"}}, "syft-cyclonedx/v1", toolExecutableDigest(plan, sbomToolName(plan, planNode(plan, child.BuildTarget+"/sbom"))))
 		if err != nil {
 			t.Fatal(err)
 		}

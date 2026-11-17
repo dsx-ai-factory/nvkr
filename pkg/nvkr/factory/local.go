@@ -95,6 +95,8 @@ type LocalRunResult struct {
 	diskPublicationWait    sync.WaitGroup
 	diskCompletions        []diskProducerCompletion
 	materialConsumptions   map[string]producerConsumption
+	internalExecutables    map[string]*pipeline.ProducedExecutable
+	internalToolEvidence   map[string]map[string]string
 }
 
 // QualificationLane returns the evidence lane recorded by this local execution.
@@ -673,6 +675,9 @@ func admitLocalPlanBase(ctx context.Context, plan *Plan) error {
 		return e.New(e.CodeEngineCapability, "Tekton execution policy requires authenticated cluster execution")
 	}
 	if err := plan.Validate(); err != nil {
+		return err
+	}
+	if err := admitInternalToolExecution(plan); err != nil {
 		return err
 	}
 	if len(plan.Environment.GitHubRuntimeSources) != 0 {

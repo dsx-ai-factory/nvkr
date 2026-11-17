@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/diskinspect"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
@@ -41,14 +42,15 @@ func InspectHeldDebianDependencies(ctx context.Context, subject *heldfile.File, 
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
-	inspection, err := inspectDebianMaterial(ctx, subject, platform, scanner, packageReaderDigest, maxBytes)
+	inspection, err := diskinspect.InspectDebianMaterial(ctx, subject, platform, scanner, packageReaderDigest, maxBytes)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, e.Wrap(e.CodeTimeout, ctx.Err(), "Debian payload inspection canceled")
 		}
 		return nil, err
 	}
-	if inspection.subject != subject.Digest() || inspection.size != subject.Size() || inspection.scanner != scanner.Digest {
+	observedSubject, observedSize, _, observedScanner, _ := inspection.Binding()
+	if observedSubject != subject.Digest() || observedSize != subject.Size() || observedScanner != scanner.Digest {
 		return nil, e.New(e.CodeVerifyFailed, "Debian payload inspection differs from exact held package")
 	}
 	components := inspection.Components()

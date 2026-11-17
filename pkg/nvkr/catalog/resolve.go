@@ -168,6 +168,9 @@ func resolvePrebuilt(name string, raw rawComponent, src Source, pin Pin, lock *P
 		if pin.Tool == nil && pin.Tools == nil {
 			return c, e.New(e.CodeUnpinnedSource, "release executable %q has no source tool pin", name)
 		}
+		if len(raw.Platforms) == 0 {
+			return c, e.New(e.CodeInvalidCatalog, "release executable %q requires a platform", name)
+		}
 		evidence, err := renderEvidence(name, raw.Prebuilt.Evidence, pin)
 		if err != nil {
 			return c, err
@@ -178,6 +181,9 @@ func resolvePrebuilt(name string, raw rawComponent, src Source, pin Pin, lock *P
 				if slices.Contains(raw.Platforms, tool.Platform) {
 					c.Prebuilt.Executables = append(c.Prebuilt.Executables, tool.clone())
 				}
+			}
+			if len(raw.Platforms) == 1 {
+				return c.ForPlatform(raw.Platforms[0])
 			}
 			return c, nil
 		}

@@ -175,10 +175,11 @@ func inspectAcquiredImageDependencies(ctx context.Context, plan *Plan, node Node
 		return sbom.DependencyInventory{}, e.New(e.CodeUsage, "acquired image inspection requires its frozen Plan")
 	}
 	_, planned := planIndex(plan)
-	toolID := "tool/" + plan.Definition.SBOMTool
+	toolName := sbomToolName(plan, node)
+	toolID := "tool/" + toolName
 	tool, found := artifacts[toolID]
 	if !found || tool.Kind != "pipeline-tool" || planned[toolID] != tool || !containsString(node.Inputs, toolID) ||
-		scanner.Path != tool.Path || scanner.Digest != toolExecutableDigest(plan, plan.Definition.SBOMTool) {
+		scanner.Path != tool.Path || scanner.Digest != toolExecutableDigest(plan, toolName) {
 		return sbom.DependencyInventory{}, e.New(e.CodeVerifyFailed, "acquired image inspection substitutes its frozen scanner")
 	}
 	if err := heldfile.RequireExecutableSupport(); err != nil {

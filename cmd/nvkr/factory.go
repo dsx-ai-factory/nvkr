@@ -31,6 +31,7 @@ func cmdFactory() *cli.Command {
 				&cli.StringFlag{Name: "node"},
 				&cli.StringFlag{Name: "plan-digest"},
 				&cli.StringFlag{Name: "workspace", Value: ".nvkr/factory"},
+				&cli.BoolFlag{Name: "internal-tool-sbom", Hidden: true},
 			},
 			Action: func(c *cli.Context) error {
 				if c.String("plan") == "" || c.String("node") == "" {
@@ -50,6 +51,12 @@ func cmdFactory() *cli.Command {
 					if err := factory.VerifyPlanDigest(plan, expected); err != nil {
 						return err
 					}
+				}
+				if c.Bool("internal-tool-sbom") {
+					if c.String("plan-digest") == "" {
+						return e.New(e.CodeUsage, "internal tool SBOM requires --plan-digest")
+					}
+					return factory.ComputeInternalToolSBOM(c.Context, plan, c.String("node"), os.Stdout)
 				}
 				return factory.ExecuteNode(c.Context, plan, c.String("node"), os.Stdout, os.Stderr)
 			},

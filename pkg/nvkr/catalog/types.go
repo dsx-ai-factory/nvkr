@@ -320,14 +320,14 @@ type Component struct {
 // Catalog is the loaded, fully resolved registry and lock. Producer selection is
 // explicit in each Definition output; the catalog contains no authored groups.
 type Catalog struct {
-	Actions         map[string]ActionPin
-	Tools           map[string]ToolPin
-	ToolsByPlatform map[string][]ToolPin `json:"ToolsByPlatform,omitempty"`
-	APIVersion      string
-	Kind            string
-	Metadata        Metadata
-	Sources         map[string]Source
-	Components      map[string]Component
+	Actions       map[string]ActionPin
+	Tools         map[string]ToolPin
+	ToolPlatforms map[string][]ToolPin `json:",omitempty"`
+	APIVersion    string
+	Kind          string
+	Metadata      Metadata
+	Sources       map[string]Source
+	Components    map[string]Component
 
 	// sourcePins is populated only by the validated registry-and-lock loader.
 	// Keeping it private prevents callers from treating an authored PinLock as a

@@ -176,6 +176,9 @@ func validateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 			}
 			observedBuilds[node.BuildTarget] = true
 		case "sbom-set":
+			if err := validateInternalToolUseEvidence(ctx, plan, nodes[artifact.Producer], path, artifacts, local); err != nil {
+				return err
+			}
 			evidence, err := sbomPublicationObjects(ctx, plan, artifact, artifacts, local)
 			if err != nil {
 				return err

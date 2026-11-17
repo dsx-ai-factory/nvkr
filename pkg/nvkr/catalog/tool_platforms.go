@@ -7,200 +7,214 @@ import (
 	"context"
 	"net/http"
 	"slices"
+	"sort"
 	"strings"
-	"text/template"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
-func toolPlatforms(source ToolSource) ([]string, error) {
-	if source.Platforms == nil {
-		if err := target.ValidateExecutablePlatform(source.Platform); err != nil {
-			return nil, err
-		}
-		return []string{source.Platform}, nil
-	}
-	if source.Platform != "" || len(source.Platforms) == 0 {
-		return nil, e.New(e.CodeInvalidCatalog, "tool requires exactly one of platform or nonempty platforms")
-	}
-	for i, platform := range source.Platforms {
-		if err := target.ValidateExecutablePlatform(platform); err != nil {
-			return nil, err
-		}
-		if i > 0 && source.Platforms[i-1] >= platform {
-			return nil, e.New(e.CodeInvalidCatalog, "tool platforms must be sorted and unique")
-		}
-	}
-	return slices.Clone(source.Platforms), nil
+func (source ToolSource) supportsPlatform(platform string) bool {
+	return source.Platform == platform || slices.Contains(source.Platforms, platform)
 }
 
-func renderPlatformTool(source ToolSource, pin Pin, platform string) (ToolSource, error) {
-	osName, arch, _ := strings.Cut(platform, "/")
-	major, minor, patch := splitVersion(pin.Tag)
-	data := struct {
-		refData
-		OS string
-	}{refData: refData{Tag: pin.Tag, ModuleTag: StripTagPrefix(pin.Tag), Version: NormalizeVersion(pin.Tag), Commit: pin.Commit, Major: major, Minor: minor, Patch: patch, Arch: arch}, OS: osName}
-	render := func(value string) (string, error) {
-		t, err := template.New("tool asset").Option("missingkey=error").Parse(value)
-		if err != nil {
-			return "", e.Wrap(e.CodeInvalidCatalog, err, "parse platform tool template")
-		}
-		var out strings.Builder
-		if err := t.Execute(&out, data); err != nil {
-			return "", e.Wrap(e.CodeInvalidCatalog, err, "render platform tool template")
-		}
-		return out.String(), nil
-	}
+// platformSource expands only platform tokens. Version tokens retain the existing
+// release resolver and a single-platform declaration retains its original bytes.
+func platformSource(source ToolSource, platform string) ToolSource {
+	os, arch, _ := strings.Cut(platform, "/")
+	replacer := strings.NewReplacer("{{.OS}}", os, "{{.Arch}}", arch)
 	source.Platform, source.Platforms = platform, nil
-	var err error
-	if source.URL, err = render(source.URL); err != nil {
-		return ToolSource{}, err
-	}
-	if source.ExecutablePath, err = render(source.ExecutablePath); err != nil {
-		return ToolSource{}, err
-	}
+	source.URL = replacer.Replace(source.URL)
+	source.ExecutablePath = replacer.Replace(source.ExecutablePath)
 	source.Companions = slices.Clone(source.Companions)
-	for i, companion := range source.Companions {
-		if source.Companions[i], err = render(companion); err != nil {
-			return ToolSource{}, err
-		}
+	for i := range source.Companions {
+		source.Companions[i] = replacer.Replace(source.Companions[i])
 	}
-	return source, nil
+	return source
 }
 
 func validatePlatformToolSource(source ToolSource) error {
-	platforms, err := toolPlatforms(source)
-	if err != nil {
-		return err
+	if source.Platform != "" || len(source.Platforms) == 0 {
+		return e.New(e.CodeInvalidCatalog, "tool requires exactly one of platform or nonempty platforms")
 	}
 	seen := map[string]bool{}
-	for _, platform := range platforms {
-		rendered, err := renderPlatformTool(source, Pin{Tag: "v1.2.3", Commit: strings.Repeat("a", 40)}, platform)
-		if err != nil {
+	for i, platform := range source.Platforms {
+		if err := target.ValidateExecutablePlatform(platform); err != nil {
 			return err
 		}
-		if err := validateToolSource(rendered); err != nil {
+		if i > 0 && source.Platforms[i-1] >= platform {
+			return e.New(e.CodeInvalidCatalog, "tool platforms must be sorted and unique")
+		}
+		selected := platformSource(source, platform)
+		if err := validateToolSource(selected); err != nil {
 			return err
 		}
-		key := rendered.URL + "\x00" + rendered.ExecutablePath
+		if strings.ContainsAny(selected.ExecutablePath+strings.Join(selected.Companions, ""), "{}") {
+			return e.New(e.CodeInvalidCatalog, "unknown tool member template token")
+		}
+		key := selected.URL + "\x00" + selected.ExecutablePath
 		if seen[key] {
-			return e.New(e.CodeInvalidCatalog, "tool platforms must select distinct release assets")
+			return e.New(e.CodeInvalidCatalog, "tool platforms select the same release asset and executable")
 		}
 		seen[key] = true
 	}
 	return nil
 }
 
-func cloneTools(tools []ToolPin) []ToolPin {
-	if tools == nil {
+func validateToolPinsShape(pin Pin) error {
+	if pin.Tools == nil {
 		return nil
 	}
-	out := make([]ToolPin, len(tools))
-	for i, tool := range tools {
-		out[i] = tool.clone()
+	if pin.Tool != nil || len(pin.Tools) == 0 {
+		return e.New(e.CodeInvalidCatalog, "tool and nonempty tools lock forms are exclusive")
 	}
-	return out
-}
-
-func validateToolPins(tools []ToolPin) error {
-	seen := map[string]bool{}
-	for i, tool := range tools {
-		if i > 0 && tools[i-1].Platform >= tool.Platform {
+	for i, tool := range pin.Tools {
+		if i > 0 && pin.Tools[i-1].Platform >= tool.Platform {
 			return e.New(e.CodeInvalidCatalog, "tool pins must be sorted by unique platform")
 		}
 		if err := validateToolPin(tool); err != nil {
 			return err
 		}
-		key := tool.URL + "\x00" + tool.ExecutablePath
-		if seen[key] {
-			return e.New(e.CodeInvalidCatalog, "tool platforms must pin distinct assets")
-		}
-		seen[key] = true
 	}
 	return nil
 }
 
-func checkPlatformToolPins(source ToolSource, pin Pin) error {
-	if pin.Tool != nil {
-		return e.New(e.CodeInvalidCatalog, "multi-platform source cannot carry a single tool pin")
+func checkPlatformToolPins(source *ToolSource, pin Pin) error {
+	if source == nil || source.Platforms == nil {
+		return e.New(e.CodeInvalidCatalog, "orphan per-platform tool pins")
 	}
-	platforms, err := toolPlatforms(source)
-	if err != nil {
+	if err := validatePlatformToolSource(*source); err != nil {
 		return err
 	}
-	if err := validateToolPins(pin.Tools); err != nil {
+	if pin.Tool != nil {
+		return e.New(e.CodeInvalidCatalog, "multi-platform tool requires tools lock form")
+	}
+	if err := validateToolPinsShape(pin); err != nil {
 		return err
 	}
 	for _, tool := range pin.Tools {
-		if !slices.Contains(platforms, tool.Platform) {
-			return e.New(e.CodeInvalidCatalog, "orphan tool platform %q", tool.Platform)
+		if !slices.Contains(source.Platforms, tool.Platform) {
+			return e.New(e.CodeInvalidCatalog, "tool lock has undeclared platform %q", tool.Platform)
 		}
 	}
-	if len(pin.Tools) != len(platforms) {
-		return e.New(e.CodeUnpinnedSource, "tool source requires every declared platform to be pinned")
+	if len(pin.Tools) != len(source.Platforms) {
+		return e.New(e.CodeUnpinnedSource, "tool lock does not cover every declared platform")
 	}
-	for i, platform := range platforms {
-		rendered, err := renderPlatformTool(source, pin, platform)
-		if err != nil {
-			return err
-		}
-		if err := checkToolPin(&rendered, Pin{Tag: pin.Tag, Commit: pin.Commit, Tool: &pin.Tools[i]}); err != nil {
+	for _, tool := range pin.Tools {
+		selected := platformSource(*source, tool.Platform)
+		if err := checkToolPin(&selected, Pin{Tag: pin.Tag, Commit: pin.Commit, Tool: &tool}); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func resolvePlatformTools(ctx context.Context, source ToolSource, pin Pin, client *http.Client) ([]ToolPin, error) {
-	if err := validateToolSource(source); err != nil {
-		return nil, err
-	}
-	platforms, err := toolPlatforms(source)
-	if err != nil {
-		return nil, err
-	}
-	tools := make([]ToolPin, 0, len(platforms))
-	for _, platform := range platforms {
-		rendered, err := renderPlatformTool(source, pin, platform)
-		if err != nil {
-			return nil, err
-		}
-		var tool ToolPin
-		if client == nil {
-			tool, err = resolveToolPin(ctx, rendered, pin)
-		} else {
-			tool, err = resolveToolWithClient(ctx, rendered, pin, client)
-		}
-		if err != nil {
-			return nil, err
-		}
-		tools = append(tools, tool)
-	}
-	if err := validateToolPins(tools); err != nil {
-		return nil, err
-	}
-	return tools, nil
+func resolveSourceToolPins(ctx context.Context, source ToolSource, pin Pin) (Pin, error) {
+	return resolveSourceToolPinsWithClient(ctx, source, pin, toolHTTPClient())
 }
 
-// ToolForPlatform selects a detached exact pin; there is no cross-platform fallback.
-func (cat *Catalog) ToolForPlatform(name, platform string) (ToolPin, error) {
-	if pin, ok := cat.Tools[name]; ok {
-		if pin.Platform != platform {
-			return ToolPin{}, e.New(e.CodeEngineCapability, "tool %q has no pin for platform %s", name, platform)
-		}
-		return pin.clone(), nil
+func resolveSourceToolPinsWithClient(ctx context.Context, source ToolSource, pin Pin, client *http.Client) (Pin, error) {
+	if err := validateToolSource(source); err != nil {
+		return Pin{}, err
 	}
-	if pins, ok := cat.ToolsByPlatform[name]; ok {
-		for _, pin := range pins {
-			if pin.Platform == platform {
-				return pin.clone(), nil
+	if source.Platforms == nil {
+		tool, err := resolveToolWithClient(ctx, source, pin, client)
+		if err != nil {
+			return Pin{}, err
+		}
+		pin.Tool, pin.Tools = &tool, nil
+		return pin, nil
+	}
+	var pins []ToolPin
+	for _, platform := range source.Platforms {
+		tool, err := resolveToolWithClient(ctx, platformSource(source, platform), pin, client)
+		if err != nil {
+			return Pin{}, err
+		}
+		pins = append(pins, tool)
+	}
+	pin.Tool, pin.Tools = nil, pins
+	return pin, nil
+}
+
+func cloneToolPins(pins []ToolPin) []ToolPin {
+	copy := slices.Clone(pins)
+	for i := range copy {
+		copy[i] = copy[i].clone()
+	}
+	return copy
+}
+
+func selectToolPin(pin Pin, platform string) (ToolPin, error) {
+	if err := validateToolPinsShape(pin); err != nil {
+		return ToolPin{}, err
+	}
+	if pin.Tool != nil && pin.Tool.Platform == platform {
+		return pin.Tool.clone(), nil
+	}
+	for _, tool := range pin.Tools {
+		if tool.Platform == platform {
+			return tool.clone(), nil
+		}
+	}
+	return ToolPin{}, e.New(e.CodeEngineCapability, "tool has no pinned executable for %s", platform)
+}
+
+// SelectTool selects an exact platform pin from the resolved catalog snapshot.
+// The Plan owner authenticates that snapshot; this selection grants no authority.
+func (cat *Catalog) SelectTool(name, platform string) (ToolPin, error) {
+	if cat == nil {
+		return ToolPin{}, e.New(e.CodeInvalidCatalog, "tool selection requires a catalog")
+	}
+	tool, single := cat.Tools[name]
+	pins, multi := cat.ToolPlatforms[name]
+	if single && multi {
+		return ToolPin{}, e.New(e.CodeInvalidCatalog, "tool %q has competing pin forms", name)
+	}
+	if !single && !multi {
+		return ToolPin{}, e.New(e.CodeUnpinnedSource, "selected catalog tool %q has no pin", name)
+	}
+	pin := Pin{Tools: pins}
+	if single {
+		pin.Tool = &tool
+	}
+	return selectToolPin(pin, platform)
+}
+
+func (cat *Catalog) validatePlatformTools() error {
+	if cat == nil {
+		return e.New(e.CodeInvalidCatalog, "catalog is nil")
+	}
+	names := make([]string, 0, len(cat.ToolPlatforms))
+	for name := range cat.ToolPlatforms {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if _, exists := cat.Tools[name]; exists {
+			return e.New(e.CodeInvalidCatalog, "tool %q has competing pin forms", name)
+		}
+		pins := cat.ToolPlatforms[name]
+		source, exists := cat.Sources[name]
+		if !exists || source.Tool == nil || len(pins) == 0 {
+			return e.New(e.CodeInvalidCatalog, "per-platform tool %q has no source or pins", name)
+		}
+		if err := validatePlatformToolSource(*source.Tool); err != nil {
+			return err
+		}
+		if err := validateToolPinsShape(Pin{Tools: pins}); err != nil {
+			return err
+		}
+		if len(source.Tool.Platforms) != len(pins) {
+			return e.New(e.CodeUnpinnedSource, "per-platform tool %q has incomplete pins", name)
+		}
+		for i, pin := range pins {
+			if source.Tool.Platforms[i] != pin.Platform {
+				return e.New(e.CodeUnpinnedSource, "per-platform tool %q changes declared platforms", name)
 			}
 		}
-		return ToolPin{}, e.New(e.CodeEngineCapability, "tool %q has no pin for platform %s", name, platform)
 	}
-	return ToolPin{}, e.New(e.CodeUnpinnedSource, "selected catalog tool %q has no pin", name)
+	return nil
 }
 
 // ForPlatform resolves a release executable's exact platform before graph lowering.
@@ -229,14 +243,28 @@ func toolSupportsPlatforms(source *ToolSource, platforms []string) bool {
 	if source == nil || len(platforms) == 0 {
 		return false
 	}
-	available, err := toolPlatforms(*source)
-	if err != nil {
-		return false
-	}
 	for _, platform := range platforms {
-		if !slices.Contains(available, platform) {
+		if !source.supportsPlatform(platform) {
 			return false
 		}
 	}
 	return true
+}
+
+func validateToolPins(tools []ToolPin) error {
+	seen := map[string]bool{}
+	for i, tool := range tools {
+		if i > 0 && tools[i-1].Platform >= tool.Platform {
+			return e.New(e.CodeInvalidCatalog, "tool pins must be sorted by unique platform")
+		}
+		if err := validateToolPin(tool); err != nil {
+			return err
+		}
+		key := tool.URL + "\x00" + tool.ExecutablePath
+		if seen[key] {
+			return e.New(e.CodeInvalidCatalog, "tool platforms must pin distinct assets")
+		}
+		seen[key] = true
+	}
+	return nil
 }

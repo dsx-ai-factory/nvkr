@@ -1,11 +1,11 @@
 # ADR-21 — Generated-pipeline maintenance & lifecycle
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-21 in the consolidated NVKR ADR set (added to close the day-2 pipeline-maintenance gap).
 - **Relates to:** ADR-18 (what is emitted / the runner), ADR-11 (catalog producer overlays), ADR-07
   (runner/profile digest, re-sign), ADR-22 (the pin/lock contract a bump edits), ADR-01 (canonical codec +
@@ -89,7 +89,7 @@ ownership are outside generation (ADR-16/18).
 
 The Environment's explicit GitHub development mode selects a second fixed generated layout:
 `.github/workflows/nvkr-dev.yml`, `.github/nvkr-dev/plan.json`, and `.github/nvkr-dev/manifest.json`.
-Proposed ADR-26 §9 additionally admits, for composite Definitions only, a named signed development layout
+ADR-26 §9 additionally admits, for composite Definitions only, a named signed development layout
 `.github/workflows/nvkr-dev-<name>.yml` and `.github/nvkr-dev-<name>/`, published under its own
 `development-<name>` namespace with a signer bound to that workflow; it never shares the fixed layout.
 The default production layout remains `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/`. Both use the same
@@ -198,6 +198,12 @@ The local 30-minute finish-gap split (ADR-18 §8) avoids rebalancing other depth
 Changing the lowest member, capacity chunks or finish gaps can still change affected workers. Legacy
 `__partition-NN.yml` files are accepted only from the prior ownership manifest for authenticated retirement;
 new bundles emit only the stable worker names.
+
+Native output utility placement is compiled from the Environment utility-container map and per-platform
+catalog tool pins. Changing that selection requires regenerating every consuming Plan and bundle,
+including runtime-Plan baselines; rendered workflows are never patched to move a step independently
+of its authenticated platform and container. Root scanner acquisitions remain separate jobs, while
+output utilities join their native producer subject when authority, prerequisites and limits permit.
 
 ### 2. Drift detection is a fail-closed `--check` twin, run by a separate generated gate
 

@@ -6,7 +6,6 @@ package catalog
 import (
 	"crypto/sha256"
 	"fmt"
-	"maps"
 	"net/url"
 	"path"
 	"slices"
@@ -123,17 +122,11 @@ func (cat *Catalog) Validate() error {
 	if cat == nil {
 		return e.New(e.CodeInvalidCatalog, "catalog is nil")
 	}
+	if err := cat.validatePlatformTools(); err != nil {
+		return err
+	}
 	for _, name := range sortedSourceNames(cat.Sources) {
 		if err := validatePinSetDeclaration(name, cat.Sources[name]); err != nil {
-			return err
-		}
-	}
-	for _, name := range slices.Sorted(maps.Keys(cat.ToolsByPlatform)) {
-		pins := cat.ToolsByPlatform[name]
-		if _, exists := cat.Tools[name]; exists || len(pins) == 0 {
-			return e.New(e.CodeInvalidCatalog, "tool %q has ambiguous or empty platform pins", name)
-		}
-		if err := validateToolPins(pins); err != nil {
 			return err
 		}
 	}

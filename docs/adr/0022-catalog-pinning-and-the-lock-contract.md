@@ -1,11 +1,11 @@
 # ADR-22 — Catalog pinning & the lock contract (declare vs. resolve)
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-22 in the consolidated NVKR ADR set (added to give the pin/lock model a decided home).
 - **Relates to:** ADR-02 (what enters `buildDigest`), ADR-10 (toolchain / builder pins), ADR-11 (the catalog
   the lock feeds resolution), ADR-12 (the output/composition shape a curated set takes), ADR-13 (the aggregate
@@ -57,7 +57,9 @@ snapshot is admitted; there is no wildcard or general deep merge. Catalog snapsh
 rejects removed classification fields even when the caller supplies the current version. Registry v3 accepts
 the explicit pin-set declarations in §7.
 Lock v1 retains its version and adds optional `derivedFrom` provenance to source and artifact pins; older strict
-readers reject these new fields rather than ignoring them.
+readers reject these new fields rather than ignoring them. The accepted multi-platform tool
+contract also adds an optional `tools` list under each source pin, exclusive with `tool`, without changing
+lock v1. Its exact platform membership and compatibility rules are defined in "Tool release assets" below. Older strict readers reject an unknown `tools` field with `invalid-catalog`.
 
 **Shared declarations.** Registry `imports` select sources and components from
 `nvkr.dev/catalog-fragment/v1` / `CatalogFragment` documents. Each import declares a canonical relative
@@ -520,19 +522,16 @@ on supported filesystems and publication of a separately versioned catalog-data 
 ## Tool release assets
 
 A source may declare `tool` with `format` (`raw`, `tar-gzip` or `zip`), a version-rendered HTTPS `url`,
-`executablePath`, optional `companions`, and exactly one of `platform` or `platforms`. The platform domain is
-`darwin/arm64`, `linux/amd64`, and `linux/arm64`. `platforms` is nonempty, sorted and unique. The legacy
-single-platform declaration retains its meaning and lock bytes. Tool names are source names; the same source
-constraint and tag-prefix selection used by other sources governs `catalog pin` and `catalog bump`.
-
-A multi-platform declaration renders `{{.OS}}` and `{{.Arch}}` in the URL, executable member and companion
-members for each declared platform, alongside the existing version tokens. Format and companion templates
-apply to every platform. Two platforms may not select the same URL and executable member. There is no
-platform fallback or spelling map. Upstreams needing different archive formats retain distinct declarations.
-The source lock uses `tools`, a platform-sorted list of ordinary tool records, exclusive with legacy `tool`.
-Every declared platform must have exactly one record; missing, duplicate or extra platforms fail loading.
-All platform downloads must succeed before the existing atomic lock writer can commit the source update.
-This folds ADR-28 sections 1–2 into the catalog contract; executable index publication remains separate.
+`platform` (`linux/amd64` or `linux/arm64`), `executablePath`, and optional `companions`. Tool names are source names; they do not
+include release versions. The same source constraint and tag-prefix selection used by other sources governs
+`catalog pin` and `catalog bump`. A tool may instead declare nonempty sorted unique `platforms`,
+exclusive with `platform`, using the existing Linux AMD64/ARM64 and Darwin ARM64 executable domain.
+The multi-platform form expands `{{.OS}}` and `{{.Arch}}` in URL, executable member and companion paths.
+Each platform must select a distinct URL/member pair; unknown tokens fail admission. The lock uses a
+sorted `tools` list, exclusive with `tool`, with exactly one complete pin per declared platform.
+Missing entries are `unpinned-source`; extra, duplicate or competing forms are `invalid-catalog`.
+Pinning resolves one source release and acquires every platform before its single lock CAS write.
+Single-platform declarations and locks retain their canonical bytes. No platform fallback is inferred.
 
 Pinning resolves the upstream tag to commit/tree/epoch, downloads the release asset with bounded I/O, checks
 archive structure and computes both archive and selected-executable SHA-256 digests without running the tool.
@@ -542,7 +541,9 @@ lock snapshot/CAS writer, including `--check` no-write behavior; a failed downlo
 These hashes pin acquired bytes; they do not establish an upstream signature or reproducible build.
 
 The resolved catalog snapshot includes tool pins. Definition selects tools by purpose, and compilation
-requires each selected catalog tool to match the utility execution platform. Missing pins, invalid formats
+selects the exact tool pin matching each utility operation platform, failing `engine-capability` when absent.
+The optional resolved `toolPlatforms` snapshot field binds the complete per-source platform list.
+The original `tools` single-pin map remains unchanged for legacy catalogs. Missing pins, invalid formats
 or ambiguous declarations fail before execution. Regenerate the Run bundle after any tool bump.
 
 An acquired `host-package` producer may set `prebuilt.releaseExecutable: true`
@@ -587,6 +588,33 @@ the selected executable's atomic digest-checked publication. Linux uses a sealed
 memfd; Darwin supports diagnostic anonymous read-only holding, not Linux execution
 authority. These finite byte bounds do not constitute runner capacity reservation.
 Production provenance records archive and selected-member digests independently (ADR-09).
+
+### Multi-platform tool declarations and lock entries
+
+The accepted ADR-28 §1–§2 contract is owned here. See
+[the ledger](reconciliation/adr-28.md) for implementation and acceptance limits.
+
+A tool may declare `platforms` instead of `platform`: a nonempty, sorted, unique list from
+`linux/amd64`, `linux/arm64` and `darwin/arm64`. The fields are mutually exclusive. Existing `platform`
+declarations retain their meaning and lock bytes. The URL, executable path and each companion path may
+use `{{.OS}}` and `{{.Arch}}`, rendered per platform with the existing `linux`/`darwin` and
+`amd64`/`arm64` spellings; version tokens retain their meaning. Two platforms rendering the same URL and
+executable path are rejected. Format and companion declarations apply to every platform. Different formats,
+companion lists or architecture spellings require separate sources; no spelling map or fallback is inferred.
+
+Lock v1's optional `tools` list is sorted by platform, exclusive with `tool`, and uses the existing
+single-platform tool record shape for each entry, including companion digests. A list distinguishes
+`linux/arm64` from `darwin/arm64`. Completeness requires exactly one entry per declared platform. Missing or
+inconsistent entries fail with `unpinned-source`; extra or duplicate entries fail with `invalid-catalog`.
+Older strict readers reject an unknown `tools` field with `invalid-catalog`. Source commit, tree and epoch remain shared across all entries.
+
+`catalog pin` and `catalog bump` resolve the tag once and acquire every declared platform through the
+existing bounded selector. All entries commit in one compare-and-swap write; any failure leaves the lock
+unchanged. `--check` reports every entry, and one platform cannot be pinned independently.
+Run-wide `sbomTool` and `cosignTool` select the utility execution platform's entry; pinned-tool producers
+select their target's entry. A missing execution-platform entry fails with `engine-capability` before
+acquisition. Utility selection uses per-platform entries; multi-platform executable producer lowering
+remains deferred as recorded in the ledger. Single-platform acquisition and companion contracts remain unchanged.
 
 ## GitHub action dependencies
 
