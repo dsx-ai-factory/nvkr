@@ -543,7 +543,7 @@ the original named job slots, prerequisite closure, conditions and credential bo
 composite actions expose fixed semantic interfaces for execution, input/image preparation, output collection
 and carrier transfer. Grouped jobs reuse the node interface; declared optional slots and further individual
 upload calls preserve output counts and order without cardinality-specific or numbered variant actions.
-Named operation parameters are transient and are no longer committed as `action-data.json` (ADR-21).
+Named operation parameters are transient and are not committed or transported as `action-data.json` (ADR-21).
 The runtime descriptor admits the Plan and recomputes the selected values; templates retain fixed commands and pinned actions without
 accepting executable script data.
 Operator setup and timed producer execution stay inline. Controlled upload/download wrappers contain one pinned transport step,

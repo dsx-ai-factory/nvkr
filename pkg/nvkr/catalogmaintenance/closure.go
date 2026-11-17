@@ -32,7 +32,7 @@ type closure struct {
 
 // closureRun is one non-production Run member with the fresh Plan it renders.
 // A runtime-Plan member (githubRuntimePlan) keeps its owner's contract: its
-// committed workflow and actions stay fixed while the Plan and action data move.
+// committed workflow and actions stay fixed while the Plan and derived manifest move.
 type closureRun struct {
 	bundle *factory.GeneratedBundle
 	plan   *factory.Plan

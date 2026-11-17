@@ -1609,9 +1609,9 @@ Actions are statically selected from the generated bundle, with no arbitrary com
 
 Validation checks the closed shared-template and invocation-data set and expands its admitted references
 and input bindings before applying the existing graph, transport, permission, credential and execution-order
-checks. Exact regeneration additionally compares every generated member's bytes, including templates and
-invocation data. An unknown, missing or changed template or data member cannot be accepted merely because
-the top-level workflow is unchanged. This lowering replaces numbered YAML anchors and inline-map compaction;
+checks. Invocation data is recomputed from the Plan for expansion. Exact regeneration
+compares every generated member's bytes, including templates. An unknown, missing or changed template
+cannot be accepted merely because the top-level workflow is unchanged. This lowering replaces numbered YAML anchors and inline-map compaction;
 top-level policy and dependencies remain
 ordinary readable YAML. Complete, identical native-platform preflight, pinned checkout and shared job
 preparation steps may use descriptive aliases: `check-native-linux-amd64`, `check-native-linux-arm64`,

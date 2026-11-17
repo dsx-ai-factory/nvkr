@@ -297,7 +297,7 @@ downstream AMD64 E2E adapter builds its inputs locally.
 Read the top-level workflow to review which jobs can run, their dependency order, permissions, protected
 Environments and time limits. Follow a job's local `uses: ./.github/nvkr-run/actions/...` reference to inspect
 the shared operations it calls. The helper derives exact node and carrier values from the Plan for each job;
-`action-data.json` is no longer a committed bundle member. Calls such as `execute-node`, `execute-source` and `collect-node-outputs` name the operation rather
+`action-data.json` is not a committed bundle member. Calls such as `execute-node`, `execute-source` and `collect-node-outputs` name the operation rather
 than a generated shape. Grouped jobs reuse the node interface for each operation; optional slots and further
 individual upload calls preserve every output without adding output-count variants. Invocation parameters
 have named roles. The helper recomputes those values from the admitted Plan at runtime; this data is generated,
@@ -323,8 +323,8 @@ outside the workflow only when their calls can be extracted; the required inline
 upload-action pin updates visible in the maintained workflow. Always regenerate
 and check the complete bundle after an input change, even when the workflow file has no diff.
 
-The shared actions and invocation data are part of the same bundle: commit them with the workflow, Plan and
-manifest when adopting a generated pipeline. `--check` covers every template and data file, and regeneration
+The shared actions are part of the same bundle: commit them with the workflow, Plan and
+manifest when adopting a generated pipeline. `--check` covers every template, and regeneration
 retires unchanged obsolete actions through the previous manifest. Editing an action directly produces drift just like editing the
 workflow. Producer jobs retain explicit dependencies and separate results; producer matrices and general
 callable workflows remain deferred. The optional qualification bundle has its own fixed reusable native

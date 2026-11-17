@@ -78,13 +78,6 @@ Stable worker paths are derived from the current Plan without previous-output in
 The rename changes generated workflow bytes and ownership manifests, not Plan or Build identity.
 Hosted execution of the renamed bundles remains unrecorded.
 
-Invocation data is now transient. GitHub generation excludes `action-data.json` from the committed
-manifest, and runtime input carriers contain only Plan and manifest. The descriptor still regenerates
-bounded canonical job output from the admitted Plan. `TestGitHubActionDataIsTransientAndRetired`
-covers omission, prior-owned retirement, refusal of modified or unowned copies, and point-of-use output.
-Runtime installation and carrier contracts cover the two-file handoff. A local replay on 2026-11-16
-preserved exact Plan bytes and all embedded Build Digests in all 11 maintained bundles, and reproduced
-all 1,123 job invocation projections byte-for-byte. One job output per bundle was exercised locally;
-development and runtime-source baselines exercised the canonical writer diagnostically because their
-execution admission requires dispatch context or freshly frozen inputs. No hosted execution acceptance
-is established by that replay. Catalog snapshot storage is unchanged.
+Invocation data is regenerated from the Plan and is not a bundle member;
+`TestGitHubActionDataIsTransientAndRetired` covers omission, prior-owned retirement and refusal of
+modified or unowned copies. Hosted execution of the regenerated bundles remains unrecorded.

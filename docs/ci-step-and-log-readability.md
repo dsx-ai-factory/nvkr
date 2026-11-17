@@ -107,7 +107,7 @@ distinct operation-and-part step names, pinned provider actions, credentials, pe
 For example, `collect node outputs part-3` identifies the operation within its job; expand it to see
 the exact producer in its original inner step labels. Identical complete calls can still share an alias
 across jobs without repeating an ambiguous label inside one job.
-The generated invocation-data member is not an authored transport manifest or an alternative Plan. Source-fetch credentials stay on `run-node`, while
+The generated invocation data is not an authored transport manifest or an alternative Plan. Source-fetch credentials stay on `run-node`, while
 `pack-outputs` remains a separate step.
 
 These excerpts illustrate the expanded controller-chart operations and finalizer. Exact names and node IDs
