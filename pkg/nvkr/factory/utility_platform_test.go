@@ -4,6 +4,7 @@
 package factory
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -202,6 +203,72 @@ func TestNativeDiskScannerSelectionUsesExactPlatformPin(t *testing.T) {
 				assertFactoryErrorCode(t, err, tc.code)
 			} else if err != nil {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestDiskProfileOwnsScannerForOtherCatalogPlatform(t *testing.T) {
+	for _, legacy := range []bool{true, false} {
+		for _, platform := range []string{"linux/amd64", "linux/arm64"} {
+			t.Run(platform+"/legacy="+fmt.Sprint(legacy), func(t *testing.T) {
+				before, after := nativeUtilityFixture(t)
+				plan := before
+				if !legacy {
+					plan = after
+					plan.CatalogSnapshot.ToolPlatforms["syft"] = plan.CatalogSnapshot.ToolPlatforms["syft"][:1]
+					source := plan.CatalogSnapshot.Sources["syft"]
+					source.Tool.Platforms = []string{"linux/amd64"}
+					plan.CatalogSnapshot.Sources["syft"] = source
+				}
+				err := validateDiskScannerSelection(plan, platform, "sha256:"+strings.Repeat("c", 64))
+				if platform == "linux/amd64" {
+					assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+				} else if err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
+	}
+}
+
+func TestInternalScannerPlatformAdmission(t *testing.T) {
+	for _, tc := range []struct {
+		name, scanner, platform  string
+		native, reject, twoTools bool
+	}{
+		{"legacy inherited cross-platform", "", "linux/arm64", false, true, false},
+		{"legacy explicit shared cross-platform", "syft", "linux/arm64", false, true, false},
+		{"legacy same platform", "", "linux/amd64", false, false, false},
+		{"legacy distinct scanner", "helper-scanner", "linux/arm64", false, false, false},
+		{"native inherited cross-platform", "", "linux/arm64", true, false, false},
+		{"legacy internal scanner collision", "helper-scanner", "linux/arm64", false, true, true},
+		{"native internal scanner sharing", "helper-scanner", "linux/arm64", true, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, plan := nativeUtilityFixture(t)
+			d, env := plan.Definition.Clone(), plan.Environment.Clone()
+			if !tc.native {
+				env.UtilityContainers = nil
+			}
+			tool := authored.InternalTool{Name: "helper", Platform: tc.platform, Format: authored.OutputExecutable,
+				Components: []string{"containerd"}, Result: "containerd", SBOMTool: tc.scanner}
+			d.InternalTools = []authored.InternalTool{tool}
+			if tc.twoTools {
+				tool.Name, tool.Platform = "first", "linux/amd64"
+				d.InternalTools = append([]authored.InternalTool{tool}, d.InternalTools...)
+			}
+			if !tc.reject {
+				if err := admitInputs(d, env); err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			d.Catalog.Base = "missing-catalog"
+			_, err := CompileDocuments(t.Context(), "definition.yaml", d, "environment.yaml", env, "test")
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if !strings.Contains(err.Error(), "scanner") {
+				t.Fatalf("wrong admission branch: %v", err)
 			}
 		})
 	}
