@@ -1,12 +1,7 @@
-# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 apiVersion: nvkr.dev/catalog-overlay/v3
 kind: CatalogOverlay
 name: nvke-m2-native-toolchains
-requiresCatalogDigest: sha256:19629d981b60678796380a38663c2da14eba5284f7c1444ba88aaf4f924be803
-# Preparation: https://github.com/dsx-ai-factory/nvkr/actions/runs/42904976235/attempts/1
-# Candidate-only exception: inputs/policies/toolchain-maintenance/42904976235.json (expires 2027-02-08).
+requiresCatalogDigest: sha256:4afb4e97f617e3c348fca7b42e9f9cb5fd2d627c58bec8242cff9ea43b77c663
 toolchainSubstitutions:
 - arch: amd64
   components:

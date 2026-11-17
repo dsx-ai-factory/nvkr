@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-os-arm64-tcg-local",
-  "requiresCatalogDigest": "sha256:19629d981b60678796380a38663c2da14eba5284f7c1444ba88aaf4f924be803",
+  "requiresCatalogDigest": "sha256:4afb4e97f617e3c348fca7b42e9f9cb5fd2d627c58bec8242cff9ea43b77c663",
   "components": {
     "nvke-cni-ovn": {
       "component": {
@@ -69,6 +69,13 @@
         "tag": "v0.23.0",
         "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
         "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "patches": [
+          {
+            "name": "patches/packer-toolchain-version.patch",
+            "sha256": "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227",
+            "content": "--- a/os-image/packer/versions.pkr.hcl\n+++ b/os-image/packer/versions.pkr.hcl\n@@ -4,8 +4,8 @@\n packer {\n-  required_version = \"= 1.15.4\"\n+  required_version = \"= 1.16.2\"\n\n   required_plugins {\n     qemu = {\n       source  = \"github.com/hashicorp/qemu\"\n-      version = \"= 1.1.6\"\n+      version = \"= 1.1.8\"\n     }\n"
+          }
+        ],
         "toolchainImages": {
           "amd64": "sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd",
           "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"

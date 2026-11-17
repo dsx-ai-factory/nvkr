@@ -522,8 +522,9 @@ exec "$NVKR_AUTHORING_TEST_EXE" -test.run='^TestAuthoringLabCLIProcess$' -- "$@"
 					if !strings.Contains(build.Name, "ubuntu24") || agent == image || !strings.HasPrefix(agent, "docker.io/library/golang@sha256:") {
 						t.Fatalf("Ubuntu 24 selection lost its compatible agent toolchain: output=%s, agent=%s", build.Name, agent)
 					}
-					if len(build.CatalogSnapshot.Components[diskRoot].Patches) != 0 {
-						t.Fatal("frozen disk must preserve stock upstream source")
+					// The frozen disk carries exactly the Packer version-pin patch: dropping it restores pins the toolchain refuses.
+					if patches := build.CatalogSnapshot.Components[diskRoot].Patches; len(patches) != 1 || patches[0].SHA256 != "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227" {
+						t.Fatal("frozen disk must carry the Packer version-pin patch and no other source change")
 					}
 					for _, name := range []string{"native-toolchains.yaml", "ubuntu24.json"} {
 						if _, err := os.Stat(filepath.Join(root, ".nvkr/inputs/test-attempt", name)); err != nil {

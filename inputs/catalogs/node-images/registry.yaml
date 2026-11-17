@@ -348,6 +348,9 @@ components:
     source: nvke-kubeadm-distro-source
     writeDir: nvkr-output
   nvke-node-fde-amd64:
+    patches:
+      - name: patches/packer-toolchain-version.patch
+        sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227
     artifactPath: fde/nvke-node.qcow2
     buildNetwork: default
     buildRequirements:
@@ -398,6 +401,9 @@ components:
     - linux/amd64
     source: nvke-os
   nvke-node-fde-arm64:
+    patches:
+      - name: patches/packer-toolchain-version.patch
+        sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227
     artifactPath: fde/nvke-node.qcow2
     buildNetwork: default
     buildRequirements:
@@ -449,6 +455,9 @@ components:
     - linux/arm64
     source: nvke-os
   nvke-node-image:
+    patches:
+      - name: patches/packer-toolchain-version.patch
+        sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227
     artifactPath: non-fde/nvke-node.qcow2
     buildNetwork: default
     buildRequirements:
@@ -499,6 +508,9 @@ components:
     - linux/arm64
     source: nvke-os
   nvke-node-image-amd64:
+    patches:
+      - name: patches/packer-toolchain-version.patch
+        sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227
     artifactPath: non-fde/nvke-node.qcow2
     buildNetwork: default
     buildRequirements:
@@ -548,6 +560,9 @@ components:
     - linux/amd64
     source: nvke-os
   nvke-node-image-amd64-diagnostic:
+    patches:
+      - name: patches/packer-toolchain-version.patch
+        sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227
     artifactPath: non-fde/nvke-node.qcow2
     buildNetwork: default
     buildRequirements:
@@ -595,6 +610,9 @@ components:
     - linux/amd64
     source: nvke-os
   nvke-node-image-diagnostic:
+    patches:
+      - name: patches/packer-toolchain-version.patch
+        sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227
     artifactPath: non-fde/nvke-node.qcow2
     buildNetwork: default
     buildRequirements:

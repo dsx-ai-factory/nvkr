@@ -264,7 +264,9 @@ func TestGitHubCollectedRecoveryUsesOriginalLeafResults(t *testing.T) {
 
 func TestGitHubCollectedRecoveryRejectsCollectorFailureWithoutPublication(t *testing.T) {
 	plan := recompileGitHubStabilityPlan(t, buildOnlyPlan(t, "ubuntu-24.04"), func(inputs *githubStabilityInputs) {
-		for index := 1; index < 12; index++ {
+		// One job serves a whole Build target, so the build-only fixture needs
+		// more outputs than the collector threshold of 64 required jobs.
+		for index := 1; index < 70; index++ {
 			output := inputs.definition.Outputs[0]
 			output.Name = fmt.Sprintf("worker-%02d", index)
 			inputs.definition.Outputs = append(inputs.definition.Outputs, output)
@@ -296,10 +298,11 @@ func TestGitHubCollectedRecoveryRejectsCollectorFailureWithoutPublication(t *tes
 
 func collectedRecoveryPlan(t *testing.T) (*Plan, *githubNeedsProjection, map[string]string) {
 	t.Helper()
-	// Six small outputs cross the collector threshold without importing the
-	// maintained product's unrelated images, charts, disks and source closure.
+	// Small outputs cross the collector threshold of 64 required jobs without
+	// importing the maintained product's unrelated images, charts, disks and
+	// source closure. Each output is one producer job and one release job.
 	plan := recompileGitHubStabilityPlan(t, referenceTestPlan(t), func(inputs *githubStabilityInputs) {
-		for index := len(inputs.definition.Outputs); index < 6; index++ {
+		for index := len(inputs.definition.Outputs); index < 36; index++ {
 			output := inputs.definition.Outputs[0]
 			output.Name = fmt.Sprintf("worker-z%02d", index)
 			inputs.definition.Outputs = append(inputs.definition.Outputs, output)

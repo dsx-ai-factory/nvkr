@@ -98,8 +98,10 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	if err != nil {
 		return nil, err
 	}
-	if plan.Environment.GitHubExecutionPartitions {
-		entry, workers, err := lowerGitHubPartitions(ctx, plan, bundle.Files[bundle.WorkflowPath])
+	flat := bundle.Files[bundle.WorkflowPath]
+	switch {
+	case githubPartitionsEngaged(plan, flat):
+		entry, workers, err := lowerGitHubPartitions(ctx, plan, flat)
 		if err != nil {
 			return nil, err
 		}
@@ -108,6 +110,12 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		}
 		bundle.Files[bundle.WorkflowPath] = entry
 		bundle = newGeneratedBundle(EngineGitHub, githubLayoutFor(plan), bundle.Files, bundle.PlanDigest)
+	case plan.Environment.GitHubExecutionPartitions:
+		// A permitted fallback that does not engage leaves the flat workflow
+		// subject to every admission bound, as without the setting.
+		if err := validateGitHubWorkflowSize(flat); err != nil {
+			return nil, err
+		}
 	}
 	if validate {
 		if err := ValidateGitHubBundle(ctx, plan, bundle); err != nil {
@@ -115,6 +123,19 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		}
 	}
 	return bundle, nil
+}
+
+// githubForcePartitionFallback lets partition-fallback tests engage the
+// fallback on small fixtures. It only adds engagement: the production limits
+// still decide every real overflow.
+var githubForcePartitionFallback bool
+
+// Partitioned execution is a fallback. The admitted Environment permits it, and
+// it engages only when the flat workflow exceeds the provider's file-size
+// ceiling or parser event cap. GitHub's 256-job limit is for matrix expansion
+// and is not a trigger.
+func githubPartitionsEngaged(plan *Plan, flat []byte) bool {
+	return plan.Environment.GitHubExecutionPartitions && (githubForcePartitionFallback || githubWorkflowOverflows(flat))
 }
 
 // The flat rendering is the semantic reference for exact partition projection.
@@ -307,7 +328,9 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 		for k, v := range plan.Environment.Runtime.Variables {
 			env[k] = v
 		}
-		if node.Kind == NodePublish || signFamilyNode(node.Kind) {
+		// Release operations share one job, so each registry credential stays
+		// on the step that uses it. An object publication keeps its own job.
+		if IsObjectPublicationNode(plan, node.ID) {
 			registryEnv, err := githubRegistryEnvironment(plan, node.Kind, node.Target)
 			if err != nil {
 				return nil, err
@@ -315,11 +338,6 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 			for key, value := range registryEnv {
 				env[key] = value
 			}
-		}
-		if token := githubPublicationRepositoryToken(plan, node); token != "" {
-			env[githubRepositoryTokenEnv] = token
-		}
-		if IsObjectPublicationNode(plan, node.ID) {
 			destination, err := objectPublicationDestination(plan, node.Target)
 			if err != nil {
 				return nil, err
@@ -392,11 +410,14 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 		for _, node := range stage.Nodes {
 			fmt.Fprintf(&body, "      - name: %s\n", yamlSingle(githubNodeLabel(plan, node)))
 			fmt.Fprintf(&body, "        id: %s\n", githubJobID(node.ID))
-			sourceEnv := githubSourceEnvironment(plan, node)
-			if len(sourceEnv) > 0 {
+			stepEnv, err := githubNodeStepEnvironment(plan, node)
+			if err != nil {
+				return nil, err
+			}
+			if len(stepEnv) > 0 {
 				fmt.Fprintln(&body, "        env:")
-				for _, key := range sortedKeys(sourceEnv) {
-					fmt.Fprintf(&body, "          %s: %s\n", key, yamlSingle(sourceEnv[key]))
+				for _, key := range sortedKeys(stepEnv) {
+					fmt.Fprintf(&body, "          %s: %s\n", key, yamlSingle(stepEnv[key]))
 				}
 			}
 			fmt.Fprintln(&body, "        run: |")
@@ -496,6 +517,7 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 	for name, raw := range actionFiles {
 		files[name] = raw
 	}
+	// Without the permitted fallback an oversized flat workflow fails closed.
 	if !plan.Environment.GitHubExecutionPartitions {
 		if err := validateGitHubWorkflowSize(workflow); err != nil {
 			return nil, err
@@ -603,6 +625,26 @@ func githubRegistryEnvironment(plan *Plan, kind, targetName string) (map[string]
 		}
 	}
 	return map[string]string{"NVKR_CREDENTIAL": "${{ secrets." + secret + " }}", "NVKR_REGISTRY_USER": user}, nil
+}
+
+// githubNodeStepEnvironment is the exact credential environment of one
+// execution step: a source fetch's source credential, or a release operation's
+// registry credential and repository token. No other step receives either.
+func githubNodeStepEnvironment(plan *Plan, node Node) (map[string]string, error) {
+	if IsObjectPublicationNode(plan, node.ID) || (node.Kind != NodePublish && !signFamilyNode(node.Kind)) {
+		return githubSourceEnvironment(plan, node), nil
+	}
+	env, err := githubRegistryEnvironment(plan, node.Kind, node.Target)
+	if err != nil {
+		return nil, err
+	}
+	if token := githubPublicationRepositoryToken(plan, node); token != "" {
+		if env == nil {
+			env = map[string]string{}
+		}
+		env[githubRepositoryTokenEnv] = token
+	}
+	return env, nil
 }
 
 // GHCR privacy admission authenticates the source repository with the automatic

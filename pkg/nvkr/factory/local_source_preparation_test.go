@@ -221,6 +221,10 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 			if name == "nvke-node-image-amd64" && (component.Packer == nil || component.Packer.PackerVersion != "1.15.4") {
 				t.Fatal("frozen nightly disk must match NVKE's Packer 1.15.4 contract")
 			}
+			// NVKE's own pins accept this Packer version, so the version-pin patch must not apply here.
+			if name == "nvke-node-image-amd64" && len(component.Patches) != 0 {
+				t.Fatal("frozen nightly disk must build unpatched NVKE source")
+			}
 			original := prior.ResolvedComponents[componentIndex]
 			if original.Name != name {
 				t.Fatal("source selection changed component membership")

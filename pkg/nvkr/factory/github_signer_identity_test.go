@@ -114,7 +114,26 @@ func TestGitHubPartitionForwardingResolvesExactMembers(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !plan.Environment.GitHubExecutionPartitions {
-		t.Fatal("committed development bundle is not partitioned; replace this fixture rather than skipping")
+		t.Fatal("committed development Environment does not permit partitions; replace this fixture rather than skipping")
+	}
+	// The committed bundle fits one flat workflow, so render its permitted
+	// fallback and read the forwarding expressions from that projection.
+	engageGitHubPartitions(t)
+	bundle, err := RenderGitHub(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root = t.TempDir()
+	for name, raw := range bundle.Files {
+		if !strings.HasPrefix(name, ".github/workflows/") {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(root, name)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, name), raw, 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	layout := githubLayoutFor(plan)
 	entry := githubForwardingJobs(t, filepath.Join(root, layout.workflowPath))

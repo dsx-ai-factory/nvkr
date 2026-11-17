@@ -1,6 +1,3 @@
-# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
 apiVersion: nvkr.dev/catalog-overlay/v3
 components:
   nvke-node-image-diagnostic:
@@ -49,6 +46,23 @@ components:
           efi_firmware_vars: /usr/share/AAVMF/AAVMF_VARS.fd
           ssh_timeout: 180m
           ubuntu_series: "26.04"
+      patches:
+      - content: |
+          --- a/os-image/packer/versions.pkr.hcl
+          +++ b/os-image/packer/versions.pkr.hcl
+          @@ -4,8 +4,8 @@
+           packer {
+          -  required_version = "= 1.15.4"
+          +  required_version = "= 1.16.2"
+
+             required_plugins {
+               qemu = {
+                 source  = "github.com/hashicorp/qemu"
+          -      version = "= 1.1.6"
+          +      version = "= 1.1.8"
+               }
+        name: patches/packer-toolchain-version.patch
+        sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227
       platforms:
       - linux/arm64
       repo: https://github.com/dsx-ai-factory/nvke.git
@@ -87,4 +101,4 @@ components:
         }
 kind: CatalogOverlay
 name: nvke-os-arm64-native-kvm
-requiresCatalogDigest: sha256:19629d981b60678796380a38663c2da14eba5284f7c1444ba88aaf4f924be803
+requiresCatalogDigest: sha256:4afb4e97f617e3c348fca7b42e9f9cb5fd2d627c58bec8242cff9ea43b77c663

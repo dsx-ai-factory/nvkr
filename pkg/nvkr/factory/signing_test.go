@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"maps"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -293,18 +294,23 @@ func TestPlanValidationRejectsAPublicationThatIsNotSigned(t *testing.T) {
 }
 
 func TestRenderGitHubSigningJobsCarryModeScopedPermissions(t *testing.T) {
+	// Each operation has its own scope. The release job that runs them holds
+	// their union: a dry run adds nothing to the publisher's package write.
 	tests := []struct {
 		name    string
 		signing *authored.Signing
 		sign    map[string]string
 		verify  map[string]string
+		job     map[string]string
 	}{
 		{name: "dry-run", signing: dryRunSigningProfile(),
 			sign:   map[string]string{"contents": "read"},
-			verify: map[string]string{"contents": "read", "packages": "read"}},
+			verify: map[string]string{"contents": "read", "packages": "read"},
+			job:    map[string]string{"contents": "read", "packages": "write"}},
 		{name: "cosign", signing: cosignSigningProfile(),
 			sign:   map[string]string{"contents": "read", "packages": "write", "id-token": "write"},
-			verify: map[string]string{"contents": "read", "packages": "read"}},
+			verify: map[string]string{"contents": "read", "packages": "read"},
+			job:    map[string]string{"contents": "read", "packages": "write", "id-token": "write"}},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -317,24 +323,29 @@ func TestRenderGitHubSigningJobsCarryModeScopedPermissions(t *testing.T) {
 			if err := yaml.UnmarshalStrict(expandedGitHubWorkflow(t, bundle), &document); err != nil {
 				t.Fatal(err)
 			}
-			for jobID, want := range map[string]map[string]string{
-				githubJobID("sign/release"):               test.sign,
-				githubJobID("verify-publication/release"): test.verify,
-			} {
-				job, ok := document.Jobs[jobID]
-				if !ok {
-					t.Fatalf("workflow has no job %q", jobID)
+			_, jobs, err := githubStages(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			nodes, _ := planIndex(plan)
+			jobID := jobs["sign/release"]
+			job, ok := document.Jobs[jobID]
+			if !ok || jobs["verify-publication/release"] != jobID {
+				t.Fatalf("signing and verification do not share release job %q", jobID)
+			}
+			if !maps.Equal(job.Permissions, test.job) {
+				t.Fatalf("job %q permissions = %v, want %v", jobID, job.Permissions, test.job)
+			}
+			if _, present := job.Env["NVKR_CREDENTIAL"]; present {
+				t.Fatalf("job %q binds the registry credential at job scope", jobID)
+			}
+			for nodeID, want := range map[string]map[string]string{"sign/release": test.sign, "verify-publication/release": test.verify} {
+				scope, err := githubNodePermissions(plan, nodes[nodeID])
+				if err != nil || !maps.Equal(scope, want) {
+					t.Fatalf("%s scope = %v, want %v: %v", nodeID, scope, want, err)
 				}
-				if len(job.Permissions) != len(want) {
-					t.Fatalf("job %q permissions = %v, want %v", jobID, job.Permissions, want)
-				}
-				for name, value := range want {
-					if job.Permissions[name] != value {
-						t.Fatalf("job %q %s = %q, want %q", jobID, name, job.Permissions[name], value)
-					}
-				}
-				if job.Env["NVKR_CREDENTIAL"] != "${{ secrets.NVKR_REGISTRY_AUTH }}" {
-					t.Fatalf("job %q does not carry the target's configured credential reference: %v", jobID, job.Env)
+				if step := githubNodeStep(t, &job, nodeID); step.Env["NVKR_CREDENTIAL"] != "${{ secrets.NVKR_REGISTRY_AUTH }}" {
+					t.Fatalf("%s does not carry the target's configured credential reference: %v", nodeID, step.Env)
 				}
 			}
 			// A dry run must not obtain an OIDC identity token anywhere.
@@ -355,25 +366,39 @@ func TestValidateGitHubBundleRejectsIdentityTokenOutsideTheSigningFamily(t *test
 		t.Fatal(err)
 	}
 	original := bundle.Files[GitHubWorkflowPath]
+	_, jobs, err := githubStages(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var producer string
+	for _, node := range plan.Graph.Nodes {
+		if node.Kind == NodeBuild {
+			producer = jobs[node.ID]
+		}
+	}
+	release := jobs["publish/release"]
+	if producer == "" || release == "" || producer == release {
+		t.Fatal("fixture requires separate producer and release jobs")
+	}
 	tests := []struct {
 		name   string
 		old    []byte
 		new    []byte
 		mutate func(*yamlv3.Node)
 	}{
-		{name: "publish-grabs-id-token",
+		{name: "producer-grabs-id-token",
 			mutate: func(root *yamlv3.Node) {
-				permissions := githubTestYAMLField(t, root, "jobs", githubJobID("publish/release"), "permissions")
-				githubYAMLSet(permissions, "id-token", githubYAMLString("write"))
+				githubYAMLSet(githubTestYAMLField(t, root, "jobs", producer), "permissions",
+					githubYAMLMap("contents", githubYAMLString("read"), "id-token", githubYAMLString("write")))
 			}},
 		{name: "deployment-environment-removed",
 			old: []byte("    environment: " + yamlSingle(githubReleaseEnvironment) + "\n"), new: []byte("")},
 		{name: "deployment-environment-replaced",
 			old: []byte("    environment: " + yamlSingle(githubReleaseEnvironment) + "\n"), new: []byte("    environment: 'unprovisioned-release'\n")},
-		{name: "verify-grabs-id-token",
+		{name: "release-job-widens-its-token",
 			mutate: func(root *yamlv3.Node) {
-				permissions := githubTestYAMLField(t, root, "jobs", githubJobID("verify-publication/release"), "permissions")
-				githubYAMLSet(permissions, "id-token", githubYAMLString("write"))
+				permissions := githubTestYAMLField(t, root, "jobs", release, "permissions")
+				githubYAMLSet(permissions, "contents", githubYAMLString("write"))
 			}},
 		{name: "sign-drops-id-token",
 			old: []byte("      contents: read\n      id-token: write\n      packages: write\n"),
