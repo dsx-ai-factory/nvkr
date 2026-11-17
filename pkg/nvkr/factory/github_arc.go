@@ -121,7 +121,7 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 			}
 		}
 		for _, instruction := range build.Graph.Nodes {
-			// ADR-27 §8: a pinned tool never joins the ARC disk group, even as a material.
+			// ADR-27 §8: a pinned-tool producer never joins the ARC disk group, even as a material.
 			if instruction.BuilderType == ir.BuilderPinnedTool {
 				return e.New(e.CodeEngineCapability, "%s native ARC disk route does not admit pinned-tool producer %q", adapter, instruction.Component)
 			}

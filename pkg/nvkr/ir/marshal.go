@@ -20,10 +20,11 @@ import (
 // immutable manifest digest while constructing this value; the registry/name prefix
 // is not representable here.
 type LogicalNode struct {
-	ImageParentDigest string   `json:"imageParentDigest,omitempty"`
-	ID                string   `json:"id"`
-	Kind              string   `json:"kind"`
-	Needs             []string `json:"needs,omitempty"`
+	BuildTool         *BuildToolBinding `json:"buildTool,omitempty"`
+	ImageParentDigest string            `json:"imageParentDigest,omitempty"`
+	ID                string            `json:"id"`
+	Kind              string            `json:"kind"`
+	Needs             []string          `json:"needs,omitempty"`
 
 	Commit            string             `json:"commit,omitempty"`
 	TreeHash          string             `json:"treeHash,omitempty"`
@@ -99,6 +100,8 @@ var nodeBuildIdentityRules = map[string]buildIdentityFieldRule{
 	"Component":         includeLogicalValueInBuildIdentity,
 	"BuilderType":       includeLogicalValueInBuildIdentity,
 	"Tool":              includeLogicalValueInBuildIdentity,
+	"BuildTool":         includeLogicalValueInBuildIdentity,
+	"BuildToolURL":      excludeTransportFromBuildIdentity,
 	"FlakeRef":          excludeTransportFromBuildIdentity,
 	"FlakeOutput":       includeLogicalValueInBuildIdentity,
 	"FlakeLockDigest":   includeLogicalValueInBuildIdentity,
@@ -166,6 +169,7 @@ func (g Graph) normalizedCopy() Graph {
 		c.Nodes[i].Packer = clonePackerConfig(g.Nodes[i].Packer)
 		c.Nodes[i].Materials = append([]MaterialBinding(nil), g.Nodes[i].Materials...)
 		c.Nodes[i].ExecutableArchive = cloneExecutableArchive(g.Nodes[i].ExecutableArchive)
+		c.Nodes[i].BuildTool = cloneBuildTool(g.Nodes[i].BuildTool)
 	}
 	c.Normalize()
 	return c
@@ -209,6 +213,7 @@ func (g Graph) logicalGraph() LogicalGraph {
 			VendorImage: imageDigestID(node.VendorImage), Digest: node.Digest, ImageParentDigest: node.ImageParentDigest,
 			ExecutableArchive: cloneExecutableArchive(node.ExecutableArchive),
 			Component:         node.Component, BuilderType: node.BuilderType, Tool: node.Tool,
+			BuildTool:   cloneBuildTool(node.BuildTool),
 			FlakeOutput: node.FlakeOutput, FlakeLockDigest: node.FlakeLockDigest,
 			Toolchain: imageDigestID(node.Toolchain), ToolchainPlatform: node.ToolchainPlatform,
 			Platform: node.Platform,

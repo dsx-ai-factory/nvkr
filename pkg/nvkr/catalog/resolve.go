@@ -37,12 +37,16 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		BuildCommand:           raw.BuildCommand,
 		BuildCommandByPlatform: raw.BuildCommandByPlatform,
 		Materials:              cloneStringMap(raw.Materials),
+		BuildTool:              cloneStringMap(raw.BuildTool),
 		ArtifactPath:           raw.ArtifactPath,
 		WriteDir:               raw.WriteDir,
 		ExclusionReason:        raw.ExclusionReason,
 		SourceMetadata:         cloneStringMap(raw.SourceMetadata),
 
 		BuildRequirements: execution.Clone(raw.BuildRequirements),
+	}
+	if err := resolveBuildTool(name, &c, sources, lock); err != nil {
+		return c, err
 	}
 	if raw.BuilderType == BuilderPinnedTool {
 		return resolvePinnedTool(name, raw, sources, lock, c)

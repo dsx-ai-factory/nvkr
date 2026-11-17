@@ -57,10 +57,11 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 	var observedMaterials *observedProducerMaterials
 	pinnedTool := instruction.Kind == ir.KindBuild && instruction.BuilderType == ir.BuilderPinnedTool
 	var toolExecutable string
-	if pinnedTool {
-		tool := artifacts["tool/"+instruction.Tool]
+	if pinnedTool || instruction.BuildTool != nil {
+		toolName := producerToolNode(instruction).Tool
+		tool := artifacts["tool/"+toolName]
 		if !containsString(node.Inputs, tool.ID) || tool.Kind != "pipeline-tool" || tool.Path == "" {
-			return e.New(e.CodeProvenanceMissing, "pinned-tool producer %q omits its tool/%s input", node.ID, instruction.Tool)
+			return e.New(e.CodeProvenanceMissing, "pinned-tool producer %q omits its tool/%s input", node.ID, toolName)
 		}
 		toolExecutable = tool.Path
 	}

@@ -70,9 +70,10 @@ type rawComponent struct {
 	BuildCommand           []string            `json:"buildCommand,omitempty"`
 	BuildCommandByPlatform map[string][]string `json:"buildCommandByPlatform,omitempty"`
 	Materials              map[string]string   `json:"materials,omitempty"`
-	Tool                   string              `json:"tool,omitempty"`     // pinned-tool: source whose tool pin runs (ADR-27)
-	ToolArgs               []string            `json:"toolArgs,omitempty"` // pinned-tool: argv after the executable
-	ToolEnv                map[string]string   `json:"toolEnv,omitempty"`  // pinned-tool: literal environment
+	BuildTool              map[string]string   `json:"buildTool,omitempty"` // native platform -> source tool used by a source build
+	Tool                   string              `json:"tool,omitempty"`      // pinned-tool: source whose tool pin runs (ADR-27)
+	ToolArgs               []string            `json:"toolArgs,omitempty"`  // pinned-tool: argv after the executable
+	ToolEnv                map[string]string   `json:"toolEnv,omitempty"`   // pinned-tool: literal environment
 	ArtifactPath           string              `json:"artifactPath,omitempty"`
 	WriteDir               string              `json:"writeDir,omitempty"`
 	VersionStamp           map[string]string   `json:"versionStamp,omitempty"` // Go text/template values

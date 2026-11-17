@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-native-local-kvm",
-  "requiresCatalogDigest": "sha256:decafe1447981f2371d684912307ec0273eb156ee2eb9975d6c1a085f6869237",
+  "requiresCatalogDigest": "sha256:550598149f8d38b49308a2764a9d83359fb042a1a3cbe12038bf2a3fa7f7f1f5",
   "components": {
     "nvke-agent": {
       "component": {
@@ -25,7 +25,7 @@
         "buildCommand": [
           "bash",
           "-ec",
-          "GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \\\n  VERSION=\"${BUILD_VERSION:?}\" \\\n  NFPM_BIN=/usr/local/bin/nfpm \\\n  DEB_OUTPUT=/src/agent/bin/nvke-agent.deb\ntest -f \"/src/agent/bin/nvke-agent.deb\"\ntest \"$(dpkg-deb --field \"/src/agent/bin/nvke-agent.deb\" Package)\" = \"nvke-agent\"\ntest \"$(dpkg-deb --field \"/src/agent/bin/nvke-agent.deb\" Architecture)\" = \"{{.Arch}}\"\n"
+          "GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \\\n  VERSION=\"${BUILD_VERSION:?}\" \\\n  NFPM_BIN={{.BuildTool}} \\\n  DEB_OUTPUT=/src/agent/bin/nvke-agent.deb\ntest -f \"/src/agent/bin/nvke-agent.deb\"\ntest \"$(dpkg-deb --field \"/src/agent/bin/nvke-agent.deb\" Package)\" = \"nvke-agent\"\ntest \"$(dpkg-deb --field \"/src/agent/bin/nvke-agent.deb\" Architecture)\" = \"{{.Arch}}\"\n"
         ],
         "artifactPath": "agent/bin/nvke-agent.deb",
         "writeDir": "agent/bin",
@@ -37,6 +37,28 @@
         "sourceDateEpoch": 1793236039,
         "versionStamp": {
           "BUILD_VERSION": "{{.Commit}}"
+        },
+        "buildTool": {
+          "linux/amd64": "nfpm-amd64",
+          "linux/arm64": "nfpm-arm64"
+        },
+        "buildToolPins": {
+          "linux/amd64": {
+            "format": "tar-gzip",
+            "url": "https://github.com/goreleaser/nfpm/releases/download/v2.48.0/nfpm_2.48.0_Linux_x86_64.tar.gz",
+            "platform": "linux/amd64",
+            "executablePath": "nfpm",
+            "archiveDigest": "sha256:6d7f9a28b2f397934403950fcbba83f598b08d02edbe79a0815b3b4897341750",
+            "executableDigest": "sha256:5377b2b61d5b39fab4adcd0fed263b85eb81da713f06fe08e93b967f36d1763c"
+          },
+          "linux/arm64": {
+            "format": "tar-gzip",
+            "url": "https://github.com/goreleaser/nfpm/releases/download/v2.48.0/nfpm_2.48.0_Linux_arm64.tar.gz",
+            "platform": "linux/arm64",
+            "executablePath": "nfpm",
+            "archiveDigest": "sha256:a9a75213763783b7669719e505474c748c5ad7dc66591a195619deb50f85c2f4",
+            "executableDigest": "sha256:74631f33142d8606096149555817d1f9bbbed8df830dead07cf54b3d7ae5faab"
+          }
         }
       }
     },

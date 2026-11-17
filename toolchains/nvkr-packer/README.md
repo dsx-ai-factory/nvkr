@@ -4,7 +4,7 @@ This directory defines the OCI toolchain consumed by NVKR's local direct-Packer
 executor. The default host-platform images contain Packer 1.16.2, the QEMU plugin 1.1.8,
 QEMU for both supported guest architectures, AMD64 and ARM64 UEFI firmware, `qemu-img`,
 `ssh-keygen`, Python, `tar`, a shell and the core utilities used by the NVKE
-Packer project. It also contains Go 1.27.4, crane 0.22.1, nfpm 2.48.0,
+Packer project. It also contains Go 1.27.4, crane 0.22.1,
 Helm 4.3.1 and ORAS 1.3.6,
 `dpkg-scanpackages`, `cloud-localds`, a native C compiler, Git, GnuPG, 7-Zip
 and xorriso. Those are the preparation and ISO-composition tools required by the
@@ -21,8 +21,8 @@ version, 1.27.1; it does not select the image compiler or validate a rebuilt ima
 `toolchain.lock.json` binds the Ubuntu and download-helper multi-platform base
 indexes, one immutable Ubuntu archive snapshot, and the official Packer and
 QEMU-plugin release archive and extracted executable digests for both host
-architectures. It also pins the official Go, crane and nfpm archives and the
-extracted crane, nfpm, Helm and ORAS executables. Helm archive hashes come from
+architectures. It also pins the official Go and crane archives and the
+extracted crane, Helm and ORAS executables. Helm archive hashes come from
 `get.helm.sh` release checksums; ORAS archive hashes come from its GitHub release
 checksum file. Extracted binary hashes were measured from those exact archives.
 Both include Apache-2.0 license text, retained in the final image. The download
@@ -51,7 +51,7 @@ existing pins. Check the nightly inputs without building with
 `toolchains/nvkr-packer/build.sh --nightly --arch amd64 --check`.
 
 Build and validate one local host architecture. The runtime check proves the
-exact Packer, plugin, Go, crane, nfpm, Helm and ORAS versions; QEMU/QCOW2 and firmware
+exact Packer, plugin, Go, crane, Helm and ORAS versions; QEMU/QCOW2 and firmware
 availability; the SSH-key, Debian-package and ISO-composition tools; and a real
 `packer validate` call through the preinstalled QEMU plugin:
 
@@ -82,7 +82,7 @@ public CA bundle as an ephemeral, read-only BuildKit secret. Its mode permits
 APT's unprivileged downloader to read it; it is never copied into the image.
 `NVKR_BUILD_ARCHIVES` selects a local directory through the `nvkr_archives`
 [named build context](https://docs.docker.com/reference/cli/docker/buildx/build/#build-context).
-Place the official Packer, QEMU plugin, Go, crane, nfpm, Helm and ORAS release archives
+Place the official Packer, QEMU plugin, Go, crane, Helm and ORAS release archives
 there under their upstream filenames for the selected architecture. Helm uses
 `helm-v4.3.1-linux-<arch>.tar.gz`; ORAS uses `oras_1.3.6_linux_<arch>.tar.gz`. Local mode copies
 them through read-only build mounts and applies the same archive and executable
@@ -150,8 +150,8 @@ mutable tag as the catalog pin.
 The Packer executable remains an external subprocess under the repository's
 license policy; it is not linked into `nvkr`. The image preserves the release
 archives' Packer BUSL-1.1 and QEMU-plugin MPL-2.0 license texts. Ubuntu package
-copyright records remain under `/usr/share/doc`; the Go BSD-3-Clause, crane
-Apache-2.0 and nfpm MIT texts are retained with the toolchain notices.
+copyright records remain under `/usr/share/doc`; the Go BSD-3-Clause and crane
+Apache-2.0 texts are retained with the toolchain notices.
 
 This repository does not record NVIDIA approval to redistribute Packer under
 BUSL-1.1 or a completed vulnerability review of this image. The source may be
@@ -223,3 +223,7 @@ The [M2 README](../../inputs/definitions/nvke/README.md) owns current source sel
 and generated execution requirements; the machine-managed locks and overlay own their exact values.
 Native preparation and registry read-back do not establish source-owner release acceptance, runtime
 isolation, a full image bake, organizational approval or independent consumer acceptance.
+
+Offline source builds that bind an auxiliary catalog tool require a 64-bit `/usr/bin/perl` with
+core `Config`, `Digest::SHA`, `Fcntl` and `POSIX` modules for the sealed-descriptor bootstrap
+(ADR-27). Replacement runtime images must preserve this requirement; missing support fails at launch.

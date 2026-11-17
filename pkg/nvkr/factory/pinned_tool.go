@@ -30,9 +30,10 @@ func withProducerTools(tools map[string]catalog.ToolPin, builds []BuildPlan) (ma
 			continue
 		}
 		for _, node := range build.Graph.Nodes {
-			if node.Kind != ir.KindBuild || node.BuilderType != ir.BuilderPinnedTool {
+			if node.Kind != ir.KindBuild || (node.BuilderType != ir.BuilderPinnedTool && node.BuildTool == nil) {
 				continue
 			}
+			node = producerToolNode(node)
 			pin, err := pinnedToolPin(node)
 			if err != nil {
 				return nil, err
@@ -53,6 +54,7 @@ func withProducerTools(tools map[string]catalog.ToolPin, builds []BuildPlan) (ma
 // pinnedToolPin projects the tool pin a pinned-tool build carries in its IR node.
 // The shared acquisition supports raw and tar-gzip assets only.
 func pinnedToolPin(node ir.Node) (catalog.ToolPin, error) {
+	node = producerToolNode(node)
 	archive := node.ExecutableArchive
 	if archive == nil || node.Tool == "" {
 		return catalog.ToolPin{}, e.New(e.CodePipelineDrift, "pinned-tool build %q has no tool pin", node.ID)
@@ -69,6 +71,7 @@ func pinnedToolPin(node ir.Node) (catalog.ToolPin, error) {
 // (ADR-27 §7): the release URL bound to the archive digest, and a logical
 // nvkr:tool/<name> URI naming the archive and member, bound to the executable digest.
 func pinnedToolDependencies(node ir.Node) []provenance.Dependency {
+	node = producerToolNode(node)
 	logical := "nvkr:tool/" + url.PathEscape(node.Tool) + "?" + url.Values{
 		"archive": {node.Artifact}, "member": {node.ExecutableArchive.Member},
 	}.Encode()
@@ -90,9 +93,10 @@ func requirePinnedToolDependencies(plan *Plan, dependencies []provenance.Depende
 			continue
 		}
 		for _, node := range build.Graph.Nodes {
-			if node.Kind != ir.KindBuild || node.BuilderType != ir.BuilderPinnedTool {
+			if node.Kind != ir.KindBuild || (node.BuilderType != ir.BuilderPinnedTool && node.BuildTool == nil) {
 				continue
 			}
+			node = producerToolNode(node)
 			if node.ExecutableArchive == nil {
 				return e.New(e.CodeProvenanceMissing, "pinned-tool build %q has no tool pin to record", node.ID)
 			}
@@ -117,7 +121,7 @@ func admitLocalPinnedTools(plan *Plan) error {
 		if err != nil {
 			return err
 		}
-		if instruction.BuilderType != ir.BuilderPinnedTool {
+		if instruction.BuilderType != ir.BuilderPinnedTool && instruction.BuildTool == nil {
 			continue
 		}
 		if err := pipeline.AdmitPinnedToolHost(instruction); err != nil {
@@ -125,4 +129,14 @@ func admitLocalPinnedTools(plan *Plan) error {
 		}
 	}
 	return nil
+}
+
+// producerToolNode projects either explicit producer binding into the existing
+// acquisition description. It is not an executable node and never changes the IR.
+func producerToolNode(node ir.Node) ir.Node {
+	if tool := node.BuildTool; tool != nil {
+		node.Tool, node.Artifact, node.Digest = tool.Name, node.BuildToolURL, tool.ExecutableDigest
+		node.ExecutableArchive = &ir.ExecutableArchive{Format: tool.Format, Member: tool.Member, Digest: tool.ArchiveDigest}
+	}
+	return node
 }

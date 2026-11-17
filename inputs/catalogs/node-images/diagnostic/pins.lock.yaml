@@ -11,6 +11,30 @@ artifacts:
     tag: 26.04.1
 kind: PinLock
 pins:
+  nfpm-amd64:
+    commit: db22372bfbddb6b2968ff71e9c25e6bb1a2355c2
+    sourceDateEpoch: 1791826650
+    tag: v2.48.0
+    tool:
+      archiveDigest: sha256:6d7f9a28b2f397934403950fcbba83f598b08d02edbe79a0815b3b4897341750
+      executableDigest: sha256:5377b2b61d5b39fab4adcd0fed263b85eb81da713f06fe08e93b967f36d1763c
+      executablePath: nfpm
+      format: tar-gzip
+      platform: linux/amd64
+      url: https://github.com/goreleaser/nfpm/releases/download/v2.48.0/nfpm_2.48.0_Linux_x86_64.tar.gz
+    treeHash: 1f1773c46af87693b9028b9f5f48b5f093571c11
+  nfpm-arm64:
+    commit: db22372bfbddb6b2968ff71e9c25e6bb1a2355c2
+    sourceDateEpoch: 1791826650
+    tag: v2.48.0
+    tool:
+      archiveDigest: sha256:a9a75213763783b7669719e505474c748c5ad7dc66591a195619deb50f85c2f4
+      executableDigest: sha256:74631f33142d8606096149555817d1f9bbbed8df830dead07cf54b3d7ae5faab
+      executablePath: nfpm
+      format: tar-gzip
+      platform: linux/arm64
+      url: https://github.com/goreleaser/nfpm/releases/download/v2.48.0/nfpm_2.48.0_Linux_arm64.tar.gz
+    treeHash: 1f1773c46af87693b9028b9f5f48b5f093571c11
   nvke-cni-calico-source:
     commit: 2cfd00081b468d85a4894ec17e9deac13c9d8169
     sourceDateEpoch: 1793236039

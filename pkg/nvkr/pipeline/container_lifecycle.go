@@ -20,6 +20,10 @@ import (
 // operations. It rechecks admitted images before run/create and dispatches through
 // the configured runtime pathname.
 func runContainerRuntime(opts RunOptions, args ...string) error {
+	return runContainerRuntimeInput(opts, nil, args...)
+}
+
+func runContainerRuntimeInput(opts RunOptions, input *os.File, args ...string) error {
 	if opts.preparedImage != nil && len(args) > 0 && (args[0] == "run" || args[0] == "create") {
 		image := opts.preparedImage
 		if err := image.RequireFor(opts.ctx(), opts.Runtime, image.subject, image.platform); err != nil {
@@ -29,6 +33,9 @@ func runContainerRuntime(opts RunOptions, args ...string) error {
 	}
 
 	cmd := execCmd(opts, opts.Runtime, args...)
+	if input != nil {
+		cmd.Stdin = input
+	}
 	cmd.Stdout = opts.Stdout
 	cmd.Stderr = opts.Stderr
 	return runOwnedCommand(opts.ctx(), cmd)

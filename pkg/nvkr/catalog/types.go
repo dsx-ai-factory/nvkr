@@ -288,6 +288,10 @@ type Component struct {
 	// VM lowering turns these declarations into build-graph edges and stages
 	// only the verified outputs named here.
 	Materials map[string]string `json:"materials,omitempty"`
+	// BuildTool selects one pinned release executable per native platform for an
+	// offline source build. BuildToolPins is loader-resolved; registries cannot author it.
+	BuildTool     map[string]string  `json:"buildTool,omitempty"`
+	BuildToolPins map[string]ToolPin `json:"buildToolPins,omitempty"`
 	// Tool names the catalog source whose tool pin a pinned-tool producer runs.
 	// ToolExecutable is loader-resolved from that source's lock record; registries
 	// cannot author it. ToolArgs follow the executable and may carry only the typed

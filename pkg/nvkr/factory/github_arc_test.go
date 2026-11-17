@@ -491,3 +491,30 @@ func TestARCPreparesOutputPublicationWithoutHostedMaterialDownloads(t *testing.T
 		})
 	}
 }
+
+// An auxiliary tool does not turn its source consumer into a pinned-tool producer.
+func TestARCAdmissionAcceptsAuxiliaryBuildTool(t *testing.T) {
+	plan := arcTestPlan(t, "linux/amd64")
+	cat := plan.CatalogSnapshot
+	image := cat.Components["image"]
+	cat.Components["agent"] = catalog.Component{
+		Platforms: []string{"linux/amd64"}, FromSource: true,
+		BuilderType: catalog.BuilderOCIHermetic, OutputType: "host-package",
+		Repo: image.Repo, Tag: image.Tag, Commit: image.Commit, TreeHash: image.TreeHash,
+		SourceDate: image.SourceDate, ToolchainImages: image.ToolchainImages,
+		BuildCommand: []string{"make", "NFPM_BIN=" + catalog.BuildToolToken}, WriteDir: "out", ArtifactPath: "out/agent.deb",
+		BuildTool:     map[string]string{"linux/amd64": "nfpm-amd64"},
+		BuildToolPins: map[string]catalog.ToolPin{"linux/amd64": pinnedToolFixturePin},
+	}
+	stack, err := catalog.ApplyStack(cat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err = Compile(t.Context(), plan.Definition, plan.Environment, stack, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := admitGitHubRequirements(plan, "test"); err != nil {
+		t.Fatalf("auxiliary tool source material refused by ARC admission: %v", err)
+	}
+}

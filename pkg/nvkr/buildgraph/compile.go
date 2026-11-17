@@ -291,6 +291,17 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		if selected, ok := nc.BuildCommandByPlatform[r.Platform]; ok {
 			command = renderArchAll(selected, arch)
 		}
+		var buildTool *ir.BuildToolBinding
+		var buildToolURL string
+		if name, selected := nc.BuildTool[r.Platform]; selected {
+			pin := nc.BuildToolPins[r.Platform]
+			buildTool = &ir.BuildToolBinding{Name: name, Platform: pin.Platform, Format: pin.Format,
+				Member: pin.ExecutablePath, ArchiveDigest: pin.ArchiveDigest, ExecutableDigest: pin.ExecutableDigest}
+			buildToolURL = pin.URL
+			for i := range command {
+				command[i] = strings.ReplaceAll(command[i], catalog.BuildToolToken, ir.BuildToolPath)
+			}
+		}
 		workdir, sourceReadOnly, writeDir := "/src", nc.WriteDir != "", nc.WriteDir
 		if builderType == ir.BuilderNativeGo {
 			sourceReadOnly = false // Native builds get their own authenticated source copy.
@@ -320,6 +331,8 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 			Env:               env,
 			Patches:           patchRefs(nc.Patches),
 			Command:           command,
+			BuildTool:         buildTool,
+			BuildToolURL:      buildToolURL,
 			Workdir:           workdir,
 			SourceDest:        dest,
 			SourceCommit:      nc.Commit,

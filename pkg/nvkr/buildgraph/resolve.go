@@ -218,6 +218,12 @@ func cloneComponent(component catalog.Component) catalog.Component {
 	component.ToolchainImages = maps.Clone(component.ToolchainImages)
 	component.BuildCommand = slices.Clone(component.BuildCommand)
 	component.Materials = maps.Clone(component.Materials)
+	component.BuildTool = maps.Clone(component.BuildTool)
+	component.BuildToolPins = maps.Clone(component.BuildToolPins)
+	for platform, pin := range component.BuildToolPins {
+		pin.Companions = slices.Clone(pin.Companions)
+		component.BuildToolPins[platform] = pin
+	}
 	component.VendorCommand = slices.Clone(component.VendorCommand)
 	component.VersionStamp = maps.Clone(component.VersionStamp)
 	component.SourceMetadata = maps.Clone(component.SourceMetadata)

@@ -26,13 +26,16 @@ components:
     source: nvke-os
     cgo: true
     outputType: host-package
+    buildTool:
+      linux/amd64: nfpm-amd64
+      linux/arm64: nfpm-arm64
     buildCommand:
       - bash
       - -ec
       - |
         GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \
           VERSION="${BUILD_VERSION:?}" \
-          NFPM_BIN=/usr/local/bin/nfpm \
+          NFPM_BIN={{.BuildTool}} \
           DEB_OUTPUT=/src/agent/bin/nvke-agent.deb
         test -f "/src/agent/bin/nvke-agent.deb"
         test "$(dpkg-deb --field "/src/agent/bin/nvke-agent.deb" Package)" = "nvke-agent"
@@ -46,6 +49,9 @@ components:
     fromSource: true
     source: nvke-cni-calico-source
     outputType: tarball
+    buildTool:
+      linux/amd64: nfpm-amd64
+      linux/arm64: nfpm-arm64
     buildCommand:
       - bash
       - -ec
@@ -55,7 +61,7 @@ components:
           /src/nvkr-output/work/
         CNI=cni-calico PRODUCT=Calico CONTENT_KIND=manifests \
           CONTENT_SPEC=/src/nvkr-output/work/cni-calico/packaging/nfpm-manifests.yaml \
-          NFPM_BIN=/usr/local/bin/nfpm ARCH={{.Arch}} DEB_REVISION=1 \
+          NFPM_BIN={{.BuildTool}} ARCH={{.Arch}} DEB_REVISION=1 \
           /src/nvkr-output/work/cni-common/build-deb.sh v3.30.1 \
           /src/os-image/packages/cni-calico/dist/v3.30.1 \
           /src/nvkr-output/calico
@@ -170,6 +176,9 @@ components:
     fromSource: true
     source: nvke-kubeadm-distro-source
     outputType: tarball
+    buildTool:
+      linux/amd64: nfpm-amd64
+      linux/arm64: nfpm-arm64
     buildCommand:
       - bash
       - -ec
@@ -178,7 +187,7 @@ components:
         cp -a os-image/packages/kubeadm-distro /src/nvkr-output/work/
         for version in v1.36.3 v1.35.3 v1.34.2; do
           PEER_VERSIONS='v1.36.3 v1.35.3 v1.34.2' DEB_REVISION=1 \
-            NFPM_BIN=/usr/local/bin/nfpm ARCH={{.Arch}} \
+            NFPM_BIN={{.BuildTool}} ARCH={{.Arch}} \
             /src/nvkr-output/work/kubeadm-distro/packaging/build-deb.sh \
             "$version" "/src/os-image/packages/kubeadm-distro/dist/$version" \
             /src/nvkr-output/kubeadm-distro
@@ -413,6 +422,8 @@ components:
 
 imports:
 - sources:
+    nfpm-amd64: nfpm-amd64
+    nfpm-arm64: nfpm-arm64
     nvke-os: nvke-os
     nvke-cni-calico-source: nvke-cni-calico-source
     nvke-kubeadm-distro-source: nvke-kubeadm-distro-source
@@ -427,4 +438,4 @@ imports:
     ubuntu-installer-iso: ubuntu-installer-iso
     ubuntu-installer-iso-amd64: ubuntu-installer-iso-amd64
   path: "../../shared/node-images.yaml"
-  sha256: 645a95c90ef1f68fd7e84cd660a7d0fb660e63a2932f8370cde65383a6d71225
+  sha256: c0ec3e81b65d9719b70a33de124e38960127c4f2abb94f688f0d5517fc452079

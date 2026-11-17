@@ -510,7 +510,7 @@ func productionBuildType(plan *Plan) string {
 		}
 		for _, node := range buildPlan.Graph.Nodes {
 			if node.Kind == ir.KindBuild {
-				if node.BuilderType == ir.BuilderBuildKit || node.BuilderType == ir.BuilderPinnedTool || node.Network != ir.NetworkNone {
+				if node.BuilderType == ir.BuilderBuildKit || node.BuilderType == ir.BuilderPinnedTool || node.BuildTool != nil || node.Network != ir.NetworkNone {
 					return provenance.BuildTypeWrappedBuild
 				}
 				hasBuild = true
@@ -546,7 +546,7 @@ func resolvedDependencies(plan *Plan) []provenance.Dependency {
 				dependency = provenance.SourceDependency(node.Repo, node.Commit, node.TreeHash)
 			case node.Kind == ir.KindBuild && node.Toolchain != "":
 				dependency = provenance.ToolchainDependency(node.Toolchain)
-				if node.BuilderType == ir.BuilderPinnedTool && node.ExecutableArchive != nil {
+				if (node.BuilderType == ir.BuilderPinnedTool && node.ExecutableArchive != nil) || node.BuildTool != nil {
 					for _, tool := range pinnedToolDependencies(node) {
 						if _, seen := byURI[tool.URI]; !seen {
 							byURI[tool.URI] = tool
