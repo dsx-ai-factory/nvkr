@@ -214,6 +214,13 @@ an active registered workflow. It never commits, pushes or changes provider sett
 dispatch, use `python3 scripts/pipeline-dev.py --repo dsx-ai-factory/nvkr --check` after
 `make pipeline-dev-check`. `make pipeline-dev-generate` regenerates just the development bundle.
 
+Release metadata assembly and deliverable verification use four concurrent output workers. For a diagnostic
+factory invocation, `NVKR_VERIFY_WORKERS` selects a canonical integer from 1 through 16; invalid values fail
+before verification work. This is an execution budget and does not change the compiled Plan or evidence.
+Assembly logs per-output metadata, signature/provenance and SBOM timings plus total authentication and
+metadata-construction wall time. Per-output times overlap when workers run concurrently; do not add them
+and report that sum as elapsed job time. No timing field enters the release bytes.
+
 ### One-time operator setup
 
 Merge the development producer, qualifier, smoke worker and cleanup workflows onto the default branch before dispatching them. GitHub's

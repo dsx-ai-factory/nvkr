@@ -9,6 +9,18 @@ in this metadata closure, including platform-scoped evidence. Output-local publi
 image tags; unrelated outputs and the metadata-only release root receive no payload aliases. The independent
 Release consumer's artifact-publication scope still checks complete payloads.
 
+Release assembly and deliverable verification now use a bounded pool (four workers by default, with the
+execution-only `NVKR_VERIFY_WORKERS=1..16` override). Results and shared evidence retain canonical order;
+ordinary failures collect every output error, and cancellation joins active work before returning. Aggregate
+signing leaves deliverable verification to the mandatory post-sign gate, which authenticates the served exact
+subjects under the original identity/issuer policy before writing a successful verification record. Assembly's
+root/predicate/SBOM authentication, finalization and independent consumer checks remain separate boundaries.
+Contract cases compare every assembled release/control/evidence file against the original sequential join,
+retain Plan identity including Build Digests, check one verification per deliverable, and exercise worker limits,
+cancellation and ordered failures. Assembly timing spans distinguish local metadata checks, root signature/provenance,
+SBOM verification and construction. Hosted profiling and before/after timing remain pending; the code changes
+and synthetic contracts alone establish no signing-service speedup or external acceptance.
+
 ADR-20 admits earlier-attempt output roots only within the same GitHub run and unchanged Plan, with exact
 repository/builder and preparation/signing/consuming-attempt ordering. ADR-16 artifact checks use the same
 producer retry boundaries while independently authenticating complete payloads and evidence. Contracts cover retries, mixed
