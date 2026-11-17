@@ -20,6 +20,7 @@ import (
 
 func TestPlanStoreMixedLegacyNavigationRetiresOnlyItsOwner(t *testing.T) {
 	const script = "printf first\nprintf last"
+	scriptPath := testNamedStorePath(t, "scripts/kubelet/build", []byte(script), ".sh")
 	oldPlan := recompileGitHubStabilityPlan(t, githubRuntimePlanFixture(t), func(in *githubStabilityInputs) {
 		component := in.catalog.Components["kubelet"]
 		component.BuildCommand = []string{"sh", "-c", script}
@@ -36,19 +37,33 @@ func TestPlanStoreMixedLegacyNavigationRetiresOnlyItsOwner(t *testing.T) {
 	// Encode the old command-operand shape explicitly. This descriptive fixture
 	// exercises migration through a published manifest, not just the decoder.
 	legacyJobs := map[string]any{}
+	vendorOnly := false
 	for id, job := range jobs {
 		operations := []map[string]any{}
 		for _, operation := range job.Operations {
 			command := []any{"sh", "-c"}
+			var vendorCommand []any
 			for _, name := range operation.Scripts {
-				command = append(command, map[string]string{"file": name})
+				if name == scriptPath {
+					vendorCommand = []any{"sh", "-c", map[string]string{"file": name}}
+					vendorOnly = true
+				} else {
+					command = append(command, map[string]string{"file": name})
+				}
 			}
-			operations = append(operations, map[string]any{
+			legacyOperation := map[string]any{
 				"node": operation.Node, "step": operation.Step, "target": operation.Target,
 				"producer": operation.Producer, "record": operation.Record, "command": command,
-			})
+			}
+			if len(vendorCommand) != 0 {
+				legacyOperation["vendorCmd"] = vendorCommand
+			}
+			operations = append(operations, legacyOperation)
 		}
 		legacyJobs[id] = map[string]any{"workflow": job.Workflow, "operations": operations}
+	}
+	if !vendorOnly {
+		t.Fatal("legacy fixture omitted a vendor-only script operand")
 	}
 	legacyBytes := mustCanonical(t, map[string]any{"jobs": legacyJobs})
 	legacyPath := filepath.ToSlash(filepath.Join(filepath.Dir(old.PlanPath), "script-index.json"))
@@ -80,7 +95,6 @@ func TestPlanStoreMixedLegacyNavigationRetiresOnlyItsOwner(t *testing.T) {
 	if err := json.Unmarshal(raw, &index); err != nil {
 		t.Fatal(err)
 	}
-	scriptPath := testNamedStorePath(t, "scripts/kubelet/build", []byte(script), ".sh")
 	foundScript := false
 	for id, expected := range jobs {
 		for _, operation := range expected.Operations {
