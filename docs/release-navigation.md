@@ -193,7 +193,7 @@ workspace as a release. An optional `--layout` supplies a cached copy of the exa
 the local-layout integrity and reference rules below still apply.
 
 Unfiltered `release browse --format json` and `release export` use the same versioned wire description. A
-browse selection remains a filtered view of that schema; export always emits the complete description.
+browse selection remains a filtered view of that schema; JSON export always emits the complete description.
 The [checked-in JSON example](https://github.com/dsx-ai-factory/nvkr/blob/main/pkg/nvkr/releaseview/testdata/release-description-v1.json) illustrates all
 supported artifact kinds and multiple source revisions with synthetic identities.
 
@@ -265,6 +265,21 @@ NVKR does not rename components into installer roles or create consumer-specific
 Consumers own role mapping, target selection, deployment topology, compatibility and complete offline
 dependency inventories. JSON export does not create a new lifecycle input or canonical identity, and a
 description cannot restore a held verification capability.
+
+## Export selected AICR inventory entries
+
+```sh
+bin/nvkr release export --reference "$RELEASE_REF" --format aicr-inventory \
+  --output controller-chart --output controller-image > artifact-inventory.yaml
+```
+
+Repeat `--output` (or pass comma-separated names) to select exact release output names that your AICR catalog binds. Without it,
+AICR export includes every chart and image. Selected entries retain the same bytes and sorted order
+as in the full inventory; repeated names emit one entry. Unknown names fail with a usage error,
+and explicitly selected outputs other than charts or images fail as incompatible. `--output` is
+available only with `--format aicr-inventory`. Selection follows complete release metadata inspection
+and also works with `--layout`; it does not narrow verification or grant consumer-policy trust.
+Consumers own catalog bindings and ignore dispositions; NVKR writes no ignore dispositions.
 
 ## Export a filtered view or diagram
 
