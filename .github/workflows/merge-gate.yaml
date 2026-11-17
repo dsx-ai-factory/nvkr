@@ -127,6 +127,9 @@ jobs:
               # those compatibility checks before merge while excluding the
               # demo from the root module's own compile/lint/test commands.
               - 'demos/**'
+              # The offline dependency boundary also inspects the release CLI.
+              - 'cmd/**'
+              - 'client/**'
               - 'pkg/**'
               - 'internal/**'
               - 'inputs/**'

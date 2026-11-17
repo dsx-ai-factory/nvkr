@@ -54,6 +54,9 @@ func TestExternalModuleAndReleaseDependencyBoundary(t *testing.T) {
 			command.Stdout, command.Stderr = &output, &output
 			err := ownedcmd.Run(ctx, command)
 			if err != nil {
+				if strings.Contains(output.String(), "module lookup disabled by GOPROXY=off") {
+					t.Fatalf("%s: offline module cache is incomplete; run `make -C demos/nvke test-deps` from the repository root before direct go test: %v\n%s", check.name, err, output.String())
+				}
 				t.Fatalf("%s: %v\n%s", check.name, err, output.String())
 			}
 			if check.name == "release dependencies" {
