@@ -368,6 +368,9 @@ func TestPlanTreeRejectsMalformedStorage(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			if bytes.Equal(raw, files[planPath]) {
+				t.Fatal("duplicate-owner fixture did not change the root bytes")
+			}
 			files[planPath] = raw
 		}},
 		{"missing catalog snapshot", func(files map[string][]byte) {
