@@ -353,18 +353,22 @@ func TestPlanTreeRejectsMalformedStorage(t *testing.T) {
 		{"extra step", func(files map[string][]byte) {
 			files[path.Dir(planPath)+"/steps/unexpected/step.json"] = []byte("{}\n")
 		}},
-		{"root-owned step field", func(files map[string][]byte) {
-			name := treeStepPath(t, planPath, files, 0)
-			var step planFields
-			if err := json.Unmarshal(files[name], &step); err != nil {
+		{"step-owned root field", func(files map[string][]byte) {
+			var root planFields
+			if err := json.Unmarshal(files[planPath], &root); err != nil {
 				t.Fatal(err)
 			}
-			step["catalogDigest"] = mustCanonical(t, plan.Builds[0].CatalogDigest)
-			raw, err := treeJSON(step)
+			var builds []planFields
+			if err := json.Unmarshal(root["builds"], &builds); err != nil {
+				t.Fatal(err)
+			}
+			builds[0]["catalogDigest"] = mustCanonical(t, plan.Builds[0].CatalogDigest)
+			root["builds"] = mustCanonical(t, builds)
+			raw, err := treeJSON(root)
 			if err != nil {
 				t.Fatal(err)
 			}
-			files[name] = raw
+			files[planPath] = raw
 		}},
 		{"missing catalog snapshot", func(files map[string][]byte) {
 			var root planFields

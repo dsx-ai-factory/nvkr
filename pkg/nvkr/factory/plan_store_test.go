@@ -703,10 +703,10 @@ func TestPlanStoreRecoveryDiagnostics(t *testing.T) {
 					t.Fatal("fixture has no shared object")
 				}
 			case "empty directory":
-				if err := os.MkdirAll(filepath.Join(root, PlanStoreDirectory, "components", "unused"), 0o755); err != nil {
+				if err := os.MkdirAll(filepath.Join(root, PlanStoreDirectory, "plan", "unused"), 0o755); err != nil {
 					t.Fatal(err)
 				}
-				want = []string{"components/unused", "run generate", "without --check"}
+				want = []string{"plan/unused", "run generate", "without --check"}
 			}
 			check := func(err error) {
 				t.Helper()

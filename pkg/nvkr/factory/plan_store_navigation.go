@@ -6,7 +6,9 @@ package factory
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"os"
+	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -105,7 +107,7 @@ func readPlanStoreNavigation(ctx context.Context, root string, bundle *Generated
 	size := int64(0)
 	legacy := filepath.ToSlash(filepath.Join(filepath.Dir(bundle.PlanPath), "script-index.json"))
 	for _, member := range members {
-		if member.Path != bundle.PlanPath && member.Path != legacy && !isPlanStorePath(member.Path) && !(strings.HasPrefix(member.Path, ".github/workflows/") && strings.HasSuffix(member.Path, ".yml")) {
+		if member.Path != bundle.PlanPath && member.Path != legacy && !isPlanStorePath(member.Path) && !(strings.HasPrefix(member.Path, ".github/workflows/") && strings.HasSuffix(member.Path, ".yml") && generatedMemberInNamespace(bundle, member.Path)) {
 			continue
 		}
 		if err := validateGeneratedDirectoryChain(root, filepath.ToSlash(filepath.Dir(member.Path))); err != nil {
@@ -160,4 +162,61 @@ func legacyPlanStoreNavigation(raw []byte) (map[string]githubScriptJob, error) {
 		jobs[id] = next
 	}
 	return jobs, nil
+}
+
+// Check navigation owned by this bundle without reading a neighbor's private
+// Plan or workflows. The shared object inventory is checked across all owners;
+// checking every maintained bundle covers every bundle's navigation as well.
+func checkPlanStoreNavigation(ctx context.Context, bundle *GeneratedBundle, owners map[string]planStoreOwner, jobs map[string][]planStoreJobVariant) error {
+	plan, _, err := joinPlanTree(ctx, bundle.PlanPath, bundle.Files)
+	if err != nil {
+		return err
+	}
+	expected, err := githubScriptNavigation(plan, maps.Clone(bundle.Files))
+	if err != nil {
+		return err
+	}
+	known := map[string]bool{}
+	for _, owner := range owners {
+		for _, name := range owner.Bundles {
+			known[name] = true
+		}
+	}
+	selected := path.Base(path.Dir(bundle.ManifestPath))
+	actual := map[string]githubScriptJob{}
+	for jobID, variants := range jobs {
+		if len(variants) == 0 {
+			return e.New(e.CodePipelineDrift, "navigation job has no owners")
+		}
+		seen := map[string]bool{}
+		previousVariant := ""
+		for i, variant := range variants {
+			for _, prior := range variants[:i] {
+				if reflect.DeepEqual(prior.Operations, variant.Operations) {
+					return e.New(e.CodePipelineDrift, "navigation duplicates identical job variants")
+				}
+			}
+			if len(variant.Workflows) == 0 || variant.Workflows[0].Bundle <= previousVariant {
+				return e.New(e.CodePipelineDrift, "navigation variants have missing or unordered owners")
+			}
+			previousVariant = variant.Workflows[0].Bundle
+			previous := ""
+			for _, workflow := range variant.Workflows {
+				layout, ok := githubWorkflowNamespace(".github/workflows/" + workflow.Bundle + ".yml")
+				owner, child := legacyGitHubChildWorkflowOwner(workflow.File)
+				validWorkflow := workflow.File == layout.workflowPath || (child && owner == layout.workflowPath && githubPartitionWorkflowSuffix.MatchString(workflow.File))
+				if !ok || !known[workflow.Bundle] || seen[workflow.Bundle] || workflow.Bundle <= previous || !validWorkflow {
+					return e.New(e.CodePipelineDrift, "navigation has an invalid workflow owner")
+				}
+				seen[workflow.Bundle], previous = true, workflow.Bundle
+				if workflow.Bundle == selected {
+					actual[jobID] = githubScriptJob{Workflow: workflow.File, Operations: variant.Operations}
+				}
+			}
+		}
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		return e.New(e.CodePipelineDrift, "shared navigation differs from bundle execution jobs; regenerate the bundle")
+	}
+	return nil
 }

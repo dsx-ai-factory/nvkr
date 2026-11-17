@@ -83,21 +83,28 @@ func encodePlanStoreIndex(owners map[string]planStoreOwner, jobs map[string][]pl
 	return raw, nil
 }
 
-func checkPlanStoreIndex(ctx context.Context, root string) error {
-	expected, err := planStoreIndex(ctx, root, nil)
-	if err != nil {
-		return err
-	}
+func checkPlanStoreIndex(ctx context.Context, root string, bundle *GeneratedBundle, owners map[string]planStoreOwner) error {
 	filename := filepath.Join(root, PlanStoreIndexPath)
 	info, err := os.Lstat(filename)
 	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0o644 {
 		return e.New(e.CodePipelineDrift, "shared Plan index is missing or unsafe; regenerate the bundle")
 	}
 	raw, err := readGeneratedContext(ctx, filename)
-	if err != nil || !bytes.Equal(raw, expected) {
+	if err != nil {
+		return e.Wrap(e.CodePipelineDrift, err, "reading shared Plan index")
+	}
+	var index planStoreIndexDocument
+	if err := decodeTreeJSON(raw, &index); err != nil {
+		return err
+	}
+	expected, err := encodePlanStoreIndex(owners, index.Jobs)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(raw, expected) {
 		return e.New(e.CodePipelineDrift, "shared Plan index differs from bundle ownership; regenerate the bundle")
 	}
-	return nil
+	return checkPlanStoreNavigation(ctx, bundle, owners, index.Jobs)
 }
 
 // Publication follows the bundle manifests and sweep. An interruption leaves a

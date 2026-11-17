@@ -128,9 +128,12 @@ bytes fails closed; the suffix is a locator, not a new logical identity.
 The generated `index.json` groups object variants by logical name, with each object's path, full digest
 and sorted bundle users. Its job entries link workflow jobs and execution steps to frozen producer records
 and exact scripts. Identical job descriptions share one entry with their workflow and bundle users.
-Job comments point to this one index; no per-bundle script index is emitted. Generation and drift checks
-reconstruct navigation from each published manifest's records and workflows without rendering workflows
-or resolving catalogs. Plan loads do not consult the descriptive index or neighboring bundles.
+Job comments point to this one index; no per-bundle script index is emitted. Generation reconstructs
+navigation from each published manifest's current records and workflows without rendering workflows
+or resolving catalogs; retirement-only workflows are excluded. A bundle drift check validates the global
+object inventory and its own job mapping without reading neighboring private Plans or workflows.
+Checking all maintained bundles covers the entire navigation index. Plan loads do not consult the
+descriptive index or neighboring bundles.
 Runtime pin refresh retains the existing target/script-binding and exact workflow/action checks; the
 shared index is rebuilt when generation publishes changed records. Navigation does not change executable identity.
 Each bundle's `plan.json` retains scalar metadata, ordered build names and references, and a `catalogSnapshots` map keyed by the existing `catalogDigest`.

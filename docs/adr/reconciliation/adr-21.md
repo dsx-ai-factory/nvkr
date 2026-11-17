@@ -103,7 +103,9 @@ The generated shared `index.json` links each GitHub execution job/step to its fr
 exact script files and owning bundle workflows. Identical operations share one entry across bundles;
 exact command operands remain in the step record. Plan loads do not consult this descriptive index.
 `TestGitHubScriptIndexConnectsJobsToExactCommands` covers flat/partition routing, byte-exact script references,
-shared job and bundle-user lookup, and navigation drift without adding a Plan-loader dependency.
+shared job and bundle-user lookup, and separate object/navigation drift without adding a Plan-loader dependency.
+Bundle independence contracts cover damaged neighboring private Plans and workflows; each bundle checks its own job mapping.
+The maintained all-bundle check covers the complete navigation index. Legacy workflow retirement retains its owning manifest without admitting retired workflows into navigation.
 Runtime pin-refresh contracts retain exact executable programs while regenerating descriptive record links.
 `TestPlanStoreNamedPathGrammar` and `TestPlanStoreFullDigestDisagreementDoesNotPublish` directly cover the
 named-path predicate and both conflicting-full-digest refusal branches. These are local contracts;

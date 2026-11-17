@@ -255,7 +255,7 @@ func inspectPlanStore(ctx context.Context, root string, bundle *GeneratedBundle,
 	}
 
 	if !writing {
-		if err := checkPlanStoreIndex(ctx, root); err != nil {
+		if err := checkPlanStoreIndex(ctx, root, bundle, owners); err != nil {
 			return nil, err
 		}
 		files, directories := map[string]bool{path.Base(PlanStoreIndexPath): true}, map[string]bool{".": true}

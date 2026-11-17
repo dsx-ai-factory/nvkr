@@ -93,12 +93,27 @@ func TestGitHubScriptIndexConnectsJobsToExactCommands(t *testing.T) {
 			if !matched {
 				t.Fatal("script has no bundle-user link")
 			}
-			// Navigation is covered by closure drift, but is not consulted by Plan loads.
-			writeGeneratedFixture(t, filepath.Join(root, PlanStoreIndexPath), []byte("{}\n"))
-			if _, err := LoadPlanContext(t.Context(), filepath.Join(root, bundle.PlanPath)); err != nil {
-				t.Fatal(err)
+			// The object inventory can remain valid while the selected job mapping
+			// drifts. Both failures are descriptive and must not block Plan loads.
+			for _, damage := range []string{"objects", "jobs"} {
+				t.Run(damage, func(t *testing.T) {
+					changed := index
+					if damage == "objects" {
+						changed.Objects = map[string][]planStoreVariant{}
+					} else {
+						changed.Jobs = map[string][]planStoreJobVariant{}
+					}
+					raw, err := treeJSON(changed)
+					if err != nil {
+						t.Fatal(err)
+					}
+					writeGeneratedFixture(t, filepath.Join(root, PlanStoreIndexPath), raw)
+					if _, err := LoadPlanContext(t.Context(), filepath.Join(root, bundle.PlanPath)); err != nil {
+						t.Fatal(err)
+					}
+					assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), root, bundle), e.CodePipelineDrift)
+				})
 			}
-			assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), root, bundle), e.CodePipelineDrift)
 		})
 	}
 }
