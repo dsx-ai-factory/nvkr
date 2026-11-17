@@ -410,3 +410,7 @@ run-resolve: build ## Resolve the pinned kubectl producer and print its build gr
 .PHONY: demo-hello
 demo-hello: ## Build and verify the hello demo (requires running Docker).
 	bash demos/demo-local.sh --out "$$(mktemp -d)/hello"
+
+.PHONY: e2e-quick
+e2e-quick: go-version-check ## Build, publish, recover and smoke hello; unsigned qualification (Docker or CONTAINER_RUNTIME=podman).
+	GOMAXPROCS=2 go run -p 2 ./internal/quicke2e
