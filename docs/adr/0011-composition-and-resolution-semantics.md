@@ -23,8 +23,11 @@ complete required build graph directly from those producers.
 
 ### 1. Exact producer selection
 
-Each Definition output declares a concrete target platform, or an explicit required platform set for an OCI image index, and a nonempty explicit component selection.
-The output uses the Definition's catalog stack unless it supplies its own.
+Each ordinary Definition output declares a concrete target platform, or an explicit required platform set
+for an OCI image index, and a nonempty explicit component selection. It uses the Definition's catalog stack
+unless it supplies its own. A release-derived inventory instead declares its encoding and a nonempty explicit
+selection of named sibling outputs, without components or a catalog. Its concrete platform schedules packaging
+work without inventing a native producer. ADR-20 defines its publication-bound derivation contract.
 Catalog sources, tools and components are reusable. There is no authored Recipe, reusable build
 group, criteria query, wildcard, specificity rule, inheritance chain, mixin, enable/disable merge, or reserved-axis
 activation. Removed fields and reserved legacy `overlays/` and `mixins/` directory layouts fail closed; they
