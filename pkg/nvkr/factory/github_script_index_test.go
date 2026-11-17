@@ -43,8 +43,9 @@ func TestGitHubScriptIndexConnectsJobsToExactCommands(t *testing.T) {
 			found, worker := false, false
 			for jobID, job := range index.Jobs {
 				workflow := string(bundle.Files[job.Workflow])
-				if !strings.Contains(workflow, "(job "+jobID+")") || !strings.Contains(workflow, jobID+":") {
-					t.Fatal("job missing navigation pointer", jobID)
+				comment := "    # Producer commands: " + githubScriptIndexPath(plan) + " (job " + jobID + ")"
+				if !strings.Contains(workflow, "\n  "+jobID+":\n"+comment+"\n") || strings.Count(workflow, comment+"\n") != 1 {
+					t.Fatal("job must have exactly one navigation pointer immediately below its key", jobID)
 				}
 				worker = worker || job.Workflow != bundle.WorkflowPath
 				for _, operation := range job.Operations {
