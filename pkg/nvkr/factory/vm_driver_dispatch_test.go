@@ -618,7 +618,7 @@ func TestStandaloneLocalAdmissionPreflightsVMWithoutWorkspace(t *testing.T) {
 	workspace := ".nvkr/vm"
 	if runtime.GOOS == "linux" {
 		root := t.TempDir()
-		runtimePath := filepath.Join(root, "runtime")
+		runtimePath := filepath.Join(root, plan.Environment.RuntimeBinary())
 		if err := os.WriteFile(runtimePath, []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 			t.Fatal(err)
 		}
