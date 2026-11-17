@@ -43,7 +43,7 @@ func releasePullCmdWithOperation(pull releasePullOperation) *cli.Command {
 				return err
 			}
 			if format := c.String("format"); format != "text" && format != "json" {
-				return e.New(e.CodeUsage, "release pull format must be text or json")
+				return e.New(e.CodeUsage, "release pull format must be text or json, got %q", format)
 			}
 			shown := false
 			defer func() {

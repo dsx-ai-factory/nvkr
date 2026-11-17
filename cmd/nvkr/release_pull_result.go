@@ -9,44 +9,40 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/releaseview"
 )
 
 const releasePullResultSchemaVersion = "nvkr.dev/release-pull-result/v1"
-
-// Payload representations. A directory payload is the complete tree beneath the
-// destination; it has no per-file records and no invented directory checksum.
-const (
-	releasePullPayloadFiles     = "files"
-	releasePullPayloadDirectory = "directory"
-)
 
 // releasePullResult is a detached presentation of delivery.PulledOutput. It
 // copies only explicitly chosen public fields, so private or future delivery
 // fields never reach a script. It is diagnostic data, not a signature, policy or
 // release-acceptance receipt, and it is never written to disk.
 type releasePullResult struct {
-	SchemaVersion string                 `json:"schemaVersion"`
-	Reference     string                 `json:"reference"`
-	Output        releasePullOutput      `json:"output"`
-	Destination   string                 `json:"destination"`
-	Payload       string                 `json:"payload"`
-	Files         []releasePullFile      `json:"files"`
-	Scope         releasePullResultScope `json:"scope"`
+	SchemaVersion     string                       `json:"schemaVersion"`
+	Reference         string                       `json:"reference"`
+	Output            releasePullOutput            `json:"output"`
+	Destination       string                       `json:"destination"`
+	Payload           string                       `json:"payload"`
+	Files             []releasePullFile            `json:"files"`
+	InspectionDetails releasePullInspectionDetails `json:"inspectionDetails"`
 }
 
 type releasePullOutput struct {
-	Name        string               `json:"name"`
-	Kind        string               `json:"kind"`
-	Digest      string               `json:"digest"`
-	BuildDigest string               `json:"buildDigest"`
-	Platform    *releasePullPlatform `json:"platform,omitempty"`
-	// RequiredPlatforms lists every platform an aggregate image declares.
-	RequiredPlatforms []string `json:"requiredPlatforms,omitempty"`
+	Name        string `json:"name"`
+	Kind        string `json:"kind"`
+	Digest      string `json:"digest"`
+	BuildDigest string `json:"buildDigest"`
+	// OS and Arch use release browse's flat names for a native artifact.
+	OS   string `json:"os,omitempty"`
+	Arch string `json:"arch,omitempty"`
+	// ImageIndex mirrors release browse: an aggregate image lists every
+	// platform it declares under imageIndex.requiredPlatforms.
+	ImageIndex *releasePullImageIndex `json:"imageIndex,omitempty"`
 }
 
-type releasePullPlatform struct {
-	OS   string `json:"os"`
-	Arch string `json:"arch"`
+type releasePullImageIndex struct {
+	RequiredPlatforms []string `json:"requiredPlatforms"`
 }
 
 type releasePullFile struct {
@@ -55,48 +51,46 @@ type releasePullFile struct {
 	Size   int64  `json:"size"`
 }
 
-// releasePullResultScope states what the pull did and did not establish.
-type releasePullResultScope struct {
-	PayloadIntegrityChecked bool `json:"payloadIntegrityChecked"`
-	SignaturesChecked       bool `json:"signaturesChecked"`
-	PolicyChecked           bool `json:"policyChecked"`
+// releasePullInspectionDetails states what the pull did and did not establish,
+// using release browse's inspectionDetails.checks type so the two cannot drift.
+type releasePullInspectionDetails struct {
+	Checks releaseview.InspectionChecks `json:"checks"`
 }
 
-// releasePullPayloads maps each output kind that release pull can materialize to
-// its payload shape. OCI layouts and APT repositories are complete directories
-// and carry no file records, so none is invented for them. A kind missing here is
-// an error rather than a guess: delivery owns the kind list, and a newly
-// supported kind must be classified deliberately before it can be presented.
-var releasePullPayloads = map[string]string{
-	"debian-package": releasePullPayloadFiles,
-	"executable":     releasePullPayloadFiles,
-	"disk-image":     releasePullPayloadFiles,
-	"helm-oci":       releasePullPayloadFiles,
-	"bundle-oci":     releasePullPayloadFiles,
-	"apt-repository": releasePullPayloadDirectory,
-	"oci":            releasePullPayloadDirectory,
-}
-
-func releasePullPayloadKind(kind string) (string, error) {
-	payload, ok := releasePullPayloads[kind]
-	if !ok {
-		return "", e.New(e.CodeInternal, "release pull result has no payload representation for output kind %q", kind)
+// releasePullChecks reports what a pull established. It validates the complete
+// release metadata and evidence closure before it downloads the selected payload,
+// then binds the payload bytes to that closure. As in browse, registry
+// availability and installation compatibility are not established: the reference
+// is the caller's locator and nothing is installed or run. It authenticates no
+// signature and applies no consumer policy.
+func releasePullChecks() releaseview.InspectionChecks {
+	return releaseview.InspectionChecks{
+		MetadataIntegrity: "checked", PayloadIntegrity: "checked",
+		Signatures: "not-checked", ConsumerPolicy: "not-checked",
+		RegistryAvailability: "not-checked", InstallationCompatibility: "not-checked",
 	}
-	return payload, nil
+}
+
+// releasePullPayload validates the shape delivery chose for the pulled output.
+// An empty or unknown shape is an error rather than a guess.
+func releasePullPayload(result delivery.PulledOutput) (string, error) {
+	switch result.Payload {
+	case delivery.PulledPayloadFiles, delivery.PulledPayloadDirectory:
+		return string(result.Payload), nil
+	}
+	return "", e.New(e.CodeInternal, "release pull result has no payload representation for output kind %q", result.Output.Kind)
 }
 
 func newReleasePullResult(reference, out string, result delivery.PulledOutput) (releasePullResult, error) {
-	payload, err := releasePullPayloadKind(result.Output.Kind)
+	payload, err := releasePullPayload(result)
 	if err != nil {
 		return releasePullResult{}, err
 	}
 	output := releasePullOutput{Name: result.Output.Name, Kind: result.Output.Kind,
 		Digest: result.Output.Digest, BuildDigest: result.Output.BuildDigest}
-	if result.Output.OS != "" {
-		output.Platform = &releasePullPlatform{OS: result.Output.OS, Arch: result.Output.Arch}
-	}
+	output.OS, output.Arch = result.Output.OS, result.Output.Arch
 	if result.Output.ImageIndex != nil {
-		output.RequiredPlatforms = slices.Clone(result.Output.ImageIndex.RequiredPlatforms)
+		output.ImageIndex = &releasePullImageIndex{RequiredPlatforms: slices.Clone(result.Output.ImageIndex.RequiredPlatforms)}
 	}
 	files := make([]releasePullFile, 0, len(result.Files))
 	for _, file := range result.Files {
@@ -104,7 +98,7 @@ func newReleasePullResult(reference, out string, result delivery.PulledOutput) (
 	}
 	return releasePullResult{SchemaVersion: releasePullResultSchemaVersion, Reference: reference, Output: output,
 		Destination: out, Payload: payload, Files: files,
-		Scope: releasePullResultScope{PayloadIntegrityChecked: true}}, nil
+		InspectionDetails: releasePullInspectionDetails{Checks: releasePullChecks()}}, nil
 }
 
 // renderReleasePullJSON returns exactly one JSON value followed by a newline.
