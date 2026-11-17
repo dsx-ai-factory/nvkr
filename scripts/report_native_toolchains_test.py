@@ -156,6 +156,14 @@ class ComparisonTest(unittest.TestCase):
             self.assertEqual(refused.exception.code, 1)
             self.assertEqual("".join(call.args[0] for call in stderr.write.call_args_list), "rejected tree")
 
+    def test_plan_inspection_timeout_has_bounded_diagnostic(self):
+        with patch.object(MODULE.subprocess, "run", side_effect=subprocess.TimeoutExpired(
+            ["./nvkr-exec"], 60, stderr=b"partial helper output",
+        )), contextlib.redirect_stderr(io.StringIO()) as stderr, self.assertRaises(SystemExit) as refused:
+            MODULE.load_plan(Path("plan.json"))
+        self.assertEqual(refused.exception.code, 1)
+        self.assertEqual(stderr.getvalue(), "[NVKR-E-GATE-UNMET] Plan inspection timed out after 60 seconds\n")
+
 
 class RoutingTest(unittest.TestCase):
     def test_existing_open_issue_gets_comment_without_create(self):

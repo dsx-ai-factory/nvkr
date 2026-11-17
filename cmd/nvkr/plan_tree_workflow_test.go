@@ -73,4 +73,37 @@ func TestNativeToolchainWorkflowSelectsPlanTreePins(t *testing.T) {
 			}
 		})
 	}
+	for _, test := range []struct{ name, step string }{
+		{"empty steps", ""},
+		{"mutable Packer pin", `{"platform":"linux/amd64","executionGraph":{"nodes":[{"toolchain":"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@latest"}]}}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			root := t.TempDir()
+			steps := filepath.Join(root, ".github/nvkr-run/steps")
+			if err := os.MkdirAll(steps, 0755); err != nil {
+				t.Fatal(err)
+			}
+			if test.step != "" {
+				if err := os.WriteFile(filepath.Join(steps, "step.json"), []byte(test.step), 0644); err != nil {
+					t.Fatal(err)
+				}
+			}
+			// A valid inspector lets an empty Packer selection reach the output
+			// on xargs implementations that skip the command for empty input.
+			rootPlan := `{"environment":{"diskInspectionProfiles":{"linux/amd64":{"image":"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}}}`
+			if err := os.WriteFile(filepath.Join(root, factory.FactoryPlanPath), []byte(rootPlan), 0644); err != nil {
+				t.Fatal(err)
+			}
+			output := filepath.Join(root, "output")
+			command := exec.CommandContext(t.Context(), "bash", "-euc", script)
+			command.Dir = root
+			command.Env = append(os.Environ(), "NATIVE_ARCH=amd64", "GITHUB_OUTPUT="+output)
+			if raw, err := command.CombinedOutput(); err == nil {
+				t.Fatalf("invalid Packer selection accepted: %s", raw)
+			}
+			if _, err := os.Stat(output); !os.IsNotExist(err) {
+				t.Fatalf("invalid Packer selection wrote output: %v", err)
+			}
+		})
+	}
 }

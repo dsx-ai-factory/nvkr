@@ -536,7 +536,11 @@ func unsharedGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle,
 	workflow = lowerGitHubTestNeeds(t, plan, workflow)
 	changed := *bundle
 	changed.Files = files
-	changed.Files[bundle.PlanPath] = append([]byte(nil), bundle.Files[bundle.PlanPath]...)
+	for name, raw := range bundle.Files {
+		if name == bundle.PlanPath || strings.HasPrefix(name, path.Dir(bundle.PlanPath)+"/steps/") {
+			changed.Files[name] = append([]byte(nil), raw...)
+		}
+	}
 	changed.Files[bundle.WorkflowPath] = workflow
 	changed.WorkflowDigest = pipeline.FileDigest(workflow)
 	return &changed

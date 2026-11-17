@@ -240,7 +240,7 @@ func loadPlanTree(ctx context.Context, filename string, rootBytes []byte) (*Plan
 	}
 	encoded, err := canonical.Marshal(manifest)
 	if err != nil {
-		return nil, "", err
+		return nil, "", e.Wrap(e.CodePipelineDrift, err, "encoding Plan tree manifest")
 	}
 	if manifest.SchemaVersion != generatedManifestSchema || manifest.Engine != EngineGitHub ||
 		len(manifest.Members) > maxGeneratedDirEntries || !bytes.Equal(raw, append(encoded, '\n')) {
@@ -298,7 +298,11 @@ func loadPlanTree(ctx context.Context, filename string, rootBytes []byte) (*Plan
 			}
 		}
 	}
-	if !bytes.Equal(rootBytes, files[planPath]) {
+	storedRoot, listed := files[planPath]
+	if !listed {
+		return nil, "", e.New(e.CodePipelineDrift, "Plan tree manifest does not list the root")
+	}
+	if !bytes.Equal(rootBytes, storedRoot) {
 		return nil, "", e.New(e.CodePipelineDrift, "Plan tree root changed during admission")
 	}
 	stepsDirectory := filepath.Join(root, filepath.FromSlash(steps))

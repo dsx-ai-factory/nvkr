@@ -30,6 +30,9 @@ def load_plan(filename):
             text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             check=True, timeout=60,
         )
+    except subprocess.TimeoutExpired:
+        print("[NVKR-E-GATE-UNMET] Plan inspection timed out after 60 seconds", file=sys.stderr)
+        raise SystemExit(1) from None
     except subprocess.CalledProcessError as error:
         print(error.stderr, file=sys.stderr, end="")
         raise SystemExit(error.returncode) from None

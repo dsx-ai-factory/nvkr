@@ -610,9 +610,8 @@ func TestGeneratedBundleRejectsRequirementsInjectedIntoPlan(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	path := bundle.PlanPath
-	var decoded Plan
-	if err := canonical.UnmarshalExact(bundle.Files[path], &decoded); err != nil {
+	decoded, _, err := joinPlanTree(t.Context(), bundle.PlanPath, bundle.Files)
+	if err != nil {
 		t.Fatal(err)
 	}
 	found := false
@@ -626,7 +625,7 @@ func TestGeneratedBundleRejectsRequirementsInjectedIntoPlan(t *testing.T) {
 	if !found {
 		t.Fatal("generated Plan has no build instruction")
 	}
-	raw, err := canonical.Marshal(decoded)
+	files, err := renderPlanTree(t.Context(), decoded, bundle.PlanPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -635,7 +634,9 @@ func TestGeneratedBundleRejectsRequirementsInjectedIntoPlan(t *testing.T) {
 	for name, member := range bundle.Files {
 		mutated.Files[name] = append([]byte(nil), member...)
 	}
-	mutated.Files[path] = raw
+	for name, raw := range files {
+		mutated.Files[name] = raw
+	}
 
 	assertFactoryErrorCode(t,
 		ValidateGitHubBundle(context.Background(), plan, &mutated),

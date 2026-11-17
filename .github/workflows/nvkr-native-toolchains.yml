@@ -161,6 +161,10 @@ jobs:
             if length == 1 then .[0]
             else error("expected one selected Packer image") end
           ')
+          case "$packer" in
+            "$repository/packer-native@sha256:"*) ;;
+            *) echo 'unexpected Packer repository' >&2; exit 1 ;;
+          esac
           inspector=$(jq -er --arg platform "$platform" \
             '.environment.diskInspectionProfiles[$platform].image' "$plan")
           case "$inspector" in

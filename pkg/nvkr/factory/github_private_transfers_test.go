@@ -11,6 +11,7 @@ import (
 	"maps"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -691,7 +692,11 @@ func TestGitHubPrivateTransferProjectionRemainsStableAcrossSourcePins(t *testing
 		t.Fatal(err)
 	}
 	for name, raw := range first.Files {
-		if name != first.PlanPath && name != githubActionDataPathFor(before) && !bytes.Equal(raw, second.Files[name]) {
+		if name == first.PlanPath || name == githubActionDataPathFor(before) ||
+			(strings.HasPrefix(name, path.Dir(first.PlanPath)+"/steps/") && strings.HasSuffix(name, "/step.json")) {
+			continue
+		}
+		if !bytes.Equal(raw, second.Files[name]) {
 			t.Fatalf("source pin update changed private transport implementation %s", name)
 		}
 	}

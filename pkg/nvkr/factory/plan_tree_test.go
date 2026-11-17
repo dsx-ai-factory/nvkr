@@ -359,7 +359,7 @@ func TestPlanTreeRejectsMalformedStorage(t *testing.T) {
 
 func TestPlanTreeLoadAdmitsCompleteInventory(t *testing.T) {
 	plan := githubRuntimePlanFixture(t)
-	for _, mutation := range []string{"none", "extra", "extra directory", "missing", "missing directory", "missing manifest", "edited", "symlink", "manifest digest"} {
+	for _, mutation := range []string{"none", "extra", "extra directory", "missing", "missing directory", "missing manifest", "unlisted root", "edited", "symlink", "manifest digest"} {
 		t.Run(mutation, func(t *testing.T) {
 			root := t.TempDir()
 			bundle := writeGitHubRuntimeBaseline(t, root, plan)
@@ -398,8 +398,12 @@ func TestPlanTreeLoadAdmitsCompleteInventory(t *testing.T) {
 				if err := os.Symlink(other, step); err != nil {
 					t.Fatal(err)
 				}
-			case "manifest digest":
-				bundle.PlanDigest = "sha256:" + strings.Repeat("a", 64)
+			case "manifest digest", "unlisted root":
+				if mutation == "manifest digest" {
+					bundle.PlanDigest = "sha256:" + strings.Repeat("a", 64)
+				} else {
+					delete(bundle.Files, bundle.PlanPath)
+				}
 				_, raw, err := ManifestFor(bundle)
 				if err != nil {
 					t.Fatal(err)
@@ -418,6 +422,9 @@ func TestPlanTreeLoadAdmitsCompleteInventory(t *testing.T) {
 				}
 			} else {
 				assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+				if mutation == "unlisted root" && !strings.Contains(err.Error(), "manifest does not list the root") {
+					t.Fatal("missing root diagnostic", err)
+				}
 			}
 		})
 	}

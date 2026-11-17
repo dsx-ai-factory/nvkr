@@ -106,6 +106,9 @@ func TestGeneratedStageOwnersNeverTakeTheGenerationSeam(t *testing.T) {
 		{"check-runtime-inputs", func(ctx context.Context, root string) error {
 			return CheckGitHubRuntimeInputs(ctx, plan, root)
 		}, e.CodePipelineDrift, false},
+		{"stage-runtime-inputs", func(ctx context.Context, root string) error {
+			return StageGitHubRuntimeInputs(ctx, plan, root)
+		}, e.CodePipelineDrift, false},
 		{"install-runtime-inputs", func(ctx context.Context, root string) error {
 			stageGitHubRuntimeInputs(t, root, fresh)
 			return InstallGitHubRuntimeInputs(ctx, plan, root)
@@ -229,7 +232,8 @@ var (
 		"factory github check-runtime-inputs": true, "factory github ci-download": true,
 		"factory github ci-fetch-locators": true, "factory github ci-upload": true,
 		"factory github describe-action": true, "factory github install-runtime-inputs": true,
-		"factory github pack-outputs": true, "factory github prepare-images": true,
+		"factory github stage-runtime-inputs": true,
+		"factory github pack-outputs":         true, "factory github prepare-images": true,
 		"factory github preflight-images": true,
 		"factory github recover":          true, "factory github run-disk": true, "factory github run-node": true,
 		"run finalize": true, "run generate": true,

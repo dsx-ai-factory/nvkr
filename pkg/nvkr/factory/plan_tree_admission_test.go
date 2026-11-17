@@ -90,11 +90,15 @@ func TestPlanTreeRelativeAndLoneRoot(t *testing.T) {
 
 func TestPlanTreeDiagnosticsEscapeUntrustedNames(t *testing.T) {
 	plan := githubRuntimePlanFixture(t)
-	for _, control := range []string{"\x1b]0;title\a", "\t", "\u202e"} {
-		t.Run("manifest", func(t *testing.T) {
+	for _, test := range []struct{ name, control string }{
+		{"terminal title", "\x1b]0;title\a"},
+		{"tab", "\t"},
+		{"bidi override", "\u202e"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 			root := t.TempDir()
 			bundle := writeGitHubRuntimeBaseline(t, root, plan)
-			bundle.Files[path.Dir(bundle.PlanPath)+"/steps/"+control+"/step.json"] = []byte("{}")
+			bundle.Files[path.Dir(bundle.PlanPath)+"/steps/"+test.control+"/step.json"] = []byte("{}")
 			_, raw, err := ManifestFor(bundle)
 			if err != nil {
 				t.Fatal(err)
