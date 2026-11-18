@@ -203,6 +203,22 @@ func componentForWithExternalEvidence(nc catalog.NamedComponent, artifactHash, a
 func componentForEvidence(nc catalog.NamedComponent, artifactHash, arch string,
 	evidenceProps []Property,
 ) Component {
+	if nc.BuilderType == catalog.BuilderMkosi {
+		// The pinned source is the assembler. Installed distribution packages
+		// are acquired inputs, not software compiled from that source tree.
+		component := Component{Type: "container", Name: nc.Name, Version: catalog.NormalizeVersion(nc.Tag), Properties: []Property{
+			{Name: "nvkr:builder", Value: catalog.BuilderMkosi},
+			{Name: "nvkr:builderCommit", Value: nc.Commit},
+			{Name: "nvkr:builderTreeHash", Value: nc.TreeHash},
+			{Name: "nvkr:fromSource", Value: "false"},
+			{Name: "nvkr:lane", Value: "package-assembly"},
+			{Name: "nvkr:outputType", Value: nc.OutputType},
+		}}
+		if artifactHash != "" {
+			component.Hashes = []Hash{{Alg: "SHA-256", Content: strings.TrimPrefix(artifactHash, "sha256:")}}
+		}
+		return component
+	}
 	// A prebuilt (no-compile) component is recorded honestly as acquired, carrying its
 	// externally verified evidence state or an explicit evidence:none (ADR-13 §2) —
 	// never claimed as from-source and never conflated with a Tier-4 exclusion.

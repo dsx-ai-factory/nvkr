@@ -11,6 +11,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
@@ -58,6 +59,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 			if err != nil {
 				return ArtifactGraph{}, err
 			}
+		}
+		if tool.Format == authored.OutputOCI {
+			container = "" // Evidence stays with the native production owner.
 		}
 		if err := addBuildDataflow(selection, nativeUtilityRunner(delivery, tool.Platform, runsOn), build.Graph, selected, container, tool.Platform, false, nodes, artifacts); err != nil {
 			return ArtifactGraph{}, err
@@ -119,7 +123,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		disk := plan.hasCompiledDiskTarget(node.BuildTarget, artifacts)
 		bundle := plan.hasBundleTarget(node.BuildTarget)
 		scanner := sbomToolName(&plan, node)
-		if !disk && !bundle && scanner == "" {
+		tool, internal := plan.internalToolForTarget(node.BuildTarget)
+		runtime := internal && tool.Format == authored.OutputOCI
+		if !disk && !bundle && !runtime && scanner == "" {
 			continue
 		}
 		components := map[string]bool{}

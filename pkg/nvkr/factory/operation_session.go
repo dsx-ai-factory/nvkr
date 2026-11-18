@@ -161,13 +161,23 @@ func (session *operationSession) dispatch(ctx context.Context, plan *Plan, node 
 			session.stdout, session.stderr, session.placement.producer, owner)
 	}
 	_, artifacts := planIndex(plan)
-	if _, internal := plan.internalToolForTarget(node.BuildTarget); internal && (node.Kind == NodeVerify || node.Kind == NodeSBOM) {
+	if selected, internal := plan.internalToolForTarget(node.BuildTarget); internal && (node.Kind == NodeVerify || node.Kind == NodeSBOM) {
 		if err := session.placement.owner.admitInternalToolEvidence(ctx, plan, node); err != nil {
 			return err
 		}
 		var err error
 		if node.Kind == NodeVerify {
 			err = executeObservation(ctx, plan, node, artifacts)
+		} else if selected.Format == authored.OutputOCI {
+			if node.Container != "" || node.Platform != selected.Platform || node.Network != ir.NetworkNone ||
+				len(node.Outputs) != 1 || node.Outputs[0] != selected.SBOMArtifactID {
+				return e.New(e.CodeEngineCapability, "runtime SBOM requires its native offline Run owner")
+			}
+			var runtime *pipeline.ProducedRuntime
+			runtime, _, err = session.placement.owner.internalRuntimeProduction(ctx, plan, selected.Name)
+			if err == nil {
+				err = executeSBOMWithRuntime(ctx, plan, node, artifacts, session.stdout, runtime)
+			}
 		} else {
 			if err = validateInternalToolSBOMNode(plan, node); err == nil {
 				if session.placement.launch == nil {

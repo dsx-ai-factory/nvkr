@@ -29,6 +29,14 @@ import (
 )
 
 func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
+	return executeSBOMWithRuntime(ctx, plan, node, artifacts, stdout, nil)
+}
+
+func executeSBOMWithRuntime(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer, runtime *pipeline.ProducedRuntime) error {
+	selected, internal := plan.internalToolForTarget(node.BuildTarget)
+	if internal && selected.Format == authored.OutputOCI && runtime == nil {
+		return e.New(e.CodeEngineCapability, "runtime SBOM requires its original live production")
+	}
 	var buildPlan *BuildPlan
 	for i := range plan.Builds {
 		if plan.Builds[i].Name == node.BuildTarget {
@@ -75,6 +83,24 @@ func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	}
 	if len(boms) == 0 {
 		return e.New(e.CodePipelineDrift, "factory sbom node %q produced no per-artifact SBOM", node.ID)
+	}
+	if runtime != nil {
+		if !internal || selected.Format != authored.OutputOCI {
+			return e.New(e.CodeEngineCapability, "runtime SBOM has no selected internal OCI producer")
+		}
+		bom, err := sbom.WithRuntimeContents(ctx, boms[selected.Component], runtime, filepath.Dir(artifacts[selected.ArtifactID].Path))
+		if err != nil {
+			return err
+		}
+		boms[selected.Component] = bom
+		for i := range index.Entries {
+			if index.Entries[i].Artifact == selected.Component {
+				index.Entries[i].SBOMDigest, err = bom.Digest()
+				if err != nil {
+					return err
+				}
+			}
+		}
 	}
 	if tool := sbomToolName(plan, node); tool != "" || plan.hasBundleTarget(node.BuildTarget) {
 		if tool != "" && (!containsString(node.Inputs, "tool/"+tool) || artifacts["tool/"+tool].Kind != "pipeline-tool") {

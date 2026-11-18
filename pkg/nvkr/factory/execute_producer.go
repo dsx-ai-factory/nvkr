@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -25,11 +26,19 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 	}
 	tool, internal := plan.internalToolForTarget(node.BuildTarget)
 	selectedTool := internal && instruction.Kind != ir.KindFetch && instruction.Component == tool.Component
-	if selectedTool && (owner == nil || tool.Format != "executable") {
-		return e.New(e.CodeEngineCapability, "internal executable production requires its original Run owner")
+	if selectedTool && owner == nil {
+		return e.New(e.CodeEngineCapability, "internal tool production requires its original Run owner")
 	}
 	if selectedTool {
-		if err := owner.admitInternalExecutable(ctx, plan, tool); err != nil {
+		switch tool.Format {
+		case definition.OutputExecutable:
+			err = owner.admitInternalExecutable(ctx, plan, tool)
+		case definition.OutputOCI:
+			err = owner.admitInternalRuntime(ctx, plan, tool)
+		default:
+			err = e.New(e.CodeEngineCapability, "internal tool has an unsupported production format")
+		}
+		if err != nil {
 			return err
 		}
 	}
@@ -64,7 +73,7 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 		}
 		toolExecutable = tool.Path
 	}
-	if instruction.Kind == ir.KindBuild && (instruction.BuilderType == ir.BuilderOCIHermetic || pinnedTool) && len(instruction.Materials) != 0 {
+	if instruction.Kind == ir.KindBuild && (instruction.BuilderType == ir.BuilderOCIHermetic || instruction.BuilderType == ir.BuilderMkosi || pinnedTool) && len(instruction.Materials) != 0 {
 		observedMaterials, err = observeBuildMaterials(ctx, plan, node)
 		if err != nil {
 			return err
@@ -83,7 +92,10 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 	}
 	var result *pipeline.ArtifactResult
 	var produced *pipeline.ProducedExecutable
-	if selectedTool {
+	var producedRuntime *pipeline.ProducedRuntime
+	if selectedTool && tool.Format == definition.OutputOCI {
+		result, producedRuntime, err = (pipeline.Local{}).ExecuteProducedRuntime(build.Graph, build.BuildDigest, instruction.Component, opts)
+	} else if selectedTool {
 		result, produced, err = (pipeline.Local{}).ExecuteProducedExecutable(build.Graph, build.BuildDigest, instruction.Component, opts)
 	} else {
 		result, err = run(instruction, opts)
@@ -91,6 +103,9 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 	defer func() {
 		if produced != nil {
 			returnErr = joinFactoryCleanupError(returnErr, produced.Close(), "closing unowned internal executable")
+		}
+		if producedRuntime != nil {
+			returnErr = joinFactoryCleanupError(returnErr, producedRuntime.Close(), "closing unowned internal runtime")
 		}
 	}()
 	if err != nil {
@@ -143,6 +158,12 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 			return err
 		}
 		produced = nil // The Run now owns revocation and cleanup.
+	}
+	if producedRuntime != nil {
+		if err := owner.retainInternalRuntime(ctx, plan, tool, producedRuntime); err != nil {
+			return err
+		}
+		producedRuntime = nil // The Run now owns revocation and cleanup.
 	}
 	return nil
 }

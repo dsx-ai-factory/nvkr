@@ -173,6 +173,9 @@ func selectedTools(definition authored.Definition, environment authored.Environm
 		}
 	}
 	for _, internal := range definition.InternalTools {
+		if internal.Format == authored.OutputOCI {
+			continue // Runtime inventory reads the original embedded reports.
+		}
 		scanner := internal.SBOMTool
 		selected := source
 		if scanner == "" {

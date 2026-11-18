@@ -39,10 +39,14 @@ func TestInternalToolSelectionAdmission(t *testing.T) {
 		{"empty producers", func(d *Definition) { d.InternalTools[0].Components = nil }, e.CodeInvalidCatalog},
 		{"repeated producer", func(d *Definition) { d.InternalTools[0].Components = []string{"helper", "helper"} }, e.CodeInvalidCatalog},
 		{"invalid producer", func(d *Definition) { d.InternalTools[0].Components = []string{"../helper", "helper"} }, e.CodeInvalidCatalog},
-		{"ambiguous image", func(d *Definition) {
+		{"image material closure", func(d *Definition) {
 			d.InternalTools[0].Format = OutputOCI
 			d.InternalTools[0].Components = []string{"helper", "second"}
-		}, e.CodeInvalidCatalog},
+		}, ""},
+		{"image scanner override", func(d *Definition) {
+			d.InternalTools[0].Format = OutputOCI
+			d.InternalTools[0].SBOMTool = "scanner"
+		}, e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			input := internalToolDefinition()

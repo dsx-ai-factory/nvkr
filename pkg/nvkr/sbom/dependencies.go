@@ -18,6 +18,9 @@ import (
 // Root edges describe inclusion in this artifact, not inferred package-to-package
 // relationships. No timestamps, scanner locations or random scanner IDs survive.
 func WithDependencies(bom *BOM, components []Component, method, scannerDigest string) (*BOM, error) {
+	if method == MkosiInstalledMethod {
+		return nil, e.New(e.CodeEngineCapability, "runtime inventory requires the live produced runtime")
+	}
 	return withDependencies(bom, components, method, scannerDigest, nil)
 }
 
@@ -122,6 +125,11 @@ func validateInventorySemantics(bom *BOM, artifact string) error {
 	}
 	diskInventory := method == "disk-content/v1" || method == "disk-reconciled/v1" || method == DebianPayloadMethod
 	archiveInventory := method == archiveContentMethod
+	if method == MkosiInstalledMethod {
+		if err := validateRuntimeInventory(bom, artifact); err != nil {
+			return err
+		}
+	}
 	if archiveInventory {
 		outputType := ""
 		for _, property := range bom.Metadata.Component.Properties {
@@ -156,7 +164,7 @@ func validateInventorySemantics(bom *BOM, artifact string) error {
 			if err := validateBundleFileComponent(component); err != nil {
 				return err
 			}
-		} else if component.Type == "file" && !diskInventory && !archiveInventory {
+		} else if component.Type == "file" && !diskInventory && !archiveInventory && method != MkosiInstalledMethod {
 			return e.New(e.CodeVerifyFailed, "file inventory requires its descriptive disk-content or reconciled disk method")
 		}
 		if archiveInventory {
@@ -226,9 +234,9 @@ func validateDependencies(bom *BOM) error {
 }
 
 func supportedDependencyMethod(method string) bool {
-	return method == "helm-manifests/v1" || method == "syft-cyclonedx/v1" || method == "disk-reconciled/v1" || method == "disk-content/v1" || method == archiveContentMethod || method == BundleFilesMethod || method == DebianPayloadMethod
+	return method == "helm-manifests/v1" || method == "syft-cyclonedx/v1" || method == "disk-reconciled/v1" || method == "disk-content/v1" || method == archiveContentMethod || method == BundleFilesMethod || method == DebianPayloadMethod || method == MkosiInstalledMethod
 }
 
 func dependencyMethodNeedsScanner(method string) bool {
-	return method != "helm-manifests/v1" && method != archiveContentMethod && method != BundleFilesMethod
+	return method != "helm-manifests/v1" && method != archiveContentMethod && method != BundleFilesMethod && method != MkosiInstalledMethod
 }

@@ -52,8 +52,8 @@ func (definition Definition) validateInternalTools() error {
 				return e.New(e.CodeInvalidCatalog, "internal tool %q selects invalid component %q", tool.Name, component)
 			}
 		}
-		if tool.Format == OutputOCI && len(tool.Components) != 1 {
-			return e.New(e.CodeInvalidCatalog, "internal OCI tool %q requires exactly one image producer", tool.Name)
+		if tool.Format == OutputOCI && tool.SBOMTool != "" {
+			return e.New(e.CodeEngineCapability, "internal OCI runtime %q uses its original installed-package reports", tool.Name)
 		}
 	}
 	return nil

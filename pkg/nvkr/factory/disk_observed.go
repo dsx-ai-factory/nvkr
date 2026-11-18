@@ -521,11 +521,16 @@ func (result *LocalRunResult) Close() error {
 	result.materialConsumptions = nil
 	tools := result.internalExecutables
 	result.internalExecutables = nil
+	runtimes := result.internalRuntimes
+	result.internalRuntimes = nil
 	result.internalToolEvidence = nil
 	result.diskMu.Unlock()
 	var closeErr error
 	for _, name := range sortedKeys(tools) {
 		closeErr = errors.Join(closeErr, tools[name].Close())
+	}
+	for _, name := range sortedKeys(runtimes) {
+		closeErr = errors.Join(closeErr, runtimes[name].Close())
 	}
 	for _, completion := range completions {
 		if completion.Payload != nil {

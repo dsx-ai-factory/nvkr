@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
@@ -105,6 +106,18 @@ func sbomPublicationObjects(ctx context.Context, plan *Plan, artifact Artifact, 
 		if plan.hasCompiledDiskTarget(artifact.BuildTarget, artifacts) {
 			if err := validateReconciledDiskDocument(plan, artifact.BuildTarget, entry.Artifact, entry.ArtifactSHA, &bom); err != nil {
 				return nil, err
+			}
+			continue
+		}
+		if selected, internal := plan.internalToolForTarget(artifact.BuildTarget); internal && selected.Format == definition.OutputOCI && entry.Artifact == selected.Component {
+			method := ""
+			for _, property := range bom.Metadata.Props {
+				if property.Name == "nvkr:dependencyInspection" {
+					method = property.Value
+				}
+			}
+			if method != sbom.MkosiInstalledMethod || len(bom.Components) == 0 {
+				return nil, e.New(e.CodeProvenanceMissing, "runtime SBOM omits its original installed-package inventory")
 			}
 			continue
 		}

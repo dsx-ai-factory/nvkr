@@ -14,6 +14,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/testutil"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
@@ -148,6 +149,15 @@ func TestPublicationRejectsInternalToolOnUnsupportedConsumer(t *testing.T) {
 	if _, err := os.Stat(artifacts[node.Outputs[0]].Path); !os.IsNotExist(err) {
 		t.Fatal("unsupported helper use wrote a publication")
 	}
+}
+
+func TestRuntimeEvidenceRejectsCompositionWithoutInstalledInventory(t *testing.T) {
+	plan, artifacts, _ := publicationSBOMFixture(t)
+	set := artifacts["sbom/node-worker"]
+	plan.InternalTools = []InternalToolPlan{{Name: "runtime", Format: definition.OutputOCI,
+		BuildTarget: set.BuildTarget, Component: plan.Builds[0].ResolvedComponents[0].Name}}
+	_, err := sbomPublicationObjects(t.Context(), plan, set, artifacts, func(path string) (string, error) { return path, nil })
+	assertFactoryErrorCode(t, err, e.CodeProvenanceMissing)
 }
 
 func TestPublicationRejectsInvalidSBOMBeforeWriting(t *testing.T) {

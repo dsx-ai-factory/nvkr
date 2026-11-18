@@ -1,5 +1,13 @@
 ## Support by owner
 
+The mkosi runtime inventory reader authenticates a live production receipt, stages its held OCI layer,
+rechecks the embedded recipe/configuration and every original installed-package report, and measures
+projected file materials. `mkosi-installed/v1` CycloneDX projection binds those exact bytes and retains
+package archive pins as acquisition properties. Focused fixtures cover substitution, missing authority,
+revocation, package/root membership, deterministic ordering and descriptive validation. This inventory
+has not yet run on the native runtime proof output or through a completed public Run; maintained
+consumer compilation and Run-use integration remain gated as recorded in ADR-18 reconciliation.
+
 The native scanner adapter admits Syft JSON `16.1.10` and `16.1.13`, preserving
 the retained image schema while the inspector source advances to Syft v1.57.1.
 Contract tests cover exact schema admission and rejection of nested package

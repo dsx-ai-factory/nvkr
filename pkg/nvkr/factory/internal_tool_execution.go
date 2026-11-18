@@ -30,6 +30,9 @@ func (plan *Plan) internalToolForTarget(target string) (InternalToolPlan, bool) 
 // admitInternalToolEvidence rejects absent, revoked or foreign production before
 // an evidence operation can perform filesystem or subprocess work.
 func (owner *LocalRunResult) admitInternalToolEvidence(ctx context.Context, plan *Plan, node Node) error {
+	if plan == nil {
+		return e.New(e.CodeUsage, "internal tool evidence requires its Plan")
+	}
 	selected, internal := plan.internalToolForTarget(node.BuildTarget)
 	if !internal {
 		return e.New(e.CodePipelineDrift, "internal evidence has no selected tool")
@@ -47,12 +50,22 @@ func (owner *LocalRunResult) admitInternalToolEvidence(ctx context.Context, plan
 	owner.diskMu.Lock()
 	closed := owner.diskClosed || owner.diskClosing
 	tool := owner.internalExecutables[selected.Name]
+	runtime := owner.internalRuntimes[selected.Name]
 	owner.diskMu.Unlock()
-	if closed || tool == nil {
+	if closed || tool == nil && runtime == nil {
 		return e.New(e.CodeGateUnmet, "internal tool evidence has no live production owner")
 	}
-	if _, err := tool.BindingContext(ctx); err != nil {
-		return err
+	switch selected.Format {
+	case definition.OutputExecutable:
+		if _, err := tool.BindingContext(ctx); err != nil {
+			return err
+		}
+	case definition.OutputOCI:
+		if _, err := runtime.BindingContext(ctx); err != nil {
+			return err
+		}
+	default:
+		return e.New(e.CodeEngineCapability, "unsupported internal tool evidence format")
 	}
 	owner.diskMu.Lock()
 	completed := owner.internalToolEvidence[selected.Name][node.Kind] != ""
@@ -80,7 +93,7 @@ func (owner *LocalRunResult) recordInternalToolEvidence(ctx context.Context, pla
 	}
 	owner.diskMu.Lock()
 	defer owner.diskMu.Unlock()
-	if owner.diskClosed || owner.diskClosing || owner.internalExecutables[selected.Name] == nil {
+	if owner.diskClosed || owner.diskClosing || owner.internalExecutables[selected.Name] == nil && owner.internalRuntimes[selected.Name] == nil {
 		return e.New(e.CodeGateUnmet, "internal tool evidence has no live production owner")
 	}
 	if owner.internalToolEvidence == nil {
@@ -173,7 +186,7 @@ func (owner *LocalRunResult) borrowInternalExecutable(ctx context.Context, plan 
 	if binding.BuildDigest != selected.BuildDigest || binding.Platform != selected.Platform || binding.Component != selected.Component {
 		return nil, e.New(e.CodeVerifyFailed, "internal tool consumer substitutes its selected producer")
 	}
-	nodes, artifacts := planIndex(plan)
+	_, artifacts := planIndex(plan)
 	result, err := observeProducerPayload(ctx, plan, artifacts[selected.ArtifactID], artifacts)
 	if err != nil {
 		return nil, err
@@ -192,27 +205,35 @@ func (owner *LocalRunResult) borrowInternalExecutable(ctx context.Context, plan 
 	if err := tool.AuthenticateResultContext(ctx, recorded); err != nil {
 		return nil, err
 	}
-	for _, id := range []string{selected.ObservationArtifactID, selected.SBOMArtifactID} {
-		artifact := artifacts[id]
-		node := nodes[artifact.Producer]
-		if evidence[node.Kind] == "" {
-			return nil, e.New(e.CodeProvenanceMissing, "required internal tool evidence has not completed")
-		}
-		if err := validateInternalToolEvidence(ctx, plan, selected, node, artifacts); err != nil {
-			return nil, err
-		}
-		digest, err := digestFactoryPath(ctx, artifact.Path)
-		if err != nil {
-			return nil, err
-		}
-		if digest != evidence[node.Kind] {
-			return nil, e.New(e.CodeVerifyFailed, "internal tool evidence changed after completion")
-		}
+	if err := validateCompletedInternalToolEvidence(ctx, plan, selected, evidence); err != nil {
+		return nil, err
 	}
 	if _, err := tool.BindingContext(ctx); err != nil {
 		return nil, err
 	}
 	return tool, nil
+}
+
+func validateCompletedInternalToolEvidence(ctx context.Context, plan *Plan, selected InternalToolPlan, evidence map[string]string) error {
+	nodes, artifacts := planIndex(plan)
+	for _, id := range []string{selected.ObservationArtifactID, selected.SBOMArtifactID} {
+		artifact := artifacts[id]
+		node := nodes[artifact.Producer]
+		if evidence[node.Kind] == "" {
+			return e.New(e.CodeProvenanceMissing, "required internal tool evidence has not completed")
+		}
+		if err := validateInternalToolEvidence(ctx, plan, selected, node, artifacts); err != nil {
+			return err
+		}
+		digest, err := digestFactoryPath(ctx, artifact.Path)
+		if err != nil {
+			return err
+		}
+		if digest != evidence[node.Kind] {
+			return e.New(e.CodeVerifyFailed, "internal tool evidence changed after completion")
+		}
+	}
+	return nil
 }
 
 func (owner *LocalRunResult) openDiskEvidenceRuntime(ctx context.Context, plan *Plan, runtimeExecutable string, workspace *os.File, diagnostics *diskdiagnostic.Collector) (*sbom.DiskInspectionRuntime, error) {
@@ -279,6 +300,13 @@ func (owner *LocalRunResult) retainInternalExecutable(ctx context.Context, plan 
 }
 
 func (owner *LocalRunResult) admitInternalExecutable(ctx context.Context, plan *Plan, selected InternalToolPlan) error {
+	if selected.Format != definition.OutputExecutable {
+		return e.New(e.CodeEngineCapability, "internal executable requires its executable Plan selection")
+	}
+	return owner.admitInternalProduction(ctx, plan, selected)
+}
+
+func (owner *LocalRunResult) admitInternalProduction(ctx context.Context, plan *Plan, selected InternalToolPlan) error {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "internal tool production requires a context")
 	}
@@ -304,7 +332,7 @@ func (owner *LocalRunResult) admitInternalExecutable(ctx context.Context, plan *
 	if owner.diskClosed || owner.diskClosing {
 		return e.New(e.CodeGateUnmet, "internal tool Run owner is closed")
 	}
-	if owner.internalExecutables[selected.Name] != nil {
+	if owner.internalExecutables[selected.Name] != nil || owner.internalRuntimes[selected.Name] != nil {
 		return e.New(e.CodeVerifyFailed, "internal tool %q has repeated production", selected.Name)
 	}
 	return nil

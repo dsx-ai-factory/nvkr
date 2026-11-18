@@ -19,6 +19,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/ociclosure"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/rootfs"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/mkosi"
 )
 
 // ProducedRuntime holds exact filesystem bytes from a concrete mkosi producer.
@@ -34,6 +35,7 @@ type producedRuntimeState struct {
 	result   ArtifactResult
 	root     string
 	rootInfo os.FileInfo
+	recipe   *mkosi.Spec
 }
 
 // ProducedRuntimeBinding describes the live production capability; this value
@@ -168,7 +170,7 @@ func captureExecutedRuntime(ctx context.Context, platform, buildDigest string, p
 	if err != nil {
 		return nil, err
 	}
-	state := &producedRuntimeState{layer: layer, root: root, rootInfo: info, result: retained,
+	state := &producedRuntimeState{layer: layer, root: root, rootInfo: info, result: retained, recipe: mkosi.Clone(producer.Mkosi),
 		binding: ProducedRuntimeBinding{BuildDigest: buildDigest, Platform: platform, Component: producer.Component, Digest: result.SHA256, Size: size,
 			LayoutDigest: tree.Digest(), LayerDigest: layer.Digest(), TerminalDigest: terminal}}
 	if err := state.require(ctx); err != nil {

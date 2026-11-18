@@ -30,8 +30,11 @@ and absence of a controlling terminal. The assembly service used a two-CPU quota
 512-task limit and a separately owned 20 GiB scratch filesystem. The workflow retained text diagnostics,
 not the OCI payload. Host bootstrap utilities were recorded but not snapshot-pinned.
 
-Run-bound evidence and consumer receipts, runtime SBOM, Environment binding and generated Plan integration
-remain incomplete, so maintained Run execution stays gated. This proof does not establish disk-output
+The Run dispatcher can retain and revoke concrete runtime production and join recorded terminal/SBOM
+evidence. Runtime inventory reads original reports from the authenticated layer and projects a subject-bound
+SBOM; focused fixtures cover these boundaries. Consumer-use receipts, Environment binding and generated
+Plan integration remain incomplete, so maintained Run execution stays gated. No real Run has exercised
+the new runtime SBOM and dispatcher together. This proof does not establish disk-output
 equivalence, guest boot, ARM64 operation or a stronger evidence lane. The earlier isolated amd64
 [assembly Run](https://github.com/njhensley/nvkr/actions/runs/44145459516) built two byte-identical runtime
 archives from fresh roots and the same revalidated snapshot inputs. It used Ubuntu's mkosi package,

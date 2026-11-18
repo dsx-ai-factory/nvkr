@@ -44,6 +44,17 @@ separate digest authenticates those bytes. Moving that external reference change
 even when the verified payload digest is unchanged; relocating the publisher's build inputs does not change
 locally generated evidence identity.
 
+Run-only mkosi runtimes use `mkosi-installed/v1` inventory from their original embedded installed-package
+reports, read through the live production capability after complete OCI-closure authentication. Every
+reported package must match the selected root's retained package inputs. The document binds the exact
+runtime subject, layer, recipe and report bytes. Package archive digests, sizes, snapshot timestamps and
+repository metadata digests remain acquisition properties, never hashes of installed files. Projected
+static tools have separately measured file hashes and material bindings. Repeated packages retain each
+root's input/report binding. Artifact-to-component edges describe inclusion; package dependency edges
+are not inferred. The source pin identifies the mkosi assembler, not source compilation of the acquired
+distribution packages. This inventory grants no license clearance, qualification or execution authority;
+the owning Run must still complete and authenticate terminal evidence before consumer use.
+
 ### 2. External evidence for acquired artifacts
 
 **NVKE OS source-migration policy (proposed; candidate catalogs only).** Publicly

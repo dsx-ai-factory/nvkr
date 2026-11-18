@@ -97,6 +97,7 @@ type LocalRunResult struct {
 	diskCompletions        []diskProducerCompletion
 	materialConsumptions   map[string]producerConsumption
 	internalExecutables    map[string]*pipeline.ProducedExecutable
+	internalRuntimes       map[string]*pipeline.ProducedRuntime
 	internalToolEvidence   map[string]map[string]string
 }
 

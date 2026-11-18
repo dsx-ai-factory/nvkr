@@ -120,21 +120,38 @@ func inspectMkosiOutput(ctx context.Context, node ir.Node, layout, inputs, scrat
 }
 
 func hashMkosiRootFile(ctx context.Context, root *os.File, relative string) (string, int64, os.FileMode, error) {
+	file, info, err := openMkosiRootFile(ctx, root, relative)
+	if err != nil {
+		return "", 0, 0, err
+	}
+	digest, size, _, hashErr := hashOpenRegularContext(ctx, file, info)
+	return digest, size, info.Mode().Perm(), errors.Join(hashErr, file.Close())
+}
+
+func openMkosiRootFile(ctx context.Context, root *os.File, relative string) (*os.File, os.FileInfo, error) {
+	if ctx == nil {
+		return nil, nil, e.New(e.CodeUsage, "runtime file opening requires context")
+	}
 	parts := strings.Split(relative, "/")
 	current := root
 	for index, part := range parts {
+		if err := ctx.Err(); err != nil {
+			if current != root {
+				_ = current.Close()
+			}
+			return nil, nil, e.Wrap(e.CodeTimeout, err, "opening runtime file")
+		}
 		next, info, err := securepath.OpenChild(current, part, index != len(parts)-1)
 		if current != root {
 			_ = current.Close()
 		}
 		if err != nil {
-			return "", 0, 0, err
+			return nil, nil, err
 		}
 		if index == len(parts)-1 {
-			digest, size, _, hashErr := hashOpenRegularContext(ctx, next, info)
-			return digest, size, info.Mode().Perm(), errors.Join(hashErr, next.Close())
+			return next, info, nil
 		}
 		current = next
 	}
-	return "", 0, 0, e.New(e.CodeVerifyFailed, "runtime file path is empty")
+	return nil, nil, e.New(e.CodeVerifyFailed, "runtime file path is empty")
 }

@@ -39,8 +39,13 @@ func internalToolSelection(tool authored.InternalTool) authored.DefinitionOutput
 // from the Environment's ordinary utility platform.
 func (plan Plan) sbomToolForBuild(target string) string {
 	for _, tool := range plan.Definition.InternalTools {
-		if internalToolSelection(tool).Name == target && tool.SBOMTool != "" {
-			return tool.SBOMTool
+		if internalToolSelection(tool).Name == target {
+			if tool.Format == authored.OutputOCI {
+				return "" // Original mkosi reports and measured projected files.
+			}
+			if tool.SBOMTool != "" {
+				return tool.SBOMTool
+			}
 		}
 	}
 	return plan.Definition.SBOMTool
@@ -62,7 +67,11 @@ func requiredInternalTools(definition authored.Definition, builds []BuildPlan) (
 		if selected == nil || selected.Platform != tool.Platform || !slices.Equal(selected.Components, tool.Components) {
 			return nil, e.New(e.CodePipelineDrift, "internal tool %q lacks its exact selected producer closure", tool.Name)
 		}
-		if err := pipeline.ValidateProducedExecutableProducer(selected.Graph, selected.BuildDigest, tool.Result); err != nil {
+		validate := pipeline.ValidateProducedExecutableProducer
+		if tool.Format == authored.OutputOCI {
+			validate = pipeline.ValidateProducedRuntimeProducer
+		}
+		if err := validate(selected.Graph, selected.BuildDigest, tool.Result); err != nil {
 			return nil, err
 		}
 		requirements = append(requirements, InternalToolPlan{Name: tool.Name, Platform: tool.Platform, Format: tool.Format,
