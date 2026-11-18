@@ -23,7 +23,7 @@ func definitionInitCommand() *cli.Command {
 			// redirect would write into the Definition file. The owner refuses a
 			// missing flag with a coded error instead.
 			&cli.StringFlag{Name: "name", Usage: "Definition and output name (required)"},
-			&cli.StringFlag{Name: "catalog", Usage: "catalog directory, written into the Definition as an absolute path (required)"},
+			&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Usage: "catalog directory, written into the Definition as an absolute path (required)"},
 			&cli.StringFlag{Name: "platform", Usage: "executable target, for example linux/arm64 (required)"},
 			&cli.StringSliceFlag{Name: "component", Usage: "catalog component to bundle; repeat for more (required)"}),
 		Action: func(c *cli.Context) error {
