@@ -42,6 +42,23 @@ func TestMkosiStagingUsesExactPrivateInputs(t *testing.T) {
 	if digest != "" || len(operations) != 2 {
 		t.Fatalf("unexpected material binding or operations: %q, %d", digest, len(operations))
 	}
+	for _, operation := range operations {
+		var mirror string
+		for _, argument := range operation.Command {
+			if strings.HasPrefix(argument, "--local-mirror=") {
+				mirror = strings.TrimPrefix(argument, "--local-mirror=file://")
+			}
+		}
+		// Mkosi binds a file mirror from its outer namespace, before entering
+		// the APT sandbox. Its nested /repository destination is not a source.
+		if !strings.HasPrefix(mirror, "/inputs/") {
+			t.Fatalf("%s mirror is outside staged inputs: %q", operation.Format, mirror)
+		}
+		info, err := os.Stat(filepath.Join(inputs, strings.TrimPrefix(mirror, "/inputs/")))
+		if err != nil || !info.IsDir() {
+			t.Fatalf("%s mirror has no staged directory: %q, %v", operation.Format, mirror, err)
+		}
+	}
 	for relative, want := range map[string]string{
 		"roots/runtime/packages/base-files_1.0_amd64.deb":     "pinned archive bytes",
 		"roots/runtime/project/mkosi.conf":                    node.Mkosi.Configuration,

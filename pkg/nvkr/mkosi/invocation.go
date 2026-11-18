@@ -83,7 +83,7 @@ func rootInvocation(root Root, architecture, format, state string) Invocation {
 		"--format=" + format, "--output=" + root.Name, "--output-extension=", "--image-id=" + root.Name,
 		"--output-directory=" + operation.OutputDirectory, "--workspace-directory=" + operation.Workspace,
 		"--cache-directory=" + operation.Cache, "--package-cache-directory=" + operation.PackageCache,
-		"--local-mirror=file:///repository", "--cache-only=always", "--incremental=no", "--cache-key=nvkr-vm-runtime",
+		"--local-mirror=file://" + operation.Packages, "--cache-only=always", "--incremental=no", "--cache-key=nvkr-vm-runtime",
 		"--source-date-epoch=0", "--bootable=no", "--compress-output=no", "--split-artifacts=", "--manifest-format=json",
 		"--build-sources=", "--with-network=no", "--with-docs=yes", "--with-recommends=no", "--clean-package-metadata=no",
 		"--remove-files=/var/cache/*,/var/log/*", "--history=no"}
