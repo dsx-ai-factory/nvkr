@@ -17,7 +17,7 @@ import (
 )
 
 func readCatalogRegularBeneathContext(ctx context.Context, rootPath, relative string) ([]byte, error) {
-	file, before, err := openCatalogPath(rootPath, relative, false)
+	file, before, err := openCatalogPath(ctx, rootPath, relative, false)
 	if err != nil {
 		return nil, err
 	}
@@ -44,7 +44,26 @@ func readCatalogRegularBeneathContext(ctx context.Context, rootPath, relative st
 }
 
 func readCatalogDirectoryBeneathContext(ctx context.Context, rootPath, relative string) ([]string, error) {
-	directory, _, err := openCatalogPath(rootPath, relative, true)
+	directory, _, err := openCatalogPath(ctx, rootPath, relative, true)
+	if err != nil {
+		return nil, err
+	}
+	defer directory.Close()
+	state := &catalogWalkState{}
+	if err := walkCatalogDirectory(ctx, directory, "", 0, state); err != nil {
+		return nil, err
+	}
+	return state.files, nil
+}
+
+// readCatalogInventoryDirectoryContext holds the named scan root itself. Its
+// ancestors may be symlinks (for example /tmp on macOS), but the root and every
+// entry beneath it retain the catalog provider's no-follow policy and bounds.
+func readCatalogInventoryDirectoryContext(ctx context.Context, rootPath string) ([]string, error) {
+	if err := requireCatalogContext(ctx, "catalog inventory scan"); err != nil {
+		return nil, err
+	}
+	directory, err := openCatalogRoot(ctx, rootPath)
 	if err != nil {
 		return nil, err
 	}
@@ -100,15 +119,26 @@ func walkCatalogDirectory(ctx context.Context, directory *os.File, prefix string
 	return nil
 }
 
-func openCatalogPath(rootPath, relative string, directory bool) (*os.File, os.FileInfo, error) {
+func openCatalogRoot(ctx context.Context, rootPath string) (*os.File, error) {
+	if err := requireCatalogContext(ctx, "catalog root open"); err != nil {
+		return nil, err
+	}
 	rootFD, err := unix.Open(rootPath, unix.O_RDONLY|unix.O_CLOEXEC|unix.O_DIRECTORY|unix.O_NOFOLLOW|unix.O_NONBLOCK, 0)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	current := os.NewFile(uintptr(rootFD), rootPath)
 	if current == nil {
 		_ = unix.Close(rootFD)
-		return nil, nil, fmt.Errorf("opening catalog root %q", rootPath)
+		return nil, fmt.Errorf("opening catalog root %q", rootPath)
+	}
+	return current, nil
+}
+
+func openCatalogPath(ctx context.Context, rootPath, relative string, directory bool) (*os.File, os.FileInfo, error) {
+	current, err := openCatalogRoot(ctx, rootPath)
+	if err != nil {
+		return nil, nil, err
 	}
 	parts := strings.Split(relative, "/")
 	for index, part := range parts {
