@@ -15,10 +15,13 @@ own policy.
 [NVKE](https://github.com/dsx-ai-factory/nvke) installs and operates clusters.
 NVKR owns the build and release workflow that supplies their artifacts.
 
-> **Preview:** NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview status and known limitations](docs/overview/preview-status.md).
+> **Preview:** NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview limits](docs/overview/preview-status.md).
 
 [Try it](#build-your-first-artifact) · [Documentation](docs/README.md) ·
 [Contribute](CONTRIBUTING.md) · [Get help](SUPPORT.md)
+
+Follow the [six worked journeys](docs/journeys.md) from a small build through an intentional change,
+Run inspection, publication and consumption.
 
 ## Build your first artifact
 
