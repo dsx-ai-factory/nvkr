@@ -92,12 +92,14 @@ and selects no publication or signing; it is additive opt-in artifact support.
 `definitions/diagnostics/demo-arm64/` retains the existing components, OS, profiles, providers,
 simulator, site and installer-tool loops used by the local launcher. Additional controller and OVN
 Definitions retain focused producer/packaging contracts. The standalone OVN diagnostic keeps its
-[separate Environment](environments/github-ovn-diagnostics.yaml). These are transitional selections
-with explicit dispositions in the migration map, rather than silently expanded full-product Runs.
+[separate Environment](environments/github-ovn-diagnostics.yaml). The focused OS and source-built
+installer-tool loops remain supported. The other selections retain their explicit transitional or
+retirement dispositions in the migration map; none silently expands into a full-product Run.
 
 The [three-output tutorial](../docs/examples/nvke-tutorial/README.md) and
 [deploy example](../docs/examples/nvke-deploy/README.md) keep their example-specific Environments
-beside their Definitions. Other authoring and pin-set teaching fixtures remain in `docs/examples/`.
+beside their Definitions. The [module-tags build-only development Environment](../docs/examples/nvke-module-tags/environment-github-dev.yaml)
+remains supported per the migration map. Other authoring and pin-set teaching fixtures remain in `docs/examples/`.
 
 ## Maintenance
 

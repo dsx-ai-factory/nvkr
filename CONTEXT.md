@@ -19,6 +19,8 @@ _Avoid_: Factory, FactoryDefinition, cluster definition
 Separately selected execution settings, required publication transports and namespace, credential references,
 and signing identity policy. Container execution defaults to Docker; local Runs inherit the Environment
 runtime and reject conflicting executable overrides before work. Podman is an explicit alternative.
+Local execution may resolve a versioned build-only default instead of an authored Environment; the exact
+policy bytes and digest are frozen with the Plan and Run. This grants no signing, publication or VM capability.
 Selecting an unavailable transport fails before work; a supported sibling cannot
 substitute for it. An explicit OCI representation selects construction before packaging and signing;
 it changes Environment and Plan identity, not logical Build identity or existing publication bytes.
@@ -102,8 +104,8 @@ _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition**:
 The derived ordinary Definition that composite admission produces by merging its members, with every output's
-catalog stack made explicit. It is an internal record, recorded by digest in the composite's Plan; it is never
-authored or selected as input.
+catalog locator rebased and its shared ordered catalog candidates preserved. It is an internal record,
+recorded by digest in the composite's Plan; it is never authored or selected as input.
 _Avoid_: Flattened file, combined candidate, authored Definition
 
 **Declared variant**:
@@ -266,6 +268,14 @@ S3 is the first provider. The transport inventory locates original bytes and pro
 and complete verification establish acceptance. It changes neither Build identity nor the original signature
 subject and grants no destination authorization, boot, installation or qualification claim.
 _Avoid_: New signed release, successful upload flag, mutable channel, atomic bucket transaction
+
+**Selective boot-asset publication**:
+Opt-in copy of named QCOW2/EFI bytes and original proofs, with complete OCI Release membership and separate preliminary, completion and selected-artifact receipts. Core APIs are implemented; generated execution and external acceptance remain deferred. [ADR-20](docs/adr/0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding) owns the contract.
+_Avoid_: Partial mirror success, new Release, checksum as membership
+
+**MachineImage render artifact**:
+Proposed signed CR artifact for declared disk/architecture/destination pairs. Its own Build includes byte-affecting serving configuration; its eventual aggregate/content/inventory digests are excluded. Downstream NVKE owns deployment; the artifact grants no registration, placement or disk-selection authority.
+_Avoid_: Final Release root, selected-verification receipt, installed machine
 
 ## Evidence and authority
 

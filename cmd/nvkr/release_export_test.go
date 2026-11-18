@@ -327,3 +327,78 @@ func TestReleaseExportAICRInventory(t *testing.T) {
 		t.Fatalf("calls=%d output=%s", calls, out.String())
 	}
 }
+
+func TestReleaseExportAICRSelection(t *testing.T) {
+	digest := "sha256:" + strings.Repeat("a", 64)
+	description := releaseview.Description{Outputs: []releaseview.Output{
+		{Name: "image", Kind: "oci", Reference: "registry.example.test/image@" + digest, Digest: digest, OS: "linux", Arch: "amd64"},
+		{Name: "other", Kind: "oci", Reference: "registry.example.test/other@" + digest, Digest: digest, OS: "linux", Arch: "arm64"},
+	}}
+	raw, err := json.Marshal(description)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name       string
+		args, want []string
+		code       e.Code
+	}{
+		{"single", []string{"--output", "other"}, []string{"other"}, ""},
+		{"repeated flag", []string{"--output", "other", "--output", "image"}, []string{"image", "other"}, ""},
+		{"comma separated", []string{"--output", "other,image"}, []string{"image", "other"}, ""},
+		{"duplicate flag", []string{"--output", "image", "--output", "image"}, []string{"image"}, ""},
+		{"unknown", []string{"--output", "missing"}, nil, e.CodeUsage},
+		{"empty", []string{"--output", ""}, nil, e.CodeUsage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var out bytes.Buffer
+			calls := 0
+			command := releaseExportCmdWithOperation(func(context.Context, string, lifecycle.InspectionOptions) ([]byte, error) { calls++; return raw, nil })
+			app := &cli.App{Commands: []*cli.Command{command}, Writer: &out}
+			args := []string{"nvkr", "export", "--reference", "registry.example.test/releases@" + digest, "--format", "aicr-inventory"}
+			err := app.RunContext(t.Context(), append(args, tc.args...))
+			if tc.code != "" {
+				if cliErrorCode(err) != tc.code || out.Len() != 0 {
+					t.Fatalf("output=%s err=%v", out.String(), err)
+				}
+				if tc.name == "unknown" && !strings.Contains(err.Error(), "missing") {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var inventory struct{ Artifacts []struct{ Name string } }
+			if err := json.Unmarshal(out.Bytes(), &inventory); err != nil {
+				t.Fatal(err)
+			}
+			var names []string
+			for _, item := range inventory.Artifacts {
+				names = append(names, item.Name)
+			}
+			if calls != 1 || !slices.Equal(names, tc.want) {
+				t.Fatalf("calls=%d names=%v", calls, names)
+			}
+		})
+	}
+}
+
+func TestReleaseExportRejectsJSONSelectionBeforeInspection(t *testing.T) {
+	for _, format := range []string{"", "json"} {
+		t.Run("format="+format, func(t *testing.T) {
+			var out bytes.Buffer
+			calls := 0
+			command := releaseExportCmdWithOperation(func(context.Context, string, lifecycle.InspectionOptions) ([]byte, error) { calls++; return nil, nil })
+			app := &cli.App{Commands: []*cli.Command{command}, Writer: &out}
+			args := []string{"nvkr", "export", "--reference", "unopened", "--output", "image"}
+			if format != "" {
+				args = append(args, "--format", format)
+			}
+			err := app.RunContext(t.Context(), args)
+			if cliErrorCode(err) != e.CodeUsage || out.Len() != 0 || calls != 0 {
+				t.Fatalf("calls=%d output=%s err=%v", calls, out.String(), err)
+			}
+		})
+	}
+}

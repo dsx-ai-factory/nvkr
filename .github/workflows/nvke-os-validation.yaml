@@ -50,6 +50,7 @@ permissions:
 jobs:
   select:
     name: Select exact commit and native runners
+    if: github.event_name != 'push' || github.repository == 'dsx-ai-factory/nvkr'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:

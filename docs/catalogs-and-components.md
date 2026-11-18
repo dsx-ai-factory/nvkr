@@ -88,7 +88,70 @@ Both outputs use the default catalog. `components` selects exact producer keys; 
 them. Neither output selects `app-cli-alt` yet. Each output remains
 independently required even when it shares a component with another output.
 
+## Share catalog selections across outputs
+
+Keep `catalog` for shared action and utility pins. Add an optional ordered `catalogs` list when outputs
+select producers from several stacks:
+
+```yaml
+catalog:
+  base: ./tools
+catalogs:
+  - base: ./applications
+  - base: ./images
+    overlays: [./image-toolchains.yaml]
+outputs:
+  - name: client-bundle
+    components: [app-cli]
+    platform: linux/amd64
+    format: executable
+```
+
+An output without an override must find its complete component selection and every required platform
+in exactly one listed stack. No match returns `NVKR-E-NO-MATCH`; multiple matches return
+`NVKR-E-AMBIGUOUS`, even if their producers are identical. List order never resolves a collision.
+Set that output's `catalog` explicitly to choose a stack. All listed stacks are validated, including
+unused candidates. At most 64 distinct stacks are admitted; an omitted or empty list retains the
+singular catalog behavior. Internal tools use the same selection rule. Composite members must share
+the same ordered list after rebasing paths.
+
+`run plan` shows each selected catalog, overlays and digest in its producer section. Its JSON view
+records `builds[].selectedCatalog` and the complete `catalogCandidates` snapshots. Validation rechecks
+the whole output's choice, including every native child of a platform set.
+
+The maintained NVKE Definition uses six stacks and two explicit `nvkectl` overrides because that
+producer exists in both the release and module-tag catalogs. Its 69 output names and all 73 native
+producer selections stay unchanged. Source-built image outputs already use platform sets. Acquired
+image pairs remain separate: aggregate packaging currently requires built OCI exports. Disk outputs
+remain native, and executable-index migration belongs to issues #297, #296 and #376 with their
+qualification prerequisites. No output rename or consumer mapping changes in this migration.
+
 ## Find components
+
+Browse all catalogs without first choosing a producer:
+
+```sh
+nvkr catalog list --data inputs/catalogs
+nvkr catalog find --data inputs/catalogs nvkectl
+```
+
+Root listing includes imported components and keeps duplicate names separate by catalog path.
+`find` matches an exact component name and reports each location with its recorded source or
+acquisition pins; an unknown name returns a no-match error (exit 10). Both accept `--format json`.
+Root JSON groups descriptions under root-relative `path`, catalog `name`, and `components`.
+Missing locks, invalid imports and unsafe directory entries fail before results are printed.
+Discovery is offline and read-only: it validates local declarations and recorded lock structure,
+but does not re-derive pin sets from upstream Git trees or select anything for a Definition.
+Normal executable catalog loading retains that upstream verification requirement.
+The root scan admits at most 1,024 total files and directories and 16 directory levels,
+using the same no-symlink entry policy as catalog loading. Scan a narrower root if it exceeds
+those bounds. Each catalog load retains its existing file and aggregate byte limits.
+
+The [generated catalog inventory](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/INDEX.md) lists locations, component names and
+producer modes from these same descriptions. Pins remain in `catalog find` so automated pin refreshes
+do not change this navigation index.
+After editing catalog inputs, run `make catalog-index-generate`; `make catalog-index-check`
+rejects stale content and also runs as part of `make workflows-check`.
 
 `nvkr catalog list --data DIR` prints every component. Two optional selectors narrow it, and
 `--format json` prints a machine-readable projection:
@@ -106,7 +169,7 @@ nvkr catalog list --data inputs/catalogs/tools/operator-arm64 \
   valid selector that matches nothing is a no-match error (exit 10). Neither prints a result.
 - Unfiltered text output is unchanged.
 
-The JSON output is a stable array sorted by component name. Each entry has `name`, `platforms`,
+For a leaf catalog, JSON output remains a stable array sorted by component name. Each entry has `name`, `platforms`,
 `outputType` and `producerMode`. `producerMode` is one of:
 
 | Value | Meaning |
@@ -115,6 +178,34 @@ The JSON output is a stable array sorted by component name. Each entry has `name
 | `acquired` | an executable or image delivered from a prebuilt URL or image (the `prebuilt` lane) |
 | `pinned-tool` | a pinned build tool (`file` or `oci-layout` output) |
 | `excluded` | declared but neither built nor acquired |
+
+## Explain authored inputs
+
+Use an explicit input root to inspect a file and the supported authored files that refer to it:
+
+```sh
+nvkr explain --root inputs inputs/definitions/nvke/definition.yaml
+nvkr explain --root inputs inputs/catalogs/shared/nvke.yaml --json
+```
+
+The command recognizes Definitions, Environments, composites, catalogs, overlays, catalog fragments,
+generated pin locks, hosted qualification policies and local qualification policies. Paths in the report are relative to the
+printed scan root; the JSON `root` is an absolute locator and differs between checkouts. Fragment imports label local-to-fragment selections and fragment-to-local source bindings separately; Definition catalog selections
+show overlay order, and overlays identify their exact predecessor binding. Locks identify their owning
+catalog and the pin-generation commands. The public consumer `VerificationPolicy` currently has no
+authored file form; the supported policy files here are hosted and local qualification policies.
+
+The root must contain the referenced input closure. Reverse references cover these supported kinds only
+within that root. Other schemas and the `.git`, `.nvkr` and `node_modules` directories are excluded.
+An unsupported target schema, missing files, stale
+fragment or composite pins, and ambiguous or unmatched overlay predecessors fail with coded errors and
+no partial report. The scan is bounded to 4,096 entries, depth 16 and 32 MiB of YAML/JSON input; symlinks
+are refused. Choose a smaller complete input tree if a broad repository scan exceeds those limits.
+
+Explanation is read-only and offline. It validates recorded declarations through their existing loaders,
+but does not re-derive upstream pin sets, execute producers, or authenticate release evidence. A fragment's
+complete producer meaning still depends on its importing registry's mappings and pins. A validation error
+elsewhere in the scanned authored graph must be fixed before the command prints an explanation.
 
 ## Replace a producer or change a selection
 

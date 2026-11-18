@@ -53,6 +53,87 @@ func localPreparationFixture(t *testing.T) (*Plan, []LocalToolchainBinding) {
 	return plan, bindings
 }
 
+func TestLocalToolchainPreparationCatalogList(t *testing.T) {
+	baseline, bindings := localPreparationFixture(t)
+	def := baseline.Definition.Clone()
+	spec := *def.Outputs[0].Catalog
+	def.Catalogs = []authored.Catalog{spec}
+	def.Outputs[0].Catalog = nil
+	stacks := map[string]*catalog.Stack{}
+	for _, build := range baseline.Builds {
+		stacks[build.Name] = &catalog.Stack{Catalog: build.CatalogSnapshot, Digest: build.CatalogDigest, Applied: build.AppliedOverlays}
+	}
+	first := baseline.Builds[0]
+	candidates := []CatalogCandidate{{Selection: spec, CatalogSnapshot: first.CatalogSnapshot, CatalogDigest: first.CatalogDigest, AppliedOverlays: first.AppliedOverlays}}
+	plan, err := compileWithTargetStacksFor(t.Context(), def, baseline.Environment, &catalog.Stack{Catalog: baseline.CatalogSnapshot, Digest: baseline.CatalogDigest}, stacks, "test", "definition.json", "environment.json", nil, candidates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preparation, err := CompileLocalToolchainPreparation(t.Context(), plan, bindings, "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	image := "sha256:" + strings.Repeat("b", 64)
+	for _, tamper := range []bool{false, true} {
+		t.Run(fmt.Sprint("candidate-tamper=", tamper), func(t *testing.T) {
+			selected, _, err := preparation.substitute(t.Context(), image)
+			if err != nil {
+				t.Fatal(err)
+			}
+			selected.Definition.Catalogs[0].Base = "../relocated/catalog-0"
+			selected.CatalogCandidates[0].Selection.Base = selected.Definition.Catalogs[0].Base
+			selected.DefinitionDigest, err = selected.Definition.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tamper {
+				selected.CatalogCandidates[0].CatalogSnapshot.Metadata.Description = "changed"
+				selected.CatalogCandidates[0].CatalogDigest, err = selected.CatalogCandidates[0].CatalogSnapshot.SnapshotDigest()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			err = preparation.Verify(t.Context(), selected, image)
+			if tamper {
+				assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	t.Run("unused candidate membership", func(t *testing.T) {
+		selected, _, err := preparation.substitute(t.Context(), image)
+		if err != nil {
+			t.Fatal(err)
+		}
+		unused, err := catalog.ApplyStack(selected.CatalogCandidates[0].CatalogSnapshot)
+		if err != nil {
+			t.Fatal(err)
+		}
+		delete(unused.Catalog.Components, "image")
+		unused, err = catalog.ApplyStack(unused.Catalog)
+		if err != nil {
+			t.Fatal(err)
+		}
+		spec := authored.Catalog{Base: "unused"}
+		selected.Definition.Catalogs = append(selected.Definition.Catalogs, spec)
+		selected.CatalogCandidates = append(selected.CatalogCandidates, CatalogCandidate{Selection: spec, CatalogSnapshot: unused.Catalog, CatalogDigest: unused.Digest})
+		selected.DefinitionDigest, err = selected.Definition.Digest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := selected.Validate(); err != nil {
+			t.Fatalf("membership fixture must otherwise validate: %v", err)
+		}
+		err = preparation.Verify(t.Context(), selected, image)
+		assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+		if !strings.Contains(err.Error(), "candidate membership") {
+			t.Fatalf("wrong verification boundary: %v", err)
+		}
+	})
+
+}
+
 func TestLocalToolchainPreparationCompleteCompiledSelections(t *testing.T) {
 	for _, sameImage := range []bool{false, true} {
 		t.Run(fmt.Sprint("already-measured=", sameImage), func(t *testing.T) {
@@ -229,6 +310,41 @@ func TestLoadLocalToolchainBindingsRejectsAmbiguity(t *testing.T) {
 			}
 			_, err := LoadLocalToolchainBindings(t.Context(), path)
 			assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+		})
+	}
+}
+
+func TestLocalToolchainPreparationInternalToolCatalogListAdmission(t *testing.T) {
+	_, baseline := internalToolPlanFixture(t)
+	def := baseline.Definition.Clone()
+	def.Catalogs = []authored.Catalog{def.Catalog}
+	stack := &catalog.Stack{Catalog: baseline.CatalogSnapshot, Digest: baseline.CatalogDigest}
+	candidates := []CatalogCandidate{{Selection: def.Catalog, CatalogSnapshot: stack.Catalog, CatalogDigest: stack.Digest}}
+	stacks := map[string]*catalog.Stack{}
+	for _, build := range baseline.Builds {
+		stacks[build.Name] = stack
+	}
+	for _, publication := range []bool{true, false} {
+		t.Run(fmt.Sprint("publication=", publication), func(t *testing.T) {
+			env := baseline.Environment.Clone()
+			if !publication {
+				env.Publication, env.Signing = nil, nil
+			}
+			plan, err := compileWithTargetStacksFor(t.Context(), def, env, stack, stacks, "test", "definition.json", "environment.json", nil, candidates)
+			if !publication {
+				// Current internal-tool consumers require publication inspection. A plain
+				// diagnostic disk has no SBOM inspection consumer and cannot retain the tool.
+				assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+				if !strings.Contains(err.Error(), "no selected consumer") {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = CompileLocalToolchainPreparation(t.Context(), plan, nil, "amd64")
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 		})
 	}
 }

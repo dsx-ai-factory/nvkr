@@ -169,21 +169,26 @@ Native children are locked separately from source-owned index parents, and mater
 membership. Controlled source/pin/image tests and exact-source approval do not prove external layer acquisition,
 scanner acceptance or complete production input approval. The
 [acquisition observations](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/producer-acquisition-observations.md#temporary-spire-source-selection) retain the historical mixed-source candidate and HTTP-403 limits.
-The maintained release and native demo inputs now select the same stock NVKE `v0.23.0`
+The maintained release and retained native demo baseline select the same stock NVKE `v0.23.0`
 source, `2cfd00081b468d85a4894ec17e9deac13c9d8169`, for OS assembly, agent, Calico,
 kubeadm, SPIRE packaging and DOCA OVS acquisition, including the renamed Packer targets, disk filenames,
 material schema and required Ubuntu-series input. NVKE telemetry pipelines is packaged from its own repository,
 `dsx-ai-factory/nvke-telemetry-pipeline`, at `nktp/v0.1.0`, the release that `v0.23.0`'s site values target.
-The native installer bundle still installs `v0.23.0`'s in-tree chart until NVKR selects an NVKE release without it
-([#465](https://github.com/dsx-ai-factory/nvkr/issues/465)). SPIRE uses that release's revision-4
+The native installer bundle carries the in-tree chart when the selected NVKE source has it, and extraction
+requires it when that source installs NKTP by path, as `v0.23.0` does. The nightly's NVKE `main` installs
+the published chart instead ([#465](https://github.com/dsx-ai-factory/nvkr/issues/465)).
+SPIRE uses that release's revision-4
 package and source-owned public acquisition/packaging commands; no pre-DSX source
 rollback is selected. The default package's removal of DSX IMDS is an upstream release
 contract, not a missing private dependency waived by NVKR. Historical DSX source,
 distribution and compatibility questions are recorded in
 [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641); the older HTTP-403
 observations are not a current v0.23.0 build blocker. No source gate, submodule rejection
-or security requirement is weakened. Current-source execution remains unverified here
-until its own complete recorded attempt succeeds. Standalone plugin compilation does
+or security requirement is weakened. Execution of the retained v0.23.0 selection remains
+unverified here until its own complete recorded attempt succeeds. The
+[recorded fork nightly](consumer-acceptance-scopes.md) establishes native build/site/tenant
+acceptance only for its exact November 18 NVKE main source pair;
+it does not establish combined release publication. Standalone plugin compilation does
 not establish native execution/boot acceptance. NVKE telemetry pipelines acquisition and
 offline Helm packaging were exercised locally; no successful combined hosted Run of these release additions is claimed.
 
