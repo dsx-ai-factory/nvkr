@@ -226,7 +226,7 @@ func TestPullOutputOCIValidatesWholeReleaseWithoutSiblingPayloads(t *testing.T) 
 					if err != nil {
 						t.Fatal(err)
 					}
-					if result.Output.Name != fixture.object.Name || result.Output.Kind != "oci" || len(result.Files) != 0 || selectedGets.Load() == 0 {
+					if result.Output.Name != fixture.object.Name || result.Output.Kind != "oci" || result.Payload != PulledPayloadDirectory || len(result.Files) != 0 || selectedGets.Load() == 0 {
 						t.Fatalf("wrong selected output result: %+v, payload requests=%d", result, selectedGets.Load())
 					}
 					assertPulledImageFixture(t, fixture, out)
