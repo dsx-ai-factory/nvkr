@@ -48,27 +48,67 @@ preserving build identity. A dry-run signing mode records intended operations an
 
 ## Start a small executable Definition
 
-`definition init` prints a plain Definition with one executable output named after `--name`, bundling
-catalog components you select explicitly. It adds no Environment, pins, signer, CI files or composite, and
-it never adds a dependency you did not name:
+`definition init` prints one output named after `--name`, selecting only the components you name.
+Give its intended `--destination` inside the checkout root. Catalog references are relative to that file,
+so the saved Definition has the same bytes when the checkout moves:
 
 ```sh
-bin/nvkr definition init --name my-tools \
+bin/nvkr definition init --name my-tools --destination definition.yaml \
   --catalog inputs/catalogs/tools/operator-arm64 \
   --platform linux/arm64 --component helm --component kubectl > definition.yaml
 bin/nvkr definition validate --definition definition.yaml
+bin/nvkr run local --definition definition.yaml --attempt my-tools-1
 ```
 
-The selection is admitted through the same catalog, platform-route and material-set checks a later run uses,
-and init adds no rule of its own. A missing flag, a missing, duplicate or unknown component, an unsupported
-platform or an incomplete material selection fails with a coded error and prints nothing. Components are sorted, so the same request on the same checkout always prints the same
-bytes.
+Run the last command from the checkout root with a supported local runtime available. It uses the
+built-in build-only Environment below. The example selects ARM64 tools explicitly; use a matching local
+execution host. `--destination` does not write a file: save stdout at that exact location. Shell redirection opens the file
+before validation, so choose a new filename to avoid truncating an existing Definition. The parent must
+already exist. `--root` defaults to the working directory; when authoring from another directory, pass
+an absolute checkout root and catalog path. Relative destinations are resolved under `--root`.
+Outside-root destinations and catalogs are refused before YAML is emitted. Later Run preparation still
+confines captured inputs to its root; moving the Definition alone requires updating its relative references.
 
-`--catalog` is written as an absolute path, so the printed file works where it was made. That path is part of the
-Definition digest and the Plan, so the same request prints different bytes and identities on another checkout.
-Captured local runs, hosted runs and composite Definitions refuse an absolute catalog locator. Before you commit
-the file or use it in one of those runs, change `catalog.base` to a path relative to the Definition file's own
-directory, not the directory you ran `definition init` from. This first version covers one executable output and a single platform.
+The default format is `executable`. Use `--format` for another supported single-platform output:
+
+| Format | Explicit selection and example |
+|---|---|
+| `executable` | One or more executable producers; the command above selects acquired tools. |
+| `oci` | One OCI image producer, for example `pause` in `testdata/examples/layered-catalog`. |
+| `apt-repository` | Host-package producers plus `--apt-distribution stable --apt-component main`; for example `kubectl` in the layered catalog exercises packaging, not Debian package installation. |
+| `helm-oci` | One source chart archive or acquired chart with no required image bindings; `gpu-runtime-chart` in the layered catalog is a source-archive example. |
+| `bundle-oci` | One source archive or one pinned-tool layout with its complete material closure; `gpu-runtime-chart` also demonstrates archive packaging. |
+| `debian-package` | One source host-package producer; the maintained [NVSENTINEL Debian Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvsentinel/debian-ubuntu-24.04-arm64.yaml) selects an actual Debian-producing component. |
+| `disk-image` | One disk root and every explicit material; the maintained [disk Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/disks-ubuntu24.yaml) shows complete selections. Supply `--environment` with the necessary explicit execution classes. |
+
+These are authoring and compilation examples, not evidence that a producer ran or that its payload is
+installable. Init validates the complete selection through the compiler. It adds no dependency, image binding,
+overlay, signer or execution class. Use an existing multi-output Definition when a chart requires images.
+Unsupported formats, platform routes, incomplete materials and incompatible packaging return coded errors
+without printing YAML. `--environment FILE` validates a starter against that policy instead of the built-in
+local policy; it does not embed the Environment in the Definition or select it for subsequent commands.
+
+### Built-in local Environment
+
+Only `run local` may omit `--environment`. It resolves a versioned `builtin-local-v1-amd64` or
+`builtin-local-v1-arm64` policy on Linux or macOS, using the host architecture for utility execution while
+preserving each output's explicit target. Host architecture therefore changes Environment and Plan identity;
+logical producer Build Digests stay unchanged. The policy selects Docker, offline build networking and a pinned
+Go utility image. Anonymous toolchain pulls are limited to `docker.io/library/alpine`,
+`docker.io/library/golang`, and `docker.io/moby/buildkit`. Fetching declared sources remains a separate step.
+Other image roots, image-location bindings, native toolchains and producer network access require an explicit
+Environment. The default supplies no signing, publication, VM execution classes, KVM access or qualification
+claim. `--publish` requires an explicit Environment.
+
+The Plan contains the resolved Environment and its digest; the Run binds that digest and the Plan digest.
+Local execution retains the exact policy bytes in `compile-inputs.json` under the logical path
+`.nvkr/builtin/local-environment-v1.json`, alongside all other captured compiler inputs. That entry is never
+read from or written to the checkout when the Environment is omitted. A file at that path cannot override
+that default. Explicit `--environment` selection always uses the selected file, including at that location;
+the path alone is not proof of the built-in policy. Inspect its bytes and digest. Replay uses the
+captured bytes, so a later CLI default cannot change an existing Run's identity. Dry runs and rejected
+capabilities create no attempt storage. An explicit `--environment` keeps its existing meaning; planning
+and hosted generation continue to require it.
 
 ## Inspect and generate
 
