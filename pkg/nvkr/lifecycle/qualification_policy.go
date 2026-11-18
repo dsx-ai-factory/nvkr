@@ -119,6 +119,29 @@ func LoadQualificationPolicy(ctx context.Context, path string) (QualificationPol
 	if err != nil {
 		return QualificationPolicy{}, qualificationPolicyReadError(ctx, err)
 	}
+	policy, err := DecodeQualificationPolicy(raw)
+	if err != nil {
+		return QualificationPolicy{}, err
+	}
+	if policy.Cosign.Path == "" {
+		policy.Cosign.Path = "cosign"
+	} else if !filepath.IsAbs(policy.Cosign.Path) && strings.ContainsRune(policy.Cosign.Path, '/') {
+		base, err := filepath.Abs(filepath.Dir(path))
+		if err != nil {
+			return QualificationPolicy{}, e.Wrap(e.CodeTrustPolicyMissing, err, "resolving qualification policy directory")
+		}
+		policy.Cosign.Path = filepath.Join(base, policy.Cosign.Path)
+	}
+	return policy, nil
+}
+
+// DecodeQualificationPolicy validates bounded captured policy bytes without I/O.
+// Relative executable locators stay descriptive; LoadQualificationPolicy resolves
+// them from the explicitly selected policy directory for execution callers.
+func DecodeQualificationPolicy(raw []byte) (QualificationPolicy, error) {
+	if len(raw) > maxQualificationPolicyBytes {
+		return QualificationPolicy{}, e.New(e.CodeTrustPolicyMissing, "qualification policy exceeds byte limit")
+	}
 	// The streaming decoder rejects a second document; YAML-to-JSON conversion
 	// preserves scalar types so a number or boolean cannot become a suite name.
 	decoder := yamlv2.NewDecoder(bytes.NewReader(raw))
@@ -142,15 +165,6 @@ func LoadQualificationPolicy(ctx context.Context, path string) (QualificationPol
 	}
 	if err := policy.Validate(); err != nil {
 		return QualificationPolicy{}, err
-	}
-	if policy.Cosign.Path == "" {
-		policy.Cosign.Path = "cosign"
-	} else if !filepath.IsAbs(policy.Cosign.Path) && strings.ContainsRune(policy.Cosign.Path, '/') {
-		base, err := filepath.Abs(filepath.Dir(path))
-		if err != nil {
-			return QualificationPolicy{}, e.Wrap(e.CodeTrustPolicyMissing, err, "resolving qualification policy directory")
-		}
-		policy.Cosign.Path = filepath.Join(base, policy.Cosign.Path)
 	}
 	return policy, nil
 }
