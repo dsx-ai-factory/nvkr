@@ -17,6 +17,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
 	"github.com/dsx-ai-factory/nvkr/internal/rundiagnostics"
 	"github.com/dsx-ai-factory/nvkr/internal/runpresenter"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
@@ -123,7 +124,20 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 		defer func() { _ = activity.Close() }()
 	}
 	var prepared *lifecycle.PreparedRun
-	if c.IsSet("capture-inputs-root") {
+	if !c.IsSet("environment") {
+		if c.Bool("publish") {
+			return e.New(e.CodeEngineCapability, "publication requires an explicit --environment; the built-in local Environment is build-only")
+		}
+		root, definitionPath := c.String("capture-inputs-root"), c.String("definition")
+		if root == "" {
+			root = "."
+			definitionPath, err = definition.WorkingRelativePath(definitionPath)
+			if err != nil {
+				return err
+			}
+		}
+		prepared, err = lifecycle.PrepareDefaultLocal(c.Context, root, definitionPath, factoryGeneratorVersion(), c.String("attempt"))
+	} else if c.IsSet("capture-inputs-root") {
 		prepared, err = lifecycle.PrepareCapturedFiles(c.Context, c.String("capture-inputs-root"), c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("attempt"))
 	} else {
 		prepared, err = lifecycle.PrepareFiles(c.Context, c.String("definition"), c.String("environment"), factoryGeneratorVersion(), c.String("attempt"))

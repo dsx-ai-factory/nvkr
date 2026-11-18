@@ -208,7 +208,10 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			fmt.Printf("generated %s hosted run\nplanDigest: %s\n", c.String("engine"), digest)
 			return nil
 		}},
-		{Name: "local", Usage: "execute a local run; publication remains opt-in", Flags: append(lifecycleInputFlags(),
+		{Name: "local", Usage: "execute a local run; publication remains opt-in", Flags: append([]cli.Flag{
+			&cli.StringFlag{Name: "definition", Required: true, Usage: "Definition YAML"},
+			&cli.StringFlag{Name: "environment", Usage: "Environment YAML (default: recorded built-in build-only local policy)"},
+		},
 			&cli.StringFlag{Name: "attempt", Required: true, Usage: "new immutable attempt name"},
 			&cli.StringFlag{Name: "attempts-root", Value: ".nvkr/runs"}, &cli.StringFlag{Name: "runner-source", Value: "."},
 			&cli.StringFlag{Name: "capture-inputs-root", Usage: "retain compiler inputs beneath this root; definition and environment paths must be repository-relative"},
