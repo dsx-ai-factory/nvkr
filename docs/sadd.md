@@ -551,6 +551,13 @@ first byte provider. It reuses original artifacts, provenance and SBOMs, complet
 generated publication/finalization. External provider, workflow and downstream boot/install acceptance remain
 separate evidence; the transport adds no deployment or qualification claim.
 
+The [selective contract](adr/0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding)
+copies named QCOW2/EFI bytes and proofs while preserving complete OCI membership. Payload copy/readback precedes rendering;
+aggregate authentication precedes proof and final inventory publication/readback. [Reconciliation](adr/reconciliation/object-store-publication.md#selective-boot-asset-publication) tracks implementation.
+Environment v3 and Plan v7 describe the opt-in selection and two bounded phases. Core lifecycle APIs issue
+limited selected-artifact receipts after original authentication and cleanup; generated selective execution,
+rendering and external provider/client acceptance remain separate work.
+
 [Reconciliation](adr/reconciliation/README.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
 `pipeline-attested` consumers for `authenticity` and `artifact-publication` are implemented. Authenticity

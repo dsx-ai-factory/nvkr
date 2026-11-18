@@ -32,6 +32,7 @@ type BinaryBundleRequest struct {
 	InventoryDigest   string
 	Epoch             int64
 	Files             []BinaryFileInput
+	Boot              *BinaryBootBinding
 }
 
 type capturedBinary struct {
@@ -52,6 +53,9 @@ func BuildBinaryBundle(ctx context.Context, out string, request BinaryBundleRequ
 	if len(request.Files) == 0 || len(request.Files) > maxDeliveryObjects {
 		return Result{}, e.New(e.CodeUsage, "binary bundle requires 1..%d files", maxDeliveryObjects)
 	}
+	if err := admitBinaryBootRequest(request); err != nil {
+		return Result{}, err
+	}
 	files := append([]BinaryFileInput(nil), request.Files...)
 	sort.Slice(files, func(i, j int) bool { return files[i].Name < files[j].Name })
 	captures := make([]capturedBinary, 0, len(files))
@@ -64,6 +68,9 @@ func BuildBinaryBundle(ctx context.Context, out string, request BinaryBundleRequ
 	bundle := BinaryBundle{SchemaVersion: BinaryBundleSchemaVersion, OS: request.OS,
 		Arch: request.Arch, Purpose: request.Purpose, ReleaseSetDigest: request.ReleaseSetDigest,
 		InventoryDigest: request.InventoryDigest, Entries: make([]BinaryEntry, 0, len(files))}
+	if request.Boot != nil {
+		bundle.SchemaVersion, bundle.Boot = BinaryBootSchemaVersion, request.Boot.clone()
+	}
 	for index, input := range files {
 		if index > 0 && files[index-1].Name == input.Name {
 			return Result{}, e.New(e.CodeInvalidCatalog, "binary bundle repeats name %q", input.Name)
