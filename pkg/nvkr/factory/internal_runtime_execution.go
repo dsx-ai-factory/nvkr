@@ -12,6 +12,25 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
 
+// The public LocalRunResult fields are descriptions. Retain both original and
+// relocated Plan identities privately with each concrete runtime production.
+type runtimeProductionPlan struct {
+	identity string
+	current  string
+}
+
+func runtimePlanBinding(plan *Plan) (runtimeProductionPlan, error) {
+	identity, err := plan.IdentityDigest()
+	if err != nil {
+		return runtimeProductionPlan{}, err
+	}
+	current, err := plan.Digest()
+	if err != nil {
+		return runtimeProductionPlan{}, err
+	}
+	return runtimeProductionPlan{identity: identity, current: current}, nil
+}
+
 func (owner *LocalRunResult) admitInternalRuntime(ctx context.Context, plan *Plan, selected InternalToolPlan) error {
 	if selected.Format != definition.OutputOCI {
 		return e.New(e.CodeEngineCapability, "internal runtime requires its OCI Plan selection")
@@ -30,6 +49,10 @@ func (owner *LocalRunResult) retainInternalRuntime(ctx context.Context, plan *Pl
 	if binding.BuildDigest != selected.BuildDigest || binding.Platform != selected.Platform || binding.Component != selected.Component {
 		return e.New(e.CodeVerifyFailed, "internal runtime differs from its selected producer")
 	}
+	planned, err := runtimePlanBinding(plan)
+	if err != nil {
+		return err
+	}
 	owner.diskMu.Lock()
 	defer owner.diskMu.Unlock()
 	if owner.diskClosed || owner.diskClosing {
@@ -41,7 +64,11 @@ func (owner *LocalRunResult) retainInternalRuntime(ctx context.Context, plan *Pl
 	if owner.internalRuntimes == nil {
 		owner.internalRuntimes = make(map[string]*pipeline.ProducedRuntime)
 	}
+	if owner.internalRuntimePlans == nil {
+		owner.internalRuntimePlans = make(map[string]runtimeProductionPlan)
+	}
 	owner.internalRuntimes[selected.Name] = runtime
+	owner.internalRuntimePlans[selected.Name] = planned
 	return nil
 }
 
@@ -71,9 +98,17 @@ func (owner *LocalRunResult) internalRuntimeProduction(ctx context.Context, plan
 	owner.diskMu.Lock()
 	closed := owner.diskClosed || owner.diskClosing
 	runtime := owner.internalRuntimes[name]
+	planned := owner.internalRuntimePlans[name]
 	owner.diskMu.Unlock()
-	if closed || runtime == nil {
+	if closed || runtime == nil || planned.identity == "" {
 		return nil, InternalToolPlan{}, e.New(e.CodeGateUnmet, "runtime observation has no live production")
+	}
+	current, err := runtimePlanBinding(plan)
+	if err != nil {
+		return nil, InternalToolPlan{}, err
+	}
+	if current != planned {
+		return nil, InternalToolPlan{}, e.New(e.CodeVerifyFailed, "runtime observation changes its original production Plan")
 	}
 	binding, err := runtime.BindingContext(ctx)
 	if err != nil {

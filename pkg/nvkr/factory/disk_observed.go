@@ -11,6 +11,7 @@ import (
 	"errors"
 	"hash"
 	"io"
+	"maps"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -507,7 +508,16 @@ func (result *LocalRunResult) Close() error {
 	if result.diskInspectionCancel != nil {
 		result.diskInspectionCancel()
 	}
+	runtimeUses := maps.Clone(result.internalRuntimeUses)
 	result.diskMu.Unlock()
+	// Revoke consumer work before closing the produced layer it may still hold.
+	// Receipt.Close cancels and joins the complete namespace execution callback.
+	for _, receipt := range runtimeUses {
+		receipt.Revoke()
+	}
+	for _, subject := range sortedKeys(runtimeUses) {
+		runtimeUses[subject].Close()
+	}
 	// No new reservation can pass after diskClosing is set. A completion
 	// already committing must record its outcomes before its held Run closes.
 	result.diskPublicationWait.Wait()
@@ -527,6 +537,8 @@ func (result *LocalRunResult) Close() error {
 	result.internalExecutables = nil
 	runtimes := result.internalRuntimes
 	result.internalRuntimes = nil
+	result.internalRuntimePlans = nil
+	result.internalRuntimeUses = nil
 	result.internalToolEvidence = nil
 	result.diskMu.Unlock()
 	var closeErr error

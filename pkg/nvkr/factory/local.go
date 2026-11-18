@@ -26,6 +26,7 @@ import (
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/runtimeuse"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/progress"
@@ -98,6 +99,8 @@ type LocalRunResult struct {
 	materialConsumptions   map[string]producerConsumption
 	internalExecutables    map[string]*pipeline.ProducedExecutable
 	internalRuntimes       map[string]*pipeline.ProducedRuntime
+	internalRuntimePlans   map[string]runtimeProductionPlan
+	internalRuntimeUses    map[string]*runtimeuse.Receipt
 	internalToolEvidence   map[string]map[string]string
 }
 

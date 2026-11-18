@@ -18,6 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/ociclosure"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/rootfs"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/runtimeuse"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/mkosi"
 )
@@ -40,16 +41,7 @@ type producedRuntimeState struct {
 
 // ProducedRuntimeBinding describes the live production capability; this value
 // cannot restore it or authorize a different Run or consumer.
-type ProducedRuntimeBinding struct {
-	BuildDigest    string `json:"buildDigest"`
-	Platform       string `json:"platform"`
-	Component      string `json:"component"`
-	Digest         string `json:"digest"`
-	Size           int64  `json:"size"`
-	LayoutDigest   string `json:"layoutDigest"`
-	LayerDigest    string `json:"layerDigest"`
-	TerminalDigest string `json:"terminalDigest"`
-}
+type ProducedRuntimeBinding = runtimeuse.ProductionBinding
 
 func ValidateProducedRuntimeProducer(graph *ir.Graph, buildDigest, component string) error {
 	if err := validateProducedExecutableGraph(graph, buildDigest); err != nil {

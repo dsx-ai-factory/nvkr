@@ -61,7 +61,7 @@ func (owner *LocalRunResult) admitInternalToolEvidence(ctx context.Context, plan
 			return err
 		}
 	case definition.OutputOCI:
-		if _, err := runtime.BindingContext(ctx); err != nil {
+		if _, _, err := owner.internalRuntimeProduction(ctx, plan, selected.Name); err != nil {
 			return err
 		}
 	default:

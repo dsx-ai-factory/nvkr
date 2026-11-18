@@ -36,8 +36,12 @@ SBOM; focused fixtures cover these boundaries. The compiler resolves the Environ
 runtime producer into each selected Packer Build and adds the runtime result, terminal observation and
 SBOM as required consumer inputs. Complete Plan fixtures exercise catalog revalidation, runtime repins,
 removal of the unused image dependency and exact license companion names. These are compiler contracts,
-not executed disk builds. Consumer-use receipts, namespace consumer execution and hosted scheduling
-remain incomplete, so maintained Run execution stays gated. No real Run has exercised
+not executed disk builds. The internal consumer-use receipt now binds the original and relocated Plan,
+exact consumer instruction, runtime production and completed evidence. Contract tests cover single use,
+substitution rejection, revocation and cancellation with joining; the owning Run retains private production
+Plan bindings and revokes all its issued uses before closing runtime resources. The issuer remains
+disconnected from consumer dispatch. Namespace consumer execution and hosted scheduling remain incomplete,
+so maintained Run execution stays gated. No real Run has exercised
 the new runtime SBOM and dispatcher together. This proof does not establish disk-output
 equivalence, guest boot, ARM64 operation or a stronger evidence lane. The earlier isolated amd64
 [assembly Run](https://github.com/njhensley/nvkr/actions/runs/44145459516) built two byte-identical runtime
