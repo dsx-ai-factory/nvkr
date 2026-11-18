@@ -32,9 +32,13 @@ func TestInstallerArchivePreservesLocalChartDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	stack, err := ApplyStack(base, nightly)
+	if err != nil {
+		t.Fatal(err)
+	}
 	for name, producer := range map[string]Component{
 		"native":  base.Components["nvke-installer-sources"],
-		"nightly": *nightly.Components["nvke-installer-sources"].Component,
+		"nightly": stack.Catalog.Components["nvke-installer-sources"],
 	} {
 		for _, layout := range []struct {
 			name               string

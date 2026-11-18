@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strconv"
 	"strings"
@@ -54,10 +55,11 @@ func assertNativeStorageFits(t *testing.T, claims []int) {
 		}
 		spec := object["spec"].(map[string]any)
 		path := spec["hostPath"].(map[string]any)["path"].(string)
-		if paths[path] || !strings.HasPrefix(path, "/var/lib/nvke-native/") {
+		relative, err := filepath.Rel("/var/lib/nvke-native", path)
+		if err != nil || !filepath.IsLocal(relative) || relative == "." || paths[relative] {
 			t.Fatalf("volume directory is shared or outside the guest-owned root: %s", path)
 		}
-		paths[path] = true
+		paths[relative] = true
 		if spec["storageClassName"] != "nvke-native-local" || spec["persistentVolumeReclaimPolicy"] != "Retain" {
 			t.Fatal("site volumes must retain data under the demo's default storage class")
 		}
@@ -71,8 +73,8 @@ func assertNativeStorageFits(t *testing.T, claims []int) {
 	if classes != 1 {
 		t.Fatalf("expected one static default StorageClass, got %d", classes)
 	}
-	// Static binding consumes the smallest matching available volume. NKTP is
-	// installed before the database releases, so its queues must not take theirs.
+	// Check aggregate capacity with all volumes available. The separate
+	// reservation test covers queues racing database-volume initialization.
 	slices.Sort(capacities)
 	for _, claim := range claims {
 		index := slices.IndexFunc(capacities, func(capacity int) bool { return capacity >= claim })
@@ -94,6 +96,35 @@ func TestNativeSiteStorageFitsPersistentTelemetryQueues(t *testing.T) {
 		{"telemetry before databases", []int{1, 1, 1, 1, 40, 10}},
 	} {
 		t.Run(tc.name, func(t *testing.T) { assertNativeStorageFits(t, tc.claims) })
+	}
+}
+
+func TestNativeSiteDatabaseVolumesAreReserved(t *testing.T) {
+	want := map[string]any{
+		"nvke-native-postgres": map[string]any{"namespace": "postgres", "name": "data-postgres-postgresql-0"},
+		"nvke-native-spire":    map[string]any{"namespace": "spire-server", "name": "spire-data-spire-server-0"},
+	}
+	queues := 0
+	for _, object := range nativeStorageObjects(t, nativeSiteStorage()) {
+		if object["kind"] != "PersistentVolume" {
+			continue
+		}
+		name := object["metadata"].(map[string]any)["name"].(string)
+		spec := object["spec"].(map[string]any)
+		if claim, database := want[name]; database {
+			if !reflect.DeepEqual(spec["claimRef"], claim) {
+				t.Fatalf("%s can bind outside its database claim: %v", name, spec["claimRef"])
+			}
+			delete(want, name)
+			continue
+		}
+		if spec["claimRef"] != nil || spec["capacity"].(map[string]any)["storage"] != "1Gi" {
+			t.Fatalf("queue volume must remain available to a 1Gi telemetry claim: %s", name)
+		}
+		queues++
+	}
+	if len(want) != 0 || queues != 4 {
+		t.Fatalf("missing database reservations or queue capacity: databases=%v queues=%d", want, queues)
 	}
 }
 
@@ -129,7 +160,11 @@ func TestNativeSiteStorageDirectoriesMatchVolumes(t *testing.T) {
 			continue
 		}
 		path := object["spec"].(map[string]any)["hostPath"].(map[string]any)["path"].(string)
-		info, err := os.Stat(filepath.Join(dir, filepath.Base(path)))
+		relative, err := filepath.Rel("/var/lib/nvke-native", path)
+		if err != nil || !filepath.IsLocal(relative) || relative == "." {
+			t.Fatalf("volume path is outside the guest-owned root: %s", path)
+		}
+		info, err := os.Stat(filepath.Join(dir, relative))
 		if err != nil || !info.IsDir() || info.Mode().Perm() != 0777 || info.Mode()&os.ModeSticky == 0 {
 			t.Fatalf("volume lacks a guest directory writable by its source-owned non-root container: %s: %v", path, err)
 		}
@@ -170,6 +205,10 @@ func TestNativeSiteStorageMatchesSourceNKTPChart(t *testing.T) {
 			requests := claim["resources"].(map[string]any)["requests"].(map[string]any)
 			if spec["replicas"] != 1 || requests["storage"] != "1Gi" || claim["storageClassName"] != nil {
 				t.Fatalf("source queue contract changed: %v", claim)
+			}
+			if claim["selector"] != nil || claim["volumeName"] != nil || !reflect.DeepEqual(claim["accessModes"], []any{"ReadWriteOnce"}) ||
+				(claim["volumeMode"] != nil && claim["volumeMode"] != "Filesystem") {
+				t.Fatalf("source queue cannot bind to the demo's unreserved filesystem volumes: %v", claim)
 			}
 			claims = append(claims, 1)
 		}

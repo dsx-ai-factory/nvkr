@@ -47,7 +47,8 @@ reducing tenants alone cannot reduce the initial 6-GiB bootstrap requirement,
 and a smaller site has no recorded acceptance. The observed range leaves
 752–977 MiB above the 13-GiB peak guest allocation. Admission still fails closed
 below its selected memory or CPU requirement and reserves nothing. Contract tests
-cover both boundaries and the observed range. The November 18 fork Runs below
+cover both boundaries and the observed range.
+[Fork Run 44213539138](https://github.com/njhensley/nvkr/actions/runs/44213539138)
 exercised the new allowance through complete site/tenant acceptance and cleanup.
 The small profile also sets the site's system reservation and the tenant's
 Reserved/SystemReserved/KubeReserved memory to 256Mi, appends the guest kubelet
@@ -62,7 +63,10 @@ The demo supplies four 1-GiB static volumes and writable guest directories for
 NKTP's persistent queues alongside the PostgreSQL and SPIRE volumes. The default
 StorageClass has no dynamic provisioner. Queue data survives Pod restarts in the
 site VM and is removed with that disposable VM; this is demo storage, not a
-production durability claim.
+production durability claim. Database volumes are reserved for their exact
+PostgreSQL and SPIRE claims so early queue claims cannot consume them while other
+volumes become Available. This reservation correction has contract and rendered-chart
+checks; it is later than the hosted Run recorded below.
 
 Runtime fixes admit the installer's legacy/current controller identity, bounded
 writable helper staging with source-supported shell, unchanged pinned-context

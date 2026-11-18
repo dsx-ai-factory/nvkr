@@ -305,6 +305,14 @@ volumeBindingMode: Immediate
 `
 	for _, item := range nativeSiteVolumes() {
 		storage += fmt.Sprintf("---\napiVersion: v1\nkind: PersistentVolume\nmetadata:\n  name: nvke-native-%s\nspec:\n  capacity: {storage: %s}\n  accessModes: [ReadWriteOnce]\n  storageClassName: nvke-native-local\n  persistentVolumeReclaimPolicy: Retain\n  hostPath: {path: /var/lib/nvke-native/%s, type: DirectoryOrCreate}\n", item.name, item.capacity, item.name)
+		// Reserve database storage even before the controller has made every
+		// queue volume Available. These are the source charts' one-replica claims.
+		switch item.name {
+		case "postgres":
+			storage += "  claimRef: {namespace: postgres, name: data-postgres-postgresql-0}\n"
+		case "spire":
+			storage += "  claimRef: {namespace: spire-server, name: spire-data-spire-server-0}\n"
+		}
 	}
 	return storage
 }
