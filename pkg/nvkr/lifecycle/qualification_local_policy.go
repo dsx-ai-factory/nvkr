@@ -37,6 +37,15 @@ func LoadLocalQualificationPolicy(ctx context.Context, path string) (LocalQualif
 	if err != nil {
 		return LocalQualificationPolicy{}, qualificationPolicyReadError(ctx, err)
 	}
+	return DecodeLocalQualificationPolicy(raw)
+}
+
+// DecodeLocalQualificationPolicy validates bounded captured JSON policy bytes.
+// It performs no I/O and grants no execution or verification authority.
+func DecodeLocalQualificationPolicy(raw []byte) (LocalQualificationPolicy, error) {
+	if len(raw) > maxQualificationPolicyBytes {
+		return LocalQualificationPolicy{}, e.New(e.CodeTrustPolicyMissing, "local qualification policy exceeds byte limit")
+	}
 	if err := canonical.ValidateJSONDocument(raw); err != nil {
 		return LocalQualificationPolicy{}, e.Wrap(e.CodeTrustPolicyMissing, err, "invalid local qualification policy JSON")
 	}
