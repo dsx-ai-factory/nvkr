@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
@@ -562,13 +563,39 @@ func assertCatalogCandidateTree(t *testing.T, plan *Plan) {
 	if err != nil || !bytes.Equal(joined, mustCanonical(t, plan)) {
 		t.Fatal("candidate storage changed canonical Plan bytes", err)
 	}
-	// A second inline owner must not bypass the digest-keyed snapshot table.
-	candidates[0]["catalogSnapshot"] = mustCanonical(t, plan.CatalogCandidates[0].CatalogSnapshot)
-	root["catalogCandidates"] = mustCanonical(t, candidates)
-	files[FactoryPlanPath], err = treeJSON(root)
-	if err != nil {
-		t.Fatal(err)
+	missingDigest := "sha256:" + strings.Repeat("0", 64)
+	if snapshots[plan.CatalogDigest] == nil || snapshots[missingDigest] != nil {
+		t.Fatal("refusal fixture requires a valid root snapshot and an absent candidate digest")
 	}
-	_, _, err = joinPlanTree(t.Context(), FactoryPlanPath, files)
-	assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+	for _, test := range []struct {
+		name   string
+		mutate func(planFields)
+	}{
+		{"candidate inline snapshot", func(candidate planFields) {
+			candidate["catalogSnapshot"] = mustCanonical(t, plan.CatalogCandidates[0].CatalogSnapshot)
+		}},
+		{"candidate snapshot absent", func(candidate planFields) {
+			candidate["catalogDigest"] = mustCanonical(t, missingDigest)
+		}},
+		{"candidate digest omitted", func(candidate planFields) {
+			delete(candidate, "catalogDigest")
+		}},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			changedCandidates := slices.Clone(candidates)
+			changedCandidates[0] = maps.Clone(candidates[0])
+			test.mutate(changedCandidates[0])
+			// Keep the root digest and snapshot table valid so refusal must
+			// reach the candidate reference, not fail while restoring the root.
+			changedRoot := maps.Clone(root)
+			changedRoot["catalogCandidates"] = mustCanonical(t, changedCandidates)
+			changedFiles := maps.Clone(files)
+			changedFiles[FactoryPlanPath], err = treeJSON(changedRoot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, _, err = joinPlanTree(t.Context(), FactoryPlanPath, changedFiles)
+			assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+		})
+	}
 }
