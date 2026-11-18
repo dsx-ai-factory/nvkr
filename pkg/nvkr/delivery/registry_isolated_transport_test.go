@@ -81,7 +81,7 @@ func TestRegistryAuthorityRestrictsCredentialDestinations(t *testing.T) {
 			if tc.host != "" {
 				request.Host = tc.host
 			}
-			response, err := (httpsRegistryTransport{base: p, authority: scope}).RoundTrip(request)
+			response, err := newHTTPSRegistryTransport(p, scope).RoundTrip(request)
 			if response != nil {
 				response.Body.Close()
 			}
@@ -117,12 +117,57 @@ func TestRegistryAuthorityRejectsDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	response, err := (httpsRegistryTransport{base: probe, authority: scope}).RoundTrip(request)
+	response, err := newHTTPSRegistryTransport(probe, scope).RoundTrip(request)
 	if response != nil {
 		response.Body.Close()
 	}
 	if err == nil || probe.calls != 0 {
 		t.Fatal("delete request reached registry transport")
+	}
+}
+
+func TestRegistryTransportFreezesAuthority(t *testing.T) {
+	scope := &RegistryAuthority{
+		RegistryHost: "registry.example.test", TokenEndpoint: "https://gitlab.example.test/jwt/auth",
+		Repositories: []string{"registry.example.test/a", "registry.example.test/nested/b"},
+	}
+	probe := &registryAuthorityProbe{}
+	scoped := newHTTPSRegistryTransport(probe, scope)
+	// Caller changes must not alter the admitted credential destinations or scopes.
+	scope.RegistryHost = "foreign.example.test"
+	scope.TokenEndpoint = "https://foreign.example.test/jwt/auth"
+	scope.Repositories[0] = "foreign.example.test/other"
+	for _, tc := range []struct {
+		name, endpoint, auth string
+		allowed              bool
+	}{
+		{"original repository", "https://registry.example.test/v2/a/manifests/x", "Bearer synthetic", true},
+		{"nested repository", "https://registry.example.test/v2/nested/b/manifests/x", "Bearer synthetic", true},
+		{"repository boundary", "https://registry.example.test/v2/nested/b-sibling/manifests/x", "Bearer synthetic", false},
+		{"original token scope", "https://gitlab.example.test/jwt/auth?service=container_registry&scope=repository%3Aa%3Apull", "Basic synthetic", true},
+		{"nested token scope", "https://gitlab.example.test/jwt/auth?service=container_registry&scope=repository%3Anested%2Fb%3Apush%2Cpull", "Basic synthetic", true},
+		{"new token scope", "https://gitlab.example.test/jwt/auth?service=container_registry&scope=repository%3Aother%3Apull", "Basic synthetic", false},
+		{"new token endpoint", "https://foreign.example.test/jwt/auth?service=container_registry&scope=repository%3Aa%3Apull", "Basic synthetic", false},
+		{"new registry", "https://foreign.example.test/v2/other/manifests/x", "Bearer synthetic", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, tc.endpoint, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request.Header.Set("Authorization", tc.auth)
+			before := probe.calls
+			response, err := scoped.RoundTrip(request)
+			if response != nil {
+				response.Body.Close()
+			}
+			if (err == nil) != tc.allowed || probe.calls-before != boolInt(tc.allowed) {
+				t.Fatalf("admitted=%v requests=%d: %v", tc.allowed, probe.calls-before, err)
+			}
+			if err != nil && e.ExitCode(err) != e.ExitCode(e.New(e.CodeTrustPolicyMissing, "expected")) {
+				t.Fatalf("unexpected refusal: %v", err)
+			}
+		})
 	}
 }
 
@@ -169,7 +214,7 @@ func TestRegistryBlobRedirectDropsCredentialsAndRejectsOtherDelegation(t *testin
 			host := strings.TrimPrefix(origin.URL, "https://")
 			scope := &RegistryAuthority{RegistryHost: host, TokenEndpoint: origin.URL + "/jwt/auth", Repositories: []string{host + "/a"}}
 			client := origin.Client()
-			client.Transport = httpsRegistryTransport{base: client.Transport, authority: scope}
+			client.Transport = newHTTPSRegistryTransport(client.Transport, scope)
 			requestPath := "/v2/a/blobs/" + digest
 			switch mode {
 			case "manifest":

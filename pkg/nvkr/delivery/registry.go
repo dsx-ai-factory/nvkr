@@ -470,30 +470,61 @@ func registryTransport(options RegistryOptions) http.RoundTripper {
 	if !options.IsolatedTransport {
 		return remote.DefaultTransport
 	}
-	authority := options.Authority
-	if authority != nil {
-		copy := *authority
-		copy.Repositories = slices.Clone(authority.Repositories)
-		authority = &copy
-	}
-	return httpsRegistryTransport{authority: authority, base: &http.Transport{
+	return newHTTPSRegistryTransport(&http.Transport{
 		Proxy:             http.ProxyFromEnvironment,
 		DialContext:       (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 		ForceAttemptHTTP2: true, DisableKeepAlives: true, MaxIdleConns: 100, MaxIdleConnsPerHost: 50,
 		IdleConnTimeout: 90 * time.Second, TLSHandshakeTimeout: 10 * time.Second,
 		ExpectContinueTimeout: time.Second,
-	}}
+	}, options.Authority)
 }
 
 // Enforce HTTPS for every request, including redirects followed by net/http.
 type httpsRegistryTransport struct {
-	base      http.RoundTripper
-	authority *RegistryAuthority
+	base               http.RoundTripper
+	authority          *RegistryAuthority
+	tokenEndpoint      *url.URL
+	repositoryPrefixes []string
+	allowedScopes      map[string]bool
+	admissionErr       error
+}
+
+// Freeze and parse the caller's scope once. Request processing only consults
+// this immutable snapshot, including when the HTTP client follows redirects.
+func newHTTPSRegistryTransport(base http.RoundTripper, authority *RegistryAuthority) httpsRegistryTransport {
+	scoped := httpsRegistryTransport{base: base}
+	if authority == nil {
+		return scoped
+	}
+	copy := *authority
+	copy.Repositories = slices.Clone(authority.Repositories)
+	scoped.authority = &copy
+	endpoint, err := url.Parse(copy.TokenEndpoint)
+	if err != nil {
+		scoped.admissionErr = e.New(e.CodeTrustPolicyMissing, "registry token endpoint is invalid")
+		return scoped
+	}
+	scoped.tokenEndpoint = endpoint
+	scoped.allowedScopes = make(map[string]bool, 2*len(copy.Repositories))
+	for _, selected := range copy.Repositories {
+		repo, err := name.NewRepository(selected, name.StrictValidation)
+		if err != nil || repo.RegistryStr() != copy.RegistryHost {
+			scoped.admissionErr = e.New(e.CodeTrustPolicyMissing, "registry scope is invalid")
+			return scoped
+		}
+		scoped.repositoryPrefixes = append(scoped.repositoryPrefixes, "/v2/"+repo.RepositoryStr()+"/")
+		scoped.allowedScopes[repo.Scope(transport.PullScope)] = true
+		scoped.allowedScopes[repo.Scope(transport.PushScope)] = true
+	}
+	return scoped
 }
 
 func (scoped httpsRegistryTransport) RoundTrip(request *http.Request) (*http.Response, error) {
 	if request.URL == nil || request.URL.Scheme != "https" {
 		return nil, e.New(e.CodeUsage, "isolated registry transport requires HTTPS")
+	}
+	if scoped.admissionErr != nil {
+		return nil, scoped.admissionErr
 	}
 	if scoped.authority.enabled() {
 		if scoped.blobStorageRedirect(request) {
@@ -513,25 +544,14 @@ func (scoped httpsRegistryTransport) RoundTrip(request *http.Request) (*http.Res
 		if request.URL.Path != clean && request.URL.Path != clean+"/" {
 			return nil, e.New(e.CodeTrustPolicyMissing, "registry request path is not canonical")
 		}
-		endpoint, err := url.Parse(scoped.authority.TokenEndpoint)
-		if err != nil {
-			return nil, e.New(e.CodeTrustPolicyMissing, "registry token endpoint is invalid")
-		}
 		auth := request.Header.Get("Authorization")
 		registry := request.URL.Host == scoped.authority.RegistryHost && request.URL.Path == "/v2/"
-		allowedScopes := map[string]bool{}
-		for _, selected := range scoped.authority.Repositories {
-			repo, err := name.NewRepository(selected, name.StrictValidation)
-			if err != nil {
-				return nil, e.New(e.CodeTrustPolicyMissing, "registry scope is invalid")
-			}
-			if request.URL.Host == scoped.authority.RegistryHost && strings.HasPrefix(request.URL.Path, "/v2/"+repo.RepositoryStr()+"/") {
+		for _, prefix := range scoped.repositoryPrefixes {
+			if request.URL.Host == scoped.authority.RegistryHost && strings.HasPrefix(request.URL.Path, prefix) {
 				registry = true
 			}
-			allowedScopes[repo.Scope(transport.PullScope)] = true
-			allowedScopes[repo.Scope(transport.PushScope)] = true
 		}
-		token := request.URL.Host == endpoint.Host && request.URL.Path == endpoint.Path
+		token := request.URL.Host == scoped.tokenEndpoint.Host && request.URL.Path == scoped.tokenEndpoint.Path
 		if (registry && auth != "" && !strings.HasPrefix(auth, "Bearer ")) || (token && auth != "" && !strings.HasPrefix(auth, "Basic ")) || (!registry && !token) {
 			return nil, e.New(e.CodeTrustPolicyMissing, "registry request is outside its admitted authority")
 		}
@@ -540,11 +560,11 @@ func (scoped httpsRegistryTransport) RoundTrip(request *http.Request) (*http.Res
 		}
 		if token {
 			query, err := url.ParseQuery(request.URL.RawQuery)
-			if err != nil || request.Method != http.MethodGet || len(query["service"]) != 1 || query.Get("service") != "container_registry" || len(query["scope"]) == 0 || len(query["scope"]) > len(allowedScopes) {
+			if err != nil || request.Method != http.MethodGet || len(query["service"]) != 1 || query.Get("service") != "container_registry" || len(query["scope"]) == 0 || len(query["scope"]) > len(scoped.allowedScopes) {
 				return nil, e.New(e.CodeTrustPolicyMissing, "registry token request exceeds its admitted scope")
 			}
 			for _, scope := range query["scope"] {
-				if !allowedScopes[scope] {
+				if !scoped.allowedScopes[scope] {
 					return nil, e.New(e.CodeTrustPolicyMissing, "registry token request exceeds its admitted scope")
 				}
 			}
@@ -578,13 +598,8 @@ func (scoped httpsRegistryTransport) blobStorageRedirect(request *http.Request) 
 	if err != nil || location.String() != request.URL.String() {
 		return false
 	}
-	for _, selected := range scoped.authority.Repositories {
-		repository, err := name.NewRepository(selected, name.StrictValidation)
-		if err != nil || repository.RegistryStr() != scoped.authority.RegistryHost {
-			return false
-		}
-		prefix := "/v2/" + repository.RepositoryStr() + "/blobs/"
-		if digest, ok := strings.CutPrefix(source.URL.Path, prefix); ok {
+	for _, prefix := range scoped.repositoryPrefixes {
+		if digest, ok := strings.CutPrefix(source.URL.Path, prefix+"blobs/"); ok {
 			_, err := v1.NewHash(digest)
 			return err == nil
 		}
