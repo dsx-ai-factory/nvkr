@@ -90,6 +90,31 @@ independently required even when it shares a component with another output.
 
 ## Find components
 
+Browse all catalogs without first choosing a producer:
+
+```sh
+nvkr catalog list --data inputs/catalogs
+nvkr catalog find --data inputs/catalogs nvkectl
+```
+
+Root listing includes imported components and keeps duplicate names separate by catalog path.
+`find` matches an exact component name and reports each location with its recorded source or
+acquisition pins; an unknown name returns a no-match error (exit 10). Both accept `--format json`.
+Root JSON groups descriptions under root-relative `path`, catalog `name`, and `components`.
+Missing locks, invalid imports and unsafe directory entries fail before results are printed.
+Discovery is offline and read-only: it validates local declarations and recorded lock structure,
+but does not re-derive pin sets from upstream Git trees or select anything for a Definition.
+Normal executable catalog loading retains that upstream verification requirement.
+The root scan admits at most 1,024 total files and directories and 16 directory levels,
+using the same no-symlink entry policy as catalog loading. Scan a narrower root if it exceeds
+those bounds. Each catalog load retains its existing file and aggregate byte limits.
+
+The [generated catalog inventory](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/INDEX.md) lists locations, component names and
+producer modes from these same descriptions. Pins remain in `catalog find` so automated pin refreshes
+do not change this navigation index.
+After editing catalog inputs, run `make catalog-index-generate`; `make catalog-index-check`
+rejects stale content and also runs as part of `make workflows-check`.
+
 `nvkr catalog list --data DIR` prints every component. Two optional selectors narrow it, and
 `--format json` prints a machine-readable projection:
 
@@ -106,7 +131,7 @@ nvkr catalog list --data inputs/catalogs/tools/operator-arm64 \
   valid selector that matches nothing is a no-match error (exit 10). Neither prints a result.
 - Unfiltered text output is unchanged.
 
-The JSON output is a stable array sorted by component name. Each entry has `name`, `platforms`,
+For a leaf catalog, JSON output remains a stable array sorted by component name. Each entry has `name`, `platforms`,
 `outputType` and `producerMode`. `producerMode` is one of:
 
 | Value | Meaning |
