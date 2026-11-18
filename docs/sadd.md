@@ -552,8 +552,8 @@ generated publication/finalization. External provider, workflow and downstream b
 separate evidence; the transport adds no deployment or qualification claim.
 
 The proposed [selective contract](adr/0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding)
-copies named QCOW2/EFI bytes and proofs while preserving complete OCI membership. Copy/readback precedes rendering;
-aggregate authentication precedes final inventory publication. [Reconciliation](adr/reconciliation/object-store-publication.md#selective-boot-asset-publication) tracks implementation.
+copies named QCOW2/EFI bytes and proofs while preserving complete OCI membership. Payload copy/readback precedes rendering;
+aggregate authentication precedes proof and final inventory publication/readback. [Reconciliation](adr/reconciliation/object-store-publication.md#selective-boot-asset-publication) tracks implementation.
 
 [Reconciliation](adr/reconciliation/README.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
