@@ -129,11 +129,11 @@ func runLocalCommandWithServices(c *cli.Context, execute localLifecycleExecutor,
 			return e.New(e.CodeEngineCapability, "publication requires an explicit --environment; the built-in local Environment is build-only")
 		}
 		root, definitionPath := c.String("capture-inputs-root"), c.String("definition")
-		if root == "" {
+		if !c.IsSet("capture-inputs-root") {
 			root = "."
 			definitionPath, err = definition.WorkingRelativePath(definitionPath)
 			if err != nil {
-				return err
+				return e.Wrap(e.CodeUsage, err, "local Definition must be beneath the working input root; run from the checkout root or select --capture-inputs-root")
 			}
 		}
 		prepared, err = lifecycle.PrepareDefaultLocal(c.Context, root, definitionPath, factoryGeneratorVersion(), c.String("attempt"))

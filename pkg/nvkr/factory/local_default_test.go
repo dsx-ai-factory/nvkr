@@ -82,6 +82,18 @@ func TestDefaultLocalCaptureFreezesAndReplaysPolicy(t *testing.T) {
 			t.Fatal("logical Build identity changed with the policy source path")
 		}
 	}
+	// Explicit selection always means the authored bytes, even at the logical
+	// default location. Paths describe inputs; they do not attest policy origin.
+	selected := plan.Environment.Clone()
+	selected.Metadata.Name = "explicit-policy"
+	writeSnapshotFixtureDocument(t, root, DefaultLocalEnvironmentPath, selected)
+	explicitAtDefaultPath, _, err := CaptureCompileFiles(t.Context(), root, snapshotDefinition, DefaultLocalEnvironmentPath, "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if explicitAtDefaultPath.EnvironmentDigest == plan.EnvironmentDigest || explicitAtDefaultPath.Environment.Metadata.Name != "explicit-policy" {
+		t.Fatal("explicit policy selection was replaced by the default")
+	}
 	replay, err := CompileSnapshot(t.Context(), snapshot, "test")
 	if err != nil {
 		t.Fatal(err)
@@ -119,4 +131,34 @@ func TestDefaultLocalCaptureRefusals(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDefaultLocalPolicyVersionAndMaintainedPin(t *testing.T) {
+	maintained, err := authored.LoadEnvironment(t.Context(), "../../../inputs/environments/local-amd64-kvm.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct{ arch, digest string }{
+		{"amd64", "sha256:1c98c468746b4e67db02f4201b748ed38e60e8059c23b285598cf6fb2bf4f7fc"},
+		{"arm64", "sha256:baac6bbffb14fbfcf8335a599ef2ce46c5c09fce78de4b8fec6624d14808a600"},
+	} {
+		t.Run(tc.arch, func(t *testing.T) {
+			env, err := defaultLocalEnvironment("linux", tc.arch)
+			if err != nil {
+				t.Fatal(err)
+			}
+			digest, err := env.Digest()
+			if err != nil || digest != tc.digest {
+				t.Fatalf("v1 policy changed; a policy change needs an explicit version migration: %s, %v", digest, err)
+			}
+			if env.UtilityContainer != maintained.UtilityContainer {
+				t.Fatal("built-in utility index differs from maintained local pin; review and version the policy update")
+			}
+		})
+	}
+}
+
+func TestCompileStarterRefusesReservedDestination(t *testing.T) {
+	_, err := CompileStarter(t.Context(), t.TempDir(), DefaultLocalEnvironmentPath, authored.Definition{}, authored.Environment{})
+	assertFactoryErrorCode(t, err, e.CodeUsage)
 }

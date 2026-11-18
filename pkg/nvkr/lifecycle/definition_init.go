@@ -88,12 +88,13 @@ func InitDefinition(ctx context.Context, request DefinitionInit) (Definition, er
 	if !filepath.IsAbs(destination) {
 		destination = filepath.Join(root, destination)
 	}
-	relative, err := filepath.Rel(root, destination)
+	relative, err := starterRelativePath(root, resolvedRoot, destination)
 	if err != nil || !filepath.IsLocal(relative) || relative == "." {
 		return Definition{}, e.New(e.CodeUsage, "starter destination %q must be inside checkout root %q; choose an in-checkout destination and run from that root", request.Destination, root)
 	}
 	// Require the destination parent to exist, and reject symlink routes that
 	// bounded compiler input capture would refuse later.
+	destination = filepath.Join(resolvedRoot, relative)
 	parent := filepath.Dir(destination)
 	resolved, err := filepath.EvalSymlinks(parent)
 	if err != nil || resolved != filepath.Join(resolvedRoot, filepath.Dir(relative)) {
@@ -110,10 +111,11 @@ func InitDefinition(ctx context.Context, request DefinitionInit) (Definition, er
 	if err != nil {
 		return Definition{}, e.Wrap(e.CodeUsage, err, "resolving catalog %q", request.Catalog)
 	}
-	catalogRelative, err := filepath.Rel(root, base)
+	catalogRelative, err := starterRelativePath(root, resolvedRoot, base)
 	if err != nil || (!filepath.IsLocal(catalogRelative) && catalogRelative != ".") {
 		return Definition{}, e.New(e.CodeUsage, "starter catalog must be inside checkout root %q", root)
 	}
+	base = filepath.Join(resolvedRoot, catalogRelative)
 	reference, err := filepath.Rel(parent, base)
 	if err != nil {
 		return Definition{}, e.Wrap(e.CodeUsage, err, "resolving destination-relative catalog")
@@ -126,10 +128,46 @@ func InitDefinition(ctx context.Context, request DefinitionInit) (Definition, er
 	if err != nil {
 		return Definition{}, err
 	}
-	if err := factory.ValidateStarter(ctx, root, filepath.ToSlash(relative), authored, environment); err != nil {
+	plan, err := factory.CompileStarter(ctx, resolvedRoot, filepath.ToSlash(relative), authored, environment)
+	if err != nil {
+		// Preserve the starter's original resolver error codes while sharing the
+		// compiler's full packaging and policy validation.
+		var targetError *e.Error
+		if errors.As(err, &targetError) && targetError.Code == e.CodeNoMatch {
+			var cause *e.Error
+			if errors.As(targetError.Err, &cause) {
+				return Definition{}, targetError.Err
+			}
+		}
 		return Definition{}, err
 	}
+	if request.Environment == "" {
+		if err := factory.AdmitLocalPlan(ctx, plan); err != nil {
+			return Definition{}, err
+		}
+	}
 	return authored, nil
+}
+
+// Accept both the spelling used for the selected root and its physical path,
+// without resolving symlinks inside that root. Captured reads still refuse them.
+func starterRelativePath(root, physicalRoot, name string) (string, error) {
+	relative, err := filepath.Rel(root, name)
+	if err == nil && (relative == "." || filepath.IsLocal(relative)) {
+		return relative, nil
+	}
+	relative, err = filepath.Rel(physicalRoot, name)
+	if err == nil && (relative == "." || filepath.IsLocal(relative)) {
+		return relative, nil
+	}
+	// The working directory itself may use another spelling of the same root
+	// (notably /var versus /private/var). Resolve only that outside parent;
+	// internal root-relative symlinks have already taken the confined path above.
+	parent, parentErr := filepath.EvalSymlinks(filepath.Dir(name))
+	if parentErr != nil {
+		return relative, err
+	}
+	return filepath.Rel(physicalRoot, filepath.Join(parent, filepath.Base(name)))
 }
 
 // RenderDefinition returns the authored YAML of a validated Definition. Keys

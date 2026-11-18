@@ -59,9 +59,11 @@ func TestDefinitionInitRefusalsPrintNoYAML(t *testing.T) {
 		extra []string
 		code  e.Code
 	}{
-		{"unknown component", []string{"--component", "nope"}, e.CodeNoMatch},
+		{"unknown component", []string{"--component", "nope"}, e.CodeInvalidCatalog},
 		{"duplicate component", []string{"--component", "helm", "--component", "helm"}, e.CodeUsage},
-		{"unsupported platform", []string{"--platform", "linux/amd64", "--component", "helm"}, e.CodeNoMatch},
+		{"unsupported platform", []string{"--platform", "linux/amd64", "--component", "helm"}, e.CodeEngineCapability},
+		{"unclassified producer image", []string{"--catalog", "../../inputs/catalogs/nicosim", "--component", "nico-sim-runtime-assets"}, e.CodeEngineCapability},
+		{"outside root", []string{"--destination", "../outside.yaml", "--component", "helm"}, e.CodeUsage},
 		{"unexpected argument", []string{"--component", "helm", "extra"}, e.CodeUsage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -123,7 +125,7 @@ func TestDefinitionInitTUIShowsTheSelectionAndPrintsNoYAML(t *testing.T) {
 		code      e.Code
 	}{
 		{"admitted", "helm", "complete", ""},
-		{"refused", "nope", "failed", e.CodeNoMatch},
+		{"refused", "nope", "failed", e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var shown *progress.Snapshot

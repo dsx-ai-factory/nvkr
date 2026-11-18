@@ -117,6 +117,7 @@ func TestDefinitionStarterRefusesUnsupportedCombination(t *testing.T) {
 	}{
 		{"missing destination", func(r *DefinitionInit) { r.Destination = "" }, e.CodeUsage},
 		{"outside root", func(r *DefinitionInit) { r.Destination = "../outside.yaml" }, e.CodeUsage},
+		{"outside catalog", func(r *DefinitionInit) { r.Catalog = t.TempDir() }, e.CodeUsage},
 		{"unknown format", func(r *DefinitionInit) { r.Format = "unknown" }, e.CodeInvalidCatalog},
 		{"image from package", func(r *DefinitionInit) { r.Format = definition.OutputOCI }, e.CodeInvalidCatalog},
 		{"chart from package", func(r *DefinitionInit) { r.Format = definition.OutputHelm }, e.CodeInvalidCatalog},
@@ -173,5 +174,81 @@ func TestDefinitionStarterAdmissionPrecedesReads(t *testing.T) {
 			_, err := InitDefinition(ctx, DefinitionInit{Root: filepath.Join(t.TempDir(), "absent"), Destination: "starter.yaml", Name: "starter", Catalog: "absent", Platform: tc.platform, Format: tc.format, Components: []string{"artifact"}})
 			assertCode(t, err, tc.code)
 		})
+	}
+}
+
+func TestDefaultLocalExecutionAdmissionAndDryRun(t *testing.T) {
+	root, _ := starterCatalog(t, "host-package", false)
+	d := Definition{APIVersion: DefinitionAPIVersion, Kind: DefinitionKind, Metadata: Metadata{Name: "default-test"}, Catalog: Catalog{Base: "catalog"}, Outputs: []DefinitionOutput{{Name: "output", Format: OutputExecutable, Platform: "linux/amd64", Components: []string{"artifact"}}}}
+	writeCanonicalTestFile(t, filepath.Join(root, "definition.json"), d)
+	prepared, err := PrepareDefaultLocal(t.Context(), root, "definition.json", "test", "attempt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	attempts := filepath.Join(root, "attempts")
+	_, err = ExecuteLocal(t.Context(), prepared, LocalOptions{Publish: true, AttemptsRoot: attempts})
+	assertCode(t, err, e.CodeEngineCapability)
+	if _, err := os.Stat(attempts); !os.IsNotExist(err) {
+		t.Fatalf("publication refusal created storage: %v", err)
+	}
+	called := false
+	_, err = executeLocalWithDependencies(t.Context(), prepared, LocalOptions{DryRun: true, AttemptsRoot: attempts}, localExecutionDependencies{
+		admitLocal: func(context.Context, *factory.Plan, factory.LocalRunOptions) error { return nil },
+		runFactory: func(_ context.Context, _ *factory.Plan, options factory.LocalRunOptions) (localExecutionResult, error) {
+			called = true
+			if !options.DryRun || options.CompileInputs == "" {
+				t.Fatal("default inputs not handed to dry-run owner")
+			}
+			return nil, nil
+		},
+		writeRecordState: writeRunRecordState, beginDiskCommit: beginDiskAttemptTransaction,
+	})
+	if err != nil || !called {
+		t.Fatalf("dry run failed: %v", err)
+	}
+	if _, err := os.Stat(attempts); !os.IsNotExist(err) {
+		t.Fatalf("dry run created storage: %v", err)
+	}
+}
+
+func TestDefinitionStarterDocumentedLayeredExamples(t *testing.T) {
+	root := initRepoRoot(t)
+	for _, tc := range []struct{ format, component string }{
+		{definition.OutputOCI, "pause"}, {definition.OutputAPT, "kubectl"}, {definition.OutputHelm, "gpu-runtime-chart"}, {definition.OutputBundle, "gpu-runtime-chart"},
+	} {
+		t.Run(tc.format, func(t *testing.T) {
+			request := DefinitionInit{Root: root, Destination: "starter.yaml", Name: "starter", Catalog: filepath.Join(root, "testdata/examples/layered-catalog"), Platform: "linux/amd64", Format: tc.format, Components: []string{tc.component}}
+			if tc.format == definition.OutputAPT {
+				request.APTDistribution = "stable"
+				request.APTComponent = "main"
+			}
+			if _, err := InitDefinition(t.Context(), request); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestDefinitionStarterAcceptsPhysicalPathsUnderSymlinkedRoot(t *testing.T) {
+	root, _ := starterCatalog(t, "host-package", false)
+	physical, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	alias := filepath.Join(t.TempDir(), "root")
+	if err := os.Symlink(physical, alias); err != nil {
+		t.Fatal(err)
+	}
+	got, err := InitDefinition(t.Context(), DefinitionInit{Root: alias, Destination: filepath.Join(physical, "starter.yaml"), Name: "starter", Catalog: filepath.Join(physical, "catalog"), Platform: "linux/amd64", Components: []string{"artifact"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Catalog.Base != "catalog" {
+		t.Fatalf("unexpected relative catalog: %s", got.Catalog.Base)
+	}
+	t.Chdir(alias)
+	got, err = InitDefinition(t.Context(), DefinitionInit{Root: physical, Destination: "starter.yaml", Name: "starter", Catalog: "catalog", Platform: "linux/amd64", Components: []string{"artifact"}})
+	if err != nil || got.Catalog.Base != "catalog" {
+		t.Fatalf("logical cwd under physical root: %+v, %v", got, err)
 	}
 }

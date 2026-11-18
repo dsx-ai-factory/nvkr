@@ -62,7 +62,8 @@ bin/nvkr run local --definition definition.yaml --attempt my-tools-1
 
 Run the last command from the checkout root with a supported local runtime available. It uses the
 built-in build-only Environment below. The example selects ARM64 tools explicitly; use a matching local
-execution host. `--destination` does not write a file: save stdout at that exact location. The parent must
+execution host. `--destination` does not write a file: save stdout at that exact location. Shell redirection opens the file
+before validation, so choose a new filename to avoid truncating an existing Definition. The parent must
 already exist. `--root` defaults to the working directory; when authoring from another directory, pass
 an absolute checkout root and catalog path. Relative destinations are resolved under `--root`.
 Outside-root destinations and catalogs are refused before YAML is emitted. Later Run preparation still
@@ -91,7 +92,8 @@ local policy; it does not embed the Environment in the Definition or select it f
 
 Only `run local` may omit `--environment`. It resolves a versioned `builtin-local-v1-amd64` or
 `builtin-local-v1-arm64` policy on Linux or macOS, using the host architecture for utility execution while
-preserving each output's explicit target. The policy selects Docker, offline build networking and a pinned
+preserving each output's explicit target. Host architecture therefore changes Environment and Plan identity;
+logical producer Build Digests stay unchanged. The policy selects Docker, offline build networking and a pinned
 Go utility image. Anonymous toolchain pulls are limited to `docker.io/library/alpine`,
 `docker.io/library/golang`, and `docker.io/moby/buildkit`. Fetching declared sources remains a separate step.
 Other image roots, image-location bindings, native toolchains and producer network access require an explicit
@@ -101,7 +103,9 @@ claim. `--publish` requires an explicit Environment.
 The Plan contains the resolved Environment and its digest; the Run binds that digest and the Plan digest.
 Local execution retains the exact policy bytes in `compile-inputs.json` under the logical path
 `.nvkr/builtin/local-environment-v1.json`, alongside all other captured compiler inputs. That entry is never
-read from or written to the checkout. A file at that path cannot override the built-in policy. Replay uses the
+read from or written to the checkout when the Environment is omitted. A file at that path cannot override
+that default. Explicit `--environment` selection always uses the selected file, including at that location;
+the path alone is not proof of the built-in policy. Inspect its bytes and digest. Replay uses the
 captured bytes, so a later CLI default cannot change an existing Run's identity. Dry runs and rejected
 capabilities create no attempt storage. An explicit `--environment` keeps its existing meaning; planning
 and hosted generation continue to require it.

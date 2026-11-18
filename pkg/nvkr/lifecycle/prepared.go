@@ -14,8 +14,10 @@ import (
 // PreparedRun is the opaque prepared lifecycle input. Callers can inspect Run;
 // the generated compiler plan remains owned by this module.
 type PreparedRun struct {
-	plan *factory.Plan
-	run  *Run
+	// Set only by the owned built-in policy constructor; never decoded from input.
+	defaultLocal bool
+	plan         *factory.Plan
+	run          *Run
 	// Captured compiler reads are immutable transport, not signing authority.
 	inputs string
 }
@@ -51,7 +53,12 @@ func PrepareDefaultLocal(ctx context.Context, root, definitionPath, generatorVer
 	if err != nil {
 		return nil, err
 	}
-	return prepareCaptured(plan, inputs, attempt)
+	prepared, err := prepareCaptured(plan, inputs, attempt)
+	if err != nil {
+		return nil, err
+	}
+	prepared.defaultLocal = true
+	return prepared, nil
 }
 
 func PrepareFiles(ctx context.Context, definitionPath, environmentPath, generatorVersion, attempt string) (*PreparedRun, error) {

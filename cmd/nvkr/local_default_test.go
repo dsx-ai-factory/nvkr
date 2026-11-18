@@ -17,17 +17,26 @@ import (
 
 func TestRunLocalDefaultEnvironmentAndExplicitOverride(t *testing.T) {
 	lifecycleCommandRepo(t)
-	root, err := os.Getwd()
+	repository, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
-	scratch, err := os.MkdirTemp(root, ".starter-test-")
+	root := t.TempDir()
+	for _, name := range []string{"inputs/catalogs/tools/operator-arm64", "inputs/catalogs/shared"} {
+		if err := os.CopyFS(filepath.Join(root, name), os.DirFS(filepath.Join(repository, name))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	environmentBytes, err := os.ReadFile(filepath.Join(repository, "inputs/environments/local-conformance-tools-arm64.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = os.RemoveAll(scratch) })
-	destination := filepath.Join(scratch, "definition.yaml")
-	authored, err := lifecycle.InitDefinition(t.Context(), lifecycle.DefinitionInit{Root: root, Destination: destination, Name: "starter", Catalog: "inputs/catalogs/tools/operator-arm64", Platform: "linux/arm64", Components: []string{"helm"}})
+	if err := os.WriteFile(filepath.Join(root, "environment.yaml"), environmentBytes, 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(root)
+	destination := filepath.Join(root, "definition.yaml")
+	authored, err := lifecycle.InitDefinition(t.Context(), lifecycle.DefinitionInit{Root: root, Destination: destination, Name: "starter", Catalog: "inputs/catalogs/tools/operator-arm64", Platform: "linux/arm64", Components: []string{"helm", "kubectl"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +57,9 @@ func TestRunLocalDefaultEnvironmentAndExplicitOverride(t *testing.T) {
 		code              e.Code
 	}{
 		{name: "built-in"},
-		{name: "explicit", environment: "inputs/environments/local-conformance-tools-arm64.yaml"},
+		{name: "captured built-in", flags: []string{"--capture-inputs-root", root}},
+		{name: "empty capture root", flags: []string{"--capture-inputs-root="}, code: e.CodeUsage},
+		{name: "explicit", environment: "environment.yaml"},
 		{name: "no implicit publication", flags: []string{"--publish"}, code: e.CodeEngineCapability},
 		{name: "explicit empty", flags: []string{"--environment="}, code: e.CodeInvalidCatalog},
 	} {

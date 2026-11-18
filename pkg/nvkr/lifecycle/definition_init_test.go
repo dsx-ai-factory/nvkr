@@ -134,11 +134,11 @@ func TestInitDefinitionRefusesBeforeAuthoring(t *testing.T) {
 		{"no components", DefinitionInit{Root: initRepoRoot(t), Destination: "starter.yaml", Name: "t", Catalog: operator, Platform: "linux/arm64"}, e.CodeUsage},
 		{"duplicate component", DefinitionInit{Root: initRepoRoot(t), Destination: "starter.yaml", Name: "t", Catalog: operator, Platform: "linux/arm64", Components: []string{"helm", "helm"}}, e.CodeUsage},
 		{"non-canonical name", DefinitionInit{Root: initRepoRoot(t), Destination: "starter.yaml", Name: "My_Tools", Catalog: operator, Platform: "linux/arm64", Components: []string{"helm"}}, e.CodeInvalidCatalog},
-		{"unknown component", DefinitionInit{Root: initRepoRoot(t), Destination: "starter.yaml", Name: "t", Catalog: operator, Platform: "linux/arm64", Components: []string{"nope"}}, e.CodeNoMatch},
+		{"unknown component", DefinitionInit{Root: initRepoRoot(t), Destination: "starter.yaml", Name: "t", Catalog: operator, Platform: "linux/arm64", Components: []string{"nope"}}, e.CodeInvalidCatalog},
 		{"invalid platform", DefinitionInit{Root: initRepoRoot(t), Destination: "starter.yaml", Name: "t", Catalog: operator, Platform: "linux/riscv64", Components: []string{"helm"}}, e.CodeInvalidCatalog},
-		{"unsupported platform", DefinitionInit{Root: initRepoRoot(t), Destination: "starter.yaml", Name: "t", Catalog: operator, Platform: "linux/amd64", Components: []string{"helm"}}, e.CodeNoMatch},
+		{"unsupported platform", DefinitionInit{Root: initRepoRoot(t), Destination: "starter.yaml", Name: "t", Catalog: operator, Platform: "linux/amd64", Components: []string{"helm"}}, e.CodeEngineCapability},
 		{"missing catalog directory", DefinitionInit{Root: initRepoRoot(t), Destination: "starter.yaml", Name: "t", Catalog: filepath.Join(initRepoRoot(t), "absent"), Platform: "linux/arm64", Components: []string{"helm"}}, e.CodeInvalidCatalog},
-		{"incomplete material selection", DefinitionInit{Root: initRepoRoot(t), Destination: "starter.yaml", Name: "t", Catalog: ovn, Platform: "linux/arm64", Components: []string{"nvke-cni-ovn"}}, e.CodeNoMatch},
+		{"incomplete material selection", DefinitionInit{Root: initRepoRoot(t), Destination: "starter.yaml", Name: "t", Catalog: ovn, Platform: "linux/arm64", Components: []string{"nvke-cni-ovn"}}, e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := InitDefinition(t.Context(), tc.request)
@@ -153,7 +153,7 @@ func TestInitDefinitionRefusesBeforeAuthoring(t *testing.T) {
 // A run bundles any producer output type into an executable output (the OVN
 // graphs bundle an OCI image), so init admits the same selections and adds no
 // output-type rule of its own.
-func TestInitDefinitionAdmitsWhatARunAdmits(t *testing.T) {
+func TestInitDefinitionExplicitPolicyPreservesProducerFormats(t *testing.T) {
 	root := initRepoRoot(t)
 	for _, tc := range []struct {
 		name, catalog string
@@ -164,7 +164,7 @@ func TestInitDefinitionAdmitsWhatARunAdmits(t *testing.T) {
 		{"oci-image", "testdata/examples/layered-catalog", []string{"pause"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := InitDefinition(t.Context(), DefinitionInit{Root: initRepoRoot(t), Destination: "starter.yaml", Name: "t", Catalog: filepath.Join(root, tc.catalog), Platform: "linux/arm64", Components: tc.components})
+			_, err := InitDefinition(t.Context(), DefinitionInit{Environment: filepath.Join(root, "inputs/environments/local-conformance-tools-arm64.yaml"), Root: initRepoRoot(t), Destination: "starter.yaml", Name: "t", Catalog: filepath.Join(root, tc.catalog), Platform: "linux/arm64", Components: tc.components})
 			if err != nil {
 				t.Fatal(err)
 			}

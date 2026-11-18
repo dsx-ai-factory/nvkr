@@ -11,8 +11,9 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// DefaultLocalEnvironmentPath is a logical snapshot entry, never a file read
-// from or written to the checkout. Its bytes are frozen with every local Run.
+// DefaultLocalEnvironmentPath is the logical entry seeded by built-in
+// preparation. Explicit Environment selection still reads a file at this path;
+// the path is descriptive and never proves policy origin.
 const DefaultLocalEnvironmentPath = ".nvkr/builtin/local-environment-v1.json"
 
 // CaptureCompileDefaultLocal compiles with the versioned build-only local
@@ -29,7 +30,14 @@ func CaptureCompileDefaultLocal(ctx context.Context, root, definitionPath, gener
 	if definitionPath == DefaultLocalEnvironmentPath {
 		return nil, InputSnapshot{}, e.New(e.CodeUsage, "Definition cannot use the reserved built-in Environment path")
 	}
-	return captureCompileFiles(ctx, root, definitionPath, DefaultLocalEnvironmentPath, generatorVersion, &environment, nil)
+	plan, inputs, err := captureCompileFiles(ctx, root, definitionPath, DefaultLocalEnvironmentPath, generatorVersion, &environment, nil)
+	if err != nil {
+		return nil, InputSnapshot{}, err
+	}
+	if err := AdmitLocalPlan(ctx, plan); err != nil {
+		return nil, InputSnapshot{}, err
+	}
+	return plan, inputs, nil
 }
 
 // DefaultLocalEnvironment describes the built-in policy for this host. The
@@ -42,12 +50,9 @@ func defaultLocalEnvironment(goos, arch string) (authored.Environment, error) {
 	if (goos != "linux" && goos != "darwin") || (arch != "amd64" && arch != "arm64") {
 		return authored.Environment{}, e.New(e.CodeEngineCapability, "built-in local Environment supports Linux and macOS on amd64 or arm64; select an explicit Environment for another host")
 	}
-	// Existing maintained local utility pins; the host selects only utility
+	// One maintained multi-platform utility index; the host selects only utility
 	// execution, never an output's explicitly declared target platform.
 	pin := "957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b"
-	if arch == "arm64" {
-		pin = "08bcb99a38f85a265f9a93d1d3323e2440eec333380f3ea26ee0dec9264bb41c"
-	}
 	environment := authored.Environment{
 		APIVersion: authored.EnvironmentAPIVersion, Kind: authored.EnvironmentKind,
 		Metadata:         authored.Metadata{Name: "builtin-local-v1-" + arch},
@@ -61,13 +66,14 @@ func defaultLocalEnvironment(goos, arch string) (authored.Environment, error) {
 	return environment, nil
 }
 
-// ValidateStarter compiles proposed authored values without writing them. All
-// referenced files use the same root-confined reader as captured local Runs.
+// CompileStarter compiles proposed authored values without writing them. All
+// referenced Definition/catalog files use the root-confined captured reader.
+// The separately selected Environment is already decoded descriptive input.
 // Values are descriptions and gain no execution authority through this API.
-func ValidateStarter(ctx context.Context, root, destination string, definition authored.Definition, environment authored.Environment) error {
+func CompileStarter(ctx context.Context, root, destination string, definition authored.Definition, environment authored.Environment) (*Plan, error) {
 	if destination == DefaultLocalEnvironmentPath {
-		return e.New(e.CodeUsage, "starter destination uses the reserved built-in Environment path")
+		return nil, e.New(e.CodeUsage, "starter destination uses the reserved built-in Environment path")
 	}
-	_, _, err := captureCompileFiles(ctx, root, destination, DefaultLocalEnvironmentPath, "definition-init", &environment, &definition)
-	return err
+	plan, _, err := captureCompileFiles(ctx, root, destination, DefaultLocalEnvironmentPath, "definition-init", &environment, &definition)
+	return plan, err
 }
