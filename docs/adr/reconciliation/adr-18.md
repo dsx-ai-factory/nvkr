@@ -99,6 +99,13 @@ Native AMD64 execution, module-installed bootstrap, live registry publication an
 recovery remain outside this acceptance. Signing, qualification, disk and private-source execution remain
 refused. Full repository checks and maintainer review are separate gates; this exercise grants no production acceptance.
 
+Native metadata GETs retry HTTP 429 at most twice inside the existing lookup and caller deadlines.
+They honor a valid `Retry-After` of at most 30 seconds, use one- and two-second delays when absent,
+and refuse ambiguous, invalid or excessive delays without exposing provider text. Failed bodies close
+before waiting; cancellation and client Close stop the wait. Contract tests cover these bounds, credential
+destinations, exhaustion and joined cancellation. Other statuses, identity changes and failed validation
+are not retried. This is controlled-client coverage, not live provider-throttling acceptance.
+
 ## GitLab SDK reuse assessment
 
 The current follow-up assessment identifies the official `gitlab.com/gitlab-org/api/client-go/v3` SDK

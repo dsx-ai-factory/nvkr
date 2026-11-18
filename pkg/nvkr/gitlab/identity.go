@@ -70,6 +70,7 @@ type Client struct {
 	project                            uint64
 	jobToken, readCredential, readKind string
 	http                               *http.Client
+	waitRetry                          func(context.Context, time.Duration) error
 }
 
 // Receipt holds authenticated observations, not a server-atomic snapshot or
@@ -228,12 +229,9 @@ func (c *Client) getQuery(ctx context.Context, endpoint, query, kind, credential
 	} else {
 		req.Header.Set("PRIVATE-TOKEN", credential)
 	}
-	resp, err := c.http.Do(req)
+	resp, err := c.lookupGET(ctx, req)
 	if err != nil {
-		if ctx.Err() != nil {
-			return e.New(e.CodeTimeout, "GitLab lookup canceled")
-		}
-		return e.New(e.CodeUnavailable, "GitLab lookup transport failed")
+		return err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
