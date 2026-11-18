@@ -152,3 +152,18 @@ func TestBootPlanOrdersCopyBeforeAggregateAndFinalProof(t *testing.T) {
 		t.Fatal("unfinished route emitted a workflow")
 	}
 }
+
+func TestBootPlanRejectsProjectionBeforePluginCalls(t *testing.T) {
+	plan, _ := bootPlanFixture(t)
+	for _, engine := range []string{EngineGitHub, EngineTekton} {
+		t.Run(engine, func(t *testing.T) {
+			record := &projectionCalls{}
+			plugin := countedProjection{plugin: referenceProjection{engine: engine, release: projectionTestRelease}, record: record}
+			bundle, err := renderProjected(t.Context(), plan, engine, plugin, projectionTestRelease)
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			if bundle != nil || record.calls != 0 || record.plans != 0 {
+				t.Fatal("selective Plan reached projection plugin or emitted a bundle")
+			}
+		})
+	}
+}

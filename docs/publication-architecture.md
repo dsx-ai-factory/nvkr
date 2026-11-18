@@ -211,8 +211,10 @@ do not replace it with the retry process's current attempt.
 Independent consumers choose the original aggregate reference/invocation, exact compiled inputs, selection,
 destination, serving configuration, signer identity/issuer and disk-evidence minimum. Pass these with the
 pinned inventory locator to `VerifyBootSelection`, using `selected-boot-artifacts` policy scope. Artifacts
-and proofs come entirely from S3; missing bytes cannot fall back to OCI. Independently provisioned pinned
-cosign and certificate/transparency trust remain required. Bounded public-good TUF acquisition is online,
+and proofs come entirely from S3; missing bytes cannot fall back to OCI. Verification also retrieves every
+raw asset through the configured HTTPS serving endpoint. Bearer readers require the configured credential;
+anonymous readers pass none. An inaccessible endpoint fails verification even when S3 and trust acquisition
+succeed. Independently provisioned pinned cosign and certificate/transparency trust remain required. Bounded public-good TUF acquisition is online,
 so registry independence does not imply disconnected verification. The result authenticates selected
 artifact bytes and their original Release membership, with no omitted-payload, freshness or boot-safety claim.
 

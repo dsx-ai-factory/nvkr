@@ -17,12 +17,16 @@ type bootRecoveryStore struct {
 	lostAck bool
 	denied  bool
 	pins    []StoredObject
+	observe func(StoredObject) StoredObject
 }
 
 func (store *bootRecoveryStore) PutIfAbsent(ctx context.Context, object Object, source io.ReadSeeker) (StoredObject, error) {
 	observed, err := store.mirrorMemoryStore.PutIfAbsent(ctx, object, source)
 	if err == nil && store.lostAck {
 		return StoredObject{}, e.New(e.CodeTimeout, "synthetic acknowledgement lost")
+	}
+	if err == nil && store.observe != nil {
+		observed = store.observe(observed)
 	}
 	return observed, err
 }
@@ -115,6 +119,41 @@ func TestBootInventoryAttemptAdmission(t *testing.T) {
 				return
 			}
 			assertRegistryCode(t, err, e.CodeVerifyFailed)
+		})
+	}
+}
+
+func TestBootInventoryRecoveryRetainsRejectedSameObjectPin(t *testing.T) {
+	reference := "registry.example.test/product/releases@" + digestBytes([]byte("root"))
+	raw := []byte("synthetic canonical inventory")
+	digest := digestBytes(raw)
+	object := Object{Key: bootInventoryKey(reference, digest), SHA256: digest, Size: int64(len(raw)), MediaType: "application/json"}
+	for _, foreign := range []bool{false, true} {
+		t.Run(map[bool]string{false: "rejected same-object pin", true: "foreign object pin"}[foreign], func(t *testing.T) {
+			store := &bootRecoveryStore{observe: func(observed StoredObject) StoredObject {
+				if foreign {
+					observed.Key = "foreign"
+				} else {
+					observed.VersionID = "null"
+				}
+				return observed
+			}}
+			got, err := commitBootInventory(t.Context(), store, object, raw, nil)
+			assertRegistryCode(t, err, e.CodeVerifyFailed)
+			var failure *BootInventoryError
+			if got != (StoredObject{}) || !errors.As(err, &failure) || failure.Attempt.Object != object || len(store.pins) != 0 {
+				t.Fatalf("invalid acknowledgement produced a receipt or lost attempted object: %v, %v", got, err)
+			}
+			if foreign {
+				if failure.Attempt.VersionID != "" || failure.Attempt.ETag != "" {
+					t.Fatal("foreign acknowledgement attached a pin to the attempted object")
+				}
+			} else {
+				if failure.Attempt.VersionID != "null" {
+					t.Fatal("rejected acknowledged pin was discarded")
+				}
+				assertRegistryCode(t, ValidateBootInventoryAttempt(reference, failure.Attempt), e.CodeVerifyFailed)
+			}
 		})
 	}
 }

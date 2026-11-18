@@ -4,6 +4,7 @@
 package delivery
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -60,18 +61,24 @@ func TestSelectedMetadataOwnsSparseBytesAndRevocation(t *testing.T) {
 			}
 			_, err = borrowed.Read(make([]byte, 1))
 			assertRegistryCode(t, err, e.CodeGateUnmet)
-			for range 2 {
+			var evidence [][]byte
+			for round := range 2 {
 				visits := 0
 				err = shared.VisitEvidence(t.Context(), func(_ context.Context, binding EvidenceBinding, raw []byte) error {
 					if !slices.Contains(binding.Outputs, selected) || len(raw) == 0 {
 						t.Fatal("selected evidence lost its exact named use")
+					}
+					if round == 0 {
+						evidence = append(evidence, slices.Clone(raw))
+					} else if visits >= len(evidence) || !bytes.Equal(raw, evidence[visits]) {
+						t.Fatal("evidence bytes changed after mutating a previous visit")
 					}
 					binding.Outputs[0] = "mutated"
 					raw[0] = '!'
 					visits++
 					return nil
 				})
-				if err != nil || visits == 0 {
+				if err != nil || visits == 0 || visits != len(evidence) {
 					t.Fatalf("evidence snapshot: visits=%d err=%v", visits, err)
 				}
 			}
@@ -119,17 +126,27 @@ func TestSelectedMetadataCloseJoinsActiveEvidence(t *testing.T) {
 		t.Fatal("evidence visit ended before entering its callback")
 	}
 	closed := make(chan struct{})
-	closing := make(chan struct{})
 	group.Go(func() {
-		close(closing)
 		if err := owner.Close(); err != nil {
 			t.Error(err)
 		}
 		close(closed)
 	})
-	<-closing
-	runtime.Gosched()
 	closedEarly := false
+	// The callback holds a read lock. A failed TryRLock proves the closer
+	// has reached its pending write lock; a scheduler yield alone cannot.
+	for owner.state.mu.TryRLock() {
+		owner.state.mu.RUnlock()
+		select {
+		case <-closed:
+			closedEarly = true
+		default:
+			runtime.Gosched()
+		}
+		if closedEarly {
+			break
+		}
+	}
 	select {
 	case <-closed:
 		closedEarly = true

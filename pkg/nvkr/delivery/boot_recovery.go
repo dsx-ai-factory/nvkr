@@ -62,10 +62,10 @@ func commitBootInventory(ctx context.Context, store ObjectStore, object Object, 
 		if observed.Object != object {
 			return StoredObject{}, e.New(e.CodeVerifyFailed, "boot inventory provider changed exact object")
 		}
+		attempt = observed
 		if err := validateBootPin(observed); err != nil {
 			return StoredObject{}, err
 		}
-		attempt = observed
 	}
 	if err := readMirrorObject(ctx, store, attempt, io.Discard); err != nil {
 		return StoredObject{}, err
