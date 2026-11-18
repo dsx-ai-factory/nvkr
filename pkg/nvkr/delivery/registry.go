@@ -7,8 +7,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -31,6 +35,22 @@ type RegistryOptions struct {
 	Anonymous bool
 	Username  string
 	Password  string
+	// IsolatedTransport selects a fresh standard TLS transport rather than the
+	// process-mutable upstream default. It does not alter registry credentials.
+	IsolatedTransport bool
+	// Authority restricts authenticated traffic to the selected registry and
+	// its token endpoint. It is descriptive and grants no provider authority.
+	Authority *RegistryAuthority
+}
+
+type RegistryAuthority struct {
+	RegistryHost  string
+	TokenEndpoint string
+	Repositories  []string
+}
+
+func (authority *RegistryAuthority) enabled() bool {
+	return authority != nil
 }
 
 // Push publishes a complete verified OCI layout to a Distribution-compatible
@@ -55,6 +75,21 @@ func PushWithOptions(ctx context.Context, layoutPath, reference string, request 
 	// followed by tag admission, before Inspect or any registry operation.
 	if err := request.Validate(); err != nil {
 		return "", err
+	}
+	// An isolated caller must refuse an insecure endpoint before opening any
+	// publication bytes. Keep the established ordering of ordinary callers.
+	if options.IsolatedTransport {
+		repo, err := name.NewRepository(reference, name.StrictValidation)
+		if err != nil {
+			tag, tagErr := name.NewTag(reference, name.StrictValidation)
+			if tagErr != nil {
+				return "", e.New(e.CodeUsage, "isolated registry transport requires an HTTPS reference")
+			}
+			repo = tag.Context()
+		}
+		if repo.Scheme() != "https" || (options.Authority.enabled() && repo.RegistryStr() != options.Authority.RegistryHost) {
+			return "", e.New(e.CodeUsage, "isolated registry transport requires an HTTPS reference")
+		}
 	}
 	inspection, err := Inspect(ctx, layoutPath)
 	if err != nil {
@@ -81,6 +116,9 @@ func PushWithOptions(ctx context.Context, layoutPath, reference string, request 
 	}
 	if err != nil {
 		return "", e.Wrap(e.CodeUsage, err, "parsing OCI publication tag %q", reference)
+	}
+	if options.IsolatedTransport && (ref.Context().Scheme() != "https" || (options.Authority.enabled() && ref.Context().RegistryStr() != options.Authority.RegistryHost)) {
+		return "", e.New(e.CodeUsage, "isolated registry transport requires an HTTPS reference")
 	}
 	path, err := layout.FromPath(layoutPath)
 	if err != nil {
@@ -195,6 +233,9 @@ func Pull(ctx context.Context, reference, out string, options RegistryOptions) (
 	ref, err := name.NewDigest(reference, parseOptions...)
 	if err != nil {
 		return Inspection{}, e.Wrap(e.CodeUnpinnedSource, err, "parsing digest-pinned publication reference")
+	}
+	if options.IsolatedTransport && (ref.Context().Scheme() != "https" || (options.Authority.enabled() && ref.Context().RegistryStr() != options.Authority.RegistryHost)) {
+		return Inspection{}, e.New(e.CodeUsage, "isolated registry transport requires an HTTPS reference")
 	}
 	return pullWithRecovery(ctx, out, func(attemptCtx context.Context, stage string) (Inspection, error) {
 		return pullToStage(attemptCtx, ref, stage, options)
@@ -408,7 +449,7 @@ func helmTagPublishError(err error, tag name.Tag, chart string) error {
 // push, pull, and resolve paths.
 func registryOptions(ctx context.Context, options RegistryOptions) []remote.Option {
 	remoteOptions := []remote.Option{remote.WithContext(ctx), remote.WithUserAgent("nvkr/delivery")}
-	base := readbudget.Transport(ctx, remote.DefaultTransport)
+	base := readbudget.Transport(ctx, registryTransport(options))
 	if observer, ok := ctx.Value(registryObserverKey{}).(*registryObserver); ok {
 		base = observer.transport(base)
 	}
@@ -425,6 +466,83 @@ func registryOptions(ctx context.Context, options RegistryOptions) []remote.Opti
 	}
 }
 
+func registryTransport(options RegistryOptions) http.RoundTripper {
+	if !options.IsolatedTransport {
+		return remote.DefaultTransport
+	}
+	authority := options.Authority
+	if authority != nil {
+		copy := *authority
+		copy.Repositories = slices.Clone(authority.Repositories)
+		authority = &copy
+	}
+	return httpsRegistryTransport{authority: authority, base: &http.Transport{
+		Proxy:             http.ProxyFromEnvironment,
+		DialContext:       (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+		ForceAttemptHTTP2: true, DisableKeepAlives: true, MaxIdleConns: 100, MaxIdleConnsPerHost: 50,
+		IdleConnTimeout: 90 * time.Second, TLSHandshakeTimeout: 10 * time.Second,
+		ExpectContinueTimeout: time.Second,
+	}}
+}
+
+// Enforce HTTPS for every request, including redirects followed by net/http.
+type httpsRegistryTransport struct {
+	base      http.RoundTripper
+	authority *RegistryAuthority
+}
+
+func (scoped httpsRegistryTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	if request.URL == nil || request.URL.Scheme != "https" {
+		return nil, e.New(e.CodeUsage, "isolated registry transport requires HTTPS")
+	}
+	if scoped.authority.enabled() {
+		if request.URL.User != nil || request.URL.Fragment != "" || request.URL.RawPath != "" || (request.Host != "" && request.Host != request.URL.Host) {
+			return nil, e.New(e.CodeTrustPolicyMissing, "registry request authority is invalid")
+		}
+		clean := path.Clean(request.URL.Path)
+		if request.URL.Path != clean && request.URL.Path != clean+"/" {
+			return nil, e.New(e.CodeTrustPolicyMissing, "registry request path is not canonical")
+		}
+		endpoint, err := url.Parse(scoped.authority.TokenEndpoint)
+		if err != nil {
+			return nil, e.New(e.CodeTrustPolicyMissing, "registry token endpoint is invalid")
+		}
+		auth := request.Header.Get("Authorization")
+		registry := request.URL.Host == scoped.authority.RegistryHost && request.URL.Path == "/v2/"
+		allowedScopes := map[string]bool{}
+		for _, selected := range scoped.authority.Repositories {
+			repo, err := name.NewRepository(selected, name.StrictValidation)
+			if err != nil {
+				return nil, e.New(e.CodeTrustPolicyMissing, "registry scope is invalid")
+			}
+			if request.URL.Host == scoped.authority.RegistryHost && strings.HasPrefix(request.URL.Path, "/v2/"+repo.RepositoryStr()+"/") {
+				registry = true
+			}
+			allowedScopes[repo.Scope(transport.PullScope)] = true
+			allowedScopes[repo.Scope(transport.PushScope)] = true
+		}
+		token := request.URL.Host == endpoint.Host && request.URL.Path == endpoint.Path
+		if (registry && auth != "" && !strings.HasPrefix(auth, "Bearer ")) || (token && auth != "" && !strings.HasPrefix(auth, "Basic ")) || (!registry && !token) {
+			return nil, e.New(e.CodeTrustPolicyMissing, "registry request is outside its admitted authority")
+		}
+		if registry && request.Method != http.MethodGet && request.Method != http.MethodHead && request.Method != http.MethodPost && request.Method != http.MethodPatch && request.Method != http.MethodPut {
+			return nil, e.New(e.CodeTrustPolicyMissing, "registry request method is outside its admitted authority")
+		}
+		if token {
+			query, err := url.ParseQuery(request.URL.RawQuery)
+			if err != nil || request.Method != http.MethodGet || len(query["service"]) != 1 || query.Get("service") != "container_registry" || len(query["scope"]) == 0 || len(query["scope"]) > len(allowedScopes) {
+				return nil, e.New(e.CodeTrustPolicyMissing, "registry token request exceeds its admitted scope")
+			}
+			for _, scope := range query["scope"] {
+				if !allowedScopes[scope] {
+					return nil, e.New(e.CodeTrustPolicyMissing, "registry token request exceeds its admitted scope")
+				}
+			}
+		}
+	}
+	return scoped.base.RoundTrip(request)
+}
+
 // AmbientKeychain returns the keychain these options consult, or nil when access
 // is anonymous or explicit. Other registry readers use it so ambient access
 // cannot drift from delivery; explicit secrets are never widened through it.
@@ -437,6 +555,24 @@ func (options RegistryOptions) AmbientKeychain() authn.Keychain {
 
 // Validate admits transport credentials before filesystem or network work.
 func (options RegistryOptions) Validate() error {
+	if options.IsolatedTransport && options.PlainHTTP {
+		return e.New(e.CodeUsage, "isolated registry transport requires HTTPS")
+	}
+	if options.Authority.enabled() {
+		registry, registryErr := name.NewRegistry(options.Authority.RegistryHost, name.StrictValidation)
+		endpoint, endpointErr := url.Parse(options.Authority.TokenEndpoint)
+		if !options.IsolatedTransport || registryErr != nil || registry.RegistryStr() != options.Authority.RegistryHost || endpointErr != nil || endpoint.Scheme != "https" || endpoint.Host == "" || endpoint.User != nil || endpoint.RawQuery != "" || endpoint.Fragment != "" || endpoint.Path != "/jwt/auth" || endpoint.RawPath != "" || len(options.Authority.Repositories) == 0 || len(options.Authority.Repositories) > maxDeliveryObjects+1 {
+			return e.New(e.CodeUsage, "registry authority must select an isolated HTTPS registry and exact token endpoint")
+		}
+		seen := map[string]bool{}
+		for _, selected := range options.Authority.Repositories {
+			repo, err := name.NewRepository(selected, name.StrictValidation)
+			if err != nil || repo.Name() != selected || repo.RegistryStr() != registry.RegistryStr() || seen[selected] {
+				return e.New(e.CodeUsage, "registry authority contains an invalid repository")
+			}
+			seen[selected] = true
+		}
+	}
 	if options.Anonymous && (options.Username != "" || options.Password != "") {
 		return e.New(e.CodeUsage, "anonymous registry access cannot carry explicit credentials")
 	}

@@ -91,9 +91,12 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 // Other legacy siblings are admitted only when retiring a prior manifest.
 func validateBundleNamespace(bundle *GeneratedBundle) error {
 	layout, ok := githubWorkflowNamespace(bundle.WorkflowPath)
-	if bundle.Engine == EngineTekton {
+	switch bundle.Engine {
+	case EngineTekton:
 		layout = generationLayout{workflowPath: tektonResourcePath, manifestPath: tektonManifestPath, planPath: tektonPlanPath}
 		ok = bundle.WorkflowPath == layout.workflowPath
+	case EngineGitLab:
+		layout, ok = gitlabWorkflowNamespace(bundle.WorkflowPath)
 	}
 	if !ok {
 		return e.New(e.CodeInvalidCatalog, "generated Run has an invalid namespace")

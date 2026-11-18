@@ -129,8 +129,9 @@ func cmdRun() *cli.Command {
 type localLifecycleExecutor func(context.Context, *lifecycle.PreparedRun, lifecycle.LocalOptions) (*lifecycle.Run, error)
 
 func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
-	generationFlags := append(append(lifecycleInputFlags(), commandPresentationFlags()...), &cli.StringFlag{Name: "engine", Value: factory.EngineGitHub, Usage: "CI adapter: github or tekton"})
+	generationFlags := append(append(lifecycleInputFlags(), commandPresentationFlags()...), &cli.StringFlag{Name: "engine", Value: factory.EngineGitHub, Usage: "CI adapter: github, gitlab, or tekton"})
 	return &cli.Command{Name: "run", Usage: "plan, generate, and execute Definition runs", Subcommands: []*cli.Command{
+		cmdRunFinalizeGitLab(),
 		{Name: "finalize", Hidden: true, Usage: "finalize one generated hosted Run from restored carriers", Flags: append(lifecycleInputFlags(),
 			&cli.StringFlag{Name: "plan", Required: true}, &cli.StringFlag{Name: "attempt", Required: true},
 			&cli.StringFlag{Name: "workspace", Value: ".nvkr/factory"}, &cli.StringFlag{Name: "out", Value: ".nvkr/run.json"},
@@ -168,6 +169,9 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			&cli.StringFlag{Name: "projection-pilot", Hidden: true, Usage: "diagnostic: render through the reference projection plugin over `TRANSPORT` (in-process)"}), Action: func(c *cli.Context) error {
 			view, err := selectCommandPresentation(c)
 			if err != nil {
+				return err
+			}
+			if err := admitGitLabGenerationFlags(c); err != nil {
 				return err
 			}
 			if c.IsSet("projection-pilot") {

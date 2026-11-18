@@ -81,3 +81,15 @@ Hosted execution of the renamed bundles remains unrecorded.
 Invocation data is regenerated from the Plan and is not a bundle member;
 `TestGitHubActionDataIsTransientAndRetired` covers omission, prior-owned retirement and refusal of
 modified or unowned copies. Hosted execution of the regenerated bundles remains unrecorded.
+
+## GitLab generated bundle
+
+GitLab generation implements the fixed `.gitlab/nvkr-run/` pipeline/Plan/manifest namespace through the
+shared generated-file owner. Root `.gitlab-ci.yml` remains operator-owned; runtime admission requires its
+single exact local include and the project's default root CI configuration. Exact projection, conditional
+dependencies, custody/tampering, coexistence, ownership/retirement and symlink-refusal contracts are included
+in the [scoped Mac factory result](adr-18.md#gitlab-ordinary-unsigned-profile). That diagnostic snapshot's
+26-test result with zero skips is not a completed native/provider run or full gate. The full gate and final
+source/scope verification remain incomplete. GitLab named namespaces, arbitrary root
+customization, runtime/source refresh, qualification generation, catalog maintenance and projection-pilot
+selection remain outside the admitted profile.

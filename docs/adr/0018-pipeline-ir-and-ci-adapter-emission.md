@@ -14,7 +14,7 @@
 
 - **Scope:** Sections 1–7 define shared execution requirements and the deferred qualified provider protocol.
   Qualified CI renderers and their TransportPlan implementation are removed; shared local authority primitives
-  remain. Section 8 defines the implemented GitHub Run emitter and event policy.
+  remain. Section 1 also defines the bounded ordinary unsigned GitLab profile. Section 8 defines the GitHub Run emitter and event policy.
 
 ## Context
 
@@ -29,12 +29,12 @@ implementation of rendered strings that must be kept in sync.
 
 ### 1. One IR, many adapters — topology/transport only
 
-The maintained GitHub adapter and local runner use the same producer IR. GitLab and Argo generation
-are unavailable; their unused adapters are removed, as are the separate qualified GitHub/GitLab renderers.
+The GitHub adapter, local runner and bounded ordinary unsigned GitLab adapter use the same producer IR.
+Argo generation is unavailable. Separate qualified GitHub/GitLab renderers remain retired.
 Tekton's cluster execution and independent key policy are specified below. Generation admits only that
 explicit contract; reconciliation records implementation checks and external acceptance separately.
-The former GitLab-only `runtime.builderImage` schema field has no retained adapter and any nonempty value
-fails capability admission. GitHub uses its pinned setup-go action for source bootstrap. The generator's
+The former GitLab-only `runtime.builderImage` schema field remains rejected; native GitLab bootstrap images
+belong to its explicit runner policy below. GitHub uses its pinned setup-go action for source bootstrap. The generator's
 own build selects how bootstraps obtain the runner. Any build of a local checkout emits bootstraps that install
 `./cmd/nvkr` from the checkout with its `.go-version`; they require NVKR source. A module-mode install of an
 exact module version, either a release (`go install …/cmd/nvkr@vX.Y.Z`) or a commit
@@ -74,6 +74,53 @@ edges, package membership and terminal-observation gates, and publication/signin
 admitted inputs. Missing, extra or substituted operations, artifacts or edges fail before execution or emission.
 Only the local runner may relocate admitted artifact paths into its selected workspace; a serialized path does
 not grant relocation authority.
+
+#### GitLab ordinary unsigned execution contract
+
+This proposed extension requires maintainer review; the existing ADR acceptance does not ratify it.
+The profile admits only `static-unqualified` execution against the complete Plan. Fetch, build, acquisition,
+verification, SBOM and packaging operations retain their existing owners. Optional publication is the bounded
+unsigned HTTPS OCI route in ADR-20. Signing configuration, `pipeline-attested` and `qualified` claims, disk
+outputs, private-source access, private execution images, native-toolchain/runtime-source profiles, runtime
+storage extensions and unsupported producer execution requirements fail capability admission before output.
+Arbitrary setup hooks, job variables, services and legacy runtime/helper image overrides are not admitted.
+Neither authenticated provider metadata nor successful publication upgrades this evidence lane.
+
+Environment's `gitlab` policy selects an exact HTTPS `/api/v4` endpoint, positive native project ID, API-reader
+credential reference and kind, and one or two native `linux/amd64` / `linux/arm64` runner routes. Each route
+declares sorted unique literal tags and a digest-pinned bootstrap image. There are no inferred organization
+tags or GitHub runner-label substitutions. Selected execution images require declared anonymous access.
+The operator supplies the native host, matching Go installation and container runtime. Placement and time
+budgets resolve through the Plan's executable producer view; an empty scheduler reference cannot substitute
+the utility platform or hide source-owned requirements. Actual host mismatch fails before execution.
+The source-built runner follows the generator's checkout or exact module-version bootstrap contract above;
+bootstrap checks the selected Go release and native host before compiling with automatic toolchain download disabled.
+
+ADR-21 owns the fixed generated include and operator-owned root pipeline. Native GitLab pipeline invocation
+does not become a GitHub dispatch event, and no generated cron, trigger API or callable producer interface is
+added. Debug trace/service modes are refused by workflow rules. At most 256 operations and 50 native needs
+per job are admitted; an oversized graph fails rather than changing its output selection. Dependencies retain
+their full prerequisite closure: ordinary operations require success, while verification runs after completion.
+The finalizer is scheduled with `when: always`; cancellation or provider loss can still prevent a Run record.
+
+Caller-supplied project, pipeline, job and commit values describe a selection. Before operation work, the
+provider owner authenticates the current running generated job using its own `CI_JOB_TOKEN`, checks project
+configuration and exact pipeline identity, and enumerates the complete current non-retried generated job map.
+The separately configured API reader must cover project metadata, pipeline metadata, job enumeration and
+original-job artifact downloads. Its `private-token` and `job-token` kinds describe authentication mechanisms,
+not a grant of API permissions; the operator must establish the selected instance's endpoint access.
+The current-job token is not interchangeable with that API reader. Provider clients have bounded I/O and a
+caller-derived lifetime; closing an owner cancels and joins its work.
+
+Each outcome binds its exact Plan operation, project, pipeline, commit, original job ID, inputs and carrier
+digests/sizes. Consumers authenticate the original provider job and bounded carrier bytes before restoration;
+workspace files and digest strings confer no authority. A retried producer replacing an acquired original job,
+foreign or ambiguous membership, missing outcomes and failed/skipped jobs fail closed. Original bindings are
+revalidated before acceptance. The finalizer authenticates its role before recompilation, compares the exact
+authored-input Plan, validates the complete job/outcome closure and delegates observation, named-output
+binding and immutable Run writing to the shared lifecycle. No alternative public lifecycle object is added.
+Implementation checks, credential-access limits and external acceptance belong to
+[reconciliation](reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile).
 
 #### Tekton execution, signing and qualification contract
 
@@ -195,7 +242,7 @@ execute a producer reference from the complete Plan through `factory execute-nod
 
 ### 3. Helper-owned isolation and narrowly admitted native ARC disks
 
-Jobs use generic hosted runners except the explicit native ARC disk policy below. With `runsOn`
+GitHub jobs use generic hosted runners except the explicit native ARC disk policy below. With `runsOn`
 unset and no ARC policy selected, ordinary native ARM64 producer fetch/acquisition/build operations select `ubuntu-24.04-arm`;
 AMD64 producers and legacy single-platform utility operations retain `ubuntu-latest`.
 An Environment may enable native output utilities with `utilityContainers`, a platform-to-digest-pinned-image
@@ -1165,8 +1212,8 @@ requires separate runtime evidence. An opt-in native smoke test requires an expl
 and already-local exact native image ID; absence of those inputs skips it, not proves the backend works.
 No generated disk executor or stronger evidence lane is implied.
 
-Maintained lifecycle targets are local, GitHub and the explicit native Tekton cluster contract above.
-GitLab and Argo selection returns `CodeEngineCapability` before reading authored inputs or producing output.
+Maintained lifecycle targets are local, GitHub, the explicit native Tekton cluster contract and the bounded
+ordinary unsigned GitLab contract above. Argo selection returns `CodeEngineCapability` before reading authored inputs or producing output.
 No fallback renderer exists.
 
 | Event | Admitted work and credentials |
@@ -1178,7 +1225,7 @@ No fallback renderer exists.
 | Development Environment branch manual dispatch | Unsigned hosted builds, or full signed publication using development environments/credentials, the admitted native ARC route, and disposable attempt namespaces |
 | Git tag | No signing trigger |
 
-Generated Run workflows are manual-only. Production execution admits the default branch plus exact branch
+Generated GitHub Run workflows are manual-only. Production execution admits the default branch plus exact branch
 names explicitly listed in `Environment.githubDispatchBranches`. The optional list is sorted and unique;
 wildcards, tag/PR refs and expression syntax are rejected. It is bound into Environment and Plan identity,
 cloned with its owner, and enforced in every helper bootstrap, source access, execution and finalization guard.

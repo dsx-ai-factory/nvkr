@@ -63,3 +63,39 @@ and cross-worker exports use the lowest member job ID; capacity remains 64 jobs 
 `TestGitHubPartitionRootAdditionChurn` renders the maintained Plan before and after inserting one root
 and bounds the changed worker files to two. Split-boundary, namespace, exact bundle and inline-signer
 contracts remain local evidence; the renamed worker topology has no recorded hosted execution.
+
+## GitLab ordinary unsigned profile
+
+The bounded GitLab adapter is connected in source: explicit native runner/bootstrap policy, complete-Plan
+projection, provider-authenticated current jobs, original-job outcomes/carriers and shared lifecycle finalization.
+Resolved producer placement and budgets use the executable producer view without copying fields into scheduler
+references. Signing, stronger evidence lanes, disk, private-source and unsupported execution requirements remain refused.
+
+A diagnostic snapshot based on `e2fb13e74342a703d8b45b81ba5f48c18502ce89`, using Go 1.27.4 on
+`darwin/arm64`, passed all five `TestGitLabResolvedProducerExecution` subcases: native producer routes with
+unchanged utility placement; missing-route refusal; unsupported-requirement refusal; resolved budgets with
+unchanged logical fields; and source-owned timeout preservation. The tested
+`pkg/nvkr/factory/gitlab_test.go` SHA-256 was
+`ab5cc0e0d61db5a6072ea8ab6800436d28557341cb9aa684263e8ae761500b60`.
+The same snapshot passed all 26 top-level factory `^TestGitLab` tests, with zero skips, using
+`go test -mod=readonly -p=1 ./pkg/nvkr/factory -run '^TestGitLab' -count=1 -json`.
+These controlled contracts are not a native Linux producer Run, a full gate or acceptance by a GitLab provider.
+That result belongs to the historical snapshot. Against integration base
+`ef7951f1cddee46af953ff7dbca8e10debdeec4c`, the same 47-file GitLab implementation also passed the
+26-test factory selection on Go 1.27.4 `darwin/arm64`, with zero failures or skips. This scoped repeat supplies
+no native Linux, full-suite or provider-acceptance evidence. These results do not establish validation of the
+integration based on `031be28a0565f5f5dddcd959aa3cb692a5037c2b`. A native `make ci-check` attempt exited 2
+after the `govulncheck` subprocess was killed with exit 137; the cause is unproved. A completed independent
+check did not establish final source/scope conformance. The full gate and final source/scope verification
+remain incomplete; no custody acceptance is claimed.
+
+API-reader provisioning is a separate acceptance gap. The selected reader needs project metadata, pipeline
+metadata, current job enumeration and original-job artifacts. Standard job tokens authenticate `/job` and
+artifact downloads; fine-grained permissions additionally name pipeline/job-list reads. The complete optional
+job-token reader route, especially project-metadata access, is not established for a selected real instance.
+The configured `private-token` reader is a separate alternative, not evidence that either mechanism has been
+exercised against a provider. See GitLab's [job-token access table](https://docs.gitlab.com/ci/jobs/ci_job_token/#job-token-access)
+and [fine-grained endpoint permissions](https://docs.gitlab.com/ci/jobs/fine_grained_permissions/).
+Current-job `CI_JOB_TOKEN` authentication and same-project registry publication do not resolve API-reader access.
+Real native runner/bootstrap prerequisites, artifact retention/permissions, retry/cancellation behavior and
+live project-registry publication remain unverified. This profile grants no signing, qualification or production acceptance.

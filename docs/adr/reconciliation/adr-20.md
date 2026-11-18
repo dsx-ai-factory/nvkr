@@ -81,3 +81,14 @@ in the observation transport. Metadata-member cancellation preserves the member 
 guidance before any write, and nested alias readback classification does not duplicate its message.
 Write probes remain absent; the library's mutating, asynchronously cleaned-up push-permission helper is not
 used. Live registry/version coverage and hosted validation of these changes remain unverified.
+
+## GitLab ordinary unsigned publication
+
+The GitLab publication path is implemented as anonymous HTTPS OCI transport or current-job
+`gitlab:CI_JOB_TOKEN` authentication confined to provider-reported same-project registry metadata.
+It checks every output/evidence repository, isolates registry/token endpoint traffic and independently
+reads back the complete closure before recording success. The signed publication lanes are unchanged.
+The [Mac factory contract result and exact source-file identity](adr-18.md#gitlab-ordinary-unsigned-profile)
+cover controlled HTTPS publication/refusal fixtures only. They do not establish acceptance by a live GitLab
+registry, complete native validation, signing or qualification. API-reader access remains separate from
+registry-write authority. The full gate and final source/scope verification remain incomplete.

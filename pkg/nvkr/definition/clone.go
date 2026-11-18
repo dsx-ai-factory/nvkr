@@ -53,6 +53,15 @@ func (input Environment) Clone() Environment {
 		value.Smoke = value.Smoke.Clone()
 		input.Tekton = &value
 	}
+	if input.GitLab != nil {
+		value := *input.GitLab
+		value.Runners = maps.Clone(value.Runners)
+		for platform, runner := range value.Runners {
+			runner.Tags = slices.Clone(runner.Tags)
+			value.Runners[platform] = runner
+		}
+		input.GitLab = &value
+	}
 	input.GitHubRuntimeSources = slices.Clone(input.GitHubRuntimeSources)
 	if input.ToolchainAccess != nil {
 		value := *input.ToolchainAccess

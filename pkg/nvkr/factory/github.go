@@ -142,6 +142,9 @@ func githubPartitionsEngaged(plan *Plan, flat []byte) bool {
 
 // The flat rendering is the semantic reference for exact partition projection.
 func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*GeneratedBundle, error) {
+	if plan != nil && plan.Environment.GitLab != nil {
+		return nil, e.New(e.CodeEngineCapability, "GitHub generation cannot ignore Environment.gitlab")
+	}
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "GitHub factory rendering requires a context")
 	}

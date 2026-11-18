@@ -16,7 +16,6 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	orasremote "oras.land/oras-go/v2/registry/remote"
 	orasauth "oras.land/oras-go/v2/registry/remote/auth"
@@ -282,7 +281,7 @@ func CheckRegistry(ctx context.Context, repository string, options RegistryOptio
 		return report, e.Wrap(e.CodeUsage, err, "parsing registry check endpoint")
 	}
 	registry.PlainHTTP = options.PlainHTTP
-	registry.Client = &orasauth.Client{Client: &http.Client{Transport: observer.transport(remote.DefaultTransport)},
+	registry.Client = &orasauth.Client{Client: &http.Client{Transport: observer.transport(registryTransport(options))},
 		Credential: func(ctx context.Context, host string) (orasauth.Credential, error) {
 			if host != repo.RegistryStr() || options.Anonymous {
 				return orasauth.EmptyCredential, nil

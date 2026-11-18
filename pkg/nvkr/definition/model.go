@@ -103,6 +103,9 @@ type Environment struct {
 	// Tekton selects the explicit cluster execution and signer trust contract.
 	// It contains public configuration only; credentials stay in scoped Secrets.
 	Tekton *TektonExecution `json:"tekton,omitempty"`
+	// GitLab explicitly selects native runner routes for the GitLab adapter.
+	// Runner selectors and bootstrap pins are configuration, not runtime proof.
+	GitLab *GitLab `json:"gitlab,omitempty"`
 	// GitHubBundle selects an independent generated workflow namespace; empty
 	// preserves the original generated Run paths. Paths are never authored.
 	GitHubBundle string `json:"githubBundle,omitempty"`
@@ -365,6 +368,9 @@ func (environment Environment) Validate() error {
 		return e.New(e.CodeInvalidCatalog, "environment runner contains control characters")
 	}
 	if err := validateGitHubRunners(environment.GitHubRunners, environment.RunsOn); err != nil {
+		return err
+	}
+	if err := environment.validateGitLab(); err != nil {
 		return err
 	}
 	if len(environment.GitHubDispatchBranches) > 32 {

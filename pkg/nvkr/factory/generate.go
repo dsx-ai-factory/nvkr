@@ -38,15 +38,15 @@ type GeneratedBundle struct {
 // inputs. It is intentionally callable before catalog resolution.
 func ValidateGenerationEngine(engine string) error {
 	switch strings.ToLower(strings.TrimSpace(engine)) {
-	case EngineGitHub, EngineTekton:
+	case EngineGitHub, EngineGitLab, EngineTekton:
 		return nil
-	case EngineGitLab, EngineArgo:
+	case EngineArgo:
 		return e.New(e.CodeEngineCapability,
-			"factory generation for %s is unavailable; supported engines are github and tekton", engine)
+			"factory generation for %s is unavailable; supported engines are github, gitlab and tekton", engine)
 	case "local":
 		return e.New(e.CodeUsage, "local execution uses `run local`, not `run generate`")
 	default:
-		return e.New(e.CodeUsage, "unknown factory generation engine %q (github, tekton)", engine)
+		return e.New(e.CodeUsage, "unknown factory generation engine %q (github, gitlab, tekton)", engine)
 	}
 }
 
@@ -60,6 +60,10 @@ func ValidateGenerationEngine(engine string) error {
 func Render(ctx context.Context, plan *Plan, engine string) (*GeneratedBundle, error) {
 	if err := ValidateGenerationEngine(engine); err != nil {
 		return nil, err
+	}
+	if plan != nil && plan.Environment.GitLab != nil &&
+		!strings.EqualFold(strings.TrimSpace(engine), EngineGitLab) {
+		return nil, e.New(e.CodeEngineCapability, "%s generation cannot ignore Environment.gitlab", engine)
 	}
 	return renderSelected(ctx, plan, strings.ToLower(strings.TrimSpace(engine)))
 }
@@ -75,11 +79,14 @@ var renderSelected = func(ctx context.Context, plan *Plan, engine string) (*Gene
 		}
 		return renderProjected(ctx, plan, engine, plugin, adapter.Release)
 	}
-	if engine == EngineTekton {
+	switch engine {
+	case EngineTekton:
 		if plan == nil {
 			return nil, e.New(e.CodeInvalidCatalog, "projection requires a plan")
 		}
 		return renderProjected(ctx, plan, engine, builtinProjection(engine, plan.GeneratorVersion), plan.GeneratorVersion)
+	case EngineGitLab:
+		return RenderGitLab(ctx, plan)
 	}
 	return RenderGitHub(ctx, plan)
 }
@@ -90,6 +97,13 @@ var renderSelected = func(ctx context.Context, plan *Plan, engine string) (*Gene
 func CheckGenerated(ctx context.Context, plan *Plan, engine, root string) error {
 	if err := ValidateGenerationEngine(engine); err != nil {
 		return err
+	}
+	if strings.EqualFold(strings.TrimSpace(engine), EngineGitLab) {
+		bundle, err := RenderGitLab(ctx, plan)
+		if err != nil {
+			return err
+		}
+		return CheckGeneratedBundle(ctx, root, bundle)
 	}
 	if strings.EqualFold(strings.TrimSpace(engine), EngineTekton) {
 		bundle, err := renderTekton(ctx, plan)
@@ -187,6 +201,11 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 	}
 	if plan == nil || bundle == nil {
 		return nil, e.New(e.CodeUsage, "factory static validation requires a plan and generated bundle")
+	}
+	// This helper is the GitHub validator's boundary. Reject a substituted
+	// provider before interpreting the Plan under any provider-specific policy.
+	if bundle.Engine != EngineGitHub {
+		return nil, e.New(e.CodePipelineDrift, "generated bundle engine does not match GitHub validation")
 	}
 	if err := plan.Validate(); err != nil {
 		return nil, err

@@ -56,7 +56,7 @@ func TestRenderIsTheGenerationSeam(t *testing.T) {
 		return previous(ctx, plan, engine)
 	}
 	t.Cleanup(func() { renderSelected = previous })
-	assertFactoryErrorCode(t, func() error { _, err := Render(t.Context(), plan, EngineGitLab); return err }(), e.CodeEngineCapability)
+	assertFactoryErrorCode(t, func() error { _, err := Render(t.Context(), plan, EngineArgo); return err }(), e.CodeEngineCapability)
 	got, err := Render(t.Context(), plan, EngineGitHub)
 	if err != nil || reached != 1 || !reflect.DeepEqual(got, want) {
 		t.Fatalf("Render did not take the seam exactly once for the admitted engine: reached=%d err=%v", reached, err)
@@ -71,6 +71,30 @@ func TestRenderIsTheGenerationSeam(t *testing.T) {
 	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 	if reached != 3 {
 		t.Fatalf("Generate pilot check did not take the seam: reached=%d", reached)
+	}
+}
+
+func TestRenderGitLabTakesTheGenerationSeam(t *testing.T) {
+	_, plan := gitlabFixture(t, 1)
+	want, err := RenderGitLab(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	previous, reached := renderSelected, 0
+	renderSelected = func(ctx context.Context, plan *Plan, engine string) (*GeneratedBundle, error) {
+		reached++
+		return previous(ctx, plan, engine)
+	}
+	t.Cleanup(func() { renderSelected = previous })
+	got, err := Render(t.Context(), plan, EngineGitLab)
+	if err != nil || reached != 1 || !reflect.DeepEqual(got, want) {
+		t.Fatalf("Render did not take the seam exactly once for the admitted native GitLab engine: reached=%d err=%v", reached, err)
+	}
+	// A GitLab Environment is not silently ignored by another engine.
+	_, err = Render(t.Context(), plan, EngineGitHub)
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if reached != 1 {
+		t.Fatalf("refused GitHub generation reached the seam: reached=%d", reached)
 	}
 }
 

@@ -80,10 +80,12 @@ retains its original scope; superseded requirements and plans are available only
    errors, never warnings or silent defaults.
 4. **Never overclaim.** Distinguish implemented, contract-tested, and externally exercised. Mocks and unit tests
    do not prove registries, CI, signing services, or runners.
-5. **Generated CI defaults to generic hosted runners.** ADR-18 permits only the explicit `native-kvm-v1`
-   ARC disk route on `arc-amd64-kvm` and `arc-arm64-kvm`; no arbitrary self-hosted labels or qualified
-   claims. Execution targets are local, GitHub, and ADR-18's native Tekton route. Tekton publication and
-   signing require explicit cluster keys; external acceptance scope is recorded in reconciliation.
+5. **Generated GitHub CI defaults to generic hosted runners.** ADR-18 permits only the explicit `native-kvm-v1`
+   ARC disk route on `arc-amd64-kvm` and `arc-arm64-kvm`; no arbitrary GitHub self-hosted labels or qualified
+   claims. Execution targets are local, GitHub, ADR-18's native Tekton route and its proposed bounded unsigned GitLab
+   route. GitLab requires authored native runner tags and digest-pinned bootstrap images; it grants no signing
+   or qualification capability. Tekton publication and signing require explicit cluster keys; external acceptance
+   scope is recorded in reconciliation.
    ADR-31's unsigned qualification results index is a description, not publication.
 6. **Do not commit, push, tag, or open PRs unless explicitly asked.** Leave the working tree for the user to
    review.
@@ -168,7 +170,7 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 | Accept a caller-provided digest, path, or boolean as proof | Authenticate in the owning module and issue an opaque receipt bound to the bytes |
 | Raw `sha256.Sum256` as a structured identity | Use the canonical codec and an existing typed digest family |
 | Log a warning and continue on a validation, pin, or signature problem | Return a coded error; fail closed |
-| Emit an arbitrary self-hosted runner label or a `git tag` trigger in a generated workflow | Generic hosted runners, with only ADR-18's explicitly admitted native ARC disk exception; sign through the admitted default-branch workflow |
+| Emit an arbitrary GitHub self-hosted runner label or a `git tag` signing trigger | Generic GitHub hosted runners with ADR-18's native ARC disk exception; GitLab uses its separate authored native routes and stays unsigned |
 | Hand-edit `.github/workflows/nvkr-run.yml` or `pins.lock.yaml` | Regenerate with `run generate` from the Definition and Environment, or `catalog pin`; edit authored inputs, not generated output |
 | Claim a feature works because a unit test with a fake passes | Cite the exact external Run or release artifact and its scope in reconciliation |
 | Write repo paths, commands, or code identifiers into a product spec or epic | Specs use product nouns only; implementation detail belongs in ADRs and code |

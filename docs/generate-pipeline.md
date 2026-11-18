@@ -3,8 +3,9 @@
 Turn a Definition and Environment into a reviewable pipeline bundle. A **Definition** selects the named
 outputs to build; an **Environment** supplies execution, publication, and signing settings. This walkthrough
 uses the three-output NVKE tutorial: a CLI executable, a container image, and a Helm chart.
-The walkthrough uses GitHub Actions. [Tekton cluster execution](#tekton-cluster-execution) uses the same
-Plan and runner with explicit cluster trust.
+The walkthrough uses GitHub Actions. [Native GitLab execution](#native-gitlab-execution) uses the bounded
+unsigned profile; [Tekton cluster execution](#tekton-cluster-execution) uses explicit cluster trust.
+Both retain the same Plan and shared execution owners.
 
 Start at the repository root with `bin/nvkr` built as described in the [quickstart](quickstart.md#build-only-the-cli).
 Run these commands in the same terminal. They write to a temporary directory, leaving the repository's
@@ -363,6 +364,69 @@ in-cluster registry and test-only keys, selects the maintained core Definition's
 publication, signing, qualification, transport faults and cancellation. Set `NVKR_TEKTON_EVIDENCE` to an
 external directory to retain public reports; keys and kubeconfig stay in disposable scratch storage.
 See [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-18.md) for the exact externally exercised scope.
+
+## Native GitLab execution
+
+The GitLab extension is proposed for maintainer review; it does not inherit acceptance from the existing ADR headers.
+Select `--engine gitlab` with the intended Definition and an Environment that explicitly declares `gitlab`.
+Repeat generation with the same inputs, generator identity and `--check` to check the complete bundle.
+The GitHub walkthrough's Environment is not a GitLab configuration. Keep authored inputs and generation
+under review before committing or invoking the pipeline.
+
+The Environment supplies these provider settings; values are public configuration and credential references,
+never credential contents:
+
+| Setting | Required selection |
+|---|---|
+| `gitlab.apiURL` | Exact HTTPS provider API base ending in `/api/v4`, without credentials, query or fragment |
+| `gitlab.projectID` | Exact positive native project ID |
+| `gitlab.apiReadCredentialRef` | `gitlab:VARIABLE_NAME` naming the separately provisioned API reader |
+| `gitlab.apiReadCredentialKind` | Explicit `private-token` or `job-token` authentication mechanism |
+| `gitlab.runners` | Explicit native `linux/amd64` and/or `linux/arm64` routes covering every resolved operation and the utility platform |
+| Each route's `tags` and `bootstrapImage` | Sorted unique literal runner tags and an immutable digest-pinned OCI bootstrap image |
+
+Provide the exact Go release selected by the generator's bootstrap, a matching native Linux host and the
+selected container runtime. Bootstrap checks Go and host architecture before source compilation with
+`GOTOOLCHAIN=local`. The runner comes from checkout source or the generator's own exact module version
+and checksum contract. Declared producer/vendor/utility images require anonymous immutable access.
+Runner tags select placement; they prove neither capacity nor runtime compatibility. GitHub labels and
+`GITHUB_*` invocation variables cannot substitute for native GitLab context.
+
+Generation owns only `.gitlab/nvkr-run/pipeline.yml`, `.gitlab/nvkr-run/plan.json` and
+`.gitlab/nvkr-run/manifest.json`. Keep the root `.gitlab-ci.yml` operator-owned, containing only one local
+include of `.gitlab/nvkr-run/pipeline.yml`. Additional root jobs, variables, includes or policy overrides
+are refused by execution admission. The project must use its default root CI configuration. Review and
+commit the root and complete generated bundle together; never hand-edit generated members. The profile
+uses native GitLab pipeline invocation and adds no cron or trigger API. Debug tracing and service debugging
+must be off. The bounded projection permits at most 256 operations and 50 needs per job.
+
+Use the provider-supplied current job's `CI_JOB_TOKEN` for current-job authentication. Separately provision
+the API reader named by the Environment for project/pipeline metadata, current job enumeration and original-job artifact downloads.
+Selecting a credential kind does not grant endpoint permissions. Keep API access and masking/protection
+policy scoped to the intended project and permitted pipeline sources; never put tokens in authored inputs,
+generated Plans or logs. The optional API-reader job-token route has instance-specific permission requirements;
+consult the [credential-access ledger](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile)
+before choosing it. A separately provisioned `private-token` reader is the alternative mechanism.
+
+The provider authenticates the exact current job and pipeline, then consumers fetch original producer
+outcomes and digest-bound carriers. They retain original job IDs across retries and reject substituted,
+failed, skipped, missing or corrupt members. The always-scheduled finalizer rechecks the complete closure,
+recompiles the exact authored inputs and writes the shared immutable Run record. A missing final Run
+record proves neither success nor absence of remote effects.
+
+This profile stays unsigned and `static-unqualified`. Optional publication selects HTTPS OCI transport,
+either anonymous or the exact `publication.credentialRef: gitlab:CI_JOB_TOKEN` with anonymous access off.
+That publication token is separate from API-reader provisioning. The authenticated route confines all
+repositories to the provider-reported current project registry and independently reads back the complete
+published closure. It supplies byte integrity, not signer or qualification acceptance.
+Signing, stronger evidence lanes, disk outputs, private-source and private execution-image routes,
+native-toolchain/runtime-source profiles, unsupported execution requirements, arbitrary runtime setup,
+variables/services, storage extensions, object-store copying and user-selected image aliases fail admission.
+GitHub-specific runtime/source refresh, qualification generation, catalog maintenance and the diagnostic
+projection pilot are also outside this profile. The
+[GitLab execution ledger](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile)
+and [publication ledger](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-20.md#gitlab-ordinary-unsigned-publication)
+own exact validation and external acceptance scope.
 
 ## Diagnostic projection pilot
 

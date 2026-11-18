@@ -135,6 +135,45 @@ func registryReadbackError(ctx context.Context, err error, operation string, arg
 	return registryPublishError(ctx, err, operation, args...)
 }
 
+// SafeRegistryReadbackError retains the underlying typed error for callers but
+// never presents registry-supplied response bodies, details, or request URLs.
+func SafeRegistryReadbackError(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	if ctx == nil {
+		return e.Wrap(e.CodeUsage, registryRedactedCause{cause: err}, "registry readback requires a context")
+	}
+	classified := registryReadbackError(ctx, err, "reading back publication")
+	return redactRegistryError(err, classified, "registry readback failed")
+}
+
+// SafeRegistryPublishError presents a fixed message while retaining native causes.
+func SafeRegistryPublishError(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	if ctx == nil {
+		return e.Wrap(e.CodeUsage, registryRedactedCause{cause: err}, "registry publication requires a context")
+	}
+	classified := registryPublishError(ctx, err, "publishing release")
+	return redactRegistryError(err, classified, "registry publication failed; destination may contain partial uploads")
+}
+
+func redactRegistryError(err, classified error, message string) error {
+	code := e.CodeUnavailable
+	var coded *e.Error
+	if errors.As(classified, &coded) {
+		code = coded.Code
+	}
+	return e.Wrap(code, registryRedactedCause{cause: err}, "%s", message)
+}
+
+type registryRedactedCause struct{ cause error }
+
+func (cause registryRedactedCause) Error() string { return "registry response or transport failed" }
+func (cause registryRedactedCause) Unwrap() error { return cause.cause }
+
 func registryResponseCode(response *transport.Error) e.Code {
 	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
 		return e.CodeRegistryAuthFailed

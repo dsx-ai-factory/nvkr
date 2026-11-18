@@ -62,9 +62,36 @@ its publication mode is `per-output-v1`; signing and complete published-byte ver
 This route does not reinterpret GitHub secret references or keyless certificate policy as cluster authority.
 NVIDIA-specific services are optional adapters, not hard-coded signing authorities. Local development without
 publication/signing remains explicitly unsigned and unqualified. Required publication must fail before work
-when signing or trust inputs are absent; it cannot silently downgrade to unsigned output. APT/GPG adapter
+when its lane's signing or trust inputs are absent; it cannot silently downgrade to unsigned output. ADR-18's
+explicit ordinary unsigned GitLab profile is the bounded exception below. APT/GPG adapter
 configuration, key management and authenticated read-back remain deferred, so these defaults do not admit
 APT publication today.
+
+#### Ordinary unsigned GitLab publication
+
+This proposed GitLab extension requires maintainer review; the existing ADR acceptance does not ratify it.
+The ordinary GitLab profile may explicitly select unsigned HTTPS OCI publication without changing signed
+GitHub, Tekton or consumer-policy contracts. It accepts anonymous transport or the exact credential reference
+`gitlab:CI_JOB_TOKEN`, with no signing configuration. The job token is publication authentication, separate
+from the configured API reader. Authenticated publication requires provider-reported enabled registry metadata
+for the authenticated current project and a destination inside that exact project's registry namespace.
+Every derived output and evidence repository must remain inside it; a lexical sibling is not a child.
+The native registry username is `gitlab-ci-token`. An isolated TLS transport confines authenticated requests
+to the selected registry, admitted repositories and the selected provider's exact `/jwt/auth` token endpoint,
+with only the admitted repository scopes. No ambient registry keychain supplies publication credentials.
+
+Only the compiled `publish/release` route is admitted. The publisher validates the complete local closure,
+writes its existing digest-addressed representation,
+then independently pulls and inspects the complete published closure before recording the immutable reference.
+Push success alone is insufficient. A failed operation grants no accepted publication outcome or rollback
+promise, even if remote uploads remain. The profile refuses plain HTTP, other publication credentials, `per-output-v1`,
+user-selected image aliases and object-store destinations. Existing chart-scoped discovery tags retain their
+ordinary non-authoritative semantics. Format compatibility remains an explicit packaging choice, never a
+response-driven rewrite. Publication and its Run remain unsigned and `static-unqualified`; byte integrity
+does not establish signer authenticity, qualification or production acceptance.
+The [publication ledger](reconciliation/adr-20.md#gitlab-ordinary-unsigned-publication) owns validation and provider acceptance.
+
+#### Shared destination and output rules
 
 Explicit OCI selection is independently bound to Environment and Plan identity without changing native or
 aggregate logical Build identity. Compiler snapshots own the selection independently of caller mutations.
