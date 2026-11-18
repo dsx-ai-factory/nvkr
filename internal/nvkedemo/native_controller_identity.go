@@ -85,11 +85,11 @@ func selectNativeControllerIdentity(ctx context.Context, installer string) (iden
 	}
 	// Both admitted sources already publish the chart as nvke-controller. The
 	// retained 400c release still declares the old runtime name explicitly.
-	// ImageArtifact below is an external source-metadata key, retained verbatim;
-	// NVKR's controller output is independently named nvke-controller.
+	// ImageArtifact names the NVKR output. Admit the retained and renamed values
+	// during the source-metadata transition, while binding the exact bytes above.
 	if release.Release.Namespace != identity.name || release.Chart.Name != identity.name || chart.Name != "nvke-controller" ||
 		release.Chart.Path != "../../controller/deploy/charts/controller" || release.Chart.Artifact != "controller-chart" ||
-		release.Chart.ImageArtifact != "cwe" || release.Chart.ProfilesArtifact != "controller-profiles" ||
+		(release.Chart.ImageArtifact != "cwe" && release.Chart.ImageArtifact != "nvke-controller") || release.Chart.ProfilesArtifact != "controller-profiles" ||
 		len(release.Values) != 2 || release.Values[0] != "values.yaml" || release.Values[1] != "overlay.yaml" ||
 		!nativeControllerOverride(base.Namespace, identity.name) || base.Name.Kind != 0 || base.Fullname.Kind != 0 ||
 		!nativeControllerOverride(overlay.Name, identity.name) || !nativeControllerOverride(overlay.Fullname, identity.name) || !nativeControllerOverride(overlay.Namespace, identity.name) {
