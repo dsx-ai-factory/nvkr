@@ -81,7 +81,7 @@ func TestPullSelectedMetadataDoesNotRequireOtherControlsOrPayloads(t *testing.T)
 	if forbiddenReads.Load() != 0 {
 		t.Fatal("selected pull attempted excluded control or payload reads", forbiddenReads.Load())
 	}
-	owner, err := OpenSelectedMetadata(t.Context(), out, pin, []string{"tools"})
+	owner, err := OpenSelectedMetadata(t.Context(), out, pin, []string{"tools"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestSelectedImageIndexMetadataRetainsExactChildren(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			owner, err := OpenSelectedMetadata(t.Context(), out, result.RootDigest, []string{output.Name})
+			owner, err := OpenSelectedMetadata(t.Context(), out, result.RootDigest, []string{output.Name}, "")
 			if err != nil {
 				t.Fatal(err)
 			}

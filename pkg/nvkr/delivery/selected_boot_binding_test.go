@@ -59,7 +59,7 @@ func TestSelectedBootMetadataBindsRawFileWithoutPayload(t *testing.T) {
 			if _, err := CopySelectedMetadataWithExpectedRoot(t.Context(), root, sparse, digest, []string{name}); err != nil {
 				t.Fatal(err)
 			}
-			owner, err := OpenSelectedMetadata(t.Context(), sparse, digest, []string{name})
+			owner, err := OpenSelectedMetadata(t.Context(), sparse, digest, []string{name}, "")
 			if err != nil {
 				t.Fatal(err)
 			}

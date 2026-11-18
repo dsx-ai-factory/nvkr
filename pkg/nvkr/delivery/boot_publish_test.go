@@ -71,7 +71,7 @@ func TestBootPublicationCommitsInventoryAfterFreshRecheckAndProofs(t *testing.T)
 				if _, err := CopySelectedMetadataWithExpectedRoot(t.Context(), sources[binding.Output], sparse, pin, []string{binding.Output}); err != nil {
 					t.Fatal(err)
 				}
-				owner, err := OpenSelectedMetadata(t.Context(), sparse, pin, []string{binding.Output})
+				owner, err := OpenSelectedMetadata(t.Context(), sparse, pin, []string{binding.Output}, "")
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -100,7 +100,7 @@ func TestBootPublicationCommitsInventoryAfterFreshRecheckAndProofs(t *testing.T)
 				t.Fatal(err)
 			}
 			aggregateReference := "registry.example.test/releases@" + aggregate.RootDigest
-			owner, err := OpenSelectedMetadata(t.Context(), aggregatePath, aggregate.RootDigest, []string{"node-image", "tools"})
+			owner, err := OpenSelectedMetadata(t.Context(), aggregatePath, aggregate.RootDigest, []string{"node-image", "tools"}, "")
 			if err != nil {
 				t.Fatal(err)
 			}

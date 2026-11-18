@@ -29,6 +29,16 @@ type Budget struct {
 	failure   error
 }
 
+// Active reports whether this operation requires response accounting, including
+// an already exhausted allowance. Exhaustion must never select an unmetered path.
+func Active(ctx context.Context) bool {
+	if ctx == nil {
+		return false
+	}
+	_, ok := ctx.Value(contextKey{}).(*Budget)
+	return ok
+}
+
 func WithLimit(ctx context.Context, limit int64) (context.Context, *Budget, error) {
 	if ctx == nil || limit <= 0 {
 		return nil, nil, e.New(e.CodeUsage, "response reads require a context and positive finite byte allowance")

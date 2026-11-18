@@ -84,6 +84,12 @@ func bootServingURL(config definition.BootServing, object Object) (string, error
 	return config.Origin + strings.TrimSuffix(config.Prefix, "/") + "/" + object.Key, nil
 }
 
+// BootAssetURL describes the literal content-addressed mapping. It is not an
+// availability receipt; only a complete phase read can establish that observation.
+func BootAssetURL(config definition.BootServing, binding BootAssetBinding) (string, error) {
+	return bootServingURL(config, bootPayloadObject(binding))
+}
+
 // verify reads the full approved client path independently of pinned S3 reads.
 // It reports equality at check time, not permanent routing or firmware trust.
 func (reader *bootServingClient) verify(ctx context.Context, object Object) (_ string, resultErr error) {

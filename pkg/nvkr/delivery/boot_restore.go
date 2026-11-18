@@ -47,6 +47,28 @@ func (set *BootProofSet) Uses() ([]BootOriginalUse, error) {
 	return slices.Clone(set.state.inventory.Uses), nil
 }
 
+// StoredAssets returns only descriptive pins. Recheck must join them to raw
+// bindings independently authenticated from the original signed controls.
+func (set *BootProofSet) StoredAssets() ([]BootStoredAsset, error) {
+	if set == nil || set.state == nil {
+		return nil, e.New(e.CodeGateUnmet, "boot proof set was not opened")
+	}
+	set.state.mu.RLock()
+	defer set.state.mu.RUnlock()
+	if set.state.closed {
+		return nil, e.New(e.CodeGateUnmet, "boot proof set is closed")
+	}
+	objects := map[string]StoredObject{}
+	for _, object := range set.state.inventory.Objects {
+		objects[object.SHA256] = object.stored()
+	}
+	assets := make([]BootStoredAsset, len(set.state.inventory.Uses))
+	for index, use := range set.state.inventory.Uses {
+		assets[index] = BootStoredAsset{Binding: use.Binding, Object: objects[use.Binding.SHA256], URL: use.URL}
+	}
+	return assets, nil
+}
+
 // Metadata lends one exact original sparse owner. Closing that owner makes
 // subsequent checks fail. Callers must not close the set during owner callbacks.
 func (set *BootProofSet) Metadata(reference string) (*SelectedMetadata, error) {
@@ -103,7 +125,7 @@ func (set *BootProofSet) Close() error {
 // RestoreProofs retrieves only the selected proof/control closure. The caller
 // owns Close even if later signature authentication fails. Raw bytes are checked
 // separately by Recheck against bindings derived from these original controls.
-func (phase *BootPhase) RestoreProofs(ctx context.Context, locator StoredObject, expected BootInventoryExpectation) (_ *BootProofSet, resultErr error) {
+func (phase *BootPhase) RestoreProofs(ctx context.Context, locator StoredObject, expected BootInventoryExpectation, workspaceRoot string) (_ *BootProofSet, resultErr error) {
 	state, finish, err := phase.begin(ctx)
 	if err != nil {
 		return nil, err
@@ -112,10 +134,10 @@ func (phase *BootPhase) RestoreProofs(ctx context.Context, locator StoredObject,
 	if !reflect.DeepEqual(expected.Selection, state.request.Selection) || !reflect.DeepEqual(expected.Destination, state.request.Destination) {
 		return nil, e.New(e.CodeVerifyFailed, "boot proof restoration differs from admitted selection or destination")
 	}
-	return restoreBootProofs(ctx, state.store, locator, expected, state.request.Limits)
+	return restoreBootProofs(ctx, state.store, locator, expected, state.request.Limits, workspaceRoot)
 }
 
-func restoreBootProofs(ctx context.Context, store ObjectStore, locator StoredObject, expected BootInventoryExpectation, limits BootTransferLimits) (result *BootProofSet, resultErr error) {
+func restoreBootProofs(ctx context.Context, store ObjectStore, locator StoredObject, expected BootInventoryExpectation, limits BootTransferLimits, workspaceRoot string) (result *BootProofSet, resultErr error) {
 	if err := deliveryContext(ctx); err != nil {
 		return nil, err
 	}
@@ -146,7 +168,7 @@ func restoreBootProofs(ctx context.Context, store ObjectStore, locator StoredObj
 	if err != nil {
 		return nil, err
 	}
-	stage, err := os.MkdirTemp("", "nvkr-boot-proofs-*")
+	stage, err := os.MkdirTemp(workspaceRoot, "nvkr-boot-proofs-*")
 	if err != nil {
 		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating private selected proof workspace")
 	}
@@ -189,7 +211,7 @@ func restoreBootProofs(ctx context.Context, store ObjectStore, locator StoredObj
 				return nil, e.Wrap(e.CodeImmutableViolation, err, "assembling original selected metadata bytes")
 			}
 		}
-		owner, err := OpenSelectedMetadata(ctx, root, publication.RootDigest, publication.Outputs)
+		owner, err := OpenSelectedMetadata(ctx, root, publication.RootDigest, publication.Outputs, workspaceRoot)
 		if err != nil {
 			return nil, err
 		}

@@ -176,7 +176,7 @@ func (consumer *Consumer) prepareBootAssets(ctx context.Context, expectation *Bo
 	if consumer == nil || consumer.materialize == nil {
 		return e.New(e.CodeEngineCapability, "boot preparation requires the original publication reader")
 	}
-	verifier, err := consumer.portableVerifier(policy)
+	verifier, err := consumer.bootVerifier(policy)
 	if err != nil {
 		return err
 	}
@@ -184,103 +184,120 @@ func (consumer *Consumer) prepareBootAssets(ctx context.Context, expectation *Bo
 	if err != nil {
 		return err
 	}
-	return delivery.WithBootPhase(ctx, request, options, credential, func(ctx context.Context, phase *delivery.BootPhase) (resultErr error) {
-		var publications []*delivery.Publication
-		var assets []*delivery.BootAsset
-		defer func() {
-			for _, asset := range assets {
-				resultErr = errors.Join(resultErr, asset.Close())
-			}
-			for _, publication := range publications {
-				resultErr = errors.Join(resultErr, publication.Close())
-			}
-		}()
-		prepared := expectation.exact.prepared
-		description := PreparedBootDescription{DefinitionDigest: prepared.DefinitionDigest, EnvironmentDigest: prepared.EnvironmentDigest,
-			PlanDigest: prepared.PlanDigest, PolicyDigest: policyDigest, Invocation: invocation, Selection: expectation.selection.Clone(), Destination: request.Destination}
-		proofs := map[string]bool{}
-		var proofBytes int64
-		for _, name := range selectedBootNames(expectation.selection) {
-			reference := references[name]
-			publication, err := consumer.materialize(ctx, reference)
-			if err != nil {
-				return err
-			}
-			publications = append(publications, publication)
-			local, err := publication.Description(reference)
-			if err != nil {
-				return err
-			}
-			if err := requireBootOutputInputs(expectation.exact, name, local); err != nil {
-				return err
-			}
-			if err := requireDiskEvidence(policy, []delivery.Output{local.Outputs[0].Output}); err != nil {
-				return err
-			}
-			proof, err := retainPublicationProof(ctx, verifier, reference, policy, local.Metadata, "", invocation)
-			if err != nil {
-				return err
-			}
-			if err := reserveBootProof(proof, proofs, &proofBytes); err != nil {
-				return err
-			}
-			signedInvocation, err := bootProofInvocation(proof)
-			if err != nil {
-				return err
-			}
-			for _, output := range local.Outputs {
-				proof, err := retainPublicationProof(ctx, verifier, output.Reference, policy, local.Metadata, signedInvocation, invocation)
+	return delivery.WithBootPhase(ctx, request, options, credential, func(ctx context.Context, phase *delivery.BootPhase) error {
+		return sign.WithBoundedVerification(ctx, func(ctx context.Context) (resultErr error) {
+			var publications []*delivery.Publication
+			var assets []*delivery.BootAsset
+			defer func() {
+				for _, asset := range assets {
+					resultErr = errors.Join(resultErr, asset.Close())
+				}
+				for _, publication := range publications {
+					resultErr = errors.Join(resultErr, publication.Close())
+				}
+			}()
+			prepared := expectation.exact.prepared
+			description := PreparedBootDescription{DefinitionDigest: prepared.DefinitionDigest, EnvironmentDigest: prepared.EnvironmentDigest,
+				PlanDigest: prepared.PlanDigest, PolicyDigest: policyDigest, Invocation: invocation, Selection: expectation.selection.Clone(), Destination: request.Destination}
+			proofs := map[string]bool{}
+			var proofBytes int64
+			for _, name := range selectedBootNames(expectation.selection) {
+				reference := references[name]
+				publication, err := consumer.materialize(ctx, reference)
+				if err != nil {
+					return err
+				}
+				publications = append(publications, publication)
+				local, err := publication.Description(reference)
+				if err != nil {
+					return err
+				}
+				if err := requireBootOutputInputs(expectation.exact, name, local); err != nil {
+					return err
+				}
+				if err := requireDiskEvidence(policy, []delivery.Output{local.Outputs[0].Output}); err != nil {
+					return err
+				}
+				proof, err := retainPublicationProof(ctx, verifier, reference, policy, local.Metadata, "", invocation)
 				if err != nil {
 					return err
 				}
 				if err := reserveBootProof(proof, proofs, &proofBytes); err != nil {
 					return err
 				}
-			}
-			if err := publication.VisitEvidence(ctx, func(ctx context.Context, binding delivery.EvidenceBinding, raw []byte) error {
-				return verifier.VerifySBOM(ctx, binding.SubjectDigest, raw)
-			}); err != nil {
-				return err
-			}
-			var asset *delivery.BootAsset
-			for _, disk := range expectation.selection.Disks {
-				if disk.Output == name {
-					asset, err = publication.OpenBootDisk(ctx, reference, disk)
+				signedInvocation, err := bootProofInvocation(proof)
+				if err != nil {
+					return err
 				}
-			}
-			for _, imager := range expectation.selection.Imagers {
-				if imager.Output == name {
-					asset, err = publication.OpenBootImager(ctx, reference, imager)
+				for _, output := range local.Outputs {
+					proof, err := retainPublicationProof(ctx, verifier, output.Reference, policy, local.Metadata, signedInvocation, invocation)
+					if err != nil {
+						return err
+					}
+					if err := reserveBootProof(proof, proofs, &proofBytes); err != nil {
+						return err
+					}
 				}
+				if err := publication.VisitEvidence(ctx, func(ctx context.Context, binding delivery.EvidenceBinding, raw []byte) error {
+					return verifier.VerifySBOM(ctx, binding.SubjectDigest, raw)
+				}); err != nil {
+					return err
+				}
+				var asset *delivery.BootAsset
+				for _, disk := range expectation.selection.Disks {
+					if disk.Output == name {
+						asset, err = publication.OpenBootDisk(ctx, reference, disk)
+					}
+				}
+				for _, imager := range expectation.selection.Imagers {
+					if imager.Output == name {
+						asset, err = publication.OpenBootImager(ctx, reference, imager)
+					}
+				}
+				if err != nil {
+					return err
+				}
+				if asset == nil {
+					return e.New(e.CodeVerifyFailed, "selected output has no exact raw owner")
+				}
+				assets = append(assets, asset)
+				description.Assets = append(description.Assets, PreparedBootAsset{BootStoredAsset: delivery.BootStoredAsset{Binding: delivery.BootAssetBinding{Output: name}}, PreparedInvocation: local.Metadata.InvocationID, SignedInvocation: signedInvocation})
 			}
+			availability, err := phase.Copy(ctx, assets)
 			if err != nil {
 				return err
 			}
-			if asset == nil {
-				return e.New(e.CodeVerifyFailed, "selected output has no exact raw owner")
+			records, err := availability.Descriptions()
+			if err != nil {
+				return err
 			}
-			assets = append(assets, asset)
-			description.Assets = append(description.Assets, PreparedBootAsset{BootStoredAsset: delivery.BootStoredAsset{Binding: delivery.BootAssetBinding{Output: name}}, PreparedInvocation: local.Metadata.InvocationID, SignedInvocation: signedInvocation})
-		}
-		availability, err := phase.Copy(ctx, assets)
-		if err != nil {
-			return err
-		}
-		records, err := availability.Descriptions()
-		if err != nil {
-			return err
-		}
-		if len(records) != len(description.Assets) {
-			return e.New(e.CodeVerifyFailed, "boot preparation changed the complete named asset set")
-		}
-		for index, record := range records {
-			if record.Binding.Output != description.Assets[index].Binding.Output {
-				return e.New(e.CodeVerifyFailed, "boot preparation changed the output/invocation join")
+			if len(records) != len(description.Assets) {
+				return e.New(e.CodeVerifyFailed, "boot preparation changed the complete named asset set")
 			}
-			description.Assets[index].BootStoredAsset = record
-		}
-		return use(ctx, &PreparedBootAssets{availability: availability, description: description})
+			for index, record := range records {
+				if record.Binding.Output != description.Assets[index].Binding.Output {
+					return e.New(e.CodeVerifyFailed, "boot preparation changed the output/invocation join")
+				}
+				description.Assets[index].BootStoredAsset = record
+			}
+			return use(ctx, &PreparedBootAssets{availability: availability, description: description})
+		})
 	})
+}
+
+func (consumer *Consumer) bootVerifier(policy VerificationPolicy) (portablePublicationVerifier, error) {
+	verifier, err := consumer.portableVerifier(policy)
+	if err != nil {
+		return nil, err
+	}
+	bounded, ok := verifier.(interface{ AdmitBoundedVerification() error })
+	if !ok {
+		return nil, e.New(e.CodeEngineCapability, "selected boot verification requires bounded keyless trust acquisition")
+	}
+	if err := bounded.AdmitBoundedVerification(); err != nil {
+		return nil, err
+	}
+	return verifier, nil
 }
 
 func requireBootOutputInputs(expectation *ExactInputExpectation, name string, local delivery.PublicationDescription) error {

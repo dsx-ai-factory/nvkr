@@ -24,7 +24,7 @@ func TestSelectedMetadataOwnsSparseBytesAndRevocation(t *testing.T) {
 			if _, err := CopySelectedMetadataWithExpectedRoot(t.Context(), full, root, pin, []string{selected}); err != nil {
 				t.Fatal(err)
 			}
-			owner, err := OpenSelectedMetadata(t.Context(), root, pin, []string{selected})
+			owner, err := OpenSelectedMetadata(t.Context(), root, pin, []string{selected}, "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -95,7 +95,7 @@ func TestSelectedMetadataCloseJoinsActiveEvidence(t *testing.T) {
 	if _, err := CopySelectedMetadataWithExpectedRoot(t.Context(), full, root, pin, []string{"tools"}); err != nil {
 		t.Fatal(err)
 	}
-	owner, err := OpenSelectedMetadata(t.Context(), root, pin, []string{"tools"})
+	owner, err := OpenSelectedMetadata(t.Context(), root, pin, []string{"tools"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestSelectedMetadataObjectTransferReinspectsWithoutPayloads(t *testing.T) {
 	if _, err := CopySelectedMetadataWithExpectedRoot(t.Context(), full, selected, pin, []string{"tools"}); err != nil {
 		t.Fatal(err)
 	}
-	owner, err := OpenSelectedMetadata(t.Context(), selected, pin, []string{"tools"})
+	owner, err := OpenSelectedMetadata(t.Context(), selected, pin, []string{"tools"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestSelectedMetadataRejectsExtraBytesAndUnattestedEvidence(t *testing.T) {
 	if _, err := CopySelectedMetadataWithExpectedRoot(t.Context(), full, root, pin, []string{"tools"}); err != nil {
 		t.Fatal(err)
 	}
-	owner, err := OpenSelectedMetadata(t.Context(), root, pin, []string{"tools"})
+	owner, err := OpenSelectedMetadata(t.Context(), root, pin, []string{"tools"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,7 +205,7 @@ func TestSelectedMetadataRejectsExtraBytesAndUnattestedEvidence(t *testing.T) {
 	if err := os.WriteFile(fixtureBlobPath(root, digestBytes(raw)), raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	other, err := OpenSelectedMetadata(t.Context(), root, pin, []string{"tools"})
+	other, err := OpenSelectedMetadata(t.Context(), root, pin, []string{"tools"}, "")
 	assertRegistryCode(t, err, e.CodeVerifyFailed)
 	if other != nil {
 		t.Fatal("extra bytes issued metadata owner")

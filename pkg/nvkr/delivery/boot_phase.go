@@ -28,7 +28,7 @@ type BootPhaseRequest struct {
 
 // BootPhaseMinimumReadBytes reserves conservative mandatory network passes:
 // two complete source acquisitions at the per-object ceiling, three passes of
-// each control/proof pool, both destination reads, and inventory readback.
+// each control/proof pool, both destination reads, inventory readback, and 32 MiB of trust-metadata response headroom.
 // Retry/error responses debit the same counter; callers may declare a larger
 // finite allowance. This calculation is deterministic and performs no I/O.
 func BootPhaseMinimumReadBytes(selection definition.BootSelection, destination definition.ObjectStoreDestination) (int64, error) {
@@ -45,7 +45,7 @@ func BootPhaseMinimumReadBytes(selection definition.BootSelection, destination d
 	limits := destination.EffectiveTransfer()
 	control := (count+1)*uint64(maxMetadataBytes) + uint64(maxMirrorProofBytes)
 	// Source objects are individually bounded at 64 GiB and selection at 1026.
-	fixed := 2*count*limits.MaxObjectBytes + 3*control + uint64(maxMirrorInventoryBytes) + 1<<20
+	fixed := 2*count*limits.MaxObjectBytes + 3*control + uint64(maxMirrorInventoryBytes) + 32<<20
 	if fixed > math.MaxInt64 || limits.MaxTotalBytes > (math.MaxInt64-fixed)/2 {
 		return 0, e.New(e.CodeEngineCapability, "boot phase read reservation exceeds finite accounting range")
 	}

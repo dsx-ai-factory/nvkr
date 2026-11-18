@@ -6,6 +6,7 @@ package delivery
 import (
 	"context"
 	"io"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -62,7 +63,7 @@ func bootSparseRestoreFixture(t *testing.T) (*mirrorMemoryStore, StoredObject, B
 		if _, err := CopySelectedMetadataWithExpectedRoot(t.Context(), full, sparse, pin, publication.Outputs); err != nil {
 			t.Fatal(err)
 		}
-		owner, err := OpenSelectedMetadata(t.Context(), sparse, pin, publication.Outputs)
+		owner, err := OpenSelectedMetadata(t.Context(), sparse, pin, publication.Outputs, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -99,11 +100,24 @@ func TestBootRestoreUsesOnlyPinnedSparseControlsAndProofs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	set, err := restoreBootProofs(ctx, store, locator, expected, limits)
+	workspace := t.TempDir()
+	set, err := restoreBootProofs(ctx, store, locator, expected, limits, workspace)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer set.Close()
+	if entries, err := os.ReadDir(workspace); err != nil || len(entries) != 0 {
+		t.Fatal("restoration left staging files in configured workspace", entries, err)
+	}
+	assets, err := set.StoredAssets()
+	if err != nil || len(assets) != 2 {
+		t.Fatal("restored named pins missing", err)
+	}
+	assets[0].URL = "mutated"
+	againAssets, err := set.StoredAssets()
+	if err != nil || againAssets[0].URL == "mutated" {
+		t.Fatal("restored pins alias private state", err)
+	}
 	uses, err := set.Uses()
 	if err != nil || len(uses) != 2 {
 		t.Fatalf("restored uses: %v", err)
@@ -141,8 +155,10 @@ func TestBootRestoreUsesOnlyPinnedSparseControlsAndProofs(t *testing.T) {
 	}
 	_, err = owner.Description(expected.RootReference)
 	assertRegistryCode(t, err, e.CodeGateUnmet)
+	_, err = set.StoredAssets()
+	assertRegistryCode(t, err, e.CodeGateUnmet)
 	delete(store.data, mirrorBlobKey(proofDigest))
-	set, err = restoreBootProofs(ctx, store, locator, expected, limits)
+	set, err = restoreBootProofs(ctx, store, locator, expected, limits, "")
 	assertRegistryCode(t, err, e.CodeVerifyFailed)
 	if set != nil {
 		t.Fatal("missing S3 proof returned a retained owner")
@@ -156,7 +172,7 @@ func TestBootRestoreRejectsForeignLocatorBeforeRead(t *testing.T) {
 		t.Fatal(err)
 	}
 	locator.Key = "publications/foreign.json"
-	_, err = restoreBootProofs(ctx, store, locator, expected, limits)
+	_, err = restoreBootProofs(ctx, store, locator, expected, limits, "")
 	assertRegistryCode(t, err, e.CodeVerifyFailed)
 	if store.reads != 0 {
 		t.Fatal("foreign locator read before admission")

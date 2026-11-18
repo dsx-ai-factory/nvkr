@@ -30,7 +30,7 @@ type SelectedMetadata struct {
 // OpenSelectedMetadata captures a sparse metadata layout into immutable held
 // files, then validates the captured bytes. Source replacement after issuance
 // cannot change the retained proof closure. All payloads and extra blobs fail.
-func OpenSelectedMetadata(ctx context.Context, root, expectedRoot string, names []string) (result *SelectedMetadata, resultErr error) {
+func OpenSelectedMetadata(ctx context.Context, root, expectedRoot string, names []string, workspaceRoot string) (result *SelectedMetadata, resultErr error) {
 	selection, err := newMetadataSelection(names)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func OpenSelectedMetadata(ctx context.Context, root, expectedRoot string, names 
 	if _, err := InspectSelectedMetadata(ctx, root, expectedRoot, names); err != nil {
 		return nil, err
 	}
-	stage, err := os.MkdirTemp("", "nvkr-selected-metadata-*")
+	stage, err := os.MkdirTemp(workspaceRoot, "nvkr-selected-metadata-*")
 	if err != nil {
 		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating selected metadata workspace")
 	}
