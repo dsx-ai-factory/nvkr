@@ -271,7 +271,9 @@ A pin or catalog change moves the IR, which moves the emitted pipeline. The two 
   failure after pin commit leaves a disposable checkout for diagnosis, never a publishable candidate.
   Recovery context preserves the generating owner's coded cause, including retryable cancellation and
   non-retryable generated-file drift during either generation pass.
-- Optional `family` selects explicit catalog/source roots for coordinated interactive bumping. The family
+- Optional `family` selects explicit catalog/source roots for coordinated interactive bumping.
+  Family bump is supported only on a checkout the operator exclusively owns, with no uncoordinated writers during the run.
+  The family
   owner prepares issued pin candidates, producer overlays and all configured bundles in a bounded private
   input snapshot before touching working files. Preview describes old/new pins, derived recipe versions,
   overlay paths and consumers; failed resolution or validation leaves working files unchanged. Applying
@@ -281,7 +283,7 @@ A pin or catalog change moves the IR, which moves the emitted pipeline. The two 
   sibling, checks its bytes, then links the candidate without replacing another writer. Restoration uses
   the same protocol; a path can briefly be absent, so concurrent consumers must not use this checkout.
   Ordinary commit failures roll back only this operation's bytes; conflicting
-  external edits are preserved and retained backups are reported. File retirement requires ordinary
+  external edits detected by these checks are preserved and retained backups are reported. File retirement requires ordinary
   regeneration. This does not promise crash atomicity across files: an interrupted checkout must pass owner
   regeneration and checks before use. The scheduled refresh operation retains its separate transactions.
 - Optional `producerOverlays` names a strict `nvkr.dev/producer-overlay-maintenance/v1` input. Its ordered

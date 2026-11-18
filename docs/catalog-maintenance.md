@@ -34,6 +34,8 @@ tag prefix and constraint text and resolve the same release identity. Their modu
 vendoring and packaging contracts remain distinct. Shared fragments already consolidate equivalent
 source declarations; equal commits alone do not make source roles interchangeable.
 
+Family bump is supported only on a checkout the operator exclusively owns, with no uncoordinated writers during the run.
+
 Family preparation validates the current overlay and generated closure, resolves every selected lock,
 then renders overlays and consumer bundles in a bounded private input copy. Resolution or validation
 failure writes no working files. Applying acquires the owners' writer guards, rechecks original bytes,
@@ -41,7 +43,7 @@ stages replacements and recovery copies, then commits payloads before manifests.
 captured baseline and checks the expected complete input/output state before success. Replacement retains
 the actual displaced file and publishes without replacing a racing save; paths can briefly be absent,
 so do not use the checkout concurrently for compilation or execution. Ordinary commit errors
-restore this operation's bytes. Concurrent edits are preserved and an incomplete rollback reports retained
+restore this operation's bytes. Detected conflicts preserve the displaced bytes, and an incomplete rollback reports retained
 backups for repair. This is not cross-file crash atomicity: after interruption, repair the disposable
 checkout through the pin, overlay and bundle owners and require their checks before using it.
 The result describes maintenance only, never execution or release acceptance.

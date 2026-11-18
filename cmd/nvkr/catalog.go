@@ -250,9 +250,10 @@ func cmdCatalog() *cli.Command {
 				Action: func(c *cli.Context) error { return pinSources(c, false) },
 			},
 			{
-				Name:      "bump",
-				Usage:     "pin the newest constraint-matching source releases, including declared tool assets",
-				ArgsUsage: "[source...]",
+				Name:        "bump",
+				Usage:       "pin the newest constraint-matching source releases, including declared tool assets",
+				Description: "Family bump is supported only on a checkout the operator exclusively owns, with no uncoordinated writers during the run.",
+				ArgsUsage:   "[source...]",
 				Flags: []cli.Flag{
 					&cli.BoolFlag{Name: "all", Usage: "with --dir, bump every source in that catalog; with a family name and no --dir, coordinate its declared catalogs"},
 					&cli.BoolFlag{Name: "check", Usage: "dry-run: print the lockfile diff, write nothing (ADR-22 §4)"},
