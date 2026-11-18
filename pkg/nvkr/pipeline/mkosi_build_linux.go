@@ -126,10 +126,11 @@ func assembleMkosi(ctx context.Context, node ir.Node, options RunOptions, scratc
 			if err := retainMkosiReport(ctx, workspace.work, workspace.inputs, operation, node.Mkosi.Roots[index]); err != nil {
 				return nil, err
 			}
-		} else if _, err := readMkosiReport(ctx, workspace.work, operation, node.Mkosi.Roots[len(node.Mkosi.Roots)-1]); err != nil {
-			return nil, err
 		}
 	}
+	// Packaging installs no packages and has no new full-closure report.
+	// inspectMkosiOutput checks every original report in the final layer,
+	// along with its recipe, projected materials and measured package files.
 	output := filepath.Join(workspace.work, "runtime-oci")
 	if err := wrapMkosiTar(ctx, workspace.work, operations[len(operations)-1], node.Platform, output); err != nil {
 		return nil, err

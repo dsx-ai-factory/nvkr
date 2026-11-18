@@ -36,10 +36,11 @@ func TestOfflineInvocationBoundary(t *testing.T) {
 					t.Fatalf("operation %d contains transport locations or exceeds launch bound", index)
 				}
 				if index < len(spec.Roots) {
-					if operation.Format != "directory" || operation.PackageConfiguration != "[Content]\nPackages=\n    base-files=1.0\n" {
+					if operation.Format != "directory" || operation.Manifest != operation.Output+".manifest" || operation.PackageConfiguration != "[Content]\nPackages=\n    base-files=1.0\n" {
 						t.Fatalf("package root lost its exact installed selection: %+v", operation)
 					}
 				} else if operation.Format != "tar" || operation.PackageConfiguration != "" || strings.Contains(command, "--package-directory=") ||
+					operation.Output != "/work/packaging/output/runtime.tar" || operation.Manifest != "" || !slices.Contains(operation.Command, "--output-extension=tar") ||
 					!slices.Contains(operation.Command, "--base-tree=/work/roots/runtime/output/runtime") || !slices.Contains(operation.Command, "--extra-tree=/inputs/evidence") {
 					t.Fatal("packaging pass lost its completed root/reports or may reinstall packages")
 				}

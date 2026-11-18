@@ -75,13 +75,21 @@ func rootInvocation(root Root, architecture, format, state string) Invocation {
 		Packages: path.Join(inputState, "packages"), OutputDirectory: path.Join(state, "output")}
 	operation.Output = path.Join(operation.OutputDirectory, root.Name)
 	operation.Manifest = operation.Output + ".manifest"
+	extension := ""
+	if format == "tar" {
+		extension = "tar"
+		operation.Output += ".tar"
+		// BaseTrees packaging reports only newly installed packages. This
+		// pass installs none and carries the original checked root reports.
+		operation.Manifest = ""
+	}
 	// Python reads only the authenticated source checkout. Isolated mode and
 	// disabled site initialization exclude user modules and ambient startup hooks.
 	operation.Command = []string{"/usr/bin/python3", "-I", "-S", "-c",
 		"import runpy,sys; sys.path.insert(0, '/src'); runpy.run_module('mkosi', run_name='__main__')",
 		"--directory=" + operation.Project,
 		"--distribution=" + root.Distribution, "--release=" + root.Release, "--architecture=" + architecture,
-		"--format=" + format, "--output=" + root.Name, "--output-extension=", "--image-id=" + root.Name,
+		"--format=" + format, "--output=" + root.Name, "--output-extension=" + extension, "--image-id=" + root.Name,
 		"--output-directory=" + operation.OutputDirectory, "--workspace-directory=" + operation.Workspace,
 		"--cache-directory=" + operation.Cache, "--package-cache-directory=" + operation.PackageCache,
 		"--local-mirror=file://" + operation.Packages, "--cache-only=always", "--incremental=no", "--cache-key=nvkr-vm-runtime",
