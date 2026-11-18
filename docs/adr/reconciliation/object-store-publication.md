@@ -65,6 +65,17 @@ fixtures cover authentic updates, rollback-cache isolation, tampered targets, ca
 Live Linux cosign/TUF service acceptance remains unexercised. No new signing trust, IAM, bucket, credential,
 provisioning network or retention policy is configured here.
 
+The MachineImage renderer is contract-first and disabled in production. `Consumer.RenderMachineImages`
+returns `CodeEngineCapability` with no manifests before inspecting receipts or doing I/O. Private candidate
+tests cover deterministic exact YAML/material records, full-digest immutable names, complete supplied-pair
+ordering, duplicate rejection, metadata bounds and URL/template grammar for both architectures. They check
+field constraints against the unchanged CRD from NVKE commit `28b9e338c1d08a4a0427b7c6d79c8174358ad991`
+and script invariants separately; this is not API-server/CEL admission or an EFI execution test.
+Candidate descriptions authenticate nothing. Declared Plan/render Build integration, authorized metadata,
+live receipt joins, signed packaging, final render verification and independent import remain unimplemented.
+The admitted imager profile/source pin is owned by #516's mkosi EFI lane after step 3 and NVKE #2365;
+production rendering also requires recorded amd64/arm64 boot evidence. No flag bypasses this boundary.
+
 Generated selective execution remains rejected before effects pending its configuration/generation owner;
 static Plan compilation and lifecycle APIs do not establish hosted Run completion. No selective provider,
 independent provisioning-client, chainload, boot, qualification or organizational ratification evidence is claimed.
@@ -73,7 +84,7 @@ Existing full-mirror evidence is unchanged. See the [operator boundary](../../pu
 | Owner | Outstanding scope |
 |---|---|
 | [#515](https://github.com/dsx-ai-factory/nvkr/issues/515) | Core selection, raw-member proofs, limited receipts, serving, recovery and S3-only verification are contract-tested; external acceptance remains with the owners below. |
-| [#517](https://github.com/dsx-ai-factory/nvkr/issues/517) | Predeclared render, pinned schema/profile, dependency joins, trusted import and chainload/imaging/first-boot evidence. |
+| [#517](https://github.com/dsx-ai-factory/nvkr/issues/517) | Private formatting candidate and unconditional production refusal are contract-tested. Predeclared render, admitted imager profile, authority/dependency joins, signed packaging, trusted import and chainload/imaging/first-boot evidence remain. |
 | [#516](https://github.com/dsx-ai-factory/nvkr/issues/516) | Signed EFI member/platform/profile binding; separate mkosi producer lane. |
 | [#384](https://github.com/dsx-ai-factory/nvkr/issues/384) | Selective configuration, regeneration and required finalization, preserving full-mirror defaults. |
 | [#383](https://github.com/dsx-ai-factory/nvkr/issues/383) | Provider/Run selected-only inventory, original proofs, pinned-read/fault evidence and independent S3-only client access. |

@@ -344,6 +344,30 @@ Pipeline-attested contract from [#514](https://github.com/dsx-ai-factory/nvkr/is
 [Reconciliation](reconciliation/object-store-publication.md#selective-boot-asset-publication) owns acceptance/implementation. Existing full-mirror schemas, bytes and verification stay unchanged.
 Generated execution, producer integration and rendering remain separate acceptance work; compiling the versioned Plan does not enable those routes.
 
+The contract-first renderer implements only a private deterministic formatting candidate and an
+unconditionally disabled `Consumer.RenderMachineImages` entry point. The candidate pins the MachineImage
+schema to NVKE commit `28b9e338c1d08a4a0427b7c6d79c8174358ad991`. Its canonical candidate record
+includes the exact spec, named raw dependencies, serving description and proposed imager profile/source pin,
+and excludes eventual aggregate/content/inventory identities. The existing material owner constructs and
+validates a native material manifest referencing that record's exact bytes and derives its typed digest
+under `nvkr.build-material-manifest/v1`. Names encode the full material digest in lowercase base32 under `mi-` (55 characters);
+duplicate pairs and name collisions fail. A separate canonical record binds those materials to the raw
+SHA-256 of the exact YAML. This material digest is neither a compiled Build Digest nor an authenticated
+metadata binding. Existing source Build and Plan identities are unchanged. Candidate names and request shapes are provisional;
+production admission will establish the render Build contract. The private fixture formatter caps supplied
+sets at 256 pairs; that is not an admitted Plan or destination limit.
+
+Private fixtures exercise the proposed raw `image_sha`, `disk_strategy` and EFI-chain arguments with
+architecture-specific console/kernel settings. They admit only an importer-verification/TLS candidate
+trust description, without loader or firmware enforcement. This is not a production imager profile.
+Production admission requires the strict profile/source pin from the mkosi EFI producer in
+[#516](https://github.com/dsx-ai-factory/nvkr/issues/516) after step 3 and the argument contract in
+[NVKE #2365](https://github.com/dsx-ai-factory/nvke/issues/2365), plus recorded amd64/arm64 boot evidence.
+Before enabling the entry point, implement the declared Plan/render Build, authorized metadata and live
+receipt joins, signed artifact handoff, final dependency authentication and independent import described
+below. No configuration flag enables the candidate. [#517](https://github.com/dsx-ai-factory/nvkr/issues/517)
+remains open for those joins and acceptance.
+
 **Admission.** `selective-boot-v1` requires a new Environment/Plan version and explicit destination modes.
 The new schema has no mode default; old schemas keep full mirror on omission and reject selective fields. Select sorted, nonempty QCOW2 outputs, one
 compatible EFI output/regular member/profile per architecture, and named destinations. Require every selected asset
