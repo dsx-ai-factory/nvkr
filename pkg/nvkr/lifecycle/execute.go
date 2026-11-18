@@ -103,6 +103,9 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	if prepared == nil || prepared.plan == nil || prepared.run == nil {
 		return nil, e.New(e.CodeUsage, "local execution requires a prepared run")
 	}
+	if prepared.defaultLocal && options.Publish {
+		return nil, e.New(e.CodeEngineCapability, "built-in local Environment is build-only; publication requires an explicit Environment")
+	}
 	if !options.Progress.Matches(prepared.run.Attempt, prepared.run.PlanDigest) {
 		options.Progress = nil
 	}
