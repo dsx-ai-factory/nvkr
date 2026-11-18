@@ -109,7 +109,7 @@ The root scan admits at most 1,024 total files and directories and 16 directory 
 using the same no-symlink entry policy as catalog loading. Scan a narrower root if it exceeds
 those bounds. Each catalog load retains its existing file and aggregate byte limits.
 
-The [generated catalog inventory](../inputs/catalogs/INDEX.md) lists locations, component names and
+The [generated catalog inventory](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/INDEX.md) lists locations, component names and
 producer modes from these same descriptions. Pins remain in `catalog find` so automated pin refreshes
 do not change this navigation index.
 After editing catalog inputs, run `make catalog-index-generate`; `make catalog-index-check`
