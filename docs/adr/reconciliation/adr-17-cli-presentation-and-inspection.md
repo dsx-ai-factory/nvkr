@@ -1,6 +1,6 @@
 ## ADR-17 CLI presentation and inspection
 
-Of the 34 public command leaves, 30 expose typed terminal result browsers; local Run
+Of the 36 public command leaves, 32 expose typed terminal result browsers; local Run
 execution additionally supplies bounded operation/output progress. The separate `validate`,
 `run check-artifacts`, `run qualify` and `run qualify-local` commands retain canonical machine-readable diagnostics. The hidden native worker is
 not a public command. Owners retain
