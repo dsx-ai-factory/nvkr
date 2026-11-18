@@ -350,7 +350,6 @@ func (s *scan) selection(name string, spec definition.Catalog, label string, com
 
 func (s *scan) admit(name string) error {
 	doc := s.docs[name]
-	file := filepath.Join(s.root, name)
 	switch doc.kind {
 	case definition.DefinitionKind:
 		def, err := definition.DecodeDefinition(doc.raw)
@@ -444,12 +443,12 @@ func (s *scan) admit(name string) error {
 		doc.summary = fmt.Sprintf("Machine-managed catalog pins. From the printed scan root, generate with nvkr catalog pin --dir %q SOURCE or update with nvkr catalog bump --dir %q SOURCE.", path.Dir(name), path.Dir(name))
 		doc.refs = append(doc.refs, Reference{Path: path.Join(path.Dir(name), catalog.RegistryFile), Relation: "owning catalog"})
 	case "LocalQualificationPolicy":
-		if _, err := lifecycle.LoadLocalQualificationPolicy(s.ctx, file); err != nil {
+		if _, err := lifecycle.DecodeLocalQualificationPolicy(doc.raw); err != nil {
 			return err
 		}
 		doc.summary = "Independent local qualification policy binds exact input identities and public verification keys; it does not authenticate a Run."
 	case "QualificationPolicy":
-		if _, err := lifecycle.LoadQualificationPolicy(s.ctx, file); err != nil {
+		if _, err := lifecycle.DecodeQualificationPolicy(doc.raw); err != nil {
 			return err
 		}
 		doc.summary = "Independent qualification verification policy; workflow and signer selections describe trust requirements, not verified evidence."

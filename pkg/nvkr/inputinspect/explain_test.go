@@ -344,6 +344,29 @@ func TestExplainPolicyKinds(t *testing.T) {
 		if err != nil || got.Kind != tc.kind {
 			t.Fatalf("policy %s: %+v %v", tc.file, got, err)
 		}
+		t.Run(tc.kind+" captured before parent replacement", func(t *testing.T) {
+			raw, err := os.ReadFile(filepath.Join(root, tc.file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			r := t.TempDir()
+			write(t, r, "sub/policy.json", raw)
+			s := &scan{ctx: t.Context(), root: r, docs: map[string]*document{}}
+			if err := s.walk("sub/policy.json"); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Rename(filepath.Join(r, "sub"), filepath.Join(r, "old")); err != nil {
+				t.Fatal(err)
+			}
+			outside := t.TempDir()
+			write(t, outside, "policy.json", []byte("invalid outside policy"))
+			if err := os.Symlink(outside, filepath.Join(r, "sub")); err != nil {
+				t.Fatal(err)
+			}
+			if err := s.admit("sub/policy.json"); err != nil {
+				t.Fatalf("reopened policy after scan: %v", err)
+			}
+		})
 	}
 }
 
@@ -445,6 +468,12 @@ func TestExplainRootBounds(t *testing.T) {
 		name  string
 		setup func(*testing.T, string)
 	}{
+		{"malformed neighbor", func(t *testing.T, r string) { write(t, r, "malformed.yaml", []byte("kind: [")) }},
+		{"aggregate bytes", func(t *testing.T, r string) {
+			for i := 0; i < 9; i++ {
+				write(t, r, fmt.Sprintf("large-%d.json", i), []byte(`{"padding":"`+strings.Repeat("x", (4<<20)-32)+`"}`))
+			}
+		}},
 		{"depth", func(t *testing.T, r string) { write(t, r, strings.Repeat("deep/", 18)+"file.txt", nil) }},
 		{"entries", func(t *testing.T, r string) {
 			for i := 0; i < maxEntries; i++ {
@@ -455,8 +484,11 @@ func TestExplainRootBounds(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			r := fixture(t)
 			tc.setup(t, r)
-			_, err := Explain(t.Context(), r, filepath.Join(r, "definition.json"))
+			got, err := Explain(t.Context(), r, filepath.Join(r, "definition.json"))
 			code(t, err, e.CodeInvalidCatalog)
+			if got.Kind != "" {
+				t.Fatalf("partial report: %+v", got)
+			}
 		})
 	}
 }
