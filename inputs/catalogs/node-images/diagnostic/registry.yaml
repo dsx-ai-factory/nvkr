@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-os
+  name: node-images/diagnostic
   description: Non-FDE NVKE node image from explicit authenticated component outputs.
 sources:
   ovn-kubernetes:

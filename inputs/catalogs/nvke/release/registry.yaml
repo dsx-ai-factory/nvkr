@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-controller
+  name: nvke/release
   description: NVKE controller containers and helm chart.
 components:
   nvke-controller-profiles-image:

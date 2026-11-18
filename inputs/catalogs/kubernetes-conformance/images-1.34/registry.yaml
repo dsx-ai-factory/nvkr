@@ -15,7 +15,7 @@ components:
 kind: SourceBuildRegistry
 metadata:
   description: Kubernetes v1.34.2 suite selection matching the maintained native demo tenant; acquired image integrity only, without upstream signature or qualification acceptance.
-  name: kubernetes-conformance-demo-1-34-arm64
+  name: kubernetes-conformance/images-1.34
 sources:
   kubernetes-conformance:
     constraint: 1.34.2

@@ -11,7 +11,7 @@ There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriti
 
 | Field or choice | Owning source | Required check |
 |---|---|---|
-| Each disk's exact root and complete material set | M2 Definition and `inputs/catalogs/node-images/release/registry.yaml` | Resolve the explicitly selected closure for its native platform. |
+| Each disk's exact root and complete material set | NVKE release Definition and `inputs/catalogs/node-images/release/registry.yaml` | Resolve the explicitly selected closure for its native platform. |
 | OS, Calico and kubeadm source | `inputs/catalogs/node-images/release/pins.lock.yaml`, NVKE `v0.23.0` at `2cfd00081b468d85a4894ec17e9deac13c9d8169` | Exact commit/tree/epoch; each producer retains its own source binding. |
 | SPIRE packaging selection | The same v0.23.0 lock selects `nvke-spire-agent-source` | Source-owned SPIRE 1.14.1 and TPM plugin 1.9.0, Debian revision 4; this release package omits DSX IMDS. |
 | DOCA OVS packages | The same v0.23.0 lock selects `nvke-doca-ovs-source` | NVIDIA's DOCA OVS 3.5.0 debs for the image's Ubuntu series, each checked against NVKE's committed lock; binary-only, with no published source. |

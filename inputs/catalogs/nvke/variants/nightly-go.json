@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-nightly-site-go-1-27-4",
-  "requiresCatalogDigest": "sha256:8c09fc0d80355f4b578e5224d810b51ae5c117a98e13d18a0c2fa9b649c41b6a",
+  "requiresCatalogDigest": "sha256:f57116d22fc2daf0f6c85d02a90a0cbb49db8441fde0b7db0d05d1762e6ec1f9",
   "components": {
     "nvke-controller": {
       "component": {

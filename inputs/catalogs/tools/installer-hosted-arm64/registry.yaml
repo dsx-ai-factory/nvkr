@@ -5,7 +5,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-nightly-installer-tools-arm64
+  name: tools/installer-hosted-arm64
   description: Source-built ARM64 clusterctl, kind, kubectl and oras with acquired
     Helm4.2.4; complete executable bundle for signed nightly candidate, not qualification.
 sources:

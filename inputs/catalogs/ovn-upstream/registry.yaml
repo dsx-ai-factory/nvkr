@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-local-upstream-ovn
+  name: ovn-upstream
   description: Explicit diagnostic upstream OVN v1.4.0 alternative. Source-built image, digest-bound chart and offline CNI packages; not the NVIDIA default, hermetic, FIPS/STIG or compatibility-qualified.
 sources:
   ovn-kubernetes:

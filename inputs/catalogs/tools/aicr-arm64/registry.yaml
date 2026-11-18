@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: aicr-arm64
+  name: tools/aicr-arm64
   description: Native Linux ARM64 AICR CLI release with its binary attestation delivered beside the executable.
 components:
   aicr:

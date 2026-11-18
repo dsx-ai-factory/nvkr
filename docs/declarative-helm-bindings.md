@@ -79,7 +79,7 @@ On an AMD64 Linux Docker host, with NVKE source access:
 ```sh
 mkdir -p .nvkr/controller-bindings
 cp docs/examples/nvke-controller-bindings/*.yaml .nvkr/controller-bindings/
-go run ./cmd/nvkr catalog pin --dir .nvkr/controller-bindings \
+go run ./cmd/nvkr catalog pin --catalog .nvkr/controller-bindings \
   --tag v0.23.0 nvke-controller
 go run ./cmd/nvkr run local \
   --definition .nvkr/controller-bindings/definition.yaml \

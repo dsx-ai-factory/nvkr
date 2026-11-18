@@ -7,7 +7,7 @@ components:
 kind: SourceBuildRegistry
 metadata:
   description: Kubernetes v1.34.12 client with explicit hash-checked dependency updates, built with the maintained Go toolchain for the disposable v1.34.2 demo tenant; diagnostic candidate only.
-  name: validation-kubectl-demo-1-34-reviewed-candidate
+  name: kubernetes-conformance/kubectl-1.34
 sources:
   kubectl:
     constraint: 1.34.12

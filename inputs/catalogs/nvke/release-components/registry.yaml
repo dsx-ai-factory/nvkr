@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-m2-release-components
+  name: nvke/release-components
   description: Source-built CAPNICo, NKTP chart and NICO reference-profile fixtures, plus digest-pinned acquired CAPI, cert-manager and NKTP runtime images. Deployment topology and site configuration remain consumer-owned.
 components:
   capi-controller-image:

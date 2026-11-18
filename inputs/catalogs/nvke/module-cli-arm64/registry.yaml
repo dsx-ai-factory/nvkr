@@ -5,7 +5,7 @@
   "apiVersion": "nvkr.dev/catalog/v3",
   "kind": "SourceBuildRegistry",
   "metadata": {
-    "name": "nvke-cli-arm64-local",
+    "name": "nvke/module-cli-arm64",
     "description": "Explicit new native ARM64 CLI producer using the maintained CLI source release and existing reviewed build command; not a target-changing catalog overlay."
   },
   "components": {

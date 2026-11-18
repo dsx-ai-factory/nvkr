@@ -1,9 +1,9 @@
 # Definition partitioning and related Releases
 
-The NVKE family pilot implements separate authored Definitions and named production bundles alongside
+The NVKE product-family split implements separate authored Definitions and named production bundles alongside
 the combined candidate. It reuses the current lifecycle and catalog owners; it adds no cross-Release import,
 automatic association file or qualification capability. Hosted family execution and consumer acceptance remain
-unrecorded. The [input instructions](../inputs/definitions/nvke/README.md#family-pilot) own commands and
+unrecorded. The [input instructions](../inputs/definitions/nvke/README.md#product-families) own commands and
 current selections; [reconciliation](adr/reconciliation/maintained-input-and-schema-boundaries.md#maintained-input-and-schema-boundaries) owns
 implementation and acceptance status.
 
@@ -34,7 +34,7 @@ publication uses `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. The result
 `<prefix>/releases@sha256:…` identifies only that family's Release.
 
 The family Environments preserve the combined candidate's independent production registry writer.
-The exact `disks` and `disks-ubuntu24` publication prefixes also retain preparation of the existing private M2 toolchain pins
+The exact `disks` and `disks-ubuntu24` publication prefixes also retain preparation of the existing private NVKE release toolchain pins
 using the fixed registry reader, before source or producer execution. Namespace lookalikes, child prefixes,
 other families and foreign toolchain owners receive no exception. These are credential projection
 contracts, not evidence of provisioned package access or hosted disk execution.
@@ -453,7 +453,7 @@ satisfy the current single-Run M3 qualification contract.
 
 ## Cutover work and acceptance
 
-The authored four-family pilot and maintained generation/maintenance enrollment are the first step.
+The authored product-family split and maintained generation/maintenance enrollment are the first step.
 Before replacing the combined path:
 
 1. Check exact union membership, native platform sets and per-output Build identities against the combined

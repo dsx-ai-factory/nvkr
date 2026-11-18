@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-local-nicosim-arm64
+  name: nicosim
   description: Source-built Linux ARM64 NICoSim tools and pinned runtime assets for a local NICo demo; not complete demo or OS boot acceptance.
 sources:
   nvke-nicosim:

@@ -16,7 +16,7 @@ remain unrecorded. The combined production and qualification paths remain until 
 cutover; the GPU site composite below owns the fixed development bundle. Named producer qualification remains unsupported, and so does named development for these plain family Definitions; a composite may have a named development bundle (ADR-26). The pilot
 emits no automatic association file or parent Release. Consumers independently verify exact family
 references and own any required association or compatibility decision. See the
-[pilot inputs](../../../inputs/definitions/nvke/README.md#family-pilot) and
+[pilot inputs](../../../inputs/definitions/nvke/README.md#product-families) and
 [partitioning strategy](../../definition-partitioning-strategy.md) for scope and historical measurements.
 [ADR-26](../0026-definition-composition.md) designs a composite of these families as one Release;
 units U1–U8 are implemented and contract-tested, with historical publication evidence below. The authored

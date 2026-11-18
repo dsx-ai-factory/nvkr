@@ -50,9 +50,9 @@ Definition and prints the actual output count. For explicit `upstream-ovn`, it i
 These read-only commands inspect the NVIDIA selection:
 
 ```sh
-bin/nvkr catalog validate --data inputs/catalogs/nvke/module-cli-arm64
-bin/nvkr catalog list --data inputs/catalogs/nvke/module-cli-arm64
-bin/nvkr catalog source-pin --data inputs/catalogs/nvke/module-cli-arm64 nvke
+bin/nvkr catalog validate --catalog inputs/catalogs/nvke/module-cli-arm64
+bin/nvkr catalog list --catalog inputs/catalogs/nvke/module-cli-arm64
+bin/nvkr catalog source-pin --catalog inputs/catalogs/nvke/module-cli-arm64 nvke
 bin/nvkr definition validate --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json
 bin/nvkr definition inspect --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json
 ```

@@ -27,7 +27,7 @@ components:
 kind: SourceBuildRegistry
 metadata:
   description: 'Review candidate: original Hydrophone commit plus declared fixed dependency transformation; not admitted.'
-  name: validation-tools-reviewed-candidate
+  name: kubernetes-conformance/hydrophone
 sources:
   hydrophone:
     repo: https://github.com/kubernetes-sigs/hydrophone

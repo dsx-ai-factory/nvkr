@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-nightly-site-arm64
+  name: nvke/nightly-site-arm64
   description: Source-aligned CLI, controller and charts for the reviewed NVKE nightly suite. Profile-owned candidate producers; not runtime acceptance or a qualified release.
 sources:
   nvke-controller-helm:

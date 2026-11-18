@@ -8,7 +8,7 @@ The local and hosted clusterctl selections match NVKE v0.23.0 (CAPI `v1.13.6`).
 Helm remains version 4.2.4 but is an acquired ARM64 executable. The hosted source fetch owner rejects
 the external test symlinks in that source before the local diagnostic vendor command can remove
 them. This catalog uses the existing release-executable contract rather than weakening source capture.
-`nvkr catalog pin --dir inputs/catalogs/tools/installer-hosted-arm64 --tag v4.2.4 helm`
+`nvkr catalog pin --catalog inputs/catalogs/tools/installer-hosted-arm64 --tag v4.2.4 helm`
 generated its lock entry on October 13, 2026. Clusterctl now follows NVKE v0.23.0, which keeps CAPI `v1.13.6`; kind, kubectl and ORAS retain their prior pins.
 
 | Binding | Verified value |

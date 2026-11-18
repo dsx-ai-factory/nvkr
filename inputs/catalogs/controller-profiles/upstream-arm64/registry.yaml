@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-local-upstream-ovn-profiles-arm64
+  name: controller-profiles/upstream-arm64
   description: Native diagnostic profiles image from the pinned NVKE Dockerfile/config/runbooks and an authenticated additive local profile overlay. Installs upstream OVN 1.4.0 matching the explicit upstream disk. Not fleet configuration or compatibility proof.
 sources:
 components:

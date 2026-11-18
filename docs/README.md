@@ -47,7 +47,7 @@ The task and reference indexes below retain the detailed command, schema, mainte
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](examples/nvke-tutorial/README.md),
-[nine-output deploy example](examples/nvke-deploy/README.md), [69-output M2 candidate and committed workflow](../inputs/definitions/nvke/README.md),
+[nine-output deploy example](examples/nvke-deploy/README.md), [69-output NVKE release candidate and committed workflow](../inputs/definitions/nvke/README.md),
 and [OS-image routes](../inputs/definitions/diagnostics/README.md). The separate
 [Ubuntu 24 inputs](../inputs/definitions/diagnostics/ubuntu24/README.md) select build-only native plain and
 public-bootstrap FDE disk diagnostics; the sibling Ubuntu 24.04 disks family selects them for publication. The
@@ -56,7 +56,7 @@ The [demo index](../demos/README.md) lists presentations, runnable journeys, and
 
 Experimental [public OS source producers](../inputs/experiments/public-os-sources/README.md) and the
 [OVN source-build option](../inputs/catalogs/ovn-nvidia/README.md) are separate candidates, not full OS
-migration or maintained M2 membership. The [v0.21.0 dependency inventory](nvke-v0.21.0-os-dependency-inventory.md)
+migration or maintained NVKE release membership. The [v0.21.0 dependency inventory](nvke-v0.21.0-os-dependency-inventory.md)
 records source availability and remaining gaps.
 
 ### Detailed references
@@ -102,7 +102,7 @@ implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to t
 
 [Definition partitioning strategy](definition-partitioning-strategy.md) explains the NVKE family
 pilot, historical graph-capacity measurements, shared catalog ownership and related Release options.
-The [input instructions](../inputs/definitions/nvke/README.md#family-pilot) own generation and checking;
+The [input instructions](../inputs/definitions/nvke/README.md#product-families) own generation and checking;
 the combined candidate remains available pending consumer and qualification cutover.
 
 [ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
@@ -165,4 +165,4 @@ own current user instructions.
 
 [NVKE customer choices](nvke-customer-choices.md) explains supplier replacement and its current validation scope.
 
-[Multiarch CWE delivery](multiarch-cwe-delivery.md) describes aggregate image membership, evidence and current validation limits.
+[Multiarch NVKE image delivery](multiarch-cwe-delivery.md) describes aggregate image membership, evidence and current validation limits.

@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: aicr-bundles
+  name: aicr
   description: Pinned AICR renders packaged as OCI deployment bundles; no cluster execution or hardware qualification.
 sources:
   aicr-tool-arm64:

@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-m2-os
+  name: node-images/release
   description: Non-FDE and public-bootstrap FDE NVKE node images from explicit authenticated component outputs.
 sources:
   ovn-kubernetes:

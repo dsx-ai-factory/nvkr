@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: capnico-local
+  name: capnico/local
   description: Source-built CAPNICo at the NVKE deployment baseline; source-owned Dockerfile, not an acquired controller image.
 components:
   capnico-controller:

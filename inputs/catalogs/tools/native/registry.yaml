@@ -370,7 +370,7 @@ components:
         source: vmnet-client
 kind: SourceBuildRegistry
 metadata:
-    name: nvke-native-tools
+    name: tools/native
 sources:
     oras-linux-amd64:
       constraint: 1.3.3

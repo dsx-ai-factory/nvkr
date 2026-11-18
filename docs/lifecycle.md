@@ -226,7 +226,7 @@ presentation flags.
 ```sh
 bin/nvkr definition inspect --definition docs/examples/nvke-module-tags/definition.yaml --ui=tui
 bin/nvkr run graph --plan .github/nvkr-run/plan.json --ui=tui
-bin/nvkr catalog list --data inputs/catalogs/nvke/module-tags --ui=tui
+bin/nvkr catalog list --catalog inputs/catalogs/nvke/module-tags --ui=tui
 ```
 
 Graph and release browsers start with an output overview when their supplied

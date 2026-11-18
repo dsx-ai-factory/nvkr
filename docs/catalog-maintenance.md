@@ -75,7 +75,7 @@ For NVIDIA TCG pin updates, follow the commands beside its
 [source catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/ovn-nvidia/README.md).
 For the native NVIDIA overlay, update the release node-image catalog instead: review the constraints for
 both `ovn-kubernetes` and `nvke-cni-ovn-source`, then use `catalog pin` with
-`--dir inputs/catalogs/node-images/release` to pin each source to the same reviewed revision. Review the
+`--catalog inputs/catalogs/node-images/release` to pin each source to the same reviewed revision. Review the
 release producers' version and commit constants in that same change; they do not inherit the TCG catalog's
 source-metadata bindings. Keep lock updates machine-managed. Then regenerate the copies:
 

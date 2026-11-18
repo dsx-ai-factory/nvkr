@@ -1,4 +1,4 @@
-# NVKE release candidate and family pilot
+# NVKE release candidate and product families
 
 The combined [Definition](definition.yaml) is used by the committed `nvkr-run.yml`. It joins independently pinned NVKE CLI,
 controller and chart builds, operator executables, native node images and third-party deployment images
@@ -33,7 +33,7 @@ make nvke-split-check
 ```
 
 Each family Run is a manual `workflow_dispatch` of `.github/workflows/nvkr-run-nvke-<family>.yml` on `main`,
-with the credentials in [Family pilot](#family-pilot). Each Run publishes one Release under
+with the credentials in [Product families](#product-families). Each Run publishes one Release under
 `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/<family>`. To consume them, follow
 [Install an NVKE site from the Releases](../../../docs/release-quickstart.md#install-an-nvke-site-from-the-releases).
 
@@ -127,7 +127,7 @@ takes them from its NICo deployment or builds them as
 NVKR's role ends at building, signing and publishing these outputs. GPU driver, fabric and runtime acceptance
 belongs to AICR and NVKE evidence, and NVKR records none ([reconciliation](../../../docs/adr/reconciliation/maintained-input-and-schema-boundaries.md#maintained-input-and-schema-boundaries)).
 
-## Family pilot
+## Product families
 
 Five independent Definitions partition 68 of the combined candidate's 69 named outputs, and together add 12
 family-only outputs, for 80 in all. The core family delivers the 69th, `nico-reference-profiles-fixture`, as `controller-profiles`:
@@ -243,7 +243,7 @@ detection is not implemented.
 
 ### Setting NICo image values from the Release
 
-No maintained Definition selects the NICo outputs yet ([Family pilot](#family-pilot)); these steps apply once
+No maintained Definition selects the NICo outputs yet ([Product families](#product-families)); these steps apply once
 they return to the core family.
 
 The `nico` chart is not image-bound. It renders `<repository>:<tag>`, so the consumer sets the values.
@@ -336,7 +336,7 @@ The source's composition command receives the required explicit native `--archit
 The selected material projection binds `image-inputs` as `archive` and `installer-iso` as `disk-image`
 under `nvke.nvidia.com/os-image-materials/v1`; every selected material and disk target retains its own architecture.
 
-This is a candidate Definition, not completed M2 acceptance. The production target Environment reuses
+This is a candidate Definition, not completed NVKE release acceptance. The production target Environment reuses
 the existing registry credential, source access and workflow signing policy, but publishes only under
 the separately authored `ghcr.io/dsx-ai-factory/nvkr/m2-candidate` prefix. The maintained signer identity
 admits only `main`; the temporary PR #97 branch-test exception has been removed after the
@@ -348,7 +348,7 @@ The OS catalog directly retains its published ARM64 Docker Packer pin.
 The two inspector profiles use measured executable hashes and published native image manifests.
 Their bounded budgets cover up to an 8 GiB subject and 16 GiB filesystem: 28 GiB inspection memory,
 224 GiB private scratch and a ten-minute deadline. Execution classes request 36 GiB memory to
-include the held subject snapshot. These are admission budgets, not measured full-M2 usage.
+include the held subject snapshot. These are admission budgets, not measured full-NVKE release usage.
 The inspector and Packer source locks retain their outstanding organizational approval gates;
 the [candidate exception and publication evidence](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md)
 records the narrower authorization and exact registry read-back.
@@ -372,7 +372,7 @@ and [NKX-18052](https://nvidia.atlassian.net/browse/NKX-18052)).
 The product acceptance floor remains AMD64; this candidate retains the separately selected ARM64
 extension, and all four disk outputs remain mandatory for completion of this Definition.
 Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
-M2 candidate requires publication, signatures and consumer verification for every selected output.
+NVKE release candidate requires publication, signatures and consumer verification for every selected output.
 The [failed delivery attempt](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md)
 records the earlier aggregate transport failure; the per-output route below avoids aggregate payload downloads.
 Per-output storage peaks still require measured admission.
@@ -413,11 +413,11 @@ The direct-Packer contract opts into APT capture and declares the matching plain
 source-owned material projection. Capture byte correspondence alone does not authenticate repository
 origin or establish a complete installed-software inventory.
 
-The Environment explicitly selects `diskEvidence: build-provenance-v1`. M2 authenticates the held disk
+The Environment explicitly selects `diskEvidence: build-provenance-v1`. NVKE release authenticates the held disk
 and its live producer/material subjects and signs evidence describing the deferred inspection scope.
 Deep content inspection and reconciliation are deferred beyond the approved M3 MVP. The existing strict
 inspection profiles remain available for plain disks, but this mode neither prepares nor invokes the inspector.
-A successful M2 pipeline still
+A successful NVKE release pipeline still
 requires every named output, exact-subject evidence, publication, signing and verification; deferral
 cannot substitute for those gates or establish qualified reproduction.
 
@@ -451,7 +451,7 @@ budgets, not observed allocation or general runner-capacity guarantees. Docker u
 and producer-declared build-network controls; no ambient storage-driver workaround is selected.
 
 `../../catalogs/node-images/release` directly retains the historical published ARM64 Docker Packer candidate.
-`../../catalogs/node-images/variants/native-toolchains.yaml` substitutes the measured published AMD64 Packer pin for its nine M2
+`../../catalogs/node-images/variants/native-toolchains.yaml` substitutes the measured published AMD64 Packer pin for its nine NVKE release
 source-map consumers and the FDE root, preserving OVN's separate BuildKit pin. These historical images do not establish
 reproduction of the current Dockerfile or bootstrap compiler. Internal Packer/inspector images were
 published under the user's scoped candidate exception. Their source locks retain unresolved general
@@ -461,7 +461,7 @@ and [inspector measurement](../../../toolchains/nvkr-disk-inspect/README.md#loca
 
 Strict profiles contain actual native image/executable pins and conservative bounds: up to an 8 GiB
 subject, 16 GiB filesystem, 28 GiB inspection memory, 224 GiB private scratch and a ten-minute deadline.
-These retained profiles do not demonstrate a successful full M2 inspection or measured peak usage.
+These retained profiles do not demonstrate a successful full NVKE release inspection or measured peak usage.
 
 Publication uses the separate `ghcr.io/dsx-ai-factory/nvkr/m2-candidate` prefix and
 `publication.mode: per-output-v1`. Each output is packaged, published, signed and verified independently.

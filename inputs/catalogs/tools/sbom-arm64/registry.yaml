@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: sbom-tools-arm64
+  name: tools/sbom-arm64
   description: Native Linux ARM64 Syft at the maintained release catalog's scanner version.
 components:
   syft:

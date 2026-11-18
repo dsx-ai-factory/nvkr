@@ -7,7 +7,7 @@ components:
 kind: SourceBuildRegistry
 metadata:
   description: Exact Kubernetes1.36.3 with explicit bounded reviewed dependency transformation before workspace vendoring; diagnostic candidate only.
-  name: validation-kubectl-reviewed-candidate
+  name: kubernetes-conformance/kubectl
 sources:
   kubectl:
     constraint: 1.36.3

@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-native-nvidia-profiles
+  name: controller-profiles/native-nvidia
   description: Native demo profiles using the renamed NVKE packages and services with explicit NVIDIA OVN 2.4.2. Diagnostic payload, not fleet configuration.
 sources:
 components:

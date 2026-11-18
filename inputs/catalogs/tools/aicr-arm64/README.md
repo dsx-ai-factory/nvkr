@@ -8,7 +8,7 @@ cannot chain binary provenance into a bundle.
 Update the version through the CLI:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/tools/aicr-arm64 --tag v1.1.2 aicr
+bin/nvkr catalog pin --catalog inputs/catalogs/tools/aicr-arm64 --tag v1.1.2 aicr
 ```
 
 The lock binds the source revision, release archive, executable and companion bytes. `evidence.none`

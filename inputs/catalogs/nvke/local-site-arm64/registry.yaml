@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-local-site-arm64
+  name: nvke/local-site-arm64
   description: Source-aligned controller, CLI and charts for the staged NICo installer. Candidate source, not a complete demo or qualified release.
 sources:
   nvke-controller-helm:

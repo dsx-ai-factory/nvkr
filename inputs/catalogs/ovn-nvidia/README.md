@@ -3,7 +3,7 @@
 Candidate, selectable CNI producer catalog for the
 `[dsx-ai-factory/ovn-kubernetes](https://github.com/dsx-ai-factory/ovn-kubernetes)` fork.
 It does not remove Calico or change the maintained
-OS/M2 Definitions. The maintained release node-image catalog now selects the same
+OS/NVKE release Definitions. The maintained release node-image catalog now selects the same
 fork pin with `nvke-*` Debian package names; this catalog keeps the earlier `nke-*` packaging. Do not stack it blindly with the old OS catalog: `ovn-kube-ubuntu`
 and `nvke-cni-ovn` are authored component names; packaged Debian names remain source-owned. A maintained
 replacement must use the predecessor-digest-bound catalog overlay contract and
@@ -26,7 +26,7 @@ current main is the source of NVKE v0.21.0's OVN 1.4.0 release. A rebuilt image 
 new bytes and identity. The source lock was generated with:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/ovn-nvidia \
+bin/nvkr catalog pin --catalog inputs/catalogs/ovn-nvidia \
   --tag v2.4.2 --timeout 5m ovn-kubernetes
 ```
 
@@ -143,7 +143,7 @@ Release membership remain authoritative. These are configured routes, not proof
 that those OVN outputs have been pushed.
 
 Generate and check the candidate in a disposable output root from the repository
-root, without replacing the maintained M2 workflow:
+root, without replacing the maintained NVKE release workflow:
 
 ```sh
 ovn_bundle_root=$(mktemp -d /tmp/nvkr-ovn-bundle.XXXXXX)
@@ -159,7 +159,7 @@ go run ./cmd/nvkr run generate \
 
 Production execution requires installing that generated bundle in an admitted
 consumer checkout. The generator owns one `nvkr-run.yml` per root; this candidate does
-not replace the maintained M2 bundle. Dispatch remains default-branch-only,
+not replace the maintained NVKE release bundle. Dispatch remains default-branch-only,
 with the existing protected `nvkr-release` environment and main signer policy.
 The OVN fork is public and source retrieval uses anonymous access. Registry write and OIDC tokens stay
 out of producer containers. Ordinary PR tests compile and regenerate without them.

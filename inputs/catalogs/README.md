@@ -26,7 +26,7 @@ publication accepts one bundle entry per component, so the companion cannot be p
 source-built NICo Core and Flow images, pinned independently of NVKE to one infra-controller release.
 Both images use the generic rootless BuildKit route with digest-pinned bases. Core chains the source's
 native build, runtime and release Dockerfiles in one producer per architecture. No maintained Definition
-currently selects the five NICo outputs; the [family pilot](../definitions/nvke/README.md#family-pilot)
+currently selects the five NICo outputs; the [product families](../definitions/nvke/README.md#product-families)
 explains their withdrawal. A cold Core build may exceed the generated hosted build-job budget; no hosted Run has built it.
 
 [`local-path-provisioner`](local-path-provisioner/registry.yaml) packages Rancher's chart from

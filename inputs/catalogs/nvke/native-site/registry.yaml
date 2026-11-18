@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-native-site
+  name: nvke/native-site
   description: Native Linux demo controller, CLI, provider and charts aligned to the renamed NVKE source contract. Local diagnostic inputs; no Release qualification claim.
 sources:
   nvke-deploy:

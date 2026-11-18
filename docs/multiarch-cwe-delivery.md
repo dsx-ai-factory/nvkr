@@ -1,6 +1,8 @@
-# Multi-architecture CWE delivery
+# Multi-architecture NVKE container image delivery
 
-The implementation compiles an explicit Linux AMD64/ARM64 platform set into independent native CWE
+The legacy `cwe` producer/output key names the NVKE container image in this example; it is retained for compatibility.
+
+The implementation compiles an explicit Linux AMD64/ARM64 platform set into independent native NVKE container image
 producers and one standard runnable OCI image index. Delivery preserves each native child image's exact
 manifest, config and layer bytes. The [deploy Definition](examples/nvke-deploy/README.md) keeps one public `cwe` output and eight public
 outputs overall, with nine native build selections. External execution and release acceptance are recorded
@@ -149,7 +151,7 @@ the required platform/build vector. Exact per-platform evidence remains separate
 
 The delivery module owns the image-index bytes and binding checks; factory and lifecycle own frozen work,
 observations and completeness. Release navigation projects these bindings without adding authority.
-The combined M2 pipeline retains ownership of ARC disk execution and per-output publication. Native image
+The combined NVKE release pipeline retains ownership of ARC disk execution and per-output publication. Native image
 builds use hosted AMD64 and ARM64 runners; disk stages retain their admitted ARC routes. Metadata-only
 assembly carries the exact aggregate index, native manifests/configs and platform-scoped evidence without
 reading image layers. Loopback transport contracts cover export, publication, metadata browsing, missing
@@ -165,9 +167,9 @@ FIFOs, source replacement after capture, defensive metadata, closed/zero capabil
 independent competing writers and concurrent closing. The pre-existing single-image inspector still rejects
 an aggregate index.
 
-These fixtures establish the representation and ownership contracts. They do not establish a successful CWE
+These fixtures establish the representation and ownership contracts. They do not establish a successful NVKE container image
 build, runnable application behavior, registry acceptance, a hosted job, signature verification or release
-acceptance. The final integration stage requires real native AMD64 and ARM64 CWE production, exact child
+acceptance. The final integration stage requires real native AMD64 and ARM64 NVKE container image production, exact child
 SBOM/provenance, standard OCI pull/run through the index, failed-child/tag tests and complete signed release
 consumption. Recorded execution must distinguish native and emulated checks.
 

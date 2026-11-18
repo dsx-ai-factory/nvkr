@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-operator-tools
+  name: tools/operator-amd64
   description: Acquire operator executables from pinned upstream release assets, without rebuilding or installing their archives.
 components:
   helm:

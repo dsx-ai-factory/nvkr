@@ -31,7 +31,7 @@ The full demo uses one NVKR/demo bootstrap and a measured
 Packer/Go/GCC toolchain across its selected output scopes; that image also includes
 digest-checked Helm 4.2.4 and ORAS 1.3.3. There is no separate Helm-wrapper image.
 The combined selection creates one immutable Run. Catalog
-overlays remain bound to each exact predecessor digest. `../../catalogs/node-images/variants/nvidia-tcg.json` depends on the M2
+overlays remain bound to each exact predecessor digest. `../../catalogs/node-images/variants/nvidia-tcg.json` depends on the NVKE release
 OS catalog's digest: repinning that catalog requires regenerating and reviewing this binding.
 The upstream selection stacks `../../catalogs/node-images/variants/upstream-tcg.json` after `../../catalogs/node-images/variants/nvidia-tcg.json`;
 its `requiresCatalogDigest` binds that exact predecessor, not the base catalog

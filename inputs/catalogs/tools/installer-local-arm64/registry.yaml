@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvke-local-installer-tools-arm64
+  name: tools/installer-local-arm64
   description: Source-built tools matching NVKE's staged-installer candidate. Local diagnostic lane; no hosted Helm preparation or organization approval claim.
 sources:
   helm:

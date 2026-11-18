@@ -9,7 +9,7 @@ source controller Helm chart from NVKE `v0.23.0`. The chart depends on the exact
 instructions live in the catalog; the Definition selects and packages outputs; the Environment selects
 runtime, destination and signing.
 
-The committed production workflow uses the [M2 candidate](../../../inputs/definitions/nvke/README.md).
+The committed production workflow uses the [NVKE release candidate](../../../inputs/definitions/nvke/README.md).
 The development workflow runs the 83-output GPU site composite, five NVKE family Definitions and the GB200 AICR bundle.
 This three-output Definition retains a smaller unsigned development example for scratch generation.
 Its [historical hosted run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md)
@@ -125,11 +125,11 @@ of the production paths below. Generate this smaller unsigned example only into 
 See [pipeline development](../../../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) for one-time
 registration, source access, development signing/publication, downloads and cleanup.
 
-The repository commits the [M2 candidate](../../../inputs/definitions/nvke/README.md), selected by `make workflows-check`.
+The repository commits the [NVKE release candidate](../../../inputs/definitions/nvke/README.md), selected by `make workflows-check`.
 This checked-in configuration is not a ratified canonical-product decision.
 
 Generate this alternative into a scratch directory. Generating it into the repository root would
-replace the maintained M2 bundle and fail `make workflows-check`. Pinned-tree access may be
+replace the maintained NVKE release bundle and fail `make workflows-check`. Pinned-tree access may be
 needed during catalog loading; configure your existing Git credentials or the transport override above.
 
 ```sh
@@ -153,14 +153,14 @@ source chart's existing digest support. Each source role has its own lock entry;
 update both for a shared NVKE release:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v0.23.0 nvke
-bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v0.23.0 nvke-controller
+bin/nvkr catalog pin --catalog inputs/catalogs/nvke/module-tags --tag v0.23.0 nvke
+bin/nvkr catalog pin --catalog inputs/catalogs/nvke/module-tags --tag v0.23.0 nvke-controller
 ```
 
 Repin only through `nvkr catalog pin`; never hand-edit the lock. Regenerate CI after changing pins.
 
 The generated workflow path is `.github/workflows/nvkr-run.yml`, with exact inputs under
-`.github/nvkr-run/`. Its current repository selection is M2, not this three-output alternative; use
+`.github/nvkr-run/`. Its current repository selection is NVKE release, not this three-output alternative; use
 `make workflows-check` for that maintained selection. Dispatch runs whichever reviewed bundle is committed
 at the selected ref and does not choose a different Definition. This alternative's GitHub Environment targets
 the `nvkectl`, `cwe` and `nvke-helm` repositories under `ghcr.io/dsx-ai-factory/nvkr` and uses the
@@ -180,8 +180,8 @@ use the existing command-scoped mirror override described above.
 `../../../inputs/catalogs/nvke/module-tags/registry.yaml`; `../../../inputs/catalogs/nvke/module-tags/pins.lock.yaml` binds source and executable bytes. Update through:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v1.51.1 syft
-bin/nvkr catalog bump --dir inputs/catalogs/nvke/module-tags syft cosign
+bin/nvkr catalog pin --catalog inputs/catalogs/nvke/module-tags --tag v1.51.1 syft
+bin/nvkr catalog bump --catalog inputs/catalogs/nvke/module-tags syft cosign
 ```
 
 Regenerate the workflow after changing the lock. Each Environment configures one
@@ -194,8 +194,8 @@ Workflow dependencies are catalog sources with `kind: github-action`. Their cons
 release lines; their exact commits are in the same lock as NVKE and tool pins.
 
 ```sh
-bin/nvkr catalog bump --dir inputs/catalogs/nvke/module-tags --check checkout download-artifact setup-go upload-artifact
-bin/nvkr catalog bump --dir inputs/catalogs/nvke/module-tags checkout download-artifact setup-go upload-artifact
+bin/nvkr catalog bump --catalog inputs/catalogs/nvke/module-tags --check checkout download-artifact setup-go upload-artifact
+bin/nvkr catalog bump --catalog inputs/catalogs/nvke/module-tags checkout download-artifact setup-go upload-artifact
 ```
 
 Regenerate the Run workflow after applying an update. No generator rebuild is needed. The adapter rejects

@@ -24,7 +24,7 @@ components:
 kind: SourceBuildRegistry
 metadata:
   description: Original recorded local ARM64 diagnostic suite image selections, acquired through ordinary OCI outputs; no deployment or conformance acceptance claim.
-  name: kubernetes-conformance-runtime-arm64
+  name: kubernetes-conformance/images
 sources:
   hydrophone-suite-selection:
     repo: https://github.com/kubernetes-sigs/hydrophone
