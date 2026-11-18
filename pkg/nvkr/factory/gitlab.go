@@ -174,6 +174,9 @@ func renderGitLab(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	// Fresh source checkout avoids retained permission differences in reused
 	// CI workspaces; Git tracks only the executable bit of regular-file modes.
 	// Native Runner owns that workspace lifecycle; NVKR never chmods its inputs.
+	// Higher-precedence project/group/pipeline variables can override these YAML
+	// defaults; removing those overrides is an operator prerequisite, not a
+	// property that generated-bundle equality can establish.
 	document["variables"] = map[string]string{
 		"FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR": "true",
 		"GIT_STRATEGY":                         "clone",
@@ -208,10 +211,6 @@ func renderGitLab(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		script := "set -eu\nset +x\nexport GOTOOLCHAIN=local\ntest \"$(go env GOVERSION)\" = \"go" + version + "\"\ntest \"$(go env GOHOSTOS)/$(go env GOHOSTARCH)\" = " + shellQuote(platform) + "\nRUNNER_TEMP=$(mktemp -d)\nexport RUNNER_TEMP\ntrap 'rm -rf -- \"$RUNNER_TEMP\"' EXIT\n" + "mkdir -p \"$RUNNER_TEMP/home\"\n" + "env -i PATH=\"$PATH\" HOME=\"$RUNNER_TEMP/home\" GOTOOLCHAIN=local RUNNER_TEMP=\"$RUNNER_TEMP\" /bin/sh -c " + shellQuote(install) + "\nmkdir -p " + shellQuote(dir) + "\nmv nvkr-exec " + shellQuote(dir+"/nvkr-exec") + "\n(cd " + shellQuote(dir) + " && sha256sum nvkr-exec > SHA256SUMS)\n"
 		document[gitlabBootstrapJob(platform)] = map[string]any{"stage": "nvkr-bootstrap", "image": route.BootstrapImage, "tags": route.Tags, "timeout": "15 minutes", "script": []string{script}, "artifacts": map[string]any{"paths": []string{dir}, "access": "developer", "expire_in": "1 day"}, "allow_failure": false}
 	}
-	leaves := map[string]bool{}
-	for _, op := range projection.Operations {
-		leaves[op.Job] = true
-	}
 	for _, op := range projection.Operations {
 		platform, err := gitlabNodePlatform(plan, op.Node)
 		if err != nil {
@@ -221,7 +220,6 @@ func renderGitLab(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		needs := []map[string]any{{"job": gitlabBootstrapJob(platform), "artifacts": true}}
 		for _, parent := range op.Needs {
 			needs = append(needs, map[string]any{"job": parent, "artifacts": false})
-			delete(leaves, parent)
 		}
 		if len(needs) > 50 {
 			return nil, e.New(e.CodeEngineCapability, "GitLab operation exceeds the supported native needs bound")
@@ -239,20 +237,17 @@ func renderGitLab(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		job := map[string]any{"stage": "nvkr-execute", "image": route.BootstrapImage, "tags": route.Tags, "needs": needs, "when": when, "allow_failure": false, "timeout": fmt.Sprintf("%d seconds", int64(budget/time.Second)+900), "script": []string{command}, "artifacts": map[string]any{"when": "always", "access": "developer", "expire_in": "1 day", "paths": []string{gitlabOutcomePath(op.Node.ID), gitlabNodeCarrierDirectory(op.Node.ID)}}}
 		document[op.Job] = job
 	}
-	if len(leaves)+1 > 50 {
-		return nil, e.New(e.CodeEngineCapability, "GitLab finalizer exceeds the supported native needs bound")
-	}
 	platform := plan.Environment.UtilityPlatform
 	route, ok := plan.Environment.GitLab.Runners[platform]
 	if !ok {
 		return nil, e.New(e.CodeEngineCapability, "GitLab finalizer has no exact utility-platform route")
 	}
-	needs := []map[string]any{{"job": gitlabBootstrapJob(platform), "artifacts": true}}
-	for _, leaf := range sortedKeys(leaves) {
-		needs = append(needs, map[string]any{"job": leaf, "artifacts": false})
-	}
+	// A final-stage barrier waits for every earlier job, including an unrelated
+	// still-running bootstrap when another execution branch was skipped. DAG
+	// needs with when:always can become runnable early after a skipped need.
+	// Artifact dependencies select only the utility helper, not scheduling.
 	runner := ".nvkr/gitlab/bootstrap/" + strings.ReplaceAll(platform, "/", "-") + "/nvkr-exec"
-	document[gitlabFinalizerJob] = map[string]any{"stage": "nvkr-finalize", "image": route.BootstrapImage, "tags": route.Tags, "needs": needs, "when": "always", "allow_failure": false, "timeout": "2 hours", "script": []string{gitlabRunnerCheck(runner) + "\n" + shellQuote(runner) + " run finalize-gitlab --definition " + shellQuote(plan.DefinitionPath) + " --environment " + shellQuote(plan.EnvironmentPath) + " --plan " + shellQuote(GitLabPlanPath) + " --workspace .nvkr/factory --out .nvkr/gitlab/run.json"}, "artifacts": map[string]any{"when": "always", "access": "developer", "expire_in": "1 day", "paths": []string{".nvkr/gitlab/run.json"}}}
+	document[gitlabFinalizerJob] = map[string]any{"stage": "nvkr-finalize", "image": route.BootstrapImage, "tags": route.Tags, "dependencies": []string{gitlabBootstrapJob(platform)}, "when": "always", "allow_failure": false, "timeout": "2 hours", "script": []string{gitlabRunnerCheck(runner) + "\n" + shellQuote(runner) + " run finalize-gitlab --definition " + shellQuote(plan.DefinitionPath) + " --environment " + shellQuote(plan.EnvironmentPath) + " --plan " + shellQuote(GitLabPlanPath) + " --workspace .nvkr/factory --out .nvkr/gitlab/run.json"}, "artifacts": map[string]any{"when": "always", "access": "developer", "expire_in": "1 day", "paths": []string{".nvkr/gitlab/run.json"}}}
 	raw, err := yaml.Marshal(document)
 	if err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "encoding GitLab transport YAML")

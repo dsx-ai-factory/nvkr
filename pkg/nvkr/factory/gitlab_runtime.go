@@ -501,6 +501,14 @@ func executeGitLabPublication(ctx context.Context, plan *Plan, node Node, artifa
 		}
 		options.Authority.Repositories = uniqueSorted(repositories)
 	}
+	// Inspection may outlive an upstream attempt. Refuse an already superseded
+	// closure before the first remote write; completion still checks for changes
+	// during publication under the same original acquired observations.
+	if admission != nil {
+		if err := admission.revalidateAcquired(ctx); err != nil {
+			return err
+		}
+	}
 	ref, err := delivery.PushWithOptions(ctx, input.Path, target.Ref, delivery.PushOptions{Registry: options, ExpectedRootDigest: inspection.RootDigest})
 	if err != nil {
 		return delivery.SafeRegistryPublishError(ctx, err)
@@ -538,7 +546,6 @@ func (state *gitlabAdmission) restore(ctx context.Context, plan *Plan, ids []str
 	if len(byProducer) == 0 {
 		return state.revalidateAcquired(ctx)
 	}
-	nodes, _ := planIndex(plan)
 	// Authenticate one bounded snapshot for the complete acquisition, then
 	// compare every retained original observation after all transfers. A refresh
 	// per producer adds no atomicity and makes provider load grow with artifacts.
@@ -547,30 +554,15 @@ func (state *gitlabAdmission) restore(ctx context.Context, plan *Plan, ids []str
 		return err
 	}
 	jobs := gitlabJobDescriptions(receipt, state.names)
+	nodes, _ := planIndex(plan)
+	validated := map[string]map[string]gitlabCarrier{}
+	visiting := map[string]bool{}
 	for _, producer := range sortedKeys(byProducer) {
-		job, ok := receipt.Job(gitlabNodeJob(producer))
-		if !ok || job.Status != "success" {
-			return e.New(e.CodeReleaseIncomplete, "GitLab producer is not current and successful")
-		}
-		if err := state.retain(gitlabNodeJob(producer), job); err != nil {
-			return err
-		}
-		raw, err := state.member(ctx, job.ID, gitlabOutcomePath(producer), 4<<20)
+		carriers, err := state.validateProducerClosure(ctx, nodes, artifacts, producer, jobs, validated, visiting)
 		if err != nil {
 			return err
 		}
-		carriers, err := validateGitLabProducerOutcome(raw, state.identity, state.digest, job.ID, producer, plan, jobs)
-		if err != nil {
-			return err
-		}
-		// Outcome validation checked these exact original input attempts too.
-		// Retain them even when this consumer restores only the producer's output.
-		for _, input := range nodes[producer].Inputs {
-			name := gitlabNodeJob(artifacts[input].Producer)
-			if err := state.retain(name, jobs[name]); err != nil {
-				return err
-			}
-		}
+		job := jobs[gitlabNodeJob(producer)]
 		for _, id := range uniqueSorted(byProducer[producer]) {
 			item, ok := carriers[id]
 			if !ok {
@@ -589,6 +581,47 @@ func (state *gitlabAdmission) restore(ctx context.Context, plan *Plan, ids []str
 		}
 	}
 	return state.revalidateAcquired(ctx)
+}
+
+// validateProducerClosure authenticates every ancestor outcome against the same
+// provider snapshot, once per acquisition. Ancestor carriers are descriptions
+// only: restore downloads just the consumer's selected artifact payloads.
+func (state *gitlabAdmission) validateProducerClosure(ctx context.Context, nodes map[string]Node, artifacts map[string]Artifact, producer string, jobs map[string]provider.Job, validated map[string]map[string]gitlabCarrier, visiting map[string]bool) (map[string]gitlabCarrier, error) {
+	if carriers, ok := validated[producer]; ok {
+		return carriers, nil
+	}
+	node, ok := nodes[producer]
+	if !ok || visiting[producer] {
+		return nil, e.New(e.CodePipelineDrift, "GitLab producer closure is unknown or cyclic")
+	}
+	job, ok := jobs[gitlabNodeJob(producer)]
+	if !ok || job.Status != "success" {
+		return nil, e.New(e.CodeReleaseIncomplete, "GitLab producer is not current and successful")
+	}
+	if err := state.retain(gitlabNodeJob(producer), job); err != nil {
+		return nil, err
+	}
+	raw, err := state.member(ctx, job.ID, gitlabOutcomePath(producer), 4<<20)
+	if err != nil {
+		return nil, err
+	}
+	carriers, err := validateGitLabProducerOutcome(raw, state.identity, state.digest, job.ID, producer, nodes, artifacts, jobs)
+	if err != nil {
+		return nil, err
+	}
+	visiting[producer] = true
+	defer delete(visiting, producer)
+	for _, input := range node.Inputs {
+		artifact, ok := artifacts[input]
+		if !ok {
+			return nil, e.New(e.CodePipelineDrift, "GitLab producer closure has an unknown input")
+		}
+		if _, err := state.validateProducerClosure(ctx, nodes, artifacts, artifact.Producer, jobs, validated, visiting); err != nil {
+			return nil, err
+		}
+	}
+	validated[producer] = carriers
+	return carriers, nil
 }
 
 // retain preserves the first authenticated observation. Refreshing a provider
@@ -785,7 +818,7 @@ func gitlabCheckout(ctx context.Context, commit string, paths []string) error {
 	return sourcegit.VerifyCheckout(ctx, []string{"PATH=" + os.Getenv("PATH")}, root, commit, paths, 100000)
 }
 
-func validateGitLabProducerOutcome(raw []byte, identity provider.Identity, digest string, jobID uint64, producer string, plan *Plan, jobs map[string]provider.Job) (map[string]gitlabCarrier, error) {
+func validateGitLabProducerOutcome(raw []byte, identity provider.Identity, digest string, jobID uint64, producer string, nodes map[string]Node, artifacts map[string]Artifact, jobs map[string]provider.Job) (map[string]gitlabCarrier, error) {
 	var outcome gitlabOutcome
 	if err := canonical.UnmarshalExact(raw, &outcome); err != nil {
 		return nil, e.New(e.CodeProvenanceMissing, "GitLab operation outcome is malformed")
@@ -793,12 +826,10 @@ func validateGitLabProducerOutcome(raw []byte, identity provider.Identity, diges
 	if outcome.Schema != "nvkr.dev/gitlab-operation/v1" || outcome.APIURL != identity.APIURL || outcome.ProjectID != identity.ProjectID || outcome.PipelineID != identity.PipelineID || outcome.JobID != jobID || outcome.Commit != identity.Commit || outcome.Plan != digest || outcome.Node != producer || outcome.Status != "success" || outcome.ExitCode != 0 {
 		return nil, e.New(e.CodeProvenanceMissing, "GitLab outcome does not bind its exact current producer")
 	}
-	nodes, _ := planIndex(plan)
 	node, ok := nodes[producer]
 	if !ok || len(outcome.Carriers) != len(node.Outputs) {
 		return nil, e.New(e.CodeProvenanceMissing, "GitLab outcome has incomplete carrier membership")
 	}
-	_, artifacts := planIndex(plan)
 	if len(outcome.Inputs) != len(node.Inputs) {
 		return nil, e.New(e.CodeProvenanceMissing, "GitLab outcome omits exact original input producer bindings")
 	}

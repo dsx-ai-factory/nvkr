@@ -400,6 +400,16 @@ commit the root and complete generated bundle together; never hand-edit generate
 uses native GitLab pipeline invocation and adds no cron or trigger API. Debug tracing and service debugging
 must be off. The bounded projection permits at most 256 operations and 50 needs per job.
 
+Reserve `GIT_STRATEGY=clone` and `FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR=true` for the generated
+checkout policy. [GitLab variable precedence](https://docs.gitlab.com/ci/variables/#ci-cd-variable-precedence)
+allows project, group and pipeline variables to override YAML defaults, including job-level defaults.
+Before submitting the pipeline, remove conflicting keys from **Settings > CI/CD > Variables** at the
+project and inherited group levels, and from schedules, triggers, API/run-pipeline variables and any
+applicable policy. Do not override either key through Runner configuration. An override such as
+`GIT_STRATEGY=empty` prevents checkout; disabling the umask switch can change generated-file modes.
+`run generate --check` verifies committed bytes, not these external settings, and cannot establish
+the prerequisite. Remove the override and start a fresh pipeline; never repair its checkout with chmod.
+
 Use the provider-supplied current job's `CI_JOB_TOKEN` for current-job authentication. Separately provision
 the API reader named by the Environment for project/pipeline metadata, current job enumeration and original-job artifact downloads.
 Selecting a credential kind does not grant endpoint permissions. Keep API access and masking/protection

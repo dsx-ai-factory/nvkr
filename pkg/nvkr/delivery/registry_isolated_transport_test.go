@@ -46,8 +46,11 @@ func TestRegistryDefaultTransportRemainsUnchanged(t *testing.T) {
 
 type registryAuthorityProbe struct{ calls int }
 
-func (p *registryAuthorityProbe) RoundTrip(*http.Request) (*http.Response, error) {
+func (p *registryAuthorityProbe) RoundTrip(request *http.Request) (*http.Response, error) {
 	p.calls++
+	if request.Body != nil {
+		_ = request.Body.Close()
+	}
 	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(""))}, nil
 }
 func TestRegistryAuthorityRestrictsCredentialDestinations(t *testing.T) {
@@ -60,6 +63,18 @@ func TestRegistryAuthorityRestrictsCredentialDestinations(t *testing.T) {
 		{"token basic", "https://gitlab.example.test/jwt/auth?service=container_registry&scope=repository%3Aa%3Apull", "Basic synthetic-basic", "", true},
 		{"foreign scope", "https://gitlab.example.test/jwt/auth?service=container_registry&scope=repository%3Aother%3Apush%2Cpull", "Basic synthetic-basic", "", false},
 		{"combined scope", "https://gitlab.example.test/jwt/auth?service=container_registry&scope=repository%3Aa%3Apull+repository%3Aother%3Apull", "Basic synthetic-basic", "", false},
+		{"blob", "https://registry.example.test/v2/a/blobs/sha256:123", "Bearer synthetic-bearer", "", true},
+		{"blob upload initiation", "https://registry.example.test/v2/a/blobs/uploads/", "Bearer synthetic-bearer", "", true},
+		{"nested reserved blobs repository", "https://registry.example.test/v2/a/blobs/manifests/x", "Bearer synthetic-bearer", "", false},
+		{"nested reserved uploads repository", "https://registry.example.test/v2/a/blobs/uploads/blobs/x", "Bearer synthetic-bearer", "", false},
+		{"nested reserved manifests repository", "https://registry.example.test/v2/a/manifests/manifests/x", "Bearer synthetic-bearer", "", false},
+		{"nested reserved referrers repository", "https://registry.example.test/v2/a/referrers/manifests/x", "Bearer synthetic-bearer", "", false},
+		{"nested reserved tags repository", "https://registry.example.test/v2/a/tags/manifests/x", "Bearer synthetic-bearer", "", false},
+		{"blob upload", "https://registry.example.test/v2/a/blobs/uploads/session", "Bearer synthetic-bearer", "", true},
+		{"referrers", "https://registry.example.test/v2/a/referrers/sha256:123", "Bearer synthetic-bearer", "", true},
+		{"tags", "https://registry.example.test/v2/a/tags/list", "Bearer synthetic-bearer", "", true},
+		{"nested repository", "https://registry.example.test/v2/a/child/manifests/x", "Bearer synthetic-bearer", "", false},
+		{"endpoint suffix", "https://registry.example.test/v2/a/blobs-child/manifests/x", "Bearer synthetic-bearer", "", false},
 		{"foreign repository", "https://registry.example.test/v2/other/manifests/x", "Bearer synthetic-bearer", "", false},
 		{"dot traversal", "https://registry.example.test/v2/a/../other/manifests/x", "Bearer synthetic-bearer", "", false},
 		{"foreign realm", "https://foreign.example.test/jwt/auth", "Basic synthetic-basic", "", false},
@@ -174,9 +189,10 @@ func TestRegistryTransportFreezesAuthority(t *testing.T) {
 func TestRegistryBlobRedirectDropsCredentialsAndRejectsOtherDelegation(t *testing.T) {
 	payload := []byte("exact redirected blob")
 	digest := fmt.Sprintf("sha256:%x", sha256.Sum256(payload))
-	for _, mode := range []string{"blob", "encoded storage path", "corrupt blob", "manifest", "token", "foreign repository", "invalid digest", "http", "storage chain"} {
+	for _, mode := range []string{"blob", "encoded storage path", "corrupt blob", "manifest", "token", "foreign repository", "invalid digest", "http", "storage chain", "storage http chain"} {
 		t.Run(mode, func(t *testing.T) {
-			var storageCalls, insecureCalls atomic.Int64
+			var storageCalls, insecureCalls, returnedRegistryCalls atomic.Int64
+			var registryURL atomic.Value
 			insecure := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { insecureCalls.Add(1) }))
 			defer insecure.Close()
 			storage := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -187,6 +203,10 @@ func TestRegistryBlobRedirectDropsCredentialsAndRejectsOtherDelegation(t *testin
 					}
 				}
 				if mode == "storage chain" {
+					http.Redirect(w, r, registryURL.Load().(string)+"/v2/a/manifests/chain", http.StatusFound)
+					return
+				}
+				if mode == "storage http chain" {
 					http.Redirect(w, r, insecure.URL+"/chain", http.StatusFound)
 					return
 				}
@@ -198,6 +218,11 @@ func TestRegistryBlobRedirectDropsCredentialsAndRejectsOtherDelegation(t *testin
 			}))
 			defer storage.Close()
 			origin := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/v2/a/manifests/chain" {
+					returnedRegistryCalls.Add(1)
+					w.WriteHeader(http.StatusOK)
+					return
+				}
 				if !strings.HasPrefix(r.URL.Path, "/jwt/auth") && r.Header.Get("Authorization") != "Bearer synthetic-token" {
 					t.Error("registry credential missing")
 				}
@@ -211,6 +236,7 @@ func TestRegistryBlobRedirectDropsCredentialsAndRejectsOtherDelegation(t *testin
 				http.Redirect(w, r, location, http.StatusFound)
 			}))
 			defer origin.Close()
+			registryURL.Store(origin.URL)
 			host := strings.TrimPrefix(origin.URL, "https://")
 			scope := &RegistryAuthority{RegistryHost: host, TokenEndpoint: origin.URL + "/jwt/auth", Repositories: []string{host + "/a"}}
 			client := origin.Client()
@@ -262,12 +288,15 @@ func TestRegistryBlobRedirectDropsCredentialsAndRejectsOtherDelegation(t *testin
 					t.Fatal("out-of-scope redirect succeeded")
 				}
 				wantStorage := int64(0)
-				if mode == "storage chain" {
+				if mode == "storage chain" || mode == "storage http chain" {
 					wantStorage = 1
 				}
 				if storageCalls.Load() != wantStorage {
 					t.Fatal("unadmitted storage request reached destination")
 				}
+			}
+			if returnedRegistryCalls.Load() != 0 {
+				t.Fatal("storage redirected back into registry authority")
 			}
 			if insecureCalls.Load() != 0 {
 				t.Fatal("redirect reached an insecure destination")
@@ -275,3 +304,71 @@ func TestRegistryBlobRedirectDropsCredentialsAndRejectsOtherDelegation(t *testin
 		})
 	}
 }
+
+// The base owns forwarded bodies; every local refusal must close its own body.
+func TestRegistryLocalRefusalsCloseRequestBody(t *testing.T) {
+	valid := &RegistryAuthority{RegistryHost: "registry.example.test", TokenEndpoint: "https://gitlab.example.test/jwt/auth", Repositories: []string{"registry.example.test/a"}}
+	for _, tc := range []struct {
+		name, endpoint, method string
+		change                 func(*http.Request, *httpsRegistryTransport)
+		allowed                bool
+	}{
+		{name: "forwarded control", endpoint: "https://registry.example.test/v2/a/blobs/uploads/", method: http.MethodPost, allowed: true},
+		{name: "HTTP", endpoint: "http://registry.example.test/v2/"},
+		{name: "nil URL", endpoint: "https://registry.example.test/v2/", change: func(r *http.Request, _ *httpsRegistryTransport) { r.URL = nil }},
+		{name: "invalid configured scope", endpoint: "https://registry.example.test/v2/", change: func(_ *http.Request, s *httpsRegistryTransport) {
+			s.admissionErr = e.New(e.CodeTrustPolicyMissing, "invalid scope")
+		}},
+		{name: "authority", endpoint: "https://user@registry.example.test/v2/"},
+		{name: "path", endpoint: "https://registry.example.test/v2/a/../b/manifests/x"},
+		{name: "repository", endpoint: "https://registry.example.test/v2/a/child/blobs/x"},
+		{name: "method", endpoint: "https://registry.example.test/v2/a/manifests/x", method: http.MethodDelete},
+		{name: "token query", endpoint: "https://gitlab.example.test/jwt/auth?service=wrong&scope=repository%3Aa%3Apull"},
+		{name: "token scope", endpoint: "https://gitlab.example.test/jwt/auth?service=container_registry&scope=repository%3Ab%3Apull"},
+		{name: "second redirect", endpoint: "https://registry.example.test/v2/a/manifests/x", change: func(r *http.Request, _ *httpsRegistryTransport) {
+			source, err := http.NewRequest(http.MethodGet, "https://storage.example.test/object", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.Response = &http.Response{StatusCode: http.StatusFound, Request: source}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			method := tc.method
+			if method == "" {
+				method = http.MethodGet
+			}
+			body := &registryTrackedBody{Reader: strings.NewReader("synthetic body")}
+			request, err := http.NewRequestWithContext(t.Context(), method, tc.endpoint, body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			probe := &registryAuthorityProbe{}
+			scoped := newHTTPSRegistryTransport(probe, valid)
+			if tc.change != nil {
+				tc.change(request, &scoped)
+			}
+			response, err := scoped.RoundTrip(request)
+			if response != nil {
+				response.Body.Close()
+			}
+			if (err == nil) != tc.allowed || probe.calls != boolInt(tc.allowed) || body.closed != 1 {
+				t.Fatalf("allowed=%v forwarded=%d body closes=%d err=%v", tc.allowed, probe.calls, body.closed, err)
+			}
+			if !tc.allowed {
+				want := e.CodeTrustPolicyMissing
+				if tc.name == "HTTP" || tc.name == "nil URL" {
+					want = e.CodeUsage
+				}
+				assertRegistryCode(t, err, want)
+			}
+		})
+	}
+}
+
+type registryTrackedBody struct {
+	*strings.Reader
+	closed int
+}
+
+func (body *registryTrackedBody) Close() error { body.closed++; return nil }

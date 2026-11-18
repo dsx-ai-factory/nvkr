@@ -300,3 +300,57 @@ func TestGitLabConditionalProjection(t *testing.T) {
 		}
 	})
 }
+
+// The finalizer uses GitLab's stage barrier rather than the DAG aggregate of
+// leaf statuses. In particular a skipped ARM leaf cannot bypass a still-running
+// utility bootstrap. These assertions establish the emitted scheduling contract,
+// not a simulation or replacement for real GitLab acceptance.
+func TestGitLabFinalizerStageBarrier(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		mixed bool
+	}{
+		{name: "all success topology"},
+		{name: "skipped ARM leaf with independent utility bootstrap", mixed: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var plan *Plan
+			if tc.mixed {
+				plan = gitlabResolvedExecutionPlan(t, nil, []string{"linux/amd64", "linux/arm64"})
+			} else {
+				_, plan = gitlabFixture(t, 1)
+			}
+			bundle, err := RenderGitLab(t.Context(), plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var document map[string]any
+			if err := yaml.Unmarshal(bundle.Files[GitLabWorkflowPath], &document); err != nil {
+				t.Fatal(err)
+			}
+			stages := document["stages"].([]any)
+			if !reflect.DeepEqual(stages, []any{"nvkr-bootstrap", "nvkr-execute", "nvkr-finalize"}) {
+				t.Fatalf("finalization lost the complete earlier-stage barrier: %v", stages)
+			}
+			finalizer := document[gitlabFinalizerJob].(map[string]any)
+			if _, exists := finalizer["needs"]; exists {
+				t.Fatal("DAG needs can release an always finalizer before all earlier jobs finish")
+			}
+			if finalizer["stage"] != "nvkr-finalize" || finalizer["when"] != "always" || finalizer["allow_failure"] != false {
+				t.Fatal("finalizer lost its terminal stage and failure policy")
+			}
+			if !reflect.DeepEqual(finalizer["dependencies"], []any{gitlabBootstrapJob(plan.Environment.UtilityPlatform)}) {
+				t.Fatalf("finalizer must download only the utility helper: %v", finalizer["dependencies"])
+			}
+			for name, value := range document {
+				job, ok := value.(map[string]any)
+				if !ok || name == gitlabFinalizerJob || job["script"] == nil {
+					continue
+				}
+				if job["stage"] != "nvkr-bootstrap" && job["stage"] != "nvkr-execute" {
+					t.Fatalf("job %q bypasses the final stage barrier", name)
+				}
+			}
+		})
+	}
+}

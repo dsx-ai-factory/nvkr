@@ -106,6 +106,22 @@ before waiting; cancellation and client Close stop the wait. Contract tests cove
 destinations, exhaustion and joined cancellation. Other statuses, identity changes and failed validation
 are not retried. This is controlled-client coverage, not live provider-throttling acceptance.
 
+Each consumer authenticates every ancestor outcome against one provider snapshot and retains the original
+attempt bindings; only selected payload carriers are downloaded. Publication revalidates that acquired
+closure after inspection and before the first write, then again on completion. The finalizer uses the last
+stage as its completion barrier and downloads only its utility bootstrap. Raw checkout input bytes are
+compared with the authenticated commit's blobs without Git worktree conversion.
+
+A fresh native Linux ARM64 server/Runner exercise passed on the complete 3,067-entry source archive
+`ce0a8f34a90e99b659d0871bf528f56a1385cab796bf899f295faa740ced0f2c`, based on `1f156647` plus these
+review fixes. All eight generated jobs succeeded with zero retries; the test verified the executable and
+complete exact Run, exited zero in 295.101 seconds, and joined cleanup with no owned resources remaining.
+Source bytes and modes remained unchanged. The finalizer remained unstarted while the build was active;
+this success case does not establish mixed-platform skipped-branch failure scheduling. Later edits only
+change this evidence record, a development-guide status link, and the bounded Close-cancellation test.
+The current manual GitHub workflow still selects a standard runner whose guaranteed disk is below the
+35 GiB test prerequisite. An adequately sized hosted route and hosted execution remain unverified.
+
 ## GitLab SDK reuse assessment
 
 The current follow-up assessment identifies the official `gitlab.com/gitlab-org/api/client-go/v3` SDK

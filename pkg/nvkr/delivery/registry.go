@@ -15,6 +15,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/readbudget"
@@ -64,7 +65,16 @@ func Push(ctx context.Context, layoutPath, reference string, options RegistryOpt
 // explicit image discovery tags. Tags do not establish signer or release authority.
 func PushWithOptions(ctx context.Context, layoutPath, reference string, request PushOptions) (published string, resultErr error) {
 	ctx, observer := observeRegistry(ctx)
-	defer func(observedCtx context.Context) { resultErr = observer.explain(observedCtx, resultErr) }(ctx)
+	publication := &registryPublicationProgress{}
+	if ctx != nil {
+		ctx = context.WithValue(ctx, registryPublicationProgressKey{}, publication)
+	}
+	defer func(observedCtx context.Context) {
+		resultErr = observer.explain(observedCtx, resultErr)
+		if publication.writeAttempted.Load() {
+			resultErr = uncertainRegistryPublication(resultErr)
+		}
+	}(ctx)
 	options := request.Registry
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
@@ -450,6 +460,9 @@ func helmTagPublishError(err error, tag name.Tag, chart string) error {
 func registryOptions(ctx context.Context, options RegistryOptions) []remote.Option {
 	remoteOptions := []remote.Option{remote.WithContext(ctx), remote.WithUserAgent("nvkr/delivery")}
 	base := readbudget.Transport(ctx, registryTransport(options))
+	if progress, ok := ctx.Value(registryPublicationProgressKey{}).(*registryPublicationProgress); ok {
+		base = registryPublicationProgressTransport{base: base, progress: progress}
+	}
 	if observer, ok := ctx.Value(registryObserverKey{}).(*registryObserver); ok {
 		base = observer.transport(base)
 	}
@@ -464,6 +477,23 @@ func registryOptions(ctx context.Context, options RegistryOptions) []remote.Opti
 	default:
 		return append(remoteOptions, remote.WithAuthFromKeychain(options.AmbientKeychain()))
 	}
+}
+
+// All remote writes in one Push share this operation-phase observation. A
+// later local integrity failure must retain uncertainty from earlier uploads.
+type registryPublicationProgressKey struct{}
+type registryPublicationProgress struct{ writeAttempted atomic.Bool }
+type registryPublicationProgressTransport struct {
+	base     http.RoundTripper
+	progress *registryPublicationProgress
+}
+
+func (tracked registryPublicationProgressTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	switch request.Method {
+	case http.MethodPost, http.MethodPatch, http.MethodPut:
+		tracked.progress.writeAttempted.Store(true)
+	}
+	return tracked.base.RoundTrip(request)
 }
 
 func registryTransport(options RegistryOptions) http.RoundTripper {
@@ -512,7 +542,9 @@ func newHTTPSRegistryTransport(base http.RoundTripper, authority *RegistryAuthor
 			scoped.admissionErr = e.New(e.CodeTrustPolicyMissing, "registry scope is invalid")
 			return scoped
 		}
-		scoped.repositoryPrefixes = append(scoped.repositoryPrefixes, "/v2/"+repo.RepositoryStr()+"/")
+		for _, endpoint := range []string{"blobs", "manifests", "referrers", "tags"} {
+			scoped.repositoryPrefixes = append(scoped.repositoryPrefixes, "/v2/"+repo.RepositoryStr()+"/"+endpoint+"/")
+		}
 		scoped.allowedScopes[repo.Scope(transport.PullScope)] = true
 		scoped.allowedScopes[repo.Scope(transport.PushScope)] = true
 	}
@@ -520,13 +552,28 @@ func newHTTPSRegistryTransport(base http.RoundTripper, authority *RegistryAuthor
 }
 
 func (scoped httpsRegistryTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	// RoundTripper owns Body even when admission refuses before the base is called.
+	refuse := func(err error) (*http.Response, error) {
+		if request.Body != nil {
+			_ = request.Body.Close()
+		}
+		return nil, err
+	}
 	if request.URL == nil || request.URL.Scheme != "https" {
-		return nil, e.New(e.CodeUsage, "isolated registry transport requires HTTPS")
+		return refuse(e.New(e.CodeUsage, "isolated registry transport requires HTTPS"))
 	}
 	if scoped.admissionErr != nil {
-		return nil, scoped.admissionErr
+		return refuse(scoped.admissionErr)
 	}
 	if scoped.authority.enabled() {
+		// Check redirect history before ordinary registry admission: delegated
+		// storage cannot redirect back into the registry's credential authority.
+		if request.Response != nil && request.Response.Request != nil {
+			source := request.Response.Request.URL
+			if source == nil || source.Host != scoped.authority.RegistryHost {
+				return refuse(e.New(e.CodeTrustPolicyMissing, "registry storage delegation permits only one redirect"))
+			}
+		}
 		if scoped.blobStorageRedirect(request) {
 			// net/http can preserve sensitive headers across a redirect to the
 			// same hostname on another port. Storage receives no credentials,
@@ -538,39 +585,57 @@ func (scoped httpsRegistryTransport) RoundTrip(request *http.Request) (*http.Res
 			return scoped.base.RoundTrip(storage)
 		}
 		if request.URL.User != nil || request.URL.Fragment != "" || request.URL.RawPath != "" || (request.Host != "" && request.Host != request.URL.Host) {
-			return nil, e.New(e.CodeTrustPolicyMissing, "registry request authority is invalid")
+			return refuse(e.New(e.CodeTrustPolicyMissing, "registry request authority is invalid"))
 		}
 		clean := path.Clean(request.URL.Path)
 		if request.URL.Path != clean && request.URL.Path != clean+"/" {
-			return nil, e.New(e.CodeTrustPolicyMissing, "registry request path is not canonical")
+			return refuse(e.New(e.CodeTrustPolicyMissing, "registry request path is not canonical"))
 		}
 		auth := request.Header.Get("Authorization")
 		registry := request.URL.Host == scoped.authority.RegistryHost && request.URL.Path == "/v2/"
 		for _, prefix := range scoped.repositoryPrefixes {
-			if request.URL.Host == scoped.authority.RegistryHost && strings.HasPrefix(request.URL.Path, prefix) {
+			if request.URL.Host == scoped.authority.RegistryHost && registryEndpointMatches(request.URL.Path, prefix) {
 				registry = true
 			}
 		}
 		token := request.URL.Host == scoped.tokenEndpoint.Host && request.URL.Path == scoped.tokenEndpoint.Path
 		if (registry && auth != "" && !strings.HasPrefix(auth, "Bearer ")) || (token && auth != "" && !strings.HasPrefix(auth, "Basic ")) || (!registry && !token) {
-			return nil, e.New(e.CodeTrustPolicyMissing, "registry request is outside its admitted authority")
+			return refuse(e.New(e.CodeTrustPolicyMissing, "registry request is outside its admitted authority"))
 		}
 		if registry && request.Method != http.MethodGet && request.Method != http.MethodHead && request.Method != http.MethodPost && request.Method != http.MethodPatch && request.Method != http.MethodPut {
-			return nil, e.New(e.CodeTrustPolicyMissing, "registry request method is outside its admitted authority")
+			return refuse(e.New(e.CodeTrustPolicyMissing, "registry request method is outside its admitted authority"))
 		}
 		if token {
 			query, err := url.ParseQuery(request.URL.RawQuery)
 			if err != nil || request.Method != http.MethodGet || len(query["service"]) != 1 || query.Get("service") != "container_registry" || len(query["scope"]) == 0 || len(query["scope"]) > len(scoped.allowedScopes) {
-				return nil, e.New(e.CodeTrustPolicyMissing, "registry token request exceeds its admitted scope")
+				return refuse(e.New(e.CodeTrustPolicyMissing, "registry token request exceeds its admitted scope"))
 			}
 			for _, scope := range query["scope"] {
 				if !scoped.allowedScopes[scope] {
-					return nil, e.New(e.CodeTrustPolicyMissing, "registry token request exceeds its admitted scope")
+					return refuse(e.New(e.CodeTrustPolicyMissing, "registry token request exceeds its admitted scope"))
 				}
 			}
 		}
 	}
 	return scoped.base.RoundTrip(request)
+}
+
+// Match the selected repository's endpoint shape, not a descendant repository
+// that happens to start with a reserved endpoint name. Upload sessions are the
+// sole two-segment suffix used by the pinned Distribution client.
+func registryEndpointMatches(requestPath, prefix string) bool {
+	suffix, ok := strings.CutPrefix(requestPath, prefix)
+	if !ok {
+		return false
+	}
+	switch {
+	case strings.HasSuffix(prefix, "/tags/"):
+		return suffix == "list"
+	case strings.HasSuffix(prefix, "/blobs/") && strings.HasPrefix(suffix, "uploads/"):
+		return !strings.Contains(strings.TrimPrefix(suffix, "uploads/"), "/")
+	default:
+		return suffix != "" && !strings.Contains(suffix, "/")
+	}
 }
 
 // blobStorageRedirect admits one HTTPS delegation from a selected registry's
@@ -599,7 +664,10 @@ func (scoped httpsRegistryTransport) blobStorageRedirect(request *http.Request) 
 		return false
 	}
 	for _, prefix := range scoped.repositoryPrefixes {
-		if digest, ok := strings.CutPrefix(source.URL.Path, prefix+"blobs/"); ok {
+		if !strings.HasSuffix(prefix, "/blobs/") {
+			continue
+		}
+		if digest, ok := strings.CutPrefix(source.URL.Path, prefix); ok {
 			_, err := v1.NewHash(digest)
 			return err == nil
 		}

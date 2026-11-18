@@ -138,7 +138,7 @@ func newWithHTTPClient(ctx context.Context, c Config, testClient *http.Client) (
 		return nil, e.New(e.CodeTimeout, "GitLab client context is already canceled")
 	}
 	u, err := url.Parse(c.APIURL)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" ||
+	if err != nil || u.Scheme != "https" || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" ||
 		u.Opaque != "" || u.RawPath != "" || u.Path != "/api/v4" || strings.ContainsAny(c.APIURL, "\r\n\x00?#") || u.String() != c.APIURL || c.ProjectID == 0 {
 		return nil, e.New(e.CodeUsage, "GitLab API requires an exact HTTPS API base and project")
 	}

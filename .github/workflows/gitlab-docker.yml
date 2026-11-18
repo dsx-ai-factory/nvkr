@@ -16,6 +16,9 @@ concurrency:
 jobs:
   nvkectl:
     name: Real GitLab server and Runner, generated nvkectl pipeline
+    # Retained manual route; standard hosted storage does not guarantee the
+    # 35 GiB prerequisite. A verified larger hosted route is still required
+    # for hosted acceptance. The harness fails its capacity gate without pruning.
     runs-on: ubuntu-24.04
     timeout-minutes: 125
     env:

@@ -22,6 +22,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	provider "github.com/dsx-ai-factory/nvkr/pkg/nvkr/gitlab"
 )
 
@@ -43,7 +44,7 @@ func TestGitLabProducerOutcomeExactCurrentMembership(t *testing.T) {
 	for _, id := range node.Outputs {
 		good.Carriers = append(good.Carriers, gitlabCarrier{Artifact: id, Digest: "sha256:" + strings.Repeat("b", 64), Bytes: 1024})
 	}
-	_, artifacts := planIndex(plan)
+	nodes, artifacts := planIndex(plan)
 	jobs := map[string]provider.Job{}
 	for index, id := range node.Inputs {
 		name := gitlabNodeJob(artifacts[id].Producer)
@@ -86,13 +87,13 @@ func TestGitLabProducerOutcomeExactCurrentMembership(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			_, err = validateGitLabProducerOutcome(raw, identity, digest, 9, node.ID, plan, jobs)
+			_, err = validateGitLabProducerOutcome(raw, identity, digest, 9, node.ID, nodes, artifacts, jobs)
 			if (err == nil) != test.valid {
 				t.Fatalf("outcome validation=%v", err)
 			}
 		})
 	}
-	if _, err := validateGitLabProducerOutcome([]byte("{"), identity, digest, 9, node.ID, plan, jobs); err == nil {
+	if _, err := validateGitLabProducerOutcome([]byte("{"), identity, digest, 9, node.ID, nodes, artifacts, jobs); err == nil {
 		t.Fatal("corrupt outcome accepted")
 	}
 }
@@ -130,6 +131,8 @@ func TestGitLabSharedSourceVendorCarrierFanout(t *testing.T) {
 func TestGitLabNativeArtifactTransport(t *testing.T) {
 	for _, mode := range []string{"success", "signed-storage", "corrupt", "oversize", "redirect", "timeout"} {
 		t.Run(mode, func(t *testing.T) {
+			root := t.TempDir()
+			canceled := make(chan struct{})
 			var insecureRequests atomic.Int64
 			insecure := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { insecureRequests.Add(1) }))
 			defer insecure.Close()
@@ -156,13 +159,16 @@ func TestGitLabNativeArtifactTransport(t *testing.T) {
 					return
 				}
 				if mode == "timeout" {
+					if err := os.WriteFile(filepath.Join(root, "handler-entered"), nil, 0600); err != nil {
+						t.Error(err)
+					}
 					<-r.Context().Done()
+					close(canceled)
 					return
 				}
 				_, _ = w.Write([]byte("original native carrier bytes"))
 			}))
 			defer server.Close()
-			root := t.TempDir()
 			certificate := filepath.Join(root, "ca.pem")
 			if err := os.WriteFile(certificate, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw}), 0600); err != nil {
 				t.Fatal(err)
@@ -179,6 +185,13 @@ func TestGitLabNativeArtifactTransport(t *testing.T) {
 			}
 			if insecureRequests.Load() != 0 {
 				t.Fatal("insecure redirect reached the destination")
+			}
+			if mode == "timeout" {
+				select {
+				case <-canceled:
+				case <-time.After(5 * time.Second):
+					t.Fatal("active artifact handler did not observe cancellation")
+				}
 			}
 		})
 	}
@@ -209,17 +222,38 @@ func TestGitLabNativeArtifactTransportChild(t *testing.T) {
 		item.Bytes--
 	}
 	ctx := t.Context()
-	if mode == "timeout" {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 100*time.Millisecond)
-		defer cancel()
-	}
 	originalTransport := http.DefaultTransport
 	poison := &gitlabPoisonTransport{}
 	http.DefaultTransport = poison
 	defer func() { http.DefaultTransport = originalTransport }()
 	path := ".nvkr/gitlab/carriers/test/carrier.tar"
-	err = state.download(ctx, 9, path, item)
+	if mode == "timeout" {
+		bounded, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		finished := make(chan error, 1)
+		go func() { finished <- state.download(bounded, 9, path, item) }()
+		ticker := time.NewTicker(5 * time.Millisecond)
+		defer ticker.Stop()
+		for {
+			if _, statErr := os.Stat("handler-entered"); statErr == nil {
+				break
+			}
+			select {
+			case err := <-finished:
+				t.Fatalf("transport returned before active handler cancellation: %v", err)
+			case <-bounded.Done():
+				cancel()
+				<-finished
+				t.Fatal("artifact request never entered handler")
+			case <-ticker.C:
+			}
+		}
+		cancel()
+		err = <-finished
+		assertFactoryErrorCode(t, err, e.CodeTimeout)
+	} else {
+		err = state.download(ctx, 9, path, item)
+	}
 	if poison.calls.Load() != 0 {
 		t.Fatal("production artifact owner used mutable global HTTP transport")
 	}

@@ -31,6 +31,9 @@ func TestGitLabEnvironmentAdmission(t *testing.T) {
 		{name: "empty map", change: func(e *Environment) { e.GitLab.Runners = nil }, code: e.CodeInvalidCatalog},
 		{name: "missing project", change: func(e *Environment) { e.GitLab.ProjectID = 0 }, code: e.CodeInvalidCatalog},
 		{name: "insecure api", change: func(e *Environment) { e.GitLab.APIURL = "http://gitlab.example.com/api/v4" }, code: e.CodeInvalidCatalog},
+		{name: "hostname missing", change: func(e *Environment) { e.GitLab.APIURL = "https://:443/api/v4" }, code: e.CodeInvalidCatalog},
+		{name: "explicit port", change: func(e *Environment) { e.GitLab.APIURL = "https://gitlab.example.com:8443/api/v4" }},
+		{name: "IPv6 hostname", change: func(e *Environment) { e.GitLab.APIURL = "https://[::1]:8443/api/v4" }},
 		{name: "foreign api path", change: func(e *Environment) { e.GitLab.APIURL = "https://gitlab.example.com/other" }, code: e.CodeInvalidCatalog},
 		{name: "embedded api credential", change: func(e *Environment) { e.GitLab.APIURL = "https://user:password@gitlab.example.com/api/v4" }, code: e.CodeInvalidCatalog},
 		{name: "query api", change: func(e *Environment) { e.GitLab.APIURL = "https://gitlab.example.com/api/v4?token=value" }, code: e.CodeInvalidCatalog},
@@ -40,6 +43,17 @@ func TestGitLabEnvironmentAdmission(t *testing.T) {
 		{name: "opaque api", change: func(e *Environment) { e.GitLab.APIURL = "https:gitlab.example.com/api/v4" }, code: e.CodeInvalidCatalog},
 		{name: "escaped api path", change: func(e *Environment) { e.GitLab.APIURL = "https://gitlab.example.com/api/%764" }, code: e.CodeInvalidCatalog},
 		{name: "wrong credential provider", change: func(e *Environment) { e.GitLab.APIReadCredentialRef = "github:NVKR_API_READ" }, code: e.CodeInvalidCatalog},
+		{name: "native token as private reader", change: func(e *Environment) { e.GitLab.APIReadCredentialRef = "gitlab:CI_JOB_TOKEN" }, code: e.CodeInvalidCatalog},
+		{name: "native registry password as private reader", change: func(e *Environment) { e.GitLab.APIReadCredentialRef = "gitlab:CI_REGISTRY_PASSWORD" }, code: e.CodeInvalidCatalog},
+		{name: "native token as job reader", change: func(e *Environment) {
+			e.GitLab.APIReadCredentialRef = "gitlab:CI_JOB_TOKEN"
+			e.GitLab.APIReadCredentialKind = "job-token"
+		}, code: e.CodeInvalidCatalog},
+		{name: "native registry password as job reader", change: func(e *Environment) {
+			e.GitLab.APIReadCredentialRef = "gitlab:CI_REGISTRY_PASSWORD"
+			e.GitLab.APIReadCredentialKind = "job-token"
+		}, code: e.CodeInvalidCatalog},
+		{name: "separate job reader", change: func(e *Environment) { e.GitLab.APIReadCredentialKind = "job-token" }},
 		{name: "unknown credential kind", change: func(e *Environment) { e.GitLab.APIReadCredentialKind = "auto" }, code: e.CodeEngineCapability},
 		{name: "unsupported platform", change: func(e *Environment) { e.GitLab.Runners["darwin/arm64"] = e.GitLab.Runners["linux/amd64"] }, code: e.CodeEngineCapability},
 		{name: "two native routes", change: func(e *Environment) {
@@ -106,6 +120,11 @@ func TestGitLabEnvironmentAdmission(t *testing.T) {
 		{name: "floating image", change: func(e *Environment) {
 			r := e.GitLab.Runners["linux/amd64"]
 			r.BootstrapImage = "registry.example.com/tools/go:latest"
+			e.GitLab.Runners["linux/amd64"] = r
+		}, code: e.CodeUnpinnedSource},
+		{name: "variable image authority", change: func(e *Environment) {
+			r := e.GitLab.Runners["linux/amd64"]
+			r.BootstrapImage = "$REGISTRY.example.com/tools/go@sha256:" + strings.Repeat("b", 64)
 			e.GitLab.Runners["linux/amd64"] = r
 		}, code: e.CodeUnpinnedSource},
 		{name: "invalid repository", change: func(e *Environment) {

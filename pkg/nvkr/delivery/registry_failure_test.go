@@ -104,11 +104,14 @@ func TestRegistryPublicationRejectionReachesPublicBoundary(t *testing.T) {
 	for _, diagnostic := range []struct {
 		code string
 		want e.Code
-	}{{"MANIFEST_INVALID", e.CodeRegistryRejected}, {"UNSUPPORTED", e.CodeEngineCapability}, {"DENIED", e.CodeRegistryAuthFailed}} {
+	}{{"MANIFEST_INVALID", e.CodeRegistryRejected}, {"UNSUPPORTED", e.CodeEngineCapability}, {"DENIED", e.CodeRegistryAuthFailed}, {"DIGEST_INVALID", e.CodeVerifyFailed}, {"SIZE_INVALID", e.CodeVerifyFailed}} {
 		t.Run(diagnostic.code, func(t *testing.T) {
-			var attempts atomic.Int32
+			var attempts, blobWrites atomic.Int32
 			handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPatch && strings.Contains(r.URL.Path, "/blobs/uploads/") {
+					blobWrites.Add(1)
+				}
 				if r.Method == http.MethodPut && strings.Contains(r.URL.Path, "/manifests/") {
 					attempts.Add(1)
 					w.Header().Set("Content-Type", "application/json")
@@ -132,6 +135,14 @@ func TestRegistryPublicationRejectionReachesPublicBoundary(t *testing.T) {
 			}
 			if ref != "" || e.Retryable(err) {
 				t.Fatalf("permanent refusal returned success or authorized retry: %s %v", ref, err)
+			}
+			safe := SafeRegistryPublishError(t.Context(), err)
+			assertRegistryCode(t, safe, diagnostic.want)
+			if !strings.Contains(safe.Error(), "destination may contain partial uploads") || !errors.Is(safe, err) || blobWrites.Load() == 0 {
+				t.Fatalf("actual write refusal lost publication uncertainty or cause: blob writes=%d err=%v", blobWrites.Load(), safe)
+			}
+			if diagnostic.want == e.CodeVerifyFailed && !strings.Contains(safe.Error(), "expected digest") {
+				t.Fatalf("integrity refusal lost fixed guidance: %v", safe)
 			}
 			if attempts.Load() != 1 {
 				t.Fatalf("permanent refusal attempted another manifest: %d writes", attempts.Load())
@@ -435,5 +446,100 @@ func TestSafeRegistryErrorsKeepRemoteUncertainty(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestSafeRegistryIntegrityUncertaintyIsIndependentOfCode(t *testing.T) {
+	for _, code := range []e.Code{e.CodeVerifyFailed, e.CodeUnverifiedRef} {
+		for _, uploaded := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/uploaded=%v", code, uploaded), func(t *testing.T) {
+				cause := &os.PathError{Op: "read", Path: "/PRIVATE_SENTINEL", Err: os.ErrPermission}
+				original := e.Wrap(code, cause, "PRIVATE_SENTINEL")
+				var input error = original
+				if uploaded {
+					input = uncertainRegistryPublication(input)
+				}
+				for _, wrap := range []func(context.Context, error) error{SafeRegistryPublishError, SafeRegistryReadbackError} {
+					got := wrap(t.Context(), input)
+					assertRegistryCode(t, got, code)
+					if !errors.Is(got, cause) || strings.Contains(got.Error(), "PRIVATE_SENTINEL") || !strings.Contains(got.Error(), "expected digest") || strings.Contains(got.Error(), "partial uploads") != uploaded {
+						t.Fatalf("phase, category, cause or privacy lost: %v", got)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestSafeRegistryLocalIntegrityAfterUploadKeepsUncertainty(t *testing.T) {
+	for _, corrupt := range []bool{false, true} {
+		t.Run(fmt.Sprintf("corrupt=%v", corrupt), func(t *testing.T) {
+			root, expected := releasePublicationFixture(t)
+			inspection, err := Inspect(t.Context(), root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var output, evidence PublishedObject
+			for _, object := range inspection.Root.Objects {
+				if object.Output != nil {
+					output = object
+				}
+				if object.Evidence != nil {
+					evidence = object
+				}
+			}
+			if output.DescriptorDigest == "" || evidence.DescriptorDigest == "" {
+				t.Fatal("fixture requires an output followed by evidence")
+			}
+			var writes atomic.Int64
+			var changed atomic.Bool
+			mutationErrors := make(chan error, 1)
+			handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPut && r.URL.Path == "/v2/candidate/tools/manifests/"+output.DescriptorDigest {
+					writes.Add(1)
+					if corrupt && changed.CompareAndSwap(false, true) {
+						path := fixtureBlobPath(root, evidence.DescriptorDigest)
+						raw, mutationErr := os.ReadFile(path)
+						if mutationErr == nil {
+							raw[len(raw)/2] ^= 1
+							mutationErr = os.WriteFile(path, raw, 0o600)
+						}
+						if mutationErr != nil {
+							mutationErrors <- mutationErr
+							w.WriteHeader(http.StatusInternalServerError)
+							return
+						}
+					}
+				}
+				handler.ServeHTTP(w, r)
+			}))
+			defer server.Close()
+			ref, original := PushWithOptions(t.Context(), root, strings.TrimPrefix(server.URL, "http://")+"/candidate/releases", PushOptions{Registry: RegistryOptions{PlainHTTP: true, Anonymous: true}})
+			select {
+			case mutationErr := <-mutationErrors:
+				t.Fatal(mutationErr)
+			default:
+			}
+			if writes.Load() == 0 || changed.Load() != corrupt {
+				t.Fatal("fixture did not exercise the prior output upload")
+			}
+			if !corrupt {
+				if original != nil || !strings.HasSuffix(ref, "@"+expected) {
+					t.Fatalf("unchanged publication control failed: %v", original)
+				}
+				return
+			}
+			assertRegistryCode(t, original, e.CodeVerifyFailed)
+			var remote *transport.Error
+			if ref != "" || errors.As(original, &remote) {
+				t.Fatal("fixture did not reach local integrity refusal after upload")
+			}
+			safe := SafeRegistryPublishError(t.Context(), original)
+			assertRegistryCode(t, safe, e.CodeVerifyFailed)
+			if !errors.Is(safe, original) || !strings.Contains(safe.Error(), "expected digest") || !strings.Contains(safe.Error(), "destination may contain partial uploads") || strings.Contains(safe.Error(), root) || strings.Contains(safe.Error(), server.URL) {
+				t.Fatalf("local post-upload failure lost phase, guidance, cause or privacy: %v", safe)
+			}
+		})
 	}
 }

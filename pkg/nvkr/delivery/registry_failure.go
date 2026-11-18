@@ -30,7 +30,35 @@ func registryPublicationContext(ctx context.Context, timeout time.Duration) (con
 // Classify responses, not error strings or presumed registry versions. A refusal
 // never authorizes rewriting an already identified manifest or dropping evidence.
 func registryPublishError(ctx context.Context, err error, operation string, args ...any) error {
-	return registryOperationError(ctx, err, fmt.Sprintf(operation, args...), true)
+	classified := registryOperationError(ctx, err, fmt.Sprintf(operation, args...), true)
+	var response *transport.Error
+	var network registryNetworkError
+	readOnly := false
+	if observer, ok := ctx.Value(registryObserverKey{}).(*registryObserver); ok {
+		readOnly = observer.readOnly
+	}
+	if !readOnly && (errors.As(classified, &response) || errors.As(classified, &network)) {
+		return uncertainRegistryPublication(classified)
+	}
+	return classified
+}
+
+// Upload uncertainty is an operation-phase fact, independent of its error code.
+// Keep it private and retain the native cause; it conveys no successful outcome.
+type registryPublicationUncertain struct{ cause error }
+
+func (failure registryPublicationUncertain) Error() string { return failure.cause.Error() }
+func (failure registryPublicationUncertain) Unwrap() error { return failure.cause }
+
+func uncertainRegistryPublication(err error) error {
+	if err == nil {
+		return nil
+	}
+	var marked registryPublicationUncertain
+	if errors.As(err, &marked) {
+		return err
+	}
+	return registryPublicationUncertain{cause: err}
 }
 
 // A successful base response with an unrecognized API (for example HTML) is
@@ -132,7 +160,7 @@ func registryReadbackError(ctx context.Context, err error, operation string, arg
 			return e.Wrap(e.CodeUnavailable, registryResponseError{response}, "%s; publication readback is incomplete", message)
 		}
 	}
-	return registryPublishError(ctx, err, operation, args...)
+	return registryOperationError(ctx, err, fmt.Sprintf(operation, args...), true)
 }
 
 // SafeRegistryReadbackError retains the underlying typed error for callers but
@@ -181,6 +209,10 @@ func redactRegistryError(err, classified error, message string) error {
 		message = "publication authority is invalid or missing; check the selected registry, project and admitted scope"
 	case e.CodeEngineCapability:
 		message = "publication requires an unsupported capability; select a supported publication configuration"
+	}
+	var uncertain registryPublicationUncertain
+	if (errors.As(err, &uncertain) || errors.As(classified, &uncertain)) && !strings.Contains(message, "destination may contain partial uploads") {
+		message += "; destination may contain partial uploads"
 	}
 	return e.Wrap(code, registryRedactedCause{cause: err}, "%s", message)
 }

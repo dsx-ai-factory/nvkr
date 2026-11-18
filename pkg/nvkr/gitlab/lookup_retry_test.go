@@ -6,6 +6,8 @@ package gitlab
 import (
 	"context"
 	"net/http"
+	"os"
+	"os/exec"
 	"slices"
 	"strings"
 	"sync/atomic"
@@ -108,46 +110,90 @@ func TestGitLabRetryDelay(t *testing.T) {
 }
 
 func TestGitLabRetryRespectsDeadlineAndClose(t *testing.T) {
+	if os.Getenv("NVKR_GITLAB_RETRY_BOUND_CHILD") != "1" {
+		executable, err := os.Executable()
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Keep cancellation/join assertions in the child. Its own timeout and
+		// this outer watchdog also bound regressions in deferred cleanup.
+		ctx, cancel := context.WithTimeout(t.Context(), 20*time.Second)
+		defer cancel()
+		child := exec.CommandContext(ctx, executable, "-test.run=^TestGitLabRetryRespectsDeadlineAndClose$", "-test.count=1", "-test.timeout=10s")
+		child.Env = append(os.Environ(), "NVKR_GITLAB_RETRY_BOUND_CHILD=1")
+		child.WaitDelay = time.Second
+		output, err := child.CombinedOutput()
+		if ctx.Err() != nil {
+			t.Fatalf("retry cancellation child exceeded its watchdog: %v", ctx.Err())
+		}
+		if err != nil {
+			t.Fatalf("retry cancellation child failed: %v\n%s", err, output)
+		}
+		return
+	}
 	for _, mode := range []string{"deadline", "close"} {
 		t.Run(mode, func(t *testing.T) {
 			client := fixtureClient(t, func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Retry-After", "30")
 				w.WriteHeader(http.StatusTooManyRequests)
 			})
-			defer client.Close()
 			waiting := make(chan struct{})
 			client.waitRetry = func(ctx context.Context, _ time.Duration) error {
 				close(waiting)
 				<-ctx.Done()
 				return ctx.Err()
 			}
-			ctx := t.Context()
+			ctx, cancel := context.WithCancel(t.Context())
 			if mode == "deadline" {
-				var cancel context.CancelFunc
-				ctx, cancel = context.WithTimeout(ctx, time.Second)
-				defer cancel()
+				deadlineCtx, deadlineCancel := context.WithTimeout(ctx, time.Second)
+				defer deadlineCancel()
+				ctx = deadlineCtx
 			}
 			finished := make(chan error, 1)
+			var lookupResult, closeResult <-chan error = finished, nil
+			// Release the caller first even on a failed assertion, then join both
+			// goroutines before closing the client and its fixture transport.
+			defer func() {
+				cancel()
+				if lookupResult != nil {
+					<-lookupResult
+				}
+				if closeResult != nil {
+					<-closeResult
+				}
+				_ = client.Close()
+			}()
+			deadline := time.NewTimer(5 * time.Second)
+			defer deadline.Stop()
 			go func() { _, err := client.Current(ctx, id(), []string{"nvkr:finalize"}); finished <- err }()
 			if mode == "close" {
 				select {
 				case <-waiting:
 				case err := <-finished:
+					lookupResult = nil
 					t.Fatalf("lookup returned before retry wait: %v", err)
-				case <-time.After(5 * time.Second):
+				case <-deadline.C:
 					t.Fatal("lookup did not enter retry wait")
 				}
-				if err := client.Close(); err != nil {
-					t.Fatal(err)
-				}
+				closed := make(chan error, 1)
+				closeResult = closed
+				go func() { closed <- client.Close() }()
 			}
-			select {
-			case err := <-finished:
-				if e.ExitCode(err) != e.ExitCode(e.New(e.CodeTimeout, "expected")) {
-					t.Fatalf("deadline or Close lost: %v", err)
+			for lookupResult != nil || closeResult != nil {
+				select {
+				case err := <-lookupResult:
+					lookupResult = nil
+					if e.ExitCode(err) != e.ExitCode(e.New(e.CodeTimeout, "expected")) {
+						t.Fatalf("deadline or Close lost: %v", err)
+					}
+				case err := <-closeResult:
+					closeResult = nil
+					if err != nil {
+						t.Fatal(err)
+					}
+				case <-deadline.C:
+					t.Fatal("retry lookup and Close did not stop and join within their shared bound")
 				}
-			case <-time.After(5 * time.Second):
-				t.Fatal("retry did not stop and join")
 			}
 		})
 	}

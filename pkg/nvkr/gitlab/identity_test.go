@@ -293,17 +293,20 @@ func TestCurrentPaginationRejectsChangedConfirmation(t *testing.T) {
 
 func TestClientAPIURLCanonicality(t *testing.T) {
 	for _, test := range []struct {
-		name, suffix string
-		valid        bool
+		name, api string
+		valid     bool
 	}{
-		{"canonical", "", true},
-		{"empty query", "?", false},
-		{"empty fragment", "#", false},
-		{"query", "?token=value", false},
-		{"fragment", "#fragment", false},
+		{"canonical", "https://gitlab.example.test/api/v4", true},
+		{"explicit port", "https://gitlab.example.test:8443/api/v4", true},
+		{"IPv6 hostname", "https://[::1]:8443/api/v4", true},
+		{"missing hostname", "https://:443/api/v4", false},
+		{"empty query", "https://gitlab.example.test/api/v4?", false},
+		{"empty fragment", "https://gitlab.example.test/api/v4#", false},
+		{"query", "https://gitlab.example.test/api/v4?token=value", false},
+		{"fragment", "https://gitlab.example.test/api/v4#fragment", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			client, err := New(t.Context(), Config{APIURL: "https://gitlab.example.test/api/v4" + test.suffix, ProjectID: 1, JobToken: "j", ReadCredential: "r", ReadCredentialKind: "private-token"})
+			client, err := New(t.Context(), Config{APIURL: test.api, ProjectID: 1, JobToken: "j", ReadCredential: "r", ReadCredentialKind: "private-token"})
 			if test.valid {
 				if err != nil {
 					t.Fatal(err)
@@ -387,13 +390,32 @@ func TestCurrentStartedAtComesOnlyFromAuthenticatedSelf(t *testing.T) {
 func TestRejectCredentialsRedirectAndInvalidJSON(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
-		response func(http.ResponseWriter)
-	}{{"redirect", func(w http.ResponseWriter) { w.Header().Set("Location", "https://example.com/"); w.WriteHeader(302) }}, {"duplicate json", func(w http.ResponseWriter) { _, _ = w.Write([]byte(`{"id":3,"id":4}`)) }}, {"error secret", func(w http.ResponseWriter) { w.WriteHeader(403); _, _ = w.Write([]byte("secret-token")) }}} {
+		response func(http.ResponseWriter, string)
+	}{
+		{"redirect", func(w http.ResponseWriter, target string) { w.Header().Set("Location", target); w.WriteHeader(302) }},
+		{"duplicate json", func(w http.ResponseWriter, _ string) { _, _ = w.Write([]byte(`{"id":3,"id":4}`)) }},
+		{"error secret", func(w http.ResponseWriter, _ string) { w.WriteHeader(403); _, _ = w.Write([]byte("secret-token")) }},
+	} {
 		t.Run(tc.name, func(t *testing.T) {
-			c := fixtureClient(t, func(w http.ResponseWriter, r *http.Request) { tc.response(w) })
-			_, err := c.Current(context.Background(), id(), []string{"nvkr:finalize"})
-			if err == nil || strings.Contains(err.Error(), "secret-token") || strings.Contains(err.Error(), "example.com") {
+			var foreignRequests atomic.Int64
+			foreign := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				foreignRequests.Add(1)
+				_, _ = w.Write([]byte(`{"id":3}`))
+			}))
+			defer foreign.Close()
+			c := fixtureClient(t, func(w http.ResponseWriter, _ *http.Request) { tc.response(w, foreign.URL) })
+			defer c.Close()
+			transport := c.http.Transport.(*http.Transport).Clone()
+			transport.TLSClientConfig = transport.TLSClientConfig.Clone()
+			transport.TLSClientConfig.RootCAs = transport.TLSClientConfig.RootCAs.Clone()
+			transport.TLSClientConfig.RootCAs.AddCert(foreign.Certificate())
+			c.http.Transport = transport
+			_, err := c.Current(t.Context(), id(), []string{"nvkr:finalize"})
+			if err == nil || strings.Contains(err.Error(), "secret-token") || strings.Contains(err.Error(), foreign.URL) {
 				t.Fatal("unsafe or missing refusal")
+			}
+			if foreignRequests.Load() != 0 {
+				t.Fatal("GitLab metadata redirect reached a foreign endpoint")
 			}
 		})
 	}

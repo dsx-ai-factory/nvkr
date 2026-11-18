@@ -27,11 +27,13 @@ import (
 // The fixture uses real production HTTPS clients and real native transport
 // archives. Synthetic provider data is contract evidence, never a live CI proof.
 func TestGitLabEarlierProducerRetryDuringLaterAcquisition(t *testing.T) {
-	for _, mode := range []string{"unchanged", "retry-earlier", "unchanged-transitive", "retry-transitive", "retry-after-restore"} {
+	for _, mode := range []string{"unchanged", "retry-earlier", "unchanged-transitive", "retry-transitive", "retry-after-restore", "unchanged-deep", "stale-deep", "retry-deep"} {
 		t.Run(mode, func(t *testing.T) {
 			var names []string
 			jobs := map[string]provider.Job{}
 			members := map[string][]byte{}
+			selectedCarriers := map[string]bool{}
+			outcomeReads := map[string]*atomic.Int64{}
 			var first, second Node
 			var plan *Plan
 			var changed atomic.Bool
@@ -75,7 +77,13 @@ func TestGitLabEarlierProducerRetryDuringLaterAcquisition(t *testing.T) {
 					http.NotFound(w, r)
 					return
 				}
-				if (mode == "retry-earlier" || mode == "retry-transitive") && strings.Contains(r.URL.Path, "/jobs/"+strconv.FormatUint(jobs[gitlabNodeJob(second.ID)].ID, 10)+"/artifacts/") && strings.HasSuffix(r.URL.Path, ".tar") {
+				if strings.HasSuffix(r.URL.Path, ".tar") && !selectedCarriers[r.URL.Path] {
+					t.Error("consumer fetched an unselected ancestor carrier")
+				}
+				if count := outcomeReads[r.URL.Path]; count != nil && count.Add(1) != 1 {
+					t.Error("shared ancestor outcome was fetched more than once")
+				}
+				if (mode == "retry-earlier" || mode == "retry-transitive" || mode == "retry-deep") && strings.Contains(r.URL.Path, "/jobs/"+strconv.FormatUint(jobs[gitlabNodeJob(second.ID)].ID, 10)+"/artifacts/") && strings.HasSuffix(r.URL.Path, ".tar") {
 					changed.Store(true)
 				}
 				_, _ = w.Write(payload)
@@ -107,6 +115,30 @@ func TestGitLabEarlierProducerRetryDuringLaterAcquisition(t *testing.T) {
 					t.Fatal("fixture lacks a producer with an original input attempt")
 				}
 			}
+			if strings.Contains(mode, "deep") {
+				nodes, artifacts := planIndex(plan)
+				found := false
+				for _, node := range plan.Graph.Nodes {
+					direct := map[string]bool{}
+					for _, input := range node.Inputs {
+						direct[artifacts[input].Producer] = true
+					}
+					for _, input := range node.Inputs {
+						parent := nodes[artifacts[input].Producer]
+						if len(parent.Inputs) > 0 && len(node.Outputs) > 0 && !direct[artifacts[parent.Inputs[0]].Producer] {
+							first, second = nodes[artifacts[parent.Inputs[0]].Producer], node
+							found = true
+							break
+						}
+					}
+					if found {
+						break
+					}
+				}
+				if !found {
+					t.Fatal("fixture lacks a two-edge producer ancestry")
+				}
+			}
 			namesErr := error(nil)
 			names, namesErr = GitLabJobNames(t.Context(), plan)
 			if namesErr != nil {
@@ -123,7 +155,22 @@ func TestGitLabEarlierProducerRetryDuringLaterAcquisition(t *testing.T) {
 			_, artifacts := planIndex(plan)
 			var selected []string
 			producerRoot := t.TempDir()
-			for _, node := range []Node{first, second} {
+			nodes, _ := planIndex(plan)
+			closure := map[string]Node{}
+			var include func(Node)
+			include = func(node Node) {
+				if _, exists := closure[node.ID]; exists {
+					return
+				}
+				closure[node.ID] = node
+				for _, input := range node.Inputs {
+					include(nodes[artifacts[input].Producer])
+				}
+			}
+			include(first)
+			include(second)
+			for _, nodeID := range sortedKeys(closure) {
+				node := closure[nodeID]
 				job := jobs[gitlabNodeJob(node.ID)]
 				outcome := gitlabOutcome{Schema: "nvkr.dev/gitlab-operation/v1", APIURL: server.URL + "/api/v4", ProjectID: 123, PipelineID: 2, JobID: job.ID, Commit: strings.Repeat("a", 40), Plan: digest, Node: node.ID, Status: "success", Inputs: []gitlabInput{}, Carriers: []gitlabCarrier{}}
 				for _, id := range node.Inputs {
@@ -154,8 +201,9 @@ func TestGitLabEarlierProducerRetryDuringLaterAcquisition(t *testing.T) {
 					}
 					outcome.Carriers = append(outcome.Carriers, gitlabCarrier{Artifact: id, Digest: pipeline.FileDigest(payload), Bytes: int64(len(payload))})
 					members["/api/v4/projects/123/jobs/"+strconv.FormatUint(job.ID, 10)+"/artifacts/"+carrier] = payload
-					if !strings.Contains(mode, "transitive") || node.ID == second.ID {
+					if node.ID == second.ID || (node.ID == first.ID && !strings.Contains(mode, "transitive") && !strings.Contains(mode, "deep")) {
 						selected = append(selected, id)
+						selectedCarriers["/api/v4/projects/123/jobs/"+strconv.FormatUint(job.ID, 10)+"/artifacts/"+carrier] = true
 					}
 				}
 				raw, err := canonical.Marshal(outcome)
@@ -163,6 +211,13 @@ func TestGitLabEarlierProducerRetryDuringLaterAcquisition(t *testing.T) {
 					t.Fatal(err)
 				}
 				members["/api/v4/projects/123/jobs/"+strconv.FormatUint(job.ID, 10)+"/artifacts/"+gitlabOutcomePath(node.ID)] = raw
+				outcomeReads["/api/v4/projects/123/jobs/"+strconv.FormatUint(job.ID, 10)+"/artifacts/"+gitlabOutcomePath(node.ID)] = &atomic.Int64{}
+			}
+			if mode == "stale-deep" {
+				name := gitlabNodeJob(first.ID)
+				job := jobs[name]
+				job.ID += 10000
+				jobs[name] = job
 			}
 			raw, err := canonical.Marshal(plan)
 			if err != nil {
@@ -195,6 +250,9 @@ func TestGitLabEarlierProducerRetryDuringLaterAcquisition(t *testing.T) {
 				t.Fatalf("native retry fixture failed: %v\n%s", err, output)
 			}
 			wantReads := int64(2)
+			if mode == "stale-deep" {
+				wantReads = 1
+			}
 			if mode == "retry-after-restore" {
 				wantReads = 3
 			}
@@ -249,11 +307,11 @@ func TestGitLabEarlierProducerRetryChild(t *testing.T) {
 	}
 	_, artifacts := planIndex(plan)
 	err = state.restore(t.Context(), plan, ids, artifacts)
-	if (mode == "unchanged" || mode == "unchanged-transitive" || mode == "retry-after-restore") && err != nil {
+	if (mode == "unchanged" || mode == "unchanged-transitive" || mode == "unchanged-deep" || mode == "retry-after-restore") && err != nil {
 		t.Fatal(err)
 	}
-	if (mode == "retry-earlier" || mode == "retry-transitive") && err == nil {
-		t.Fatal("earlier producer retry during later acquisition was accepted")
+	if mode == "retry-earlier" || mode == "retry-transitive" || mode == "stale-deep" || mode == "retry-deep" {
+		assertFactoryErrorCode(t, err, e.CodeProvenanceMissing)
 	}
 	if mode == "retry-after-restore" {
 		err = (&GitLabFinalizer{state: state}).Revalidate(t.Context())
@@ -286,7 +344,7 @@ func TestGitLabSubstitutedEndpointRefusesBeforeCredentialTransport(t *testing.T)
 	}
 	git("init", "--quiet")
 	git("add", "--all")
-	git("-c", "user.name=Native Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "authenticated original source")
+	git("-c", "user.name=Native Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--no-gpg-sign", "--quiet", "-m", "authenticated original source")
 	commit := git("rev-parse", "HEAD")
 	// Tamper both the local policy and its matching regenerated Plan/pipeline.
 	// Byte agreement among these files must not authorize the changed API origin.

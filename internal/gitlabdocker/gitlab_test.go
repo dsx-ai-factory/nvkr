@@ -59,6 +59,7 @@ type lab struct {
 	containers, volumes                                            []string
 	project, pipeline                                              int
 	pipelineTerminal                                               bool
+	cleanupRun                                                     func(context.Context, ...string) ([]byte, error)
 }
 type job struct {
 	ID            int `json:"id"`
@@ -120,6 +121,21 @@ func TestGitLabNVKE(t *testing.T) {
 	// CLI acknowledgement is lost. No pre-existing resources are removed.
 	t.Cleanup(l.cleanup)
 	l.command(ctx, l.root, nil, "docker", "network", "create", "--label", "nvkr.integration="+l.name, l.name)
+	// The small CLI prerequisite is pulled first so free space is measured on
+	// an actual daemon volume before pulling the much larger server/helper set.
+	l.command(ctx, l.root, nil, "docker", "pull", l.pins.Docker)
+	probe := l.name + "-socket-probe"
+	l.containers = append(l.containers, probe)
+	observed := strings.TrimSpace(string(l.command(ctx, l.root, nil, "docker", "run", "--rm", "--name", probe, "--mount", "type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock", l.pins.Docker, "docker", "info", "--format", "{{.ID}}")))
+	if observed != info.ID || observed == "" {
+		t.Fatal("daemon-side socket does not identify the selected Docker daemon")
+	}
+	l.socket = "/var/run/docker.sock"
+	diskVolume := l.volume(ctx, "disk-probe")
+	diskProbe := l.name + "-disk-probe"
+	l.containers = append(l.containers, diskProbe)
+	space := l.command(ctx, l.root, nil, "docker", "run", "--rm", "--name", diskProbe, "--network", "none", "--mount", "type=volume,src="+diskVolume+",dst=/fixture-space", "--entrypoint", "/bin/stat", l.pins.Docker, "-f", "-c", "%a %S", "/fixture-space")
+	must(t, requireGitLabDiskSpace(space))
 	for _, image := range []string{l.pins.Server, l.pins.Runner, l.pins.Glab, l.pins.Go, l.pins.Docker, l.pins.Helpers[l.arch]} {
 		t.Logf("pulling pinned native image %s", strings.Split(image, "@")[0])
 		l.command(ctx, l.root, nil, "docker", "pull", image)
@@ -128,13 +144,6 @@ func TestGitLabNVKE(t *testing.T) {
 			t.Fatalf("image platform %s differs from native linux/%s", got, l.arch)
 		}
 	}
-	probe := l.name + "-socket-probe"
-	l.containers = append(l.containers, probe)
-	observed := strings.TrimSpace(string(l.command(ctx, l.root, nil, "docker", "run", "--rm", "--name", probe, "--mount", "type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock", l.pins.Docker, "docker", "info", "--format", "{{.ID}}")))
-	if observed != info.ID || observed == "" {
-		t.Fatal("daemon-side socket does not identify the selected Docker daemon")
-	}
-	l.socket = "/var/run/docker.sock"
 	secrets := filepath.Join(l.work, "secrets")
 	must(t, os.Mkdir(secrets, 0700))
 	cert, key := certificate(t)
@@ -578,22 +587,34 @@ func (l *lab) cleanup() {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
 	defer cancel()
 	if l.pipeline > 0 && !l.pipelineTerminal {
-		_, _ = l.invoke(ctx, l.root, nil, "docker", "exec", l.tool, "glab", "api", "--hostname", "gitlab.test", "--method", "POST", fmt.Sprintf("projects/%d/pipelines/%d/cancel", l.project, l.pipeline))
+		_, _ = l.cleanupDocker(ctx, "exec", l.tool, "glab", "api", "--hostname", "gitlab.test", "--method", "POST", fmt.Sprintf("projects/%d/pipelines/%d/cancel", l.project, l.pipeline))
 	}
 	if slices.Contains(l.containers, l.runner) {
-		_, _ = l.invoke(ctx, l.root, nil, "docker", "stop", "--time", "30", l.runner)
+		_, _ = l.cleanupDocker(ctx, "stop", "--time", "30", l.runner)
+	}
+	// Remove every owned-network creator before taking the producer snapshot.
+	raw, err := l.cleanupDocker(ctx, "network", "inspect", "--format", "{{range $id,$c := .Containers}}{{$id}} {{end}}", l.name)
+	if err == nil {
+		for _, id := range strings.Fields(string(raw)) {
+			if _, err := l.cleanupDocker(ctx, "rm", "--force", "--volumes", id); err != nil {
+				l.t.Errorf("remove owned-network container:%v", err)
+			}
+		}
 	}
 	// Product utilities may use bridge/none rather than the Runner network. A
 	// mount strictly beneath our exact owned volume identifies those children.
 	if l.buildMount != "" {
-		ids, err := l.invoke(ctx, l.root, nil, "docker", "ps", "--all", "--quiet")
+		ids, err := l.cleanupDocker(ctx, "ps", "--all", "--quiet", "--no-trunc")
 		if err != nil {
 			l.t.Errorf("inventory owned producer cleanup:%v", err)
 		} else {
 			for _, id := range strings.Fields(string(ids)) {
-				raw, err := l.invoke(ctx, l.root, nil, "docker", "inspect", "--format", "{{json .Mounts}}", id)
+				raw, err := l.cleanupMounts(ctx, id)
 				if err != nil {
 					l.t.Errorf("inspect producer cleanup:%v", err)
+					continue
+				}
+				if raw == nil { // Unrelated auto-removed container disappeared.
 					continue
 				}
 				var mounts []struct{ Source string }
@@ -603,7 +624,7 @@ func (l *lab) cleanup() {
 				}
 				for _, m := range mounts {
 					if m.Source == l.buildMount || strings.HasPrefix(m.Source, l.buildMount+"/") {
-						if _, err := l.invoke(ctx, l.root, nil, "docker", "rm", "--force", "--volumes", id); err != nil {
+						if _, err := l.cleanupDocker(ctx, "rm", "--force", "--volumes", id); err != nil {
 							l.t.Errorf("remove owned producer:%v", err)
 						}
 						break
@@ -612,23 +633,15 @@ func (l *lab) cleanup() {
 			}
 		}
 	}
-	raw, err := l.invoke(ctx, l.root, nil, "docker", "network", "inspect", "--format", "{{range $id,$c := .Containers}}{{$id}} {{end}}", l.name)
-	if err == nil {
-		for _, id := range strings.Fields(string(raw)) {
-			if _, err := l.invoke(ctx, l.root, nil, "docker", "rm", "--force", "--volumes", id); err != nil {
-				l.t.Errorf("remove owned-network container:%v", err)
-			}
-		}
-	}
 	for i := len(l.containers) - 1; i >= 0; i-- {
-		_, _ = l.invoke(ctx, l.root, nil, "docker", "rm", "--force", "--volumes", l.containers[i])
+		_, _ = l.cleanupDocker(ctx, "rm", "--force", "--volumes", l.containers[i])
 	}
 	for _, v := range l.volumes {
-		if _, err := l.invoke(ctx, l.root, nil, "docker", "volume", "rm", v); err != nil {
+		if _, err := l.cleanupDocker(ctx, "volume", "rm", v); err != nil {
 			l.t.Errorf("remove owned GitLab volume:%v", err)
 		}
 	}
-	if _, err := l.invoke(ctx, l.root, nil, "docker", "network", "rm", l.name); err != nil {
+	if _, err := l.cleanupDocker(ctx, "network", "rm", l.name); err != nil {
 		l.t.Errorf("remove owned GitLab network:%v", err)
 	}
 	l.checkKnownContainersGone(ctx)
@@ -811,7 +824,7 @@ func sourceOwnedFailureMessages(ctx context.Context, sourcePaths []string, trace
 // A remove error may mean an already absent container. Prove the final state
 // through Docker's JSON inventory instead of classifying human error strings.
 func (l *lab) checkKnownContainersGone(ctx context.Context) {
-	raw, err := l.invoke(ctx, l.root, nil, "docker", "container", "ls", "--all", "--format", "{{json .Names}}")
+	raw, err := l.cleanupDocker(ctx, "container", "ls", "--all", "--format", "{{json .Names}}")
 	if err != nil {
 		l.t.Errorf("final owned-container inventory unavailable: %v", err)
 		return
@@ -849,4 +862,45 @@ func remainingKnownContainers(raw []byte, known []string) ([]string, error) {
 		}
 	}
 	return remaining, nil
+}
+
+// The injectable command is only for deterministic cleanup race regressions;
+// the real acceptance always uses the owned, bounded Docker subprocess.
+func (l *lab) cleanupDocker(ctx context.Context, args ...string) ([]byte, error) {
+	if l.cleanupRun != nil {
+		return l.cleanupRun(ctx, args...)
+	}
+	return l.invoke(ctx, l.root, nil, "docker", args...)
+}
+
+func (l *lab) cleanupMounts(ctx context.Context, id string) ([]byte, error) {
+	raw, err := l.cleanupDocker(ctx, "inspect", "--format", "{{json .Mounts}}", id)
+	if err == nil {
+		return raw, nil
+	}
+	// An unrelated --rm container may exit after the snapshot. Recheck exact
+	// full IDs, never human-readable CLI errors or ambiguous short IDs.
+	current, inventoryErr := l.cleanupDocker(ctx, "ps", "--all", "--quiet", "--no-trunc")
+	if inventoryErr != nil {
+		return nil, fmt.Errorf("inspection failed and current container inventory is unavailable: %w", inventoryErr)
+	}
+	if !slices.Contains(strings.Fields(string(current)), id) {
+		return nil, nil
+	}
+	return nil, err
+}
+
+func requireGitLabDiskSpace(raw []byte) error {
+	// Same pinned-container stat observation as diskInspectionScratchPrepare;
+	// fmt owns integer decoding. Refuse unknown, trailing and overflowed facts.
+	var blocks, blockSize uint64
+	var trailing string
+	n, err := fmt.Fscan(bytes.NewReader(raw), &blocks, &blockSize, &trailing)
+	if n != 2 || err != io.EOF || blockSize == 0 || blocks > ^uint64(0)/blockSize {
+		return fmt.Errorf("real GitLab acceptance could not establish available Docker volume space")
+	}
+	if blocks*blockSize < 35<<30 {
+		return fmt.Errorf("real GitLab acceptance requires at least 35 GiB available on Docker volume storage; no resources were pruned")
+	}
+	return nil
 }

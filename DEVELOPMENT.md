@@ -513,10 +513,24 @@ identifies active references; historical drafts and dated evidence do not overri
 
 ## Test the GitLab adapter against a real server
 
-Run the same opt-in integration test locally or through the manual **GitLab Docker acceptance**
-workflow. Install the Go version in `.go-version`, Git and Docker, then use a local Unix Docker context
+Run the opt-in integration test locally. The manual **GitLab Docker acceptance** workflow remains
+available, but its standard `ubuntu-24.04` runner does not guarantee the disk requirement below.
+See the [GitLab acceptance ledger](docs/adr/reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile)
+for recorded execution scope. The workflow's [`nvkectl` job](.github/workflows/gitlab-docker.yml)
+has a fixed `runs-on: ubuntu-24.04`; dispatch offers no runner selector. Before dispatch, change that
+job's `runs-on` to an adequately sized GitHub-hosted runner configured for the repository, or use
+the local path below.
+The standard public runner has four CPUs and 16 GB RAM but only 14 GB guaranteed storage; the private
+repository allocation is two CPUs, 8 GB RAM and 14 GB storage. See the
+[GitHub runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+The supported alternative is a disposable local Docker daemon with the required capacity. Install
+the Go version in `.go-version`, Git and Docker, then use a local Unix Docker context
 with native Linux AMD64 or ARM64 execution, at least four CPUs, 12 GiB Docker memory and 35 GiB free disk.
-The test pulls several large pinned upstream images and builds the real pinned NVKE CLI; allow up to two hours.
+The test checks Docker CPU and memory first, then pulls only the pinned Docker CLI prerequisite and
+measures available bytes on an owned daemon volume before pulling the large server images. The
+35 GiB observation is a precondition, not a reservation; concurrent use can still consume capacity.
+The test neither adds storage nor deletes unrelated resources. It builds the real pinned NVKE CLI;
+allow up to two hours.
 No existing GitLab service, registration token, SSH key or organization credential is needed.
 
 ```sh

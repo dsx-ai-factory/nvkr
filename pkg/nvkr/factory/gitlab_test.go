@@ -670,13 +670,15 @@ func TestGitLabRejectsUnsupportedExecutionConfigurationBeforeRendering(t *testin
 	for _, test := range []struct {
 		name   string
 		change func(*authored.Environment)
+		stage  string
+		code   e.Code
 	}{
-		{"missing exact route", func(e *authored.Environment) { delete(e.GitLab.Runners, "linux/amd64") }},
-		{"arbitrary variables", func(e *authored.Environment) { e.Runtime.Variables = map[string]string{"CI_JOB_TOKEN": "forged"} }},
-		{"setup hook", func(e *authored.Environment) { e.Runtime.Setup = []string{"arbitrary setup"} }},
-		{"runtime startup override", func(e *authored.Environment) { e.Runtime.RuntimeImage = fixtureUtilityContainer }},
-		{"helper override", func(e *authored.Environment) { e.Runtime.HelperImage = fixtureUtilityContainer }},
-		{"undeclared execution root", func(e *authored.Environment) { e.ToolchainAccess.PublicRoots = []string{"example.test/unrelated"} }},
+		{"missing exact route", func(e *authored.Environment) { delete(e.GitLab.Runners, "linux/amd64") }, "compile", e.CodeInvalidCatalog},
+		{"arbitrary variables", func(e *authored.Environment) { e.Runtime.Variables = map[string]string{"CI_JOB_TOKEN": "forged"} }, "render", e.CodeEngineCapability},
+		{"setup hook", func(e *authored.Environment) { e.Runtime.Setup = []string{"arbitrary setup"} }, "render", e.CodeEngineCapability},
+		{"runtime startup override", func(e *authored.Environment) { e.Runtime.RuntimeImage = fixtureUtilityContainer }, "render", e.CodeEngineCapability},
+		{"helper override", func(e *authored.Environment) { e.Runtime.HelperImage = fixtureUtilityContainer }, "render", e.CodeEngineCapability},
+		{"undeclared execution root", func(e *authored.Environment) { e.ToolchainAccess.PublicRoots = []string{"example.test/unrelated"} }, "render", e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			root, plan := gitlabFixture(t, 1)
@@ -684,11 +686,19 @@ func TestGitLabRejectsUnsupportedExecutionConfigurationBeforeRendering(t *testin
 			test.change(&environment)
 			writeSnapshotFixtureDocument(t, root, snapshotEnvironment, environment)
 			changed, _, err := CaptureCompileFiles(t.Context(), root, snapshotDefinition, snapshotEnvironment, "v0.0.0 (test)")
-			if err != nil {
+			if test.stage == "compile" {
+				assertFactoryErrorCode(t, err, test.code)
+				if changed != nil {
+					t.Fatal("refused compilation returned a Plan")
+				}
 				return
 			}
+			if err != nil {
+				t.Fatalf("fixture must compile before GitLab capability admission: %v", err)
+			}
 			bundle, err := RenderGitLab(t.Context(), changed)
-			if err == nil || bundle != nil {
+			assertFactoryErrorCode(t, err, test.code)
+			if bundle != nil {
 				t.Fatal("unsupported selected profile produced output")
 			}
 		})

@@ -4,12 +4,14 @@
 package sourcegit
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -125,6 +127,31 @@ func VerifyCheckout(ctx context.Context, environment []string, dir, commit strin
 	}
 	if _, err := query(append([]string{"diff", "--exit-code", "--no-ext-diff", "--no-textconv", "HEAD", "--"}, paths...)...); err != nil {
 		return e.New(e.CodeProvenanceMissing, "checkout input bytes differ from authenticated source")
+	}
+	// A clean Git diff can normalize CRLF or apply worktree conversions.
+	// cat-file emits the committed blob without filters; compare the exact
+	// regular-file bytes the caller consumes, retaining the existing Git checks.
+	for _, relative := range paths {
+		if !securepath.WorkspaceRelative(relative) || filepath.Clean(relative) != relative {
+			return e.New(e.CodeProvenanceMissing, "checkout input path is not a canonical relative file")
+		}
+		blob, err := query("cat-file", "blob", commit+":"+filepath.ToSlash(relative))
+		if err != nil {
+			return err
+		}
+		file, before, err := securepath.OpenRegular(filepath.Join(dir, relative))
+		if err != nil {
+			return e.New(e.CodeProvenanceMissing, "checkout input is not an available regular file")
+		}
+		raw, readErr := io.ReadAll(io.LimitReader(file, int64(len(blob))+1))
+		after, statErr := file.Stat()
+		closeErr := file.Close()
+		if err := ctx.Err(); err != nil {
+			return e.Wrap(e.CodeTimeout, err, "checkout byte comparison canceled")
+		}
+		if readErr != nil || statErr != nil || closeErr != nil || !securepath.SameMetadata(before, after) || !bytes.Equal(blob, raw) {
+			return e.New(e.CodeProvenanceMissing, "checkout raw input bytes differ from authenticated source")
+		}
 	}
 	return nil
 }

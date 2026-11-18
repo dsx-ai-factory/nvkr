@@ -41,7 +41,7 @@ func (environment Environment) validateGitLab() error {
 		return e.New(e.CodeInvalidCatalog, "gitlab.apiURL requires an HTTPS API base ending in /api/v4 without credentials, query or fragment")
 	}
 	api, _ := url.Parse(policy.APIURL) // The shared URL owner admitted canonical HTTPS above.
-	if api.RawPath != "" || api.Path != "/api/v4" || strings.ContainsAny(policy.APIURL, "\r\n\x00") {
+	if api.Hostname() == "" || api.RawPath != "" || api.Path != "/api/v4" || strings.ContainsAny(policy.APIURL, "\r\n\x00") {
 		return e.New(e.CodeInvalidCatalog, "gitlab.apiURL requires an HTTPS API base ending in /api/v4 without credentials, query or fragment")
 	}
 	if policy.ProjectID == 0 {
@@ -50,8 +50,8 @@ func (environment Environment) validateGitLab() error {
 	// Reuse the established credential-variable grammar; only the provider
 	// namespace changes. This validates a reference, never a credential value.
 	variable, ok := strings.CutPrefix(policy.APIReadCredentialRef, "gitlab:")
-	if !ok || !githubCredentialRefPattern.MatchString("github:"+variable) {
-		return e.New(e.CodeInvalidCatalog, "gitlab.apiReadCredentialRef must be gitlab:VARIABLE_NAME")
+	if !ok || !githubCredentialRefPattern.MatchString("github:"+variable) || variable == "CI_JOB_TOKEN" || variable == "CI_REGISTRY_PASSWORD" {
+		return e.New(e.CodeInvalidCatalog, "gitlab.apiReadCredentialRef must name a separately provisioned gitlab:VARIABLE_NAME reader")
 	}
 	if policy.APIReadCredentialKind != "job-token" && policy.APIReadCredentialKind != "private-token" {
 		return e.New(e.CodeEngineCapability, "GitLab API credential kind must explicitly be job-token or private-token")
@@ -84,7 +84,7 @@ func (environment Environment) validateGitLab() error {
 		}
 		image, err := name.NewDigest(runner.BootstrapImage, name.StrictValidation)
 		if err != nil || image.Name() != runner.BootstrapImage || !canonical.IsDigest(image.DigestStr()) ||
-			strings.ContainsAny(runner.BootstrapImage, "\r\n\x00") {
+			strings.ContainsAny(runner.BootstrapImage, "$\r\n\x00") {
 			return e.New(e.CodeUnpinnedSource, "GitLab runner %s bootstrapImage must be a digest-pinned OCI image", platform)
 		}
 	}
