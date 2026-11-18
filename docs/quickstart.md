@@ -1,6 +1,6 @@
 # Build your first NVKE artifacts
 
-> **Preview:** NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview status and known limitations](overview/preview-status.md).
+> **Preview:** NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview limits](overview/preview-status.md).
 
 Build NVKR from source, then use it to build the NVKE CLI, controller container image and Helm chart.
 All three artifacts and their dependency SBOMs stay on your machine.
@@ -93,6 +93,8 @@ This preserves the Makefile’s version and commit stamps. Use `bin/nvkr` from t
 The guided build’s local SDK downloader requires Docker; this CLI-only route assumes Go is already installed.
 
 ## Next steps
+
+Use the [six worked journeys](journeys.md) to change one component, inspect a Run, publish or consume a Release.
 
 - **Choose or preview outputs:** see the [tutorial inputs](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-tutorial/README.md#preview-the-native-build). The preview needs no Docker.
 - **Build the larger NVKE selection, including OS images:** follow the [maintained NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md). OS-image builds require native Linux KVM runners.
