@@ -344,9 +344,9 @@ func TestHostedE2EUsesAuthoredConfiguration(t *testing.T) {
 	if _, err := freshDestination(cfg.Out); err != nil {
 		t.Fatalf("authored output must admit a fresh hosted workspace: %v", err)
 	}
-	if build.Repository != repository || build.NVKEClone != filepath.Join(repository, "nvke-source") || cfg.Out != filepath.Join(repository, "nightly-site") ||
+	if build.Repository != repository || build.NVKEClone != "" || cfg.Out != filepath.Join(repository, "nightly-site") ||
 		!tenant || !cfg.Cleanup || cfg.Conformance || cfg.TenantWorkers != 1 || build.Jobs != 1 || cfg.Runs != (RunInputs{}) || cfg.NVKR != "" ||
-		cfg.Resources != (NativeResources{SiteMemoryGiB: 7, TenantMemoryGiB: 3, HeadroomMiB: 1024, VCPUs: 4, Profile: "small"}) {
+		cfg.Resources != (NativeResources{SiteMemoryGiB: 7, TenantMemoryGiB: 3, HeadroomMiB: 512, VCPUs: 4, Profile: "small"}) {
 		t.Fatalf("authored hosted configuration changed required inputs or lifecycle: build=%+v run=%+v", build, cfg)
 	}
 }
