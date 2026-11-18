@@ -211,8 +211,10 @@ and image publication batches can change membership. A GitHub job is one authori
 normally for one Build target or publication route. Source fetch, build,
 observation, SBOM and packaging share a producer job; attestation, publication, signing and remote
 verification share a release job with step-scoped credentials. An operation joins a job only when it adds
-no prerequisite, except bounded single-platform image publication batches that admit acyclic cross-output
-dependencies and at most two output routes per batch. Each image operation retains its timeout, evidence, signing and credential scope.
+no prerequisite, except bounded single-platform image publication batches and same-target source-fetch groups.
+Image batches admit acyclic cross-output dependencies and at most two output routes per batch.
+Source-fetch groups may combine acyclic dependencies on different source owners; the job waits for all
+those owners and shares their failure coupling. Each image operation retains its timeout, evidence, signing and credential scope.
 Same-Run source seeds share exact repository/commit/tree acquisition and matching vendor/platform closures;
 every consumer still authenticates its own inputs and waits for the selected owner's vendor operation. Shared source owners finish before producer work.
 A shared pinned root tool may be an additional prerequisite for a job,

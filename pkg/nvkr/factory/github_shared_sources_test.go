@@ -58,6 +58,29 @@ func TestGitHubSourceSeedsRequireExactPins(t *testing.T) {
 	}
 }
 
+func TestGitHubSourceSeedsSelectNativePreparedOwner(t *testing.T) {
+	for _, platforms := range [][]string{{"linux/amd64", "linux/arm64", "linux/arm64"}, {"linux/arm64", "linux/amd64", "linux/amd64"}} {
+		t.Run(platforms[0], func(t *testing.T) {
+			instruction := ir.Node{ID: "fetch", Kind: ir.KindFetch, Repo: "https://example.invalid/source",
+				Commit: strings.Repeat("a", 40), TreeHash: strings.Repeat("b", 40),
+				VendorCmd: []string{"vendor"}, VendorImage: "registry.example/vendor@sha256:" + strings.Repeat("c", 64)}
+			plan := &Plan{}
+			var nodes []Node
+			for i, name := range []string{"a", "b", "c"} {
+				plan.Builds = append(plan.Builds, BuildPlan{Name: name, Graph: &ir.Graph{Platform: platforms[i], Nodes: []ir.Node{instruction}}})
+				nodes = append(nodes, Node{ID: name + "/fetch", Kind: NodeFetch, BuildTarget: name, IRNode: "fetch"})
+			}
+			seeds, err := githubSourceSeeds(plan, nodes)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(seeds) != 2 || seeds["b/fetch"].ID != "a/fetch" || seeds["c/fetch"].ID != "b/fetch" {
+				t.Fatalf("native prepared owner selection = %+v", seeds)
+			}
+		})
+	}
+}
+
 func TestGitHubSharedSourcesKeepConsumerAdmission(t *testing.T) {
 	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-dev/plan.json")
 	if err != nil {
