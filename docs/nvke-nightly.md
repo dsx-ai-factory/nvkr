@@ -87,6 +87,25 @@ The demo's default StorageClass has no dynamic provisioner. It supplies four
 addition to the PostgreSQL and SPIRE volumes. Queue data survives Pod restarts
 within the disposable site VM; deleting that VM removes the data.
 
+An optional Helm-rendering check can detect queue-storage drift before a full VM
+cycle. Use the NKTP chart selected by the exact frozen NVKE revision and that
+revision's `deploy/nico/nktp/values.yaml`; do not mix either input with a newer
+checkout. For example, NVKE `d36f0b61ad1b0369087ddb3a277eec99fe63dbdb` selects the
+NGC `nktp` chart at `0.2.0` in its
+[deployment declaration](https://github.com/dsx-ai-factory/nvke/blob/d36f0b61ad1b0369087ddb3a277eec99fe63dbdb/deploy/nico/nktp/release.yaml).
+Keep the chart archive digest (or exact chart-source commit) with the test result.
+With Helm available, replace these paths with that matching pair:
+
+```sh
+NVKR_NATIVE_PROFILE_NKTP_CHART=/path/to/selected/nktp-0.2.0.tgz \
+NVKR_NATIVE_PROFILE_NKTP_VALUES=/path/to/frozen-nvke/deploy/nico/nktp/values.yaml \
+  go test ./internal/nvkedemo -run '^TestNativeSiteStorageMatchesSourceNKTPChart$' -count=1
+```
+
+The check validates rendered queue count, size and binding constraints. It skips
+when both inputs are absent and fails when only one is supplied. It remains
+optional and does not replace the full hosted E2E or acquire inputs in default CI.
+
 The six-hour job passes its remaining deadline to Go, which preserves two hours
 for independently bounded cleanup. Setup requires a GitHub-hosted AMD64 machine,
 KVM, unattended administrator access and sufficient disk/memory. A runner-scoped
