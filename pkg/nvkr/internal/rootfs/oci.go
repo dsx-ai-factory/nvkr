@@ -13,7 +13,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/ociclosure"
 )
 
@@ -28,7 +27,7 @@ const (
 // uncompressed layer emitted by the admitted mkosi recipe. This is byte
 // authentication, not a production or runtime-use receipt. The caller owns Close.
 // OCI process configuration is never used as a launcher instruction.
-func CaptureLayer(ctx context.Context, layout, digest, platform string) (*heldfile.File, error) {
+func CaptureLayer(ctx context.Context, layout, digest, platform, scratch string) (*Layer, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "runtime layer capture requires context")
 	}
@@ -120,7 +119,7 @@ func CaptureLayer(ctx context.Context, layout, digest, platform string) (*heldfi
 	if info.Size() != layer.Size {
 		return nil, e.New(e.CodeVerifyFailed, "runtime layer changed during capture")
 	}
-	held, err := heldfile.FromReaderContext(ctx, file, heldfile.Options{Label: "produced-runtime-layer", ExpectedDigest: layer.Digest, MaxBytes: layer.Size})
+	held, err := captureDiskLayer(ctx, file, layer.Digest, layer.Size, scratch)
 	if err != nil {
 		return nil, stageError(ctx, err)
 	}

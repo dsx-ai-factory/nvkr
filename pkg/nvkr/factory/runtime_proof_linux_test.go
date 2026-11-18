@@ -92,6 +92,7 @@ func TestNativeRuntimeConsumer(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer nativeRuntimeProofClose(t, workspace.Close)
+	nativeRuntimeProofMemory(t, "initial admission", workspace.Name())
 	admission, err := AdmitLocalVMBuild(ctx, plan, root.ID, workspace)
 	if err != nil {
 		t.Fatal(err)
@@ -134,6 +135,7 @@ func TestNativeRuntimeConsumer(t *testing.T) {
 		switch {
 		case node.Kind == NodeFetch: // Already fetched with its receipt outside root.
 		case node.ID == root.ID:
+			nativeRuntimeProofMemory(t, "consumer admission", workspace.Name(), scratch.location)
 			err = populateDiskProducerCompletion(ctx, plan, root.ID, owner,
 				func(ctx context.Context, selected Node, _ ir.Node) (*pipeline.PackerArtifact, *pipeline.ArtifactResult, error) {
 					return dispatchAdmittedVMProducer(ctx, admission, plan, selected, executor, owner)

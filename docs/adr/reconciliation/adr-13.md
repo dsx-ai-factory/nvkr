@@ -4,9 +4,13 @@ The mkosi runtime inventory reader authenticates a live production receipt, stag
 rechecks the embedded recipe/configuration and every original installed-package report, and measures
 projected file materials. `mkosi-installed/v1` CycloneDX projection binds those exact bytes and retains
 package archive pins as acquisition properties. Focused fixtures cover substitution, missing authority,
-revocation, package/root membership, deterministic ordering and descriptive validation. This inventory
-has not yet run on the native runtime proof output or through a completed public Run; maintained
-consumer compilation and Run-use integration remain gated as recorded in ADR-18 reconciliation.
+revocation, package/root membership, deterministic ordering and descriptive validation. The native
+[factory proof](https://github.com/njhensley/nvkr/actions/runs/44261280531) at
+`5d1012c7bc79b085e28b0da9b8b2f68bee8f22bb` completed runtime production, terminal observation and
+SBOM generation through the original owner. Its consumer then failed memory admission before Packer.
+The execution log records these successful operations; the failed attempt did not export the standalone
+SBOM documents. No completed public Run, disk consumption or publication is established. Maintained
+consumer selection remains gated as recorded in ADR-18 reconciliation.
 
 The native scanner adapter admits Syft JSON `16.1.10` and `16.1.13`, preserving
 the retained image schema while the inspector source advances to Syft v1.57.1.

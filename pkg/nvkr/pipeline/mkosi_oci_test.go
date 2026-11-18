@@ -106,7 +106,7 @@ func TestMkosiTarWrappingPreservesBytesAndIdentity(t *testing.T) {
 			if err != nil || !bytes.Equal(stored, original) {
 				t.Fatalf("tar bytes were repackaged: %v", err)
 			}
-			layer, err := rootfs.CaptureLayer(t.Context(), destination, subject, tc.platform)
+			layer, err := rootfs.CaptureLayer(t.Context(), destination, subject, tc.platform, t.TempDir())
 			if err != nil {
 				t.Fatalf("capture wrapped tar: %v; index %s", err, indexRaw)
 			}

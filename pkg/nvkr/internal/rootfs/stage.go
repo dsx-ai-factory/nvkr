@@ -9,6 +9,8 @@ package rootfs
 import (
 	"archive/tar"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io"
 	"os"
@@ -18,8 +20,8 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
 
 const (
@@ -74,11 +76,19 @@ func (tree *Tree) Close() error {
 	return nil
 }
 
-// Stage accepts only held bytes, creates a fresh private tree, and rejects
-// duplicate paths, device nodes, sparse encodings, archive extensions with
-// unknown semantics and every write through an archive-created symlink.
-// Absolute symlink targets remain inert until entry into the isolated root.
-func Stage(ctx context.Context, layer *heldfile.File, scratch string) (_ *Tree, resultErr error) {
+type layerInput interface {
+	io.ReaderAt
+	Size() int64
+	Digest() string
+	AssertUnchangedContext(context.Context) error
+}
+
+// Stage accepts only digest-bound bytes, creates a fresh private disk tree, and
+// rejects duplicate paths, device nodes, sparse encodings, unknown archive
+// extensions and writes through archive-created symlinks. It hashes the complete
+// extracted stream before release. Absolute symlinks remain inert until entry
+// into the isolated root.
+func Stage(ctx context.Context, layer layerInput, scratch string) (_ *Tree, resultErr error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "runtime staging requires context")
 	}
@@ -90,6 +100,14 @@ func Stage(ctx context.Context, layer *heldfile.File, scratch string) (_ *Tree, 
 	}
 	if err := layer.AssertUnchangedContext(ctx); err != nil {
 		return nil, stageError(ctx, err)
+	}
+	directory, _, err := securepath.OpenDirectory(scratch)
+	if err != nil {
+		return nil, stageError(ctx, err)
+	}
+	_, capacityErr := securepath.AvailableDiskBackedBytes(ctx, directory)
+	if err := errors.Join(capacityErr, directory.Close()); err != nil {
+		return nil, e.Wrap(e.CodeEngineCapability, err, "runtime extraction requires disk-backed scratch")
 	}
 	private, err := os.MkdirTemp(scratch, "nvkr-runtime-")
 	if err != nil {
@@ -114,7 +132,8 @@ func Stage(ctx context.Context, layer *heldfile.File, scratch string) (_ *Tree, 
 			resultErr = errors.Join(resultErr, restoreDirectoryAccess(root, directories), root.Close())
 		}
 	}()
-	stream := &contextReader{ctx: ctx, reader: io.NewSectionReader(layer, 0, layer.Size())}
+	hash := sha256.New()
+	stream := &contextReader{ctx: ctx, reader: io.TeeReader(io.NewSectionReader(layer, 0, layer.Size()), hash)}
 	reader := tar.NewReader(stream)
 	seen := make(map[string]byte)
 	var links []hardlink
@@ -218,6 +237,9 @@ func Stage(ctx context.Context, layer *heldfile.File, scratch string) (_ *Tree, 
 	}
 	if err := requireZeroTrailer(stream); err != nil {
 		return nil, stageError(ctx, err)
+	}
+	if "sha256:"+hex.EncodeToString(hash.Sum(nil)) != layer.Digest() {
+		return nil, e.New(e.CodeVerifyFailed, "runtime layer changed during extraction")
 	}
 	if err := createLinks(root, links, seen); err != nil {
 		return nil, stageError(ctx, err)

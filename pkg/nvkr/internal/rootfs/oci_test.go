@@ -66,7 +66,7 @@ func runtimeLayoutFixture(t *testing.T, mutateConfig func(map[string]any), mutat
 
 func TestCaptureRuntimeLayerHoldsExactBytes(t *testing.T) {
 	layout, digest, layerDigest := runtimeLayoutFixture(t, nil, nil)
-	layer, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64")
+	layer, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64", t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +87,7 @@ func TestCaptureRuntimeLayerHoldsExactBytes(t *testing.T) {
 	if err := tree.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if second, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64"); err == nil {
+	if second, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64", t.TempDir()); err == nil {
 		_ = second.Close()
 		t.Fatal("recapture accepted substituted producer bytes")
 	}
@@ -114,7 +114,7 @@ func TestCaptureRuntimeLayerRejectsOtherOCIForms(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			layout, digest, _ := runtimeLayoutFixture(t, tc.config, tc.manifest)
-			layer, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64")
+			layer, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64", t.TempDir())
 			if layer != nil {
 				_ = layer.Close()
 				t.Fatal("rejected OCI form returned held bytes")
@@ -131,6 +131,6 @@ func TestCaptureRuntimeLayerRejectsUnreferencedBlob(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(layout, runtimeBlobPath(name)), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64")
+	_, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64", t.TempDir())
 	requireStageCode(t, err, e.CodeVerifyFailed)
 }

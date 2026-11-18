@@ -29,7 +29,7 @@ func runtimeReceiptFixtureFiles(t *testing.T, files map[string]string) (ir.Node,
 	t.Helper()
 	node := ir.Node{ID: "build-runtime", Kind: ir.KindBuild, Component: "runtime", BuilderType: ir.BuilderMkosi,
 		OutputType: "oci-image", ArtifactPath: "nvkr-output/runtime"}
-	options := RunOptions{Ctx: t.Context(), SourceRoot: filepath.Join(t.TempDir(), "src")}
+	options := RunOptions{Ctx: t.Context(), MkosiScratch: t.TempDir(), SourceRoot: filepath.Join(t.TempDir(), "src")}
 	root := artifactHostPath(options, node)
 	if err := os.MkdirAll(filepath.Join(root, "blobs/sha256"), 0o755); err != nil {
 		t.Fatal(err)

@@ -15,7 +15,6 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/ociclosure"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/rootfs"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/runtimeuse"
@@ -31,7 +30,7 @@ type ProducedRuntime struct{ state *producedRuntimeState }
 
 type producedRuntimeState struct {
 	mu       sync.Mutex
-	layer    *heldfile.File
+	layer    *rootfs.Layer
 	binding  ProducedRuntimeBinding
 	result   ArtifactResult
 	root     string
@@ -133,7 +132,7 @@ func captureExecutedRuntime(ctx context.Context, platform, buildDigest string, p
 	if size != result.Size {
 		return nil, e.New(e.CodeVerifyFailed, "runtime layout size differs from its producer result")
 	}
-	layer, err := rootfs.CaptureLayer(ctx, root, result.SHA256, platform)
+	layer, err := rootfs.CaptureLayer(ctx, root, result.SHA256, platform, options.MkosiScratch)
 	if err != nil {
 		return nil, err
 	}

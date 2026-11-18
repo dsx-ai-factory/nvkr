@@ -542,7 +542,12 @@ after checking execution/write permissions and available disk-backed capacity. S
 upload, registry credential preparation, signing and publication remain outside this owner. No token,
 credential directory, authored environment or executable override is forwarded across the boundary.
 It admits the required mount, network, device, ownership
-and privilege-dropping capabilities before producer work. The owner stages the authenticated root
+and privilege-dropping capabilities before producer work. The owner retains the authenticated layer in a
+private disk-backed snapshot, closes its writable descriptor, and unlinks its pathname before retaining
+only the read-only descriptor. This is
+digest-bound retention, not a kernel memfd seal. The original owner rechecks its digest, and extraction
+hashes the complete stream before making the root available to a consumer. Neither large layers nor
+extracted roots may use memory-backed storage. The owner stages the authenticated root
 filesystem under a root-owned private directory and exposes it read-only, with no host root or
 container socket reachable by the payload. Source and material
 inputs remain read-only; private output and scratch locations are the only writable projections.

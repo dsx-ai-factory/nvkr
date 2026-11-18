@@ -3,7 +3,11 @@
 Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
 
 The Plan-produced VM runtime extension has manager-neutral package inputs, exact mkosi installed-package
-closure checks, source-closure acquisition, and immutable single-layer OCI capture. The native namespace
+closure checks, source-closure acquisition, and digest-bound single-layer OCI capture. The layer is
+retained on disk through an unlinked read-only descriptor; extraction rejects memory-backed storage
+and verifies the entire extracted stream before releasing its private root. Focused Linux tests cover
+disk backing, ownership, read-only retention, tampering, tmpfs rejection and cleanup. Native consumer
+execution with disk-backed retention remains unexercised. The native namespace
 [VM proof](https://github.com/njhensley/nvkr/actions/runs/44194123590) at
 `0dbb69bb55dc190884ef3ca2b9d673a6c365284d` exercised both assembly and consumer launchers on stock
 Ubuntu 24.04 AMD64 with kernel `7.0.0-1014-aws`. The separately owned executable tmpfs retained its
@@ -53,8 +57,8 @@ passes the original production and use receipt to the namespace Packer adapter. 
 SSH-key generation and validation stay offline; the build uses the fixed outbound helper. The factory
 compares the returned runtime-use record with the original receipt's completed binding before retaining
 the disk. Bounded disk/log collection and descriptive binding checks have focused tests. The maintained
-Environment has not switched to this route, and no native VM has exercised this adapter. No real Run has exercised
-the new runtime SBOM and dispatcher together. This proof does not establish disk-output
+Environment has not switched to this route, and no native VM has exercised this adapter. A native factory proof has completed runtime production, terminal observation and SBOM through the
+original owner, as scoped below; no completed public Run has exercised the consumer route. This proof does not establish disk-output
 equivalence, guest boot, ARM64 operation or a stronger evidence lane. The earlier isolated amd64
 [assembly Run](https://github.com/njhensley/nvkr/actions/runs/44145459516) built two byte-identical runtime
 archives from fresh roots and the same revalidated snapshot inputs. It used Ubuntu's mkosi package,
@@ -80,8 +84,15 @@ included ownership fixtures then failed because the service's `/tmp` was read-on
 disk execution still did not run. Both diagnostic services now direct temporary files into their owned
 scratch directories. The ownership fixtures pass in a bounded Linux container with read-only `/tmp`
 and an explicit writable scratch directory; the complete native consumer proof remains pending.
-The earlier assembly digest above describes the
-closure before this helper was added and does not evidence the changed runtime.
+The [factory production and SBOM attempt](https://github.com/njhensley/nvkr/actions/runs/44261280531)
+at `5d1012c7bc79b085e28b0da9b8b2f68bee8f22bb` passed initial admission, both fresh mkosi assemblies,
+the exact OCI reproduction gate, terminal observation and SBOM generation through the original owner.
+The repeated consumer admission then failed with 351/4096 MiB memory and 16499/16384 MiB workspace
+available/required inside the unchanged 5 GiB service. Packer and QEMU did not run. The retained log
+records successful production and SBOM operations, but the failed attempt did not export standalone
+OCI subject or SBOM documents. It establishes no completed runtime use, public Run or publication.
+The earlier assembly digest above describes the closure before the outbound helper was added and does
+not evidence the changed runtime.
 
 The quick machinery E2E [fork Run](https://github.com/njhensley/nvkr/actions/runs/44043009475)
 at `ee807779f8122a0cce1105853a0a82c88dbb4c56` passed on stock Ubuntu in 91 seconds (71 seconds
