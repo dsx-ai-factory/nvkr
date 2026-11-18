@@ -75,6 +75,7 @@ func (publication *publicationState) executableBundle(outputName string) (Binary
 	}
 	bundle := executable.bundle
 	bundle.Entries = slices.Clone(bundle.Entries)
+	bundle.Boot = bundle.Boot.clone()
 	return bundle, nil
 }
 

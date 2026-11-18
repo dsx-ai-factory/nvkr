@@ -29,6 +29,7 @@ const (
 	DefinitionKind                    = "Definition"
 	EnvironmentAPIVersion             = "nvkr.dev/environment/v1"
 	EnvironmentObjectStoresAPIVersion = "nvkr.dev/environment/v2"
+	EnvironmentBootAPIVersion         = "nvkr.dev/environment/v3"
 	EnvironmentKind                   = "Environment"
 	OutputExecutable                  = "executable"
 	OutputOCI                         = "oci"
@@ -162,6 +163,7 @@ type Publication struct {
 	// OCIRepresentation is an authored construction choice, never negotiated by push.
 	OCIRepresentation ociformat.Representation `json:"ociRepresentation,omitempty"`
 	ObjectStores      []ObjectStoreDestination `json:"objectStores,omitempty" yaml:"objectStores,omitempty"`
+	BootSelection     *BootSelection           `json:"bootSelection,omitempty"`
 	// Transports is a sorted, unique selection. Omission preserves the OCI route.
 	// APT is recognized but unavailable until its publication adapter is admitted.
 	Transports []string `json:"transports,omitempty"`
@@ -301,7 +303,7 @@ func (definition Definition) Digest() (string, error) {
 }
 
 func (environment Environment) Validate() error {
-	if (environment.APIVersion != EnvironmentAPIVersion && environment.APIVersion != EnvironmentObjectStoresAPIVersion) || environment.Kind != EnvironmentKind || !namePattern.MatchString(environment.Metadata.Name) {
+	if (environment.APIVersion != EnvironmentAPIVersion && environment.APIVersion != EnvironmentObjectStoresAPIVersion && environment.APIVersion != EnvironmentBootAPIVersion) || environment.Kind != EnvironmentKind || !namePattern.MatchString(environment.Metadata.Name) {
 		return e.New(e.CodeInvalidCatalog, "environment has unsupported apiVersion/kind or invalid name")
 	}
 	if err := environment.validateObjectStores(); err != nil {
