@@ -1,8 +1,8 @@
 # NVKE deploy example
 
-This nine-output Definition builds CWE, a runnable fixture profiles image, and its controller chart and acquires the four external charts
+This nine-output Definition builds the NVKE container image (`cwe`), a runnable fixture profiles image, and its controller chart and acquires the four external charts
 selected by NVKE `v0.23.0`. It remains available for local execution. The committed GitHub workflow uses
-[the combined M2 Definition](../../../inputs/definitions/nvke/README.md), which has its own output selection and additional artifacts.
+[the combined NVKE release candidate Definition](../../../inputs/definitions/nvke/README.md), which has its own output selection and additional artifacts.
 
 | Output | Selected input |
 |---|---|
@@ -70,13 +70,13 @@ go run ./cmd/nvkr run local \
 ```
 
 The executed record is `.nvkr/runs/nvke-deploy-001/lifecycle.json`. Local execution has no publication or
-signing. CWE uses upstream Dockerfile network dependencies; it is a wrapped, unqualified build.
+signing. The NVKE container image uses upstream Dockerfile network dependencies; it is a wrapped, unqualified build.
 
 ## Hosted workflow ownership
 
-Use [the M2 README](../../../inputs/definitions/nvke/README.md#generate-and-check-the-maintained-workflow) for the maintained bundle
+Use [the NVKE release candidate README](../../../inputs/definitions/nvke/README.md#generate-and-check-the-maintained-workflow) for the maintained bundle
 and its source, runner, registry and signing requirements. Generating this deploy example into the repository
-root would replace that bundle and fail the M2 drift check. A dispatch of the committed `nvkr-run.yml` executes M2; dispatch does not select a different Definition.
+root would replace that bundle and fail the NVKE release candidate drift check. A dispatch of the committed `nvkr-run.yml` executes NVKE release candidate; dispatch does not select a different Definition.
 This is the checked-in candidate configuration, not a ratified canonical-product/path or namespace decision.
 No parallel generated deploy workflow is maintained at that fixed path.
 
@@ -85,7 +85,7 @@ repository gate, workflow lint and dry-runs. Those dry-runs observed zero artifa
 `static-unqualified`; no complete six-output build or hosted publication was exercised at that revision.
 The current nine-output Definition has separate native-route and profiles producer contract coverage;
 those checks do not extend the historical record or establish a complete nine-output build.
-Current M2 candidate publication is separate evidence with its own exact inputs and limits.
+Current NVKE release candidate publication is separate evidence with its own exact inputs and limits.
 
 This example does not package an installer/deploy bundle, build NKTP or the provider image, mirror all
 runtime images, or establish release qualification.

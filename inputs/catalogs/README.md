@@ -4,7 +4,12 @@ The shared owner directories contain the maintained catalogs and explicit diagno
 public OS catalog is isolated under [`../experiments/public-os-sources`](../experiments/public-os-sources/README.md).
 Shared declaration owners live in [`shared/`](shared/README.md). Registries retain explicit selections and
 independent lock cohorts; identical source and component instructions are authored once in those fragments.
-The 34 catalog entrypoints retain their existing Definition references and resolved producer identities.
+The 35 catalog entrypoints retain their existing Definition references and resolved producer identities.
+
+Catalog metadata names match slash-separated paths relative to this directory, for example `nvke/release`.
+Legacy names remain readable in old catalog releases and captured Plans. A metadata rename changes catalog
+snapshot and dependent Plan identities, so overlays, name-keyed local toolchain bindings and generated
+consumers move together. Producer keys and pins keep their existing contracts.
 
 Each leaf catalog contains `registry.yaml` and `pins.lock.yaml`. `node-images/variants/` contains
 predecessor-bound producer replacements and toolchain substitutions, not additional catalogs.
@@ -27,7 +32,7 @@ source-built NICo Core and Flow images, pinned independently of NVKE to one infr
 Both images use the generic rootless BuildKit route with digest-pinned bases. Core chains the source's
 native build, runtime and release Dockerfiles in one producer per architecture. No maintained Definition
 currently selects the five NICo outputs; the [product families](../definitions/nvke/README.md#product-families)
-explains their withdrawal. A cold Core build may exceed the generated hosted build-job budget; no hosted Run has built it.
+explain their withdrawal. A cold Core build may exceed the generated hosted build-job budget; no hosted Run has built it.
 
 [`local-path-provisioner`](local-path-provisioner/registry.yaml) packages Rancher's chart from
 source, patched to accept image digests, and binds its acquired provisioner and helper images.

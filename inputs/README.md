@@ -3,7 +3,7 @@
 This directory owns the repository's NVKE, NVSentinel and AICR build and release inputs. Definitions select named outputs
 from pinned catalog producers; Environments select execution and publication policy. The maintained
 release candidate starts at [the NVKE Definition](definitions/nvke/definition.yaml).
-The [product families](definitions/nvke/README.md#product-families) supplies independent core, services,
+The [product families](definitions/nvke/README.md#product-families) supply independent core, services,
 telemetry and disk Definitions alongside that combined candidate, and the
 [GPU site composite](definitions/nvke/README.md#gpu-site-composite) releases the five families and the GB200 AICR bundle together.
 
@@ -101,7 +101,7 @@ together. Maintain pins through `catalog pin`/`catalog bump`; use
 [catalog maintenance](../docs/catalog-maintenance.md) for the complete workflow. Definition reuse is
 explicit producer selection, without inheritance or execution-time output filtering.
 
-`make workflows-generate` regenerates the maintained release, product-families, development, nightly and qualification
+`make workflows-generate` regenerates the maintained release, product-family, development, nightly and qualification
 bundles. `make workflows-check` checks their exact recorded inputs. The product-family targets are
 `make nvke-split-generate` and `make nvke-split-check`. Generated bundles remain under
 `.github/`; Run records and release artifacts remain with their execution/publication owners.

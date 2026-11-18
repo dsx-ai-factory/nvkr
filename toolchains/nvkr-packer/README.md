@@ -163,7 +163,7 @@ required review remains an organizational publication gate, not a technical
 control implemented by this source lock.
 
 The [October 6 candidate record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md#candidate-publication-exception)
-records the user's explicit exception for four measured native images used only by M2.
+records the user's explicit exception for four measured native images used only by NVKE release candidate.
 That exception permits the candidate overlay; it does not mark these general review gates approved.
 
 This source and a successful container build prove only the toolchain layout.
@@ -211,15 +211,15 @@ successful NVKE image bake.
 
 Consume a reviewed published native image through the catalog's existing `toolchainSubstitutions` contract:
 bind the exact predecessor catalog digest, native `arch`, existing `from` pin, measured `to` pin and sorted
-explicit component set. For each M2 disk, the nine source-map consumers are `nvke-agent`, `nvke-cni-calico`,
+explicit component set. For each NVKE release candidate disk, the nine source-map consumers are `nvke-agent`, `nvke-cni-calico`,
 `nvke-cni-ovn`, `nvke-image-inputs`, `nvke-kubeadm-distro`, `nvke-node-image`, `nvke-patched-installer-iso`,
 `nvke-spire-agent` and `ovn-kubernetes-chart`. Preserve `ovn-kube-ubuntu`'s independent BuildKit override.
 An upstream index tag or inherited local ID cannot replace the selected native publication pin.
 After publication, read back the exact repository reference's native descriptor, for example
 `crane digest --platform linux/arm64 '<repository>@sha256:<digest>'`, with the matching platform.
 
-The source lock's historical `validatedNVKE` commit is not validation of the capture-enabled M2 source.
-The [M2 README](../../inputs/definitions/nvke/README.md) owns current source selections, candidate exceptions
+The source lock's historical `validatedNVKE` commit is not validation of the capture-enabled NVKE release candidate source.
+The [NVKE release candidate README](../../inputs/definitions/nvke/README.md) owns current source selections, candidate exceptions
 and generated execution requirements; the machine-managed locks and overlay own their exact values.
 Native preparation and registry read-back do not establish source-owner release acceptance, runtime
 isolation, a full image bake, organizational approval or independent consumer acceptance.

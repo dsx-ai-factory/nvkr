@@ -62,12 +62,17 @@ func TestCatalogNameMigrationPreservesBuildIdentity(t *testing.T) {
 	if oldDigest == newDigest || before.DefinitionDigest == after.DefinitionDigest {
 		t.Fatal("renamed metadata did not change Plan and Definition identities")
 	}
+	if len(before.Builds) != len(after.Builds) {
+		t.Fatal("metadata changed build membership")
+	}
+	changed := false
 	for i, build := range before.Builds {
+		changed = changed || build.CatalogDigest != after.Builds[i].CatalogDigest
 		if build.BuildDigest != after.Builds[i].BuildDigest || !reflect.DeepEqual(build.ResolvedComponents, after.Builds[i].ResolvedComponents) {
 			t.Fatalf("metadata changed producer identity for %s", build.Name)
 		}
 	}
-	if before.Builds[1].CatalogDigest == after.Builds[1].CatalogDigest {
+	if !changed {
 		t.Fatal("renamed catalog retained snapshot identity")
 	}
 }

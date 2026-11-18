@@ -317,7 +317,7 @@ interruption between the two converges on the next run. The one file matching
 prefix `<d>` only names the review branch `catalog-maintenance/<d>`. Adding or removing such a file is a reviewed
 change. Exactly one policy can be enrolled until each Definition owns a generated bundle root, because
 `catalog refresh` always checks the bundle at the repository root; rendering and the `discover` job both fail on
-a second policy. Today only `nvke` is enrolled, for the `nvke-m2` Definition. Its policy selects the NVKE
+a second policy. Today only `nvke` is enrolled, for the `nvke-release` Definition. The maintenance policy retains its own `nvke-m2` name for compatibility. Its policy selects the NVKE
 umbrella and `nvke-helm`, so the NVKE release and its derived chart pins move together within the registry
 constraints. It cannot widen them.
 

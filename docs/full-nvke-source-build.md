@@ -19,7 +19,7 @@ The catalogs introduced by
 [public-source producers](../inputs/experiments/public-os-sources/README.md) and
 [OVN outputs](../inputs/catalogs/ovn-nvidia/README.md). The local demo selects
 the OVN fork producers for the disk's chart/image packages. The other direct-source
-OS producers are not yet integrated into that selection. NVKE release still uses the source-owned package-folder
+OS producers are not yet integrated into that selection. The NVKE release candidate still uses the source-owned package-folder
 producers and temporarily retains the older plugin-free SPIRE package; the remaining direct-source catalog is not integrated.
 The remaining migration is not completed by merging those
 candidate catalogs.
@@ -29,7 +29,7 @@ candidate catalogs.
 | CLI/controller/chart | Local source producers and controller image binding | Exercise the complete final source-built selection; migrating to a different NVKE baseline also requires its matching build interface/toolchain |
 | CAPNICo | This example selects a source-owned BuildKit producer at public v0.0.45, commit `30882520888ab7bb75d125cb7bb9aa89e48acd6a` | Include it in the complete Run and validate provider reconciliation; a producer declaration is not runtime acceptance |
 | Provisioned provider | Existing `inputs/catalogs/nvke/release` source producer, selected locally | Include it in the complete Run and validate provider reconciliation; the NICo demo does not use this provider |
-| Fleet profiles | NVKE `image.yml` identifies `nvke-site-deploy` as the production source; NVKE release's `nico-reference-profiles-fixture` is explicitly test data, not production profiles | Accessible Git URL and approved revision, producer and image output. A signed reference fixture does not satisfy production fleet-profile delivery |
+| Fleet profiles | NVKE `image.yml` identifies `nvke-site-deploy` as the production source; the NVKE release candidate's `nico-reference-profiles-fixture` is explicitly test data, not production profiles | Accessible Git URL and approved revision, producer and image output. A signed reference fixture does not satisfy production fleet-profile delivery |
 | Kubernetes/containerd/crictl/CNI/Helm/TPM | PR #113 has fourteen direct-source producers across supported versions | Integrate the candidate catalog and package the authenticated outputs for actual consumers. Its static containerd subset is not feature-equivalent to NVKE's upstream release archive; held Helm preparation remains a separate hosted-route limitation, not a blocker to the local developer-fetch route |
 | Remaining OS application dependencies | PR #113's inventory maps released inputs and missing source producers | SPIRE, runc with seccomp, CoreDNS, etcd, pause, Calico/Tigera and embedded OCI images; preserve package dependencies, paths, units, hooks and import behavior |
 | OVN image/chart/packages | The local demo selects PR #113's pinned DSX fork producers for its OS material closure, with matching profile and tenant chart stream | Fresh Packer/boot acceptance and maintained NVKE release integration. Independently published outputs are separate from embedded-disk bytes unless original-owner reuse is established. The fork's standard Ubuntu Dockerfile still uses APT; not every embedded subcomponent is Git-built |

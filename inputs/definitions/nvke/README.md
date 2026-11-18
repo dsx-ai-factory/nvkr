@@ -127,6 +127,11 @@ takes them from its NICo deployment or builds them as
 NVKR's role ends at building, signing and publishing these outputs. GPU driver, fabric and runtime acceptance
 belongs to AICR and NVKE evidence, and NVKR records none ([reconciliation](../../../docs/adr/reconciliation/maintained-input-and-schema-boundaries.md#maintained-input-and-schema-boundaries)).
 
+The maintained Definition is named `nvke-release` (formerly `nvke-m2`). Future generated workflow display
+names and Definition-keyed result paths use that name; historical results remain where they were written.
+Existing `m2-candidate` registry prefixes, Environment/overlay names and the maintenance policy's own
+`nvke-m2` name remain compatibility identifiers. Update external dashboard filters when selecting new Runs.
+
 ## Product families
 
 Five independent Definitions partition 68 of the combined candidate's 69 named outputs, and together add 12
@@ -336,7 +341,7 @@ The source's composition command receives the required explicit native `--archit
 The selected material projection binds `image-inputs` as `archive` and `installer-iso` as `disk-image`
 under `nvke.nvidia.com/os-image-materials/v1`; every selected material and disk target retains its own architecture.
 
-This is a candidate Definition, not completed NVKE release acceptance. The production target Environment reuses
+This is a candidate Definition, not completed acceptance of the NVKE release candidate. The production target Environment reuses
 the existing registry credential, source access and workflow signing policy, but publishes only under
 the separately authored `ghcr.io/dsx-ai-factory/nvkr/m2-candidate` prefix. The maintained signer identity
 admits only `main`; the temporary PR #97 branch-test exception has been removed after the
@@ -348,7 +353,7 @@ The OS catalog directly retains its published ARM64 Docker Packer pin.
 The two inspector profiles use measured executable hashes and published native image manifests.
 Their bounded budgets cover up to an 8 GiB subject and 16 GiB filesystem: 28 GiB inspection memory,
 224 GiB private scratch and a ten-minute deadline. Execution classes request 36 GiB memory to
-include the held subject snapshot. These are admission budgets, not measured full-NVKE release usage.
+include the held subject snapshot. These are admission budgets, not measured usage for the complete NVKE release candidate.
 The inspector and Packer source locks retain their outstanding organizational approval gates;
 the [candidate exception and publication evidence](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md)
 records the narrower authorization and exact registry read-back.
@@ -372,7 +377,7 @@ and [NKX-18052](https://nvidia.atlassian.net/browse/NKX-18052)).
 The product acceptance floor remains AMD64; this candidate retains the separately selected ARM64
 extension, and all four disk outputs remain mandatory for completion of this Definition.
 Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
-NVKE release candidate requires publication, signatures and consumer verification for every selected output.
+The NVKE release Definition requires publication, signatures and consumer verification for every selected output.
 The [failed delivery attempt](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md)
 records the earlier aggregate transport failure; the per-output route below avoids aggregate payload downloads.
 Per-output storage peaks still require measured admission.
@@ -413,7 +418,7 @@ The direct-Packer contract opts into APT capture and declares the matching plain
 source-owned material projection. Capture byte correspondence alone does not authenticate repository
 origin or establish a complete installed-software inventory.
 
-The Environment explicitly selects `diskEvidence: build-provenance-v1`. NVKE release authenticates the held disk
+The Environment explicitly selects `diskEvidence: build-provenance-v1`. The NVKE release pipeline authenticates the held disk
 and its live producer/material subjects and signs evidence describing the deferred inspection scope.
 Deep content inspection and reconciliation are deferred beyond the approved M3 MVP. The existing strict
 inspection profiles remain available for plain disks, but this mode neither prepares nor invokes the inspector.
@@ -451,7 +456,7 @@ budgets, not observed allocation or general runner-capacity guarantees. Docker u
 and producer-declared build-network controls; no ambient storage-driver workaround is selected.
 
 `../../catalogs/node-images/release` directly retains the historical published ARM64 Docker Packer candidate.
-`../../catalogs/node-images/variants/native-toolchains.yaml` substitutes the measured published AMD64 Packer pin for its nine NVKE release
+`../../catalogs/node-images/variants/native-toolchains.yaml` substitutes the measured published AMD64 Packer pin for its nine NVKE release candidate
 source-map consumers and the FDE root, preserving OVN's separate BuildKit pin. These historical images do not establish
 reproduction of the current Dockerfile or bootstrap compiler. Internal Packer/inspector images were
 published under the user's scoped candidate exception. Their source locks retain unresolved general
@@ -461,7 +466,7 @@ and [inspector measurement](../../../toolchains/nvkr-disk-inspect/README.md#loca
 
 Strict profiles contain actual native image/executable pins and conservative bounds: up to an 8 GiB
 subject, 16 GiB filesystem, 28 GiB inspection memory, 224 GiB private scratch and a ten-minute deadline.
-These retained profiles do not demonstrate a successful full NVKE release inspection or measured peak usage.
+These retained profiles do not demonstrate a successful inspection of the complete NVKE release candidate or measured peak usage.
 
 Publication uses the separate `ghcr.io/dsx-ai-factory/nvkr/m2-candidate` prefix and
 `publication.mode: per-output-v1`. Each output is packaged, published, signed and verified independently.

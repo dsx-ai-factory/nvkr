@@ -52,7 +52,8 @@ from one upstream release's version file. Update those members through their own
 
 `--catalog` is the catalog-directory flag for inspection, resolution, pinning and starter authoring.
 `--data` and `--dir` remain compatibility aliases. Supply only one spelling per invocation;
-combining aliases is a coded usage error before catalog reads or writes.
+combining aliases is a coded usage error before catalog reads or writes. The separate validator
+commands use `--catalog` for a validator index, not a producer catalog directory; these aliases do not apply there.
 
 ## Producer bytes and final formats
 

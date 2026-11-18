@@ -8,7 +8,7 @@ The [native ARC preparation record](https://github.com/dsx-ai-factory/nvkr/blob/
 This source configuration is not a published or qualified NVKR toolchain.
 Both native `images` slots and license/security approval gates remain unresolved.
 The [October 6 candidate exception](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-native-arc.md#candidate-publication-exception)
-separately authorizes internal publication and M2 selection of the recorded native images;
+separately authorizes internal publication and NVKE release candidate selection of the recorded native images;
 it does not claim completed organizational reviews.
 The Dockerfile
 uses an exact official Ubuntu 24.04 base, the existing Packer toolchain's
@@ -262,7 +262,7 @@ After separately authorized publication supplies an exact reference, read back t
 descriptor using `crane digest --platform linux/amd64 '<repository>@sha256:<digest>'`, or ARM64 on its
 native host. Local image inspection and executable measurements above do not publish, approve or
 authenticate that reference. The inspector and Packer source locks retain their general approval gates;
-the [M2 candidate](../../inputs/definitions/nvke/README.md) uses a separately recorded exception.
+the [NVKE release candidate](../../inputs/definitions/nvke/README.md) uses a separately recorded exception.
 
 The selected root's native host binding chooses the profile; guest package architecture remains a
 different field. The authenticated runtime accessor contract can be checked independently:
@@ -274,5 +274,5 @@ go test ./pkg/nvkr/pipeline \
 
 That controlled test does not scan a real disk, measure a native closure or prove original live-Run
 reconciliation. Strict full-content discovery/receipt contracts are implemented, but successful complete
-native NVKE inspection and reconciliation remain unexercised. M2 explicitly uses `build-provenance-v1`
+native NVKE inspection and reconciliation remain unexercised. NVKE release candidate explicitly uses `build-provenance-v1`
 and defers deep inspection to M3; it does not prepare or execute these retained strict profiles.

@@ -44,7 +44,7 @@ components:
     writeDir: bin
 kind: SourceBuildRegistry
 metadata:
-  description: NVKE components from the release v0.23.0 at 2cfd00081b468d85a4894ec17e9deac13c9d8169. The CLI uses an offline Go build; CWE wraps the upstream Dockerfile in digest-pinned
+  description: NVKE components from the release v0.23.0 at 2cfd00081b468d85a4894ec17e9deac13c9d8169. The CLI uses an offline Go build; the NVKE container image wraps the upstream Dockerfile in digest-pinned
     rootless BuildKit.
   name: nvke/module-tags
 sources:

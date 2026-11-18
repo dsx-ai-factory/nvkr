@@ -42,8 +42,16 @@ Maintained catalog metadata uses the slash-separated directory identity relative
 for example `nvke/release`. This is descriptive naming, not a schema or producer-key rename.
 Existing catalog names remain accepted. Renaming metadata changes the catalog snapshot digest;
 rebind authored overlay predecessors through the snapshot/stack owner and regenerate generated copies
-and dependent Plans through their owners. Lock bytes and selected producer Build Digests remain unchanged
+and dependent Plans through their owners. Update explicit name-keyed local toolchain binding selectors in the same migration. Lock bytes and selected producer Build Digests remain unchanged
 when only names change. Previously captured Plans retain their original bytes and identities.
+The maintained Definition name migrates from `nvke-m2` to `nvke-release`. Its generated workflow display
+names become `nvkr-run-nvke-release`, `nvkr-qualify-nvke-release` and `nvkr-smoke-nvke-release`, including
+the owning workflow-run trigger. Definition-keyed result paths for new Runs use the new name;
+historical results are not moved. The required repository check remains `gate`. External dashboards
+or consumers filtering the old display name or result prefix must select the new name for future Runs.
+Registry namespaces containing `m2-candidate`, existing Environment/overlay names and the maintenance
+policy's own `nvke-m2` name remain compatibility identifiers; they do not rename with the Definition.
+
 
 Both files carry explicit `apiVersion` and `kind`. Readers dispatch to an exact versioned schema, reject unknown
 versions/kinds/fields, and never interpret a future lock as the current version. A missing lock is an input error,

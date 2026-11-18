@@ -416,7 +416,7 @@ clean: ## Remove build output, coverage, and the local engine workspace.
 
 .PHONY: run-resolve
 run-resolve: build ## Resolve the pinned kubectl producer and print its build graph.
-	$(BIN) resolve --data testdata/catalogs/kubernetes-layered --component kubectl --platform linux/amd64
+	$(BIN) resolve --catalog testdata/catalogs/kubernetes-layered --component kubectl --platform linux/amd64
 
 .PHONY: demo-hello
 demo-hello: ## Build and verify the hello demo (requires running Docker).

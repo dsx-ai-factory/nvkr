@@ -684,7 +684,7 @@ bindings require their chart platform to belong to the index's declared and obse
 complete index digest. No post-build manifest rewrite or `platform: multi` is admitted. Explicit discovery
 aliases follow the post-readback rule in section 2. M2 ARC/per-output metadata-only publication composition
 and a dual-native hosted build/sign/publication remain separate, unexercised integration work. See
-[multi-architecture CWE delivery](../multiarch-cwe-delivery.md).
+[multi-architecture NVKE image delivery](../multiarch-cwe-delivery.md).
 
 ### 5. Credentials by reference, never embedded
 

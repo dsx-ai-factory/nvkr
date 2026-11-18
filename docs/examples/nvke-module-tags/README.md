@@ -160,7 +160,7 @@ bin/nvkr catalog pin --catalog inputs/catalogs/nvke/module-tags --tag v0.23.0 nv
 Repin only through `nvkr catalog pin`; never hand-edit the lock. Regenerate CI after changing pins.
 
 The generated workflow path is `.github/workflows/nvkr-run.yml`, with exact inputs under
-`.github/nvkr-run/`. Its current repository selection is NVKE release, not this three-output alternative; use
+`.github/nvkr-run/`. Its current repository selection is the NVKE release candidate, not this three-output alternative; use
 `make workflows-check` for that maintained selection. Dispatch runs whichever reviewed bundle is committed
 at the selected ref and does not choose a different Definition. This alternative's GitHub Environment targets
 the `nvkectl`, `cwe` and `nvke-helm` repositories under `ghcr.io/dsx-ai-factory/nvkr` and uses the

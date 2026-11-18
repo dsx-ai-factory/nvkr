@@ -5,7 +5,7 @@ apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
   name: ovn-nvidia
-  description: Candidate native OVN image, Helm chart and CNI packages from the internal DSX GitHub fork. Requires authenticated host-side source acquisition; not selected by maintained OS/M2 inputs.
+  description: Candidate native OVN image, Helm chart and CNI packages from the internal DSX GitHub fork. Requires authenticated host-side source acquisition; not selected by maintained OS and NVKE release inputs.
 sources:
   ovn-kubernetes:
     repo: https://github.com/dsx-ai-factory/ovn-kubernetes
