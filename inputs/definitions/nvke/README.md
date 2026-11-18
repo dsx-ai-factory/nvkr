@@ -376,7 +376,7 @@ beyond that MVP ([ADR-13](../../../docs/adr/0013-supply-chain-evidence.md#6-pipe
 and [NKX-18052](https://nvidia.atlassian.net/browse/NKX-18052)).
 The product acceptance floor remains AMD64; this candidate retains the separately selected ARM64
 extension, and all four disk outputs remain mandatory for completion of this Definition.
-Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
+Omitting producer `diskEvidence` still selects the strict contract.
 The NVKE release Definition requires publication, signatures and consumer verification for every selected output.
 The [failed delivery attempt](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-release-carrier-transport.md)
 records the earlier aggregate transport failure; the per-output route below avoids aggregate payload downloads.
