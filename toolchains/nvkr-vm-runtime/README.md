@@ -24,7 +24,8 @@ These copies preserve the baseline bytes and confer no Secure Boot or signing au
 The native assembly backend requires privileged launcher setup and an explicitly owned executable
 scratch filesystem. Assembly runs in a separate user namespace with no mapped host root or external
 network. The host's bootstrap utilities are not snapshot-pinned; this route makes no hermetic or qualified
-claim. Two fresh assembly roots must produce identical complete OCI closures before a result is exposed.
+claim. Mkosi emits an uncompressed tar, which NVKR wraps unchanged as a single OCI layer with deterministic
+config and manifest. Two fresh assembly roots must produce identical complete OCI closures before a result is exposed.
 The resulting digest changes when any selected source, package, configuration or projected file changes.
 
 The opt-in VM diagnostic is `bash scripts/test-mkosi-assembly.sh /absolute/evidence-directory` from the

@@ -34,7 +34,8 @@ type Invocation struct {
 
 // Invocations first assemble all package roots as directories. The final pass
 // packages the last root, file materials and retained original package reports
-// into a single-layer OCI image. It does not resolve or install more packages.
+// into an uncompressed tar for the execution owner to wrap as one OCI layer.
+// It does not resolve or install more packages.
 func (spec *Spec) Invocations(platform string, bindings []string) ([]Invocation, error) {
 	if err := spec.Validate(platform, bindings); err != nil {
 		return nil, err
@@ -57,7 +58,7 @@ func (spec *Spec) Invocations(platform string, bindings []string) ([]Invocation,
 		invocations = append(invocations, operation)
 	}
 	last := spec.Roots[len(spec.Roots)-1]
-	operation := rootInvocation(last, architecture, "oci", "/work/packaging")
+	operation := rootInvocation(last, architecture, "tar", "/work/packaging")
 	operation.Command = append(operation.Command, "--base-tree="+rootOutput(last.Name), "--extra-tree=/inputs/evidence")
 	if len(spec.Files)+len(spec.Copies)+len(spec.Contents) != 0 {
 		operation.Command = append(operation.Command, "--extra-tree=/inputs/file-materials")

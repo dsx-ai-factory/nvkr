@@ -505,8 +505,10 @@ Only the APT adapter is initially admitted. Acquisition authenticates metadata a
 before assembly, which runs without network access. The original mkosi JSON installed-package report
 must match the entire retained package selection, including dependencies; surplus, missing, duplicate
 or substituted packages fail. The report is an installed-content input to SBOM generation, not a
-replacement for acquisition materials or package/license review. Fresh assembly roots must also pass
-the byte-identical output gate before the runtime can be consumed.
+replacement for acquisition materials or package/license review. Mkosi emits an uncompressed tar;
+NVKR wraps those exact bytes as one uncompressed OCI layer with deterministic config and manifest.
+The layer digest and config diff ID both equal the tar's SHA-256. Fresh assembly roots must also pass
+the byte-identical complete OCI closure gate before the runtime can be consumed.
 
 Native assembly receives mount and package-ownership capabilities only in a separate user namespace.
 Its root maps to an unprivileged host ID range; host root is outside the mapping. The privileged owner

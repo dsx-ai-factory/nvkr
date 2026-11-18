@@ -130,7 +130,10 @@ func assembleMkosi(ctx context.Context, node ir.Node, options RunOptions, scratc
 			return nil, err
 		}
 	}
-	output := mkosiWorkPath(workspace.work, operations[len(operations)-1].Output)
+	output := filepath.Join(workspace.work, "runtime-oci")
+	if err := wrapMkosiTar(ctx, workspace.work, operations[len(operations)-1], node.Platform, output); err != nil {
+		return nil, err
+	}
 	subject, size, err := inspectMkosiOutput(ctx, node, output, workspace.inputs, workspace.parent)
 	if err != nil {
 		return nil, err

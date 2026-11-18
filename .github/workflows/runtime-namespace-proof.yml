@@ -36,7 +36,7 @@ jobs:
         env:
           NAMESPACE_EVIDENCE: ${{ runner.temp }}/runtime-namespace-evidence
         run: bash scripts/test-runtime-namespace.sh "$NAMESPACE_EVIDENCE"
-      - name: Assemble twice with the staged local mirror on the VM kernel
+      - name: Assemble and wrap two fresh tar outputs on the VM kernel
         env:
           ASSEMBLY_EVIDENCE: ${{ runner.temp }}/runtime-assembly-evidence
         run: bash scripts/test-mkosi-assembly.sh "$ASSEMBLY_EVIDENCE"

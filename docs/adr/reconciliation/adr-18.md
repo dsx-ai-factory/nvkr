@@ -15,12 +15,13 @@ the revised launcher has no corresponding ARM64 VM proof. The production assembl
 the source-pinned module, performs two fresh offline builds, checks original package reports and measured
 files in each packaged layer, and requires identical complete OCI closures before issuing a production
 receipt. Its focused tests cover staging, substitution rejection, closure checking and receipt revocation;
-the [source-bootstrap assembly attempt](https://github.com/njhensley/nvkr/actions/runs/44207984513) at
-`8b9b9a13f9bb323bb66de866ede2e24a086cdc79` completed pinned acquisition and entered mkosi in the native
-namespace, then failed before package installation because its nested sandbox required `/dev/full`.
-The pinned source also requires `/dev/tty`. A subsequent fix supplies these fixed API devices only to
-assembly and creates a fresh session without the caller's controlling terminal. Native assertions for
-the device numbers, full-device `ENOSPC` behavior and absent controlling terminal await execution.
+the [source-bootstrap assembly attempt](https://github.com/njhensley/nvkr/actions/runs/44210223101) at
+`76e5420eab085b1158c5033b6a8a7aee7aa3b9fe` passed the native namespace assertions, including assembly-only
+`/dev/full` and `/dev/tty`, full-device `ENOSPC` behavior and absence of a controlling terminal. It installed
+and checked both package roots, then failed in the pinned mkosi revision's uncompressed OCI media-type
+handling. The backend now asks mkosi for tar output and wraps its unchanged bytes with NVKR's daemonless
+OCI library; this preserves the existing single uncompressed layer contract and source pin. Native
+execution of the tar-wrapping path remains pending.
 No production runtime OCI output or receipt has been observed. Run-bound evidence and consumer receipts,
 Environment binding and generated Plan integration remain incomplete, so maintained Run execution stays
 gated. The isolated amd64

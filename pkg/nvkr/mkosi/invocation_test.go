@@ -39,7 +39,7 @@ func TestOfflineInvocationBoundary(t *testing.T) {
 					if operation.Format != "directory" || operation.PackageConfiguration != "[Content]\nPackages=\n    base-files=1.0\n" {
 						t.Fatalf("package root lost its exact installed selection: %+v", operation)
 					}
-				} else if operation.Format != "oci" || operation.PackageConfiguration != "" || strings.Contains(command, "--package-directory=") ||
+				} else if operation.Format != "tar" || operation.PackageConfiguration != "" || strings.Contains(command, "--package-directory=") ||
 					!slices.Contains(operation.Command, "--base-tree=/work/roots/runtime/output/runtime") || !slices.Contains(operation.Command, "--extra-tree=/inputs/evidence") {
 					t.Fatal("packaging pass lost its completed root/reports or may reinstall packages")
 				}
