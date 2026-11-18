@@ -26,7 +26,7 @@ jobs:
       - name: Check out the tested source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          # Exercise the bounded guest with its generated checksum file.
+          # Retain the complete runtime SBOM set after the bounded guest proof.
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Set up the repository Go toolchain
@@ -53,9 +53,10 @@ jobs:
             ${{ runner.temp }}/runtime-consumer-evidence/inputs.txt
             ${{ runner.temp }}/runtime-consumer-evidence/prepare.log
             ${{ runner.temp }}/runtime-consumer-evidence/consumer.log
+            ${{ runner.temp }}/runtime-consumer-evidence/export.log
             ${{ runner.temp }}/runtime-consumer-evidence/disk-result.json
             ${{ runner.temp }}/runtime-consumer-evidence/disk-observation.json
-            ${{ runner.temp }}/runtime-consumer-evidence/runtime-sbom.json
+            ${{ runner.temp }}/runtime-consumer-evidence/runtime-sbom/
             ${{ runner.temp }}/runtime-consumer-evidence/runtime-observation.json
           if-no-files-found: error
           retention-days: 7

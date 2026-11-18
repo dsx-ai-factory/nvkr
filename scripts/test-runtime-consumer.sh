@@ -77,24 +77,8 @@ sudo -n systemd-run --quiet --wait --pipe --collect \
 # material remain on the disposable filesystem until runner teardown.
 sudo -n install -m 0644 "$fixture/root/workspace/disk-result.json" "$evidence/disk-result.json"
 sudo -n install -m 0644 "$fixture/root/workspace/disk-observation.json" "$evidence/disk-observation.json"
-python3 - "$fixture/root/workspace" "$evidence" <<'PY'
-import hashlib
-import json
-import sys
-from pathlib import Path
-
-workspace, evidence = map(Path, sys.argv[1:])
-plan = json.loads((workspace / "plan.json").read_bytes())
-result = json.loads((evidence / "disk-result.json").read_bytes())
-tool, = plan["internalTools"]
-artifacts = {item["id"]: item for item in plan["graph"]["artifacts"]}
-for field, name, digest in (
-    ("sbomArtifactId", "runtime-sbom.json", result["runtimeUse"]["sbom"]),
-    ("observationArtifactId", "runtime-observation.json", result["runtimeUse"]["observation"]),
-):
-    path = (workspace / artifacts[tool[field]]["path"]).resolve()
-    path.relative_to(workspace.resolve())
-    raw = path.read_bytes()
-    assert "sha256:" + hashlib.sha256(raw).hexdigest() == digest
-    (evidence / name).write_bytes(raw)
-PY
+env -i PATH=/usr/bin:/bin LANG=C GOMAXPROCS=2 \
+  NVKR_TEST_RUNTIME_PHASE=export "NVKR_TEST_RUNTIME_WORKSPACE=$fixture/root/workspace" \
+  "NVKR_TEST_RUNTIME_EVIDENCE=$evidence" \
+  "$binary" -test.run='^TestNativeRuntimeExport$' -test.v -test.timeout=2m \
+  2>&1 | tee "$evidence/export.log"

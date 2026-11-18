@@ -36,6 +36,14 @@ It does not complete a Run, generate a runtime SBOM, execute a disk producer or 
 The backing filesystem remains with the temporary evidence until runner teardown; only text diagnostics
 should be uploaded.
 
+`test-runtime-consumer.sh /absolute/evidence-directory` adds a bounded BIOS disk build through the
+original runtime owner, Packer and QEMU, with guest-write, shutdown and outbound HTTPS checks. Its
+unprivileged diagnostic export copies the complete runtime SBOM directory and observation, checking
+each against the completed use description with the factory's existing file/tree digest. Only the
+logs and exported descriptions are uploaded; the disk and runtime payload remain on disposable scratch.
+This fixture does not exercise a complete public Run, maintained NVKE disk equivalence, signing,
+publication, libguestfs inspection, EFI or ARM64.
+
 `test-tekton-kind.sh` runs the native AMD64 core Definition in an owned kind cluster with pinned Tekton
 and an in-cluster registry. The [Tekton guide](../docs/generate-pipeline.md#tekton-cluster-execution)
 lists prerequisites, trust scope and retained evidence. The GitHub acceptance workflow runs this same

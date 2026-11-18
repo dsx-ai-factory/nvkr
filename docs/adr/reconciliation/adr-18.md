@@ -9,8 +9,8 @@ archive. Extraction rejects memory-backed storage and verifies the entire stream
 private root; that root is removed after inspection or consumption joins. Focused tests cover original
 inode retention, ownership, read-only descriptors, tampering, tmpfs rejection and cleanup. Cgroup memory
 observation excludes only inactive file pages from usage, preserves host and ancestor limits, and rejects
-missing or malformed statistics. Native consumer admission and offline Packer validation have run with
-these changes, but the guest build remains unproved, as scoped below. The native namespace
+missing or malformed statistics. A bounded native BIOS guest build and original runtime use have passed
+with these changes; the workflow's subsequent diagnostic export failed, as scoped below. The native namespace
 [VM proof](https://github.com/njhensley/nvkr/actions/runs/44194123590) at
 `0dbb69bb55dc190884ef3ca2b9d673a6c365284d` exercised both assembly and consumer launchers on stock
 Ubuntu 24.04 AMD64 with kernel `7.0.0-1014-aws`. The separately owned executable tmpfs retained its
@@ -60,9 +60,10 @@ passes the original production and use receipt to the namespace Packer adapter. 
 SSH-key generation and validation stay offline; the build uses the fixed outbound helper. The factory
 compares the returned runtime-use record with the original receipt's completed binding before retaining
 the disk. Bounded disk/log collection and descriptive binding checks have focused tests. The maintained
-Environment has not switched to this route, and no native VM has exercised this adapter. A native factory proof has completed runtime production, terminal observation and SBOM through the
-original owner, as scoped below; no completed public Run has exercised the consumer route. This proof does not establish disk-output
-equivalence, guest boot, ARM64 operation or a stronger evidence lane. The earlier isolated amd64
+Environment has not switched to this route. A native factory proof has completed runtime production,
+terminal observation, SBOM and a bounded BIOS guest build through the original owner, as scoped below;
+no completed public Run has exercised the consumer route. This proof does not establish maintained
+disk-output equivalence, ARM64 operation or a stronger evidence lane. The earlier isolated amd64
 [assembly Run](https://github.com/njhensley/nvkr/actions/runs/44145459516) built two byte-identical runtime
 archives from fresh roots and the same revalidated snapshot inputs. It used Ubuntu's mkosi package,
 not the source-commit bootstrap now required by the contract. That Run establishes neither production
@@ -108,6 +109,22 @@ one root-owned 1852 MiB OCI tar remained, with no unlinked non-memfd descriptor 
 rejected the fixture's unsupported `filesha256` function before QEMU execution. The fixture now supplies
 a generated checksum file. This failed attempt establishes neither a completed consumer receipt nor a
 disk result, and it exported no standalone OCI subject or SBOM documents.
+The [bounded guest attempt](https://github.com/njhensley/nvkr/actions/runs/44276540278) at
+`0667a25fb8c513ac1badbd84e7178a80fab21e56` passed the original-owner native factory test, including
+production, SBOM, consumer admission, Packer validation, QEMU guest write and ACPI shutdown, consumer
+UID/capability checks, and the exact snapshot download over HTTPS through the produced outbound helper.
+The completed runtime use binds manifest `sha256:7e35e0e6d5cf4131e77c308217e3d9524bd46651981cdbc885d076465f38d276`,
+layout `sha256:8a74cc11eeb4b7b31ec55dcd743be32ae1a09eb3952b68d508094ed16dfb2302` (1,942,467,503 bytes),
+layer `sha256:85855f97a1ae48884e7b57bf8a96248ad04de53d7809bc85536169e808ac8835`, and SBOM set
+`sha256:aba32249a8839126db71498f44c0145f32ca384d4b78727e1af8c4ab887a896c`. The uploaded disk result and
+observation agree on QCOW2 `sha256:890f00ca2521cc18f880f75e9051799a46db8accc533bde052d2aa0243f20cd7`
+(393,216 file bytes, 8 MiB virtual size). The workflow then failed because the diagnostic exporter read
+the SBOM directory as a file. The complete SBOM set and runtime observation were not uploaded. The exporter
+now copies files and directories and checks both source and destination with the factory's existing
+path digest; focused fixtures cover nested contents, modes, tampering, symlinks, cancellation and an
+existing destination. A fresh export-inclusive native attempt remains pending. This BIOS fixture does
+not establish a public Run, maintained NVKE disk equivalence, publication, signing, libguestfs inspection,
+EFI or ARM64 runtime execution.
 The earlier assembly digest above describes the closure before the outbound helper was added and does
 not evidence the changed runtime.
 
