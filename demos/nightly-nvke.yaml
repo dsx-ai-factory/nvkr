@@ -8,7 +8,6 @@ build:
   repo: .
   attempt: nightly-e2e
   jobs: 1
-  nvkeClone: nvke-source
 run:
   out: nightly-site
   timeoutSeconds: 3600
@@ -17,5 +16,5 @@ run:
     profile: small
     siteMemoryGiB: 7
     tenantMemoryGiB: 3
-    headroomMiB: 1024
+    headroomMiB: 512
     vcpus: 4
