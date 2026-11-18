@@ -127,7 +127,7 @@ func (s *scan) walk() error {
 	if err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "opening scan root")
 	}
-	defer root.Close()
+	defer func() { _ = root.Close() }()
 	entries := 0
 	var bytes int64
 	var walk func(string, int) error
