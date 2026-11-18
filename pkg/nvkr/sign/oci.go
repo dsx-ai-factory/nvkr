@@ -658,6 +658,11 @@ func (s *CosignOCISigner) verifyAndCapture(ctx context.Context, subject Subject,
 	if err := s.admit(); err != nil {
 		return VerificationRecord{}, err
 	}
+	finish, err := beginBoundedVerification(ctx)
+	if err != nil {
+		return VerificationRecord{}, err
+	}
+	defer finish()
 	if err := subject.Validate(); err != nil {
 		return VerificationRecord{}, err
 	}
@@ -753,12 +758,17 @@ func (s *CosignOCISigner) verifyAndCapture(ctx context.Context, subject Subject,
 // exit to the crypto-gate error code.
 func (s *CosignOCISigner) capture(ctx context.Context, args, environment []string) ([]byte, error) {
 	var stdout, stderr cosignOutputBuffer
-	if err := s.run(ctx, args, environment, &stdout, &stderr); err != nil {
-		if ctxErr := contextError(ctx); ctxErr != nil {
-			return nil, ctxErr
+	err := withBoundedBundleVerification(ctx, args, func(args []string) error {
+		if err := s.run(ctx, args, environment, &stdout, &stderr); err != nil {
+			if failure := boundedVerificationFailure(ctx); failure != nil {
+				return failure
+			}
+			return e.Wrap(e.CodeSignatureInvalid, err, "cosign %s failed: %s", args[0], strings.TrimSpace(stderr.String()))
 		}
-		return nil, e.Wrap(e.CodeSignatureInvalid, err,
-			"cosign %s failed: %s", args[0], strings.TrimSpace(stderr.String()))
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	if stdout.exceeded || stderr.exceeded {
 		return nil, e.New(e.CodeSignatureInvalid, "cosign %s produced an oversized report", args[0])
