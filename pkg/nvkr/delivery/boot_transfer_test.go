@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -187,5 +188,93 @@ func TestBootTransferReservesControlsBeforePayloadWrites(t *testing.T) {
 			tc.change(&s, b, &l)
 			assertRegistryCode(t, admitBootStorage(s, b, l), tc.code)
 		})
+	}
+}
+
+func TestBootTransferDeduplicatesIdenticalBytesAcrossValidOwners(t *testing.T) {
+	selection, assets, bindings, limits := bootTransferFixture(t)
+	request, manifest := diskPublicationRequest(t, "amd64")
+	request.Objects[0].Name, request.Objects[0].Output.Repository = "sibling", "sibling"
+	for i := range request.Objects {
+		if request.Objects[i].Evidence != nil {
+			request.Objects[i].Evidence.Outputs = []string{"sibling"}
+		}
+	}
+	output := request.Objects[0].Output
+	var err error
+	request.Release.ContentSubject, err = ContentDigest([]Output{{Name: "sibling", Kind: output.Format, Digest: manifest,
+		BuildDigest: output.BuildDigest, Components: output.Components, Disk: output.Disk}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(t.TempDir(), "sibling")
+	result, err := BuildPublicationRoot(t.Context(), root, request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, err := openDiskPublicationFixture(t.Context(), root, result.RootDigest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = owner.Close() })
+	selected := definition.BootDisk{Output: "sibling", Platform: "linux/amd64"}
+	asset, err := owner.OpenBootDisk(t.Context(), "registry.example.test/sibling-release@"+result.RootDigest, selected)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = asset.Close() })
+	binding, err := asset.Binding()
+	_, firstRoot, _ := strings.Cut(bindings[0].Publication, "@")
+	if err != nil || binding.SHA256 != bindings[0].SHA256 || binding.Size != bindings[0].Size || result.RootDigest == firstRoot {
+		t.Fatalf("fixture must bind identical bytes through distinct original owners: %+v, %v", binding, err)
+	}
+	selection.Disks = append(selection.Disks, selected)
+	assets = append(assets, asset)
+	store := &mirrorMemoryStore{}
+	var mu sync.Mutex
+	servingReads := map[string]int{}
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		key := strings.TrimPrefix(r.URL.Path, "/boot/")
+		mu.Lock()
+		servingReads[key]++
+		mu.Unlock()
+		raw, exists := store.data[key]
+		if !exists {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write(raw)
+	}))
+	defer server.Close()
+	original := http.DefaultTransport
+	http.DefaultTransport = server.Client().Transport
+	defer func() { http.DefaultTransport = original }()
+	ctx, _, err := readbudget.WithLimit(t.Context(), 16<<20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reader, err := newBootServingClient(ctx, definition.BootServing{Profile: definition.BootServingProfile,
+		Origin: server.URL, Prefix: "/boot", ReaderMode: "anonymous"}, BootReaderCredential{}, time.Minute)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.close()
+	records, err := copyBootAssets(ctx, store, reader, selection, assets, limits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]BootStoredAsset{}
+	for _, record := range records {
+		byName[record.Binding.Output] = record
+	}
+	first, sibling, imager := byName["node-image"], byName["sibling"], byName["tools"]
+	if len(records) != 3 || len(byName) != 3 || first.Binding != bindings[0] || sibling.Binding != binding || imager.Binding != bindings[1] ||
+		first.Object != sibling.Object || first.URL != sibling.URL || first.Object.VersionID == "" {
+		t.Fatalf("deduplication lost exact named uses or shared immutable pin: %+v", records)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(store.writes) != 2 || store.reads != 2 || len(servingReads) != 2 || servingReads[first.Object.Key] != 1 || servingReads[imager.Object.Key] != 1 {
+		t.Fatalf("shared bytes were transferred twice: writes=%d pinnedReads=%d serving=%v", len(store.writes), store.reads, servingReads)
 	}
 }

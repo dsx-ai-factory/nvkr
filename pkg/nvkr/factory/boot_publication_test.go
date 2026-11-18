@@ -167,3 +167,70 @@ func TestBootPlanRejectsProjectionBeforePluginCalls(t *testing.T) {
 		})
 	}
 }
+
+func TestBootPlanPreservesComposedDefinitionBindings(t *testing.T) {
+	selected, _ := bootPlanFixture(t)
+	composite := definition.CompositeDefinition{APIVersion: definition.CompositeAPIVersion, Kind: definition.CompositeKind,
+		Metadata: definition.Metadata{Name: "boot-product"}}
+	files := map[string][]byte{}
+	owners := map[string]string{}
+	for _, member := range []struct{ name, output string }{
+		{"disk", selected.Environment.Publication.BootSelection.Disks[0].Output},
+		{"imager", selected.Environment.Publication.BootSelection.Imagers[0].Output},
+	} {
+		input := selected.Definition.Clone()
+		input.Metadata.Name = member.name
+		input.Outputs = slices.DeleteFunc(input.Outputs, func(output definition.DefinitionOutput) bool { return output.Name != member.output })
+		digest, err := input.Digest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		files["defs/"+member.name+".json"] = mustCanonical(t, input)
+		composite.Members = append(composite.Members, definition.CompositeMember{Name: member.name, Definition: member.name + ".json", Digest: digest})
+		owners[member.output] = member.name
+	}
+	composition, err := definition.AdmitComposite(t.Context(), "defs/composite.json", mustCanonical(t, composite), func(_ context.Context, path string) ([]byte, error) {
+		raw, exists := files[path]
+		if !exists {
+			return nil, e.New(e.CodeInvalidCatalog, "missing fixture member %s", path)
+		}
+		return raw, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stack, err := catalog.ApplyStack(selected.CatalogSnapshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := compileComposition(t.Context(), composition, "defs/environment.json", selected.Environment, "test",
+		func(context.Context, definition.Catalog) (*catalog.Stack, error) { return stack, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.SchemaVersion != BootPlanSchemaVersion || plan.Composition == nil || plan.BootPublication == nil || plan.DefinitionDigest != composition.Digest() {
+		t.Fatal("selective v7 Plan lost the admitted composition")
+	}
+	if err := plan.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(plan.Composition.Members, composite.MemberIdentities()) || len(plan.Composition.Outputs) != len(owners) {
+		t.Fatal("Plan changed pinned members or output attribution")
+	}
+	for output, want := range owners {
+		if got, exists := plan.Composition.MemberOf(output); !exists || got != want {
+			t.Fatalf("output %s belongs to %s, want %s", output, got, want)
+		}
+	}
+	for _, node := range []string{"prepare-boot/boot", "publish-boot/boot"} {
+		request, _, err := BootPhaseForNode(plan, node)
+		if err != nil || !reflect.DeepEqual(request.Selection, *selected.Environment.Publication.BootSelection) {
+			t.Fatalf("composed Plan changed the exact selected boot outputs: %v", err)
+		}
+	}
+	bundle, err := RenderGitHub(t.Context(), plan)
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if bundle != nil || err == nil || !strings.Contains(err.Error(), "selective boot generated execution") {
+		t.Fatal("composed boot Plan bypassed selective execution admission", err)
+	}
+}

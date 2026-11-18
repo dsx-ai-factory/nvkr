@@ -259,10 +259,30 @@ func boundedVerificationCandidateFailure(ctx context.Context, err error) error {
 		if _, failure := admitBoundedTrust(ctx); failure != nil {
 			return failure
 		}
-		var coded *e.Error
-		if errors.As(err, &coded) && coded.Code != e.CodeSignatureInvalid {
-			return err
+		if failure := boundedCandidateFatalCode(err); failure != nil {
+			// Keep every cause, but expose the fatal code before a sibling
+			// signature rejection in a joined error tree.
+			return e.Wrap(failure.Code, err, "bounded verification cannot continue")
 		}
+	}
+	return nil
+}
+
+// A rejected candidate may be joined with a cleanup or ownership failure.
+// Inspect the complete tree; errors.As alone only finds the first coded cause.
+func boundedCandidateFatalCode(err error) *e.Error {
+	if coded, ok := err.(*e.Error); ok && coded.Code != e.CodeSignatureInvalid {
+		return coded
+	}
+	switch cause := err.(type) {
+	case interface{ Unwrap() []error }:
+		for _, child := range cause.Unwrap() {
+			if fatal := boundedCandidateFatalCode(child); fatal != nil {
+				return fatal
+			}
+		}
+	case interface{ Unwrap() error }:
+		return boundedCandidateFatalCode(cause.Unwrap())
 	}
 	return nil
 }
