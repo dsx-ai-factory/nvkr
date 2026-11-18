@@ -197,3 +197,26 @@ func TestBootPhaseRejectsInsufficientLimitsBeforeStore(t *testing.T) {
 		})
 	}
 }
+
+func TestBootPhaseReservesCompleteSourceLayersIndependentlyOfDestinationLimit(t *testing.T) {
+	selection, _, _, limits := bootTransferFixture(t)
+	// A raw EFI can fit a small destination limit while its containing source
+	// bundle still needs the full acquisition ceiling. No large fixture I/O.
+	limits.Storage.MaxTotalBytes = 256 << 30
+	var previous int64
+	for _, objectBytes := range []int64{128 << 20, 1 << 30, maxDeliveryFileBytes} {
+		limits.Storage.MaxObjectBytes = objectBytes
+		request := bootPhaseRequestFixture(t, selection, limits, "https://boot.example.test")
+		if err := request.Validate(); err != nil {
+			t.Fatal(err)
+		}
+		sourcePasses := int64(2*(len(selection.Disks)+len(selection.Imagers))) * maxDeliveryFileBytes
+		if request.ReadBytes <= sourcePasses+2*limits.Storage.MaxTotalBytes {
+			t.Fatal("source acquisition or destination rechecks lack control/proof headroom")
+		}
+		if previous != 0 && previous != request.ReadBytes {
+			t.Fatal("destination raw-object limit changed the source read reservation")
+		}
+		previous = request.ReadBytes
+	}
+}

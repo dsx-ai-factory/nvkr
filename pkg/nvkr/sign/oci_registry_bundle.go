@@ -281,8 +281,10 @@ func loadRegistryBundle(ctx context.Context, puller *remote.Puller, subject name
 }
 
 func ociBundleFetchError(ctx context.Context, err error) error {
-	if ctxErr := contextError(ctx); ctxErr != nil {
-		return ctxErr
+	// Discovery can fail before candidate-level checks run. Preserve the
+	// operation's sticky exhaustion code instead of relabeling it as a bad signature.
+	if failure := boundedVerificationFailure(ctx); failure != nil {
+		return failure
 	}
 	// A registry refusal is an access failure, never evidence about a signature.
 	var registryErr *transport.Error

@@ -417,6 +417,15 @@ deadline/read allowance; restarted phases admit fresh limits. Per destination, r
 | Total/count | Exact payload sizes plus all reservations and Plan-derived maximum control/proof object count. Count shared bytes once; check every use. |
 | Reads | Plan-declared finite allowance per phase covering acquisition, proof verification, pinned/HTTPS reads and retry/failed responses. Reject insufficient mandatory-pass allowance before I/O; debit actual bytes locally. |
 
+The conservative source-read reservation uses the delivery source-layer ceiling (64 GiB per selected
+output-local disk or executable), independently of the destination raw-object ceiling. Preparation acquires
+the whole executable bundle before extracting the selected EFI; unselected bundle members can be larger
+than that EFI. Phase accounting bounds response reads during acquisition; `OpenPublication` enforces
+source-layer admission after staging. The reservation covers successful sources, not a per-layer preflight
+check. Selected destination object/total limits remain unchanged. Both compiled phase allowances retain this conservative source
+reservation. This correction changes opt-in v7 Plan Digests on recompilation when the destination object
+ceiling is below 64 GiB; it changes neither producer Build Digests nor existing full-mirror Plans.
+
 Reject insufficient reservations or oversized documents. Later phases recompute unique bytes/count from the Plan,
 authenticated controls and checked destination objects, never transported counters. Controls must fit owner caps and
 reservations.

@@ -47,6 +47,14 @@ preliminary availability, final original membership/proof publication and indepe
 receipt. `PublishBootSelection` and `VerifyBootSelection` issue only `SelectedBootReceipt` after cleanup.
 Original full Release metadata remains intact; unselected payloads and proofs are not required by this route.
 Old Environment, BinaryBundle and full-mirror inventory bytes retain compatibility coverage.
+Selected descriptions retain unselected logical evidence entries; an omitted source on those entries is
+unchecked, never verified source absence. Source acquisition reserves the full 64-GiB layer ceiling for
+each selected output-local disk/executable, including the entire binary bundle around an EFI member.
+The lower raw destination-object ceiling does not reduce that reservation. Phase metering bounds transfer
+reads; source-layer size is checked by the retained owner after staging. Opt-in v7 read allowances and Plan
+Digests change on recompilation for destination object ceilings below 64 GiB; producer Build Digests and
+maintained full-mirror Plans do not.
+Initial registry discovery preserves the phase exhaustion code before signature-error normalization.
 
 `TestBootMembershipAuthenticatesOnlySelectedOriginalProofs` and its rejection table cover original aggregate,
 local-root/descriptor, input/invocation, member/platform/profile and disk-evidence joins. Delivery tests cover
