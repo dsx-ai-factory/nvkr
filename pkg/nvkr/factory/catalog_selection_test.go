@@ -245,6 +245,11 @@ func TestCatalogListSelection(t *testing.T) {
 					p.CatalogCandidates[0], p.CatalogCandidates[1] = p.CatalogCandidates[1], p.CatalogCandidates[0]
 				}},
 				{"build catalog digest", func(p *Plan) { p.Builds[0].CatalogDigest = "sha256:" + strings.Repeat("9", 64) }},
+				{"unused candidate overlay", func(p *Plan) { p.CatalogCandidates[0].AppliedOverlays = []catalog.AppliedOverlay{{Name: "invented"}} }},
+				{"unused candidate overlay endpoint", func(p *Plan) {
+					digest := "sha256:" + strings.Repeat("1", 64)
+					p.CatalogCandidates[0].AppliedOverlays = []catalog.AppliedOverlay{{Name: "invented", OverlayDigest: digest, InputDigest: digest, OutputDigest: digest}}
+				}},
 				{"snapshot changed", func(p *Plan) { p.CatalogCandidates[0].CatalogSnapshot.Metadata.Description = "changed" }},
 			} {
 				t.Run(tamper.name, func(t *testing.T) {

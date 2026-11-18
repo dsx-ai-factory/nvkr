@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"slices"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -102,6 +103,18 @@ func (plan Plan) validateCatalogCandidates() error {
 		digest, err := candidate.CatalogSnapshot.SnapshotDigest()
 		if err != nil {
 			return err
+		}
+		previous := ""
+		for _, applied := range candidate.AppliedOverlays {
+			if !canonicalName.MatchString(applied.Name) || !canonical.IsDigest(applied.OverlayDigest) ||
+				!canonical.IsDigest(applied.InputDigest) || !canonical.IsDigest(applied.OutputDigest) ||
+				(previous != "" && applied.InputDigest != previous) {
+				return e.New(e.CodeUnverifiedRef, "Plan catalog candidate %d has an invalid overlay chain", i)
+			}
+			previous = applied.OutputDigest
+		}
+		if previous != "" && previous != digest {
+			return e.New(e.CodeUnverifiedRef, "Plan catalog candidate %d overlay chain ends at the wrong snapshot", i)
 		}
 		if digest != candidate.CatalogDigest {
 			return e.New(e.CodeUnverifiedRef, "Plan catalog candidate %d snapshot differs", i)

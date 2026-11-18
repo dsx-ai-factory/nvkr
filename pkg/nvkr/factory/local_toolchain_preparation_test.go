@@ -282,3 +282,38 @@ func TestLoadLocalToolchainBindingsRejectsAmbiguity(t *testing.T) {
 		})
 	}
 }
+
+func TestLocalToolchainPreparationInternalToolCatalogListAdmission(t *testing.T) {
+	_, baseline := internalToolPlanFixture(t)
+	def := baseline.Definition.Clone()
+	def.Catalogs = []authored.Catalog{def.Catalog}
+	stack := &catalog.Stack{Catalog: baseline.CatalogSnapshot, Digest: baseline.CatalogDigest}
+	candidates := []CatalogCandidate{{Selection: def.Catalog, CatalogSnapshot: stack.Catalog, CatalogDigest: stack.Digest}}
+	stacks := map[string]*catalog.Stack{}
+	for _, build := range baseline.Builds {
+		stacks[build.Name] = stack
+	}
+	for _, publication := range []bool{true, false} {
+		t.Run(fmt.Sprint("publication=", publication), func(t *testing.T) {
+			env := baseline.Environment.Clone()
+			if !publication {
+				env.Publication, env.Signing = nil, nil
+			}
+			plan, err := compileWithTargetStacksFor(t.Context(), def, env, stack, stacks, "test", "definition.json", "environment.json", nil, candidates)
+			if !publication {
+				// Current internal-tool consumers require publication inspection. A plain
+				// diagnostic disk has no SBOM inspection consumer and cannot retain the tool.
+				assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+				if !strings.Contains(err.Error(), "no selected consumer") {
+					t.Fatal(err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = CompileLocalToolchainPreparation(t.Context(), plan, nil, "amd64")
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+		})
+	}
+}
