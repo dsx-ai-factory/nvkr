@@ -89,6 +89,12 @@ was skipped. The exact error is reproduced by the package-admission fixture. Bou
 post-seed confirmation now covers delayed visibility, exhaustion, cancellation and immediate explicit
 policy refusal; whole-set admission still rechecks every package before payload upload. The later package
 API read showed the metadata root as internal and unlinked, which is consistent with delayed visibility
-but does not establish the original credential's provider response sequence. Hosted validation of this
-recovery remains pending; neither failed development attempt supplies release timing or complete release
-evidence.
+but does not establish the original credential's provider response sequence. The subsequent [Run 44270895414](https://github.com/dsx-ai-factory/nvkr/actions/runs/44270895414), at
+`8fdf3737`, completed on attempt 2: all 83 named artifacts/evidence and the aggregate release were verified,
+and finalization recorded 83 observed outputs. Its separate disk blob-readback HTTP 403 recovered through
+an authorized failed-job-only retry without changing credentials, target construction or code. No automatic
+authentication-error retry or privacy-policy relaxation is introduced. The published release is
+`ghcr.io/dsx-ai-factory/nvkr/development/runs/44270895414/attempts/2/releases@sha256:3b73371f34c31ca91ce8387d85f3826a5728ed2a5c1615c1bccefe0ab76c661b`.
+This supplies hosted evidence for that exact selection and revision, including successful post-seed admission;
+it does not prove every bounded retry branch occurred remotely. [ADR-18](adr-18.md) records timing and
+cross-Run byte-comparison limits. The earlier failed attempts supply no release-completeness evidence.

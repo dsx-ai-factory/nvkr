@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"slices"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -169,4 +170,24 @@ func TestPrivateCarrierWaitsForSeedVisibility(t *testing.T) {
 	if waits != 1 || f.gets != 4 {
 		t.Fatalf("waits=%d, package reads=%d", waits, f.gets)
 	}
+}
+
+func TestSeedVisibilityDefaultWaitHonorsParentDeadline(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		started := time.Now()
+		ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+		defer cancel()
+		b := newBackend() // Keep the production default waiter.
+		reads := 0
+		b.client.Transport = admissionTransportFunc(func(r *http.Request) (*http.Response, error) {
+			reads++
+			return admissionResponseFor(r, http.StatusNotFound, "", ""), nil
+		})
+		source := repositoryRecord{Owner: account{Login: "Example", Type: "Organization"}}
+		err := b.confirmSeedPrivacy(ctx, "source/releases", source, publisherOptions, true)
+		assertCode(t, err, e.CodeTimeout)
+		if reads != 1 || time.Since(started) != time.Second {
+			t.Fatalf("confirmation reads=%d, elapsed=%s; want one read and parent deadline", reads, time.Since(started))
+		}
+	})
 }
