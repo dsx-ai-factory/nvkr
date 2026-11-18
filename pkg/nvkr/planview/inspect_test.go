@@ -242,8 +242,8 @@ func comparisonPlan(t *testing.T, change func(*catalog.Catalog, *definition.Defi
 }
 
 func TestInspectionEscapesCatalogLocator(t *testing.T) {
-	doc := inspectPlan(t, maintainedPlan(t))
-	doc.plan.Builds[0].SelectedCatalog.Base = "catalog\x1b[2J"
+	doc := inspectPlan(t, comparisonPlan(t, nil))
+	doc.plan.Builds[0].SelectedCatalog = &definition.Catalog{Base: "catalog\x1b[2J"}
 	raw, err := doc.Render(PlanOptions{Format: "text"})
 	if err != nil {
 		t.Fatal(err)
