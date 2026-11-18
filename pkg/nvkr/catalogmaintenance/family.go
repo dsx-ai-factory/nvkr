@@ -9,6 +9,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 
@@ -116,6 +117,9 @@ func bumpFamily(ctx context.Context, configPath, familyName, generatorVersion st
 		return result, err
 	}
 	defer func() { _ = os.RemoveAll(snapshot.root) }()
+	if err := validateFamilyBaseline(ctx, snapshot, config, configPath, generatorVersion); err != nil {
+		return result, err
+	}
 	var release *catalog.Pin
 	var repository, prefix, constraint string
 	for _, member := range config.Family.Catalogs {
@@ -321,6 +325,47 @@ func bumpFamily(ctx context.Context, configPath, familyName, generatorVersion st
 	}
 	result.Complete = true
 	return result, nil
+}
+
+// Validate the bytes actually captured, not the earlier working-tree view.
+func validateFamilyBaseline(ctx context.Context, snapshot *familySnapshot, config Config, configPath, generatorVersion string) error {
+	captured, err := Load(ctx, filepath.Join(snapshot.root, configPath))
+	if err != nil {
+		return err
+	}
+	if captured.Family != nil {
+		slices.SortFunc(captured.Family.Catalogs, func(a, b FamilyCatalog) int { return strings.Compare(a.Catalog, b.Catalog) })
+		for i := range captured.Family.Catalogs {
+			slices.Sort(captured.Family.Catalogs[i].Sources)
+		}
+	}
+	if !reflect.DeepEqual(config, captured) {
+		return e.New(e.CodeWriteConflict, "family policy changed during baseline capture")
+	}
+	if captured.ProducerOverlays != "" {
+		files, err := renderProducerOverlaysAtRoot(ctx, snapshot.root, captured.ProducerOverlays)
+		if err != nil {
+			return err
+		}
+		if err := checkOverlayFiles(files); err != nil {
+			return err
+		}
+	}
+	if err := admitCommittedPlanStampsAtRoot(ctx, snapshot.root, generatorVersion); err != nil {
+		return err
+	}
+	runs, err := prepareFamilyRuns(ctx, captured, generatorVersion, snapshot.root, true)
+	if err != nil {
+		return err
+	}
+	allowed := map[string]bool{}
+	for _, run := range runs {
+		allowed[filepath.ToSlash(filepath.Dir(run.bundle.ManifestPath))] = true
+		if run.pair != nil {
+			allowed[filepath.ToSlash(filepath.Dir(run.pair.ManifestPath()))] = true
+		}
+	}
+	return refuseUnnamedBundlesAtRoot(snapshot.root, allowed)
 }
 
 func familyRecipes(ctx context.Context, root, directory string) (map[string]familyRecipeVersion, error) {

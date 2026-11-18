@@ -154,13 +154,21 @@ func buildClosure(ctx context.Context, config Config, generatorVersion string, p
 // maintenance run would leave stale: refresh cannot regenerate what the policy
 // does not name, and the bot cannot transport what it did not regenerate.
 func refuseUnnamedBundles(allowed map[string]bool) error {
-	manifests, err := filepath.Glob(generatedBundleGlob)
+	return refuseUnnamedBundlesAtRoot(".", allowed)
+}
+
+func refuseUnnamedBundlesAtRoot(root string, allowed map[string]bool) error {
+	manifests, err := filepath.Glob(filepath.Join(root, generatedBundleGlob))
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "listing committed generated bundles")
 	}
 	sort.Strings(manifests)
 	for _, manifest := range manifests {
-		directory := filepath.ToSlash(filepath.Dir(manifest))
+		relative, err := filepath.Rel(root, filepath.Dir(manifest))
+		if err != nil {
+			return e.Wrap(e.CodeInternal, err, "locating generated bundle")
+		}
+		directory := filepath.ToSlash(relative)
 		if !allowed[directory] {
 			return e.New(e.CodeEngineCapability, "committed generated bundle %q is not named by the maintenance policy; name its Environment or qualification policy, or retire it, because a pin change would leave it stale", directory)
 		}
@@ -243,13 +251,21 @@ const committedPlanGlob = ".github/nvkr-*/plan.json"
 // binary fails without network or private-source access. Every committed Run
 // must belong to the closure anyway, so no Plan is exempt.
 func admitCommittedPlanStamps(ctx context.Context, generatorVersion string) error {
-	plans, err := filepath.Glob(committedPlanGlob)
+	return admitCommittedPlanStampsAtRoot(ctx, ".", generatorVersion)
+}
+
+func admitCommittedPlanStampsAtRoot(ctx context.Context, root, generatorVersion string) error {
+	plans, err := filepath.Glob(filepath.Join(root, committedPlanGlob))
 	if err != nil {
 		return e.Wrap(e.CodeInternal, err, "listing committed Plans")
 	}
 	sort.Strings(plans)
 	for _, plan := range plans {
-		if err := admitPlanStamp(ctx, filepath.ToSlash(plan), generatorVersion); err != nil {
+		relative, err := filepath.Rel(root, plan)
+		if err != nil {
+			return e.Wrap(e.CodeInternal, err, "locating committed Plan")
+		}
+		if err := admitPlanStampAtRoot(ctx, root, filepath.ToSlash(relative), generatorVersion); err != nil {
 			return err
 		}
 	}
@@ -271,10 +287,14 @@ func (members *closure) admitGeneratorStamp(ctx context.Context, generatorVersio
 // regular file. A different stamp would render a workflow whose refresh can
 // never pass its own baseline drift check.
 func admitPlanStamp(ctx context.Context, plan, generatorVersion string) error {
-	if err := admitPath(plan); err != nil {
+	return admitPlanStampAtRoot(ctx, ".", plan, generatorVersion)
+}
+
+func admitPlanStampAtRoot(ctx context.Context, root, plan, generatorVersion string) error {
+	if err := admitPathAtRoot(root, plan); err != nil {
 		return e.Wrap(e.CodePipelineDrift, err, "admitting committed Plan %q", plan)
 	}
-	held, err := heldfile.OpenContext(ctx, plan, heldfile.Options{Label: "committed-plan", MaxBytes: factory.MaxPlanBytes})
+	held, err := heldfile.OpenContext(ctx, filepath.Join(root, plan), heldfile.Options{Label: "committed-plan", MaxBytes: factory.MaxPlanBytes})
 	if err != nil {
 		return contextError(ctx, e.Wrap(e.CodePipelineDrift, err, "reading committed Plan %q", plan))
 	}

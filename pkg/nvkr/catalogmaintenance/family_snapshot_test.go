@@ -5,6 +5,8 @@ package catalogmaintenance
 
 import (
 	"os"
+	"path/filepath"
+	"syscall"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -65,4 +67,32 @@ func TestFamilySnapshotRejectsSymlink(t *testing.T) {
 	}
 	_, err := snapshotFamilyInputs(t.Context(), Config{Family: &FamilyPolicy{}}, "inputs/policy.yaml")
 	assertCode(t, err, e.CodeInvalidCatalog)
+}
+
+func TestFamilySnapshotPreservesModeUnderUmask(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.Mkdir("inputs", 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(".github", 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeFixture(t, "inputs/policy.yaml", []byte("original"))
+	if err := os.Chmod("inputs/policy.yaml", 0644); err != nil {
+		t.Fatal(err)
+	}
+	prior := syscall.Umask(0077)
+	defer syscall.Umask(prior)
+	snapshot, err := snapshotFamilyInputs(t.Context(), Config{Family: &FamilyPolicy{}}, "inputs/policy.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll(snapshot.root) }()
+	info, err := os.Stat(filepath.Join(snapshot.root, "inputs/policy.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0644 {
+		t.Fatalf("captured mode %o", info.Mode().Perm())
+	}
 }

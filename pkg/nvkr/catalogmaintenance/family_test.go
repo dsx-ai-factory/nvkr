@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -167,6 +168,57 @@ func TestFamilyRegeneratesRuntimeAndQualificationOwners(t *testing.T) {
 				// Maintenance authored a static bundle, not a dispatch/source receipt.
 				_, err = lifecycle.GenerateRuntimeFiles(t.Context(), cfg.Definition, runtimeFixtureEnvironment, "test (deadbeef)", "github", ".", false)
 				assertCode(t, err, e.CodeUnpinnedSource)
+			}
+		})
+	}
+}
+
+func TestFamilyBaselineValidatesCapturedBytes(t *testing.T) {
+	for _, edit := range []string{"unchanged", "workflow", "policy", "unnamed", "stamp"} {
+		t.Run(edit, func(t *testing.T) {
+			_, _ = familyFixture(t)
+			cfg, loadErr := Load(t.Context(), "maintenance.yaml")
+			if loadErr != nil {
+				t.Fatal(loadErr)
+			}
+			for i := range cfg.Family.Catalogs {
+				slices.Sort(cfg.Family.Catalogs[i].Sources)
+			}
+			if edit == "workflow" {
+				writeFixture(t, ".github/workflows/nvkr-run.yml", []byte("external workflow edit"))
+			}
+			if edit == "unnamed" {
+				if err := os.Mkdir(".github/nvkr-unknown", 0700); err != nil {
+					t.Fatal(err)
+				}
+				writeFixture(t, ".github/nvkr-unknown/manifest.json", []byte("{}"))
+			}
+			if edit == "stamp" {
+				raw := readFixture(t, ".github/nvkr-run/plan.json")
+				writeFixture(t, ".github/nvkr-run/plan.json", bytes.ReplaceAll(raw, []byte("test (deadbeef)"), []byte("other")))
+			}
+			if edit == "policy" {
+				changed := cfg
+				changed.Family = &FamilyPolicy{Name: "other", Catalogs: cfg.Family.Catalogs}
+				writeJSON(t, "maintenance.yaml", changed)
+			}
+			snapshot, err := snapshotFamilyInputs(t.Context(), cfg, "maintenance.yaml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = os.RemoveAll(snapshot.root) }()
+			err = validateFamilyBaseline(t.Context(), snapshot, cfg, "maintenance.yaml", "test (deadbeef)")
+			switch edit {
+			case "unchanged":
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "policy":
+				assertCode(t, err, e.CodeWriteConflict)
+			case "unnamed":
+				assertCode(t, err, e.CodeEngineCapability)
+			case "workflow", "stamp":
+				assertCode(t, err, e.CodePipelineDrift)
 			}
 		})
 	}

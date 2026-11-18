@@ -276,7 +276,11 @@ A pin or catalog change moves the IR, which moves the emitted pipeline. The two 
   input snapshot before touching working files. Preview describes old/new pins, derived recipe versions,
   overlay paths and consumers; failed resolution or validation leaves working files unchanged. Applying
   locks the existing owners, compares original bytes, stages replacements and recovery copies, and commits
-  manifests after payloads. Ordinary commit failures roll back only this operation's bytes; conflicting
+  manifests after payloads. It validates the captured baseline before mutation and the expected complete
+  input/output state before success. Each replacement withdraws the actual destination into a retained
+  sibling, checks its bytes, then links the candidate without replacing another writer. Restoration uses
+  the same protocol; a path can briefly be absent, so concurrent consumers must not use this checkout.
+  Ordinary commit failures roll back only this operation's bytes; conflicting
   external edits are preserved and retained backups are reported. File retirement requires ordinary
   regeneration. This does not promise crash atomicity across files: an interrupted checkout must pass owner
   regeneration and checks before use. The scheduled refresh operation retains its separate transactions.

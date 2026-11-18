@@ -114,6 +114,9 @@ func snapshotFamilyInputs(ctx context.Context, config Config, configPath string)
 			if err := os.WriteFile(destination, raw, mode); err != nil {
 				return e.Wrap(e.CodeInternal, err, "staging family input %q", relative)
 			}
+			if err := os.Chmod(destination, mode); err != nil {
+				return e.Wrap(e.CodeInternal, err, "preserving captured family input mode")
+			}
 			snapshot.files[relative] = familyFileState{digest: sha256.Sum256(raw), mode: mode}
 			return nil
 		})
@@ -143,6 +146,10 @@ func readFamilyFile(ctx context.Context, filename string) ([]byte, fs.FileMode, 
 }
 
 func (snapshot *familySnapshot) checkOriginals(ctx context.Context) error {
+	return snapshot.checkState(ctx, snapshot.files, nil)
+}
+
+func (snapshot *familySnapshot) checkState(ctx context.Context, expectedFiles map[string]familyFileState, ignored map[string]bool) error {
 	seenDirectories := map[string]bool{}
 	for _, root := range snapshot.roots {
 		if err := filepath.WalkDir(root, func(name string, entry fs.DirEntry, walkErr error) error {
@@ -163,7 +170,10 @@ func (snapshot *familySnapshot) checkOriginals(ctx context.Context) error {
 			if strings.HasSuffix(name, ".lease") || strings.HasSuffix(name, "/.pins.lock.yaml.lock") {
 				return nil
 			}
-			if _, known := snapshot.files[name]; !known {
+			if ignored[name] {
+				return nil
+			}
+			if _, known := expectedFiles[name]; !known {
 				return e.New(e.CodeWriteConflict, "family input %q was added", name)
 			}
 			return nil
@@ -174,8 +184,8 @@ func (snapshot *familySnapshot) checkOriginals(ctx context.Context) error {
 	if len(seenDirectories) != len(snapshot.directories) {
 		return e.New(e.CodeWriteConflict, "family input directory membership changed")
 	}
-	names := make([]string, 0, len(snapshot.files))
-	for name := range snapshot.files {
+	names := make([]string, 0, len(expectedFiles))
+	for name := range expectedFiles {
 		names = append(names, name)
 	}
 	slices.Sort(names)
@@ -184,7 +194,7 @@ func (snapshot *familySnapshot) checkOriginals(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		expected := snapshot.files[name]
+		expected := expectedFiles[name]
 		if sha256.Sum256(raw) != expected.digest || mode != expected.mode {
 			return e.New(e.CodeWriteConflict, "family input %q changed during preparation", name)
 		}

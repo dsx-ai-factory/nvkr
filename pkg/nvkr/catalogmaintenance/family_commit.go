@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -81,7 +82,9 @@ func commitFamilyChangesWithRename(ctx context.Context, snapshot *familySnapshot
 	retained := map[string]bool{}
 	defer func() {
 		for _, file := range files {
-			_ = os.Remove(file.after)
+			if !retained[file.after] {
+				_ = os.Remove(file.after)
+			}
 			if file.before != "" && !retained[file.before] {
 				_ = os.Remove(file.before)
 			}
@@ -119,20 +122,33 @@ func commitFamilyChangesWithRename(ctx context.Context, snapshot *familySnapshot
 		// restored or explicitly reported as incomplete before releasing the guards.
 		for i := written - 1; i >= 0; i-- {
 			file := files[i]
-			raw, _, err := readFamilyFile(context.WithoutCancel(ctx), file.change.path)
-			if err != nil || !bytes.Equal(raw, file.change.after) {
-				if file.change.exists {
-					retained[file.before] = true
-					failures = append(failures, fmt.Errorf("%s changed after family write; backup %s retained", file.change.path, file.before))
-				} else {
-					failures = append(failures, fmt.Errorf("new output %s changed after family write; external bytes retained", file.change.path))
-				}
+			if err := os.Remove(file.after); err != nil && !errors.Is(err, os.ErrNotExist) {
+				retained[file.after], retained[file.before] = true, true
+				failures = append(failures, fmt.Errorf("cannot withdraw %s; stages %s and %s retained: %w", file.change.path, file.after, file.before, err))
 				continue
 			}
+			var err error
 			if file.change.exists {
-				err = os.Rename(file.before, file.change.path)
+				keep, replaceErr := replaceFamilyFile(context.WithoutCancel(ctx), file.change.path, file.before, file.after, file.change.after, file.change.mode, os.Rename)
+				err = replaceErr
+				if keep {
+					retained[file.after] = true
+				}
 			} else {
-				err = os.Remove(file.change.path)
+				// Withdraw into our private stage before checking, so a racing
+				// editor's replacement is never unlinked without being retained.
+				err = os.Rename(file.change.path, file.after)
+				if err == nil {
+					raw, _, readErr := readFamilyFile(context.WithoutCancel(ctx), file.after)
+					if readErr != nil || !bytes.Equal(raw, file.change.after) {
+						if restoreErr := os.Link(file.after, file.change.path); restoreErr != nil {
+							retained[file.after] = true
+							err = fmt.Errorf("new output changed; displaced bytes retained at %s: %w", file.after, restoreErr)
+						} else {
+							err = fmt.Errorf("new output changed; external bytes restored")
+						}
+					}
+				}
 			}
 			if err == nil {
 				err = syncOverlayDirectory(filepath.Dir(file.change.path))
@@ -141,7 +157,7 @@ func commitFamilyChangesWithRename(ctx context.Context, snapshot *familySnapshot
 				if file.before != "" {
 					retained[file.before] = true
 				}
-				failures = append(failures, fmt.Errorf("restore %s from %s: %w", file.change.path, file.before, err))
+				failures = append(failures, fmt.Errorf("restore %s: %w", file.change.path, err))
 			}
 		}
 		if len(failures) != 0 {
@@ -153,18 +169,15 @@ func commitFamilyChangesWithRename(ctx context.Context, snapshot *familySnapshot
 		if err := ctx.Err(); err != nil {
 			return rollback(contextError(ctx, err))
 		}
-		current, _, err := readFamilyFile(ctx, file.change.path)
+		var err error
 		if file.change.exists {
-			if err != nil || !bytes.Equal(current, file.change.before) {
-				return rollback(e.New(e.CodeWriteConflict, "family output %q changed before commit", file.change.path))
+			keep, replaceErr := replaceFamilyFile(ctx, file.change.path, file.after, file.before, file.change.before, file.change.mode, rename)
+			err = replaceErr
+			if keep {
+				retained[file.before] = true
 			}
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return rollback(e.New(e.CodeWriteConflict, "new family output %q already exists", file.change.path))
-		}
-		if file.change.exists {
-			err = rename(file.after, file.change.path)
 		} else {
-			// Link publishes a new regular file with no replacement of a racing writer.
+			// Link publishes a new regular file without replacing a racing writer.
 			err = os.Link(file.after, file.change.path)
 		}
 		if err != nil {
@@ -172,14 +185,61 @@ func commitFamilyChangesWithRename(ctx context.Context, snapshot *familySnapshot
 			if errors.Is(err, os.ErrExist) {
 				code = e.CodeWriteConflict
 			}
+			var coded *e.Error
+			if errors.As(err, &coded) {
+				return rollback(err)
+			}
 			return rollback(e.Wrap(code, err, "committing family output %q", file.change.path))
 		}
 		written++
+		if err := os.Remove(file.after); err != nil {
+			return rollback(e.Wrap(e.CodeInternal, err, "removing published family stage"))
+		}
 		if err := syncOverlayDirectory(filepath.Dir(file.change.path)); err != nil {
 			return rollback(e.Wrap(e.CodeInternal, err, "syncing family output"))
 		}
 	}
+	expected := maps.Clone(snapshot.files)
+	ignored := map[string]bool{}
+	for _, file := range files {
+		expected[file.change.path] = familyFileState{digest: sha256.Sum256(file.change.after), mode: file.change.mode}
+		ignored[file.after] = true
+		if file.change.exists {
+			expected[file.before] = familyFileState{digest: sha256.Sum256(file.change.before), mode: file.change.mode}
+		}
+	}
+	if err := snapshot.checkState(ctx, expected, ignored); err != nil {
+		return rollback(err)
+	}
+
 	return nil
+}
+
+// replaceFamilyFile retains the actual displaced inode before inspecting it.
+// Publication and restoration use no-replace links: a save between comparison
+// and publication stays at its destination, with displaced bytes retained when
+// restoration cannot safely put them back. There may be a brief absent path.
+func replaceFamilyFile(ctx context.Context, target, candidate, displaced string, expected []byte, mode os.FileMode, rename func(string, string) error) (bool, error) {
+	if err := rename(target, displaced); err != nil {
+		return false, err
+	}
+	restore := func(cause error) (bool, error) {
+		if err := os.Link(displaced, target); err != nil {
+			return true, e.Wrap(e.CodeWriteConflict, errors.Join(cause, err), "family output %q changed; displaced bytes retained at %s", target, displaced)
+		}
+		return false, cause
+	}
+	raw, gotMode, err := readFamilyFile(ctx, displaced)
+	if err != nil && ctx.Err() != nil {
+		return restore(contextError(ctx, err))
+	}
+	if err != nil || !bytes.Equal(raw, expected) || gotMode != mode {
+		return restore(e.New(e.CodeWriteConflict, "family output %q changed during replacement", target))
+	}
+	if err := os.Link(candidate, target); err != nil {
+		return restore(err)
+	}
+	return false, nil
 }
 
 func stageFamilyFile(ctx context.Context, target string, raw []byte, mode os.FileMode, prefix string) (string, error) {

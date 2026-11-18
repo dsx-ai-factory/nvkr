@@ -3,7 +3,10 @@
 Interactive catalog-family bumping prepares the explicit multi-catalog closure before writing working files.
 Local Git fixtures cover cross-catalog release consistency, excluded cohorts, unchanged dry-run files and
 second-catalog preparation failure. Injected writer tests cover rollback, cancellation and concurrent edits,
-including retained recovery backups when another writer changed a committed member. These contracts do not
+including retained recovery backups when another writer changed a committed member. Additional fixtures
+inject edits immediately before/after withdrawal, change unchanged inputs during publication, and
+validate edited workflow/policy bytes captured after initial admission. Publication checks the actual
+displaced bytes and uses no-replace links; paths may briefly be absent. These contracts do not
 establish cross-file crash atomicity, hosted family maintenance or producer execution. Scheduled refresh
 retains its existing source selection and separate owner transactions.
 The family path generates static authored bundles without freezing runtime source heads, then repeats

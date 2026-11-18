@@ -285,7 +285,9 @@ provenance may advance to a new umbrella with unchanged member bytes. Interactiv
 remain explicit and unchanged. No constraint is widened automatically. The maintenance workflow owner is
 defined in ADR-21.
 
-Every write follows ADR-21's same-filesystem stage, fsync, original-digest compare-and-swap, and atomic rename.
+Single-catalog writes follow ADR-21's same-filesystem stage, fsync, original-digest compare-and-swap, and atomic rename.
+Coordinated family publication uses ADR-21's retained-destination and no-replace protocol, including its
+briefly absent path and checkout-repair boundary.
 Lock snapshots and writes share the bounded context-aware file boundary. Cancellation before rename aborts and
 removes the stage; after rename, commit wins and durability work completes. Concurrent same-checkout bumps never
 use last-writer-wins; one returns the coded write conflict. `--check` runs the identical resolver/serializer and
