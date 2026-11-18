@@ -45,10 +45,6 @@ Unsigned development remains static-unqualified. Neither setting grants producti
 acceptance, provider access or qualified evidence.
 ADR-20's object-store publication configures required S3 destinations separately from producer identity.
 It copies complete existing signed publications and original evidence through a generic byte transport.
-The separate proposed selective boot-asset contract binds an explicit named QCOW2/EFI selection and serving
-configuration without reducing Definition or OCI Release membership. That configuration changes the render's
-own Build identity, not its source QCOW2/EFI Build identities; see the
-[selective boundary](docs/adr/reconciliation/object-store-publication.md#selective-boot-asset-publication).
 _Avoid_: Delivery profile, component catalog, build identity
 
 **Run**:
@@ -278,20 +274,12 @@ subject and grants no destination authorization, boot, installation or qualifica
 _Avoid_: New signed release, successful upload flag, mutable channel, atomic bucket transaction
 
 **Selective boot-asset publication**:
-The proposed opt-in copy of explicitly named QCOW2s, compatible architecture-matched EFI members and intact
-original proof bytes. Complete Release membership remains in OCI. Preliminary copy receipts establish
-output bytes and observed availability; only final aggregate authentication and inventory readback permit
-selected-publication completion. A selected-artifact receipt authenticates only the named selection under
-consumer policy and cannot substitute for whole-publication verification. A declared MachineImage render is a required
-Release member; its own eventual root/content/inventory digest stays outside its bytes and identity inputs.
-_Avoid_: Partial mirror success, new Release, checksum as membership, firmware trust
+Proposed copy of named QCOW2/EFI bytes and original proofs, with complete OCI Release membership and separate preliminary, completion and selected-artifact receipts. [ADR-20](docs/adr/0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding) owns the contract.
+_Avoid_: Partial mirror success, new Release, checksum as membership
 
 **MachineImage render artifact**:
-A proposed signed artifact containing deterministic NVKE MachineImage CRs, one for each declared disk,
-architecture and boot-destination pair. It binds authenticated QCOW2/EFI dependencies and immutable serving
-URLs; its byte-affecting serving configuration belongs to its own logical Build projection. It carries no
-cluster registration, node placement or disk-selection authority. Downstream NVKE owns use and deployment.
-_Avoid_: Final Release root, selected-verification receipt, installed machine, firmware trust
+Proposed signed CR artifact for declared disk/architecture/destination pairs. Its own Build includes byte-affecting serving configuration; its eventual aggregate/content/inventory digests are excluded. Downstream NVKE owns deployment; the artifact grants no registration, placement or disk-selection authority.
+_Avoid_: Final Release root, selected-verification receipt, installed machine
 
 ## Evidence and authority
 
