@@ -63,6 +63,9 @@ func assertNativeStorageFits(t *testing.T, claims []int) {
 		if spec["storageClassName"] != "nvke-native-local" || spec["persistentVolumeReclaimPolicy"] != "Retain" {
 			t.Fatal("site volumes must retain data under the demo's default storage class")
 		}
+		if modes, ok := spec["accessModes"].([]any); !ok || !slices.Contains(modes, "ReadWriteOnce") {
+			t.Fatalf("volume cannot satisfy a ReadWriteOnce claim: %s: %v", path, spec["accessModes"])
+		}
 		capacity := spec["capacity"].(map[string]any)["storage"].(string)
 		gib, err := strconv.Atoi(strings.TrimSuffix(capacity, "Gi"))
 		if err != nil || gib <= 0 {
