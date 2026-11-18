@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -61,6 +62,7 @@ func TestRunLocalDefaultEnvironmentAndExplicitOverride(t *testing.T) {
 		{name: "empty capture root", flags: []string{"--capture-inputs-root="}, code: e.CodeUsage},
 		{name: "explicit", environment: "environment.yaml"},
 		{name: "no implicit publication", flags: []string{"--publish"}, code: e.CodeEngineCapability},
+		{name: "outside default root", flags: []string{"--definition", "../outside.yaml"}, code: e.CodeUsage},
 		{name: "explicit empty", flags: []string{"--environment="}, code: e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -92,6 +94,14 @@ func TestRunLocalDefaultEnvironmentAndExplicitOverride(t *testing.T) {
 			err := app.RunContext(t.Context(), append(args, tc.flags...))
 			if tc.code != "" {
 				assertLifecycleCommandCode(t, err, tc.code)
+				var result localRunResult
+				if err := json.Unmarshal(output.Bytes(), &result); err != nil {
+					t.Fatalf("missing JSON refusal: %v: %s", err, output.String())
+				}
+				if result.FailureCode != string(tc.code) || result.Status != "not-started" || result.RecordAvailable {
+					t.Fatalf("wrong refusal result: %+v", result)
+				}
+
 				if called {
 					t.Fatal("refused input executed")
 				}
