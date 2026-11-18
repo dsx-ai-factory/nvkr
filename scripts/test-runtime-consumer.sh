@@ -33,6 +33,7 @@ sudo -n timeout --kill-after=10s 300s apt-get install -y --no-install-recommends
   go version
   uname -a
   sha256sum "$binary"
+  stat -Lc 'resolver owner=%u mode=%a size=%s type=%F' /etc/resolv.conf
   dpkg-query -W python3 apt apt-utils dpkg systemd coreutils tar util-linux e2fsprogs xz-utils zstd acl
 } > "$evidence/inputs.txt"
 

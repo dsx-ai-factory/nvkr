@@ -67,7 +67,13 @@ and its capacity. Shell contract tests cover credential removal, exact operation
 failure. The outbound launcher uses the snapshot's `slirp4netns` 1.3.3-1 TAP-descriptor interface, with
 fixed arguments, numeric DNS projection, unprivileged helper execution and paired process lifetime.
 The runtime package closure adds that exact package; all four library dependencies were already pinned.
-These changes have no stock-VM or disk-build proof yet. The earlier assembly digest above describes the
+The first [consumer proof attempt](https://github.com/njhensley/nvkr/actions/runs/44258176521) at
+`2689862288223c4cc09bd58eab785810a68a1f3f` passed the assembly and consumer namespace tests but failed
+the outbound resolver's protected-file admission before runtime production or disk execution. It does
+not prove the outbound helper, SBOM or consumer path. Resolver admission now also checks the root's
+delegation to protected systemd-resolved service-owned files; Linux ownership fixtures cover accepted
+targets and rejection of foreign inodes, owners, writable parents/files and unlisted targets. The revised
+path still needs native proof. The earlier assembly digest above describes the
 closure before this helper was added and does not evidence the changed runtime.
 
 The quick machinery E2E [fork Run](https://github.com/njhensley/nvkr/actions/runs/44043009475)

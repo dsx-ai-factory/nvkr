@@ -32,7 +32,7 @@ jobs:
         with:
           go-version-file: .go-version
           cache: false
-      - name: Check namespace devices and session isolation
+      - name: Check namespace devices, resolver ownership and session isolation
         env:
           NAMESPACE_EVIDENCE: ${{ runner.temp }}/runtime-namespace-evidence
         run: bash scripts/test-runtime-namespace.sh "$NAMESPACE_EVIDENCE"

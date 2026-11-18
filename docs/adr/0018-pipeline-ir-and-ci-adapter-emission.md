@@ -557,7 +557,11 @@ UID/GID 65534, no capabilities and no-new-privileges; only this fixed helper ret
 Its fixed invocation enables seccomp, disables host-loopback mapping, and exposes no API socket or
 inbound forwarding. DNS projection carries at most three numeric resolver addresses, not host resolver
 search domains or other configuration. The payload sees only the private DNS proxy. Both roots remain
-read-only. A bounded readiness handshake precedes authored payload execution; either process exiting
+read-only. Host resolver configuration is a protected regular file owned by root, or one of the two
+standard systemd-resolved files explicitly selected by the root-owned `/etc/resolv.conf` symlink.
+For service-owned files, descriptor checks require protected root-owned ancestors, a final parent owned
+by root or that service, and the exact held target inode. Only bounded numeric addresses cross the
+namespace boundary. A bounded readiness handshake precedes authored payload execution; either process exiting
 cancels and joins the other. This is outbound connectivity, not a destination firewall: the existing
 operator obligation to isolate metadata and credential services remains in force.
 KVM access requires the existing held-device admission and selected execution class; it is never

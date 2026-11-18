@@ -6,14 +6,135 @@
 package runtimeexec
 
 import (
+	"context"
 	"errors"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"golang.org/x/sys/unix"
 )
+
+func TestManagedResolverDelegation(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("requires root for real service ownership fixtures")
+	}
+	for _, tc := range []struct {
+		name   string
+		change func(*testing.T, string, *unix.Stat_t)
+		code   e.Code
+	}{
+		{name: "protected service-owned stub"},
+		{name: "root-owned delegate parent", change: func(t *testing.T, root string, _ *unix.Stat_t) {
+			if err := os.Chown(filepath.Join(root, "run/systemd/resolve"), 0, 0); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "absolute upstream resolver", change: func(t *testing.T, root string, _ *unix.Stat_t) {
+			parent := filepath.Join(root, "run/systemd/resolve")
+			if err := os.Rename(filepath.Join(parent, "stub-resolv.conf"), filepath.Join(parent, "resolv.conf")); err != nil {
+				t.Fatal(err)
+			}
+			name := filepath.Join(root, "etc/resolv.conf")
+			if err := os.Rename(name, name+".previous"); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink("/run/systemd/resolve/resolv.conf", name); err != nil {
+				t.Fatal(err)
+			}
+		}},
+		{name: "foreign held inode", change: func(_ *testing.T, _ string, stat *unix.Stat_t) { stat.Ino++ }, code: e.CodeEngineCapability},
+		{name: "writable delegate parent", change: func(t *testing.T, root string, _ *unix.Stat_t) {
+			if err := os.Chmod(filepath.Join(root, "run/systemd/resolve"), 0o777); err != nil {
+				t.Fatal(err)
+			}
+		}, code: e.CodeEngineCapability},
+		{name: "foreign parent owner", change: func(t *testing.T, root string, _ *unix.Stat_t) {
+			if err := os.Chown(filepath.Join(root, "run/systemd/resolve"), 103, 103); err != nil {
+				t.Fatal(err)
+			}
+		}, code: e.CodeEngineCapability},
+		{name: "unprotected root ancestor", change: func(t *testing.T, root string, _ *unix.Stat_t) {
+			if err := os.Chmod(filepath.Join(root, "run/systemd"), 0o777); err != nil {
+				t.Fatal(err)
+			}
+		}, code: e.CodeEngineCapability},
+		{name: "foreign delegation owner", change: func(t *testing.T, root string, _ *unix.Stat_t) {
+			if err := os.Lchown(filepath.Join(root, "etc/resolv.conf"), 102, 102); err != nil {
+				t.Fatal(err)
+			}
+		}, code: e.CodeEngineCapability},
+		{name: "writable target", change: func(t *testing.T, root string, _ *unix.Stat_t) {
+			if err := os.Chmod(filepath.Join(root, "run/systemd/resolve/stub-resolv.conf"), 0o666); err != nil {
+				t.Fatal(err)
+			}
+		}, code: e.CodeEngineCapability},
+		{name: "unlisted target", change: func(t *testing.T, root string, _ *unix.Stat_t) {
+			name := filepath.Join(root, "etc/resolv.conf")
+			if err := os.Rename(name, name+".previous"); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.Symlink("/tmp/other-resolver", name); err != nil {
+				t.Fatal(err)
+			}
+		}, code: e.CodeEngineCapability},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			for _, directory := range []string{"etc", "run/systemd/resolve"} {
+				if err := os.MkdirAll(filepath.Join(root, directory), 0o755); err != nil {
+					t.Fatal(err)
+				}
+			}
+			parent := filepath.Join(root, "run/systemd/resolve")
+			name := filepath.Join(parent, "stub-resolv.conf")
+			if err := os.WriteFile(name, []byte("nameserver 127.0.0.53\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			for _, target := range []string{parent, name} {
+				if err := os.Chown(target, 102, 102); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.Symlink("../run/systemd/resolve/stub-resolv.conf", filepath.Join(root, "etc/resolv.conf")); err != nil {
+				t.Fatal(err)
+			}
+			held, err := os.Open(name)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer held.Close()
+			var stat unix.Stat_t
+			if err := unix.Fstat(int(held.Fd()), &stat); err != nil {
+				t.Fatal(err)
+			}
+			if tc.change != nil {
+				tc.change(t, root, &stat)
+			}
+			directory, err := os.Open(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer directory.Close()
+			err = admitManagedResolverAt(t.Context(), directory, stat)
+			var coded *e.Error
+			if tc.code == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else if !errors.As(err, &coded) || coded.Code != tc.code {
+				t.Fatalf("admission = %v, want %s", err, tc.code)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+			if err := admitManagedResolverAt(ctx, directory, stat); !errors.As(err, &coded) || coded.Code != e.CodeTimeout {
+				t.Fatalf("canceled admission = %v", err)
+			}
+		})
+	}
+}
 
 func TestNetworkHandoffRejectsSubstitutedDescriptors(t *testing.T) {
 	for _, tc := range []struct {

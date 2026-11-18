@@ -142,8 +142,16 @@ func readHostResolver(ctx context.Context) (string, error) {
 	resolver := os.NewFile(uintptr(fd), "outbound-resolver")
 	defer resolver.Close()
 	var stat unix.Stat_t
-	if err := unix.Fstat(fd, &stat); err != nil || stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Uid != 0 || stat.Mode&0o022 != 0 || stat.Size > 64<<10 {
-		return "", e.New(e.CodeEngineCapability, "outbound resolver requires protected regular host configuration")
+	if err := unix.Fstat(fd, &stat); err != nil {
+		return "", e.Wrap(e.CodeEngineCapability, err, "observing outbound resolver configuration")
+	}
+	if stat.Mode&unix.S_IFMT != unix.S_IFREG || stat.Mode&0o022 != 0 || stat.Size > 64<<10 {
+		return "", e.New(e.CodeEngineCapability, "outbound resolver requires protected regular host configuration (uid=%d mode=%o size=%d)", stat.Uid, stat.Mode, stat.Size)
+	}
+	if stat.Uid != 0 {
+		if err := admitManagedResolver(ctx, stat); err != nil {
+			return "", err
+		}
 	}
 	raw, err := io.ReadAll(io.LimitReader(resolver, (64<<10)+1))
 	if err != nil {
