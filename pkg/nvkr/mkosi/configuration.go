@@ -19,7 +19,7 @@ import (
 func validateConfiguration(configuration string) error {
 	allowed := map[string]string{
 		"Output/Format": "oci", "Output/CompressOutput": "no", "Output/SplitArtifacts": "", "Output/ManifestFormat": "json",
-		"Content/Bootable": "no", "Content/WithDocs": "yes", "Content/WithRecommends": "no",
+		"Content/SourceDateEpoch": "0", "Content/Bootable": "no", "Content/WithDocs": "yes", "Content/WithRecommends": "no",
 		"Content/CleanPackageMetadata": "no", "Content/RemoveFiles": "/var/cache/* /var/log/*",
 		"Build/BuildSources": "", "Build/Incremental": "no", "Build/CacheKey": "nvkr-vm-runtime",
 		"Build/ExtraSearchPaths": ArchiveToolsDirectory,

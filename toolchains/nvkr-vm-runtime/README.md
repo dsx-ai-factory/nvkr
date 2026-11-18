@@ -34,9 +34,9 @@ scratch filesystem. Assembly runs in a separate user namespace with no mapped ho
 network. The host's bootstrap utilities are not snapshot-pinned; this route makes no hermetic or qualified
 claim. Mkosi emits an uncompressed tar, which NVKR wraps unchanged as a single OCI layer with deterministic
 config and manifest. Two fresh assembly roots must produce identical complete OCI closures before a result is exposed.
-Each root's snapshot timestamp supplies its source-date epoch. The configuration pins the fixed archive
+Each root uses epoch zero for generated dates and archive mtimes. The configuration pins the fixed archive
 adapter policy: lexical traversal, numeric ownership and stable PAX header names. The adapter is staged
-read-only and selected through mkosi's extra-search-path support. Existing per-root exclusions remove
+read-only and selected in both the outer Python search path and mkosi's nested extra-search-path support. Existing per-root exclusions remove
 assembly caches and logs; installed package state remains available for evidence.
 The resulting digest changes when any selected source, package, configuration or projected file changes.
 

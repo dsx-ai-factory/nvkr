@@ -172,7 +172,7 @@ func (workspace *mkosiWorkspace) execute(ctx context.Context, operation mkosi.In
 			{Directory: workspace.workFD, Target: "/work", Writable: true},
 		},
 		Command: operation.Command, Workdir: operation.Project,
-		Environment: []string{"HOME=/work/home", "LANG=C.UTF-8", "LC_ALL=C.UTF-8", "PATH=/usr/bin:/usr/sbin", fmt.Sprintf("SOURCE_DATE_EPOCH=%d", operation.SourceDateEpoch), "TMPDIR=/work/tmp", "TZ=UTC"},
+		Environment: operation.Environment(),
 		Stdout:      stdout, Stderr: stderr,
 	})
 }

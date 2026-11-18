@@ -135,8 +135,12 @@ Build `sha256:f10ba9797ad27d8edc0e54663570d925fbd15b1d2639f24a89346fe7d963150b` 
 runtime layer, manifest and layout digests, while the tiny QCOW2 bytes matched. Each passed its own pair
 of fresh assemblies; that check alone does not establish equality across runners. An offline GNU tar
 fixture reproduced order-dependent hard-link representations and equal bytes with lexical traversal.
-The fixed adapter and snapshot-derived epoch have focused tests; two separate native runs have not yet
-established equal runtime bytes with that policy. This BIOS fixture does
+The [first adapter attempt](https://github.com/njhensley/nvkr/actions/runs/44294801476) at
+`5613f5d18aee0e2272f3fb910afcb4e36e2ed341` passed the native fixture, but its inventory showed that
+Python bypassed the adapter: owner names and unsorted directory entries remained. The snapshot-derived
+epoch also changed installed file hashes beyond configuration evidence. The implementation now restores
+epoch zero and selects the adapter in both outer Python and nested mkosi search paths. Two separate
+native runs have not yet established equal runtime bytes with that correction. This BIOS fixture does
 not establish a public Run, maintained NVKE disk equivalence, publication, signing, libguestfs inspection,
 EFI or ARM64 runtime execution.
 The earlier assembly digest above describes the closure before the outbound helper was added and does

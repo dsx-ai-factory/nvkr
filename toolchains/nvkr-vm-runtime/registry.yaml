@@ -56,7 +56,7 @@ components:
     mkosi:
       configuration:
         name: mkosi.conf
-        sha256: sha256:5635f4e7c515c9ee4c520cfe3559455c450993e6e804b75f5786d9b07c8d7f5a
+        sha256: sha256:ec76f49f7ea868b064879134d025291a0d68a0668d176d28459a69932b9316ad
       roots:
         - name: inspect
           distribution: ubuntu

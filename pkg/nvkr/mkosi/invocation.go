@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"path"
 	"strings"
-	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/material"
@@ -29,7 +28,6 @@ type Invocation struct {
 	OutputDirectory      string
 	Output               string
 	Manifest             string
-	SourceDateEpoch      int64
 	PackageConfiguration string
 	Command              []string
 }
@@ -45,10 +43,7 @@ func (spec *Spec) Invocations(platform string, bindings []string) ([]Invocation,
 	architecture := map[string]string{"linux/amd64": "x86-64", "linux/arm64": "arm64"}[platform]
 	invocations := make([]Invocation, 0, len(spec.Roots)+1)
 	for _, root := range spec.Roots {
-		operation, err := rootInvocation(root, architecture, "directory", "/work/roots/"+root.Name)
-		if err != nil {
-			return nil, err
-		}
+		operation := rootInvocation(root, architecture, "directory", "/work/roots/"+root.Name)
 		var packages strings.Builder
 		packages.WriteString("[Content]\nPackages=\n")
 		for _, item := range root.Inputs.Packages {
@@ -63,10 +58,7 @@ func (spec *Spec) Invocations(platform string, bindings []string) ([]Invocation,
 		invocations = append(invocations, operation)
 	}
 	last := spec.Roots[len(spec.Roots)-1]
-	operation, err := rootInvocation(last, architecture, "tar", "/work/packaging")
-	if err != nil {
-		return nil, err
-	}
+	operation := rootInvocation(last, architecture, "tar", "/work/packaging")
 	operation.Command = append(operation.Command, "--base-tree="+rootOutput(last.Name), "--extra-tree=/inputs/evidence")
 	if len(spec.Files)+len(spec.Copies)+len(spec.Contents) != 0 {
 		operation.Command = append(operation.Command, "--extra-tree=/inputs/file-materials")
@@ -76,15 +68,11 @@ func (spec *Spec) Invocations(platform string, bindings []string) ([]Invocation,
 	return invocations, nil
 }
 
-func rootInvocation(root Root, architecture, format, state string) (Invocation, error) {
-	snapshot, err := time.Parse("20060102T150405Z", root.Inputs.Snapshot)
-	if err != nil {
-		return Invocation{}, e.Wrap(e.CodeInvalidCatalog, err, "mkosi root requires an exact snapshot timestamp")
-	}
+func rootInvocation(root Root, architecture, format, state string) Invocation {
 	inputState := strings.Replace(state, "/work/", "/inputs/", 1)
 	operation := Invocation{Root: root.Name, Format: format, Project: path.Join(inputState, "project"),
 		Workspace: path.Join(state, "workspace"), Cache: path.Join(state, "cache"), PackageCache: path.Join(state, "package-cache"),
-		Packages: path.Join(inputState, "packages"), OutputDirectory: path.Join(state, "output"), SourceDateEpoch: snapshot.Unix()}
+		Packages: path.Join(inputState, "packages"), OutputDirectory: path.Join(state, "output")}
 	operation.Output = path.Join(operation.OutputDirectory, root.Name)
 	operation.Manifest = operation.Output + ".manifest"
 	extension := ""
@@ -105,11 +93,21 @@ func rootInvocation(root Root, architecture, format, state string) (Invocation, 
 		"--output-directory=" + operation.OutputDirectory, "--workspace-directory=" + operation.Workspace,
 		"--cache-directory=" + operation.Cache, "--package-cache-directory=" + operation.PackageCache,
 		"--local-mirror=file://" + operation.Packages, "--cache-only=always", "--incremental=no", "--cache-key=nvkr-vm-runtime",
-		fmt.Sprintf("--source-date-epoch=%d", operation.SourceDateEpoch), "--extra-search-path=", "--extra-search-path=" + ArchiveToolsDirectory,
+		"--source-date-epoch=0", "--extra-search-path=", "--extra-search-path=" + ArchiveToolsDirectory,
 		"--bootable=no", "--compress-output=no", "--split-artifacts=", "--manifest-format=json",
 		"--build-sources=", "--with-network=no", "--with-docs=yes", "--with-recommends=no", "--clean-package-metadata=no",
 		"--remove-files=/var/cache/*,/var/log/*", "--history=no"}
-	return operation, nil
+	return operation
+}
+
+// Environment fixes the outer Python search path as well as mkosi's nested
+// ExtraSearchPaths. Python resolves executable paths before running preexec_fn;
+// changing only the nested sandbox PATH would silently bypass the tar adapter.
+// Epoch zero also avoids injecting snapshot dates into installed file contents.
+func (operation Invocation) Environment() []string {
+	return []string{"HOME=/work/home", "LANG=C.UTF-8", "LC_ALL=C.UTF-8",
+		"PATH=" + ArchiveToolsDirectory + ":/usr/bin:/usr/sbin",
+		"SOURCE_DATE_EPOCH=0", "TMPDIR=/work/tmp", "TZ=UTC"}
 }
 
 func rootOutput(name string) string { return "/work/roots/" + name + "/output/" + name }
