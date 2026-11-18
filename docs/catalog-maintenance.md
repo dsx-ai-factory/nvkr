@@ -6,8 +6,51 @@ registry. The maintained policy,
 [`inputs/policies/nvke-catalog-maintenance.yaml`](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-catalog-maintenance.yaml),
 selects `nvke` and `nvke-helm`, whose constraints remain `v0.23.0`. A normal upstream check therefore preserves
 the current pins. Broader constraints or a different exact release require an authored, reviewed registry change.
-The explicit controller chart package/app-version remains an authored producer input; maintenance does
-not infer or rewrite it.
+The opted-in controller chart `sourceRecipe` derives its package version and artifact path from the
+selected semantic tag, removing a leading `v` while preserving prerelease identifiers. Its app-version
+uses the exact tag. Commit-only chart packaging requires an explicitly authored `commitVersion` packaging
+stream; it never infers a release version from a commit hash. In commit-only execution the app-version
+is the exact commit, while the explicitly authored package stream remains visible in the preview and
+requires its own reviewed change when that stream advances.
+
+## Bump a catalog family
+
+From the repository root, `bin/nvkr-exec catalog bump --all --check nvke` previews the `family`
+selection in `inputs/policies/nvke-catalog-maintenance.yaml`. Omit `--check` to apply it, or use
+`--family-config` to select another reviewed policy. Flags precede the positional family name.
+The preview lists each catalog's old/new pins, recipe versions, maintained overlays and generated
+consumers. It compiles the candidate privately before returning `NVKR-E-DIFF` when changes are needed.
+Family mode defaults to a 15-minute timeout; `--timeout` overrides it.
+
+With `--dir`, `--all` retains its single-catalog meaning: `catalog bump --all --dir PATH` updates
+all sources in that catalog and does not enroll any other catalog. Family mode requires one family
+name and no `--dir`; it uses the policy's explicit roots rather than discovering repositories by URL.
+The scheduled `catalog refresh` workflow retains its existing selected-source behavior.
+
+The maintained NVKE family selects 25 root entries across 11 catalogs used by the maintained Plans.
+`controller-profiles/nvidia-arm64`, `node-images/diagnostic`, `nvke/local-site-arm64` and
+`nvke/module-cli-arm64` remain separate cohorts. All selected roots must have identical repository,
+tag prefix and constraint text and resolve the same release identity. Their module, patch, toolchain,
+vendoring and packaging contracts remain distinct. Shared fragments already consolidate equivalent
+source declarations; equal commits alone do not make source roles interchangeable.
+
+Family preparation validates the current overlay and generated closure, resolves every selected lock,
+then renders overlays and consumer bundles in a bounded private input copy. Resolution or validation
+failure writes no working files. Applying acquires the owners' writer guards, rechecks original bytes,
+stages replacements and recovery copies, then commits payloads before manifests. Ordinary commit errors
+restore this operation's bytes. Concurrent edits are preserved and an incomplete rollback reports retained
+backups for repair. This is not cross-file crash atomicity: after interruption, repair the disposable
+checkout through the pin, overlay and bundle owners and require their checks before using it.
+The result describes maintenance only, never execution or release acceptance.
+After repairing a failed rollback, remove the reported `.nvkr-family-before-*` recovery files before
+running owner checks; qualification directories reject files outside their declared inventory.
+
+The maintained Ubuntu24 overlay's six NVKE producer copies also follow explicit source roles in
+`node-images/release`. Their complete packaging, patch, vendoring and toolchain declarations remain
+authored in the overlay maintenance policy; source pin values come from the named catalog producers.
+The agent package's version uses the selected tag. Native toolchain substitutions and all maintained
+overlay predecessor bindings regenerate through the overlay owner. Previously approved TCG/local-KVM
+source pins and the independent OVN replacement cohorts retain their selections.
 
 ## Policy and source roles
 
@@ -66,6 +109,11 @@ paths, and source catalogs with exact component IDs. `frozen` holds any complete
 retain their current producer contract. The owner copies complete producers and derives predecessor
 digests through the normal catalog validator; it performs no field merge. Destination names/types must
 already match, and repeated or missing producers, incorrect dependency order and unsafe paths fail closed.
+`sourceBound` supplies complete producer declarations without repository or pin fields, each bound to
+one explicit catalog producer's source identity. The catalog owner supplies only that identity and renders
+opted-in source-derived values; the complete declaration owns every fetch, patch and packaging choice.
+`toolchainSubstitutions` retains the ordinary exact-pin substitution contract. These explicit declarations
+permit predecessor regeneration without guessing source relationships from equal URLs or commits.
 
 The maintained [OVN inputs](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/ovn-producer-overlays.json) select NVIDIA and upstream TCG
 producer copies, plus the native NVIDIA overlay copied from the release node-image catalog. The NVKE
@@ -105,7 +153,7 @@ The migration retains existing output membership. Its remaining copies have expl
 | `node-images/variants/upstream-tcg.json` | Generated from `ovn-upstream`, after NVIDIA TCG. A NVIDIA bump updates its predecessor binding while preserving its upstream pin. |
 | `node-images/variants/nvidia-local-kvm.json`, `upstream-local-kvm.json` | Their existing complete node-image replacements stay frozen; only dependent predecessor bindings are regenerated. |
 | `node-images/variants/native-nvidia.json` | Generated from the three OVN producers in `node-images/release`; the release catalog owns their maintained `nvke-*` package contract and source pins. |
-| `node-images/variants/upstream-kvm.json` | Retains its explicit upstream 1.4.0 snapshot; not enrolled. |
+| `node-images/variants/upstream-kvm.json` | Retains its explicit upstream 1.4.0 snapshot; only predecessor bindings regenerate. |
 | `node-images/variants/nvidia-kvm.json` | Retains the known mismatch: commit `26cc199de8e814a7fe6d899a770fc04df0bbc2f9`, stream 1.5.18, versus the candidate NVIDIA 2.4.2 stream. It is not silently upgraded. |
 | `node-images/diagnostic` | Retains its separate source-owned package producers and upstream pin. |
 | Controller profile package streams and deployment requests | Remain downstream-owned selections. Integration checks require the selected profile stream to match its producer; coordinate a stream change explicitly. |

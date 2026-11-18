@@ -33,9 +33,11 @@ components:
     fromSource: true
     source: nvke-helm
     # Package the source chart with the selected NVKE release version.
-    artifactPath: charts/nvke-controller-0.23.0.tgz
     writeDir: charts
-    buildCommand: ['package', 'controller/deploy/charts/controller', '--version=0.23.0', '--app-version=v0.23.0', '--destination=charts/']
+    sourceRecipe:
+      commitVersion: 0.23.0
+      artifactPath: charts/nvke-controller-{{.ReleaseVersion}}.tgz
+      buildCommand: ['package', 'controller/deploy/charts/controller', '--version={{.ReleaseVersion}}', '--app-version={{.Tag}}', '--destination=charts/']
     outputType: tarball
     platforms:
     - linux/amd64

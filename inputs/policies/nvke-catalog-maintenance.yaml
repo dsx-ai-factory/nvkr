@@ -41,3 +41,32 @@ additionalRuns:
     environment: inputs/environments/github-nvke-nightly-gpu-site.yaml
     qualificationPolicy: inputs/policies/nvke-nightly-gpu-site-qualification.yaml
 validation: static
+
+# Explicit release cohort for `catalog bump --all nvke` without --dir.
+# Diagnostic, local-site, module-cli-arm64 and nvidia-arm64 profile catalogs
+# remain independent; equal current pins do not enroll them.
+family:
+  name: nvke
+  catalogs:
+    - catalog: inputs/catalogs/controller-profiles/native-nvidia
+      sources: [nvke-profiles]
+    - catalog: inputs/catalogs/controller-profiles/upstream-arm64
+      sources: [nvke-profiles]
+    - catalog: inputs/catalogs/nicosim
+      sources: [nvke-nicosim]
+    - catalog: inputs/catalogs/node-images/release
+      sources: [nvke-cni-calico-source, nvke-doca-ovs-source, nvke-kubeadm-distro-source, nvke-os, nvke-spire-agent-source]
+    - catalog: inputs/catalogs/nvke/module-tags
+      sources: [nvke, nvke-controller]
+    - catalog: inputs/catalogs/nvke/native-site
+      sources: [nvke-cli, nvke-controller, nvke-controller-helm, nvke-deploy]
+    - catalog: inputs/catalogs/nvke/nightly-site-arm64
+      sources: [nvke-cli, nvke-controller, nvke-controller-helm]
+    - catalog: inputs/catalogs/nvke/release
+      sources: [nvke, nvke-cli, nvke-helm]
+    - catalog: inputs/catalogs/nvke/release-components
+      sources: [nvke-content]
+    - catalog: inputs/catalogs/runtime-dependencies
+      sources: [nvke-deployment-selection]
+    - catalog: inputs/catalogs/tools/native
+      sources: [nvke-cli, nvke-deploy, nvke-nicosim]

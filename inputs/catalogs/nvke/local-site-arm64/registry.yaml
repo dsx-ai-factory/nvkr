@@ -57,7 +57,6 @@ components:
     source: nvke-controller-helm
     platforms: [linux/arm64]
     outputType: tarball
-    artifactPath: charts/nvke-controller-0.23.0.tgz
     writeDir: charts
     helm:
       chart: .
@@ -67,7 +66,10 @@ components:
             digest: image.digest
     # The upstream Chart.yaml version is a placeholder; package the selected release.
     # The final package is bound to the produced controller digest.
-    buildCommand: [sh, -euc, 'helm package controller/deploy/charts/controller --version=0.23.0 --app-version=v0.23.0 --destination=charts/']
+    sourceRecipe:
+      commitVersion: 0.23.0
+      artifactPath: charts/nvke-controller-{{.ReleaseVersion}}.tgz
+      buildCommand: [sh, -euc, 'helm package controller/deploy/charts/controller --version={{.ReleaseVersion}} --app-version={{.Tag}} --destination=charts/']
   nktp-chart:
     fromSource: true
     source: nvke-nktp-helm

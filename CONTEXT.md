@@ -229,6 +229,9 @@ _Avoid_: Release, binary bundle, editable workflow scaffold
 A review-only lock and regenerated execution-bundle change under explicit source-selection constraints.
 Static checks and optional complete local diagnostic execution precede candidate handoff; neither is release
 acceptance. Scheduling and source-role alignment are operational policy, not additional lifecycle objects.
+An explicit catalog family coordinates named source roles, producer copies and generated consumers within
+that policy. Equal repository URLs or commits do not enroll other cohorts; preparation and rollback do not
+confer execution or release authority.
 Native toolchain maintenance additionally binds candidate-only exceptions to exact image subjects;
 independent-reader/native verification precedes the review-only pin and generated-bundle change.
 _Avoid_: Release, qualified reproduction, automatic promotion
@@ -461,6 +464,9 @@ A registry may select shared, digest-pinned declaration fragments; its lock stil
 source and artifact key sets. Fragments are authoring inputs, not additional lifecycle objects.
 Command operands may reference confined files; loading expands their exact bytes into the existing argv.
 Captured compile inputs retain these files, while resolved command identities exclude their paths.
+Source-derived command and artifact-path bindings use an exact tag or explicitly normalized release version;
+commit-only release-version use requires an authored packaging stream. Complete source-bound producer
+copies retain their declared contracts while following an explicitly named catalog producer's source pin.
 _Avoid_: Inventory, registry destination
 
 **Component producer**:

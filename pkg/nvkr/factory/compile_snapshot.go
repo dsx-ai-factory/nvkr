@@ -46,17 +46,10 @@ type InputDirectory struct {
 // Logical paths remain unchanged in the Plan regardless of root's location.
 // Upstream pin-set authentication retains catalog's bounded network access.
 func CaptureCompileFiles(ctx context.Context, root, definitionPath, environmentPath, generatorVersion string) (*Plan, InputSnapshot, error) {
-	if err := snapshotContext(ctx); err != nil {
+	state, err := rootedInputState(ctx, root)
+	if err != nil {
 		return nil, InputSnapshot{}, err
 	}
-	if root == "" {
-		return nil, InputSnapshot{}, e.New(e.CodeUsage, "input capture requires a repository root")
-	}
-	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
-		return nil, InputSnapshot{}, e.New(e.CodeEngineCapability, "input capture requires bounded no-follow filesystem support")
-	}
-	state := newInputState()
-	state.source = catalog.Dir(root).(catalog.ContextDataProvider)
 	plan, err := compileInputState(ctx, state, definitionPath, environmentPath, generatorVersion)
 	if err != nil {
 		return nil, InputSnapshot{}, err
@@ -66,6 +59,33 @@ func CaptureCompileFiles(ctx context.Context, root, definitionPath, environmentP
 		return nil, InputSnapshot{}, err
 	}
 	return plan, snapshot, nil
+}
+
+// CompileAuthoredFiles compiles an authored bundle beneath a confined root. It
+// admits a declared runtime source policy without selecting any source commit,
+// just like ordinary run generation. It neither freezes a moving ref nor issues
+// a replay snapshot or runtime source receipt. Dispatch retains its own admission.
+func CompileAuthoredFiles(ctx context.Context, root, definitionPath, environmentPath, generatorVersion string) (*Plan, error) {
+	state, err := rootedInputState(ctx, root)
+	if err != nil {
+		return nil, err
+	}
+	return compileAuthoredInputState(ctx, state, definitionPath, environmentPath, generatorVersion, true)
+}
+
+func rootedInputState(ctx context.Context, root string) (*inputState, error) {
+	if err := snapshotContext(ctx); err != nil {
+		return nil, err
+	}
+	if root == "" {
+		return nil, e.New(e.CodeUsage, "input capture requires a repository root")
+	}
+	if runtime.GOOS != "linux" && runtime.GOOS != "darwin" {
+		return nil, e.New(e.CodeEngineCapability, "input capture requires bounded no-follow filesystem support")
+	}
+	state := newInputState()
+	state.source = catalog.Dir(root).(catalog.ContextDataProvider)
+	return state, nil
 }
 
 // CompileSnapshot recompiles saved authored bytes with no host-file fallback.
@@ -119,6 +139,10 @@ func CompileSnapshot(ctx context.Context, snapshot InputSnapshot, generatorVersi
 }
 
 func compileInputState(ctx context.Context, state *inputState, definitionPath, environmentPath, generatorVersion string) (*Plan, error) {
+	return compileAuthoredInputState(ctx, state, definitionPath, environmentPath, generatorVersion, false)
+}
+
+func compileAuthoredInputState(ctx context.Context, state *inputState, definitionPath, environmentPath, generatorVersion string, authoredOnly bool) (*Plan, error) {
 	for _, name := range []string{definitionPath, environmentPath} {
 		if err := validateInputPath(name); err != nil {
 			return nil, err
@@ -143,7 +167,7 @@ func compileInputState(ctx context.Context, state *inputState, definitionPath, e
 	if err != nil {
 		return nil, err
 	}
-	if environment.GitHubRuntimeSource != nil {
+	if environment.GitHubRuntimeSource != nil && !authoredOnly {
 		return nil, e.New(e.CodeEngineCapability, "input capture cannot replay an exact runtime source selection")
 	}
 	return compileDocumentsWithLoader(ctx, definitionPath, definition, environmentPath, environment, generatorVersion,

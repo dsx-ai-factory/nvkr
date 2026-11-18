@@ -54,6 +54,10 @@ Explicit digest-pinned fragments share authored declarations before resolution; 
 complete lock. Snapshot capture includes those fragment bytes and replay remains confined to captured inputs.
 File-backed build/vendor argv operands expand to exact bytes during catalog loading and join that captured
 closure; their paths do not enter resolved command identities (ADR-22).
+Opt-in source-derived argv/path bindings and complete source-bound producer copies retain explicit producer
+contracts. Catalog-family maintenance prepares selected pins, overlay predecessors and consumer bundles
+before guarded commitment, preserving independently selected cohorts (ADR-21/22). It generates static
+authored bundles; runtime source freezing and release authorization remain separate owners.
 [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies) owns how generated
 Runs bind action commits from the catalog lock. Definitions declare named deliverable outputs once.
 NVKR does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source

@@ -254,13 +254,25 @@ func cmdCatalog() *cli.Command {
 				Usage:     "pin the newest constraint-matching source releases, including declared tool assets",
 				ArgsUsage: "[source...]",
 				Flags: []cli.Flag{
-					&cli.BoolFlag{Name: "all", Usage: "bump every source"},
+					&cli.BoolFlag{Name: "all", Usage: "with --dir, bump every source in that catalog; with a family name and no --dir, coordinate its declared catalogs"},
 					&cli.BoolFlag{Name: "check", Usage: "dry-run: print the lockfile diff, write nothing (ADR-22 §4)"},
-					&cli.StringFlag{Name: "dir", Required: true, Usage: "on-disk catalog directory to update"},
+					&cli.StringFlag{Name: "dir", Usage: "on-disk catalog directory for legacy single-catalog bump"},
+					&cli.StringFlag{Name: "family-config", Value: "inputs/policies/nvke-catalog-maintenance.yaml", Usage: "reviewed family maintenance policy (family mode only)"},
 					&cli.StringFlag{Name: "runtime", Value: "docker", Usage: "legacy default-only option (docker); image pins use anonymous HTTPS"},
 					&cli.DurationFlag{Name: "timeout", Value: 5 * time.Minute, Usage: "maximum duration for upstream git/container resolution"},
 				},
-				Action: func(c *cli.Context) error { return pinSources(c, true) },
+				Action: func(c *cli.Context) error {
+					if !c.IsSet("dir") && c.Bool("all") && c.Args().Len() == 1 {
+						return bumpCatalogFamily(c)
+					}
+					if c.String("dir") == "" {
+						return e.New(e.CodeUsage, "bump requires --dir, or --all followed by one declared family name")
+					}
+					if c.IsSet("family-config") {
+						return e.New(e.CodeUsage, "--family-config requires family mode without --dir")
+					}
+					return pinSources(c, true)
+				},
 			},
 			{
 				Name:      "pin-artifacts",

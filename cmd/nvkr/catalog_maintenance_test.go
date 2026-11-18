@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalogmaintenance"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -41,6 +42,50 @@ func TestCatalogMaintenanceRejectsBeforeOutput(t *testing.T) {
 				t.Fatalf("failure emitted output: %q", output)
 			}
 		})
+	}
+}
+
+func TestCatalogBumpFamilyCompatibility(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		args     []string
+		code     e.Code
+		contains string
+	}{
+		{"family without directory", []string{"--all", "--family-config", "absent.yaml", "nvke"}, e.CodeInvalidCatalog, "maintenance"},
+		{"legacy all requires directory", []string{"--all"}, e.CodeUsage, "--dir"},
+		{"legacy named requires directory", []string{"nvke"}, e.CodeUsage, "--dir"},
+		{"multiple families", []string{"--all", "nvke", "other"}, e.CodeUsage, "--dir"},
+		{"family config and directory conflict", []string{"--all", "--dir", "absent", "--family-config", "absent.yaml"}, e.CodeUsage, "family mode"},
+		{"legacy all directory", []string{"--all", "--dir", "absent"}, e.CodeInvalidCatalog, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			output, err := runCatalogCommand(t, append([]string{"catalog", "bump"}, tc.args...)...)
+			if cliErrorCode(err) != tc.code || !strings.Contains(err.Error(), tc.contains) {
+				t.Fatalf("unexpected route: %v", err)
+			}
+			if output != "" {
+				t.Fatalf("failed admission emitted %q", output)
+			}
+		})
+	}
+}
+
+func TestFamilyPreviewIncludesDerivedArtifactsAndCommitStream(t *testing.T) {
+	result := catalogmaintenance.FamilyResult{Catalogs: []catalogmaintenance.FamilyCatalogUpdate{{Catalog: "inputs/catalogs/test", Update: catalog.SourcePinUpdate{
+		Pins:      []catalog.SourcePinChange{{Name: "source", Before: catalog.Pin{Tag: "v1.0.0"}, After: catalog.Pin{Tag: "v1.1.0"}}},
+		Artifacts: []catalog.ArtifactPinChange{{Name: "chart", Before: catalog.ArtifactPin{Tag: "1.0.0", Digests: map[string]string{"amd64": "old"}}, After: catalog.ArtifactPin{Tag: "1.1.0", Digests: map[string]string{"amd64": "new"}}}},
+	}}}, Recipes: []catalogmaintenance.FamilyRecipeUpdate{{Catalog: "test", Component: "chart", Before: "1.0.0", After: "1.1.0", CommitVersion: "1.0.0"}}}
+	fields := familyResultFields(result)
+	var rendered strings.Builder
+	for _, field := range fields {
+		rendered.WriteString(field.Label + ": " + field.Value + "\n")
+	}
+	for _, want := range []string{"/ source:", "/ artifact chart: 1.0.0 -> 1.1.0", "amd64: old -> new", "Recipe normalized version test / chart: 1.0.0 -> 1.1.0", "Explicit commit-only packaging stream: 1.0.0"} {
+		if !strings.Contains(rendered.String(), want) {
+			t.Fatalf("preview omits %q: %s", want, rendered.String())
+		}
 	}
 }
 

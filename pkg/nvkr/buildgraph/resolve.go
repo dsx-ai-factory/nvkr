@@ -221,6 +221,11 @@ func cloneComponent(component catalog.Component) catalog.Component {
 	component.VendorCommand = slices.Clone(component.VendorCommand)
 	component.VersionStamp = maps.Clone(component.VersionStamp)
 	component.SourceMetadata = maps.Clone(component.SourceMetadata)
+	if component.SourceRecipe != nil {
+		recipe := *component.SourceRecipe
+		recipe.BuildCommand = slices.Clone(recipe.BuildCommand)
+		component.SourceRecipe = &recipe
+	}
 	component.Patches = slices.Clone(component.Patches)
 	component.BuildRequirements = execution.Clone(component.BuildRequirements)
 	component.ToolArgs = slices.Clone(component.ToolArgs)

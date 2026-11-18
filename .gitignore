@@ -23,6 +23,7 @@
 .*.pin.lock
 # persistent producer-overlay maintenance writer guard
 /.nvkr-producer-overlays.lease
+/.nvkr-catalog-family.lease
 
 # test / coverage
 coverage.out
