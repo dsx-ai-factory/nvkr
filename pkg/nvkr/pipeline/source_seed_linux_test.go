@@ -172,7 +172,7 @@ func TestSharedSourceSeedAuthenticatesEachConsumer(t *testing.T) {
 					cancel()
 					want = e.CodeTimeout
 				}
-				if want == "" && transport {
+				if transport && (want == "" || scenario == "object alternates") {
 					// Exercise the real job boundary: ordinary source transport excludes
 					// Git metadata, so seed owners require the narrow source-seed carrier.
 					seedPath := filepath.Join("src", seed.Dest)

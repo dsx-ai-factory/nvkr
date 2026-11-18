@@ -730,7 +730,9 @@ metadata or registry operations and is not added to producer execution.
 Repeated metadata checks may use ADR-18's bounded operation-local authenticated ETag revalidation; no
 admission check is skipped, and errors cannot reuse an earlier successful policy response.
 Public, unknown or inaccessible policy fails closed. A missing package can receive only a metadata-only
-seed before admission. The existing metadata inspector derives sibling references without opening product
+seed before admission. ADR-18's bounded post-seed confirmation may recheck API absence after a successful
+metadata-only write; it never authorizes payloads from the registry write alone or retries an explicit
+privacy refusal. The existing metadata inspector derives sibling references without opening product
 payloads; the actual push must retain that inspected root digest. Hosted GHCR layouts outside this metadata
 contract are rejected rather than falling back to unchecked publication. Local and other-registry transport
 contracts remain unchanged. These checks cannot lock future provider visibility or establish independent

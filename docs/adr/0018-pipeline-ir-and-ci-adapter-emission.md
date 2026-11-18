@@ -313,7 +313,10 @@ archive rather than trusting a partially received prefix, and repeats neither pu
 
 CI transfer admission requires an API-confirmed private/internal package with no linked repository,
 including while the source remains private. A missing package may receive an empty metadata-only seed;
-payload upload requires a subsequent successful privacy check. Transfers require separate dedicated read
+payload upload requires a subsequent successful privacy check. After a successful seed write, an API
+404 may receive at most five confirmation reads with cancellable waits of 2, 4, 8 and 16 seconds, under
+the original operation deadline and existing bounded API reads (including classified rate-limit waits). Each read authenticates the same package with the same credential; explicit policy
+refusals remain immediate failures, and exhaustion grants no payload access. Transfers require separate dedicated read
 and write credentials with their configured account usernames, scoped only to their consuming steps, without repository-token fallback or extra
 repository package permissions. The repository token authenticates repository metadata separately from the
 package credential. These principals must have no production publication grants. No Actions-payload fallback

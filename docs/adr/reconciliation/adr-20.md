@@ -81,3 +81,14 @@ in the observation transport. Metadata-member cancellation preserves the member 
 guidance before any write, and nested alias readback classification does not duplicate its message.
 Write probes remain absent; the library's mutating, asynchronously cleaned-up push-permission helper is not
 used. Live registry/version coverage and hosted validation of these changes remain unverified.
+
+The development [Run 44255595374](https://github.com/dsx-ai-factory/nvkr/actions/runs/44255595374)
+completed source sharing but failed publication of the second output in a two-image batch: a successful
+metadata-only seed was followed by a package API 404. Publication remained closed and the release job
+was skipped. The exact error is reproduced by the package-admission fixture. Bounded authenticated
+post-seed confirmation now covers delayed visibility, exhaustion, cancellation and immediate explicit
+policy refusal; whole-set admission still rechecks every package before payload upload. The later package
+API read showed the metadata root as internal and unlinked, which is consistent with delayed visibility
+but does not establish the original credential's provider response sequence. Hosted validation of this
+recovery remains pending; neither failed development attempt supplies release timing or complete release
+evidence.

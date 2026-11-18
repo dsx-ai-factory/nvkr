@@ -141,14 +141,31 @@ func (b *backend) ensurePrivatePackage(ctx context.Context, repository name.Repo
 	if err := remote.Write(repository.Tag("privacy-probe-v1"), seed, b.registryOptions(ctx, opts)...); err != nil {
 		return safeIOError(ctx, e.CodeFetchFailed, "seeding metadata-only private package")
 	}
-	exists, err = b.checkPackagePrivacy(ctx, packageName, source, opts, requireUnlinked)
-	if err != nil {
-		return err
+	return b.confirmSeedPrivacy(ctx, packageName, source, opts, requireUnlinked)
+}
+
+// A successful registry seed may precede package API visibility. Retry only
+// absence after that metadata-only write, never an explicit policy refusal.
+// Every attempt authenticates the same exact package with the same credential.
+func (b *backend) confirmSeedPrivacy(ctx context.Context, packageName string, source repositoryRecord, opts Options, requireUnlinked bool) error {
+	// Preserve the caller and per-read API deadlines, including rate-limit waits.
+	wait := b.wait
+	if wait == nil {
+		wait = waitChunkRetry
 	}
-	if !exists {
-		return e.New(e.CodeTrustPolicyMissing, "metadata seed did not establish an API-confirmed private package")
+	const attempts = 5
+	for attempt := 0; attempt < attempts; attempt++ {
+		exists, err := b.checkPackagePrivacy(ctx, packageName, source, opts, requireUnlinked)
+		if err != nil || exists {
+			return err
+		}
+		if attempt+1 < attempts {
+			if err := wait(ctx, (2*time.Second)<<attempt); err != nil {
+				return safeIOError(ctx, e.CodeTimeout, "private package seed confirmation canceled")
+			}
+		}
 	}
-	return nil
+	return e.New(e.CodeTrustPolicyMissing, "metadata seed did not establish an API-confirmed private package %q within the confirmation budget", packageName)
 }
 
 func privateVisibility(visibility string) bool {
