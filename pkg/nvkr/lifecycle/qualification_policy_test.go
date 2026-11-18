@@ -91,6 +91,12 @@ func TestLoadQualificationPolicyStrictDocuments(t *testing.T) {
 		{"oversized", valid + "#" + strings.Repeat("x", maxQualificationPolicyBytes), e.CodeTrustPolicyMissing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			_, decodeErr := DecodeQualificationPolicy([]byte(tc.raw))
+			if tc.code != "" {
+				assertCode(t, decodeErr, tc.code)
+			} else if decodeErr != nil {
+				t.Fatal(decodeErr)
+			}
 			path := filepath.Join(t.TempDir(), "policy.yaml")
 			if err := os.WriteFile(path, []byte(tc.raw), 0o600); err != nil {
 				t.Fatal(err)

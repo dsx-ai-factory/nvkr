@@ -39,19 +39,20 @@ const (
 )
 
 const (
-	OutputExecutable         = definition.OutputExecutable
-	OutputOCI                = definition.OutputOCI
-	OutputAPT                = definition.OutputAPT
-	OutputHelm               = definition.OutputHelm
-	OutputBundle             = definition.OutputBundle
-	OutputDiskImage          = definition.OutputDiskImage
-	OutputDebianPackage      = definition.OutputDebianPackage
-	LaneQualified            = "qualified"
-	LanePipeline             = "pipeline-attested"
-	LaneUnqualified          = "static-unqualified"
-	ScopeAuthenticity        = "authenticity"
-	ScopeArtifactPublication = "artifact-publication"
-	ScopeRelease             = "release"
+	OutputExecutable           = definition.OutputExecutable
+	OutputOCI                  = definition.OutputOCI
+	OutputAPT                  = definition.OutputAPT
+	OutputHelm                 = definition.OutputHelm
+	OutputBundle               = definition.OutputBundle
+	OutputDiskImage            = definition.OutputDiskImage
+	OutputDebianPackage        = definition.OutputDebianPackage
+	LaneQualified              = "qualified"
+	LanePipeline               = "pipeline-attested"
+	LaneUnqualified            = "static-unqualified"
+	ScopeAuthenticity          = "authenticity"
+	ScopeArtifactPublication   = "artifact-publication"
+	ScopeSelectedBootArtifacts = "selected-boot-artifacts"
+	ScopeRelease               = "release"
 )
 
 // DiskEvidenceRequirement is the minimum disk evidence a consumer accepts.
@@ -177,8 +178,8 @@ func (policy VerificationPolicy) Validate() error {
 		}
 		return nil
 	case LanePipeline:
-		if policy.Scope != ScopeAuthenticity && policy.Scope != ScopeArtifactPublication && policy.Scope != ScopeRelease {
-			return e.New(e.CodeTrustPolicyMissing, "pipeline-attested verification requires an explicit authenticity, artifact-publication or release scope")
+		if policy.Scope != ScopeAuthenticity && policy.Scope != ScopeArtifactPublication && policy.Scope != ScopeSelectedBootArtifacts && policy.Scope != ScopeRelease {
+			return e.New(e.CodeTrustPolicyMissing, "pipeline-attested verification requires an explicit supported scope")
 		}
 		if strings.TrimSpace(policy.IdentityRegexp) == "" || strings.TrimSpace(policy.Issuer) == "" {
 			return e.New(e.CodeTrustPolicyMissing, "pipeline-attested verification requires identity and issuer")

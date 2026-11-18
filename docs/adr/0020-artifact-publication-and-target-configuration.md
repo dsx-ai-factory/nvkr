@@ -13,7 +13,8 @@
   SEC-13 (registry-by-digest).
 
 - **Scope:** Sections 3–4 specify deferred qualified publication. Diagnostic transport construction is
-  implemented as stated in §4. Section 2 includes the proposed, unimplemented selective boot-asset extension.
+  implemented as stated in §4. Section 2's selective boot-asset extension has core lifecycle APIs;
+  generated execution, producer integration and rendering remain deferred.
   Section 6 defines v1 publication; §7 is deferred registration.
 
 ## Context
@@ -141,7 +142,7 @@ serialized plan or transported source tree. Local and GitLab execution reject th
 adapters support equivalent credential isolation.
 
 OCI is the current v1 publication transport. Executable, APT-repository and Helm outputs can share a recursive
-OCI closure; an APT tree inside it is not an enabled direct APT-server publisher. Direct package repository publishers remain deferred and fail capability admission. Object-store copying retains the complete signed-publication contract below; the separate selective boot-asset extension is design only. Credential values never enter serialized inputs.
+OCI closure; an APT tree inside it is not an enabled direct APT-server publisher. Direct package repository publishers remain deferred and fail capability admission. Object-store copying retains the complete signed-publication contract below; the separate selective boot-asset extension has core lifecycle APIs with generated execution, producer integration and rendering deferred. Credential values never enter serialized inputs.
 Transport settings stay replaceable by environment owners.
 
 The pipeline-attested disk transport uses a distinct OCI manifest over the unchanged QCOW2 payload. Its one
@@ -353,8 +354,9 @@ Organizational ratification is separate from implementation and these operationa
 
 #### Selective boot-asset publication and MachineImage binding
 
-Proposed, unimplemented pipeline-attested contract for [#514](https://github.com/dsx-ai-factory/nvkr/issues/514).
+Pipeline-attested contract from [#514](https://github.com/dsx-ai-factory/nvkr/issues/514), with core API implementation in [#515](https://github.com/dsx-ai-factory/nvkr/issues/515).
 [Reconciliation](reconciliation/object-store-publication.md#selective-boot-asset-publication) owns acceptance/implementation. Existing full-mirror schemas, bytes and verification stay unchanged.
+Generated execution, producer integration and rendering remain separate acceptance work; compiling the versioned Plan does not enable those routes.
 
 **Admission.** `selective-boot-v1` requires a new Environment/Plan version and explicit destination modes.
 The new schema has no mode default; old schemas keep full mirror on omission and reject selective fields. Select sorted, nonempty QCOW2 outputs, one
@@ -458,6 +460,16 @@ or fallback; omitted unselected payloads are expected. Cancellation/cleanup fail
 and stops/joins work under bounded cleanup. Retries repeat admission/authentication, including signed-output reuse under §6's
 same-run rules; changed bindings require new Run/Plan identities. Reconcile conflicts/lost acknowledgements by full pinned hash/size
 readback. Lost inventory acknowledgement requires its exact attempted locator and reauthentication of every object/proof.
+The API retains that descriptive locator in `BootInventoryError`, including any observed version/validator;
+`RetryBootSelection` requires the reconstructed inventory to match it. An unknown pin permits conditional creation
+and pinned readback; a known pin permits only that exact read, with no current-version fallback. Cleanup failure
+after inventory readback also retains the locator and withholds completion.
+The expected inventory invocation is the aggregate's exact authenticated invocation, including when retrying
+from a later process or workflow attempt; it is not the retry's current attempt. Earlier output-local
+preparation/signing invocations retain their same-run ordering checks.
+Aggregate signing may occur on a later same-run attempt than assembly. The original authenticated production
+proof supplies that signing invocation; it must not precede assembly or cross runs. It does not replace the
+aggregate assembly invocation in the inventory or receipt.
 Exclude timestamps/sessions/attempt counters from canonical inventory; equal subjects/pins
 yield identical bytes. Changed pins require new authenticated completion and separately addressed inventory, never mutable aliases.
 Local commits retain kernel-released locks, byte-CAS/no-replace, recovery and directory fsync. Orphans may remain; no atomic

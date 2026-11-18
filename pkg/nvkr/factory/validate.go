@@ -58,6 +58,9 @@ func (plan Plan) Validate() error {
 	if err := plan.validateLifecyclePlans(); err != nil {
 		return err
 	}
+	if err := plan.validateBootPublicationPlan(); err != nil {
+		return err
+	}
 	return plan.validateCompiledGraph(packages)
 }
 
@@ -67,8 +70,9 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 			return nil, err
 		}
 	}
-	if (plan.SchemaVersion != PlanSchemaVersion && plan.SchemaVersion != CompositePlanSchemaVersion) ||
-		(plan.SchemaVersion == CompositePlanSchemaVersion) != (plan.Composition != nil) || !canonicalName.MatchString(plan.Name) {
+	if (plan.SchemaVersion != PlanSchemaVersion && plan.SchemaVersion != CompositePlanSchemaVersion && plan.SchemaVersion != BootPlanSchemaVersion) ||
+		(plan.SchemaVersion != BootPlanSchemaVersion && (plan.SchemaVersion == CompositePlanSchemaVersion) != (plan.Composition != nil)) ||
+		(plan.SchemaVersion == BootPlanSchemaVersion) != (plan.BootPublication != nil) || !canonicalName.MatchString(plan.Name) {
 		return nil, e.New(e.CodeInvalidCatalog, "run plan schema/name is invalid")
 	}
 	if strings.TrimSpace(plan.GeneratorVersion) == "" {
