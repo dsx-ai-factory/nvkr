@@ -39,7 +39,11 @@ removal of the unused image dependency and exact license companion names. These 
 not executed disk builds. The internal consumer-use receipt now binds the original and relocated Plan,
 exact consumer instruction, runtime production and completed evidence. Contract tests cover single use,
 substitution rejection, revocation and cancellation with joining; the owning Run retains private production
-Plan bindings and revokes all its issued uses before closing runtime resources. The issuer remains
+Plan bindings and revokes all its issued uses before closing runtime resources. Private consumer staging
+requires that receipt, retains the original layer through cleanup, and rejects replay and unowned use.
+Its cancellation and cleanup contracts have race tests. Narrow input/work mount points preserve the
+runtime's plugin and firmware paths; filesystem tests reject symlink parents. Mkosi material observation
+now uses the same authenticated producer-result boundary as other material consumers. The issuer remains
 disconnected from consumer dispatch. Namespace consumer execution and hosted scheduling remain incomplete,
 so maintained Run execution stays gated. No real Run has exercised
 the new runtime SBOM and dispatcher together. This proof does not establish disk-output

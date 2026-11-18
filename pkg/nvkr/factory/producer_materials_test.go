@@ -192,3 +192,30 @@ func TestObserveOrdinaryProducerMaterialsRejectsUnauthenticatedResult(t *testing
 		t.Fatalf("error = %v, want %s", err, e.CodeVerifyFailed)
 	}
 }
+
+func TestMkosiMaterialsRequireAuthenticatedResultsInCompletePlan(t *testing.T) {
+	plan := runtimeConsumerPlanFixture(t)
+	if err := plan.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	// The real maintained recipe selects pinned executable materials. An empty
+	// workspace must reach their result authentication and reject absent bytes,
+	// rather than reject mkosi as an unsupported material consumer.
+	t.Chdir(t.TempDir())
+	for _, node := range plan.Graph.Nodes {
+		if node.ID != "internal/runtime/build-vm-runtime-amd64" {
+			continue
+		}
+		materials, err := observeBuildMaterials(t.Context(), plan, node)
+		if materials != nil {
+			_ = materials.Close()
+			t.Fatal("missing mkosi inputs acquired material capabilities")
+		}
+		assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+		if !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("runtime material did not reach missing-result authentication: %v", err)
+		}
+		return
+	}
+	t.Fatal("complete Plan has no runtime assembly operation")
+}

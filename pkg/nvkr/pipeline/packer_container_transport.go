@@ -297,7 +297,7 @@ func createPackerWorkspaceRoot(workspace *os.File, attempt string) (*packerConta
 	return &packerContainerWorkspace{parent: parent, root: directory, name: name}, nil
 }
 
-func preparePackerContainerTransport(ctx context.Context, root string, request packerContainerRunRequest) (*heldfile.File, *heldfile.File, *stagedPackerInputs, error) {
+func preparePackerConsumerInputs(ctx context.Context, root string, request packerContainerRunRequest) (*stagedPackerInputs, error) {
 	inputRoot := filepath.Join(root, "input")
 	workRoot := filepath.Join(root, "work")
 	for _, directory := range []string{
@@ -307,60 +307,71 @@ func preparePackerContainerTransport(ctx context.Context, root string, request p
 		filepath.Join(workRoot, "ssh"), filepath.Join(workRoot, "stage"),
 	} {
 		if err := os.MkdirAll(directory, 0o700); err != nil {
-			return nil, nil, nil, e.Wrap(e.CodeBuildFailed, err, "creating private Packer transport state")
+			return nil, e.Wrap(e.CodeBuildFailed, err, "creating private Packer transport state")
 		}
 	}
 	before, err := sourceTreeDigestContext(ctx, request.source.Dir)
 	if err != nil {
-		return nil, nil, nil, e.Wrap(e.CodeUnverifiedRef, err, "rechecking authenticated Packer source")
+		return nil, e.Wrap(e.CodeUnverifiedRef, err, "rechecking authenticated Packer source")
 	}
 	if err := copySourceTreeContext(ctx, request.source.Dir, filepath.Join(inputRoot, "source"), 0); err != nil {
-		return nil, nil, nil, e.Wrap(e.CodeBuildFailed, err, "copying authenticated Packer source into transport")
+		return nil, e.Wrap(e.CodeBuildFailed, err, "copying authenticated Packer source into transport")
 	}
 	copied, err := sourceTreeDigestContext(ctx, filepath.Join(inputRoot, "source"))
 	if err != nil {
-		return nil, nil, nil, e.Wrap(e.CodeUnverifiedRef, err, "checking transported Packer source")
+		return nil, e.Wrap(e.CodeUnverifiedRef, err, "checking transported Packer source")
 	}
 	after, err := sourceTreeDigestContext(ctx, request.source.Dir)
 	if err != nil {
-		return nil, nil, nil, e.Wrap(e.CodeUnverifiedRef, err, "rechecking authenticated Packer source")
+		return nil, e.Wrap(e.CodeUnverifiedRef, err, "rechecking authenticated Packer source")
 	}
 	if before != after || copied != before {
-		return nil, nil, nil, e.New(e.CodeUnverifiedRef, "authenticated Packer source changed during transport")
+		return nil, e.New(e.CodeUnverifiedRef, "authenticated Packer source changed during transport")
 	}
 	manifestPath := filepath.Join(inputRoot, "inputs", "material-manifest.json")
 	manifestHeld, err := heldfile.FromBytesContext(ctx, request.manifest, heldfile.Options{
 		Label: "packer-material-manifest", MaxBytes: maxBuildMaterialManifestBytes, ExpectedDigest: request.digest,
 	})
 	if err != nil {
-		return nil, nil, nil, e.Wrap(e.CodeBuildFailed, err, "staging Packer material manifest")
+		return nil, e.Wrap(e.CodeBuildFailed, err, "staging Packer material manifest")
 	}
 	if err := materializeHeldInput(ctx, filepath.Dir(manifestPath), filepath.Base(manifestPath), manifestHeld); err != nil {
 		_ = manifestHeld.Close()
-		return nil, nil, nil, e.Wrap(e.CodeBuildFailed, err, "staging Packer material manifest")
+		return nil, e.Wrap(e.CodeBuildFailed, err, "staging Packer material manifest")
 	}
 	_ = manifestHeld.Close()
 	buildInputs, err := stageBuildMaterialInputs(ctx, filepath.Join(inputRoot, "inputs"), request.digest, request.materials)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	staged := &stagedPackerInputs{stagedBuildMaterialInputs: buildInputs}
 	if err := materializePackerContainerBytes(ctx, filepath.Join(inputRoot, "config"), "packer.json", []byte("{}\n")); err != nil {
-		return nil, nil, nil, e.Wrap(e.CodeBuildFailed, err, "staging private Packer configuration")
+		return nil, e.Wrap(e.CodeBuildFailed, err, "staging private Packer configuration")
 	}
 	if err := sealPrivateInputDirectories(inputRoot); err != nil {
-		return nil, nil, nil, e.Wrap(e.CodeInternal, err, "sealing private Packer consumer-input closure")
+		return nil, e.Wrap(e.CodeInternal, err, "sealing private Packer consumer-input closure")
 	}
 	// The transport archive is created beside the selected config/inputs/source
 	// roots. Reopen only their unarchived parent for that private publication;
 	// the selected directory modes remain sealed and are what Pack records.
 	if err := os.Chmod(inputRoot, 0o700); err != nil {
-		return nil, nil, nil, e.Wrap(e.CodeInternal, err, "opening private Packer transport parent")
+		return nil, e.Wrap(e.CodeInternal, err, "opening private Packer transport parent")
 	}
 	staged.root = filepath.Join(inputRoot, "inputs")
 	if err := staged.verify(ctx); err != nil {
+		return nil, err
+	}
+
+	return staged, nil
+}
+
+func preparePackerContainerTransport(ctx context.Context, root string, request packerContainerRunRequest) (*heldfile.File, *heldfile.File, *stagedPackerInputs, error) {
+	staged, err := preparePackerConsumerInputs(ctx, root, request)
+	if err != nil {
 		return nil, nil, nil, err
 	}
+	inputRoot := filepath.Join(root, "input")
+	workRoot := filepath.Join(root, "work")
 
 	// The deterministic inner tar is the complete consumer-input authority. It
 	// preserves the already-validated source tree, directory membership, modes,

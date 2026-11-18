@@ -111,6 +111,12 @@ func validateRecord(record requestRecord) error {
 		if projection.FD != 6+index || !validTarget || projection.Target <= previous {
 			return e.New(e.CodeUsage, "runtime projections require sorted unique fixed mount points")
 		}
+		if previous != "" && strings.HasPrefix(projection.Target, previous+"/") {
+			return e.New(e.CodeUsage, "runtime projections cannot hide one another")
+		}
+		if projection.Target == "/nvkr/input" && projection.Writable {
+			return e.New(e.CodeUsage, "runtime consumer inputs must remain read-only")
+		}
 		previous = projection.Target
 	}
 	if assembly && record.KVMFD != 0 {
@@ -129,7 +135,7 @@ func absolutePath(value string) bool {
 
 func projectionTarget(value string) bool {
 	switch value {
-	case "/src", "/out", "/inputs", "/work", "/nvkr":
+	case "/src", "/out", "/inputs", "/work", "/nvkr", "/nvkr/input", "/nvkr/work":
 		return true
 	default:
 		return false

@@ -322,17 +322,6 @@ func namespaceMountSetattr(fd int, location string, flags uint, attributes uint6
 	return nil
 }
 
-func prepareMountPoint(root *os.File, name string) error {
-	if err := unix.Mkdirat(int(root.Fd()), name, 0o755); err != nil && !errors.Is(err, unix.EEXIST) {
-		return entryError(err)
-	}
-	directory, _, err := securepath.OpenChild(root, name, true)
-	if err != nil {
-		return e.Wrap(e.CodeVerifyFailed, err, "runtime mount point must be a real directory")
-	}
-	return directory.Close()
-}
-
 func privateDevices(root string, kvmFD int, assembly bool) error {
 	for _, device := range []struct {
 		name         string

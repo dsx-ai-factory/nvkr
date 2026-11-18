@@ -32,6 +32,14 @@ func TestNamespaceRequestAdmission(t *testing.T) {
 		{"environment NUL", func(r *requestRecord) { r.Environment = []string{"HOME=/tmp\x00"} }, e.CodeUsage},
 		{"invalid environment name", func(r *requestRecord) { r.Environment = []string{"1BAD=value"} }, e.CodeUsage},
 		{"host device projection", func(r *requestRecord) { r.Projections[0].Target = "/dev" }, e.CodeUsage},
+		{"consumer input and work", func(r *requestRecord) {
+			r.Projections = []projectionRecord{{FD: 6, Target: "/nvkr/input"}, {FD: 7, Target: "/nvkr/work", Writable: true}}
+		}, ""},
+		{"writable consumer input", func(r *requestRecord) { r.Projections[0].Target = "/nvkr/input" }, e.CodeUsage},
+		{"hidden runtime plugins", func(r *requestRecord) { r.Projections[0].Target = "/nvkr/toolchain" }, e.CodeUsage},
+		{"overlapping projections", func(r *requestRecord) {
+			r.Projections = []projectionRecord{{FD: 6, Target: "/nvkr"}, {FD: 7, Target: "/nvkr/work", Writable: true}}
+		}, e.CodeUsage},
 		{"consumer host bootstrap", func(r *requestRecord) { r.Projections[0] = projectionRecord{FD: 6, Target: "/usr"} }, e.CodeUsage},
 		{"assembly", func(r *requestRecord) { r.Mode, r.UID, r.GID = "assemble", 0, 0 }, ""},
 		{"assembly KVM", func(r *requestRecord) { r.Mode, r.UID, r.GID, r.KVMFD = "assemble", 0, 0, 7 }, e.CodeEngineCapability},
