@@ -55,7 +55,7 @@ func nativeRuntimeProofPlan(t *testing.T, directory, commit, tree string) *Plan 
 	environment.Runtime.BuildNetworkPolicy = definition.BuildNetworkProducerDeclared
 	environment.ExecutionClasses = []execution.Class{{Name: "bounded-proof", RunsOn: "arc-amd64-kvm",
 		HostPlatform: execution.HostPlatformLinuxAMD64,
-		Resources:    execution.ResourceCapacity{CPUMillis: 2000, MemoryMiB: 5120, EphemeralStorageMiB: 16384},
+		Resources:    execution.ResourceCapacity{CPUMillis: 2000, MemoryMiB: 4096, EphemeralStorageMiB: 16384},
 		Capabilities: []execution.CapabilityName{execution.CapabilityKVM}, MaxTimeoutSeconds: 600}}
 	plan, err := compileWithTargetStacks(t.Context(), input, environment, stack,
 		map[string]*catalog.Stack{"internal/runtime": runtimeStack}, "runtime-proof", "", "")
