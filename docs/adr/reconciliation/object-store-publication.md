@@ -37,3 +37,30 @@ S3 copying does not establish actual EFI chainload, imaging/reboot, direct VM bo
 Secure Boot or qualification. Downstream serving and intended-client authentication remain separate. The pinned
 NVKE source documents its [imager parameter compatibility boundary](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/os-image/efi/README.md#L36);
 matching transport bytes cannot resolve that product decision. No live boot/install acceptance is asserted.
+
+### Selective boot-asset publication
+
+[Issue #514](https://github.com/dsx-ai-factory/nvkr/issues/514) adds the proposed
+[ADR-20 selective contract](../0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding).
+This is design for review, not a new named-decider acceptance, implemented mode or external provider result.
+The current full-mirror implementation and its evidence above are unchanged. No selective schema, receipt,
+copy-first graph, MachineImage renderer or selective consumer is implemented by this documentation change.
+No local contract tests or external S3/provisioning/boot runs establish the proposed path yet.
+
+| Work owner | Required implementation and evidence |
+|---|---|
+| [#515 selected copy/discovery/serving](https://github.com/dsx-ai-factory/nvkr/issues/515) | New versioned selection/inventory, original raw-member proof bindings, opaque preliminary/completion/consumer receipts, S3-contained proofs, pinned raw reads, admission and recovery matrix, old full-mirror compatibility. Record local contracts separately from provider/client runs. |
+| [#517 MachineImage rendering](https://github.com/dsx-ai-factory/nvkr/issues/517) | Predeclared render membership, deterministic pinned-schema/profile output, authenticated metadata and dependency joins, no root/content/inventory self-reference, trusted import, actual chainload/imaging/first-boot evidence. |
+| [#516 EFI producer](https://github.com/dsx-ai-factory/nvkr/issues/516) | Original signed EFI member/hash/size/platform and compatible imager binding; producer work stays in its separate mkosi lane. |
+| [#384 configuration/generation](https://github.com/dsx-ai-factory/nvkr/issues/384) | Coordinated selective configuration and required finalization, preserved full-mirror defaults and regenerated bundles. |
+| [#383 provider acceptance](https://github.com/dsx-ai-factory/nvkr/issues/383) | Exact provider and Run, selected-only object inventory, original proofs, pinned readback/fault evidence and independent S3-only consumer/client access. |
+| [#385 public verification](https://github.com/dsx-ai-factory/nvkr/issues/385) | Thin CLI/SDK selective adapters and explicit limited results; retain the full-mirror route. API evidence cannot claim UI acceptance. |
+
+The last three rows assign coordinated work; their current whole-copy acceptance text does not cover the
+selective contract. Full-mirror compatibility and selective acceptance must remain distinct in that work.
+The dependency contract requires exact named selection, complete OCI membership, no unselected S3 payloads,
+all selected proof bytes, refusal of stronger policy, acyclic ordering and interruption recovery at every phase.
+All selected assets and proofs remain mandatory; the smaller transport set is not best effort.
+Operational destination/read access/retention and real provider/client/boot acceptance remain separate from
+schema/graph and fake-provider tests. S3-only proof retrieval does not establish air-gap trust distribution,
+EFI chainload authentication, firmware Secure Boot, qualification or FDE confidentiality.
