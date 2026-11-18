@@ -26,6 +26,8 @@ jobs:
       - name: Check out the tested source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          # Exercise the approved scratch fix, independent of this trigger commit.
+          ref: 098b2669bb4631e6ea561eece2c30208ab4fd16d
           persist-credentials: false
       - name: Set up the repository Go toolchain
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
