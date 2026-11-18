@@ -116,6 +116,32 @@ The JSON output is a stable array sorted by component name. Each entry has `name
 | `pinned-tool` | a pinned build tool (`file` or `oci-layout` output) |
 | `excluded` | declared but neither built nor acquired |
 
+## Explain authored inputs
+
+Use an explicit input root to inspect a file and the supported authored files that refer to it:
+
+```sh
+nvkr explain --root inputs inputs/definitions/nvke/definition.yaml
+nvkr explain --root inputs inputs/catalogs/shared/nvke.yaml --json
+```
+
+The command recognizes Definitions, Environments, composites, catalogs, overlays, catalog fragments,
+generated pin locks and qualification verification policies. Paths in the report are relative to the
+printed scan root. Fragment imports show local-to-fragment name mappings; Definition catalog selections
+show overlay order, and overlays identify their exact predecessor binding. Locks identify their owning
+catalog and the pin-generation commands.
+
+The root must contain the referenced input closure. Reverse references cover these supported kinds only
+within that root; maintenance and validator records are excluded. Missing files, unknown schemas, stale
+fragment or composite pins, and ambiguous or unmatched overlay predecessors fail with coded errors and
+no partial report. The scan is bounded to 4,096 entries, depth 16 and 32 MiB of YAML/JSON input; symlinks
+are refused. Choose a smaller complete input tree if a broad repository scan exceeds those limits.
+
+Explanation is read-only and offline. It validates recorded declarations through their existing loaders,
+but does not re-derive upstream pin sets, execute producers, or authenticate release evidence. A fragment's
+complete producer meaning still depends on its importing registry's mappings and pins. A validation error
+elsewhere in the scanned authored graph must be fixed before the command prints an explanation.
+
 ## Replace a producer or change a selection
 
 An overlay named `supplier.json` can replace the complete `app-cli` producer: a supplier download takes

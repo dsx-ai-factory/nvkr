@@ -1,6 +1,6 @@
 ## ADR-17 CLI presentation and inspection
 
-Of the 33 public command leaves, 29 expose typed terminal result browsers; local Run
+Of the 34 public command leaves, 30 expose typed terminal result browsers; local Run
 execution additionally supplies bounded operation/output progress. The separate `validate`,
 `run check-artifacts`, `run qualify` and `run qualify-local` commands retain canonical machine-readable diagnostics. The hidden native worker is
 not a public command. Owners retain
@@ -55,3 +55,10 @@ restoration and SIGHUP fixtures exist; their invocation and env gates are in
 Earlier Darwin/Linux working-tree captures are not fresh execution evidence for
 this revision. A live NVKE producer Run, Linux race acceptance and human usability
 validation remain unexercised. Simulation screenshots establish presentation only.
+
+The offline `explain` command describes authored file kinds and references beneath an explicit input root.
+`inputinspect` owns the scoped scan and delegates schema, fragment, lock and overlay checks to the existing
+owners. Catalog inspection returns detached descriptions and never exposes an executable catalog with
+unverified upstream pin sets. Fixture contracts cover local loader parity, direct and reverse references,
+fragment mappings and hashes, overlay predecessor joins, composite cycles, cancellation and no partial
+CLI output. These are descriptive contracts, not producer execution or authenticated release evidence.
