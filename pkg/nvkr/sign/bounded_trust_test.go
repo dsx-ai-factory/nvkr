@@ -6,6 +6,7 @@ package sign
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -54,6 +55,7 @@ func TestBoundedTrustResponseAccounting(t *testing.T) {
 			f := &boundedTrustFetcher{ctx: ctx, client: &http.Client{Transport: readbudget.Transport(ctx, transport)}}
 			raw, err := f.DownloadFile(tufFixtureURL, tc.max, time.Hour)
 			if tc.wantExhaustion {
+				requireSignCode(t, err, e.CodeEngineCapability)
 				if err == nil || len(raw) != 0 || budget.Check() == nil || budget.Used() != tc.allowance {
 					t.Fatal("response escaped budget", err, budget.Used())
 				}
@@ -165,6 +167,9 @@ func TestBoundedTrustSnapshotLifetimeAndArguments(t *testing.T) {
 				requireSignCode(t, err, code)
 				return
 			}
+			if tc.mutate {
+				requireSignCode(t, err, e.CodeImmutableViolation)
+			}
 			if tc.mutate && err == nil || !tc.mutate && err != nil || !called {
 				t.Fatal("incorrect snapshot result", err)
 			}
@@ -208,7 +213,7 @@ func TestBoundedTrustJoinsUnfinishedVerification(t *testing.T) {
 }
 
 func TestBoundedTrustVerificationRecordsAndFatalErrors(t *testing.T) {
-	for _, scenario := range []string{"exact", "mutated-root", "missing-owner", "no-deadline", "unsupported-transport"} {
+	for _, scenario := range []string{"exact", "mutated-root", "missing-owner", "no-deadline", "unsupported-transport", "joined-cleanup", "coded-runner"} {
 		t.Run(scenario, func(t *testing.T) {
 			ctx, _, _ := testBoundedTrustContext(t)
 			stub := &cosignStub{stdout: map[string]string{"version": cosignVersionJSON}}
@@ -221,6 +226,12 @@ func TestBoundedTrustVerificationRecordsAndFatalErrors(t *testing.T) {
 				index := slices.Index(call.args, "--trusted-root")
 				if index < 0 {
 					t.Fatal("bounded invocation omitted authenticated root")
+				}
+				if scenario == "joined-cleanup" {
+					return errors.Join(errors.Join(nil, e.New(e.CodeSignatureInvalid, "rejected")), e.New(e.CodeImmutableViolation, "synthetic cleanup failure"))
+				}
+				if scenario == "coded-runner" {
+					return e.New(e.CodeUnpinnedInput, "synthetic pinned-runner failure")
 				}
 				if scenario == "mutated-root" {
 					return os.WriteFile(call.args[index+1], []byte("substituted"), 0600)
@@ -261,8 +272,12 @@ func TestBoundedTrustVerificationRecordsAndFatalErrors(t *testing.T) {
 				}
 				return
 			}
-			if scenario == "mutated-root" {
-				requireSignCode(t, err, e.CodeImmutableViolation)
+			if scenario == "mutated-root" || scenario == "joined-cleanup" || scenario == "coded-runner" {
+				code := e.CodeImmutableViolation
+				if scenario == "coded-runner" {
+					code = e.CodeUnpinnedInput
+				}
+				requireSignCode(t, err, code)
 				if calls != 1 || proof != nil {
 					t.Fatal("trust mutation continued candidate/provenance work", calls)
 				}
@@ -276,6 +291,39 @@ func TestBoundedTrustVerificationRecordsAndFatalErrors(t *testing.T) {
 				if i < 0 || args[i+1] != "${NVKR_TRUSTED_ROOT}" || !slices.Contains(args, "--new-bundle-format=true") {
 					t.Fatal("record lost executed trust arguments", args)
 				}
+			}
+		})
+	}
+}
+
+func TestBoundedCandidateJoinedFailures(t *testing.T) {
+	rejected := e.New(e.CodeSignatureInvalid, "candidate rejected")
+	cleanup := e.New(e.CodeImmutableViolation, "cleanup failed")
+	for _, tc := range []struct {
+		name  string
+		err   error
+		fatal bool
+	}{
+		{"signature", rejected, false},
+		{"signatures-only", errors.Join(rejected, rejected), false},
+		{"cleanup-after-signature", errors.Join(rejected, cleanup), true},
+		{"cleanup-before-signature", errors.Join(cleanup, rejected), true},
+		{"nested-cleanup", errors.Join(errors.Join(nil, nil, nil, rejected), cleanup), true},
+		{"wrapped-join", fmt.Errorf("verification: %w", errors.Join(rejected, cleanup)), true},
+		{"coded-parent", e.Wrap(e.CodeSignatureInvalid, errors.Join(rejected, cleanup), "candidate"), true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, _, _ := testBoundedTrustContext(t)
+			err := boundedVerificationCandidateFailure(ctx, tc.err)
+			if !tc.fatal {
+				if err != nil {
+					t.Fatal("signature-only fallback lost", err)
+				}
+				return
+			}
+			requireSignCode(t, err, e.CodeImmutableViolation)
+			if !errors.Is(err, rejected) || !errors.Is(err, cleanup) {
+				t.Fatal("candidate or cleanup cause lost", err)
 			}
 		})
 	}
