@@ -4,6 +4,7 @@
 package pipeline
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"errors"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
@@ -40,13 +42,23 @@ func TestMkosiAcquisitionRetainsExactInputs(t *testing.T) {
 	spec, contents := mkosiAcquisitionFixture()
 	source := t.TempDir()
 	client := &http.Client{Transport: releaseExecutableRoundTripper(func(request *http.Request) (*http.Response, error) {
+		deadline, ok := request.Context().Deadline()
+		if remaining := time.Until(deadline); !ok || remaining < 19*time.Minute || remaining > 20*time.Minute {
+			t.Errorf("request lost the twenty-minute acquisition bound: %v, present=%t", remaining, ok)
+		}
 		if request.Method != http.MethodGet || request.Header.Get("Authorization") != "" || request.Header.Get("Cookie") != "" {
 			t.Error("package request inherited credentials or changed method")
 		}
 		return &http.Response{StatusCode: http.StatusOK, ContentLength: -1, Body: io.NopCloser(strings.NewReader(contents[request.URL.Path]))}, nil
 	})}
-	if err := acquireMkosiInputsWithClient(t.Context(), spec, source, client); err != nil {
+	var diagnostic bytes.Buffer
+	if err := acquireMkosiInputsWithClient(t.Context(), spec, source, client, &diagnostic); err != nil {
 		t.Fatal(err)
+	}
+	wantBytes := len(contents["/metadata"]) + len(contents["/archive"])
+	if !strings.Contains(diagnostic.String(), fmt.Sprintf("files=2 completed=2 body_bytes=%d", wantBytes)) ||
+		strings.Count(diagnostic.String(), "mkosi acquisition slow input:") != 2 || strings.Contains(diagnostic.String(), "https:") {
+		t.Fatalf("acquisition diagnostics lost byte totals or exposed transport: %s", diagnostic.String())
 	}
 	root := spec.Roots[0]
 	for name, want := range map[string]string{
@@ -71,7 +83,7 @@ func TestMkosiAcquisitionRetainsExactInputs(t *testing.T) {
 	if err != nil || string(got) != string(want) {
 		t.Fatalf("retained input record mismatch: %v", err)
 	}
-	if err := acquireMkosiInputsWithClient(t.Context(), spec, source, client); err == nil {
+	if err := acquireMkosiInputsWithClient(t.Context(), spec, source, client, nil); err == nil {
 		t.Fatal("accepted an occupied input directory")
 	}
 }
@@ -96,10 +108,14 @@ func TestMkosiAcquisitionRejectsIncompleteDownloads(t *testing.T) {
 			client := &http.Client{Transport: releaseExecutableRoundTripper(func(*http.Request) (*http.Response, error) {
 				return &http.Response{StatusCode: tc.status, ContentLength: tc.size, Body: io.NopCloser(strings.NewReader(tc.body))}, nil
 			})}
-			err := acquireMkosiInputsWithClient(t.Context(), spec, source, client)
+			var diagnostic bytes.Buffer
+			err := acquireMkosiInputsWithClient(t.Context(), spec, source, client, &diagnostic)
 			var coded *e.Error
 			if !errors.As(err, &coded) || coded.Code != tc.code {
 				t.Fatalf("got %v; want %s", err, tc.code)
+			}
+			if !strings.Contains(diagnostic.String(), "mkosi acquisition summary:") || !strings.Contains(diagnostic.String(), "succeeded=false") {
+				t.Fatalf("failed acquisition omitted timing summary: %s", diagnostic.String())
 			}
 			if _, err := os.Stat(filepath.Join(source, mkosiInputDirectory, "runtime", "inputs.json")); !os.IsNotExist(err) {
 				t.Fatalf("failed acquisition recorded completed inputs: %v", err)
@@ -123,7 +139,7 @@ func TestMkosiAcquisitionCancellationJoinsRequests(t *testing.T) {
 	})}
 	result := make(chan error, 1)
 	source := t.TempDir()
-	go func() { result <- acquireMkosiInputsWithClient(ctx, spec, source, client) }()
+	go func() { result <- acquireMkosiInputsWithClient(ctx, spec, source, client, nil) }()
 	<-started
 	<-started
 	cancel()
@@ -158,7 +174,8 @@ func TestMkosiAcquisitionRetriesTransientResponse(t *testing.T) {
 				}
 				return &http.Response{StatusCode: status, ContentLength: -1, Body: io.NopCloser(strings.NewReader(body))}, nil
 			})}
-			err := acquireMkosiInputsWithClient(t.Context(), spec, t.TempDir(), client)
+			var diagnostic bytes.Buffer
+			err := acquireMkosiInputsWithClient(t.Context(), spec, t.TempDir(), client, &diagnostic)
 			if substituted {
 				var coded *e.Error
 				if !errors.As(err, &coded) || coded.Code != e.CodeVerifyFailed {
@@ -169,6 +186,9 @@ func TestMkosiAcquisitionRetriesTransientResponse(t *testing.T) {
 			}
 			if attempts.Load() != 2 {
 				t.Fatalf("got %d attempts, want exactly one retry", attempts.Load())
+			}
+			if strings.Count(diagnostic.String(), "mkosi acquisition retry:") != 1 || !strings.Contains(diagnostic.String(), "http_status=503 attempt=2") {
+				t.Fatalf("transient HTTP retry was not logged: %s", diagnostic.String())
 			}
 		})
 	}
@@ -183,7 +203,7 @@ func TestMkosiAcquisitionRetryHonorsCancellation(t *testing.T) {
 		cancel()
 		return &http.Response{StatusCode: http.StatusServiceUnavailable, Body: io.NopCloser(strings.NewReader(""))}, nil
 	})}
-	response, err := requestMkosiInput(ctx, client, "https://packages.invalid/archive")
+	response, err := requestMkosiInput(ctx, client, "https://packages.invalid/archive", nil)
 	if response != nil {
 		defer response.Body.Close()
 	}
@@ -202,7 +222,7 @@ func TestMkosiAcquisitionAdmissionBeforeFilesystem(t *testing.T) {
 			cancel()
 		}
 		source := t.TempDir()
-		err := acquireMkosiInputsWithClient(ctx, spec, source, &http.Client{})
+		err := acquireMkosiInputsWithClient(ctx, spec, source, &http.Client{}, nil)
 		cancel()
 		want := e.CodeTimeout
 		if invalid {

@@ -182,7 +182,7 @@ func (l Local) completeFetch(n ir.Node, dir string, opts RunOptions, vendor *sou
 					return err
 				}
 			}
-			return acquireMkosiInputs(opts.ctx(), n.Mkosi, inputRoot)
+			return acquireMkosiInputs(opts.ctx(), n.Mkosi, inputRoot, opts.Stderr)
 		})
 	}
 	if opts.SourceWorkspace == nil || len(n.VendorCmd) == 0 {

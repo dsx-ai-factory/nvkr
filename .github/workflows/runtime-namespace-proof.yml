@@ -36,7 +36,7 @@ jobs:
         env:
           NAMESPACE_EVIDENCE: ${{ runner.temp }}/runtime-namespace-evidence
         run: bash scripts/test-runtime-namespace.sh "$NAMESPACE_EVIDENCE"
-      - name: Repeat the tar member diagnostic after acquisition timeout
+      - name: Diagnose tar members with bounded acquisition timing
         env:
           ASSEMBLY_EVIDENCE: ${{ runner.temp }}/runtime-assembly-evidence
         run: bash scripts/test-mkosi-assembly.sh "$ASSEMBLY_EVIDENCE"
