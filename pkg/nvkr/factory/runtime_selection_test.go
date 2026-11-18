@@ -278,6 +278,9 @@ func TestFourRuntimeConsumersKeepIndependentProductionRequirements(t *testing.T)
 func TestRuntimeNativeGroupsKeepSeparateOwners(t *testing.T) {
 	plan := runtimeConsumersPlanFixture(t, []string{"first", "second", "third", "fourth"})
 	plan.Environment.GitHubARC = "native-kvm-v1"
+	if err := admitInternalToolExecution(plan); err != nil {
+		t.Fatal(err)
+	}
 	for _, tool := range plan.InternalTools {
 		expected := strings.TrimPrefix(tool.Name, "runtime-")
 		output, err := internalToolDiskOutput(plan, tool)

@@ -10,6 +10,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/buildactivity"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/runtimeuse"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 )
@@ -109,10 +110,27 @@ func dispatchAdmittedVMProducer(
 			return e.New(e.CodePipelineDrift,
 				"vm-image producer %q changed its admitted Packer contract", instruction.Component)
 		}
+		var production *pipeline.ProducedRuntime
+		var use *runtimeuse.Receipt
+		var scratch string
+		if instruction.Runtime != nil {
+			if owner == nil {
+				return e.New(e.CodeEngineCapability, "produced runtime execution requires its original Run owner")
+			}
+			production, use, err = owner.issueRuntimeUse(runCtx, plan, node.ID)
+			if err != nil {
+				return err
+			}
+			scratch, err = owner.runtimeScratch.path(runCtx)
+			if err != nil {
+				return err
+			}
+		}
 		materials, materialErr := observeVMPackerMaterials(runCtx, plan, node)
 		if materialErr != nil {
 			return materialErr
 		}
+		materials.runtime, materials.runtimeUse, materials.runtimeScratch = production, use, scratch
 		artifact, result, err = executor.RunPacker(runCtx, runtime, request.Subject, instruction, materials)
 		if err == nil && artifact == nil {
 			err = e.New(e.CodeVerifyFailed,
@@ -121,6 +139,14 @@ func dispatchAdmittedVMProducer(
 		if err == nil && result == nil {
 			err = e.New(e.CodeVerifyFailed,
 				"vm-image producer %q returned no descriptive result", instruction.Component)
+		}
+		if err == nil && use != nil {
+			completed, completionErr := use.CompletedBinding()
+			if completionErr != nil {
+				err = completionErr
+			} else if result.RuntimeUse == nil || *result.RuntimeUse != completed {
+				err = e.New(e.CodeVerifyFailed, "Packer result differs from its original completed runtime use")
+			}
 		}
 		if err == nil && owner != nil {
 			err = owner.recordProducerConsumption(runCtx, plan, node, instruction, result, materials.observedProducerMaterials)

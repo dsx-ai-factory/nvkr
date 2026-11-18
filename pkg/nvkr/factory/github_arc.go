@@ -145,7 +145,11 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 			}
 			binding := instruction.ExecutionBinding
 			platform := string(binding.Class.HostPlatform)
-			if platform != build.Platform || platform != instruction.ToolchainPlatform ||
+			toolchainPlatform := instruction.ToolchainPlatform
+			if instruction.Runtime != nil {
+				toolchainPlatform = instruction.Runtime.Platform
+			}
+			if platform != build.Platform || platform != toolchainPlatform ||
 				binding.Class.RunsOn != githubARCRunner(platform) || githubARCRunner(platform) == "" ||
 				len(instruction.Requirements.Capabilities) != 1 ||
 				instruction.Requirements.Capabilities[0] != (execution.CapabilityRequirement{Name: execution.CapabilityKVM, Policy: execution.CapabilityRequired}) {
@@ -153,7 +157,7 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 			}
 			// Production inputs use transportable immutable OCI references, never
 			// an inherited local image-store ID.
-			if !strings.Contains(instruction.Toolchain, "@sha256:") {
+			if instruction.Runtime == nil && !strings.Contains(instruction.Toolchain, "@sha256:") {
 				return e.New(e.CodeUnpinnedInput, "ARC disk toolchain requires a published native OCI digest")
 			}
 			if githubDiskInspectionRequired(plan) {

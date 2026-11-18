@@ -6,6 +6,7 @@ package pipeline
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -21,6 +22,8 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/runtimeexec"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/runtimeuse"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/safetext"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
@@ -34,8 +37,9 @@ type nodeSessionPackerRuntime struct {
 }
 
 // VMImagePackerExecutor is a process-local, session-owned admission for one
-// exact set of Plan nodes, one held Docker executable, one daemon identity, and
-// their already-local digest-pinned toolchain images. It produces unqualified
+// exact set of Plan nodes and their admitted native or container runtime. A
+// produced runtime additionally requires the original Run's use receipt for
+// each execution. It produces unqualified
 // local execution results only; it is not provider allocation, pipeline
 // attestation, or qualification evidence.
 type VMImagePackerExecutor struct {
@@ -45,6 +49,7 @@ type VMImagePackerExecutor struct {
 	session            *nodeSessionState
 	runtime            packerContainerRuntime
 	native             map[string]*PackerToolchain
+	produced           *runtimeexec.Launcher
 	nodes              map[string][]byte
 	activityOperations map[string]string
 }
@@ -56,7 +61,7 @@ type VMImagePackerSelection struct {
 	Subject string
 	Node    ir.Node
 	// Toolchain is an optional factory-authenticated native bundle capability.
-	// Nil retains the existing container toolchain route.
+	// Nil selects the node's produced runtime or existing container route.
 	Toolchain *PackerToolchain
 	// Descriptive operation label frozen with the exact selected subject. It
 	// does not change producer identity or authorize execution.
@@ -68,12 +73,15 @@ type VMImagePackerSelection struct {
 // be package-held observations derived from that Plan; paths and digest strings
 // do not authorize inputs at this boundary.
 type VMImagePackerRun struct {
-	SourceRoot  string
-	Workspace   string // Descriptive projection, checked against Runtime.HoldWorkspace.
-	Manifest    *heldfile.File
-	Materials   []PackerMaterialInput
-	Runtime     *execution.LocalVMRuntime
-	Diagnostics *PackerDiagnosticSink
+	SourceRoot     string
+	Workspace      string // Descriptive projection, checked against Runtime.HoldWorkspace.
+	Manifest       *heldfile.File
+	Materials      []PackerMaterialInput
+	Runtime        *execution.LocalVMRuntime
+	Production     *ProducedRuntime
+	RuntimeUse     *runtimeuse.Receipt
+	RuntimeScratch string // Original coordinator's checked private staging parent.
+	Diagnostics    *PackerDiagnosticSink
 	// Activity is optional metadata-only presentation, not execution evidence.
 	Activity *buildactivity.Sink
 	Stdout   io.Writer
@@ -93,6 +101,7 @@ func (handle *NodeSession) AdmitVMImagePacker(
 		return nil, err
 	}
 	nativeMode := len(selections) > 0 && selections[0].Toolchain != nil
+	producedMode := len(selections) > 0 && selections[0].Node.Runtime != nil
 	if runtime.GOOS != "linux" && !nativeMode {
 		return nil, e.New(e.CodeEngineCapability, "containerized Packer execution requires Linux")
 	}
@@ -116,8 +125,11 @@ func (handle *NodeSession) AdmitVMImagePacker(
 			return nil, e.New(e.CodeInvalidCatalog, "VM-image Packer admission repeats subject %q", selection.Subject)
 		}
 		node := selection.Node
-		if node.Runtime != nil {
-			return nil, e.New(e.CodeEngineCapability, "produced runtime consumers require their original Run runtime-use receipt")
+		if (node.Runtime != nil) != producedMode || (producedMode && selection.Toolchain != nil) {
+			return nil, e.New(e.CodeEngineCapability, "one Packer admission cannot mix produced runtimes and other toolchains")
+		}
+		if producedMode && (node.Runtime.Platform != runtime.GOOS+"/"+runtime.GOARCH || node.Network != ir.NetworkDefault) {
+			return nil, e.New(e.CodeEngineCapability, "produced runtime requires its native host and explicit producer-declared outbound network")
 		}
 		if (selection.Toolchain != nil) != nativeMode {
 			return nil, e.New(e.CodeEngineCapability, "one Packer admission cannot mix native and container toolchains")
@@ -177,6 +189,13 @@ func (handle *NodeSession) AdmitVMImagePacker(
 	stop := context.AfterFunc(ctx, cancel)
 	defer func() { stop(); cancel() }()
 
+	if producedMode {
+		launcher, err := runtimeexec.AdmitOutbound(callCtx)
+		if err != nil {
+			return nil, err
+		}
+		return &VMImagePackerExecutor{activityOperations: activityOperations, session: session, nodes: bound, produced: launcher}, nil
+	}
 	if nativeMode {
 		return &VMImagePackerExecutor{
 			activityOperations: activityOperations, session: session, nodes: bound, native: native,
@@ -259,7 +278,7 @@ func (session *nodeSessionState) admitPackerRuntimeStorage(ctx context.Context, 
 }
 
 func (executor *VMImagePackerExecutor) requiresExactNode(subject string, node ir.Node) error {
-	if executor == nil || executor.session == nil || (executor.runtime == nil && len(executor.native) == 0) {
+	if executor == nil || executor.session == nil || (executor.runtime == nil && len(executor.native) == 0 && executor.produced == nil) {
 		return e.New(e.CodeEngineCapability, "VM-image Packer executor is absent")
 	}
 	want, ok := executor.nodes[subject]
@@ -294,6 +313,10 @@ func (executor *VMImagePackerExecutor) Run(
 	if input.Manifest == nil || input.Runtime == nil || input.Diagnostics == nil {
 		return nil, nil, e.New(e.CodeEngineCapability,
 			"VM-image Packer execution requires held manifest, VM runtime and diagnostic capabilities")
+	}
+	if (node.Runtime == nil && (input.Production != nil || input.RuntimeUse != nil || input.RuntimeScratch != "")) ||
+		(node.Runtime != nil && (executor.produced == nil || input.Production == nil || input.RuntimeUse == nil || input.RuntimeScratch == "")) {
+		return nil, nil, e.New(e.CodeEngineCapability, "Packer runtime use differs from its original produced-runtime selection")
 	}
 	if err := ValidateVMImagePackerDiskExecution(node); err != nil {
 		return nil, nil, err
@@ -347,7 +370,35 @@ func (executor *VMImagePackerExecutor) Run(
 	defer func() { stop(); cancel() }()
 	options.Ctx = runCtx
 
-	if executor.native[subject] == nil {
+	if executor.produced != nil {
+		err := input.Production.withConsumerRoot(runCtx, input.RuntimeUse, subject, node, input.RuntimeScratch, func(callCtx context.Context, root *os.File) error {
+			var err error
+			options.Ctx = callCtx
+			artifact, result, err = executor.runAdmittedPacker(callCtx, subject, node, input, options, root)
+			return err
+		})
+		if err == nil {
+			var binding RuntimeUseBinding
+			binding, err = input.RuntimeUse.CompletedBinding()
+			if err == nil {
+				result.RuntimeUse = &binding
+			}
+		}
+		if err != nil {
+			if artifact != nil {
+				err = errors.Join(err, artifact.Close())
+			}
+			return nil, nil, err
+		}
+		return artifact, result, nil
+	}
+	return executor.runAdmittedPacker(runCtx, subject, node, input, options, nil)
+}
+
+func (executor *VMImagePackerExecutor) runAdmittedPacker(runCtx context.Context, subject string, node ir.Node,
+	input VMImagePackerRun, options RunOptions, producedRoot *os.File,
+) (artifact *PackerArtifact, result *ArtifactResult, returnErr error) {
+	if executor.native[subject] == nil && executor.produced == nil {
 		if err := observePackerRuntimeFreshness(runCtx, executor.runtime); err != nil {
 			return nil, nil, err
 		}
@@ -398,7 +449,13 @@ func (executor *VMImagePackerExecutor) Run(
 		sshPrivateKeyVariable:     node.Packer.SSHPrivateKeyVariable,
 		sshPublicKeyVariable:      node.Packer.SSHPublicKeyVariable,
 	}
-	if toolchain := executor.native[subject]; toolchain != nil {
+	if producedRoot != nil {
+		artifact, err = runProducedPackerNode(runCtx, executor.produced, producedRoot, input.RuntimeScratch, packerContainerRunRequest{
+			source: source, node: node, subject: subject, manifest: manifest, digest: input.Manifest.Digest(), materials: input.Materials,
+			workspace: workspace, kvm: kvm, diagnostics: input.Diagnostics, bindings: bindings, activity: input.Activity,
+			activityOperation: executor.activityOperations[subject], stdout: options.Stdout, stderr: options.Stderr,
+		})
+	} else if toolchain := executor.native[subject]; toolchain != nil {
 		artifact, err = runNativePackerNode(runCtx, toolchain, source, node, input, workspace)
 	} else {
 		artifact, err = runPackerContainer(runCtx, packerContainerRunRequest{
@@ -437,5 +494,5 @@ func (executor *VMImagePackerExecutor) Close() error {
 	executor.closed = true
 	executor.mu.Unlock()
 	executor.active.Wait()
-	return nil
+	return executor.produced.Close()
 }

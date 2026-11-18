@@ -182,12 +182,12 @@ func bindInternalToolInputs(node *Node, tool InternalToolPlan, artifacts map[str
 	return nil
 }
 
-// Current execution support keeps production, evidence and inspection in one
-// native hosted owner. Other consumers and cross-job capability restoration
-// remain closed; ordinary fetch and scanner acquisition may precede that group.
+// Production, evidence and consumption stay in one native hosted owner.
+// Cross-job capability restoration remains closed; ordinary fetch and scanner
+// acquisition may precede that group.
 func admitInternalToolExecution(plan *Plan) error {
 	for _, tool := range plan.InternalTools {
-		if tool.Format != authored.OutputExecutable || !githubDiskInspectionRequired(plan) {
+		if tool.Format != authored.OutputOCI && (tool.Format != authored.OutputExecutable || !githubDiskInspectionRequired(plan)) {
 			return e.New(e.CodeEngineCapability, "internal tool execution requires an original native inspection owner")
 		}
 		if _, err := internalToolDiskOutput(plan, tool); err != nil {

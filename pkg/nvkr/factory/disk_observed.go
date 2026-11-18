@@ -411,6 +411,9 @@ func inspectDiskLifecyclePayload(ctx context.Context, plan *Plan, expected Lifec
 // Both live export and hosted byte observation enforce the same exact producer
 // description. This validates metadata; it does not manufacture a live receipt.
 func validateDiskProducerDescription(producer ir.Node, result pipeline.ArtifactResult) error {
+	if err := pipeline.ValidateArtifactRuntimeUse(producer, result); err != nil {
+		return err
+	}
 	if result.Component != producer.Component || result.OutputType != authored.OutputDiskImage ||
 		result.Qualification != pipeline.ArtifactUnqualified || result.Toolchain != producer.Toolchain ||
 		result.BuilderType != producer.BuilderType || result.EngineClass != producer.BuilderType ||

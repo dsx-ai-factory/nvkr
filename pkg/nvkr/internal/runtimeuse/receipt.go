@@ -70,7 +70,7 @@ func Issue(ctx context.Context, binding Binding, node ir.Node, authenticate func
 	if err := ctx.Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "runtime use issuance canceled")
 	}
-	if err := validateBinding(binding, node); err != nil {
+	if err := ValidateBindingDescription(binding, node); err != nil {
 		return nil, err
 	}
 	raw, err := canonical.Marshal(node)
@@ -86,7 +86,9 @@ func Issue(ctx context.Context, binding Binding, node ir.Node, authenticate func
 	return &Receipt{state: &state{binding: binding, node: raw, authenticate: authenticate}}, nil
 }
 
-func validateBinding(binding Binding, node ir.Node) error {
+// ValidateBindingDescription checks a recorded use against its exact producer
+// selection. This admits descriptive evidence only; it cannot restore a receipt.
+func ValidateBindingDescription(binding Binding, node ir.Node) error {
 	if err := node.Validate(); err != nil {
 		return err
 	}

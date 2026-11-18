@@ -48,9 +48,12 @@ Plan bindings and revokes all its issued uses before closing runtime resources. 
 requires that receipt, retains the original layer through cleanup, and rejects replay and unowned use.
 Its cancellation and cleanup contracts have race tests. Narrow input/work mount points preserve the
 runtime's plugin and firmware paths; filesystem tests reject symlink parents. Mkosi material observation
-now uses the same authenticated producer-result boundary as other material consumers. The issuer remains
-disconnected from consumer dispatch. Namespace consumer execution and hosted scheduling remain incomplete,
-so maintained Run execution stays gated. No real Run has exercised
+now uses the same authenticated producer-result boundary as other material consumers. Consumer dispatch
+passes the original production and use receipt to the namespace Packer adapter. Version checking,
+SSH-key generation and validation stay offline; the build uses the fixed outbound helper. The factory
+compares the returned runtime-use record with the original receipt's completed binding before retaining
+the disk. Bounded disk/log collection and descriptive binding checks have focused tests. The maintained
+Environment has not switched to this route, and no native VM has exercised this adapter. No real Run has exercised
 the new runtime SBOM and dispatcher together. This proof does not establish disk-output
 equivalence, guest boot, ARM64 operation or a stronger evidence lane. The earlier isolated amd64
 [assembly Run](https://github.com/njhensley/nvkr/actions/runs/44145459516) built two byte-identical runtime

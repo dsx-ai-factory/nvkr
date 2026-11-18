@@ -249,12 +249,15 @@ func (executor *localVMPackerExecutor) RunPacker(
 	return executor.inner.Run(ctx, subject, node, pipeline.VMImagePackerRun{
 		Activity:   executor.activity,
 		SourceRoot: sourceRoot, Workspace: executor.workspace,
-		Manifest:    materials.manifest,
-		Materials:   materials.inputs,
-		Runtime:     runtime.inner,
-		Diagnostics: executor.diagnostics,
-		Stdout:      executor.stdout,
-		Stderr:      executor.stderr,
+		Manifest:       materials.manifest,
+		Production:     materials.runtime,
+		RuntimeUse:     materials.runtimeUse,
+		RuntimeScratch: materials.runtimeScratch,
+		Materials:      materials.inputs,
+		Runtime:        runtime.inner,
+		Diagnostics:    executor.diagnostics,
+		Stdout:         executor.stdout,
+		Stderr:         executor.stderr,
 	})
 }
 

@@ -10,6 +10,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/runtimeuse"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
@@ -31,6 +32,9 @@ func ObserveResult(ctx context.Context, node ir.Node, payloadPath, resultPath st
 	}
 	result, err := readArtifactResultContext(ctx, resultPath)
 	if err != nil {
+		return ArtifactResult{}, err
+	}
+	if err := ValidateArtifactRuntimeUse(node, result); err != nil {
 		return ArtifactResult{}, err
 	}
 	if result.Component != node.Component || result.OutputType != node.OutputType ||
@@ -120,6 +124,9 @@ func AuthenticateResultForConsumption(ctx context.Context, node ir.Node, payload
 }
 
 func authenticateConsumedResultMetadata(node ir.Node, result ArtifactResult) (ArtifactResult, error) {
+	if err := ValidateArtifactRuntimeUse(node, result); err != nil {
+		return ArtifactResult{}, err
+	}
 	switch node.Kind {
 	case ir.KindBuild:
 		if !canonical.IsDigest(result.InputDigest) {
@@ -160,6 +167,21 @@ func authenticateConsumedResultMetadata(node ir.Node, result ArtifactResult) (Ar
 			"producer result %q has unsupported kind %q", node.ID, node.Kind)
 	}
 	return result, nil
+}
+
+// ValidateArtifactRuntimeUse checks descriptive result membership. Only the
+// original Run's completed receipt can issue this field during live execution.
+func ValidateArtifactRuntimeUse(node ir.Node, result ArtifactResult) error {
+	if node.Runtime == nil {
+		if result.RuntimeUse != nil {
+			return e.New(e.CodeVerifyFailed, "producer result records an unselected runtime use")
+		}
+		return nil
+	}
+	if result.RuntimeUse == nil || node.Kind != ir.KindBuild || node.BuilderType != ir.BuilderVMImage {
+		return e.New(e.CodeVerifyFailed, "produced-runtime consumer lacks its completed use description")
+	}
+	return runtimeuse.ValidateBindingDescription(*result.RuntimeUse, node)
 }
 
 func readArtifactResultContext(ctx context.Context, path string) (ArtifactResult, error) {

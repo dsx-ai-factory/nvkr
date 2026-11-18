@@ -11,6 +11,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/runtimeuse"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/material"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -69,6 +70,9 @@ func (materials *observedProducerMaterials) Close() error {
 // producer-owned manifest projection during observation.
 type vmPackerMaterials struct {
 	*observedProducerMaterials
+	runtime        *pipeline.ProducedRuntime
+	runtimeUse     *runtimeuse.Receipt
+	runtimeScratch string
 }
 
 func observeVMPackerMaterials(

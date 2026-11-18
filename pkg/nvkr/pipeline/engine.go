@@ -14,6 +14,7 @@ import (
 	"os"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/runtimeuse"
 )
 
 // RunOptions parameterize a local run.
@@ -110,6 +111,9 @@ type ArtifactResult struct {
 	OutputType     string                `json:"outputType"`
 	Qualification  ArtifactQualification `json:"qualification"`
 	Toolchain      string                `json:"toolchain,omitempty"` // digest-pinned toolchain image that produced it (provenance)
+	// RuntimeUse describes the completed original-Run receipt for a produced
+	// runtime consumer. It is evidence, never restorable execution authority.
+	RuntimeUse *RuntimeUseBinding `json:"runtimeUse,omitempty"`
 	// InputDigest identifies the exact post-vendor, post-patch source snapshot that
 	// entered this build. It is observed by the runner, not copied from a declaration.
 	InputDigest string `json:"inputDigest,omitempty"`
@@ -144,3 +148,5 @@ type ArtifactResult struct {
 	// pulled image (use Ref instead).
 	AbsPath string `json:"-"`
 }
+
+type RuntimeUseBinding = runtimeuse.Binding
