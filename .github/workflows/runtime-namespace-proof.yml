@@ -32,6 +32,10 @@ jobs:
         with:
           go-version-file: .go-version
           cache: false
+      - name: Check namespace devices and session isolation
+        env:
+          NAMESPACE_EVIDENCE: ${{ runner.temp }}/runtime-namespace-evidence
+        run: bash scripts/test-runtime-namespace.sh "$NAMESPACE_EVIDENCE"
       - name: Assemble the source-pinned runtime twice on the VM kernel
         env:
           ASSEMBLY_EVIDENCE: ${{ runner.temp }}/runtime-assembly-evidence
@@ -42,6 +46,8 @@ jobs:
         with:
           name: runtime-assembly-evidence
           path: |
+            ${{ runner.temp }}/runtime-namespace-evidence/inputs.txt
+            ${{ runner.temp }}/runtime-namespace-evidence/namespaces.log
             ${{ runner.temp }}/runtime-assembly-evidence/inputs.txt
             ${{ runner.temp }}/runtime-assembly-evidence/assembly.log
           if-no-files-found: error
