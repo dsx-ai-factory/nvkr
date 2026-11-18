@@ -43,24 +43,41 @@ func TestBindSourceProducerPreservesCompleteContract(t *testing.T) {
 }
 
 func TestSourceRevisionRendersRecipeWithoutInventingRelease(t *testing.T) {
-	stack := sourceRevisionStackFixture(t)
-	c := stack.Catalog.Components["kubectl"]
-	c.VersionStamp = nil
-	c.SourceRecipe = &SourceRecipe{BuildCommand: []string{"echo", "{{.Tag}}", "{{.ReleaseVersion}}"}, ArtifactPath: c.ArtifactPath, CommitVersion: "1.2.3"}
-	if err := c.resolveSourceRecipe(); err != nil {
-		t.Fatal(err)
-	}
-	stack, err := ApplyStack(stack.Catalog, Overlay{APIVersion: OverlayAPIVersion, Kind: OverlayKind, Name: "recipe", RequiresCatalogDigest: stack.Digest, Components: map[string]ComponentReplacement{"kubectl": {Component: &c}}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	commit := strings.Repeat("c", 40)
-	after, err := ApplySourceRevision(stack, &SourceRevision{repository: strings.TrimSuffix(c.Repo, ".git"), pin: Pin{Tag: commit, Commit: commit, TreeHash: strings.Repeat("d", 40), SourceDateEpoch: 2000}, issued: true})
-	if err != nil {
-		t.Fatal(err)
-	}
-	got := after.Catalog.Components["kubectl"]
-	if got.BuildCommand[1] != commit || got.BuildCommand[2] != "1.2.3" || stack.Catalog.Components["kubectl"].BuildCommand[1] == commit {
-		t.Fatal("lost exact commit, explicit packaging stream or caller ownership")
+	for _, stream := range []string{"1.2.3", ""} {
+		t.Run("stream="+stream, func(t *testing.T) {
+			stack := sourceRevisionStackFixture(t)
+			c := stack.Catalog.Components["kubectl"]
+			c.VersionStamp = nil
+			c.SourceRecipe = &SourceRecipe{BuildCommand: []string{"echo", "{{.Tag}}", "{{.ReleaseVersion}}"}, ArtifactPath: c.ArtifactPath, CommitVersion: stream}
+			if err := c.resolveSourceRecipe(); err != nil {
+				t.Fatal(err)
+			}
+			stack, err := ApplyStack(stack.Catalog, Overlay{APIVersion: OverlayAPIVersion, Kind: OverlayKind, Name: "recipe", RequiresCatalogDigest: stack.Digest, Components: map[string]ComponentReplacement{"kubectl": {Component: &c}}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			before := stack.Catalog.Components["kubectl"]
+			beforeCommand := append([]string(nil), before.BuildCommand...)
+			commit := strings.Repeat("c", 40)
+			after, err := ApplySourceRevision(stack, &SourceRevision{repository: strings.TrimSuffix(c.Repo, ".git"), pin: Pin{Tag: commit, Commit: commit, TreeHash: strings.Repeat("d", 40), SourceDateEpoch: 2000}, issued: true})
+			if stream == "" {
+				assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
+				if after != nil {
+					t.Fatal("failed replacement returned a stack")
+				}
+			} else {
+				if err != nil {
+					t.Fatal(err)
+				}
+				got := after.Catalog.Components["kubectl"]
+				if got.BuildCommand[1] != commit || got.BuildCommand[2] != stream {
+					t.Fatal("lost exact commit or explicit packaging stream")
+				}
+			}
+			original := stack.Catalog.Components["kubectl"]
+			if !reflect.DeepEqual(original, before) || !reflect.DeepEqual(original.BuildCommand, beforeCommand) {
+				t.Fatal("replacement mutated original stack")
+			}
+		})
 	}
 }

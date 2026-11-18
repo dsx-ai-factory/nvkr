@@ -29,12 +29,13 @@ type familySnapshot struct {
 	roots       []string
 	directories map[string]bool
 	files       map[string]familyFileState
+	guards      map[string]bool
 }
 
 // snapshotFamilyInputs copies bounded authored/generated input roots, never Git
 // metadata or a working checkout. The private staging directory has no writers
 // except this preparation. Original files are checked again before commitment.
-func snapshotFamilyInputs(ctx context.Context, config Config, configPath string) (*familySnapshot, error) {
+func snapshotFamilyInputs(ctx context.Context, config Config, configPath string, guardPaths ...string) (*familySnapshot, error) {
 	roots := map[string]bool{".github": true}
 	add := func(name string) {
 		if name != "" {
@@ -66,6 +67,10 @@ func snapshotFamilyInputs(ctx context.Context, config Config, configPath string)
 		return nil, e.Wrap(e.CodeInternal, err, "creating family input staging")
 	}
 	snapshot := &familySnapshot{root: root, roots: names, directories: map[string]bool{}, files: map[string]familyFileState{}}
+	snapshot.guards = map[string]bool{}
+	for _, name := range guardPaths {
+		snapshot.guards[filepath.ToSlash(name)] = true
+	}
 	success := false
 	defer func() {
 		if !success {
@@ -97,7 +102,7 @@ func snapshotFamilyInputs(ctx context.Context, config Config, configPath string)
 				return nil
 			}
 			// Persistent writer guards are process coordination, not authored bytes.
-			if strings.HasSuffix(relative, ".lease") || strings.HasSuffix(relative, "/.pins.lock.yaml.lock") {
+			if snapshot.guards[relative] || strings.HasSuffix(relative, "/.pins.lock.yaml.lock") {
 				return nil
 			}
 			if !entry.Type().IsRegular() || len(snapshot.directories)+len(snapshot.files) >= familySnapshotFiles {
@@ -167,7 +172,7 @@ func (snapshot *familySnapshot) checkState(ctx context.Context, expectedFiles ma
 				seenDirectories[name] = true
 				return nil
 			}
-			if strings.HasSuffix(name, ".lease") || strings.HasSuffix(name, "/.pins.lock.yaml.lock") {
+			if snapshot.guards[name] || strings.HasSuffix(name, "/.pins.lock.yaml.lock") {
 				return nil
 			}
 			if ignored[name] {

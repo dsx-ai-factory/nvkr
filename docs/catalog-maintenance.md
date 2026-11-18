@@ -57,6 +57,9 @@ authored in the overlay maintenance policy; source pin values come from the name
 The agent package's version uses the selected tag. Native toolchain substitutions and all maintained
 overlay predecessor bindings regenerate through the overlay owner. Previously approved TCG/local-KVM
 source pins and the independent OVN replacement cohorts retain their selections.
+Toolchain substitutions retain the [candidate exception records](toolchain-maintenance.md#record-candidate-exceptions)
+in `inputs/policies/toolchain-maintenance/<preparation-run-id>.json`; that owner defines their exact-image scope,
+candidate-only limits and expiry.
 
 ## Policy and source roles
 

@@ -96,3 +96,29 @@ func TestFamilySnapshotPreservesModeUnderUmask(t *testing.T) {
 		t.Fatalf("captured mode %o", info.Mode().Perm())
 	}
 }
+
+func TestFamilySnapshotExcludesOnlyNamedLeaseGuards(t *testing.T) {
+	t.Chdir(t.TempDir())
+	if err := os.Mkdir(".github", 0700); err != nil {
+		t.Fatal(err)
+	}
+	writeFixture(t, ".github/owner.lease", []byte("guard"))
+	writeFixture(t, ".github/policy.lease", []byte("authored"))
+	snapshot, err := snapshotFamilyInputs(t.Context(), Config{Family: &FamilyPolicy{}}, ".github/policy.lease", ".github/owner.lease")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.RemoveAll(snapshot.root) }()
+	if _, ok := snapshot.files[".github/policy.lease"]; !ok {
+		t.Fatal("authored lease suffix omitted")
+	}
+	if _, ok := snapshot.files[".github/owner.lease"]; ok {
+		t.Fatal("writer guard captured")
+	}
+	writeFixture(t, ".github/owner.lease", []byte("new guard bytes"))
+	if err := snapshot.checkOriginals(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	writeFixture(t, ".github/policy.lease", []byte("changed"))
+	assertCode(t, snapshot.checkOriginals(t.Context()), e.CodeWriteConflict)
+}

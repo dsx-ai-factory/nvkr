@@ -52,8 +52,9 @@ type FamilyRecipeUpdate struct {
 type familyRecipeVersion struct{ version, commitVersion, tag string }
 
 type preparedFamilyRun struct {
-	bundle *factory.GeneratedBundle
-	pair   *qualification.GeneratedWorkflows
+	bundle              *factory.GeneratedBundle
+	pair                *qualification.GeneratedWorkflows
+	baselineRuntimePlan *factory.Plan
 }
 
 // BumpFamily uses the existing maintenance policy's complete generated closure.
@@ -112,7 +113,19 @@ func bumpFamily(ctx context.Context, configPath, familyName, generatorVersion st
 		}
 	}
 	slices.Sort(result.Consumers)
-	snapshot, err := snapshotFamilyInputs(ctx, config, configPath)
+	guards := []string{".nvkr-catalog-family.lease", producerOverlayGuard, baseline.ManifestPath + ".lease"}
+	for _, run := range closure.runs {
+		guards = append(guards, run.bundle.ManifestPath+".lease")
+	}
+	for _, pair := range pairs {
+		if pair != nil {
+			guards = append(guards, pair.ManifestPath()+".lease")
+		}
+	}
+	for _, member := range config.Family.Catalogs {
+		guards = append(guards, filepath.Join(member.Catalog, "."+catalog.LockFile+".lock"))
+	}
+	snapshot, err := snapshotFamilyInputs(ctx, config, configPath, guards...)
 	if err != nil {
 		return result, err
 	}
@@ -251,7 +264,6 @@ func bumpFamily(ctx context.Context, configPath, familyName, generatorVersion st
 	}
 	paths := map[string]bool{}
 	manifests := map[string]bool{}
-	guards := []string{".nvkr-catalog-family.lease", producerOverlayGuard}
 	for name := range snapshot.files {
 		if filepath.Base(name) == catalog.RegistryFile {
 			guards = append(guards, filepath.Join(filepath.Dir(name), "."+catalog.LockFile+".lock"))
@@ -390,7 +402,7 @@ func familyRecipes(ctx context.Context, root, directory string) (map[string]fami
 func prepareFamilyRuns(ctx context.Context, config Config, generatorVersion, root string, check bool) ([]preparedFamilyRun, error) {
 	inputs := append([]RunInput{{Definition: config.Definition, Environment: config.Environment, QualificationPolicy: config.QualificationPolicy}}, otherRuns(config)...)
 	var runs []preparedFamilyRun
-	for _, input := range inputs {
+	for i, input := range inputs {
 		plan, err := factory.CompileAuthoredFiles(ctx, root, input.Definition, input.Environment, generatorVersion)
 		if err != nil {
 			return nil, err
@@ -402,6 +414,9 @@ func prepareFamilyRuns(ctx context.Context, config Config, generatorVersion, roo
 			return nil, err
 		}
 		run := preparedFamilyRun{bundle: bundle}
+		if i > 0 && plan.Environment.GitHubRuntimePlan {
+			run.baselineRuntimePlan = plan
+		}
 		policyPath := input.QualificationPolicy
 		if input.Environment == config.DevelopmentEnvironment && config.DevelopmentQualificationPolicy != "" {
 			policyPath = config.DevelopmentQualificationPolicy
@@ -426,7 +441,13 @@ func prepareFamilyRuns(ctx context.Context, config Config, generatorVersion, roo
 
 func commitFamilyRun(ctx context.Context, root string, run preparedFamilyRun, check bool) error {
 	if check {
-		if err := factory.CheckGeneratedBundle(ctx, root, run.bundle); err != nil {
+		var err error
+		if run.baselineRuntimePlan != nil {
+			err = factory.PrepareGitHubRuntimeBundle(ctx, run.baselineRuntimePlan, root, true)
+		} else {
+			err = factory.CheckGeneratedBundle(ctx, root, run.bundle)
+		}
+		if err != nil {
 			return err
 		}
 		if run.pair != nil {
