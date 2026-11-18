@@ -132,7 +132,7 @@ func captureExecutedRuntime(ctx context.Context, platform, buildDigest string, p
 	if size != result.Size {
 		return nil, e.New(e.CodeVerifyFailed, "runtime layout size differs from its producer result")
 	}
-	layer, err := rootfs.CaptureLayer(ctx, root, result.SHA256, platform, options.MkosiScratch)
+	layer, err := rootfs.CaptureLayer(ctx, root, result.SHA256, platform)
 	if err != nil {
 		return nil, err
 	}

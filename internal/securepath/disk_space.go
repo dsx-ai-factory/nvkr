@@ -23,6 +23,10 @@ type FilesystemSpace struct {
 // ReadOnly reports the filesystem's observed read-only flag.
 func (facts FilesystemSpace) ReadOnly() bool { return facts.readOnly }
 
+// MemoryBacked reports detected memory-backed filesystems; opaque backing
+// stores such as overlay retain the limitations documented by the observer.
+func (facts FilesystemSpace) MemoryBacked() bool { return facts.memoryBacked }
+
 // AvailableBytes converts available allocation units with checked arithmetic.
 func (facts FilesystemSpace) AvailableBytes() (uint64, error) {
 	if facts.blockSize <= 0 {

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-// Package rootfs stages one immutable, uncompressed root filesystem layer. It
+// Package rootfs stages one authenticated, uncompressed root filesystem layer. It
 // grants no execution authority: the Run owner must authenticate production and
 // evidence and admit the native launcher before calling this package.
 package rootfs

@@ -111,8 +111,8 @@ func (tool *ProducedRuntime) InspectContents(ctx context.Context, scratch string
 		}
 		contents.Files = append(contents.Files, RuntimeFile{Path: file.Path, Digest: digest, Material: file.Material, Size: size})
 	}
-	// The held layer is immutable; also reject changes to the original result
-	// directory while the potentially long extraction was in progress.
+	// Recheck both the retained layer and the original result directory after
+	// extraction and inspection, before releasing these content descriptions.
 	if err := state.require(ctx); err != nil {
 		return nil, err
 	}

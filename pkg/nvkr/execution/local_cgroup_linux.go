@@ -294,17 +294,56 @@ func effectiveCgroupMemoryMiB(cgroupDir, cgroupRoot string, hostAvailable uint64
 			return 0, e.New(e.CodeEngineCapability,
 				"cgroup memory limit at %s is malformed", directory)
 		}
-		if current >= limit {
+		statistics, err := readBoundedKernelText(filepath.Join(directory, "memory.stat"), 64<<10)
+		if err != nil {
+			return 0, e.Wrap(e.CodeEngineCapability, err, "reading cgroup memory statistics at %s", directory)
+		}
+		workingSet, err := cgroupWorkingSetBytes(current, statistics)
+		if err != nil {
+			return 0, err
+		}
+		if workingSet >= limit {
 			return 0, e.New(e.CodeEngineCapability,
 				"local VM admission has no memory headroom at cgroup %s", directory)
 		}
-		effective = min(effective, (limit-current)/(1024*1024))
+		effective = min(effective, (limit-workingSet)/(1024*1024))
 	}
 	if effective == 0 {
 		return 0, e.New(e.CodeEngineCapability,
 			"local VM admission has less than one MiB of effective memory")
 	}
 	return effective, nil
+}
+
+// cgroupWorkingSetBytes follows the kubelet/cAdvisor working-set convention:
+// subtract only inactive file pages. Anonymous, active-file and kernel memory
+// remain charged. Kernel counters are sampled separately, so saturate at zero
+// if inactive pages exceed the earlier usage sample; never underflow.
+// https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/
+func cgroupWorkingSetBytes(current uint64, statistics string) (uint64, error) {
+	var inactive uint64
+	found := false
+	for _, line := range strings.Split(statistics, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		if fields[0] != "inactive_file" {
+			continue
+		}
+		if found || len(fields) != 2 {
+			return 0, e.New(e.CodeEngineCapability, "cgroup inactive file memory is ambiguous or malformed")
+		}
+		value, err := strconv.ParseUint(fields[1], 10, 64)
+		if err != nil {
+			return 0, e.New(e.CodeEngineCapability, "cgroup inactive file memory is malformed")
+		}
+		inactive, found = value, true
+	}
+	if !found {
+		return 0, e.New(e.CodeEngineCapability, "cgroup inactive file memory is absent")
+	}
+	return current - min(current, inactive), nil
 }
 
 // A controller's interface files exist only where its parent enables it in

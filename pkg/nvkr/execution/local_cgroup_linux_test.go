@@ -365,4 +365,82 @@ func writeCgroupMemory(t *testing.T, directory string, maximum, current uint64) 
 	}
 	writeCgroupValue(t, directory, "memory.max", maximumText)
 	writeCgroupValue(t, directory, "memory.current", strconv.FormatUint(current, 10))
+	writeCgroupValue(t, directory, "memory.stat", "inactive_file 0")
+}
+
+func TestEffectiveCgroupMemoryUsesWorkingSet(t *testing.T) {
+	const mib = uint64(1 << 20)
+	for _, tc := range []struct {
+		name                               string
+		anon, active, inactive, host, want uint64
+		code                               nvkrerr.Code
+	}{
+		{name: "reclaimable cache", anon: 20, active: 3, inactive: 5054, host: 8192, want: 5097},
+		{name: "anonymous memory remains charged", anon: 4096, inactive: 1024, host: 8192, want: 1024},
+		{name: "active file remains charged", active: 4096, inactive: 1024, host: 8192, want: 1024},
+		{name: "working set exhausted", anon: 3072, active: 2048, inactive: 1024, host: 8192, code: nvkrerr.CodeEngineCapability},
+		{name: "host MemAvailable still caps", anon: 20, active: 3, inactive: 5054, host: 256, want: 256},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root, parent, leaf := cgroupCapacityFixture(t)
+			writeCgroupMemory(t, root, 0, 0)
+			writeCgroupMemory(t, leaf, 0, 0)
+			// Put the constrained working set on an ancestor to retain the full
+			// hierarchy check, even when the immediate cgroup is unlimited.
+			writeCgroupMemory(t, parent, 5120*mib, (tc.anon+tc.active+tc.inactive)*mib)
+			writeCgroupValue(t, parent, "memory.stat", "anon "+strconv.FormatUint(tc.anon*mib, 10)+"\nactive_file "+strconv.FormatUint(tc.active*mib, 10)+"\ninactive_file "+strconv.FormatUint(tc.inactive*mib, 10))
+			got, err := effectiveCgroupMemoryMiB(leaf, root, tc.host)
+			if got != tc.want || errorCode(err) != tc.code {
+				t.Fatalf("available=%d error=%v; want %d %s", got, err, tc.want, tc.code)
+			}
+		})
+	}
+}
+
+func TestCgroupWorkingSetRejectsInvalidStatistics(t *testing.T) {
+	for _, tc := range []struct {
+		name, raw     string
+		current, want uint64
+		code          nvkrerr.Code
+	}{
+		{name: "separate counter samples saturate", raw: "inactive_file 30", current: 20, want: 0},
+		{name: "unknown kernel counters", raw: "future_counter 42\ninactive_file 3", current: 20, want: 17},
+		{name: "absent", raw: "anon 20", code: nvkrerr.CodeEngineCapability},
+		{name: "duplicate", raw: "inactive_file 3\ninactive_file 3", code: nvkrerr.CodeEngineCapability},
+		{name: "negative", raw: "inactive_file -1", code: nvkrerr.CodeEngineCapability},
+		{name: "overflow", raw: "inactive_file 18446744073709551616", code: nvkrerr.CodeEngineCapability},
+		{name: "extra field", raw: "inactive_file 3 bytes", code: nvkrerr.CodeEngineCapability},
+		{name: "missing value", raw: "inactive_file", code: nvkrerr.CodeEngineCapability},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := cgroupWorkingSetBytes(tc.current, tc.raw)
+			if got != tc.want || errorCode(err) != tc.code {
+				t.Fatalf("working set=%d error=%v; want %d %s", got, err, tc.want, tc.code)
+			}
+		})
+	}
+}
+
+func TestEffectiveCgroupMemoryRequiresBoundedStatistics(t *testing.T) {
+	for _, missing := range []bool{true, false} {
+		name := "oversized"
+		if missing {
+			name = "missing"
+		}
+		t.Run(name, func(t *testing.T) {
+			root, parent, leaf := cgroupCapacityFixture(t)
+			writeCgroupMemory(t, parent, 0, 0)
+			writeCgroupMemory(t, leaf, 5120<<20, 1024<<20)
+			if missing {
+				if err := os.Remove(filepath.Join(leaf, "memory.stat")); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				writeCgroupValue(t, leaf, "memory.stat", "inactive_file 0\n"+strings.Repeat("future_counter 0\n", 5000))
+			}
+			if _, err := effectiveCgroupMemoryMiB(leaf, root, 8192); errorCode(err) != nvkrerr.CodeEngineCapability {
+				t.Fatalf("unsafe statistics accepted: %v", err)
+			}
+		})
+	}
 }

@@ -66,7 +66,7 @@ func runtimeLayoutFixture(t *testing.T, mutateConfig func(map[string]any), mutat
 
 func TestCaptureRuntimeLayerHoldsExactBytes(t *testing.T) {
 	layout, digest, layerDigest := runtimeLayoutFixture(t, nil, nil)
-	layer, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64", t.TempDir())
+	layer, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,11 @@ func TestCaptureRuntimeLayerHoldsExactBytes(t *testing.T) {
 	if layer.Digest() != layerDigest {
 		t.Fatal("captured a different layer")
 	}
-	if err := os.WriteFile(filepath.Join(layout, runtimeBlobPath(layerDigest)), []byte("replaced"), 0o644); err != nil {
+	replacement := filepath.Join(layout, "replacement")
+	if err := os.WriteFile(replacement, []byte("replaced"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(replacement, filepath.Join(layout, runtimeBlobPath(layerDigest))); err != nil {
 		t.Fatal(err)
 	}
 	if err := layer.AssertUnchangedContext(t.Context()); err != nil {
@@ -87,7 +91,7 @@ func TestCaptureRuntimeLayerHoldsExactBytes(t *testing.T) {
 	if err := tree.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if second, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64", t.TempDir()); err == nil {
+	if second, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64"); err == nil {
 		_ = second.Close()
 		t.Fatal("recapture accepted substituted producer bytes")
 	}
@@ -114,7 +118,7 @@ func TestCaptureRuntimeLayerRejectsOtherOCIForms(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			layout, digest, _ := runtimeLayoutFixture(t, tc.config, tc.manifest)
-			layer, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64", t.TempDir())
+			layer, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64")
 			if layer != nil {
 				_ = layer.Close()
 				t.Fatal("rejected OCI form returned held bytes")
@@ -131,6 +135,6 @@ func TestCaptureRuntimeLayerRejectsUnreferencedBlob(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(layout, runtimeBlobPath(name)), raw, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	_, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64", t.TempDir())
+	_, err := CaptureLayer(t.Context(), layout, digest, "linux/amd64")
 	requireStageCode(t, err, e.CodeVerifyFailed)
 }

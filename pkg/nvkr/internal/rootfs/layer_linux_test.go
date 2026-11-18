@@ -6,7 +6,6 @@
 package rootfs
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"fmt"
 	"os"
@@ -17,7 +16,7 @@ import (
 
 func TestDiskLayerFilesystem(t *testing.T) {
 	raw := []byte("runtime")
-	layer, err := captureDiskLayer(t.Context(), bytes.NewReader(raw), fmt.Sprintf("sha256:%x", sha256.Sum256(raw)), int64(len(raw)), t.TempDir())
+	layer, err := captureDiskLayer(t.Context(), diskLayerFixture(t, t.TempDir(), raw), fmt.Sprintf("sha256:%x", sha256.Sum256(raw)), int64(len(raw)))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +32,7 @@ func TestDiskLayerFilesystem(t *testing.T) {
 	if err := unix.Fstat(int(layer.file.Fd()), &stat); err != nil {
 		t.Fatal(err)
 	}
-	if stat.Nlink != 0 || stat.Uid != uint32(os.Geteuid()) {
+	if stat.Nlink != 1 || stat.Uid != uint32(os.Geteuid()) {
 		t.Fatalf("retained layer ownership/links: uid=%d links=%d", stat.Uid, stat.Nlink)
 	}
 }

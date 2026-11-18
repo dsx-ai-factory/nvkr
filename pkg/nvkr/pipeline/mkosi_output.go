@@ -52,7 +52,7 @@ func inspectMkosiOutput(ctx context.Context, node ir.Node, layout, inputs, scrat
 	if !canonical.IsDigest(subject) {
 		return "", 0, e.New(e.CodeVerifyFailed, "mkosi result has no exact manifest identity")
 	}
-	layer, err := rootfs.CaptureLayer(ctx, layout, subject, node.Platform, scratch)
+	layer, err := rootfs.CaptureLayer(ctx, layout, subject, node.Platform)
 	if err != nil {
 		return "", 0, err
 	}

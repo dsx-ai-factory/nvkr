@@ -178,8 +178,8 @@ func TestProducedRuntimeReceiptDetectsLiveLayoutDrift(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(result.TransportPath, "blobs/sha256", strings.TrimPrefix(layer, "sha256:")), []byte("changed"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if err := tool.state.layer.AssertUnchangedContext(t.Context()); err != nil {
-				t.Fatal("immutable runtime layer followed mutable producer bytes")
+			if err := tool.state.layer.AssertUnchangedContext(t.Context()); code(err) != e.CodeVerifyFailed {
+				t.Fatalf("changed retained tar was accepted: %v", err)
 			}
 		}
 		_, err = tool.BindingContext(t.Context())

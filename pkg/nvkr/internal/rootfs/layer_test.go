@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
@@ -20,18 +21,26 @@ func TestDiskLayerRetention(t *testing.T) {
 	scratch := t.TempDir()
 	raw := bytes.Repeat([]byte("runtime"), 1024)
 	digest := fmt.Sprintf("sha256:%x", sha256.Sum256(raw))
-	layer, err := captureDiskLayer(t.Context(), bytes.NewReader(raw), digest, int64(len(raw)), scratch)
+	source := diskLayerFixture(t, scratch, raw)
+	layer, err := captureDiskLayer(t.Context(), source, digest, int64(len(raw)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = layer.Close() })
 	entries, err := os.ReadDir(scratch)
-	if err != nil || len(entries) != 0 {
-		t.Fatalf("retained public paths: %v, %v", entries, err)
+	if err != nil || len(entries) != 1 || entries[0].Name() != "layer" {
+		t.Fatalf("retention created a second copy: %v, %v", entries, err)
 	}
 	info, err := layer.file.Stat()
-	if err != nil || info.Mode().Perm() != 0o400 {
+	if err != nil || info.Mode().Perm() != 0o644 {
 		t.Fatalf("retained permissions: %v, %v", info, err)
+	}
+	original, err := source.Stat()
+	if err != nil || !os.SameFile(original, info) {
+		t.Fatalf("retention replaced the original tar inode: %v", err)
+	}
+	if err := source.Close(); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := layer.file.WriteAt([]byte("changed"), 0); err == nil {
 		t.Fatal("retained a writable descriptor")
@@ -65,15 +74,15 @@ func TestDiskLayerRejectsChangedInput(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			scratch := t.TempDir()
-			layer, err := captureDiskLayer(t.Context(), bytes.NewReader(tc.raw), tc.digest, tc.size, scratch)
+			layer, err := captureDiskLayer(t.Context(), diskLayerFixture(t, scratch, tc.raw), tc.digest, tc.size)
 			if layer != nil {
 				_ = layer.Close()
 				t.Fatal("rejected input returned a layer")
 			}
 			requireStageCode(t, err, e.CodeVerifyFailed)
 			entries, err := os.ReadDir(scratch)
-			if err != nil || len(entries) != 0 {
-				t.Fatalf("failed capture left files: %v %v", entries, err)
+			if err != nil || len(entries) != 1 {
+				t.Fatalf("failed capture changed the input inventory: %v %v", entries, err)
 			}
 		})
 	}
@@ -82,7 +91,7 @@ func TestDiskLayerRejectsChangedInput(t *testing.T) {
 func TestDiskLayerCanceledCapture(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	_, err := captureDiskLayer(ctx, bytes.NewReader([]byte("abc")), "", 3, t.TempDir())
+	_, err := captureDiskLayer(ctx, nil, "", 3)
 	requireStageCode(t, err, e.CodeTimeout)
 }
 
@@ -98,7 +107,12 @@ func TestDiskLayerRequiresDiskScratch(t *testing.T) {
 	if _, err := securepath.AvailableDiskBackedBytes(t.Context(), directory); err == nil {
 		t.Skip("fixture is not memory-backed")
 	}
-	_, err = captureDiskLayer(t.Context(), bytes.NewReader([]byte("abc")), "", 3, "/dev/shm")
+	private, err := os.MkdirTemp("/dev/shm", "nvkr-layer-test-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(private) })
+	_, err = captureDiskLayer(t.Context(), diskLayerFixture(t, private, []byte("abc")), "", 3)
 	requireStageCode(t, err, e.CodeEngineCapability)
 	held := layerFixture(t, nil, nil)
 	_, err = Stage(t.Context(), held, "/dev/shm")
@@ -148,7 +162,7 @@ func TestDiskLayerRejectsMutationThroughAnotherDescriptor(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	layer := &Layer{file: readonly, size: int64(len(raw)), digest: fmt.Sprintf("sha256:%x", sha256.Sum256(raw))}
+	layer := &Layer{file: readonly, size: int64(len(raw)), digest: fmt.Sprintf("sha256:%x", sha256.Sum256(raw)), mode: 0o400}
 	defer layer.Close()
 	if err := os.Remove(writable.Name()); err != nil {
 		t.Fatal(err)
@@ -156,10 +170,56 @@ func TestDiskLayerRejectsMutationThroughAnotherDescriptor(t *testing.T) {
 	if err := layer.AssertUnchangedContext(t.Context()); err != nil {
 		t.Fatal(err)
 	}
-	// Only this fault-injection fixture keeps the writable descriptor open.
-	// A production capture closes every writable descriptor before return.
+	// Simulate a privileged writer changing the retained original inode.
+	// Mutation must revoke the layer before any staged root is released.
 	if _, err := writable.WriteAt([]byte("changed"), 0); err != nil {
 		t.Fatal(err)
 	}
 	requireStageCode(t, layer.AssertUnchangedContext(t.Context()), e.CodeVerifyFailed)
+}
+
+func diskLayerFixture(t *testing.T, directory string, raw []byte) *os.File {
+	t.Helper()
+	path := filepath.Join(directory, "layer")
+	if err := os.WriteFile(path, raw, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = file.Close() })
+	return file
+}
+
+func TestDiskLayerRejectsWritableDescriptorAndPermissions(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		writable bool
+		mode     os.FileMode
+	}{
+		{name: "writable descriptor", writable: true, mode: 0o644},
+		{name: "other writable inode", mode: 0o666},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			source := diskLayerFixture(t, t.TempDir(), []byte("runtime"))
+			if err := source.Chmod(tc.mode); err != nil {
+				t.Fatal(err)
+			}
+			if tc.writable {
+				writable, err := os.OpenFile(source.Name(), os.O_RDWR, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer writable.Close()
+				source = writable
+			}
+			layer, err := captureDiskLayer(t.Context(), source, fmt.Sprintf("sha256:%x", sha256.Sum256([]byte("runtime"))), 7)
+			if layer != nil {
+				_ = layer.Close()
+				t.Fatal("unsafe layer accepted")
+			}
+			requireStageCode(t, err, e.CodeVerifyFailed)
+		})
+	}
 }

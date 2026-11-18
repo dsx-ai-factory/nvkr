@@ -4,10 +4,12 @@ Container runtime selection defaults to Docker; local Runs inherit their Environ
 
 The Plan-produced VM runtime extension has manager-neutral package inputs, exact mkosi installed-package
 closure checks, source-closure acquisition, and digest-bound single-layer OCI capture. The layer is
-retained on disk through an unlinked read-only descriptor; extraction rejects memory-backed storage
-and verifies the entire extracted stream before releasing its private root. Focused Linux tests cover
-disk backing, ownership, read-only retention, tampering, tmpfs rejection and cleanup. Native consumer
-execution with disk-backed retention remains unexercised. The native namespace
+retained through a read-only descriptor to the original disk-backed OCI tar, without a second retained
+archive. Extraction rejects memory-backed storage and verifies the entire stream before releasing its
+private root; that root is removed after inspection or consumption joins. Focused tests cover original
+inode retention, ownership, read-only descriptors, tampering, tmpfs rejection and cleanup. Cgroup memory
+observation excludes only inactive file pages from usage, preserves host and ancestor limits, and rejects
+missing or malformed statistics. Native consumer execution with these changes remains unexercised. The native namespace
 [VM proof](https://github.com/njhensley/nvkr/actions/runs/44194123590) at
 `0dbb69bb55dc190884ef3ca2b9d673a6c365284d` exercised both assembly and consumer launchers on stock
 Ubuntu 24.04 AMD64 with kernel `7.0.0-1014-aws`. The separately owned executable tmpfs retained its
@@ -91,6 +93,13 @@ The repeated consumer admission then failed with 351/4096 MiB memory and 16499/1
 available/required inside the unchanged 5 GiB service. Packer and QEMU did not run. The retained log
 records successful production and SBOM operations, but the failed attempt did not export standalone
 OCI subject or SBOM documents. It establishes no completed runtime use, public Run or publication.
+The [disk-retention attempt](https://github.com/njhensley/nvkr/actions/runs/44266926355) at
+`a0e6c3122ca7f346c426478d923baeadde3d52e3` also completed production, terminal observation and SBOM.
+Its consumer admission failed with 3/4096 MiB memory and 14647/16384 MiB workspace available/required.
+The service reported 5057 MiB file cache (5054 MiB inactive), 20 MiB anonymous memory and 45 MiB process
+RSS; the retained layer was a 1852 MiB disk snapshot. No OOM kill or Packer execution occurred. The
+current storage path removes that extra retained snapshot and retains the original OCI tar. Budgets
+remain unchanged; the working-set measurement and resulting workspace headroom need a fresh native proof.
 The earlier assembly digest above describes the closure before the outbound helper was added and does
 not evidence the changed runtime.
 

@@ -27,7 +27,7 @@ const (
 // uncompressed layer emitted by the admitted mkosi recipe. This is byte
 // authentication, not a production or runtime-use receipt. The caller owns Close.
 // OCI process configuration is never used as a launcher instruction.
-func CaptureLayer(ctx context.Context, layout, digest, platform, scratch string) (*Layer, error) {
+func CaptureLayer(ctx context.Context, layout, digest, platform string) (*Layer, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "runtime layer capture requires context")
 	}
@@ -119,7 +119,7 @@ func CaptureLayer(ctx context.Context, layout, digest, platform, scratch string)
 	if info.Size() != layer.Size {
 		return nil, e.New(e.CodeVerifyFailed, "runtime layer changed during capture")
 	}
-	held, err := captureDiskLayer(ctx, file, layer.Digest, layer.Size, scratch)
+	held, err := captureDiskLayer(ctx, file, layer.Digest, layer.Size)
 	if err != nil {
 		return nil, stageError(ctx, err)
 	}

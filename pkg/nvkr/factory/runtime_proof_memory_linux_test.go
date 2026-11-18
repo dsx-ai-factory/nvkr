@@ -97,6 +97,15 @@ func nativeRuntimeProofMemory(t *testing.T, phase string, paths ...string) {
 		if err != nil || !info.Mode().IsRegular() {
 			continue
 		}
+		if info.Size() >= 1<<30 {
+			var stat unix.Stat_t
+			var filesystem unix.Statfs_t
+			if statErr := unix.Stat(path, &stat); statErr == nil {
+				if fsErr := unix.Statfs(path, &filesystem); fsErr == nil {
+					t.Logf("large retained file: bytes=%d uid=%d mode=%#o links=%d filesystem=%#x", info.Size(), stat.Uid, stat.Mode&0o777, stat.Nlink, filesystem.Type)
+				}
+			}
+		}
 		if strings.HasPrefix(target, "/memfd:") {
 			memfdBytes += info.Size()
 		} else if strings.HasSuffix(target, " (deleted)") {

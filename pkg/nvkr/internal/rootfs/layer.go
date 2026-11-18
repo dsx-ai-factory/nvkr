@@ -7,102 +7,64 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"io"
 	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/ociclosure"
+	"golang.org/x/sys/unix"
 )
 
-// Layer owns a private disk snapshot, bound to the authenticated OCI layer hash.
-// Its only retained descriptor is read-only and its pathname is unlinked before
-// return. It exposes no descriptor or writable handle. This is byte retention,
-// not execution authority or a kernel memfd seal; Stage also hashes the complete
-// stream it extracts before releasing a root to any consumer.
+// Layer holds the authenticated OCI tar inode through a read-only descriptor.
+// It creates no second retained copy and exposes neither the descriptor nor a
+// writable handle. This is digest-bound retention, not a kernel memfd seal:
+// mutations revoke the bytes, and Stage hashes the complete extracted stream
+// before releasing its private root. The production owner also rechecks the
+// original OCI closure. A saved path or digest cannot restore that owner.
 type Layer struct {
 	mu     sync.Mutex
 	file   *os.File
 	size   int64
 	digest string
+	mode   os.FileMode
 }
 
-func captureDiskLayer(ctx context.Context, source io.Reader, digest string, size int64, scratch string) (result *Layer, returnErr error) {
+func captureDiskLayer(ctx context.Context, source *os.File, digest string, size int64) (*Layer, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "runtime retention requires context")
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, stageError(ctx, err)
 	}
-	if scratch == "" || !filepath.IsAbs(scratch) {
-		return nil, e.New(e.CodeEngineCapability, "runtime retention requires explicit disk-backed scratch")
+	if source == nil || size <= 0 || size > MaxLayerBytes {
+		return nil, e.New(e.CodeVerifyFailed, "runtime retention requires a bounded layer descriptor")
 	}
-	directory, _, err := securepath.OpenDirectory(scratch)
+	flags, err := unix.FcntlInt(source.Fd(), unix.F_GETFL, 0)
+	if err != nil || flags&unix.O_ACCMODE != unix.O_RDONLY {
+		return nil, e.New(e.CodeVerifyFailed, "runtime retention requires a read-only descriptor")
+	}
+	var filesystem unix.Statfs_t
+	if err := unix.Fstatfs(int(source.Fd()), &filesystem); err != nil {
+		return nil, stageError(ctx, err)
+	}
+	if securepath.FilesystemSpaceFromStat(filesystem).MemoryBacked() {
+		return nil, e.New(e.CodeEngineCapability, "runtime retention requires a disk-backed layer")
+	}
+	info, err := source.Stat()
 	if err != nil {
 		return nil, stageError(ctx, err)
 	}
-	available, capacityErr := securepath.AvailableDiskBackedBytes(ctx, directory)
-	if err := errors.Join(capacityErr, directory.Close()); err != nil {
-		return nil, e.Wrap(e.CodeEngineCapability, err, "runtime retention requires writable disk-backed scratch")
-	}
-	if size <= 0 || size > MaxLayerBytes || available < uint64(size)+(8<<20) {
-		return nil, e.New(e.CodeEngineCapability, "insufficient disk-backed capacity for runtime layer")
-	}
-	private, err := os.MkdirTemp(scratch, "nvkr-runtime-layer-")
+	fd, err := unix.FcntlInt(source.Fd(), unix.F_DUPFD_CLOEXEC, 0)
 	if err != nil {
 		return nil, stageError(ctx, err)
 	}
-	defer func() {
-		returnErr = errors.Join(returnErr, os.RemoveAll(private))
-		if returnErr != nil && result != nil {
-			returnErr = errors.Join(returnErr, result.Close())
-			result = nil
-		}
-	}()
-	path := filepath.Join(private, "layer")
-	writable, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	if err != nil {
-		return nil, stageError(ctx, err)
-	}
-	defer writable.Close()
-	hash := sha256.New()
-	written, err := ociclosure.CopyContext(ctx, io.MultiWriter(writable, hash), io.LimitReader(source, size+1))
-	if err != nil {
-		return nil, stageError(ctx, err)
-	}
-	if written != size || "sha256:"+hex.EncodeToString(hash.Sum(nil)) != digest {
-		return nil, e.New(e.CodeVerifyFailed, "runtime layer differs from its authenticated descriptor")
-	}
-	if err := writable.Chmod(0o400); err != nil {
-		return nil, stageError(ctx, err)
-	}
-	if err := writable.Sync(); err != nil {
-		return nil, stageError(ctx, err)
-	}
-	if err := writable.Close(); err != nil {
-		return nil, stageError(ctx, err)
-	}
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, stageError(ctx, err)
-	}
-	accepted := false
-	defer func() {
-		if !accepted || returnErr != nil {
-			returnErr = errors.Join(returnErr, file.Close())
-		}
-	}()
-	if err := os.Remove(path); err != nil {
-		return nil, stageError(ctx, err)
-	}
-	layer := &Layer{file: file, size: size, digest: digest}
+	layer := &Layer{file: os.NewFile(uintptr(fd), "retained-runtime-layer"), size: size, digest: digest, mode: info.Mode().Perm()}
 	if err := layer.AssertUnchangedContext(ctx); err != nil {
+		_ = layer.Close()
 		return nil, err
 	}
-	accepted = true
 	return layer, nil
 }
 
@@ -144,8 +106,15 @@ func (layer *Layer) AssertUnchangedContext(ctx context.Context) error {
 	if err != nil {
 		return stageError(ctx, err)
 	}
-	if !info.Mode().IsRegular() || info.Size() != layer.size || info.Mode().Perm() != 0o400 {
+	if !info.Mode().IsRegular() || info.Size() != layer.size || info.Mode().Perm() != layer.mode {
 		return e.New(e.CodeVerifyFailed, "retained runtime layer metadata changed")
+	}
+	var stat unix.Stat_t
+	if err := unix.Fstat(int(layer.file.Fd()), &stat); err != nil {
+		return stageError(ctx, err)
+	}
+	if stat.Uid != uint32(os.Geteuid()) || stat.Mode&0o022 != 0 {
+		return e.New(e.CodeVerifyFailed, "retained runtime layer ownership or write permissions changed")
 	}
 	hash := sha256.New()
 	if _, err := ociclosure.CopyContext(ctx, hash, io.NewSectionReader(layer.file, 0, layer.size)); err != nil {

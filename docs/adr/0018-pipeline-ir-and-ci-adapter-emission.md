@@ -543,11 +543,12 @@ upload, registry credential preparation, signing and publication remain outside 
 credential directory, authored environment or executable override is forwarded across the boundary.
 It admits the required mount, network, device, ownership
 and privilege-dropping capabilities before producer work. The owner retains the authenticated layer in a
-private disk-backed snapshot, closes its writable descriptor, and unlinks its pathname before retaining
-only the read-only descriptor. This is
-digest-bound retention, not a kernel memfd seal. The original owner rechecks its digest, and extraction
-hashes the complete stream before making the root available to a consumer. Neither large layers nor
-extracted roots may use memory-backed storage. The owner stages the authenticated root
+disk-backed OCI tar through a read-only descriptor to its original inode, without a second retained
+archive copy. This is digest-bound retention, not a kernel memfd seal: in-place mutation revokes the
+bytes. The original owner rechecks the layer digest and complete OCI closure, and extraction hashes
+the complete stream before making a root available to a consumer. Extracted roots exist only during
+inspection or consumption and are removed when that operation and its children have joined. Neither
+large layers nor extracted roots may use memory-backed storage. The owner stages the authenticated root
 filesystem under a root-owned private directory and exposes it read-only, with no host root or
 container socket reachable by the payload. Source and material
 inputs remain read-only; private output and scratch locations are the only writable projections.
@@ -1000,8 +1001,12 @@ The local VM admission primitive builds on the same observer without promoting d
 evidence. The factory owner validates the complete Plan and identifies one exact `vm-image` build. An opaque,
 same-process capability then binds both logical identity and the exact current Plan bytes, the selected node,
 compiler-selected request and binding, and a current Linux observation. CPU capacity is the smaller of process
-affinity and every cgroup-v2 ancestor quota. Memory capacity is the smaller of host-available memory and headroom
-under every cgroup-v2 ancestor limit. The observer resolves a unique cgroup2 mount root and mountpoint from the
+affinity and every cgroup-v2 ancestor quota. Memory capacity is the smaller of host `MemAvailable` and headroom
+under every cgroup-v2 ancestor limit. Cgroup headroom subtracts the working set (`memory.current` minus
+`inactive_file` from `memory.stat`, saturated at zero) from that limit. Only inactive file pages are
+excluded; anonymous, active-file and kernel memory remain charged. Missing, duplicate, malformed or
+oversized statistics fail admission. This follows the [kubelet working-set convention](https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/)
+and is a point-in-time observation, not a reservation or an increase to any enforced limit. The observer resolves a unique cgroup2 mount root and mountpoint from the
 process mount table, maps the process membership beneath that root, and rejects absent, ambiguous, or escaping
 mappings. Admission fails closed where that effective capacity cannot be established.
 It rejects a host-platform mismatch, insufficient CPU, memory or held-workspace capacity, and an enabled KVM
