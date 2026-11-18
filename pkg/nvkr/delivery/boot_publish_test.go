@@ -5,6 +5,7 @@ package delivery
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -12,15 +13,16 @@ import (
 	"strings"
 	"testing"
 
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 )
 
 func TestBootPublicationCommitsInventoryAfterFreshRecheckAndProofs(t *testing.T) {
-	for _, corruptProofWrite := range []bool{false, true} {
-		t.Run(map[bool]string{false: "complete", true: "proof readback failure"}[corruptProofWrite], func(t *testing.T) {
+	for _, scenario := range []string{"complete", "publication readback failure", "proof readback failure"} {
+		t.Run(scenario, func(t *testing.T) {
 			sources := map[string]string{}
 			selection, assets, bindings, limits := bootTransferFixture(t, sources)
-			store := &mirrorMemoryStore{}
+			store := &bootProofCorruptionStore{mirrorMemoryStore: &mirrorMemoryStore{}}
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				raw, found := store.data[strings.TrimPrefix(r.URL.Path, "/boot/")]
 				if !found {
@@ -114,21 +116,38 @@ func TestBootPublicationCommitsInventoryAfterFreshRecheckAndProofs(t *testing.T)
 			for index, record := range records {
 				uses[index] = BootOriginalUse{Binding: record.Binding, URL: record.URL, PreparedInvocation: expected.Invocation, SignedInvocation: expected.Invocation}
 			}
+			writesBeforeFinal := len(store.writes)
 			var locator StoredObject
 			err = withBootPhase(t.Context(), phaseRequest, BootReaderCredential{}, func(context.Context) (ObjectStore, error) { return store, nil }, func(ctx context.Context, phase *BootPhase) error {
 				receipt, err := phase.Recheck(ctx, bindings, records)
 				if err != nil {
 					return err
 				}
-				if corruptProofWrite {
+				if scenario == "publication readback failure" {
 					store.corrupt = "same-size"
+				}
+				if scenario == "proof readback failure" {
+					_, signature, _, err := proofs[0].Bundles()
+					if err != nil {
+						return err
+					}
+					store.proofDigest = digestBytes(signature)
 				}
 				locator, err = phase.PublishProofs(ctx, BootPublicationRequest{Expected: expected, Availability: receipt, Uses: uses, Publications: publications, Proofs: proofs})
 				return err
 			})
-			if corruptProofWrite {
+			if scenario != "complete" {
+				assertRegistryCode(t, err, e.CodeVerifyFailed)
+				if len(store.writes) <= writesBeforeFinal {
+					t.Fatal("failure preceded final writes")
+				}
 				if err == nil || locator != (StoredObject{}) {
-					t.Fatal("corrupt proof returned completion")
+					t.Fatal("corrupt write returned completion")
+				}
+				if scenario == "proof readback failure" {
+					if !store.corrupted || len(store.writes) <= writesBeforeFinal+1 || store.writes[len(store.writes)-1].SHA256 != store.proofDigest {
+						t.Fatal("proof failure did not follow successful control writes")
+					}
 				}
 				for _, object := range store.writes {
 					if strings.HasPrefix(object.Key, "boot-publications/") {
@@ -148,4 +167,20 @@ func TestBootPublicationCommitsInventoryAfterFreshRecheckAndProofs(t *testing.T)
 			}
 		})
 	}
+}
+
+// Corrupt only the chosen proof after earlier publication objects pass readback.
+type bootProofCorruptionStore struct {
+	*mirrorMemoryStore
+	proofDigest string
+	corrupted   bool
+}
+
+func (store *bootProofCorruptionStore) PutIfAbsent(ctx context.Context, object Object, source io.ReadSeeker) (StoredObject, error) {
+	result, err := store.mirrorMemoryStore.PutIfAbsent(ctx, object, source)
+	if err == nil && object.SHA256 == store.proofDigest {
+		store.data[object.Key][0] ^= 1
+		store.corrupted = true
+	}
+	return result, err
 }
