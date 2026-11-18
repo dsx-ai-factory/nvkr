@@ -109,6 +109,9 @@ func (d *Document) Render(o PlanOptions) ([]byte, error) {
 	fmt.Fprintf(&out, "\nProducer instructions\n")
 	for _, build := range d.plan.Builds {
 		fmt.Fprintf(&out, "  %s [%s]\n", build.Name, build.Platform)
+		if build.SelectedCatalog != nil {
+			fmt.Fprintf(&out, "    catalog: %s overlays=%s digest=%s\n", build.SelectedCatalog.Base, jsonDisplay(build.SelectedCatalog.Overlays), build.CatalogDigest)
+		}
 		for _, node := range build.Graph.Nodes {
 			fmt.Fprintf(&out, "    %s %s\n", node.Kind, node.ID)
 			if len(node.Needs) > 0 {

@@ -65,6 +65,13 @@ func TestInspectionPreservesCanonicalIdentityAndOwnsSnapshot(t *testing.T) {
 			if err != nil || !bytes.Equal(raw, again) {
 				t.Fatalf("unstable view: %v", err)
 			}
+			if test.format == "text" {
+				for _, build := range plan.Builds {
+					if build.SelectedCatalog != nil && (!bytes.Contains(raw, []byte("catalog: "+build.SelectedCatalog.Base)) || !bytes.Contains(raw, []byte("digest="+build.CatalogDigest))) {
+						t.Fatal("inspection omitted selected catalog")
+					}
+				}
+			}
 			if test.format == "json" {
 				if !test.pretty && !bytes.Equal(raw, original) {
 					t.Fatal("canonical output differs from stored bytes")

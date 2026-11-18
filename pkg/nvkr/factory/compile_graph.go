@@ -355,7 +355,7 @@ func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
 		if !ok {
 			return e.New(e.CodeUnverifiedRef, "build %q has no Definition selection", build.Name)
 		}
-		if selection.Catalog == nil && build.CatalogDigest != plan.CatalogDigest {
+		if selection.Catalog == nil && len(plan.Definition.Catalogs) == 0 && build.CatalogDigest != plan.CatalogDigest {
 			return e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", build.Name)
 		}
 	}

@@ -102,8 +102,8 @@ _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition**:
 The derived ordinary Definition that composite admission produces by merging its members, with every output's
-catalog stack made explicit. It is an internal record, recorded by digest in the composite's Plan; it is never
-authored or selected as input.
+catalog locator rebased and its shared ordered catalog candidates preserved. It is an internal record,
+recorded by digest in the composite's Plan; it is never authored or selected as input.
 _Avoid_: Flattened file, combined candidate, authored Definition
 
 **Declared variant**:

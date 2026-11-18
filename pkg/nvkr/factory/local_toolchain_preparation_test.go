@@ -53,6 +53,56 @@ func localPreparationFixture(t *testing.T) (*Plan, []LocalToolchainBinding) {
 	return plan, bindings
 }
 
+func TestLocalToolchainPreparationCatalogList(t *testing.T) {
+	baseline, bindings := localPreparationFixture(t)
+	def := baseline.Definition.Clone()
+	spec := *def.Outputs[0].Catalog
+	def.Catalogs = []authored.Catalog{spec}
+	def.Outputs[0].Catalog = nil
+	stacks := map[string]*catalog.Stack{}
+	for _, build := range baseline.Builds {
+		stacks[build.Name] = &catalog.Stack{Catalog: build.CatalogSnapshot, Digest: build.CatalogDigest, Applied: build.AppliedOverlays}
+	}
+	first := baseline.Builds[0]
+	candidates := []CatalogCandidate{{Selection: spec, CatalogSnapshot: first.CatalogSnapshot, CatalogDigest: first.CatalogDigest, AppliedOverlays: first.AppliedOverlays}}
+	plan, err := compileWithTargetStacksFor(t.Context(), def, baseline.Environment, &catalog.Stack{Catalog: baseline.CatalogSnapshot, Digest: baseline.CatalogDigest}, stacks, "test", "definition.json", "environment.json", nil, candidates)
+	if err != nil {
+		t.Fatal(err)
+	}
+	preparation, err := CompileLocalToolchainPreparation(t.Context(), plan, bindings, "amd64")
+	if err != nil {
+		t.Fatal(err)
+	}
+	image := "sha256:" + strings.Repeat("b", 64)
+	for _, tamper := range []bool{false, true} {
+		t.Run(fmt.Sprint("candidate-tamper=", tamper), func(t *testing.T) {
+			selected, _, err := preparation.substitute(t.Context(), image)
+			if err != nil {
+				t.Fatal(err)
+			}
+			selected.Definition.Catalogs[0].Base = "../relocated/catalog-0"
+			selected.CatalogCandidates[0].Selection.Base = selected.Definition.Catalogs[0].Base
+			selected.DefinitionDigest, err = selected.Definition.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tamper {
+				selected.CatalogCandidates[0].CatalogSnapshot.Metadata.Description = "changed"
+				selected.CatalogCandidates[0].CatalogDigest, err = selected.CatalogCandidates[0].CatalogSnapshot.SnapshotDigest()
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			err = preparation.Verify(t.Context(), selected, image)
+			if tamper {
+				assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestLocalToolchainPreparationCompleteCompiledSelections(t *testing.T) {
 	for _, sameImage := range []bool{false, true} {
 		t.Run(fmt.Sprint("already-measured=", sameImage), func(t *testing.T) {
