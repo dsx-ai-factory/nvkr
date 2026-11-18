@@ -41,7 +41,13 @@ func load(ctx context.Context, p DataProvider) (*Catalog, error) {
 	if err := validateDerivedPins(ctx, reg, lock); err != nil {
 		return nil, err
 	}
+	return resolveRecordedCatalog(ctx, p, reg, lock)
+}
 
+// resolveRecordedCatalog resolves locally checked declarations and recorded pins.
+// Executable loading must first authenticate derived pins in load. Offline
+// inventory uses this helper privately and returns descriptions only.
+func resolveRecordedCatalog(ctx context.Context, p DataProvider, reg *registryDoc, lock *PinLock) (*Catalog, error) {
 	cat := &Catalog{
 		APIVersion:        reg.APIVersion,
 		Kind:              reg.Kind,
@@ -81,6 +87,9 @@ func load(ctx context.Context, p DataProvider) (*Catalog, error) {
 	}
 	sort.Strings(names)
 	for _, name := range names {
+		if err := requireCatalogContext(ctx, "catalog resolution"); err != nil {
+			return nil, err
+		}
 		c, err := resolveComponent(name, reg.Components[name], reg.Sources, lock)
 		if err != nil {
 			return nil, err
