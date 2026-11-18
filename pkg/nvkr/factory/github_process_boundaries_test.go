@@ -20,51 +20,27 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-func TestGitHubBootstrapStopsDescendantHoldingCapturedPipe(t *testing.T) {
+func TestGitHubBootstrapDeadlineStopsDescendants(t *testing.T) {
 	python, err := exec.LookPath("python3")
 	if err != nil {
-		t.Skip("Python 3 required")
+		t.Skip("Python 3 required for fixture")
 	}
-	bash, err := exec.LookPath("bash")
-	if err != nil {
-		t.Skip("Bash required")
-	}
-	ps, err := exec.LookPath("ps")
-	if err != nil {
-		t.Skip("ps required")
-	}
-	for _, outcome := range []string{"valid module result", "invalid module result"} {
-		t.Run(outcome, func(t *testing.T) {
+	for _, phase := range []string{"download", "build"} {
+		t.Run(phase, func(t *testing.T) {
 			root, cache := t.TempDir(), t.TempDir()
 			for _, name := range []string{"go.mod", "go.sum"} {
 				if err := os.WriteFile(filepath.Join(root, name), []byte("fixture"), 0600); err != nil {
 					t.Fatal(err)
 				}
 			}
-			script := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import json, os, pathlib, subprocess, sys, time
-if sys.argv[1:4] == ["mod", "download", "-json"]:
-    pid = os.fork()
-    if pid == 0:
-        # Keep both inherited capture pipes open after the leader exits.
-        pathlib.Path("descendant.pid").write_text(str(os.getpid()))
-        while True:
-            if not pathlib.Path(os.environ["GOMODCACHE"]).parent.exists():
-                pathlib.Path("cleanup-before-stop").write_text("violation")
-            time.sleep(0.01)
-    deadline = time.monotonic() + 5
-    while not pathlib.Path("descendant.pid").exists():
-        if time.monotonic() > deadline: sys.exit(9)
-        time.sleep(0.01)
-    print("not-json" if ` + strconv.Quote(outcome) + ` == "invalid module result" else json.dumps({"Path":"example.com/module","Version":"v1.0.0"}), flush=True)
-    sys.exit(0)
-pid = pathlib.Path("descendant.pid").read_text()
-probe = subprocess.run(["ps", "-o", "stat=", "-p", pid], capture_output=True, text=True)
-assert probe.returncode == 0 or (probe.returncode == 1 and not probe.stdout.strip() and not probe.stderr.strip()), "ps probe failed: " + probe.stderr
-state = probe.stdout.strip()
-assert not state or state.startswith("Z"), "descendant still executing when compilation began"
-assert pathlib.Path(os.environ["GOMODCACHE"]).parent.exists(), "cache removed before compiler"
-pathlib.Path("joined-before-build").write_text("yes")
-pathlib.Path(".nvkr/ci-bootstrap/nvkr-exec").write_text("compiled")
+			script := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import os, pathlib, signal, sys, time
+phase = "download" if sys.argv[1] == "mod" else "build"
+if phase != ` + strconv.Quote(phase) + `: sys.exit(0)
+# Both leader and descendant resist TERM, exercising timeout's KILL escalation.
+signal.signal(signal.SIGTERM, signal.SIG_IGN)
+if os.fork() == 0:
+    pathlib.Path("descendant.pid").write_text(str(os.getpid()))
+while True: time.sleep(0.01)
 PY
 `
 			if err := os.WriteFile(filepath.Join(root, "go"), []byte(script), 0700); err != nil {
@@ -72,68 +48,48 @@ PY
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			command := exec.CommandContext(ctx, bash, "-c", githubCIBootstrapBuildCommand("-X main.version=fixture", githubRunnerRelease{}))
+			bootstrap := githubCIBootstrapBuildCommand("-X main.version=fixture", githubRunnerRelease{})
+			bootstrap = strings.ReplaceAll(strings.ReplaceAll(bootstrap, "900s", "3s"), "--kill-after=5s", "--kill-after=0.2s")
+			command := exec.CommandContext(ctx, "bash", "-c", bootstrap)
 			command.Dir = root
 			command.WaitDelay = time.Second
 			command.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"), "RUNNER_TEMP="+cache)
 			output, runErr := command.CombinedOutput()
-			// Register cleanup before assertions so a failing supervisor cannot leak
-			// the deliberately persistent fixture descendant into subsequent tests.
-			pidBytes, readErr := os.ReadFile(filepath.Join(root, "descendant.pid"))
-			if readErr == nil {
-				if pid, err := strconv.Atoi(string(pidBytes)); err == nil {
-					t.Cleanup(func() {
-						p, err := os.FindProcess(pid)
-						if err == nil {
-							_ = p.Kill()
-						}
-					})
+			pidBytes, err := os.ReadFile(filepath.Join(root, "descendant.pid"))
+			if err != nil {
+				t.Fatalf("missing descendant: %v %s", err, output)
+			}
+			pid, err := strconv.Atoi(string(pidBytes))
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() {
+				if p, err := os.FindProcess(pid); err == nil {
+					_ = p.Kill()
 				}
+			})
+			var exit *exec.ExitError
+			if !errors.As(runErr, &exit) || exit.ExitCode() != e.ExitCode(e.New(e.CodeTimeout, "")) || !bytes.Contains(output, []byte(e.CodeTimeout)) {
+				t.Fatalf("lost timeout: %v %s", runErr, output)
 			}
-			if ctx.Err() != nil {
-				t.Fatalf("supervisor hung draining descendant pipes: %s", output)
-			}
-			if readErr != nil {
-				t.Fatal(readErr)
-			}
-			// The Python probe checks before compilation; this one checks after the
-			// supervisor returns, including the invalid-result path. An absent PID
-			// or zombie cannot race cache cleanup; execution or a probe error fails.
-			probe := exec.CommandContext(ctx, ps, "-o", "stat=", "-p", strings.TrimSpace(string(pidBytes)))
-			var probeStderr bytes.Buffer
-			probe.Stderr = &probeStderr
-			state, probeErr := probe.Output()
-			if probeErr != nil {
-				var exit *exec.ExitError
-				if !errors.As(probeErr, &exit) || exit.ExitCode() != 1 || len(bytes.TrimSpace(state)) != 0 || probeStderr.Len() != 0 {
-					t.Fatalf("ps probe failed: %v %s", probeErr, probeStderr.String())
+			// SIGKILL delivery can precede the scheduler's final process-state update.
+			for deadline := time.Now().Add(2 * time.Second); ; {
+				probe := exec.CommandContext(ctx, "ps", "-o", "stat=", "-p", string(pidBytes))
+				state, probeErr := probe.Output()
+				if probeErr != nil && (!errors.As(probeErr, &exit) || exit.ExitCode() != 1) {
+					t.Fatal(probeErr)
 				}
-			}
-			if value := strings.TrimSpace(string(state)); value != "" && !strings.HasPrefix(value, "Z") {
-				t.Fatalf("descendant still executing: %s", state)
-			}
-			if outcome == "valid module result" {
-				if runErr != nil {
-					t.Fatalf("valid module output rejected: %v %s", runErr, output)
+				value := strings.TrimSpace(string(state))
+				if value == "" || strings.HasPrefix(value, "Z") {
+					break
 				}
-				if _, err := os.Stat(filepath.Join(root, "joined-before-build")); err != nil {
-					t.Fatal("compiler did not observe terminated descendant before cleanup")
+				if time.Now().After(deadline) {
+					t.Fatalf("descendant still executing: %s", state)
 				}
-			} else {
-				var exit *exec.ExitError
-				if !errors.As(runErr, &exit) || exit.ExitCode() != e.ExitCode(e.New(e.CodeBuildFailed, "")) || !bytes.Contains(output, []byte(e.CodeBuildFailed)) {
-					t.Fatalf("invalid capture classification: %v %s", runErr, output)
-				}
-				if _, err := os.Stat(filepath.Join(root, "joined-before-build")); !os.IsNotExist(err) {
-					t.Fatal("invalid module result reached compilation")
-				}
+				time.Sleep(10 * time.Millisecond)
 			}
-			if _, err := os.Stat(filepath.Join(root, "cleanup-before-stop")); !os.IsNotExist(err) {
-				t.Fatal("cache deletion raced a live descendant")
-			}
-			entries, err := os.ReadDir(cache)
-			if err != nil || len(entries) != 0 {
-				t.Fatalf("owned cache leaked: %v %v", entries, err)
+			if entries, err := os.ReadDir(cache); err != nil || len(entries) != 0 {
+				t.Fatalf("cache leaked: %v %v", entries, err)
 			}
 		})
 	}

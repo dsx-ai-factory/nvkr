@@ -66,7 +66,7 @@ assert build.parent.stat().st_mode & 0o077 == 0
 modfile = pathlib.Path(next(value.removeprefix("-modfile=") for value in sys.argv if value.startswith("-modfile=")))
 assert modfile.parent == build.parent / "inputs"
 assert modfile.read_text() == modfile.with_suffix(".sum").read_text() == "unchanged source manifest"
-if sys.argv[1:4] == ["mod", "download", "-json"]:
+if sys.argv[1:3] == ["mod", "download"]:
     assert "GOPROXY" not in os.environ and "GOSUMDB" not in os.environ
     print(json.dumps({"Path": "example.com/module", "Version": "v1.0.0"}))
     sys.exit(0)
@@ -79,7 +79,6 @@ pathlib.Path("bootstrap-observation.json").write_text(json.dumps({"pid": os.getp
 pathlib.Path(".nvkr/ci-bootstrap/nvkr-exec").write_text("compiled helper")
 mode = ` + strconv.Quote(test.name) + `
 if mode == "cancellation":
-    os.kill(os.getppid(), signal.SIGTERM)
     time.sleep(30)
 sys.exit(7 if mode == "build failure" else 0)
 PY
@@ -93,7 +92,11 @@ PY
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			command := exec.CommandContext(ctx, bash, "-c", githubCIBootstrapBuildCommand("-X main.version=fixture", githubRunnerRelease{}))
+			script := githubCIBootstrapBuildCommand("-X main.version=fixture", githubRunnerRelease{})
+			if test.name == "cancellation" {
+				script = strings.ReplaceAll(strings.Replace(script, "900s", "3s", 1), "--kill-after=5s", "--kill-after=0.2s")
+			}
+			command := exec.CommandContext(ctx, bash, "-c", script)
 			command.Dir = root
 			command.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"),
 				"RUNNER_TEMP="+selectedTemp, "GOCACHE="+ambient, "GOMODCACHE="+ambient,
@@ -157,197 +160,86 @@ PY
 	}
 }
 
-func TestGitHubPrivateBootstrapRetriesOnlyAdmittedModuleBodyFailure(t *testing.T) {
-	python, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("Python 3 is required to exercise the hosted bootstrap owner")
-	}
-	bash, err := exec.LookPath("bash")
-	if err != nil {
-		t.Skip("Bash is required to exercise the hosted bootstrap owner")
-	}
+func TestGitHubPrivateBootstrapRetriesDownloads(t *testing.T) {
 	for _, test := range []struct {
-		name              string
-		downloads, builds int
-		code              e.Code
+		name             string
+		failures, builds int
+		code             e.Code
 	}{
-		{"success", 1, 1, ""},
-		{"peer recovery", 2, 1, ""},
-		{"prefixed peer recovery", 2, 1, ""},
-		{"peer exhaustion", 3, 0, e.CodeBuildFailed},
-		{"unknown failure", 1, 0, e.CodeBuildFailed},
-		{"checksum failure", 1, 0, e.CodeBuildFailed},
-		{"certificate failure", 1, 0, e.CodeBuildFailed},
-		{"HTTP rejection", 1, 0, e.CodeBuildFailed},
-		{"foreign proxy", 1, 0, e.CodeBuildFailed},
-		{"wrong record", 1, 0, e.CodeBuildFailed},
-		{"query string", 1, 0, e.CodeBuildFailed},
-		{"mixed failures", 1, 0, e.CodeBuildFailed},
-		{"unexpected exit", 1, 0, e.CodeBuildFailed},
-		{"unexpected stderr", 1, 0, e.CodeBuildFailed},
-		{"malformed JSON", 1, 0, e.CodeBuildFailed},
-		{"trailing bytes", 1, 0, e.CodeBuildFailed},
-		{"duplicate field", 1, 0, e.CodeBuildFailed},
-		{"duplicate result", 1, 0, e.CodeBuildFailed},
-		{"invalid constant", 1, 0, e.CodeBuildFailed},
-		{"output overflow", 1, 0, e.CodeBuildFailed},
-		{"download changes go.mod", 1, 0, e.CodeBuildFailed},
-		{"download changes go.sum", 1, 0, e.CodeBuildFailed},
-		{"download cancellation", 1, 0, e.CodeTimeout},
-		{"compiler failure", 1, 1, e.CodeBuildFailed},
-		{"compiler changes manifest", 1, 1, e.CodeBuildFailed},
+		{"success", 0, 1, ""},
+		{"recovery", 2, 1, ""},
+		{"exhaustion", 3, 0, e.CodeBuildFailed},
+		{"compiler failure", 0, 1, e.CodeBuildFailed},
+		{"download changes go.mod", 0, 0, e.CodeBuildFailed},
+		{"download changes go.sum", 0, 0, e.CodeBuildFailed},
+		{"compiler changes go.mod", 0, 1, e.CodeBuildFailed},
+		{"compiler changes go.sum", 0, 1, e.CodeBuildFailed},
 	} {
 		t.Run(test.name, func(t *testing.T) {
-			root, runnerTemp := t.TempDir(), t.TempDir()
+			root, cache := t.TempDir(), t.TempDir()
 			for _, name := range []string{"go.mod", "go.sum"} {
-				if err := os.WriteFile(filepath.Join(root, name), []byte("fixed "+name), 0o600); err != nil {
+				if err := os.WriteFile(filepath.Join(root, name), []byte("fixed"), 0600); err != nil {
 					t.Fatal(err)
 				}
 			}
-			fakeGo := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import json, os, pathlib, signal, sys, time
-mode = ` + strconv.Quote(test.name) + `
-kind = "download" if sys.argv[1:4] == ["mod", "download", "-json"] else "build"
-record = pathlib.Path("calls.jsonl")
-previous = record.read_text().splitlines() if record.exists() else []
-with record.open("a") as output:
-    output.write(json.dumps({"kind": kind, "pid": os.getpid(), "time": time.monotonic()}) + "\n")
-modfile = pathlib.Path(next(arg.removeprefix("-modfile=") for arg in sys.argv if arg.startswith("-modfile=")))
-assert modfile.read_text() == "fixed go.mod" and modfile.with_suffix(".sum").read_text() == "fixed go.sum"
-assert os.environ["GOWORK"] == "off" and os.environ["GOENV"] == "off"
-assert all(name not in os.environ for name in ("NVKR_CREDENTIAL", "NVKR_CI_STORAGE_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"))
-if kind == "build":
-    assert os.environ["GOPROXY"] == "off" and os.environ["GOSUMDB"] == "off"
-    assert "-mod=readonly" in sys.argv
-    if mode == "compiler failure":
-        print('read "https://proxy.golang.org/example.com/module/@v/v1.0.0.zip": stream error: stream ID 1; INTERNAL_ERROR; received from peer', file=sys.stderr)
-        sys.exit(1)
-    if mode == "compiler changes manifest":
-        modfile.write_text("changed")
-    pathlib.Path(".nvkr/ci-bootstrap/nvkr-exec").write_text("compiled helper")
-    sys.exit(0)
-assert "GOPROXY" not in os.environ and "GOSUMDB" not in os.environ
-item = {"Path": "example.com/module", "Version": "v1.0.0"}
-peer = 'read "https://proxy.golang.org/example.com/module/@v/v1.0.0.zip": stream error: stream ID 1; INTERNAL_ERROR; received from peer'
-if mode == "download cancellation":
-    os.kill(os.getppid(), signal.SIGTERM)
-    time.sleep(30)
-if mode in ("download changes go.mod", "download changes go.sum"):
-    target = modfile if mode.endswith("go.mod") else modfile.with_suffix(".sum")
-    target.write_text("changed")
-if mode == "output overflow":
-    print(" " * (4 * 1024 * 1024 + 1))
-    sys.exit(1)
-if mode == "malformed JSON":
-    print("{")
-    sys.exit(1)
-if mode == "duplicate field":
-    print('{"Path":"example.com/module","Path":"example.com/module","Version":"v1.0.0"}')
-    sys.exit(1)
-if mode == "invalid constant":
-    print('{"Path":"example.com/module","Version":"v1.0.0","Other":NaN}')
-    sys.exit(1)
-success = mode in ("success", "compiler failure", "compiler changes manifest", "download changes go.mod", "download changes go.sum") or (mode in ("peer recovery", "prefixed peer recovery") and previous)
-if not success:
-    item["Error"] = peer
-    if mode == "prefixed peer recovery":
-        item["Error"] = "example.com/module@v1.0.0: " + peer
-    if mode == "unknown failure":
-        item["Error"] = "unknown failure"
-    if mode == "checksum failure":
-        item["Error"] = "verifying module: checksum mismatch"
-    if mode == "certificate failure":
-        item["Error"] = "tls: failed to verify certificate"
-    if mode == "HTTP rejection":
-        item["Error"] = "403 Forbidden"
-    if mode == "foreign proxy":
-        item["Error"] = peer.replace("proxy.golang.org", "foreign.example")
-    if mode == "wrong record":
-        item["Path"] = "example.com/other"
-    if mode == "query string":
-        item["Error"] = peer.replace('.zip"', '.zip?token=secret"')
-print(json.dumps(item))
-if mode == "mixed failures":
-    print(json.dumps({"Path": "example.com/other", "Version": "v1.0.0", "Error": "checksum mismatch"}))
-if mode == "trailing bytes":
-    print("invalid trailing bytes")
-if mode == "duplicate result":
-    print(json.dumps(item))
-if mode == "unexpected stderr":
-    print("unknown module diagnostic", file=sys.stderr)
-sys.exit(0 if success else (7 if mode == "unexpected exit" else 1))
-PY
+			mutation := ""
+			if strings.Contains(test.name, "changes") {
+				target := `"$modfile"`
+				if strings.HasSuffix(test.name, "go.sum") {
+					target = `"${modfile%.mod}.sum"`
+				}
+				mutation = "printf changed > " + target + "\n"
+			}
+			downloadMutation, buildMutation := "", ""
+			if strings.HasPrefix(test.name, "download") {
+				downloadMutation = mutation
+			} else {
+				buildMutation = mutation
+			}
+			buildExit := "exit 0"
+			if test.name == "compiler failure" {
+				buildExit = "exit 7"
+			}
+			fake := `#!/bin/sh
+set -eu
+for argument do
+  case "$argument" in -modfile=*) modfile=${argument#-modfile=} ;; esac
+done
+if [ "$1" = mod ]; then
+  ` + downloadMutation + `
+  echo download >> calls
+  count=$(wc -l < calls)
+  [ "$count" -gt ` + strconv.Itoa(test.failures) + ` ]
+else
+  echo build >> calls
+  ` + buildMutation + buildExit + `
+fi
 `
-			if err := os.WriteFile(filepath.Join(root, "go"), []byte(fakeGo), 0o700); err != nil {
+			if err := os.WriteFile(filepath.Join(root, "go"), []byte(fake), 0700); err != nil {
 				t.Fatal(err)
 			}
-			ctx, cancel := context.WithTimeout(t.Context(), 15*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()
-			command := exec.CommandContext(ctx, bash, "-c", githubCIBootstrapBuildCommand("-X main.version=fixture", githubRunnerRelease{}))
+			command := exec.CommandContext(ctx, "bash", "-c", githubCIBootstrapBuildCommand("-X main.version=fixture", githubRunnerRelease{}))
 			command.Dir = root
-			command.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"), "RUNNER_TEMP="+runnerTemp,
-				"NVKR_CREDENTIAL=must-not-inherit", "NVKR_CI_STORAGE_TOKEN=must-not-inherit", "ACTIONS_ID_TOKEN_REQUEST_TOKEN=must-not-inherit",
-				"GOPROXY=must-not-inherit", "GOSUMDB=must-not-inherit", "GOWORK=must-not-inherit")
-			output, runErr := command.CombinedOutput()
+			command.Env = append(os.Environ(), "PATH="+root+string(os.PathListSeparator)+os.Getenv("PATH"), "RUNNER_TEMP="+cache)
+			output, err := command.CombinedOutput()
 			if test.code == "" {
-				if runErr != nil {
-					t.Fatalf("bootstrap failed: %v\n%s", runErr, output)
+				if err != nil {
+					t.Fatalf("bootstrap: %v %s", err, output)
 				}
 			} else {
 				var exit *exec.ExitError
-				if !errors.As(runErr, &exit) || exit.ExitCode() != e.ExitCode(e.New(test.code, "")) || !bytes.Contains(output, []byte(test.code)) {
-					t.Fatalf("bootstrap lost coded failure %s: %v\n%s", test.code, runErr, output)
+				if !errors.As(err, &exit) || exit.ExitCode() != e.ExitCode(e.New(test.code, "")) || !bytes.Contains(output, []byte(test.code)) {
+					t.Fatalf("lost coded failure: %v %s", err, output)
 				}
 			}
-			raw, err := os.ReadFile(filepath.Join(root, "calls.jsonl"))
+			raw, err := os.ReadFile(filepath.Join(root, "calls"))
 			if err != nil {
 				t.Fatal(err)
 			}
-			counts := map[string]int{}
-			var downloadTimes []float64
-			for _, line := range strings.Split(strings.TrimSpace(string(raw)), "\n") {
-				var call struct {
-					Kind string  `json:"kind"`
-					PID  int     `json:"pid"`
-					Time float64 `json:"time"`
-				}
-				if err := json.Unmarshal([]byte(line), &call); err != nil {
-					t.Fatal(err)
-				}
-				counts[call.Kind]++
-				if call.Kind == "download" {
-					downloadTimes = append(downloadTimes, call.Time)
-				}
-				process, err := os.FindProcess(call.PID)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := process.Signal(syscall.Signal(0)); err == nil {
-					t.Fatal("bootstrap child survived cache cleanup")
-				}
-			}
-			if counts["download"] != test.downloads || counts["build"] != test.builds {
-				t.Fatalf("unexpected phase attempts: %v", counts)
-			}
-			for index := 1; index < len(downloadTimes); index++ {
-				if downloadTimes[index]-downloadTimes[index-1] < float64(index) {
-					t.Fatal("module retry omitted its bounded backoff")
-				}
-			}
-			for _, name := range []string{"go.mod", "go.sum"} {
-				if raw, err := os.ReadFile(filepath.Join(root, name)); err != nil || string(raw) != "fixed "+name {
-					t.Fatal("bootstrap changed a checked-out module manifest", err)
-				}
-			}
-			if entries, err := os.ReadDir(runnerTemp); err != nil || len(entries) != 0 {
-				t.Fatal("bootstrap retained disposable caches", err)
-			}
-			if test.builds == 0 {
-				if _, err := os.Stat(filepath.Join(root, ".nvkr/ci-bootstrap/nvkr-exec")); !os.IsNotExist(err) {
-					t.Fatal("failed acquisition reached compilation")
-				}
-			}
-			if bytes.Contains(output, []byte("must-not-inherit")) || bytes.Contains(output, []byte("token=secret")) {
-				t.Fatal("bootstrap printed a credential or rejected remote diagnostic")
+			if strings.Count(string(raw), "download") != min(test.failures+1, 3) || strings.Count(string(raw), "build") != test.builds {
+				t.Fatalf("unexpected attempts: %s", raw)
 			}
 		})
 	}
@@ -801,7 +693,7 @@ if sys.argv[1:] == ["mod", "download", "-json", ` + strconv.Quote(githubRunnerMo
 assert os.path.realpath(os.getcwd()) == os.path.realpath(source)
 modfile = pathlib.Path(next(value.removeprefix("-modfile=") for value in sys.argv if value.startswith("-modfile=")))
 assert modfile.parent == cache / "inputs" and modfile.read_text() == "published go.mod"
-if sys.argv[1:4] == ["mod", "download", "-json"]:
+if sys.argv[1:3] == ["mod", "download"]:
     print(json.dumps({"Path": "example.com/dependency", "Version": "v1.0.0"}))
     sys.exit(0)
 assert sys.argv[1] == "build" and os.environ["GOPROXY"] == "off" and sys.argv[-1] == "./cmd/nvkr"

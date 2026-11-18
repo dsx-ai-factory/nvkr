@@ -190,140 +190,12 @@ func githubCITransferMode(plan *Plan, uses string) string {
 	return ""
 }
 
-// githubCIPublishedSourcePython acquires the pinned published NVKR module for
-// the transport helper. Its arguments are the module path, version and checksum.
-const githubCIPublishedSourcePython = `def published_source(cache, env, deadline):
-    # A module-installed generator pins the helper to its own published module.
-    # Resolve it from the private cache root so the checkout's own go.mod and
-    # toolchain lines cannot affect acquisition, and require the pinned version
-    # and checksum. Go ignores go.mod beneath the module cache, so build from a
-    # private copy.
-    raw = download(["%[1]s@%[2]s"], env, deadline, cache, lambda: None)
-    decoder = json.JSONDecoder(object_pairs_hook=unique_object, parse_constant=invalid_constant)
-    item = decoder.decode(raw.decode("utf-8"))
-    if not isinstance(item, dict):
-        raise ValueError("invalid published runner module")
-    directory = item.get("Dir")
-    if item.get("Path") != "%[1]s" or item.get("Version") != "%[2]s" or item.get("Sum") != "%[3]s" or \
-            not isinstance(directory, str) or not os.path.isabs(directory):
-        raise ValueError("published runner module does not match its pin")
-    print("Building NVKR transport helper from " + item["Path"] + " " + item["Version"] + " " + item["Sum"], file=sys.stderr)
-    source = os.path.join(cache, "source")
-    shutil.copytree(directory, source, symlinks=True)
-    return source
-
-`
-
-// The source bootstrap retries only the observed public-proxy module body
-// failure, then compiles once offline. Every child shares one deadline and is
-// stopped and joined before its disposable caches are removed.
-func githubCIBootstrapBuildCommand(linker string, release githubRunnerRelease) string {
-	// A development build compiles the checkout's own source. Only a pinned
-	// release carries the published-module acquisition and its checks.
-	publishedSource, sourceExpression := "", `"."`
-	if release.Version != "" {
-		publishedSource = fmt.Sprintf(githubCIPublishedSourcePython, githubRunnerModule, release.Version, release.Sum)
-		sourceExpression = "published_source(cache, env, deadline)"
-	}
-	return fmt.Sprintf(`set +x +v
-set -eu
-if ! command -v python3 >/dev/null 2>&1; then
-  printf '%[1]s: private bootstrap requires Python 3\n' >&2
-  exit %[2]d
-fi
-exec python3 -I - %[3]s <<'PY'
-import json
-import os
-import re
-import selectors
-import shutil
-import signal
-import stat
-import subprocess
-import sys
-import tempfile
-import time
-
-canceled = False
-
-def stop(_signal, _frame):
-    global canceled
-    canceled = True
-
-signal.signal(signal.SIGINT, stop)
-signal.signal(signal.SIGTERM, stop)
-
-def check_deadline(deadline):
-    if canceled or time.monotonic() >= deadline:
-        raise TimeoutError("bootstrap canceled or timed out")
-
-def stop_child(child):
-    try:
-        os.killpg(child.pid, signal.SIGKILL)
-    except ProcessLookupError:
-        pass
-    except OSError:
-        print("%[4]s: private bootstrap child could not be stopped", file=sys.stderr, flush=True)
-        os._exit(%[5]d)
-    try:
-        child.wait(timeout=5)
-    except (OSError, subprocess.TimeoutExpired):
-        # Retain caches if the child cannot be joined; never delete beneath it.
-        print("%[4]s: private bootstrap child did not stop", file=sys.stderr, flush=True)
-        os._exit(%[5]d)
-
-def run(args, env, deadline, capture=False, cwd=None):
-    check_deadline(deadline)
-    output = [bytearray(), bytearray()]
-    child = subprocess.Popen(args, env=env, cwd=cwd, stdin=subprocess.DEVNULL,
-                             stdout=subprocess.PIPE if capture else None,
-                             stderr=subprocess.PIPE if capture else None, start_new_session=True)
-    joined = False
-    try:
-        with selectors.DefaultSelector() as streams:
-            if capture:
-                streams.register(child.stdout, selectors.EVENT_READ, 0)
-                streams.register(child.stderr, selectors.EVENT_READ, 1)
-            while True:
-                check_deadline(deadline)
-                if child.poll() is not None and not joined:
-                    stop_child(child)
-                    joined = True
-                if joined and not streams.get_map():
-                    return child.returncode, bytes(output[0]), bytes(output[1])
-                if not capture:
-                    try:
-                        child.wait(timeout=0.2)
-                    except subprocess.TimeoutExpired:
-                        pass
-                    continue
-                for key, _events in streams.select(timeout=0.2):
-                    chunk = os.read(key.fd, 65536)
-                    if not chunk:
-                        streams.unregister(key.fileobj)
-                    elif len(output[0]) + len(output[1]) + len(chunk) > 4 * 1024 * 1024:
-                        raise ValueError("module acquisition output exceeds its bound")
-                    else:
-                        output[key.data].extend(chunk)
-    finally:
-        if not joined:
-            stop_child(child)
-        for pipe in (child.stdout, child.stderr):
-            if pipe is not None:
-                pipe.close()
-
-def manifests(directory="."):
-    result = []
-    for name in ("go.mod", "go.sum"):
-        with os.fdopen(os.open(os.path.join(directory, name), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), "rb") as source:
-            if not stat.S_ISREG(os.fstat(source.fileno()).st_mode):
-                raise ValueError("source module manifest is not regular")
-            raw = source.read(4 * 1024 * 1024 + 1)
-            if len(raw) > 4 * 1024 * 1024:
-                raise ValueError("source module manifest exceeds its bound")
-            result.append(raw)
-    return result
-
+// Published helpers are acquired outside the consumer module and checked against
+// the generator's exact release pin before building a private source copy.
+const githubCIPublishedSourceShell = `cd "$cache"
+download -json %[1]s > module.json
+python3 -I - %[2]s %[3]s %[4]s <<'PYTHON'
+import json, os, shutil, sys
 def unique_object(pairs):
     result = {}
     for key, value in pairs:
@@ -331,103 +203,72 @@ def unique_object(pairs):
             raise ValueError("duplicate module result field")
         result[key] = value
     return result
+with open("module.json") as source:
+    item = json.load(source, object_pairs_hook=unique_object)
+if not isinstance(item, dict):
+    raise ValueError("invalid published runner module")
+if (item.get("Path"), item.get("Version"), item.get("Sum")) != tuple(sys.argv[1:]):
+    raise ValueError("published runner module does not match its pin")
+directory = item.get("Dir")
+if not isinstance(directory, str) or not os.path.isabs(directory):
+    raise ValueError("invalid published runner module directory")
+print("Building NVKR transport helper from " + " ".join(sys.argv[1:]), file=sys.stderr)
+shutil.copytree(directory, "source", symlinks=True)
+PYTHON
+cd "$cache/source"
+`
 
-def invalid_constant(_value):
-    raise ValueError("non-JSON module result constant")
-
-def module_errors(raw):
-    decoder = json.JSONDecoder(object_pairs_hook=unique_object, parse_constant=invalid_constant)
-    pending, seen, errors = raw.decode("utf-8").strip(), set(), []
-    while pending:
-        item, end = decoder.raw_decode(pending)
-        if not isinstance(item, dict):
-            raise ValueError("invalid module acquisition result")
-        path, version, error = item.get("Path"), item.get("Version"), item.get("Error", "")
-        if not isinstance(path, str) or not isinstance(version, str) or not isinstance(error, str) or not path or not version or (path, version) in seen:
-            raise ValueError("invalid module acquisition identity")
-        seen.add((path, version))
-        if error:
-            escaped = lambda value: "".join("!" + c.lower() if "A" <= c <= "Z" else c for c in value)
-            url = "https://proxy.golang.org/" + escaped(path) + "/@v/" + escaped(version) + ".zip"
-            prefix = path + "@" + version + ": "
-            detail = error[len(prefix):] if error.startswith(prefix) else error
-            retryable = re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._~+/-]*', path) and all(part not in ("", ".", "..") for part in path.split("/")) and re.fullmatch(r'v[A-Za-z0-9._~+-]+', version) and re.fullmatch(
-                r'read "' + re.escape(url) + r'": stream error: stream ID [1-9][0-9]*; INTERNAL_ERROR; received from peer', detail)
-            errors.append(bool(retryable))
-        pending = pending[end:].lstrip()
-    if not seen:
-        raise ValueError("module acquisition omitted its results")
-    return errors
-
-def download(args, env, deadline, cwd, check):
-    for attempt in range(3):
-        result, stdout, stderr = run(["go", "mod", "download", "-json"] + args, env, deadline, capture=True, cwd=cwd)
-        check()
-        errors = module_errors(stdout)
-        if result == 0 and not errors and not stderr.strip():
-            return stdout
-        if result != 1 or not errors or not all(errors) or stderr.strip() or attempt == 2:
-            raise ValueError("module acquisition failed")
-        print("Retrying public Go module acquisition after an HTTP/2 peer error", file=sys.stderr)
-        until = time.monotonic() + attempt + 1
-        while time.monotonic() < until:
-            check_deadline(deadline)
-            time.sleep(min(0.2, max(0, until - time.monotonic())))
-
-%[8]sdef build(cache):
-    # Never pass repository, registry or OIDC credentials to either Go process.
-    env = {key: os.environ[key] for key in ("PATH", "HOME", "TMPDIR", "GOROOT") if key in os.environ}
-    env.update(CGO_ENABLED="0", GOTOOLCHAIN="local", GOENV="off", GOWORK="off",
-               GOCACHE=os.path.join(cache, "build"), GOMODCACHE=os.path.join(cache, "modules"))
-    deadline = time.monotonic() + 900
-    check_deadline(deadline)
-    source = %[9]s
-    original = manifests(source)
-    # Go may normalize module manifests. Private copies keep the source
-    # untouched; both must remain byte-exact through download and build.
-    inputs = os.path.join(cache, "inputs")
-    os.mkdir(inputs)
-    for name, raw in zip(("go.mod", "go.sum"), original):
-        with open(os.path.join(inputs, name), "xb") as destination:
-            destination.write(raw)
-    modfile = "-modfile=" + os.path.join(inputs, "go.mod")
-
-    def unchanged():
-        if manifests(source) != original or manifests(inputs) != original:
-            raise ValueError("module acquisition changed source manifests")
-
-    download([modfile], env, deadline, source, unchanged)
-    # All module bytes were acquired and checked first. Compilation is attempted
-    # once, with proxy and checksum-database network access disabled.
-    env.update(GOPROXY="off", GOSUMDB="off")
-    os.makedirs(".nvkr/ci-bootstrap", exist_ok=True)
-    output = os.path.abspath(".nvkr/ci-bootstrap/nvkr-exec")
-    result, _stdout, _stderr = run(["go", "build", "-mod=readonly", modfile, "-trimpath", "-ldflags", sys.argv[1],
-                                  "-o", output, "./cmd/nvkr"], env, deadline, cwd=source)
-    if manifests(source) != original or manifests(inputs) != original or result != 0:
-        raise ValueError("private bootstrap compilation failed or changed source manifests")
-    return 0
-
-runner_temp = os.environ.get("RUNNER_TEMP", "")
-if not os.path.isabs(runner_temp) or not os.path.isdir(runner_temp) or shutil.which("go") is None:
-    print("%[1]s: private bootstrap requires a runner temporary directory and Go", file=sys.stderr)
-    sys.exit(%[2]d)
-try:
-    with tempfile.TemporaryDirectory(prefix="nvkr-ci-bootstrap-", dir=runner_temp) as cache:
-        result = build(cache)
-except TimeoutError:
-    print("%[4]s: private bootstrap acquisition or compilation canceled or timed out", file=sys.stderr)
-    result = %[5]d
-except (OSError, ValueError, RecursionError):
-    print("%[6]s: private bootstrap acquisition, compilation or cache cleanup failed", file=sys.stderr)
-    result = %[7]d
-if canceled and result != %[5]d:
-    print("%[4]s: private bootstrap canceled", file=sys.stderr)
-    result = %[5]d
-sys.exit(result)
-PY`, e.CodeEngineCapability, e.ExitCode(e.New(e.CodeEngineCapability, "")), shellQuote(linker),
+// One coreutils timeout bounds dependency retries and the single offline build.
+// Only the fixed allow-list reaches Go; caches belong to this invocation.
+func githubCIBootstrapBuildCommand(linker string, release githubRunnerRelease) string {
+	publishedSource, publishedCapability := "", ""
+	if release.Version != "" {
+		publishedSource = fmt.Sprintf(githubCIPublishedSourceShell, shellQuote(githubRunnerModule+"@"+release.Version), shellQuote(githubRunnerModule), shellQuote(release.Version), shellQuote(release.Sum))
+		publishedCapability = " || ! command -v python3 >/dev/null 2>&1"
+	}
+	return fmt.Sprintf(`set +x +v
+set -eu
+if [[ "${RUNNER_TEMP:-}" != /* ]] || [ ! -d "$RUNNER_TEMP" ] || ! command -v go >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1%[8]s; then
+  printf '%[1]s: private bootstrap requires a runner temporary directory and Go (plus timeout and published-module Python when needed)\n' >&2
+  exit %[2]d
+fi
+cache=$(mktemp -d "$RUNNER_TEMP/nvkr-ci-bootstrap-XXXXXXXX") || {
+  printf '%[6]s: private bootstrap acquisition, compilation or cache cleanup failed\n' >&2
+  exit %[7]d
+}
+cleanup() { chmod -R u+w "$cache" && rm -rf -- "$cache"; }
+trap 'cleanup || { printf "%%s\n" "%[6]s: private bootstrap acquisition, compilation or cache cleanup failed" >&2; exit %[7]d; }' EXIT
+result=0
+env -i PATH="$PATH" HOME="${HOME:-}" ${TMPDIR+TMPDIR="$TMPDIR"} ${GOROOT+GOROOT="$GOROOT"} \
+  CGO_ENABLED=0 GOTOOLCHAIN=local GOENV=off GOWORK=off GOCACHE="$cache/build" GOMODCACHE="$cache/modules" \
+  timeout --kill-after=5s 900s bash -eu -s -- "$cache" "$PWD/.nvkr/ci-bootstrap/nvkr-exec" %[3]s <<'SH' || result=$?
+cache=$1 output=$2 linker=$3
+# Keep the group leader alive until timeout escalates, even if Go exits on TERM.
+trap 'sleep 10' INT TERM
+download() {
+  for attempt in 1 2 3; do
+    if go mod download "$@" > "$cache/download.json"; then cat "$cache/download.json"; return 0; fi
+  done
+  return 1
+}
+%[9]smkdir "$cache/inputs"
+cp go.mod go.sum "$cache/inputs/"
+modfile="-modfile=$cache/inputs/go.mod"
+download "$modfile"
+cmp go.mod "$cache/inputs/go.mod"
+cmp go.sum "$cache/inputs/go.sum"
+mkdir -p "${output%%/*}"
+GOPROXY=off GOSUMDB=off go build -mod=readonly "$modfile" -trimpath -ldflags "$linker" -o "$output" ./cmd/nvkr
+cmp go.mod "$cache/inputs/go.mod"
+cmp go.sum "$cache/inputs/go.sum"
+SH
+case "$result" in
+  0) ;;
+  124|137|143|130) printf '%[4]s: private bootstrap acquisition or compilation canceled or timed out\n' >&2; exit %[5]d ;;
+  *) printf '%[6]s: private bootstrap acquisition, compilation or cache cleanup failed\n' >&2; exit %[7]d ;;
+esac`, e.CodeEngineCapability, e.ExitCode(e.New(e.CodeEngineCapability, "")), shellQuote(linker),
 		e.CodeTimeout, e.ExitCode(e.New(e.CodeTimeout, "")), e.CodeBuildFailed, e.ExitCode(e.New(e.CodeBuildFailed, "")),
-		publishedSource, sourceExpression)
+		publishedCapability, publishedSource)
 }
 
 func githubCITransferTemplates(plan *Plan, actions githubActionRefs) (map[string][]byte, error) {
