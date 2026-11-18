@@ -20,14 +20,26 @@ func selectedRuntimeProducers(input definition.Definition, environment definitio
 		return nil, err
 	}
 	selected := make(map[string]ir.RuntimeSelection, len(environment.Runtime.ProducedRuntimes))
-	for platform, name := range environment.Runtime.ProducedRuntimes {
+	used := make(map[string]bool, len(environment.Runtime.ProducedRuntimes))
+	for _, output := range sortedKeys(environment.Runtime.ProducedRuntimes) {
+		name := environment.Runtime.ProducedRuntimes[output]
+		found := false
+		for _, target := range input.Outputs {
+			if target.Name == output && target.Format == definition.OutputDiskImage {
+				found = true
+			}
+		}
+		if !found || used[name] {
+			return nil, e.New(e.CodeEngineCapability, "runtime %q requires one distinct selected disk output %q", name, output)
+		}
+		used[name] = true
 		var producer InternalToolPlan
 		for _, tool := range tools {
 			if tool.Name == name {
 				producer = tool
 			}
 		}
-		if producer.Name == "" || producer.Format != definition.OutputOCI || producer.Platform != platform {
+		if producer.Name == "" || producer.Format != definition.OutputOCI {
 			return nil, e.New(e.CodeEngineCapability, "runtime %q requires its exact native OCI internal producer", name)
 		}
 		for _, build := range builds {
@@ -41,11 +53,11 @@ func selectedRuntimeProducers(input definition.Definition, environment definitio
 			}
 		}
 		selection := ir.RuntimeSelection{Tool: name, BuildDigest: producer.BuildDigest, Component: producer.Component,
-			Platform: platform, Invocation: ir.RuntimeInvocation}
+			Platform: producer.Platform, Invocation: ir.RuntimeInvocation}
 		if err := selection.Validate(); err != nil {
 			return nil, err
 		}
-		selected[platform] = selection
+		selected[output] = selection
 	}
 	return selected, nil
 }

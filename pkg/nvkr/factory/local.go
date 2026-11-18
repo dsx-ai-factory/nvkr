@@ -473,6 +473,10 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 		}
 	}
 
+	_, completedArtifacts := planIndex(plan)
+	if err := validateRuntimeConsistency(ctx, plan, completedArtifacts, func(path string) (string, error) { return path, nil }); err != nil {
+		return nil, err
+	}
 	sort.Slice(result.Nodes, func(i, j int) bool { return result.Nodes[i].ID < result.Nodes[j].ID })
 	raw, err := canonical.Marshal(result)
 	if err != nil {

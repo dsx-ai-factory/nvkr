@@ -22,7 +22,7 @@ func compileOutputBuild(target authored.DefinitionOutput, delivery authored.Envi
 	if err != nil {
 		return BuildPlan{}, e.Wrap(e.CodeNoMatch, err, "factory build target %q", target.Name)
 	}
-	graph, err := compileBuildGraph(resolved, delivery, runtimes)
+	graph, err := compileBuildGraph(resolved, target.Name, delivery, runtimes)
 	if err != nil {
 		return BuildPlan{}, err
 	}
@@ -55,16 +55,20 @@ func compileOutputBuild(target authored.DefinitionOutput, delivery authored.Envi
 // class selects a host-architecture-specific toolchain before the graph digest is
 // computed because those toolchain bytes can affect the output. Validation uses
 // this same derivation before comparing the complete graph.
-func compileBuildGraph(resolved *buildgraph.Resolved, environment authored.Environment, runtimes map[string]ir.RuntimeSelection) (*ir.Graph, error) {
+func compileBuildGraph(resolved *buildgraph.Resolved, output string, environment authored.Environment, runtimes map[string]ir.RuntimeSelection) (*ir.Graph, error) {
 	vmHosts, err := selectVMHostPlatforms(resolved.Components, resolved.Platform, environment.ExecutionClasses)
 	if err != nil {
 		return nil, e.Wrap(e.CodeEngineCapability, err, "VM build cannot select an execution host")
 	}
 	consumers := make(map[string]ir.RuntimeSelection)
+	name := environment.Runtime.ProducedRuntimes[output]
+	if name != "" && len(vmHosts) == 0 {
+		return nil, e.New(e.CodeEngineCapability, "output %q selects a runtime without a VM consumer", output)
+	}
 	for component, host := range vmHosts {
-		if name := environment.Runtime.ProducedRuntimes[string(host)]; name != "" {
-			selection, ok := runtimes[string(host)]
-			if !ok || selection.Tool != name {
+		if name != "" {
+			selection, ok := runtimes[output]
+			if !ok || selection.Tool != name || selection.Platform != string(host) {
 				return nil, e.New(e.CodeEngineCapability, "VM producer %q lacks its selected runtime producer closure", component)
 			}
 			consumers[component] = selection
@@ -267,7 +271,7 @@ func validateBuildCatalog(build BuildPlan, output authored.DefinitionOutput, env
 	if selected.Platform != build.Platform || !reflect.DeepEqual(selected.Components, build.ResolvedComponents) {
 		return e.New(e.CodeUnverifiedRef, "output %q resolved producers differ from catalog", build.Name)
 	}
-	graph, err := compileBuildGraph(selected, environment, runtimes)
+	graph, err := compileBuildGraph(selected, output.Name, environment, runtimes)
 	if err != nil {
 		return err
 	}

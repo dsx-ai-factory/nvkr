@@ -34,7 +34,12 @@ The Run dispatcher can retain and revoke concrete runtime production and join re
 evidence. Runtime inventory reads original reports from the authenticated layer and projects a subject-bound
 SBOM; focused fixtures cover these boundaries. The compiler resolves the Environment's named amd64
 runtime producer into each selected Packer Build and adds the runtime result, terminal observation and
-SBOM as required consumer inputs. Complete Plan fixtures exercise catalog revalidation, runtime repins,
+SBOM as required consumer inputs. Each disk output selects a separately named runtime requirement;
+four-output fixtures retain equal runtime Build Digests with distinct artifacts and evidence. Native
+group routing keeps each requirement with its own disk owner. Run completion compares independently
+recorded manifest and complete-layout digests and sizes for equal producer selections, requiring each
+requirement's own inventory and producer records. This comparison consumes descriptions from same-Run
+transport, not restorable execution authority. Complete Plan fixtures exercise catalog revalidation, runtime repins,
 removal of the unused image dependency and exact license companion names. These are compiler contracts,
 not executed disk builds. The internal consumer-use receipt now binds the original and relocated Plan,
 exact consumer instruction, runtime production and completed evidence. Contract tests cover single use,

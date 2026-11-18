@@ -493,7 +493,7 @@ The package owner grants the reader account access without granting the source r
 The native Linux route may select a Run-only VM runtime produced by mkosi under ADR-19.
 This route uses daemonless OCI transport and a root filesystem launcher. It does not enter the
 Docker/Podman prepared-image path above. Environment selects the runtime's internal-tool requirement
-for each native consumer platform; the compiler binds the selected runtime producer and invocation
+for each named disk output; the compiler binds the selected runtime producer and invocation
 into each byte-producing consumer's logical Build. Inspection-only uses retain the observation binding
 instead. Missing, ambiguous, cyclic, cross-platform or unused selections fail before execution.
 Signing subjects, runner labels, publication policy and digest families retain their existing contracts.
@@ -522,8 +522,12 @@ flags. An unsuitable staging filesystem or unavailable private proc mount fails 
 The owning Run authenticates the exact producer result, complete OCI closure, terminal observation
 and SBOM before issuing a runtime-use receipt. The opaque receipt binds the Plan, Run attempt,
 producer requirement, native platform, runtime bytes, evidence and exact consumer purpose. Neither a
-download locator nor a result JSON document grants execution authority. Cross-job restoration must
-authenticate the original same-Run producer and its evidence before issuing a local receipt. Runtime
+download locator nor a result JSON document grants execution authority. Each native disk group produces
+its own separately named runtime requirement and retains the original owner through consumption.
+Cross-job restoration of runtime execution authority is not admitted. Independent productions with the
+same Build, component and platform must yield equal manifest and complete-layout digests and sizes.
+Run completion compares each group's own authenticated transport records, terminal observation and SBOM;
+equal digests never substitute for a missing named requirement. Runtime
 and evidence substitution, absent evidence and revoked owners fail closed. The receipt grants no
 Release membership, qualification, publication or reuse authority.
 

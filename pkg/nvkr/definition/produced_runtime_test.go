@@ -12,19 +12,20 @@ import (
 
 func TestProducedRuntimeEnvironmentSelection(t *testing.T) {
 	for _, tc := range []struct {
-		name     string
-		platform string
-		tool     string
-		code     e.Code
+		name   string
+		output string
+		tool   string
+		code   e.Code
 	}{
-		{"amd64", "linux/amd64", "vm-runtime-amd64", ""},
-		{"arm64 deferred", "linux/arm64", "vm-runtime-arm64", e.CodeEngineCapability},
-		{"host alias", "amd64", "runtime", e.CodeEngineCapability},
-		{"empty tool", "linux/amd64", "", e.CodeInvalidCatalog},
-		{"path tool", "linux/amd64", "../runtime", e.CodeInvalidCatalog},
+		{"disk output", "node-image", "vm-runtime-amd64", ""},
+		{"platform instead of output", "linux/amd64", "runtime", e.CodeInvalidCatalog},
+		{"empty output", "", "runtime", e.CodeInvalidCatalog},
+		{"path output", "../image", "runtime", e.CodeInvalidCatalog},
+		{"empty tool", "node-image", "", e.CodeInvalidCatalog},
+		{"path tool", "node-image", "../runtime", e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			input := Environment{Runtime: Runtime{ProducedRuntimes: map[string]string{tc.platform: tc.tool}}}
+			input := Environment{Runtime: Runtime{ProducedRuntimes: map[string]string{tc.output: tc.tool}}}
 			err := input.Runtime.validate()
 			var coded *e.Error
 			if tc.code == "" {
@@ -35,10 +36,18 @@ func TestProducedRuntimeEnvironmentSelection(t *testing.T) {
 				t.Fatalf("validation = %v; want %s", err, tc.code)
 			}
 			copy := input.Clone()
-			copy.Runtime.ProducedRuntimes[tc.platform] = "other"
-			if input.Runtime.ProducedRuntimes[tc.platform] != tc.tool {
+			copy.Runtime.ProducedRuntimes[tc.output] = "other"
+			if input.Runtime.ProducedRuntimes[tc.output] != tc.tool {
 				t.Fatal("Environment clone aliases runtime selection")
 			}
 		})
+	}
+}
+
+func TestProducedRuntimeEnvironmentRejectsSharedRequirement(t *testing.T) {
+	input := Runtime{ProducedRuntimes: map[string]string{"first": "runtime", "second": "runtime"}}
+	var coded *e.Error
+	if err := input.validate(); !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
+		t.Fatalf("shared runtime requirement = %v; want %s", err, e.CodeEngineCapability)
 	}
 }

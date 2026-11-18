@@ -96,6 +96,14 @@ func selectedPublicationOutputs(plan *Plan, node Node) []LifecycleOutputPlan {
 // publication records; payloads remain in their own publications. Provider job
 // outcomes still cover the whole DAG.
 func finalizerArtifact(plan *Plan, a Artifact) bool {
+	// Runtime equality needs only same-Run evidence and result records. Original
+	// runtime payloads and execution capabilities stay with their disk groups.
+	for _, tool := range plan.InternalTools {
+		if tool.Format == definition.OutputOCI && a.BuildTarget == tool.BuildTarget &&
+			(a.ID == tool.SBOMArtifactID || a.ID == tool.ObservationArtifactID || a.Kind == "producer-result") {
+			return true
+		}
+	}
 	if a.Kind == ArtifactObjectPublication {
 		return true
 	}

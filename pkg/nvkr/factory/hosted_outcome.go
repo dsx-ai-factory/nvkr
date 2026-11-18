@@ -89,8 +89,17 @@ func ValidateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 		return err
 	}
 	if PerOutputPublication(plan) {
-		_, err := AuthenticateHostedReferenceRelease(ctx, workspace, plan)
-		return err
+		if _, err := AuthenticateHostedReferenceRelease(ctx, workspace, plan); err != nil {
+			return err
+		}
+		_, artifacts := planIndex(plan)
+		return validateRuntimeConsistency(ctx, plan, artifacts, func(path string) (string, error) {
+			const prefix = ".nvkr/factory/"
+			if !strings.HasPrefix(path, prefix) || filepath.ToSlash(filepath.Clean(path)) != path {
+				return "", e.New(e.CodePipelineDrift, "unsafe runtime evidence path")
+			}
+			return filepath.Join(workspace, strings.TrimPrefix(path, prefix)), nil
+		})
 	}
 	return validateHostedOutcomes(ctx, workspace, plan)
 }
@@ -190,6 +199,9 @@ func validateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 		if !observedBuilds[build.Name] {
 			return e.New(e.CodeProvenanceMissing, "hosted Run omits terminal observation for build %q", build.Name)
 		}
+	}
+	if err := validateRuntimeConsistency(ctx, plan, artifacts, local); err != nil {
+		return err
 	}
 	for _, route := range plan.Routes {
 		packageArtifact := artifacts[route.Input]

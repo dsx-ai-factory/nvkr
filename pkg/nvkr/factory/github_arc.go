@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
@@ -214,31 +215,49 @@ func githubDiskOutput(plan *Plan, node Node) string {
 	return ""
 }
 
-// Original executable capabilities cannot cross jobs as result descriptions.
-// Until use-instance scheduling exists, a hosted tool must have one native disk
-// consumer; sharing it across independent groups fails admission explicitly.
+// Original capabilities remain in one native disk group. Separately named
+// runtime requirements may share content identity, never a live owner or receipt.
 func internalToolDiskOutput(plan *Plan, tool InternalToolPlan) (string, error) {
 	if plan.Environment.GitHubARC != "native-kvm-v1" {
 		return "", e.New(e.CodeEngineCapability, "internal tools require an original native grouped executor")
 	}
-	selected := ""
-	uses := 0
+	selected, uses := "", 0
 	for _, node := range plan.Graph.Nodes {
 		if !containsString(node.InternalTools, tool.Name) {
 			continue
 		}
 		uses++
-		if node.Kind != NodeSBOM || node.Platform != tool.Platform {
+		consumerPlatform := node.Platform
+		allowed := tool.Format == definition.OutputExecutable && node.Kind == NodeSBOM
+		if tool.Format == definition.OutputOCI && node.Kind == NodeBuild {
+			_, instruction, err := plan.producerInstruction(node)
+			if err != nil {
+				return "", err
+			}
+			runtime := instruction.Runtime
+			if instruction.ExecutionBinding != nil {
+				consumerPlatform = string(instruction.ExecutionBinding.Class.HostPlatform)
+			}
+			allowed = runtime != nil && runtime.Tool == tool.Name && runtime.Platform == tool.Platform &&
+				runtime.BuildDigest == tool.BuildDigest && runtime.Component == tool.Component &&
+				plan.Environment.Runtime.ProducedRuntimes[node.BuildTarget] == tool.Name
+		}
+		if !allowed || consumerPlatform != tool.Platform {
 			return "", e.New(e.CodeEngineCapability, "internal tool has an unsupported hosted consumer")
 		}
+		outputName := ""
 		for _, output := range plan.LifecycleOutputs {
 			if output.Name == node.BuildTarget && output.Kind == PackageDiskImage {
-				selected = output.Name
+				outputName = output.Name
 			}
 		}
+		if outputName == "" || selected != "" && selected != outputName {
+			return "", e.New(e.CodeEngineCapability, "internal tool %q crosses native disk owners", tool.Name)
+		}
+		selected = outputName
 	}
-	if uses != 1 || selected == "" {
-		return "", e.New(e.CodeEngineCapability, "internal tool %q requires one native disk consumer per hosted execution", tool.Name)
+	if uses == 0 || tool.Format == definition.OutputExecutable && uses != 1 {
+		return "", e.New(e.CodeEngineCapability, "internal tool %q requires one native disk owner", tool.Name)
 	}
 	return selected, nil
 }

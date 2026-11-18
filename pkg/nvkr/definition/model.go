@@ -189,8 +189,8 @@ type NativeToolchain struct {
 }
 
 type Runtime struct {
-	// ProducedRuntimes selects a Run-only VM runtime by native host platform.
-	// Names refer to Definition.internalTools; the compiler derives their pins.
+	// ProducedRuntimes selects one separately named Run-only VM runtime per disk
+	// output. Values refer to Definition.internalTools; the compiler derives pins.
 	ProducedRuntimes    map[string]string          `json:"producedRuntimes,omitempty"`
 	NativeToolchains    map[string]NativeToolchain `json:"nativeToolchains,omitempty"`
 	PodmanStorageDriver PodmanStorageDriver        `json:"podmanStorageDriver,omitempty"`
@@ -542,13 +542,18 @@ func (profile Environment) RuntimeBinary() string {
 }
 
 func (profile Runtime) validate() error {
-	for platform, tool := range profile.ProducedRuntimes {
-		if platform != "linux/amd64" {
-			return e.New(e.CodeEngineCapability, "produced runtime consumer platform %q is not admitted", platform)
+	if len(profile.ProducedRuntimes) > 256 {
+		return e.New(e.CodeInvalidCatalog, "produced runtime inventory exceeds 256 entries")
+	}
+	usedRuntimes := make(map[string]bool, len(profile.ProducedRuntimes))
+	for output, tool := range profile.ProducedRuntimes {
+		if !namePattern.MatchString(output) || !namePattern.MatchString(tool) {
+			return e.New(e.CodeInvalidCatalog, "produced runtime requires canonical output and internal tool names")
 		}
-		if !namePattern.MatchString(tool) {
-			return e.New(e.CodeInvalidCatalog, "produced runtime requires a canonical internal tool name")
+		if usedRuntimes[tool] {
+			return e.New(e.CodeEngineCapability, "produced runtime %q must have a separate requirement for each disk output", tool)
 		}
+		usedRuntimes[tool] = true
 	}
 	if len(profile.NativeToolchains) > 256 {
 		return e.New(e.CodeInvalidCatalog, "native toolchain inventory exceeds 256 entries")
