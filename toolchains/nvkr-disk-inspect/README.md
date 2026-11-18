@@ -273,6 +273,6 @@ go test ./pkg/nvkr/pipeline \
 ```
 
 That controlled test does not scan a real disk, measure a native closure or prove original live-Run
-reconciliation. Strict full-content discovery/receipt contracts are implemented, but successful complete
-native NVKE inspection and reconciliation remain unexercised. NVKE release candidate explicitly uses `build-provenance-v1`
+reconciliation. See the [current evidence boundary](../../docs/adr/reconciliation/current-boundary.md)
+for native NVKE inspection and reconciliation status. The NVKE release candidate explicitly uses `build-provenance-v1`
 and defers deep inspection to M3; it does not prepare or execute these retained strict profiles.

@@ -2,8 +2,7 @@
 
 The NVKE product-family split implements separate authored Definitions and named production bundles alongside
 the combined candidate. It reuses the current lifecycle and catalog owners; it adds no cross-Release import,
-automatic association file or qualification capability. Hosted family execution and consumer acceptance remain
-unrecorded. The [input instructions](../inputs/definitions/nvke/README.md#product-families) own commands and
+automatic association file or qualification capability. The [input instructions](../inputs/definitions/nvke/README.md#product-families) own commands and
 current selections; [reconciliation](adr/reconciliation/maintained-input-and-schema-boundaries.md#maintained-input-and-schema-boundaries) owns
 implementation and acceptance status.
 
