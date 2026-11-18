@@ -18,7 +18,7 @@ emits no automatic association file or parent Release. Consumers independently v
 references and own any required association or compatibility decision. See the
 [pilot inputs](../../../inputs/definitions/nvke/README.md#family-pilot) and
 [partitioning strategy](../../definition-partitioning-strategy.md) for scope and historical measurements.
-Proposed [ADR-26](../0026-definition-composition.md) designs a composite of these families as one Release;
+[ADR-26](../0026-definition-composition.md) designs a composite of these families as one Release;
 units U1–U8 are implemented and contract-tested, with historical publication evidence below. The authored
 [GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite) pins the five families
 and the GB200 AICR Definition, which inherits their `sbomTool`, declares the eight components the Ubuntu 24.04 overlay replaces as variants of the two disk families, and has
@@ -174,11 +174,10 @@ source, `2cfd00081b468d85a4894ec17e9deac13c9d8169`, for OS assembly, agent, Cali
 kubeadm, SPIRE packaging and DOCA OVS acquisition, including the renamed Packer targets, disk filenames,
 material schema and required Ubuntu-series input. NVKE telemetry pipelines is packaged from its own repository,
 `dsx-ai-factory/nvke-telemetry-pipeline`, at `nktp/v0.1.0`, the release that `v0.23.0`'s site values target.
-The retained native installer uses `v0.23.0`'s in-tree chart. The AMD64 nightly overlays instead package
-NKTP `nktp/v0.2.0` and vendor its pinned source into installers whose NVKE source lacks the chart;
-current NVKE installs NKTP 0.2.0 from NGC at deploy time, so the vendored source only satisfies the
-extractor's required-file check and the packaged chart is not deployed
-([#465](https://github.com/dsx-ai-factory/nvkr/issues/465)). SPIRE uses that release's revision-4
+The native installer bundle carries the in-tree chart when the selected NVKE source has it, and extraction
+requires it when that source installs NKTP by path, as `v0.23.0` does. The nightly's NVKE `main` installs
+the published chart instead ([#465](https://github.com/dsx-ai-factory/nvkr/issues/465)).
+SPIRE uses that release's revision-4
 package and source-owned public acquisition/packaging commands; no pre-DSX source
 rollback is selected. The default package's removal of DSX IMDS is an upstream release
 contract, not a missing private dependency waived by NVKR. Historical DSX source,

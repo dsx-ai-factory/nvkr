@@ -1,11 +1,11 @@
 # ADR-07 — Reproduction identity & builder profile
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-07 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-10 (pluggable builder types), ADR-04 (signing & verification), ADR-05 (trust object model /
   ValidationVector), ADR-08 (bake-off gate).

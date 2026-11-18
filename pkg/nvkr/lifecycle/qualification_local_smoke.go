@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -129,9 +130,7 @@ func runLocalToolSmokeWith(ctx context.Context, build *localVerifiedBuild, optio
 		return nil, err
 	}
 	report := localToolSmokeReport{SchemaVersion: "nvkr.dev/local-tool-smoke/v1", Lane: factory.TierLocalExecution.String(), BuildEvidenceDigest: pipeline.FileDigest([]byte(build.document)), PolicyDigest: digest, Platform: platform, Image: build.policy.Smoke.Images[platform], Members: []ToolSmokeMember{}}
-	if options.RuntimeExecutable == "" {
-		options.RuntimeExecutable = "docker"
-	}
+	options.RuntimeExecutable = containerruntime.Default(options.RuntimeExecutable)
 	owner, err := open(ctx, pipeline.ToolSmokeSelection{RuntimeExecutable: options.RuntimeExecutable, Image: report.Image, Platform: platform})
 	if err != nil {
 		return nil, err

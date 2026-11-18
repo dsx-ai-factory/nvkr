@@ -148,6 +148,9 @@ func TestOVNLockOnlyPropagation(t *testing.T) {
 		t.Run(flavor, func(t *testing.T) {
 			directory := t.TempDir()
 			original := "../../../inputs/catalogs/ovn-" + flavor
+			if err := os.CopyFS(filepath.Join(directory, "scripts"), os.DirFS(filepath.Join(original, "scripts"))); err != nil {
+				t.Fatal(err)
+			}
 			registry, err := os.ReadFile(filepath.Join(original, catalog.RegistryFile))
 			if err != nil {
 				t.Fatal(err)

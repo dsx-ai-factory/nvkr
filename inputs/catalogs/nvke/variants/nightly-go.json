@@ -4,39 +4,6 @@
   "name": "nvke-nightly-site-go-1-27-4",
   "requiresCatalogDigest": "sha256:8c09fc0d80355f4b578e5224d810b51ae5c117a98e13d18a0c2fa9b649c41b6a",
   "components": {
-    "nktp-chart": {
-      "component": {
-        "platforms": [
-          "linux/amd64",
-          "linux/arm64"
-        ],
-        "fromSource": true,
-        "builderType": "oci-hermetic",
-        "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline.git",
-        "tag": "nktp/v0.2.0",
-        "commit": "dd1355c63ee37bb269f5a8669854af218907681c",
-        "treeHash": "356ebc8d49f5fb2b0d618dfff0e69bb87d015c6d",
-        "toolchainImages": {
-          "amd64": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
-          "arm64": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b"
-        },
-        "outputType": "tarball",
-        "buildCommand": [
-          ".nvkr-tools/helm",
-          "package",
-          "nktp",
-          "--destination=charts/"
-        ],
-        "artifactPath": "charts/nktp-0.2.0.tgz",
-        "writeDir": "charts",
-        "vendorCommand": [
-          "sh",
-          "-euc",
-          "target_arch={{.Arch}}\nhelm_digest() {\n  case \"$1\" in\n    amd64) printf '%s' c306b46f719b0a4da32d0f78ee21bf90ce8d602f15b22ab753f0674d1670a7f3 ;;\n    arm64) printf '%s' 564de2191b881e9f71b5606b25345821ea1682f06ab90499d3ab22b530176da1 ;;\n    *) echo 'Unsupported Helm architecture' >&2; exit 1 ;;\n  esac\n}\ncase \"$(uname -m)\" in\n  x86_64) arch=amd64 ;;\n  aarch64) arch=arm64 ;;\n  *) echo 'Unsupported Helm execution architecture' >&2; exit 1 ;;\nesac\ndigest=$(helm_digest \"$arch\")\ncurl --fail --location --max-time 120 --output /tmp/helm.tar.gz \"https://get.helm.sh/helm-v4.2.4-linux-$arch.tar.gz\"\nprintf '%s  %s\\n' \"$digest\" /tmp/helm.tar.gz | sha256sum -c -\ntar --no-same-owner -xzf /tmp/helm.tar.gz -C /tmp \"linux-$arch/helm\"\n# The vendor sandbox's /tmp is noexec; only the held source volume executes.\nhost_tools=$(mktemp -d .nvkr-helm-host.XXXXXX)\ntrap 'rm -rf -- \"$host_tools\"' EXIT\ncp \"/tmp/linux-$arch/helm\" \"$host_tools/helm\"\nexport HELM_REPOSITORY_CONFIG=/tmp/nktp-repositories.yaml\nexport HELM_REPOSITORY_CACHE=/tmp/nktp-cache\n# These are the three exact URLs in the selected source's Chart.yaml.\n# Helm, not a custom parser, validates Chart.yaml against Chart.lock.\npins=\"$(sha256sum nktp/Chart.yaml nktp/Chart.lock)\"\n\"$host_tools/helm\" repo add nktp-otel https://open-telemetry.github.io/opentelemetry-helm-charts\n\"$host_tools/helm\" repo add nktp-prometheus https://prometheus-community.github.io/helm-charts\n\"$host_tools/helm\" repo add nktp-metrics https://kubernetes-sigs.github.io/metrics-server/\n\"$host_tools/helm\" dependency build nktp --skip-refresh\nprintf '%s\\n' \"$pins\" | sha256sum -c -\n# The captured source bytes and vendor identity bind the build target,\n# independently of the utility host used to resolve chart dependencies.\nif [ \"$target_arch\" != \"$arch\" ]; then\n  digest=$(helm_digest \"$target_arch\")\n  curl --fail --location --max-time 120 --output /tmp/helm-target.tar.gz \"https://get.helm.sh/helm-v4.2.4-linux-$target_arch.tar.gz\"\n  printf '%s  %s\\n' \"$digest\" /tmp/helm-target.tar.gz | sha256sum -c -\n  tar --no-same-owner -xzf /tmp/helm-target.tar.gz -C /tmp \"linux-$target_arch/helm\"\nfi\nmkdir -p .nvkr-tools\ncp \"/tmp/linux-$target_arch/helm\" .nvkr-tools/helm\nset -- nktp/charts/*.tgz\nif [ \"$#\" -ne 4 ]; then\n  echo 'Expected three pinned external NKTP archives and the source-owned NVCB chart.' >&2\n  exit 1\nfi\ntest -f nktp/charts/nvcb-0.1.0.tgz\n# The reviewed release and current main both select OTEL chart 0.25.1.\n# Helm validates Chart.lock; only these independently reviewed archives pass.\nset -- nktp/charts/opentelemetry-kube-stack-*.tgz\nif [ \"$#\" -ne 1 ]; then\n  echo 'Expected exactly one reviewed NKTP OpenTelemetry archive.' >&2\n  exit 1\nfi\ncase \"${1##*/}\" in\n  opentelemetry-kube-stack-0.25.1.tgz) otel_digest=e3460a7572a2b9c98ff421a29501dc26cdd09d83859f0556f6c3f5443793afda ;;\n  *) echo 'Unreviewed NKTP OpenTelemetry dependency archive.' >&2; exit 1 ;;\nesac\nprintf '%s\\n' \\\n  '084e6edb680cf4e2acc30bd496568c53fdf663cbacf6e17876b25785c35b7a13  nktp/charts/metrics-server-3.13.1.tgz' \\\n  \"$otel_digest  $1\" \\\n  '70fab291e00a34c58fd943bb075fecc2e2e73fa95db1bcbbe7cdfe008795354a  nktp/charts/prometheus-node-exporter-4.56.1.tgz' \\\n  | sha256sum -c -\n"
-        ],
-        "sourceDateEpoch": 1794004000
-      }
-    },
     "nvke-controller": {
       "component": {
         "artifactPath": "bin/nvke-controller-image-{{.Arch}}.oci.tar",

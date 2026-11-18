@@ -16,10 +16,11 @@ import (
 )
 
 // localNodeLabel is a display projection only. The Plan and recorded node IDs
-// remain unchanged, and verbose output retains the exact operation identifier.
+// remain unchanged. Verbose output retains the operation identifier with
+// non-printable characters, quotes and backslashes escaped.
 func localNodeLabel(plan *Plan, node Node, verbose bool) string {
 	if verbose {
-		return node.ID + " (" + node.Kind + ")"
+		return githubDisplayText(node.ID + " (" + node.Kind + ")")
 	}
 	label := node.Kind
 	if node.IRNode != "" {
@@ -56,10 +57,10 @@ func localNodeLabel(plan *Plan, node Node, verbose bool) string {
 		}
 	}
 	if node.BuildTarget != "" {
-		return node.BuildTarget + ": " + label
+		return githubDisplayText(node.BuildTarget + ": " + label)
 	}
 	// Utility IDs name the tool without source digests.
-	return node.ID + ": " + label
+	return githubDisplayText(node.ID + ": " + label)
 }
 
 // startLocalHeartbeat owns only a timer, never execution. Its caller supplies

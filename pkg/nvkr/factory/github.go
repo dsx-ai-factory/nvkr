@@ -109,7 +109,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			bundle.Files[path] = raw
 		}
 		bundle.Files[bundle.WorkflowPath] = entry
+		data := bundle.githubActionData
 		bundle = newGeneratedBundle(EngineGitHub, githubLayoutFor(plan), bundle.Files, bundle.PlanDigest)
+		bundle.githubActionData = data
 	case plan.Environment.GitHubExecutionPartitions:
 		// A permitted fallback that does not engage leaves the flat workflow
 		// subject to every admission bound, as without the setting.
@@ -527,7 +529,10 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 		}
 	}
 	files[layout.workflowPath] = append([]byte(nil), workflow...)
+	data := files[githubActionDataPathFor(plan)]
+	delete(files, githubActionDataPathFor(plan))
 	bundle := newGeneratedBundle(EngineGitHub, layout, files, planDigest)
+	bundle.githubActionData = data
 	if validate {
 		if err := validateGitHubBundleFlat(ctx, plan, bundle); err != nil {
 			return nil, err
@@ -711,7 +716,7 @@ func githubRuntimeInstallCommand(plan *Plan) string {
 
 func githubRuntimeInputPaths(plan *Plan) []string {
 	layout := githubLayoutFor(plan)
-	return []string{layout.planPath, filepath.ToSlash(filepath.Join(filepath.Dir(layout.planPath), "action-data.json")), layout.manifestPath}
+	return []string{layout.planPath, layout.manifestPath}
 }
 
 func githubRuntimeGenerationCommand(plan *Plan) string {

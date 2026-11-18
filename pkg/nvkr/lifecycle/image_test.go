@@ -41,7 +41,7 @@ func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 	}{
 		{name: "docker", authored: "docker", resolved: "docker"},
 		{name: "podman", authored: "podman", resolved: "podman"},
-		{name: "default", resolved: "podman"},
+		{name: "default", resolved: "docker"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			environment.Runtime.Runtime = tc.authored
@@ -72,14 +72,14 @@ func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 			if err := factory.ValidateGitHubBundle(ctx, plan, bundle); err != nil {
 				t.Fatal(err)
 			}
-			assertGitHubSharedNodeInvocation(t, bundle, "cwe/build-cwe")
+			assertGitHubSharedNodeInvocation(t, plan, bundle, "cwe/build-cwe")
 		})
 	}
 }
 
 // Inspect the concrete call, its canonical selector data and the referenced
 // template together. Factory validation authenticates their complete expansion.
-func assertGitHubSharedNodeInvocation(t *testing.T, bundle *factory.GeneratedBundle, selector string) {
+func assertGitHubSharedNodeInvocation(t *testing.T, plan *factory.Plan, bundle *factory.GeneratedBundle, selector string) {
 	t.Helper()
 	type step struct {
 		ID   string            `json:"id"`
@@ -96,17 +96,32 @@ func assertGitHubSharedNodeInvocation(t *testing.T, bundle *factory.GeneratedBun
 	if err := yaml.Unmarshal(bundle.Files[bundle.WorkflowPath], &workflow); err != nil {
 		t.Fatal(err)
 	}
-	var data struct {
-		Entries map[string]struct {
-			Template string            `json:"template"`
-			Values   map[string]string `json:"values"`
-		} `json:"entries"`
+	if _, exists := bundle.Files[factory.GitHubActionDataPath]; exists {
+		t.Fatal("generated bundle persists transient invocation data")
 	}
-	if err := canonical.UnmarshalExact(bundle.Files[factory.GitHubActionDataPath], &data); err != nil {
-		t.Fatal(err)
+	// Read the same point-of-use output the workflow's context step consumes.
+	jobValues := func(jobID string) map[string]string {
+		output := filepath.Join(t.TempDir(), "github-output")
+		if err := factory.WriteGitHubActionData(t.Context(), plan, jobID, output); err != nil {
+			t.Fatal(err)
+		}
+		raw, err := os.ReadFile(output)
+		if err != nil {
+			t.Fatal(err)
+		}
+		line := strings.TrimSuffix(string(raw), "\n")
+		if !strings.HasPrefix(line, "data=") {
+			t.Fatalf("job %s context output is not one data line", jobID)
+		}
+		var values map[string]string
+		if err := canonical.UnmarshalExact([]byte(strings.TrimPrefix(line, "data=")), &values); err != nil {
+			t.Fatal(err)
+		}
+		return values
 	}
 	found := 0
 	for jobID, job := range workflow.Jobs {
+		var parts map[string]string
 		for _, call := range job.Steps {
 			binding := call.With["parameters"]
 			if binding == "" {
@@ -114,11 +129,14 @@ func assertGitHubSharedNodeInvocation(t *testing.T, bundle *factory.GeneratedBun
 			}
 			const prefix = "${{ fromJSON(steps.nvkr-context.outputs.data)['"
 			part := strings.TrimSuffix(strings.TrimPrefix(binding, prefix), "'] }}")
-			if binding != prefix+part+"'] }}" || data.Entries[jobID].Template != "stage-context" {
+			if binding != prefix+part+"'] }}" {
 				t.Fatal("shared execution lacks an exact stage-context binding")
 			}
+			if parts == nil {
+				parts = jobValues(jobID)
+			}
 			var values map[string]string
-			if err := canonical.UnmarshalExact([]byte(data.Entries[jobID].Values[part]), &values); err != nil {
+			if err := canonical.UnmarshalExact([]byte(parts[part]), &values); err != nil {
 				t.Fatal(err)
 			}
 			if values["execute_present"] != "true" || values["execute_selector"] != selector {

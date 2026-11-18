@@ -36,8 +36,16 @@ func TestInstallerArchivePreservesLocalChartDependencies(t *testing.T) {
 		"native":  base.Components["nvke-installer-sources"],
 		"nightly": *nightly.Components["nvke-installer-sources"].Component,
 	} {
-		for _, layout := range []string{"standalone", "sibling"} {
-			t.Run(name+"/"+layout, func(t *testing.T) {
+		for _, layout := range []struct {
+			name               string
+			sibling, localNKTP bool
+		}{
+			{"standalone-local", false, true},
+			{"sibling-local", true, true},
+			{"standalone-repository", false, false},
+			{"sibling-repository", true, false},
+		} {
+			t.Run(name+"/"+layout.name, func(t *testing.T) {
 				root := t.TempDir()
 				files := map[string]string{
 					"make/tool-versions.mk":                          "CAPI_VERSION := v1.0.0\n",
@@ -46,14 +54,17 @@ func TestInstallerArchivePreservesLocalChartDependencies(t *testing.T) {
 				}
 				for _, path := range []string{
 					"deploy/nvke-deploy.sh", "deploy/lib/lib.sh", "deploy/nico/manifest.yaml",
-					"cli/internal/bootstrap/sitespec/template.yaml", "nktp/deploy/charts/nktp/Chart.yaml",
+					"cli/internal/bootstrap/sitespec/template.yaml",
 					"controller/hack/apply-capi-spiffe-exec-auth.sh", "controller/deploy/k8s/capi-spiffe-exec-auth/overlay.yaml",
 					"controller/test/fixtures/releases/release.yaml", "controller/nico-sim/internal/seed/default-seed.yaml",
 					"controller/nico-sim/ui/index.html", "bin/placeholder",
 				} {
 					files[path] = "fixture\n"
 				}
-				if layout == "sibling" {
+				if layout.localNKTP {
+					files["nktp/deploy/charts/nktp/Chart.yaml"] = "source-owned NKTP chart\n"
+				}
+				if layout.sibling {
 					files["controller/deploy/charts/controller/Chart.yaml"] += "dependencies:\n  - name: shared-crds\n    version: 0.1.0\n    repository: file://../shared-crds\n"
 					files["controller/deploy/charts/shared-crds/Chart.yaml"] = "apiVersion: v2\nname: shared-crds\nversion: 0.1.0\n"
 					files["controller/deploy/charts/shared-crds/templates/crds.yaml"] = "source-owned CRDs\n"
@@ -106,6 +117,10 @@ func TestInstallerArchivePreservesLocalChartDependencies(t *testing.T) {
 				}
 				if _, exists := members["controller/deploy/charts/go.mod"]; exists {
 					t.Error("installer includes the chart module's development files")
+				}
+				chart, exists := members["nktp/deploy/charts/nktp/Chart.yaml"]
+				if exists != layout.localNKTP || (exists && chart != files["nktp/deploy/charts/nktp/Chart.yaml"]) {
+					t.Error("installer changed the source-owned optional NKTP chart")
 				}
 			})
 		}

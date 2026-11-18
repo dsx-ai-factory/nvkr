@@ -98,6 +98,21 @@ lint: ## Run golangci-lint (see .golangci.yml; install: https://golangci-lint.ru
 shellcheck: ## Check executable shell surfaces for warning-or-higher defects.
 	@command -v shellcheck >/dev/null 2>&1 || { echo "shellcheck not installed — https://www.shellcheck.net/"; exit 1; }
 	shellcheck -S warning scripts/*.sh demos/*.sh toolchains/**/*.sh
+	@# Catalog argv supplies -e; the catalog renderer supplies .Arch. Lint the
+	@# same context without adding headers or changing identity-bearing file bytes.
+	@set -e; for spec in \
+	 bash:inputs/catalogs/aicr/scripts/build-nvke-bundle.sh.tmpl \
+	 bash:inputs/catalogs/node-images/release/scripts/build-nvke-cni-ovn.sh.tmpl \
+	 bash:inputs/catalogs/ovn-nvidia/scripts/build-nvke-cni-ovn.sh.tmpl \
+	 bash:inputs/catalogs/ovn-upstream/scripts/build-nvke-cni-ovn.sh.tmpl \
+	 sh:inputs/catalogs/nvsentinel/scripts/build-go-image.sh.tmpl \
+	 sh:inputs/catalogs/nvke/native-site/scripts/vendor-nktp-helm.sh.tmpl; do \
+	 script=$${spec#*:}; dialect=$${spec%%:*}; \
+	 for arch in amd64 arm64; do \
+	   body=$$(sed 's/{{\.Arch}}/'"$$arch"'/g' "$$script"); \
+	   echo "shellcheck $$script ($$arch, $$dialect)"; \
+	   printf 'set -e\n%s\n' "$$body" | shellcheck -S warning -s "$$dialect" -; \
+	 done; done
 
 .PHONY: vulncheck
 vulncheck: go-version-check ## Check reachable Go vulnerabilities using the pinned upstream scanner.
@@ -395,3 +410,9 @@ run-resolve: build ## Resolve the pinned kubectl producer and print its build gr
 .PHONY: demo-hello
 demo-hello: ## Build and verify the hello demo (requires running Docker).
 	bash demos/demo-local.sh --out "$$(mktemp -d)/hello"
+
+.PHONY: e2e-quick
+e2e-quick: export GOMAXPROCS := 2
+e2e-quick: export GOFLAGS := -p=2
+e2e-quick: build ## Build, publish, recover and smoke hello; unsigned qualification (Docker or CONTAINER_RUNTIME=podman).
+	go run ./internal/quicke2e

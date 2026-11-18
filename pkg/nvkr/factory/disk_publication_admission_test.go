@@ -17,7 +17,7 @@ func TestLocalDiskPublicationRejectsBeforeExecution(t *testing.T) {
 		t.Run(platform, func(t *testing.T) {
 			plan := diskPublicationPlanFixture(t, platform)
 			t.Chdir(t.TempDir())
-			options := withLocalDefaults(LocalRunOptions{Workspace: ".nvkr/unwired-disk-publication", Runtime: "must-not-execute"})
+			options := withLocalDefaults(LocalRunOptions{Workspace: ".nvkr/unwired-disk-publication", Runtime: "/nonexistent/nvkr-runtime/" + plan.Environment.RuntimeBinary()})
 			assertRefusal := func(err error) {
 				t.Helper()
 				if factoryErrorCode(err) != e.CodeEngineCapability || !strings.Contains(err.Error(), "disk publication") {

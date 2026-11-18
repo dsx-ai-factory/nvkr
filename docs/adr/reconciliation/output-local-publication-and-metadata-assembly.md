@@ -9,6 +9,18 @@ in this metadata closure, including platform-scoped evidence. Output-local publi
 image tags; unrelated outputs and the metadata-only release root receive no payload aliases. The independent
 Release consumer's artifact-publication scope still checks complete payloads.
 
+Release assembly and deliverable verification now use a bounded pool (four workers by default, with the
+execution-only `NVKR_VERIFY_WORKERS=1..16` override). Results and shared evidence retain canonical order;
+ordinary failures collect every output error, and cancellation joins active work before returning. Aggregate
+signing leaves deliverable verification to the mandatory post-sign gate, which authenticates the served exact
+subjects under the original identity/issuer policy before writing a successful verification record. Assembly's
+root/predicate/SBOM authentication, finalization and independent consumer checks remain separate boundaries.
+Contract cases compare every assembled release/control/evidence file against the original sequential join,
+retain Plan identity including Build Digests, check one verification per deliverable, and exercise worker limits,
+cancellation and ordered failures. Assembly timing spans distinguish local metadata checks, root signature/provenance,
+SBOM verification and construction. Hosted profiling and before/after timing remain pending; the code changes
+and synthetic contracts alone establish no signing-service speedup or external acceptance.
+
 ADR-20 admits earlier-attempt output roots only within the same GitHub run and unchanged Plan, with exact
 repository/builder and preparation/signing/consuming-attempt ordering. ADR-16 artifact checks use the same
 producer retry boundaries while independently authenticating complete payloads and evidence. Contracts cover retries, mixed
@@ -141,6 +153,11 @@ integrity on macOS and Linux, without signature or policy verification, installa
 contracts do not establish GHCR interoperability, signing-service behavior,
 runtime compatibility, installation or external acceptance of the new format projections; earlier browsing
 and publication records do not establish that acceptance.
+`release pull --format json` presents the owner's returned output and file records as one versioned,
+detached result with explicit integrity-checked and signatures/policy-not-checked scope fields; command
+contracts with an injected operation cover executable, chart and OCI-directory shapes, format and TUI admission
+before the operation, and no JSON on operation failure. It writes no file or receipt and has not been exercised
+against an external registry.
 `release pull` layer downloads share the bounded HTTP/2 peer-reset reacquisition used by registry and
 checked-publication pulls: at most three attempts within the command deadline, each removing its partial
 download and re-hashing the complete layer. Resets after the declared size, integrity failures and
@@ -543,8 +560,8 @@ the original named job slots, prerequisite closure, conditions and credential bo
 composite actions expose fixed semantic interfaces for execution, input/image preparation, output collection
 and carrier transfer. Grouped jobs reuse the node interface; declared optional slots and further individual
 upload calls preserve output counts and order without cardinality-specific or numbered variant actions.
-One canonical `action-data.json` member holds named operation parameters. The runtime descriptor admits the
-Plan and recomputes the selected values; templates retain fixed commands and pinned actions without
+Named operation parameters are transient and are not committed or transported as `action-data.json` (ADR-21).
+The runtime descriptor admits the Plan and recomputes the selected values; templates retain fixed commands and pinned actions without
 accepting executable script data.
 Operator setup and timed producer execution stay inline. Controlled upload/download wrappers contain one pinned transport step,
 with conditions, timeouts and continue-on-error on their callers. Steps with referenced outcomes/outputs
@@ -749,7 +766,7 @@ producer's OIDC jobs to sit in the entry workflow named by its anchored signer p
 admit no other committed workflow file. Lowering refuses worker or caller `id-token` declarations with
 `CodeEngineCapability`. These are local generation and contract results. The hosted Run 40727132359 above
 predates fragment forwarding, so hosted execution of the new forwarding, including failure and cancellation
-reporting, is unrecorded. Signer relocation remains a proposed ADR-18 §8 design with no implementation.
+reporting, is unrecorded. Signer relocation remains an ADR-18 §8 design with no implementation.
 
 The maintained release Environment now also selects `githubExecutionPartitions`. The NVKE v0.23.0 DOCA OVS
 producer added one source fetch per release disk and took the flat release workflow to 47,731 events,

@@ -1,19 +1,17 @@
 # ADR-28 — Multi-platform executables as OCI image indexes
 
-- **Decision status:** Proposed (design only; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Per-platform tool declarations, `tools` lock lists and native utility selection
   implement the tool-only portion of E1. Executable `platforms` outputs, executable-index identity projection
   and index packaging remain designed, not implemented; see `reconciliation/adr-28.md`.
 - **Acceptance-test maturity:** None. The implementation units below name the contract suites that must pass;
   no contract test, generated bundle, hosted Run or consumer verification exercises an executable index.
-- **Deciders:** Pending; catalog, release-engineering, delivery and evidence owners must be named before
-  ratification.
-- **Index:** Proposed ADR-28 supplements ADR-01–22 and proposed ADR-23/24/26/27; it remains outside the
-  consolidated contract set until accepted. It builds on the tool companion contract proposed in #286 (PR #294),
-  which is not on `main`. Implementation is tracked in #296 and the retrofit in #297.
+- **Deciders:** njhensley
+- **Index:** ADR-28 in the consolidated NVKR ADR set. It builds on the implemented single-platform
+  tool companion contract. Multi-platform tool/index implementation is tracked in #296 and the retrofit in #297.
 - **Relates to:** ADR-01 (`nvkr.build` schemas), ADR-02 §2 (aggregate logical projection), ADR-03 (coded errors),
   ADR-04 (signing), ADR-11 §1–§2 (direct selection, no sibling reuse), ADR-12 §1 (concrete targets and the
-  executable-aggregate exclusion this decision lifts), ADR-13 (SBOMs, `evidence: none`), ADR-16 (artifact check
+  executable platform-set admission), ADR-13 (SBOMs, `evidence: none`), ADR-16 (artifact check
   and qualification), ADR-20 (Binary Bundle, runnable image indexes, `release pull`), ADR-21 (regeneration),
   ADR-22 (tool release assets, lock v1), ADR-27 §3 (one tool pin per platform).
 - **Scope:** `linux/amd64` and `linux/arm64` executable outputs on the `static-unqualified` and
@@ -30,8 +28,8 @@ architecture. ADR-22 now admits that in one tool declaration; executable index o
   `tools/operator-amd64` and `tools/operator-arm64` pin Helm and kubectl separately, `tools/native` declares
   Helm three times, and `nvsentinel` declares `syft-amd64` and `syft-arm64`. Those retrofits remain explicit
   migrations; admitting the new form does not rewrite their identities.
-- **Executable outputs are single-platform.** ADR-12 §1 states that "the image-index contract does not create
-  an executable aggregate". The NVKE Definitions publish `nvkectl` and `nvkectl-linux-arm64` as two outputs, and
+- **Executable outputs are single-platform.** The current runtime rejects executable platform sets; the
+  accepted target contract is owned by ADR-12 §1. The NVKE Definitions publish `nvkectl` and `nvkectl-linux-arm64` as two outputs, and
   NVSentinel publishes 19 executables twice, from two Definitions.
 - **The Binary Bundle is not an image.** ADR-20 publishes each executable output as an OCI manifest with NVKR
   config and layer media types and files under `files/`. ORAS can download its layer. BuildKit `COPY --from`
@@ -49,10 +47,10 @@ publish one standard index over native children (ADR-12 §1, ADR-20). AICR v1.1.
 
 ## Placement
 
-This is a new ADR rather than an amendment. ADR-12 §1 explicitly excludes an executable aggregate, and the
-change spans the ADR-22 tool contract, ADR-20 publication, the ADR-01/02 identity projections, ADR-13
-evidence and ADR-27 §3. No existing decision owns all of it. On acceptance, each part folds into its owning
-ADR (Follow-ups).
+ADR-12 §1 owns executable platform-set admission, and ADR-22 owns multi-platform tool declarations and
+lock entries. Their accepted contracts incorporate §1–§2 and §4 below; current executable-index refusal and deferred
+index implementation remain in force. This ADR records the remaining cross-cutting identity, packaging, evidence
+and consumption contract and its implementation units.
 
 ## Decision
 
@@ -120,9 +118,9 @@ this decision; the archive digest matches `aicr_checksums.txt`. `catalog pin` pr
 - Lock v1 gains an optional `tools` list, sorted by platform and exclusive with `tool`. Each entry has exactly
   the single-platform `tool` record shape. Older strict readers reject the field, as they reject
   `derivedFrom` (ADR-22 §1).
-- The optional `companions` field, in the declaration and in each entry, is the companion contract proposed in
-  #286 (PR #294). It is not on `main`. Until it lands, the shape is the current `tool` record without
-  `companions`, and companion declarations remain unadmitted.
+- The optional `companions` field uses the implemented single-platform companion contract in the declaration
+  and in each `tools` entry. Multi-platform declarations and the `tools` lock list implement the tool-only
+  portion of E1; executable indexes remain deferred.
 - A list rather than an architecture-keyed map, as prebuilt artifacts use, because `darwin/arm64` and
   `linux/arm64` share an architecture.
 - Completeness is an exact key set: one entry per declared platform. A missing entry, or one that disagrees with
@@ -163,7 +161,7 @@ outputs:
     components: [aicr]
 ```
 
-ADR-12 §1's exclusion is lifted for `format: executable`. `platforms` is a nonempty, sorted, unique subset of
+ADR-12 §1 owns admission for `format: executable`. `platforms` is a nonempty, sorted, unique subset of
 `linux/amd64` and `linux/arm64`, exclusive with `platform`, exactly as for OCI aggregates; the existing
 validator rejects `darwin/arm64` in a set with `invalid-catalog`. Darwin stays a single-platform local
 diagnostic output.
@@ -328,7 +326,7 @@ Each unit lands with table-driven contract tests that assert the coded error, no
 |---|---|---|
 | E1 Catalog and lock | `pkg/nvkr/catalog`, `internal/releaseasset` | `platforms` declaration and exclusivity; `{{.OS}}` and `{{.Arch}}` in URL, member and companion paths; distinct-asset rule; `tools` entries with an exact platform key set; all-platform atomic pin, bump and `--check`; per-platform tool selection |
 | E2 Identity | `pkg/nvkr/buildgraph`, `pkg/nvkr/ir` | Per-platform node filled from its entry; unchanged node bytes for a migrated pin (AICR ARM64 fixture); `nvkr.dev/executable-index-build/v1` vector with an independently measured digest |
-| E3 Definition and compilation | `pkg/nvkr/definition`, `pkg/nvkr/factory` | Executable `platforms` admission; per-platform native closures plus one index package node; Plan and artifact-graph membership |
+| E3 Definition and compilation | `pkg/nvkr/definition`, `pkg/nvkr/factory` | Executable `platforms` admission, including a singleton set producing a one-child index; Darwin-set and simultaneous `platform`/`platforms` refusal with `invalid-catalog`; per-platform native closures plus one index package node; Plan and artifact-graph membership |
 | E4 Packaging | `pkg/nvkr/delivery` | Child image and layer encoding, semantic record and index assembly; byte-stable fixtures; held verification rejecting extra or missing files, non-regular entries, wrong platforms and NVKR child media types |
 | E5 Evidence and publication | `pkg/nvkr/factory`, `pkg/nvkr/delivery`, `pkg/nvkr/releasemanifest` | Index and child signatures and provenance; child SBOM referrers; PublicationRoot and Release binding; reader rejection of the unknown kind |
 | E6 Consumption | `pkg/nvkr/delivery`, `pkg/nvkr/lifecycle` | `release pull` per-platform projection; artifact verification and retention for index outputs |
@@ -398,9 +396,9 @@ Each unit lands with table-driven contract tests that assert the coded error, no
 
 ## Follow-ups
 
-- **ADR-12 §1:** on acceptance, admit `platforms` for executable outputs and remove the exclusion sentence.
-- **ADR-22:** on acceptance, move §1–§2 into "Tool release assets" and lock v1. Per-platform `companions`
-  depend on #286 (PR #294) landing first.
+- **ADR-12 §1 and ADR-22:** own the accepted target and tool/lock contracts. The tool-only portion of E1 and
+  single-platform companions are implemented; executable producer lowering, identity and output admission
+  remain deferred under E1–E3.
 - **ADR-01/02:** add `nvkr.dev/executable-index-build/v1` beside the image-index projection.
 - **ADR-20:** add the executable index publication form, its metadata binding and its `release pull` projection.
 - **ADR-13:** child SBOM referrers; verified upstream evidence referrers once #287 lands.

@@ -139,19 +139,11 @@ overlay's predecessor digest and copied producers together. The AMD64 Go predece
 `toolchains/nvkr-packer/local-bindings.json` track these images for local utility preparation;
 the Packer version and image pins are unchanged.
 
-The same nightly overlays pin NKTP `nktp/v0.2.0` from
-`dsx-ai-factory/nvke-telemetry-pipeline`, matching current NVKE's
-`deploy/nico/nktp/release.yaml`. The installer fetch verifies that exact commit
-and tree before vendoring NKTP and its source-owned NVCB chart. Its archive keeps
-the legacy chart path required by the installer extractor. NVKE pins that still
-contain the in-tree chart retain those bytes and skip the external fetch. An
-absent chart with a different deployment version or repository fails before
-fetching. The independently built nightly NKTP chart uses the same source pin;
-the shared release catalogs retain their existing NKTP selection.
-An NVKE-side NKTP version bump requires a matching overlay update. On the retained
-v0.23.0 baseline, this overlay builds an NKTP 0.2.0 chart that the baseline does
-not deploy. Current NVKE installs NKTP 0.2.0 from NGC at deploy time; the vendored
-source satisfies the extractor's required-file check and is not deployed either.
+The installer carries NKTP's in-tree chart when the selected NVKE source has it.
+Extraction requires that chart only when the source installs it by path. Current
+NVKE installs its published chart from NGC, so this installer does not inject
+another chart source. The separately packaged NKTP output retains the main
+branch's pin; changing it to 0.2.0 is a separate follow-up under #465.
 
 The scheduled workflow captures NVKE's commit from a shallow checkout, then
 fetches pinned sources from their public repositories. It does not pass that

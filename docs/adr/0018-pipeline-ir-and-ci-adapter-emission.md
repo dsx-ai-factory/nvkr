@@ -1,11 +1,11 @@
 # ADR-18 — Pipeline IR & CI-adapter emission (hermetic execution)
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-18 in the consolidated NVKR ADR set (added to close the Definition→realized-pipeline gap).
 - **Relates to:** ADR-02 (IR), ADR-10 (builder types), ADR-07 (builder profile / runner-digest pin), ADR-04
   (verify), ADR-19 (deployment ownership boundary).
@@ -366,8 +366,11 @@ thread-local before exec; a Go scheduler handoff must not change the thread that
 If the transition fails, its goroutine exits without unlocking so the runtime retires the possibly restricted
 thread instead of returning it to the scheduler.
 
-Environment selects the runtime and its pins. Rootless podman is the intended default, with docker an explicit
-operator-selected alternative. Admit the configured runtime before work; do not silently choose another sandbox
+Environment selects the runtime and its pins. Docker is the default for omitted runtime selections, matching
+the maintained hosted Environments; Podman remains an explicit alternative. Local Runs inherit the Environment
+runtime, and an explicit conflicting executable fails capability admission before workspace or execution work,
+including dry runs. Runtime selection describes the CLI dialect, not observed rootlessness; engine-observed
+container-user mapping remains deferred. Admit the configured runtime before work; do not silently choose another sandbox
 or weaker isolation. Rootless operation still depends on supported user namespaces, UID mapping, storage,
 cgroups and the provider's nesting policy. A mounted privileged Docker socket remains an explicit trust cost.
 Missing prerequisites fail capability admission. Arbitrary self-hosted labels are not admitted by the native disk route.
@@ -579,7 +582,7 @@ yet project that setting. Empty preserves the runtime's existing store selection
 
 The observed Podman identity includes UID/GID mappings, remote-service status and OCI runtime name in
 addition to the existing host, storage, security and version fields. Adding these fields changes the
-`nvkr.runtime-identity/v1` preimage; this pre-ratification implementation does not translate older identities
+`nvkr.runtime-identity/v1` preimage; this implementation does not translate older identities
 or prove compatibility with previously recorded qualification profiles.
 
 For native multi-architecture pipeline-attested Runs, `Environment.githubRunners` maps each explicit
@@ -1034,7 +1037,7 @@ Every admitted Run retains component operations and an **unconditional terminal 
 same failure behavior before it is admitted. Equal logical build identities do not collapse named output executions
 or their evidence slots. The current Definition path performs no general reuse of prior builds or verification;
 any future reuse needs an authenticated prior result bound to the exact output, members, policy, status and time.
-Proposed ADR-30 designs that pipeline-attested contract, including a distinct `reused` execution outcome and one
+ADR-30 designs that pipeline-attested contract, including a distinct `reused` execution outcome and one
 frozen reuse decision set shared by every partition; it is not implemented.
 
 The terminal signature verifier is itself an authenticated execution input. An emitted qualified pipeline must
@@ -1449,10 +1452,10 @@ execution, input preparation, image preparation, output collection and individua
 operations owned by the factory. The generator selects these interfaces directly; it does not create a new
 template for each observed step shape, group size or output count. A shared preparation action downloads the
 selected same-Run helper and immediately restores its execute bit. The production templates live under
-`.github/nvkr-run/actions/`; one canonical
-`.github/nvkr-run/action-data.json` stores invocation values keyed by stable job/segment selectors.
-The development layout uses the corresponding paths under `.github/nvkr-dev/`. Both are
-exact manifest-owned bundle members. Templates retain fixed helper commands and literal catalog-pinned
+`.github/nvkr-run/actions/`; invocation values keyed by stable job/segment selectors are regenerated
+in memory from the Plan at the point of use. The development layout uses corresponding templates under
+`.github/nvkr-dev/`. Templates are exact manifest-owned members; invocation data is neither committed
+nor transported as a separate file (ADR-21). Templates retain fixed helper commands and literal catalog-pinned
 provider actions; invocation data contains selected node IDs, carrier names, paths and other parameters,
 never executable scripts or credentials. Parameters use named operation roles such as `execute_selector`
 and `upload_with_name` rather than numbered step positions. They add no authored operation, new scheduling
@@ -1461,12 +1464,12 @@ authority or independently selectable execution input.
 The internal `factory github describe-action` operation admits the complete Plan and recomputes the selected
 invocation from the renderer before emitting bounded canonical JSON to the provider's step-output channel.
 Each job's output is limited to 200,000 UTF-8 bytes, including `data=` and the terminating newline; this is
-not a limit on the complete `action-data.json` file. Generation and runtime reject oversized output before
+not a limit on the complete in-memory invocation-data projection. Generation and runtime reject oversized output before
 opening the provider output file.
 Shared preparation selects the stable provider job through the exact `github.job` context binding in each
 inline job.
-The checked-in data file is an inspectable generated projection, not runtime execution authority. Templates
-map its recomputed parameters through explicit environment values or action inputs; fixed shell commands
+Templates
+map the recomputed parameters through explicit environment values or action inputs; fixed shell commands
 quote their parameter variables instead of evaluating generated command text. Caller-only expressions and
 credentials retain explicit bindings outside this data. Bootstrap uses a shared family that does not depend
 on the helper it is building. Host and job-container shells and distinct credential roles have explicit
@@ -1503,16 +1506,16 @@ byte-exact check after every input update.
 A named production Environment may explicitly select `githubRuntimePlan: true`. Its first bootstrap
 compiles the current repository's pinned inputs, validates the complete committed baseline against its
 embedded Plan, and compares every workflow/action byte and member path. The Environment digest and
-authored input paths remain fixed. Only Plan data, descriptive invocation data and their derived manifest
+authored input paths remain fixed. Only Plan data and its derived manifest
 may refresh. Changed scheduling, action templates or Environment policy fails before output and requires
 reviewed regeneration. This does not resolve latest versions or silently alter pins.
 
 That bootstrap publishes the frozen data once as `nvkr-runtime-inputs`. Other native helper bootstraps
-depend on it and restore its three JSON files into a fresh staging directory. The generation owner admits
-the complete committed baseline, exact staged Plan/data/manifest and current authored inputs before
+depend on it and restore its two JSON files into a fresh staging directory. The generation owner admits
+the complete committed baseline, exact staged Plan/manifest and current authored inputs before
 installing freshly rendered bytes through the existing manifest-last writer. The generic private transport
 continues to reject existing destinations. The bootstrap then runs the ordinary complete generation check
-against the same repository inputs. Every helper artifact carries the same Plan, invocation data and manifest alongside the native
+against the same repository inputs. Every helper artifact carries the same Plan and manifest alongside the native
 helper; ordinary jobs, ARC jobs, recovery and finalization therefore restore the dispatch's exact inputs
 before execution. This retains the existing trusted bootstrap and same-Run artifact boundary and issues
 no new execution receipt. CI uses `run generate --runtime --check` to admit unchanged scheduling and
@@ -1549,7 +1552,7 @@ reviewed contracts. Every allowed repository must match a selected source produc
 
 The frozen Plan binds a compile-input snapshot containing the original member,
 Definition, Environment, catalog, overlay and patch bytes plus the sorted resolution
-record. The existing three-file runtime transport carries that Plan to every partition.
+record. The two-file runtime transport carries that Plan to every partition.
 Additional native bootstraps check the restored inputs, never resolve main. Coordinator
 retries restore the original same-Run runtime-input artifact before generation and do
 not replace it. Missing or expired input transport fails closed; a new dispatch is a new
@@ -1609,9 +1612,9 @@ Actions are statically selected from the generated bundle, with no arbitrary com
 
 Validation checks the closed shared-template and invocation-data set and expands its admitted references
 and input bindings before applying the existing graph, transport, permission, credential and execution-order
-checks. Exact regeneration additionally compares every generated member's bytes, including templates and
-invocation data. An unknown, missing or changed template or data member cannot be accepted merely because
-the top-level workflow is unchanged. This lowering replaces numbered YAML anchors and inline-map compaction;
+checks. Invocation data is recomputed from the Plan for expansion. Exact regeneration
+compares every generated member's bytes, including templates. An unknown, missing or changed template
+cannot be accepted merely because the top-level workflow is unchanged. This lowering replaces numbered YAML anchors and inline-map compaction;
 top-level policy and dependencies remain
 ordinary readable YAML. Complete, identical native-platform preflight, pinned checkout and shared job
 preparation steps may use descriptive aliases: `check-native-linux-amd64`, `check-native-linux-arm64`,

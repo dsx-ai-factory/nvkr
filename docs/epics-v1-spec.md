@@ -3,7 +3,7 @@
 This specification owns M1–M4 artifact scope, numbered acceptance criteria, approved fallbacks and
 completion requirements. The [roadmap](milestones.md) summarizes outcomes; the
 [implementation record](adr/reconciliation/README.md) owns current support and operational evidence. Current
-ADRs own the engineering contracts pending named-decider ratification. Candidate success is not
+ADRs own the engineering contracts. Candidate success is not
 organizational approval or complete milestone acceptance.
 
 **What NVKR v1 is.** A generator and evidence layer. From a digest-pinned Definition of NVKE and AICR artifacts and a
@@ -74,7 +74,7 @@ acquisition. *Evidence tier* records the accepted claim: production output uses 
 SLSA Build L2; a plan or dry run alone supplies no such evidence. Build/evidence qualification in M3 and the
 signed Release manifest in M4 strengthen v1 acceptance without claiming qualified reproduction.
 
-The *decision records* state the current engineering contracts directly, pending named-decider approval; each
+The *decision records* state the current engineering contracts directly; each
 v1 contract lives in the record that owns the topic (signing, publication, provenance, source lanes, evidence
 tiers, generated pipelines, release tags). The *implementation record* tracks support, the *evidence log* records
 actual runs, and *consumer instructions* describe independent verification.

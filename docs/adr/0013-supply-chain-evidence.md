@@ -1,11 +1,11 @@
 # ADR-13 — Supply-chain evidence: SBOM, external references, vulnerability
 
-- **Decision status:** Proposed (implementation-aligned draft; pending named-decider ratification)
+- **Decision status:** Accepted (2026-11-14)
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
   establish end-to-end conformance.
-- **Deciders:** [INPUT NEEDED — author + reviewers]
+- **Deciders:** njhensley
 - **Index:** ADR-13 in the consolidated NVKR ADR set.
 - **Relates to:** ADR-05 (evidence linkage), ADR-09 (provenance), ADR-01 (canonical codec / serialization
   profile), ADR-19 (fleet boundary).
