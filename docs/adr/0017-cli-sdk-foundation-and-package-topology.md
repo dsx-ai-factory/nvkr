@@ -252,7 +252,11 @@ presentation in auto mode and conflicts with explicit terminal presentation befo
 
 Normal commands are `validate`, `definition init|validate|inspect|pin`, `run plan|graph|diff|inspect|local|generate|check-artifacts|qualify|qualify-local`,
 and `release verify|inspect|browse|diff|export|pull`. Producer operations select authored inputs with `--definition` and
-`--environment`; artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
+`--environment`; local execution alone may omit the Environment and capture the versioned build-only
+local policy. The compiler records its exact Environment bytes and digest in the Plan and captured inputs;
+the Run binds both identities. The default grants no signing, publication or VM execution capability.
+Starter authoring requires an intended destination beneath the input root, renders relative catalog references,
+and validates output packaging through the same compiler. Artifact checking and qualification use the Run/policy interfaces above. Catalog maintenance
 and exact component/platform diagnostics remain available. The SDK resolves direct selections into generated graphs and Build Digests. Backward compatibility
 is not required. Remove superseded authoring APIs and wire fixtures; retain internal mechanics only when the
 current lifecycle uses them. SDK callers obtain an opaque prepared Run and execute/generate it; decoded
