@@ -142,7 +142,7 @@ func Stage(ctx context.Context, layer *heldfile.File, scratch string) (_ *Tree, 
 		}
 		name, err := memberName(header.Name, header.Typeflag == tar.TypeDir)
 		if err != nil {
-			return nil, err
+			return nil, e.Wrap(e.CodeVerifyFailed, err, "runtime layer member %.256q (%d name bytes, typeflag 0x%02x)", header.Name, len(header.Name), header.Typeflag)
 		}
 		if _, duplicate := seen[name]; duplicate || len(seen) >= maxMembers {
 			return nil, e.New(e.CodeVerifyFailed, "runtime layer repeats a path or exceeds its member bound")

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -149,6 +150,37 @@ func TestStageRejectsUnsafeLayersAndCleans(t *testing.T) {
 			entries, err := os.ReadDir(scratch)
 			if err != nil || len(entries) != 0 {
 				t.Fatalf("failed staging left partial output: %v %v", entries, err)
+			}
+		})
+	}
+}
+
+func TestStagePathDiagnosticIsBoundedEscapedAndFirstOnly(t *testing.T) {
+	for _, tc := range []struct {
+		name, member, want string
+	}{
+		{"traversal", "../first", `"../first"`},
+		{"control characters", "bad\\line\nname", `"bad\\line\nname"`},
+		{"long name", strings.Repeat("x", 4096) + "unprinted-tail", "4110 name bytes"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			held := layerFixture(t, []tar.Header{
+				rootHeader(),
+				{Name: tc.member, Typeflag: tar.TypeReg},
+				{Name: "../second-offender", Typeflag: tar.TypeReg},
+			}, nil)
+			scratch := t.TempDir()
+			_, err := Stage(t.Context(), held, scratch)
+			requireStageCode(t, err, e.CodeVerifyFailed)
+			message := err.Error()
+			if !strings.Contains(message, tc.want) || !strings.Contains(message, "typeflag 0x30") ||
+				strings.ContainsAny(message, "\n\r\x1b") || len(message) > 2048 ||
+				strings.Contains(message, "second-offender") || strings.Contains(message, "unprinted-tail") {
+				t.Fatalf("unsafe or incomplete path diagnostic: %q", message)
+			}
+			entries, err := os.ReadDir(scratch)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("diagnostic changed failed-stage cleanup: %v", err)
 			}
 		})
 	}

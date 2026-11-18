@@ -36,7 +36,7 @@ jobs:
         env:
           NAMESPACE_EVIDENCE: ${{ runner.temp }}/runtime-namespace-evidence
         run: bash scripts/test-runtime-namespace.sh "$NAMESPACE_EVIDENCE"
-      - name: Assemble two tar outputs with retained package evidence
+      - name: Diagnose the first rejected runtime tar member
         env:
           ASSEMBLY_EVIDENCE: ${{ runner.temp }}/runtime-assembly-evidence
         run: bash scripts/test-mkosi-assembly.sh "$ASSEMBLY_EVIDENCE"
