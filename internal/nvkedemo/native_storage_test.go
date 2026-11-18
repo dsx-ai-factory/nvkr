@@ -100,9 +100,12 @@ func TestNativeSiteStorageFitsPersistentTelemetryQueues(t *testing.T) {
 }
 
 func TestNativeSiteDatabaseVolumesAreReserved(t *testing.T) {
-	want := map[string]any{
-		"nvke-native-postgres": map[string]any{"namespace": "postgres", "name": "data-postgres-postgresql-0"},
-		"nvke-native-spire":    map[string]any{"namespace": "spire-server", "name": "spire-data-spire-server-0"},
+	want := map[string]struct {
+		claim    map[string]any
+		capacity string
+	}{
+		"nvke-native-postgres": {map[string]any{"namespace": "postgres", "name": "data-postgres-postgresql-0"}, "40Gi"},
+		"nvke-native-spire":    {map[string]any{"namespace": "spire-server", "name": "spire-data-spire-server-0"}, "10Gi"},
 	}
 	queues := 0
 	for _, object := range nativeStorageObjects(t, nativeSiteStorage()) {
@@ -112,8 +115,11 @@ func TestNativeSiteDatabaseVolumesAreReserved(t *testing.T) {
 		name := object["metadata"].(map[string]any)["name"].(string)
 		spec := object["spec"].(map[string]any)
 		if claim, database := want[name]; database {
-			if !reflect.DeepEqual(spec["claimRef"], claim) {
+			if !reflect.DeepEqual(spec["claimRef"], claim.claim) {
 				t.Fatalf("%s can bind outside its database claim: %v", name, spec["claimRef"])
+			}
+			if capacity := spec["capacity"].(map[string]any)["storage"]; capacity != claim.capacity {
+				t.Fatalf("%s reserved capacity = %v, want %s", name, capacity, claim.capacity)
 			}
 			delete(want, name)
 			continue
