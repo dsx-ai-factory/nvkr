@@ -7,8 +7,10 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -90,6 +92,49 @@ func TestNativeCapacityChecksAggregatePhasesAndIncrementalTenants(t *testing.T) 
 				var coded *nvkrerr.Error
 				if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability {
 					t.Fatalf("uncoded capacity rejection: %v", err)
+				}
+			}
+		})
+	}
+}
+
+func TestHostedCapacityAdmitsObservedRunnersAndRejectsShortfalls(t *testing.T) {
+	file, err := LoadDemoFile(t.Context(), "../../demos/nightly-nvke.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name             string
+		memory, cpu      uint64
+		tenantOnly, fail bool
+		required         uint64
+	}{
+		{"lowest failed-preflight observation", 14064, 4000, false, false, 13824},
+		{"highest failed-preflight observation", 14289, 4000, false, false, 13824},
+		{"exact initial budget", 13824, 4000, false, false, 13824},
+		{"initial budget short", 13823, 4000, false, true, 13824},
+		{"CPU capacity short", 14064, 3999, false, true, 13824},
+		{"unobserved memory", 0, 4000, false, true, 13824},
+		{"exact tenant budget", 6656, 4000, true, false, 6656},
+		{"tenant budget short", 6655, 4000, true, true, 6656},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			admission := nativeResourceAdmission{
+				resources: file.Run.Resources, tenantWorkers: file.Run.TenantWorkers,
+				observe: func(context.Context, string) (execution.ResourceCapacity, error) {
+					return execution.ResourceCapacity{MemoryMiB: tc.memory, CPUMillis: tc.cpu}, nil
+				},
+			}
+			err := admission.check(t.Context(), t.TempDir(), tc.tenantOnly, nil)
+			if (err != nil) != tc.fail {
+				t.Fatalf("hosted capacity admission: %v", err)
+			}
+			if err != nil {
+				var coded *nvkrerr.Error
+				if !errors.As(err, &coded) || coded.Code != nvkrerr.CodeEngineCapability ||
+					!strings.Contains(err.Error(), fmt.Sprintf("require %d available MiB", tc.required)) ||
+					!strings.Contains(err.Error(), fmt.Sprintf("observed %d MiB", tc.memory)) {
+					t.Fatalf("capacity rejection must identify the required and observed memory: %v", err)
 				}
 			}
 		})
