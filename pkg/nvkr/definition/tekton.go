@@ -77,7 +77,7 @@ func (environment Environment) validateTekton() error {
 	}
 	if environment.Runtime.Runtime != "docker" || environment.Runtime.RuntimeImage != "" || environment.Runtime.HelperImage != "" ||
 		len(environment.Runtime.Services) != 0 || len(environment.Runtime.Setup) != 0 || len(environment.Runtime.Variables) != 0 ||
-		len(environment.Runtime.NativeToolchains) != 0 {
+		len(environment.Runtime.NativeToolchains) != 0 || len(environment.Runtime.ProducedRuntimes) != 0 {
 		return e.New(e.CodeEngineCapability, "Tekton requires its explicit per-task Docker runtime without ambient setup, services or native toolchains")
 	}
 	if environment.Publication == nil || environment.Signing == nil || environment.Signing.Mode != "cosign" ||

@@ -465,7 +465,7 @@ func validateBuildNode(n Node) error {
 
 func validateVMImageNode(n Node) error {
 	if err := rejectUnexpectedNodeFields(n, allowFields(
-		"requirements", "executionBinding", "component", "builderType", "toolchain", "toolchainPlatform",
+		"requirements", "executionBinding", "component", "builderType", "toolchain", "toolchainPlatform", "runtime",
 		"platform", "network", "patches", "command", "workdir", "sourceDest",
 		"sourceCommit", "sourceTreeHash", "vendorSpecDigest", "disk", "packer",
 		"materials", "outputType", "artifactPath", "version")); err != nil {
@@ -485,7 +485,14 @@ func validateVMImageNode(n Node) error {
 		return e.New(e.CodeInvalidCatalog,
 			"VM build node %q requires one pinned source dependency", n.ID)
 	}
-	if !exactOCIIdentity(n.Toolchain) {
+	if n.Runtime != nil {
+		if err := n.Runtime.Validate(); err != nil {
+			return err
+		}
+		if n.Toolchain != "" || n.Packer == nil || n.Runtime.Platform != n.ToolchainPlatform {
+			return e.New(e.CodeEngineCapability, "produced runtime requires an exclusive matching-platform Packer consumer")
+		}
+	} else if !exactOCIIdentity(n.Toolchain) {
 		return e.New(e.CodeTagToolchain,
 			"VM build node %q toolchain %q is not an exact OCI digest pin", n.ID, n.Toolchain)
 	}

@@ -116,6 +116,9 @@ func (handle *NodeSession) AdmitVMImagePacker(
 			return nil, e.New(e.CodeInvalidCatalog, "VM-image Packer admission repeats subject %q", selection.Subject)
 		}
 		node := selection.Node
+		if node.Runtime != nil {
+			return nil, e.New(e.CodeEngineCapability, "produced runtime consumers require their original Run runtime-use receipt")
+		}
 		if (selection.Toolchain != nil) != nativeMode {
 			return nil, e.New(e.CodeEngineCapability, "one Packer admission cannot mix native and container toolchains")
 		}

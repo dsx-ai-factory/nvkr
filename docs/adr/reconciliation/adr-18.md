@@ -32,8 +32,12 @@ not the OCI payload. Host bootstrap utilities were recorded but not snapshot-pin
 
 The Run dispatcher can retain and revoke concrete runtime production and join recorded terminal/SBOM
 evidence. Runtime inventory reads original reports from the authenticated layer and projects a subject-bound
-SBOM; focused fixtures cover these boundaries. Consumer-use receipts, Environment binding and generated
-Plan integration remain incomplete, so maintained Run execution stays gated. No real Run has exercised
+SBOM; focused fixtures cover these boundaries. The compiler resolves the Environment's named amd64
+runtime producer into each selected Packer Build and adds the runtime result, terminal observation and
+SBOM as required consumer inputs. Complete Plan fixtures exercise catalog revalidation, runtime repins,
+removal of the unused image dependency and exact license companion names. These are compiler contracts,
+not executed disk builds. Consumer-use receipts, namespace consumer execution and hosted scheduling
+remain incomplete, so maintained Run execution stays gated. No real Run has exercised
 the new runtime SBOM and dispatcher together. This proof does not establish disk-output
 equivalence, guest boot, ARM64 operation or a stronger evidence lane. The earlier isolated amd64
 [assembly Run](https://github.com/njhensley/nvkr/actions/runs/44145459516) built two byte-identical runtime

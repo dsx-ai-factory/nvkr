@@ -34,6 +34,13 @@ func (graph ArtifactGraph) Validate() error {
 			}
 		}
 		producer := node.IRNode != ""
+		if node.RuntimeEvidence != "" {
+			if !canonicalName.MatchString(node.RuntimeEvidence) || producer ||
+				node.BuildTarget != "internal/"+node.RuntimeEvidence || (node.Kind != NodeVerify && node.Kind != NodeSBOM) ||
+				node.Container != "" || node.Platform != "linux/amd64" || node.Network != ir.NetworkNone || len(node.InternalTools) != 0 {
+				return e.New(e.CodeEngineCapability, "runtime evidence requires its exact offline native producer owner")
+			}
+		}
 		if producer {
 			if node.BuildTarget == "" || (node.Kind != NodeFetch && node.Kind != NodeBuild && node.Kind != NodeAcquire) {
 				return e.New(e.CodePipelineDrift, "operation %q has an invalid producer reference", node.ID)
@@ -90,7 +97,7 @@ func (graph ArtifactGraph) Validate() error {
 					return e.New(e.CodeEngineCapability, "artifact graph build node %q lacks exact IR/container/platform execution inputs", node.ID)
 				}
 			}
-			if node.Network == ir.NetworkNone && node.Kind != NodeBuild &&
+			if node.Network == ir.NetworkNone && node.Kind != NodeBuild && node.RuntimeEvidence == "" &&
 				(node.Container == "" || node.Platform == "") {
 				return e.New(e.CodeEngineCapability,
 					"artifact graph isolated node %q lacks exact utility container/platform execution inputs", node.ID)

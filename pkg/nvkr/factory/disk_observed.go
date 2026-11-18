@@ -206,6 +206,10 @@ func cloneDiskProducerInstruction(source ir.Node) ir.Node {
 	clone.Patches = append([]ir.PatchRef(nil), source.Patches...)
 	clone.Command = append([]string(nil), source.Command...)
 	clone.Materials = append([]ir.MaterialBinding(nil), source.Materials...)
+	if source.Runtime != nil {
+		runtime := *source.Runtime
+		clone.Runtime = &runtime
+	}
 	if source.Disk != nil {
 		disk := *source.Disk
 		clone.Disk = &disk

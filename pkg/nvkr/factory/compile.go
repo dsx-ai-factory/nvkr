@@ -191,6 +191,23 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 	if len(runtimeSourceCommit) == 1 {
 		plan.RuntimeSourceCommit = runtimeSourceCommit[0]
 	}
+	var internalBuilds []BuildPlan
+	for _, tool := range definition.InternalTools {
+		selection := internalToolSelection(tool)
+		selectedStack := stack
+		if selected := targetStacks[selection.Name]; selected != nil {
+			selectedStack = selected
+		}
+		build, err := compileOutputBuild(selection, delivery, selectedStack, nil)
+		if err != nil {
+			return nil, err
+		}
+		internalBuilds = append(internalBuilds, build)
+	}
+	runtimes, err := selectedRuntimeProducers(definition, delivery, internalBuilds)
+	if err != nil {
+		return nil, err
+	}
 	for _, target := range definition.Outputs {
 		if err := ctx.Err(); err != nil {
 			return nil, e.Wrap(e.CodeTimeout, err, "factory compilation canceled")
@@ -201,25 +218,14 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 		}
 
 		for _, selection := range nativeOutputSelections(target) {
-			build, err := compileOutputBuild(selection, delivery, targetStack)
+			build, err := compileOutputBuild(selection, delivery, targetStack, runtimes)
 			if err != nil {
 				return nil, err
 			}
 			plan.Builds = append(plan.Builds, build)
 		}
 	}
-	for _, tool := range definition.InternalTools {
-		selection := internalToolSelection(tool)
-		selectedStack := stack
-		if selected := targetStacks[selection.Name]; selected != nil {
-			selectedStack = selected
-		}
-		build, err := compileOutputBuild(selection, delivery, selectedStack)
-		if err != nil {
-			return nil, err
-		}
-		plan.Builds = append(plan.Builds, build)
-	}
+	plan.Builds = append(plan.Builds, internalBuilds...)
 	tools, err := selectedTools(definition, delivery, plan.CatalogSnapshot, plan.Builds)
 	if err != nil {
 		return nil, err

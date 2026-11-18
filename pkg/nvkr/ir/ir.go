@@ -208,7 +208,8 @@ type Node struct {
 	// ToolchainPlatform is the identity-bearing host platform used to select a
 	// VM toolchain or the explicit local Mac executable cross-build toolchain.
 	// It is distinct from Platform, which describes the guest/output payload.
-	ToolchainPlatform string `json:"toolchainPlatform,omitempty"`
+	ToolchainPlatform string            `json:"toolchainPlatform,omitempty"`
+	Runtime           *RuntimeSelection `json:"runtime,omitempty"`
 	// Platform is the declared payload target. Ordinary Linux producers use its
 	// matching native toolchain container; the explicitly admitted local Mac
 	// executable route records a distinct Linux ToolchainPlatform. It remains part

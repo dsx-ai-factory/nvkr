@@ -241,7 +241,7 @@ func TestDeployCLIOutputsUseIndependentNativeBuilds(t *testing.T) {
 		if selected.Catalog != nil || selected.Platform != "linux/"+arch || selected.Format != authored.OutputExecutable {
 			t.Fatalf("wrong CLI output: %+v", selected)
 		}
-		build, err := compileOutputBuild(selected, environment, stack)
+		build, err := compileOutputBuild(selected, environment, stack, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

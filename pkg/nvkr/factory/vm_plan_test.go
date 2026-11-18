@@ -159,12 +159,12 @@ func TestValidateBuildCatalogBindsDiskOutputFormat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := validateBuildCatalog(plan.Builds[0], definition.Outputs[0], plan.Environment); err != nil {
+	if err := validateBuildCatalog(plan.Builds[0], definition.Outputs[0], plan.Environment, nil); err != nil {
 		t.Fatalf("valid disk catalog binding failed: %v", err)
 	}
 	other := definition.Outputs[0]
 	other.Format = authored.OutputExecutable
-	err = validateBuildCatalog(plan.Builds[0], other, plan.Environment)
+	err = validateBuildCatalog(plan.Builds[0], other, plan.Environment, nil)
 	if factoryErrorCode(err) != e.CodeInvalidCatalog || !strings.Contains(err.Error(), "cannot select a disk-image component") {
 		t.Fatalf("mismatched disk output format error = %v, want %s", err, e.CodeInvalidCatalog)
 	}

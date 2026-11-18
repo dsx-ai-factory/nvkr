@@ -40,6 +40,7 @@ type LogicalNode struct {
 	FlakeLockDigest   string             `json:"flakeLockDigest,omitempty"`
 	Toolchain         string             `json:"toolchain,omitempty"`
 	ToolchainPlatform string             `json:"toolchainPlatform,omitempty"`
+	Runtime           *RuntimeSelection  `json:"runtime,omitempty"`
 	Platform          string             `json:"platform,omitempty"`
 	Network           string             `json:"network,omitempty"`
 	Env               []EnvVar           `json:"env,omitempty"`
@@ -106,6 +107,7 @@ var nodeBuildIdentityRules = map[string]buildIdentityFieldRule{
 	"FlakeLockDigest":   includeLogicalValueInBuildIdentity,
 	"Toolchain":         includeContentReferenceInBuildIdentity,
 	"ToolchainPlatform": includeLogicalValueInBuildIdentity,
+	"Runtime":           includeLogicalValueInBuildIdentity,
 	"Platform":          includeLogicalValueInBuildIdentity,
 	"Network":           includeLogicalValueInBuildIdentity,
 	"Env":               includeLogicalValueInBuildIdentity,
@@ -167,6 +169,7 @@ func (g Graph) normalizedCopy() Graph {
 			c.Nodes[i].Disk = &disk
 		}
 		c.Nodes[i].Packer = clonePackerConfig(g.Nodes[i].Packer)
+		c.Nodes[i].Runtime = cloneRuntimeSelection(g.Nodes[i].Runtime)
 		c.Nodes[i].Mkosi = mkosi.Clone(g.Nodes[i].Mkosi)
 		c.Nodes[i].Materials = append([]MaterialBinding(nil), g.Nodes[i].Materials...)
 		c.Nodes[i].ExecutableArchive = cloneExecutableArchive(g.Nodes[i].ExecutableArchive)
@@ -215,6 +218,7 @@ func (g Graph) logicalGraph() LogicalGraph {
 			Component:         node.Component, BuilderType: node.BuilderType, Tool: node.Tool,
 			FlakeOutput: node.FlakeOutput, FlakeLockDigest: node.FlakeLockDigest,
 			Toolchain: imageDigestID(node.Toolchain), ToolchainPlatform: node.ToolchainPlatform,
+			Runtime:  cloneRuntimeSelection(node.Runtime),
 			Platform: node.Platform,
 			Network:  node.Network, Env: append([]EnvVar(nil), node.Env...),
 			Patches: append([]PatchRef(nil), node.Patches...),

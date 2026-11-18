@@ -120,6 +120,24 @@ func bindInternalToolUses(plan Plan, nodes map[string]Node, artifacts map[string
 	used := map[string]bool{}
 	for _, id := range sortedKeys(nodes) {
 		node := nodes[id]
+		if node.Kind == NodeBuild {
+			_, instruction, err := plan.producerInstruction(node)
+			if err != nil {
+				return err
+			}
+			if selection := instruction.Runtime; selection != nil {
+				tool, ok := tools[selection.Tool]
+				if !ok || tool.Format != authored.OutputOCI || tool.Platform != selection.Platform ||
+					tool.BuildDigest != selection.BuildDigest || tool.Component != selection.Component || tool.BuildTarget == node.BuildTarget {
+					return e.New(e.CodeEngineCapability, "runtime consumer %q lacks its exact internal producer", id)
+				}
+				if err := bindInternalToolInputs(&node, tool, artifacts); err != nil {
+					return err
+				}
+				nodes[id], used[tool.Name] = node, true
+			}
+			continue
+		}
 		if node.Kind != NodeSBOM {
 			continue
 		}
@@ -139,13 +157,9 @@ func bindInternalToolUses(plan Plan, nodes map[string]Node, artifacts map[string
 		if !ok || tool.Format != authored.OutputExecutable || tool.Platform != node.Platform {
 			return e.New(e.CodeEngineCapability, "inspection node %q lacks its exact native executable helper selection", id)
 		}
-		for _, input := range tool.inputs() {
-			if _, ok := artifacts[input]; !ok {
-				return e.New(e.CodePipelineDrift, "internal helper %q lacks producer or evidence input %q", tool.Name, input)
-			}
+		if err := bindInternalToolInputs(&node, tool, artifacts); err != nil {
+			return err
 		}
-		node.Inputs = uniqueSorted(append(node.Inputs, tool.inputs()...))
-		node.InternalTools = []string{tool.Name}
 		nodes[id] = node
 		used[tool.Name] = true
 	}
@@ -154,6 +168,17 @@ func bindInternalToolUses(plan Plan, nodes map[string]Node, artifacts map[string
 			return e.New(e.CodeInvalidCatalog, "internal tool %q has no selected consumer", tool.Name)
 		}
 	}
+	return nil
+}
+
+func bindInternalToolInputs(node *Node, tool InternalToolPlan, artifacts map[string]Artifact) error {
+	for _, input := range tool.inputs() {
+		if _, ok := artifacts[input]; !ok {
+			return e.New(e.CodePipelineDrift, "internal tool %q lacks producer or evidence input %q", tool.Name, input)
+		}
+	}
+	node.Inputs = uniqueSorted(append(node.Inputs, tool.inputs()...))
+	node.InternalTools = uniqueSorted(append(node.InternalTools, tool.Name))
 	return nil
 }
 

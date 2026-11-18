@@ -28,7 +28,7 @@ import (
 // artifact producers (NVKR-FR-BLD-001, NVKR-FR-BLD-006). Tier-4 exclusions are never
 // emitted as build nodes (NVKR-FR-RC-026).
 func Compile(r *Resolved) (*ir.Graph, error) {
-	return compile(r, nil)
+	return compile(r, nil, nil)
 }
 
 // CompileForHostPlatforms lowers a resolved graph after the factory has selected
@@ -36,10 +36,17 @@ func Compile(r *Resolved) (*ir.Graph, error) {
 // which digest-pinned VM toolchain enters Build identity; the guest/output
 // platform remains Graph.Platform and node.Platform.
 func CompileForHostPlatforms(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph, error) {
-	return compile(r, vmHosts)
+	return compile(r, vmHosts, nil)
 }
 
-func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph, error) {
+// CompileForRuntimes binds factory-selected Run-only runtimes to VM components.
+// The factory validates the referenced producer graphs; this boundary validates
+// the complete consumer selection and includes it in logical Build identity.
+func CompileForRuntimes(r *Resolved, vmHosts map[string]execution.HostPlatform, runtimes map[string]ir.RuntimeSelection) (*ir.Graph, error) {
+	return compile(r, vmHosts, runtimes)
+}
+
+func compile(r *Resolved, vmHosts map[string]execution.HostPlatform, runtimes map[string]ir.RuntimeSelection) (*ir.Graph, error) {
 	if r == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "cannot compile a nil resolved output")
 	}
@@ -74,6 +81,15 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		if _, ok := vmComponents[name]; !ok {
 			return nil, e.New(e.CodeEngineCapability,
 				"VM host selection names unknown or non-VM component %q", name)
+		}
+	}
+	for name, selection := range runtimes {
+		host, ok := vmHosts[name]
+		if !ok || string(host) != selection.Platform {
+			return nil, e.New(e.CodeEngineCapability, "runtime selection %q lacks its matching VM host", name)
+		}
+		if err := selection.Validate(); err != nil {
+			return nil, err
 		}
 	}
 	g := &ir.Graph{SchemaVersion: ir.SchemaVersion, Platform: r.Platform}
@@ -192,7 +208,15 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		} else if t, ok := nc.ToolchainImages[toolchainArch]; ok {
 			vendorImage = t
 		}
-		if vendorImage == "" && nc.BuilderType != catalog.BuilderMkosi {
+		var producedRuntime *ir.RuntimeSelection
+		if selection, ok := runtimes[nc.Name]; ok {
+			if nc.Packer == nil || len(nc.VendorCommand) != 0 {
+				return nil, e.New(e.CodeEngineCapability, "runtime consumer %q requires Packer without container vendoring", nc.Name)
+			}
+			producedRuntime = &selection
+			vendorImage = ""
+		}
+		if vendorImage == "" && nc.BuilderType != catalog.BuilderMkosi && producedRuntime == nil {
 			return nil, e.New(e.CodeUnpinnedSource,
 				"component %q has no toolchain pin for execution architecture %q", nc.Name, toolchainArch)
 		}
@@ -325,6 +349,7 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 			FlakeLockDigest:   flakeLock,
 			Toolchain:         toolchain,
 			ToolchainPlatform: toolchainPlatform,
+			Runtime:           producedRuntime,
 			Platform:          r.Platform,
 			Network:           buildNetwork,
 			Env:               env,

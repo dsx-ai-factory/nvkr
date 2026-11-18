@@ -17,12 +17,12 @@ import (
 )
 
 // compileOutputBuild resolves one exact named output into its owned producer graph.
-func compileOutputBuild(target authored.DefinitionOutput, delivery authored.Environment, targetStack *catalog.Stack) (BuildPlan, error) {
+func compileOutputBuild(target authored.DefinitionOutput, delivery authored.Environment, targetStack *catalog.Stack, runtimes map[string]ir.RuntimeSelection) (BuildPlan, error) {
 	resolved, err := buildgraph.Resolve(targetStack.Catalog, buildgraph.Selection{Components: target.Components, Platform: target.Platform, OutputFormat: target.Format})
 	if err != nil {
 		return BuildPlan{}, e.Wrap(e.CodeNoMatch, err, "factory build target %q", target.Name)
 	}
-	graph, err := compileBuildGraph(resolved, delivery)
+	graph, err := compileBuildGraph(resolved, delivery, runtimes)
 	if err != nil {
 		return BuildPlan{}, err
 	}
@@ -55,12 +55,22 @@ func compileOutputBuild(target authored.DefinitionOutput, delivery authored.Envi
 // class selects a host-architecture-specific toolchain before the graph digest is
 // computed because those toolchain bytes can affect the output. Validation uses
 // this same derivation before comparing the complete graph.
-func compileBuildGraph(resolved *buildgraph.Resolved, environment authored.Environment) (*ir.Graph, error) {
+func compileBuildGraph(resolved *buildgraph.Resolved, environment authored.Environment, runtimes map[string]ir.RuntimeSelection) (*ir.Graph, error) {
 	vmHosts, err := selectVMHostPlatforms(resolved.Components, resolved.Platform, environment.ExecutionClasses)
 	if err != nil {
 		return nil, e.Wrap(e.CodeEngineCapability, err, "VM build cannot select an execution host")
 	}
-	graph, err := buildgraph.CompileForHostPlatforms(resolved, vmHosts)
+	consumers := make(map[string]ir.RuntimeSelection)
+	for component, host := range vmHosts {
+		if name := environment.Runtime.ProducedRuntimes[string(host)]; name != "" {
+			selection, ok := runtimes[string(host)]
+			if !ok || selection.Tool != name {
+				return nil, e.New(e.CodeEngineCapability, "VM producer %q lacks its selected runtime producer closure", component)
+			}
+			consumers[component] = selection
+		}
+	}
+	graph, err := buildgraph.CompileForRuntimes(resolved, vmHosts, consumers)
 	if err != nil {
 		return nil, err
 	}
@@ -120,6 +130,10 @@ func relocateImageLocations(graph *ir.Graph, runtime authored.Runtime) error {
 }
 
 func (plan Plan) validatePlanBuilds() error {
+	runtimes, err := selectedRuntimeProducers(plan.Definition, plan.Environment, plan.Builds)
+	if err != nil {
+		return err
+	}
 	previous := ""
 	for _, applied := range plan.AppliedOverlays {
 		if !canonicalName.MatchString(applied.Name) || !canonical.IsDigest(applied.OverlayDigest) ||
@@ -180,7 +194,7 @@ func (plan Plan) validatePlanBuilds() error {
 		if !ok || selection.Platform != buildPlan.Platform {
 			return e.New(e.CodeUnverifiedRef, "native build %q graph identity is not selected by its Definition", buildPlan.Name)
 		}
-		if err := validateBuildCatalog(buildPlan, selection, plan.Environment); err != nil {
+		if err := validateBuildCatalog(buildPlan, selection, plan.Environment, runtimes); err != nil {
 			return err
 		}
 		for _, node := range buildPlan.Graph.Nodes {
@@ -234,7 +248,7 @@ func (plan *Plan) catalogPinSetRepositories() map[string]bool {
 
 // validateBuildCatalog binds the complete executable graph to its catalog and
 // Environment. Logical identity alone excludes transport and execution metadata.
-func validateBuildCatalog(build BuildPlan, output authored.DefinitionOutput, environment authored.Environment) error {
+func validateBuildCatalog(build BuildPlan, output authored.DefinitionOutput, environment authored.Environment, runtimes map[string]ir.RuntimeSelection) error {
 	if build.CatalogSnapshot == nil {
 		return e.New(e.CodeUnverifiedRef, "output %q has no catalog snapshot", build.Name)
 	}
@@ -253,7 +267,7 @@ func validateBuildCatalog(build BuildPlan, output authored.DefinitionOutput, env
 	if selected.Platform != build.Platform || !reflect.DeepEqual(selected.Components, build.ResolvedComponents) {
 		return e.New(e.CodeUnverifiedRef, "output %q resolved producers differ from catalog", build.Name)
 	}
-	graph, err := compileBuildGraph(selected, environment)
+	graph, err := compileBuildGraph(selected, environment, runtimes)
 	if err != nil {
 		return err
 	}

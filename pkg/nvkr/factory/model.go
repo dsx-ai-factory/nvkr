@@ -229,6 +229,9 @@ type Node struct {
 	Inputs           []string          `json:"inputs,omitempty"`
 	Outputs          []string          `json:"outputs,omitempty"`
 	InternalTools    []string          `json:"internalTools,omitempty"`
+	// RuntimeEvidence names the internal runtime whose original native owner
+	// performs this observation. It describes scheduling, never execution authority.
+	RuntimeEvidence string `json:"runtimeEvidence,omitempty"`
 
 	Requirements     *execution.Requirements `json:"requirements,omitempty"`
 	ExecutionBinding *execution.Binding      `json:"executionBinding,omitempty"`

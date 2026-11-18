@@ -66,6 +66,14 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		if err := addBuildDataflow(selection, nativeUtilityRunner(delivery, tool.Platform, runsOn), build.Graph, selected, container, tool.Platform, false, nodes, artifacts); err != nil {
 			return ArtifactGraph{}, err
 		}
+		if tool.Format == authored.OutputOCI {
+			for id, node := range nodes {
+				if node.BuildTarget == selection.Name && (node.Kind == NodeVerify || node.Kind == NodeSBOM) {
+					node.RuntimeEvidence = tool.Name
+					nodes[id] = node
+				}
+			}
+		}
 	}
 	for _, output := range definition.Outputs {
 		for _, target := range nativeOutputSelections(output) {

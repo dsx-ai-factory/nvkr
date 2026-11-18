@@ -4,6 +4,7 @@
 package factory
 
 import (
+	"encoding/hex"
 	"path"
 	"path/filepath"
 	"sort"
@@ -171,6 +172,12 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 const ArtifactReleaseCompanion = "release-companion"
 
 func releaseCompanionID(target, component, name string) string {
+	// Archive basenames may contain uppercase letters (for example LICENSE.txt).
+	// Keep the exact filesystem/member name in Artifact.Name and Path; encode
+	// only its scheduler key. The extra segment cannot alias a literal basename.
+	if !canonicalName.MatchString(name) {
+		name = "name/" + hex.EncodeToString([]byte(name))
+	}
 	return "companion/" + target + "/" + component + "/" + name
 }
 
