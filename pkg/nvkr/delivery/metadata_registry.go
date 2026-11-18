@@ -34,6 +34,21 @@ func PullMetadata(ctx context.Context, reference, out string, options RegistryOp
 
 // PullMetadataWithOptions optionally reports provisional acquisition progress.
 func PullMetadataWithOptions(ctx context.Context, reference, out string, request MetadataPullOptions) (Inspection, error) {
+	return pullSelectedMetadata(ctx, reference, out, request, nil)
+}
+
+// PullSelectedMetadata retrieves intact original root bytes and only the named
+// outputs' control/evidence closure. It never fetches output payloads or grants
+// signature authority, and does not use the complete-metadata cache.
+func PullSelectedMetadata(ctx context.Context, reference, out string, options RegistryOptions, names []string) (Inspection, error) {
+	selection, err := newMetadataSelection(names)
+	if err != nil {
+		return Inspection{}, err
+	}
+	return pullSelectedMetadata(ctx, reference, out, MetadataPullOptions{Registry: options}, selection)
+}
+
+func pullSelectedMetadata(ctx context.Context, reference, out string, request MetadataPullOptions, selection metadataSelection) (Inspection, error) {
 	options := request.Registry
 	if err := deliveryContext(ctx); err != nil {
 		return Inspection{}, err
@@ -128,6 +143,9 @@ func PullMetadataWithOptions(ctx context.Context, reference, out string, request
 	if err := root.Validate(); err != nil {
 		return Inspection{}, err
 	}
+	if err := selection.requireOutputs(root); err != nil {
+		return Inspection{}, err
+	}
 	if root.Release == nil {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "metadata release context missing")
 	}
@@ -188,7 +206,13 @@ func PullMetadataWithOptions(ctx context.Context, reference, out string, request
 		}
 		return nil
 	}
-	if err := fetchMetadataObjects(ctx, root.Objects, func(ctx context.Context, object PublishedObject) error {
+	objects := make([]PublishedObject, 0, len(root.Objects))
+	for _, object := range root.Objects {
+		if selection.includes(object) {
+			objects = append(objects, object)
+		}
+	}
+	if err := fetchMetadataObjects(ctx, objects, func(ctx context.Context, object PublishedObject) error {
 		if err := fetchObject(ctx, object); err != nil {
 			return err
 		}
@@ -205,7 +229,7 @@ func PullMetadataWithOptions(ctx context.Context, reference, out string, request
 	if got != ref.DigestStr() {
 		return Inspection{}, e.New(e.CodeVerifyFailed, "noncanonical metadata index")
 	}
-	inspection, err := InspectMetadata(ctx, stage)
+	inspection, err := inspectSelectedMetadata(ctx, stage, false, ref.DigestStr(), nil, selection)
 	if err != nil {
 		return Inspection{}, err
 	}

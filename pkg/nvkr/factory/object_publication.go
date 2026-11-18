@@ -88,6 +88,12 @@ func addObjectPublicationDataflow(plan *Plan, runsOn string) error {
 	}
 	nodes, artifacts := planIndex(plan)
 	for _, destination := range plan.Environment.Publication.ObjectStores {
+		if destination.Mode == definition.ObjectStoreBootMode {
+			if err := addBootPublicationDataflow(plan, destination, runsOn, nodes, artifacts); err != nil {
+				return err
+			}
+			continue
+		}
 		name := "object-" + destination.Name
 		inputs := []string{"publication/release", "signature/release", "predicate/release", "verification/release", "tool/" + plan.Definition.CosignTool}
 		for _, input := range inputs {
@@ -132,6 +138,9 @@ func ObjectPublicationForNode(plan *Plan, nodeID string) (definition.ObjectStore
 		}
 		for _, destination := range plan.Environment.Publication.ObjectStores {
 			if node.Target == "object-"+destination.Name {
+				if destination.Mode == definition.ObjectStoreBootMode {
+					return definition.ObjectStoreDestination{}, Node{}, e.New(e.CodeEngineCapability, "selective publication cannot enter the full-mirror executor")
+				}
 				return destination, node, nil
 			}
 		}

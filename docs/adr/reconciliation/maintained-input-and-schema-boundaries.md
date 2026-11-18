@@ -184,8 +184,10 @@ contract, not a missing private dependency waived by NVKR. Historical DSX source
 distribution and compatibility questions are recorded in
 [NVKE #1641](https://github.com/dsx-ai-factory/nvke/issues/1641); the older HTTP-403
 observations are not a current v0.23.0 build blocker. No source gate, submodule rejection
-or security requirement is weakened. The [recorded fork nightly](consumer-acceptance-scopes.md)
-establishes native build/site/tenant acceptance for its exact November 18 source pair;
+or security requirement is weakened. Execution of the retained v0.23.0 selection remains
+unverified here until its own complete recorded attempt succeeds. The
+[recorded fork nightly](consumer-acceptance-scopes.md) establishes native build/site/tenant
+acceptance only for its exact November 18 NVKE main source pair;
 it does not establish combined release publication. Standalone plugin compilation does
 not establish native execution/boot acceptance. NVKE telemetry pipelines acquisition and
 offline Helm packaging were exercised locally; no successful combined hosted Run of these release additions is claimed.

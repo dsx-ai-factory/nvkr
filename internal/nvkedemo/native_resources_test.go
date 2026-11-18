@@ -109,8 +109,8 @@ func TestHostedCapacityAdmitsObservedRunnersAndRejectsShortfalls(t *testing.T) {
 		tenantOnly, fail bool
 		required         uint64
 	}{
-		{"lowest observed runner", 14064, 4000, false, false, 13824},
-		{"highest observed runner", 14289, 4000, false, false, 13824},
+		{"lowest failed-preflight observation", 14064, 4000, false, false, 13824},
+		{"highest failed-preflight observation", 14289, 4000, false, false, 13824},
 		{"exact initial budget", 13824, 4000, false, false, 13824},
 		{"initial budget short", 13823, 4000, false, true, 13824},
 		{"CPU capacity short", 14064, 3999, false, true, 13824},

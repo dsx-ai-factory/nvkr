@@ -142,8 +142,8 @@ the Packer version and image pins are unchanged.
 The installer carries NKTP's in-tree chart when the selected NVKE source has it.
 Extraction requires that chart only when the source installs it by path. Current
 NVKE installs its published chart from NGC, so this installer does not inject
-another chart source. The separately packaged NKTP output retains the main
-branch's pin; changing it to 0.2.0 is a separate follow-up under #465.
+another chart source. The separately packaged NKTP output keeps its existing
+pin; changing it to 0.2.0 is a separate follow-up under #465.
 
 The scheduled workflow captures NVKE's commit from a shallow checkout, then
 fetches pinned sources from their public repositories. It does not pass that
