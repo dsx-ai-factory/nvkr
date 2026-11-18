@@ -267,6 +267,14 @@ and complete verification establish acceptance. It changes neither Build identit
 subject and grants no destination authorization, boot, installation or qualification claim.
 _Avoid_: New signed release, successful upload flag, mutable channel, atomic bucket transaction
 
+**Selective boot-asset publication**:
+Opt-in copy of named QCOW2/EFI bytes and original proofs, with complete OCI Release membership and separate preliminary, completion and selected-artifact receipts. Core APIs are implemented; generated execution and external acceptance remain deferred. [ADR-20](docs/adr/0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding) owns the contract.
+_Avoid_: Partial mirror success, new Release, checksum as membership
+
+**MachineImage render artifact**:
+Proposed signed CR artifact for declared disk/architecture/destination pairs. Its own Build includes byte-affecting serving configuration; its eventual aggregate/content/inventory digests are excluded. Downstream NVKE owns deployment; the artifact grants no registration, placement or disk-selection authority.
+_Avoid_: Final Release root, selected-verification receipt, installed machine
+
 ## Evidence and authority
 
 **External test producer**:

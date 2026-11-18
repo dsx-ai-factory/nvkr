@@ -1,6 +1,6 @@
 # ADR-20 — Artifact publication & target-registry configuration
 
-- **Decision status:** Accepted (2026-11-14)
+- **Decision status:** Accepted (2026-11-14); selective boot-asset extension below proposed for review in issue #514.
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
@@ -13,7 +13,9 @@
   SEC-13 (registry-by-digest).
 
 - **Scope:** Sections 3–4 specify deferred qualified publication. Diagnostic transport construction is
-  implemented as stated in §4. Section 6 defines v1 publication; §7 is deferred registration.
+  implemented as stated in §4. Section 2's selective boot-asset extension has core lifecycle APIs;
+  generated execution, producer integration and rendering remain deferred.
+  Section 6 defines v1 publication; §7 is deferred registration.
 
 ## Context
 
@@ -31,6 +33,11 @@ only the location differs. This makes no claim that two executions reproduce ide
 and repositories are **environment configuration**, declared **outside producer instructions** and **excluded from `buildDigest`**,
 because they are transport rather than a build input. This preserves define-once / publish-many and
 cross-environment byte-identity.
+
+The proposed MachineImage renderer consumes serving configuration as content. Its Build includes that configuration,
+render profile and selected producer Build dependencies. Mapping changes alter its Build, artifact and enclosing identities;
+source QCOW2/EFI bytes and Builds remain unchanged. Copy-only relocation retains the ordinary transport rule.
+Runtime versions, read times and receipts are excluded from render Build identity and YAML.
 
 ### 2. Target configuration surface
 
@@ -121,7 +128,7 @@ serialized plan or transported source tree. Local and GitLab execution reject th
 adapters support equivalent credential isolation.
 
 OCI is the current v1 publication transport. Executable, APT-repository and Helm outputs can share a recursive
-OCI closure; an APT tree inside it is not an enabled direct APT-server publisher. Direct package repository publishers remain deferred and fail capability admission. Object-store copying follows the complete signed-publication contract below. Credential values never enter serialized inputs.
+OCI closure; an APT tree inside it is not an enabled direct APT-server publisher. Direct package repository publishers remain deferred and fail capability admission. Object-store copying retains the complete signed-publication contract below; the separate selective boot-asset extension has core lifecycle APIs with generated execution, producer integration and rendering deferred. Credential values never enter serialized inputs.
 Transport settings stay replaceable by environment owners.
 
 The pipeline-attested disk transport uses a distinct OCI manifest over the unchanged QCOW2 payload. Its one
@@ -195,7 +202,7 @@ policy is implied by accepting a disk. The separate raw diagnostic route remains
 
 #### S3 file delivery contract
 
-Object-store publication copies the complete existing signed artifact closure. The first provider is S3;
+The implemented full-mirror mode copies the complete existing signed artifact closure. The first provider is S3;
 other providers implement the same byte transport interface. The source remains the original OCI publication:
 its manifest, raw payload, build identity, SLSA provenance and SBOM bundles are unchanged. The copier admits
 every supported publication format through the same streaming path, including executables and assets,
@@ -209,7 +216,7 @@ The S3 configuration contains explicit `region`, `bucket`, nonempty literal rela
 origin; `addressing` is `virtual` or `path`. Omission selects the SDK's regional AWS endpoint and virtual
 addressing. The role reference resolves a protected workflow variable, never a credential value in a Plan.
 
-Each destination is required for the whole selected Definition. There is no implicit subset or best-effort
+In full-mirror mode each destination is required for the whole selected Definition. There is no implicit subset or best-effort
 success. A normal generated publish operation follows the original aggregate verification; the existing
 provider-job finalizer requires its success alongside every original operation. Missing or failed publication
 fails the Run. The publisher reauthenticates the exact whole-Plan input receipt and every original output
@@ -330,6 +337,136 @@ EFI/iPXE extraction, clean boot URLs, Secure Boot, installation and runtime qual
 contracts and independent acceptance. Publication tests establish transport and ownership behavior; live
 provider, generated-workflow and downstream boot/install evidence are recorded separately in reconciliation.
 Organizational ratification is separate from implementation and these operational observations.
+
+#### Selective boot-asset publication and MachineImage binding
+
+Pipeline-attested contract from [#514](https://github.com/dsx-ai-factory/nvkr/issues/514), with core API implementation in [#515](https://github.com/dsx-ai-factory/nvkr/issues/515).
+[Reconciliation](reconciliation/object-store-publication.md#selective-boot-asset-publication) owns acceptance/implementation. Existing full-mirror schemas, bytes and verification stay unchanged.
+Generated execution, producer integration and rendering remain separate acceptance work; compiling the versioned Plan does not enable those routes.
+
+**Admission.** `selective-boot-v1` requires a new Environment/Plan version and explicit destination modes.
+The new schema has no mode default; old schemas keep full mirror on omission and reject selective fields. Select sorted, nonempty QCOW2 outputs, one
+compatible EFI output/regular member/profile per architecture, and named destinations. Require every selected asset
+at every boot destination; additional full mirrors require complete copies. Reject empty, duplicate, unknown, unused, ambiguous, foreign
+or incompatible selections, globs, implicit platforms and unsupported formats before effects.
+The compiler fixes complete OCI membership and an acyclic graph before work, including any render. Revalidate at every
+executable boundary; equal bytes/Build Digests never authorize siblings. Selection/destination/serving configuration binds
+Environment/Plan; render Build follows §1. Mapping changes require new render bytes/identities, never rewrites. No late members may attach.
+
+Admit only GitHub Linux, keyless signing and `publication.mode: per-output-v1`; reject local/dry-run, development, Tekton
+and aggregate-only routes. A Definition declaring rendering fails before partial output on other routes or without selective destinations.
+Selective publication without rendering skips only render/sign.
+Before I/O, admit signer/evidence policy, capabilities, serving/read access and resource/session limits. Inherit the S3
+rules above. Unsupported routes/stronger policy use `CodeEngineCapability`, malformed selection the owning input code,
+missing trust `CodeTrustPolicyMissing`, and subject/membership failures `CodeVerifyFailed`.
+
+**Bindings.** Canonical `nvkr.dev/publication-boot-selection/v1` inventory binds aggregate reference/invocation,
+Definition/Environment/Plan, selection and serving configuration, with sorted records below. Reject unknown versions,
+duplicate keys and missing, extra, unbound or conflicting records. Neither inventory schema decodes as the other. Preserve old wire bytes with golden fixtures.
+
+| Record | Required binding |
+|---|---|
+| Selected use | Output name/kind, platform, Build, output-local root and preparation/signing invocations, OCI descriptor, raw QCOW2 or EFI member name/hash/size, compatible profile |
+| Stored object | Payload/control/proof role, raw digest/size, literal destination/key, exact version or strong validator, every shared logical use |
+| Original proof | Aggregate index/config/manifests, original signature/production attestation, selected output-local controls/signatures/provenance, policy-required SBOM/disk evidence and subject/stage joins |
+| Serving mapping | Raw binding, authorized configuration identity, destination pin, content-addressed client URL |
+| Declared render | Output name, signed descriptor and complete dependency/profile/URL set; required iff declared |
+
+Preserve signed documents intact, including required shared SBOMs owned by unselected repositories. Retain
+every document required by `minimumDiskEvidence` and signed encryption declarations; match encryption to the wrapper. Original EFI metadata must
+bind member name/hash/size/architecture; otherwise reject or extend its original format before signing. Copy only selected
+raw payloads and required proofs. No unselected layers, bundle fallback, truncated documents, reference-only proofs,
+copier signatures or unsigned subset assertions.
+Delivery owns raw-member inspection/transport, `sign` proof authentication, `lifecycle` policy/input/membership joins and
+opaque receipts, factory dependencies/finalization, CLI/SDK adaptation. Structured records use canonical typed identities;
+raw SHA-256 is blob integrity only.
+
+**Limits.** Preparation/rendering and final publication each admit a fresh store/session and operation/cleanup deadlines
+before I/O; no background refresh. Each defaults to 1200 seconds, maximum 3509. SDK/multipart retries share that phase's
+deadline/read allowance; restarted phases admit fresh limits. Per destination, retain full-mirror object/total/count ceilings.
+
+| Budget | Bound and reservation before payload writes |
+|---|---|
+| Controls/evidence | Owner document caps; 512 MiB cap/reservation per required aggregate/output-local root. |
+| Signatures/provenance | 8 MiB per bundle; 16 MiB combined cap/reservation. SBOM/disk evidence stays in the control pool. |
+| Inventory | Maximum/reservation 128 MiB; reserve one object. |
+| Total/count | Exact payload sizes plus all reservations and Plan-derived maximum control/proof object count. Count shared bytes once; check every use. |
+| Reads | Plan-declared finite allowance per phase covering acquisition, proof verification, pinned/HTTPS reads and retry/failed responses. Reject insufficient mandatory-pass allowance before I/O; debit actual bytes locally. |
+
+Reject insufficient reservations or oversized documents. Later phases recompute unique bytes/count from the Plan,
+authenticated controls and checked destination objects, never transported counters. Controls must fit owner caps and
+reservations.
+
+**Order.** Inventory and signature attachments stay outside Release membership. Each step requires prior checks.
+
+1. Authenticate remotely verified signed output-local publications and raw bindings under policy, never producer-workspace paths.
+2. Copy raw QCOW2/EFI to immutable keys; fully hash/size-check pinned S3 readback and declared HTTPS responses.
+   Issue a live preliminary receipt bound to output/member, inputs/invocations, policy, bytes, destination pins and mapping.
+   It proves bytes and observed availability, never aggregate membership.
+3. In that lifecycle process, render the predeclared artifact from receipts/authenticated metadata using its pinned schema/profile.
+   Exclude its eventual aggregate root, release-content and inventory digests from bytes and identity inputs. Predicted URLs
+   cannot replace receipts. The ordinary output job publishes/signs the prepared artifact through authenticated producer handoff.
+4. Assemble/publish/sign/verify every required OCI member. A separate final selective job reauthenticates aggregate membership
+   and selected output/local-root/descriptor/platform/Build/raw-file/input/invocation joins, repeats pinned S3/HTTPS checks,
+   and authenticates any signed render through OCI against the complete expected dependency/profile/URL set.
+5. Publish/read back intact proofs at every destination, then commit and fully read back inventory last at
+   `<prefix>/boot-publications/<original-root-hex>/<inventory-raw-hex>.json`. Record render identity; keep YAML in OCI.
+   Lifecycle then issues selected-publication completion; provider success also requires successful cleanup.
+
+Preparation holds S3-writer, registry-reader and serving-reader access. Signing holds only registry/signing credentials.
+The final selective job gets a fresh S3-writer session and registry/serving-reader access. Credentials never enter render bytes;
+transported descriptions cannot restore receipts. The registry-read-only finalizer fetches no payloads and requires aggregate
+authentication plus provider-observed success of every exact compiled destination job, never local success files. Run completion is not a selected-artifact receipt.
+Return inventory locators through completed Runs/authenticated discovery, never by patching signed renders. Inventory/discovery remain
+descriptive pending independent verification. Separately signed downstream rendering requires a different reviewed contract.
+
+**Serving.** Admit an authorized HTTPS origin, literal content-addressed mapping, exact destination/key/pin and explicit
+anonymous or credential-reference reader. Reject userinfo, credentials, expiring URLs, queries/fragments, redirects, mutable
+aliases and ambiguous versions. Runtime versions/validators belong in receipts/inventory, never render URLs/YAML.
+Require full hash/size checks; HEAD/status is insufficient. Exact-version denial fails without URL/current-version fallback.
+Generic hosted-network checks prove equality at check time; inaccessible origins fail. Provisioning-network retrieval needs
+separate #383 evidence and independent reader access. Operators preserve TLS hostname, digest-to-bytes mapping and retained
+objects/exact versions for the promised period. Transport verifies no durable routing/availability and provisions no networking,
+IAM or credentials; trust roots, signing roles and branch policies stay unchanged. Full mirror retains no serving claim.
+Record TLS/read-auth/parser assumptions in the profile.
+
+**Verification.** Independently supply expected aggregate digest reference, invocation, authored inputs, selection/platforms,
+Verification Policy, serving configuration, pinned inventory locator and storage/proof/read/time limits. Obtain selected payloads/proofs entirely from
+S3 with OCI/attestation retrieval disabled. Provision ADR-04 workflow identity/issuer, pinned verifier and certificate/transparency
+trust independently; fully disconnected verification is excluded. Repeat all original proof, evidence, membership and raw-byte
+joins above, compare exact selection/mapping, and fully read pinned S3 objects and HTTPS bytes from the consumer's network.
+Lifecycle's selected-artifact receipt binds those expectations/bytes. It grants no whole-publication/exact-input receipt,
+full export, omitted-payload checks, qualified acceptance, freshness/revocation or boot safety. Stronger policy fails admission.
+Before registration/use, the importer also authenticates the render through the normal Release path, compares dependencies
+and preserves authenticated script/checksum. Imager checksum-before-write, firmware enforcement, Secure Boot, chainload,
+imaging, reboot and first boot need their own mechanisms and external evidence.
+
+**Recovery.** Missing selected payload/proof, mismatch, denied pinned read or exhausted budget fails without partial receipt
+or fallback; omitted unselected payloads are expected. Cancellation/cleanup failure revokes incomplete receipts, closes reads
+and stops/joins work under bounded cleanup. Retries repeat admission/authentication, including signed-output reuse under §6's
+same-run rules; changed bindings require new Run/Plan identities. Reconcile conflicts/lost acknowledgements by full pinned hash/size
+readback. Lost inventory acknowledgement requires its exact attempted locator and reauthentication of every object/proof.
+The API retains that descriptive locator in `BootInventoryError`, including any observed version/validator;
+`RetryBootSelection` requires the reconstructed inventory to match it. An unknown pin permits conditional creation
+and pinned readback; a known pin permits only that exact read, with no current-version fallback. Cleanup failure
+after inventory readback also retains the locator and withholds completion.
+The expected inventory invocation is the aggregate's exact authenticated invocation, including when retrying
+from a later process or workflow attempt; it is not the retry's current attempt. Earlier output-local
+preparation/signing invocations retain their same-run ordering checks.
+Aggregate signing may occur on a later same-run attempt than assembly. The original authenticated production
+proof supplies that signing invocation; it must not precede assembly or cross runs. It does not replace the
+aggregate assembly invocation in the inventory or receipt.
+Exclude timestamps/sessions/attempt counters from canonical inventory; equal subjects/pins
+yield identical bytes. Changed pins require new authenticated completion and separately addressed inventory, never mutable aliases.
+Local commits retain kernel-released locks, byte-CAS/no-replace, recovery and directory fsync. Orphans may remain; no atomic
+multi-destination rollback, garbage collection or transport retention guarantee is provided.
+
+The render profile declares one CR per disk/architecture/destination QCOW2/EFI URL pair before work; the signed output is exactly that deterministic set.
+For example, two amd64 disks and two destinations require four CRs; one selected amd64 EFI may serve both disks.
+Every pair is mandatory, with no first-success destination or automatic URL fallback.
+
+Tests cover every rule above. Prove complete OCI membership, selected-only S3 payloads and sufficient intact proofs with
+OCI retrieval disabled. ADR-11/12/19 and #517 own render schema/packaging/evidence.
 
 ### 3. The emitted publish phase
 

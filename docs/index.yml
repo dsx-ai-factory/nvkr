@@ -7,9 +7,11 @@
 navigation:
   - section: Overview
     contents:
+      - page: Six worked journeys
+        path: journeys.md
       - page: What is NVKR
         path: overview/what-is-nvkr.md
-      - page: Preview status and known limitations
+      - page: Preview limits
         path: overview/preview-status.md
         slug: preview-status
       - link: NVKE documentation
