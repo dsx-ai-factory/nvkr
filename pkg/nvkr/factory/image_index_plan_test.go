@@ -43,23 +43,20 @@ func compileImageIndexFixture(t *testing.T, original *Plan, environment authored
 	}
 	targetStacks := make(map[string]*catalog.Stack)
 	for _, output := range original.Definition.Outputs {
-		if output.Catalog == nil {
+		if output.Catalog == nil && len(original.CatalogCandidates) == 0 {
 			continue
 		}
 		for _, build := range original.Builds {
 			if build.Name == output.Name || strings.HasPrefix(build.Name, output.Name+"/") {
-				targetStacks[output.Name], err = catalog.ApplyStack(build.CatalogSnapshot)
-				if err != nil {
-					t.Fatal(err)
-				}
+				targetStacks[output.Name] = &catalog.Stack{Catalog: build.CatalogSnapshot, Digest: build.CatalogDigest, Applied: build.AppliedOverlays}
 			}
 		}
 		if targetStacks[output.Name] == nil {
 			t.Fatalf("missing catalog for %s", output.Name)
 		}
 	}
-	plan, err := compileWithTargetStacks(t.Context(), original.Definition, environment, stack, targetStacks,
-		original.GeneratorVersion, original.DefinitionPath, original.EnvironmentPath)
+	plan, err := compileWithTargetStacksFor(t.Context(), original.Definition, environment, stack, targetStacks,
+		original.GeneratorVersion, original.DefinitionPath, original.EnvironmentPath, nil, original.CatalogCandidates)
 	if err != nil {
 		t.Fatal(err)
 	}

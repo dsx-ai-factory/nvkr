@@ -79,6 +79,9 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 	if err := restoreCatalog(root); err != nil {
 		return nil, nil, err
 	}
+	if err := mapTreeCatalogCandidates(ctx, root, restoreCatalog); err != nil {
+		return nil, nil, err
+	}
 	var builds []planFields
 	if err := json.Unmarshal(root["builds"], &builds); err != nil {
 		return nil, nil, e.Wrap(e.CodePipelineDrift, err, "reading Plan builds")

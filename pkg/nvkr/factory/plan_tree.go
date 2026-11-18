@@ -100,6 +100,9 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 	if err := storeCatalog(root); err != nil {
 		return nil, err
 	}
+	if err := mapTreeCatalogCandidates(ctx, root, storeCatalog); err != nil {
+		return nil, err
+	}
 	names := map[string]bool{}
 	for i, build := range builds {
 		if err := ctx.Err(); err != nil {
@@ -197,4 +200,44 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 // Every multiline command operand is an immutable exact-byte script object.
 func sliceTreeCommands(build planFields, files map[string][]byte) error {
 	return treeGraphCommands(build, files, false, MaxPlanBytes)
+}
+
+// Candidate locators retain their authored order; snapshots share the same
+// digest-keyed table as the root and builds. Bound expansion before collecting
+// repeated snapshots from distinct locators.
+func mapTreeCatalogCandidates(ctx context.Context, root planFields, visit func(planFields) error) error {
+	raw, exists := root["catalogCandidates"]
+	if !exists {
+		return nil
+	}
+	var candidates []planFields
+	if err := json.Unmarshal(raw, &candidates); err != nil {
+		return e.Wrap(e.CodePipelineDrift, err, "reading Plan catalog candidates")
+	}
+	if len(candidates) > 64 {
+		return e.New(e.CodePipelineDrift, "Plan catalog candidates exceed 64 stacks")
+	}
+	size := 2
+	for _, candidate := range candidates {
+		if err := ctx.Err(); err != nil {
+			return e.Wrap(e.CodeTimeout, err, "mapping Plan catalog candidates canceled")
+		}
+		if err := visit(candidate); err != nil {
+			return err
+		}
+		encoded, err := canonical.Marshal(candidate)
+		if err != nil {
+			return err
+		}
+		size += len(encoded) + 1
+		if int64(size) > MaxPlanBytes {
+			return e.New(e.CodePipelineDrift, "Plan catalog candidates exceed decoded size bound")
+		}
+	}
+	encoded, err := canonical.Marshal(candidates)
+	if err != nil {
+		return err
+	}
+	root["catalogCandidates"] = encoded
+	return nil
 }

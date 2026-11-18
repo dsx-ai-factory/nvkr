@@ -125,6 +125,7 @@ func TestNVKEIncludesBothNativeFDEImages(t *testing.T) {
 	// This contract concerns the four native disk closures. Compiling unrelated
 	// controllers and charts adds no FDE signal and requires a synthetic Git source.
 	definition.Outputs = diskOutputs
+	definition.Catalogs = slices.DeleteFunc(definition.Catalogs, func(spec Catalog) bool { return spec.Base != "../../catalogs/node-images/release" })
 	// The disk catalog uses the .git source spelling; the controller-only entry
 	// would correctly be refused as unused in this reduced selection.
 	delete(environment.SourceAccess, "https://github.com/dsx-ai-factory/nvke")

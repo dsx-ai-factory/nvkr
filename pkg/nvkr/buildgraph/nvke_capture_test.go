@@ -88,7 +88,11 @@ func TestMaintainedNVKENativeCaptureGraph(t *testing.T) {
 		}
 		seen[output.Name] = true
 		t.Run(output.Name, func(t *testing.T) {
-			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(inputRoot, output.Catalog.Base)))
+			index := slices.IndexFunc(authored.Catalogs, func(spec definition.Catalog) bool { return spec.Base == "../../catalogs/node-images/release" })
+			if index < 0 || output.Catalog != nil {
+				t.Fatal("disk catalog must be declared once in the shared list")
+			}
+			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(inputRoot, authored.Catalogs[index].Base)))
 			if err != nil {
 				t.Fatal(err)
 			}

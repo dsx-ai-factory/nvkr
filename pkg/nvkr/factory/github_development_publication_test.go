@@ -41,7 +41,7 @@ func developmentPublicationPlan(t *testing.T, base *Plan, prefix string) *Plan {
 	stack := &catalog.Stack{Catalog: base.CatalogSnapshot, Digest: base.CatalogDigest, Applied: base.AppliedOverlays}
 	stacks := map[string]*catalog.Stack{}
 	for _, output := range base.Definition.Outputs {
-		if output.Catalog == nil {
+		if output.Catalog == nil && len(base.CatalogCandidates) == 0 {
 			continue
 		}
 		for _, build := range base.Builds {
@@ -51,8 +51,8 @@ func developmentPublicationPlan(t *testing.T, base *Plan, prefix string) *Plan {
 			}
 		}
 	}
-	plan, err := compileWithTargetStacks(t.Context(), base.Definition, environment, stack, stacks,
-		base.GeneratorVersion, base.DefinitionPath, base.EnvironmentPath)
+	plan, err := compileWithTargetStacksFor(t.Context(), base.Definition, environment, stack, stacks,
+		base.GeneratorVersion, base.DefinitionPath, base.EnvironmentPath, nil, base.CatalogCandidates)
 	if err != nil {
 		t.Fatal(err)
 	}

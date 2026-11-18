@@ -550,6 +550,8 @@ func generationOperatorToolsFixture(t *testing.T, publicationMode string) (*fact
 		t.Fatal("missing maintained operator-tools catalog")
 	}
 	inputs := maintained.Definition.Clone()
+	// This synthetic fixture compiles one captured stack, including its shared tools.
+	inputs.Catalogs = nil
 	for _, output := range inputs.Outputs {
 		if output.Name == "operator-tools" {
 			output.Catalog = nil

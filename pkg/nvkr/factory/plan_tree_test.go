@@ -520,3 +520,55 @@ func treeStepPath(t *testing.T, planPath string, files map[string][]byte, index 
 	}
 	return root.Builds[index].File
 }
+
+// Catalog candidate admission and Plan-tree storage must preserve the same Plan,
+// including unused candidates and multiple locators sharing one snapshot.
+func assertCatalogCandidateTree(t *testing.T, plan *Plan) {
+	t.Helper()
+	files, err := renderPlanTree(t.Context(), plan, FactoryPlanPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var root planFields
+	if err := json.Unmarshal(files[FactoryPlanPath], &root); err != nil {
+		t.Fatal(err)
+	}
+	var candidates []planFields
+	if err := json.Unmarshal(root["catalogCandidates"], &candidates); err != nil {
+		t.Fatal(err)
+	}
+	var snapshots planFields
+	if err := json.Unmarshal(root["catalogSnapshots"], &snapshots); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{plan.CatalogDigest: true}
+	for _, build := range plan.Builds {
+		want[build.CatalogDigest] = true
+	}
+	for i, candidate := range candidates {
+		if candidate["catalogSnapshot"] != nil {
+			t.Fatal("candidate retains an inline snapshot")
+		}
+		digest := plan.CatalogCandidates[i].CatalogDigest
+		want[digest] = true
+		if snapshots[digest] == nil {
+			t.Fatal("candidate snapshot missing from shared store")
+		}
+	}
+	if len(snapshots) != len(want) || len(candidates) != len(plan.CatalogCandidates) {
+		t.Fatal("candidate snapshot membership changed")
+	}
+	_, joined, err := joinPlanTree(t.Context(), FactoryPlanPath, files)
+	if err != nil || !bytes.Equal(joined, mustCanonical(t, plan)) {
+		t.Fatal("candidate storage changed canonical Plan bytes", err)
+	}
+	// A second inline owner must not bypass the digest-keyed snapshot table.
+	candidates[0]["catalogSnapshot"] = mustCanonical(t, plan.CatalogCandidates[0].CatalogSnapshot)
+	root["catalogCandidates"] = mustCanonical(t, candidates)
+	files[FactoryPlanPath], err = treeJSON(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, err = joinPlanTree(t.Context(), FactoryPlanPath, files)
+	assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+}

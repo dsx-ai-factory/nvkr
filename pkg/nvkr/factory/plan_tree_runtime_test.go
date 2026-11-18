@@ -41,7 +41,7 @@ func TestPlanTreeMaintainedRuntimeRefresh(t *testing.T) {
 				stacks[output.Name] = selected
 			}
 			after, err := compileWithTargetStacksFor(t.Context(), before.Definition, before.Environment,
-				rootStack, stacks, before.GeneratorVersion, before.DefinitionPath, before.EnvironmentPath, before.Composition)
+				rootStack, stacks, before.GeneratorVersion, before.DefinitionPath, before.EnvironmentPath, before.Composition, before.CatalogCandidates)
 			if err != nil {
 				t.Fatal(err)
 			}
