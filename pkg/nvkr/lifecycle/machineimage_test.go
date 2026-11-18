@@ -259,6 +259,43 @@ func TestMachineImageCandidateRejections(t *testing.T) {
 	}
 }
 
+func TestMachineImageURLAuthorityBoundaries(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		location string
+		allowed  bool
+	}{
+		{"bracketed-ipv6", "https://[2001:db8::1]/image", true},
+		{"junk-after-bracket", "https://[2001:db8::1]junk/image", false},
+		// An empty port parses as unspecified; the candidate preserves it
+		// literally. This does not establish downstream iPXE compatibility.
+		{"empty-port", "https://host:/image", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			candidate := machineImageFixture("amd64")
+			candidate.ImagerURL = tc.location
+			manifest, err := renderMachineImageCandidate(candidate)
+			if !tc.allowed {
+				requireLifecycleCode(t, err, e.CodeVerifyFailed)
+				if len(manifest.YAML) != 0 {
+					t.Fatal("invalid authority released manifest bytes")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			var document machineImageDocument
+			if err := yaml.Unmarshal(manifest.YAML, &document); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.HasPrefix(document.Spec.NICo.IPXEScript, "#!ipxe\nchain "+tc.location+" ") {
+				t.Fatal("candidate changed the literal authority")
+			}
+		})
+	}
+}
+
 func TestMachineImageScriptBoundaries(t *testing.T) {
 	candidate := machineImageFixture("amd64")
 	baseline, err := renderMachineImageCandidate(candidate)
