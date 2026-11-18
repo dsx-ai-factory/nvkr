@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -24,9 +25,9 @@ import (
 )
 
 func TestBoundedTrustAuthenticatesTUFWithoutAmbientCache(t *testing.T) {
-	root, files, poisonedTimestamp := boundedTUFRepository(t)
-	for _, scenario := range []string{"exact", "tampered-target", "read-budget", "canceled"} {
+	for _, scenario := range []string{"exact", "next-root", "tampered-target", "read-budget", "canceled"} {
 		t.Run(scenario, func(t *testing.T) {
+			root, files, poisonedTimestamp := boundedTUFRepository(t, scenario == "next-root")
 			t.Setenv("HOME", t.TempDir())
 			opts := tuf.DefaultOptions().WithRoot(root)
 			ambient := filepath.Join(opts.CachePath, tuf.URLToPath(opts.RepositoryBaseURL))
@@ -70,8 +71,12 @@ func TestBoundedTrustAuthenticatesTUFWithoutAmbientCache(t *testing.T) {
 			opts.WithFetcher(&boundedTrustFetcher{ctx: ctx, client: &http.Client{Transport: readbudget.Transport(ctx, transport)}})
 			raw, err := loadBoundedTrust(ctx, budget, opts)
 			switch scenario {
-			case "exact":
-				if err != nil || !bytes.Equal(raw, files["/targets/trusted_root.json"]) || len(paths) != 5 || paths[0] != "/2.root.json" || budget.Used() != delivered {
+			case "exact", "next-root":
+				wantPaths := []string{"/2.root.json", "/timestamp.json", "/snapshot.json", "/targets.json", "/targets/trusted_root.json"}
+				if scenario == "next-root" {
+					wantPaths = slices.Insert(wantPaths, 1, "/3.root.json")
+				}
+				if err != nil || !bytes.Equal(raw, files["/targets/trusted_root.json"]) || !slices.Equal(paths, wantPaths) || budget.Used() != delivered {
 					t.Fatal("authenticated TUF read/rotation/budget mismatch", err, paths, budget.Used(), delivered)
 				}
 			case "tampered-target":
@@ -98,7 +103,7 @@ func TestBoundedTrustAuthenticatesTUFWithoutAmbientCache(t *testing.T) {
 
 // These keys sign an in-memory synthetic TUF repository, not Sigstore artifact
 // evidence. A real TUF client must authenticate every role before target use.
-func boundedTUFRepository(t *testing.T) ([]byte, map[string][]byte, []byte) {
+func boundedTUFRepository(t *testing.T, nextRoot bool) ([]byte, map[string][]byte, []byte) {
 	t.Helper()
 	expires := time.Now().Add(time.Hour)
 	root, targets := metadata.Root(expires), metadata.Targets(expires)
@@ -143,7 +148,13 @@ func boundedTUFRepository(t *testing.T) ([]byte, map[string][]byte, []byte) {
 	snapshot.Signed.Meta["targets.json"] = metadata.MetaFile(1)
 	timestamp.Signed.Meta["snapshot.json"] = metadata.MetaFile(1)
 	files := map[string][]byte{"/targets.json": encode(targets), "/snapshot.json": encode(snapshot), "/timestamp.json": encode(timestamp), "/targets/trusted_root.json": target}
+	initialRoot := encode(root)
+	if nextRoot {
+		root.Signed.Version = 2
+		root.ClearSignatures()
+		files["/2.root.json"] = encode(root)
+	}
 	timestamp.Signed.Version = 999
 	timestamp.ClearSignatures()
-	return encode(root), files, encode(timestamp)
+	return initialRoot, files, encode(timestamp)
 }
