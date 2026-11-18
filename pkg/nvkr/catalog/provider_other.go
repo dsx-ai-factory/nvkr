@@ -17,3 +17,7 @@ func readCatalogRegularBeneathContext(context.Context, string, string) ([]byte, 
 func readCatalogDirectoryBeneathContext(context.Context, string, string) ([]string, error) {
 	return nil, fmt.Errorf("bounded no-follow catalog directories are unsupported on this platform")
 }
+
+func readCatalogInventoryDirectoryContext(context.Context, string) ([]string, error) {
+	return nil, fmt.Errorf("bounded no-follow catalog inventories are unsupported on this platform")
+}

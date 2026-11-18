@@ -409,6 +409,11 @@ failure leaves the original lock intact. Full catalog loads and lock writes re-d
 Catalogs with pin sets therefore require access to pinned Git objects when loaded; ordinary catalogs retain
 local loading. Offline pin-set transport remains deferred.
 
+Offline catalog discovery is a descriptive exception: it validates local registry/import bytes and lock
+structure, resolves recorded pins, and returns descriptions only, never an executable catalog or receipt.
+It does not re-derive upstream pin-set versions and must label that limit. Root browsing, exact-name search,
+and the generated inventory share this path; normal loading and lock updates retain full derivation checks.
+
 **NVKE deploy adapter.** `format: nvke-deploy-v1` reads the declared deploy document and each Helm item's
 `release.yaml` from the same pinned tree. Every deploy item must appear in `members` or `accounted`;
 unknown, missing, duplicate or reclassified items fail before chart acquisition. External members bind the
