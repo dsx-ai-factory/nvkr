@@ -64,6 +64,9 @@ File-backed build/vendor argv operands expand to exact bytes during catalog load
 closure; their paths do not enter resolved command identities (ADR-22).
 [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies) owns how generated
 Runs bind action commits from the catalog lock. Definitions declare named deliverable outputs once.
+An optional ordered catalog list supplies complete producer selections for outputs without an override;
+missing or multiple matches fail, and order grants no precedence. The singular catalog still owns shared
+utility/action pins. Plans bind every candidate snapshot and recheck each output's chosen stack (ADR-11).
 NVKR does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source
 access, registry retention, runtime acceptance and deployment policy. NVKR offers explicit descriptive local
 diagnostics under ADR-16 §6; these do not qualify a cluster. Downstream systems consume accepted artifact
@@ -619,7 +622,9 @@ platforms. Artifact kinds and producer metadata govern format admission directly
 
 A Definition selects producers and output-affecting settings directly on named outputs. An Environment supplies
 runtime settings (Docker by default, with explicit Podman support), runner routes and execution classes, required publication transports and namespace,
-credential references, and signing identity/issuer policy. Image access declares private and
+credential references, and signing identity/issuer policy. Local execution and starter validation may resolve a versioned
+build-only default; compiler capture retains its exact policy bytes, the Plan records its digest and the Run
+binds both identities. It supplies no signing, publication or VM execution classes. Image access declares private and
 anonymous roots independently of publication, with one reader for private roots. Every GitHub image consumer
 is inventoried before renderer grouping; unclassified images or unsupported private routes fail generation
 before output. Exact source/location bindings preserve logical Build identity. Measured local images and

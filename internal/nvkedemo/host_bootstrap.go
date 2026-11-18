@@ -45,7 +45,7 @@ DEBIAN_FRONTEND=noninteractive NVKE_AGENT_SKIP_START=1 apt-get install -y -o DPk
 systemctl daemon-reload
 systemctl stop nvke-agent.service spire-agent.service
 install -d -m 0700 /etc/nke
-install -d -m 1777 /var/lib/nvke-native/postgres /var/lib/nvke-native/spire
+{{prepareStorage}}
 install -m 0644 downloads/spire-ca.crt /etc/nke/trust-bundle.pem
 printf '%s' {{quote (spireEnvironment .)}} > /etc/nke/spire.env
 {{configureSpire}}
@@ -217,17 +217,7 @@ func (s *nativeSiteAttempt) deployFromHost(ctx context.Context, runner Runner, c
 	if err := runner.Run(ctx, initArgs, "host-site-capi", 0); err != nil {
 		return err
 	}
-	storage := `apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: nvke-native-local
-  annotations: {storageclass.kubernetes.io/is-default-class: "true"}
-provisioner: kubernetes.io/no-provisioner
-volumeBindingMode: Immediate
-`
-	for _, item := range []struct{ name, capacity string }{{"postgres", "40Gi"}, {"spire", "10Gi"}} {
-		storage += fmt.Sprintf("---\napiVersion: v1\nkind: PersistentVolume\nmetadata:\n  name: nvke-native-%s\nspec:\n  capacity: {storage: %s}\n  accessModes: [ReadWriteOnce]\n  storageClassName: nvke-native-local\n  persistentVolumeReclaimPolicy: Retain\n  hostPath: {path: /var/lib/nvke-native/%s, type: DirectoryOrCreate}\n", item.name, item.capacity, item.name)
-	}
+	storage := nativeSiteStorage()
 	storagePath := filepath.Join(out, "local-storage.yaml")
 	if err := os.WriteFile(storagePath, []byte(storage), 0600); err != nil {
 		return err
@@ -283,6 +273,48 @@ volumeBindingMode: Immediate
 	}
 	// Both source commands remain under the original work deadline.
 	return runner.Run(ctx, []string{"bash", filepath.Join(s.assets.Installer, "controller", "hack", "apply-capi-spiffe-exec-auth.sh")}, "host-site-spiffe-exec", 0)
+}
+
+// The demo runs one replica of each persistent telemetry queue. Keep its
+// volumes separate from the later PostgreSQL and SPIRE claims: the default
+// StorageClass has no dynamic provisioner.
+func nativeSiteVolumes() []struct{ name, capacity string } {
+	return []struct{ name, capacity string }{
+		{"postgres", "40Gi"}, {"spire", "10Gi"},
+		{"nktp-watchdog", "1Gi"}, {"nktp-gateway-logs", "1Gi"},
+		{"nktp-gateway-metrics", "1Gi"}, {"nktp-gateway-traces", "1Gi"},
+	}
+}
+
+func nativeSiteStorageDirectories() string {
+	paths := make([]string, 0, len(nativeSiteVolumes()))
+	for _, volume := range nativeSiteVolumes() {
+		paths = append(paths, "/var/lib/nvke-native/"+volume.name)
+	}
+	return "install -d -m 1777 " + strings.Join(paths, " ")
+}
+
+func nativeSiteStorage() string {
+	storage := `apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: nvke-native-local
+  annotations: {storageclass.kubernetes.io/is-default-class: "true"}
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: Immediate
+`
+	for _, item := range nativeSiteVolumes() {
+		storage += fmt.Sprintf("---\napiVersion: v1\nkind: PersistentVolume\nmetadata:\n  name: nvke-native-%s\nspec:\n  capacity: {storage: %s}\n  accessModes: [ReadWriteOnce]\n  storageClassName: nvke-native-local\n  persistentVolumeReclaimPolicy: Retain\n  hostPath: {path: /var/lib/nvke-native/%s, type: DirectoryOrCreate}\n", item.name, item.capacity, item.name)
+		// Reserve database storage even before the controller has made every
+		// queue volume Available. These are the source charts' one-replica claims.
+		switch item.name {
+		case "postgres":
+			storage += "  claimRef: {namespace: postgres, name: data-postgres-postgresql-0}\n"
+		case "spire":
+			storage += "  claimRef: {namespace: spire-server, name: spire-data-spire-server-0}\n"
+		}
+	}
+	return storage
 }
 
 // The source controller starts HTTP after migrations. Gate its unchanged

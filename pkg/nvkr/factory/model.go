@@ -128,6 +128,7 @@ type Route struct {
 }
 
 type Plan struct {
+	CatalogCandidates   []CatalogCandidate           `json:"catalogCandidates,omitempty"`
 	Actions             map[string]catalog.ActionPin `json:"actions,omitempty"`
 	SchemaVersion       string                       `json:"schemaVersion"`
 	Name                string                       `json:"name"`
@@ -187,6 +188,7 @@ type LifecycleOutputPlan struct {
 type LifecycleBoundOutput = delivery.Output
 
 type BuildPlan struct {
+	SelectedCatalog *definition.Catalog      `json:"selectedCatalog,omitempty"`
 	Name            string                   `json:"name"`
 	CatalogDigest   string                   `json:"catalogDigest"`
 	AppliedOverlays []catalog.AppliedOverlay `json:"appliedOverlays,omitempty"`

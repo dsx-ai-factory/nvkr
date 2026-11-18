@@ -61,6 +61,7 @@ type Definition struct {
 	Kind       string             `json:"kind"`
 	Metadata   Metadata           `json:"metadata"`
 	Catalog    Catalog            `json:"catalog"`
+	Catalogs   []Catalog          `json:"catalogs,omitempty"`
 	SBOMTool   string             `json:"sbomTool,omitempty"`
 	CosignTool string             `json:"cosignTool,omitempty"`
 	Outputs    []DefinitionOutput `json:"outputs"`
@@ -226,6 +227,19 @@ func (definition Definition) Validate() error {
 	}
 	if !namePattern.MatchString(definition.Metadata.Name) || definition.Catalog.Base == "" || len(definition.Outputs) == 0 {
 		return e.New(e.CodeInvalidCatalog, "definition requires a canonical name, catalog and outputs")
+	}
+	if len(definition.Catalogs) > 64 {
+		return e.New(e.CodeInvalidCatalog, "definition catalogs exceeds 64 stacks")
+	}
+	for i, candidate := range definition.Catalogs {
+		if candidate.Base == "" {
+			return e.New(e.CodeInvalidCatalog, "definition catalogs[%d] has an empty base", i)
+		}
+		for _, earlier := range definition.Catalogs[:i] {
+			if sameCatalog(candidate, earlier) {
+				return e.New(e.CodeInvalidCatalog, "definition repeats catalog stack %q", candidate.Base)
+			}
+		}
 	}
 	for _, tool := range []string{definition.SBOMTool, definition.CosignTool} {
 		if tool != "" && !namePattern.MatchString(tool) {

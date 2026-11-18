@@ -5,6 +5,7 @@ package factory
 
 import (
 	"path/filepath"
+	"slices"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
@@ -47,7 +48,11 @@ func TestMaintainedM2OSFetchIsAnonymous(t *testing.T) {
 		}
 		seen[output.Platform] = true
 		t.Run(output.Name, func(t *testing.T) {
-			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, output.Catalog.Base)))
+			index := slices.IndexFunc(authored.Catalogs, func(spec definition.Catalog) bool { return spec.Base == "../../catalogs/node-images/release" })
+			if index < 0 || output.Catalog != nil {
+				t.Fatal("disk catalog must be declared once in the shared list")
+			}
+			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, authored.Catalogs[index].Base)))
 			if err != nil {
 				t.Fatal(err)
 			}
