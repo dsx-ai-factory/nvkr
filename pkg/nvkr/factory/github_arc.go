@@ -70,6 +70,9 @@ func githubBootstrapRunner(runner string) string {
 }
 
 func admitGitHubRequirements(plan *Plan, adapter string) error {
+	if err := admitBootPublicationExecution(plan); err != nil {
+		return err
+	}
 	for _, tool := range plan.InternalTools {
 		if _, err := internalToolDiskOutput(plan, tool); err != nil {
 			return err

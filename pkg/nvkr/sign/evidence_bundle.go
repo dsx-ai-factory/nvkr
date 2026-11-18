@@ -45,6 +45,11 @@ func NewCosignEvidenceVerifier(binary, binaryDigest string, runner CommandRunner
 // claims, then runs cosign verify-blob-attestation for the signature, exact
 // identity, issuer and transparency evidence.
 func (v *CosignEvidenceVerifier) VerifyEvidenceBundle(ctx context.Context, bundle []byte, policy sbom.EvidenceBundlePolicy) error {
+	finish, err := beginBoundedVerification(ctx)
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if v == nil || v.cosign == nil || v.cosign.runner == nil {
 		return e.New(e.CodeInternal, "upstream evidence cosign verifier is not initialized")
 	}
