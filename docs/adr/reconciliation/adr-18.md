@@ -1,5 +1,14 @@
 ## Support by owner
 
+Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
+
+The quick machinery E2E [fork Run](https://github.com/njhensley/nvkr/actions/runs/44043009475)
+at `ee807779f8122a0cce1105853a0a82c88dbb4c56` passed on stock Ubuntu in 91 seconds (71 seconds
+for the shared Make target): real hello build, registry round-trip, unprivileged smoke and harness
+rejection of a self-consistent wrong-Plan predicate, with signing and verification in dry-run mode.
+Its unsigned diagnostics do not exercise generated-job dependencies, carrier transport, real signing,
+saved compiler-input reverification, disk/KVM, private-storage authentication or ARC; Podman remains unexercised.
+
 Tekton implements ADR-18's explicit cluster trust contract. The provider authenticates
 complete PipelineRun, TaskRun and PVC bindings and binds carrier bytes to successful task results. Controlled
 TLS and carrier fixtures pass; a local kind v0.31.0 / Kubernetes v1.35.0 / Tekton v1.18.0 installation has

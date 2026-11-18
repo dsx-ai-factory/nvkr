@@ -17,7 +17,9 @@ _Avoid_: Factory, FactoryDefinition, cluster definition
 
 **Environment**:
 Separately selected execution settings, required publication transports and namespace, credential references,
-and signing identity policy. Selecting an unavailable transport fails before work; a supported sibling cannot
+and signing identity policy. Container execution defaults to Docker; local Runs inherit the Environment
+runtime and reject conflicting executable overrides before work. Podman is an explicit alternative.
+Selecting an unavailable transport fails before work; a supported sibling cannot
 substitute for it. An explicit OCI representation selects construction before packaging and signing;
 it changes Environment and Plan identity, not logical Build identity or existing publication bytes.
 Image access separately declares private and anonymous image roots and

@@ -19,6 +19,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
@@ -58,7 +59,7 @@ func admitSourceVendorWithAccess(ctx context.Context, node ir.Node, runtimeName 
 	if err != nil {
 		return nil, err
 	}
-	if name := filepath.Base(path); name != "docker" && name != "podman" {
+	if err := containerruntime.Validate(path); err != nil {
 		return nil, e.New(e.CodeEngineCapability, "held source vendoring requires the selected Docker or Podman runtime")
 	}
 	held, err := snapshotRuntimeExecutableContext(ctx, path)

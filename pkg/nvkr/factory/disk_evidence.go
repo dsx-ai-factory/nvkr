@@ -10,7 +10,6 @@ import (
 	"maps"
 	"math"
 	"os"
-	"path/filepath"
 	"runtime"
 	"slices"
 	"strings"
@@ -19,6 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/diskdiagnostic"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
@@ -87,8 +87,10 @@ func openDiskEvidenceRuntimeWithTool(ctx context.Context, plan *Plan, runtimeExe
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}
-	if filepath.Base(runtimeExecutable) != plan.Environment.RuntimeBinary() {
-		return nil, e.New(e.CodeEngineCapability, "disk inspector runtime differs from frozen Environment runtime")
+	var err error
+	runtimeExecutable, err = containerruntime.Select(plan.Environment.Runtime.Runtime, runtimeExecutable)
+	if err != nil {
+		return nil, err
 	}
 	platform := runtime.GOOS + "/" + runtime.GOARCH
 	profile, ok := plan.Environment.DiskInspectionProfiles[platform]
@@ -142,7 +144,8 @@ func diskEvidenceProfile(ctx context.Context, plan *Plan, inspection *sbom.DiskI
 	if err := validateDiskScannerSelection(plan, selection.Platform, profile.ScannerDigest); err != nil {
 		return definition.DiskInspectionProfile{}, err
 	}
-	if diskProfileFromSelection(selection) != profile || filepath.Base(selection.RuntimeExecutable) != plan.Environment.RuntimeBinary() ||
+	_, runtimeErr := containerruntime.Select(plan.Environment.Runtime.Runtime, selection.RuntimeExecutable)
+	if diskProfileFromSelection(selection) != profile || runtimeErr != nil || selection.RuntimeExecutable == "" ||
 		selection.PodmanStorageDriver != plan.Environment.Runtime.PodmanStorageDriver {
 		return definition.DiskInspectionProfile{}, e.New(e.CodeVerifyFailed, "admitted disk inspector differs from frozen Environment profile")
 	}
@@ -169,10 +172,17 @@ func validateDiskScannerSelection(plan *Plan, platform, pin string) error {
 		return nil
 	}
 	selected, ok := plan.CatalogSnapshot.Tools[plan.Definition.SBOMTool]
-	if _, multi := plan.CatalogSnapshot.ToolPlatforms[plan.Definition.SBOMTool]; multi {
+	if pins, multi := plan.CatalogSnapshot.ToolPlatforms[plan.Definition.SBOMTool]; multi {
 		var err error
 		selected, err = plan.CatalogSnapshot.SelectTool(plan.Definition.SBOMTool, platform)
 		if err != nil {
+			var coded *e.Error
+			if len(pins) > 0 && (platform == "linux/amd64" || platform == "linux/arm64") &&
+				errors.As(err, &coded) && coded.Code == e.CodeEngineCapability {
+				// No catalog scanner targets this supported host. Its frozen
+				// inspection profile owns the independent scanner pin.
+				return nil
+			}
 			return err
 		}
 		ok = true

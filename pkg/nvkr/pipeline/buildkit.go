@@ -6,6 +6,7 @@ package pipeline
 import (
 	"path/filepath"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
@@ -20,9 +21,7 @@ func admitBuildKit(node ir.Node, opts RunOptions) error {
 	if !node.SourceReadOnly || node.WriteDir == "" || len(node.Materials) != 0 {
 		return e.New(e.CodeEngineCapability, "rootless BuildKit requires isolated source/output and does not support material inputs")
 	}
-	switch filepath.Base(opts.Runtime) {
-	case "docker", "podman":
-	default:
+	if err := containerruntime.Validate(opts.Runtime); err != nil {
 		return e.New(e.CodeEngineCapability,
 			"rootless BuildKit requires the Docker or Podman runtime adapter")
 	}

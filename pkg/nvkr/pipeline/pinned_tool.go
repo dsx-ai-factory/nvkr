@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
@@ -48,7 +49,7 @@ func admitPinnedTool(n ir.Node, opts RunOptions) error {
 	}
 	// The runtime's name selects the container identity (pinnedToolRunArgs); a name
 	// does not authenticate the runtime behind it. Empty defaults to docker.
-	if name := filepath.Base(opts.Runtime); opts.Runtime != "" && name != "docker" && name != "podman" {
+	if err := containerruntime.Validate(containerruntime.Default(opts.Runtime)); err != nil {
 		return e.New(e.CodeEngineCapability, "pinned-tool build %q requires a runtime named docker or podman, not %q", n.ID, opts.Runtime)
 	}
 	if err := AdmitPinnedToolHost(n); err != nil {

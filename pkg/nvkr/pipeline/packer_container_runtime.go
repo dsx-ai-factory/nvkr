@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
@@ -450,9 +451,7 @@ func createPackerContainer(ctx context.Context, runtime packerContainerRuntime, 
 			projection.bootID == "" || projection.deviceNumber == "") {
 		return e.New(e.CodeEngineCapability, "Packer KVM projection does not bind the held device")
 	}
-	switch runtime.RuntimeName() {
-	case "docker", "podman":
-	default:
+	if err := containerruntime.Validate(runtime.RuntimeName()); err != nil {
 		return e.New(e.CodeEngineCapability,
 			"Packer container %q requires the Docker or Podman runtime adapter", request.name)
 	}
