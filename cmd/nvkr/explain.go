@@ -31,11 +31,7 @@ func cmdExplain() *cli.Command {
 				return err
 			}
 			if view.tui {
-				display := commandDisplay{Title: "Input explanation", Note: report.Scope, Fields: commandFields("Kind", report.Kind, "Path", report.Path, "Summary", report.Summary)}
-				for i, ref := range append(slices.Clone(report.References), report.Consumers...) {
-					display.Items = append(display.Items, progress.Item{ID: fmt.Sprintf("reference-%d", i), Name: ref.Path, Kind: ref.Relation, State: "recorded", Fields: commandFields("Digest", ref.Digest)})
-				}
-				return showCommandResult(c, view, display, nil)
+				return showCommandResult(c, view, explanationDisplay(report), nil)
 			}
 			out := commandOutput(c)
 			if c.Bool("json") {
@@ -69,4 +65,25 @@ func cmdExplain() *cli.Command {
 			}
 			return nil
 		}}
+}
+
+func explanationDisplay(report inputinspect.Report) commandDisplay {
+	display := commandDisplay{Title: "Input explanation", Note: report.Scope, Fields: commandFields("Kind", report.Kind, "Path", report.Path, "Summary", report.Summary)}
+	for i, ref := range append(slices.Clone(report.References), report.Consumers...) {
+		fields := []progress.Field{}
+		if ref.Digest != "" {
+			fields = commandFields("Digest", ref.Digest)
+		}
+		direction := "Direct reference"
+		if i >= len(report.References) {
+			direction = "Reverse reference"
+		}
+		fields = append(fields, commandFields("Direction", direction)...)
+		for _, key := range slices.Sorted(maps.Keys(ref.Mappings)) {
+			fields = append(fields, commandFields(key, ref.Mappings[key])...)
+		}
+		display.Items = append(display.Items, progress.Item{ID: fmt.Sprintf("reference-%08d", i), Name: ref.Path, Kind: ref.Relation, State: "recorded", Fields: fields})
+	}
+
+	return display
 }

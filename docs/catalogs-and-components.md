@@ -151,13 +151,15 @@ nvkr explain --root inputs inputs/catalogs/shared/nvke.yaml --json
 ```
 
 The command recognizes Definitions, Environments, composites, catalogs, overlays, catalog fragments,
-generated pin locks and qualification verification policies. Paths in the report are relative to the
-printed scan root. Fragment imports show local-to-fragment name mappings; Definition catalog selections
+generated pin locks, hosted qualification policies and local qualification policies. Paths in the report are relative to the
+printed scan root; the JSON `root` is an absolute locator and differs between checkouts. Fragment imports label local-to-fragment selections and fragment-to-local source bindings separately; Definition catalog selections
 show overlay order, and overlays identify their exact predecessor binding. Locks identify their owning
-catalog and the pin-generation commands.
+catalog and the pin-generation commands. The public consumer `VerificationPolicy` currently has no
+authored file form; the supported policy files here are hosted and local qualification policies.
 
 The root must contain the referenced input closure. Reverse references cover these supported kinds only
-within that root; maintenance and validator records are excluded. Missing files, unknown schemas, stale
+within that root. Other schemas and the `.git`, `.nvkr` and `node_modules` directories are excluded.
+An unsupported target schema, missing files, stale
 fragment or composite pins, and ambiguous or unmatched overlay predecessors fail with coded errors and
 no partial report. The scan is bounded to 4,096 entries, depth 16 and 32 MiB of YAML/JSON input; symlinks
 are refused. Choose a smaller complete input tree if a broad repository scan exceeds those limits.

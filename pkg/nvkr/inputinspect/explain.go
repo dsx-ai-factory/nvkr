@@ -33,13 +33,14 @@ type Reference struct {
 }
 
 type Report struct {
-	Root       string      `json:"root"`
-	Path       string      `json:"path"`
-	Kind       string      `json:"kind"`
-	Summary    string      `json:"summary"`
-	References []Reference `json:"references"`
-	Consumers  []Reference `json:"consumers"`
-	Scope      string      `json:"scope"`
+	SchemaVersion string      `json:"schemaVersion"`
+	Root          string      `json:"root"`
+	Path          string      `json:"path"`
+	Kind          string      `json:"kind"`
+	Summary       string      `json:"summary"`
+	References    []Reference `json:"references"`
+	Consumers     []Reference `json:"consumers"`
+	Scope         string      `json:"scope"`
 }
 
 type document struct {
@@ -50,7 +51,14 @@ type document struct {
 	overlay *catalog.Overlay
 }
 
+type stackState struct {
+	base     string
+	overlays []string
+	digest   string
+}
+
 type scan struct {
+	states []stackState
 	ctx    context.Context
 	root   string
 	docs   map[string]*document
@@ -91,14 +99,17 @@ func Explain(ctx context.Context, root, file string) (Report, error) {
 	}
 	target = filepath.ToSlash(target)
 	s := &scan{ctx: ctx, root: abs, docs: map[string]*document{}, stacks: map[string]catalog.StackDescription{}}
-	if err := s.walk(); err != nil {
+	if err := s.walk(target); err != nil {
 		return Report{}, err
 	}
 	selected := s.docs[target]
 	if selected == nil {
-		return Report{}, e.New(e.CodeInvalidCatalog, "input %q has an unknown or unsupported authored schema", target)
+		return Report{}, e.New(e.CodeInvalidCatalog, "input %q has a schema not supported by explain", target)
 	}
 	for _, name := range s.paths {
+		if err := ctx.Err(); err != nil {
+			return Report{}, e.Wrap(e.CodeTimeout, err, "input explanation canceled")
+		}
 		if err := s.admit(name); err != nil {
 			return Report{}, fmt.Errorf("explaining %s: %w", name, err)
 		}
@@ -106,8 +117,8 @@ func Explain(ctx context.Context, root, file string) (Report, error) {
 	if err := s.bindOverlays(); err != nil {
 		return Report{}, err
 	}
-	result := Report{Root: filepath.ToSlash(abs), Path: target, Kind: selected.kind, Summary: selected.summary,
-		References: selected.refs, Consumers: []Reference{}, Scope: "Reverse references cover supported authored kinds only within this root; maintenance and validator records are excluded. Recorded local declarations are not authenticated release evidence; upstream pin sets are not re-derived."}
+	result := Report{SchemaVersion: "nvkr.dev/input-explanation/v1", Root: filepath.ToSlash(abs), Path: target, Kind: selected.kind, Summary: selected.summary,
+		References: selected.refs, Consumers: []Reference{}, Scope: "Reverse references cover supported authored kinds only within this root; other schemas and .git, .nvkr and node_modules directories are excluded. Recorded local declarations are not authenticated release evidence; upstream pin sets are not re-derived."}
 	if result.References == nil {
 		result.References = []Reference{}
 	}
@@ -122,12 +133,25 @@ func Explain(ctx context.Context, root, file string) (Report, error) {
 	return result, nil
 }
 
-func (s *scan) walk() error {
+func (s *scan) walk(target string) error {
 	root, err := os.OpenRoot(s.root)
 	if err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "opening scan root")
 	}
 	defer func() { _ = root.Close() }()
+	info, err := root.Lstat(target)
+	if os.IsNotExist(err) {
+		return e.New(e.CodeInvalidCatalog, "input %q was not found within --root", target)
+	}
+	if err != nil {
+		return e.Wrap(e.CodeInvalidCatalog, err, "inspecting target %q", target)
+	}
+	if !info.Mode().IsRegular() {
+		return e.New(e.CodeInvalidCatalog, "input %q is not a regular file", target)
+	}
+	if ext := path.Ext(target); ext != ".yaml" && ext != ".yml" && ext != ".json" {
+		return e.New(e.CodeInvalidCatalog, "input %q is not a YAML/JSON file", target)
+	}
 	entries := 0
 	var bytes int64
 	var walk func(string, int) error
@@ -179,7 +203,7 @@ func (s *scan) walk() error {
 				}
 				var value any
 				if err := yaml.Unmarshal(raw, &value); err != nil {
-					return e.Wrap(e.CodeInvalidCatalog, err, "reading schema of %s", name)
+					return e.Wrap(e.CodeInvalidCatalog, err, "reading schema of %s (choose a narrower input root if this is not an authored document)", name)
 				}
 				object, ok := value.(map[string]any)
 				if !ok {
@@ -190,20 +214,23 @@ func (s *scan) walk() error {
 				header.Kind, _ = object["kind"].(string)
 				header.SchemaVersion, _ = object["schemaVersion"].(string)
 				kind := header.Kind
-				if header.APIVersion == "nvkr.dev/lock/v1" {
-					kind = "GeneratedLock"
-				}
+
 				if header.SchemaVersion == lifecycle.QualificationPolicySchema {
 					kind = "QualificationPolicy"
+				}
+				if header.SchemaVersion == lifecycle.LocalQualificationPolicySchema {
+					kind = "LocalQualificationPolicy"
 				}
 				if !strings.HasPrefix(header.APIVersion, "nvkr.dev/") && !strings.HasPrefix(header.SchemaVersion, "nvkr.dev/") {
 					continue
 				}
-				// These separately owned maintenance/validation records are not
-				// any of explain's supported authored kinds. They are not parsed
-				// as Definitions, catalogs or verification policies.
-				switch header.APIVersion {
-				case "nvkr.dev/catalog-maintenance/v1", "nvkr.dev/producer-overlay-maintenance/v1", "nvkr.dev/toolchain-refresh/v1", "nvkr.dev/validator-catalog/v1", "nvkr.dev/validator/v1":
+				// Dispatch only supported kinds; unrelated generated or
+				// maintenance records do not become authored graph inputs.
+				switch kind {
+				case definition.DefinitionKind, definition.EnvironmentKind, definition.CompositeKind,
+					"SourceBuildRegistry", catalog.OverlayKind, "CatalogFragment", "PinLock",
+					"QualificationPolicy", "LocalQualificationPolicy":
+				default:
 					continue
 				}
 				s.docs[name] = &document{kind: kind, raw: raw}
@@ -238,15 +265,41 @@ func (s *scan) stack(base string, overlays []string) (catalog.StackDescription, 
 	if found, ok := s.stacks[key]; ok {
 		return found, nil
 	}
-	absolute := make([]string, len(overlays))
-	for i, overlay := range overlays {
-		absolute[i] = filepath.Join(s.root, overlay)
+	registry := path.Join(base, catalog.RegistryFile)
+	doc := s.docs[registry]
+	if doc == nil {
+		return catalog.StackDescription{}, e.New(e.CodeInvalidCatalog, "catalog %s is missing from scan root", registry)
 	}
-	description, err := catalog.DescribeStackContext(s.ctx, filepath.Join(s.root, base), absolute)
+	var header struct {
+		Imports []struct {
+			Path string `json:"path"`
+		} `json:"imports"`
+	}
+	if err := yaml.Unmarshal(doc.raw, &header); err != nil {
+		return catalog.StackDescription{}, e.Wrap(e.CodeInvalidCatalog, err, "reading catalog import paths")
+	}
+	for _, imp := range header.Imports {
+		ref, err := s.relative(registry, imp.Path)
+		if err != nil {
+			return catalog.StackDescription{}, err
+		}
+		if s.docs[ref] == nil {
+			return catalog.StackDescription{}, e.New(e.CodeInvalidCatalog, "fragment %s is missing from scanned root", ref)
+		}
+	}
+	description, err := catalog.DescribeStackContext(s.ctx, s.root, base, overlays)
 	if err != nil {
 		return catalog.StackDescription{}, err
 	}
+	// Retain intermediate states so an unselected overlay can bind to a
+	// predecessor already present inside an explicitly selected longer chain.
+	for i := 1; i < len(overlays); i++ {
+		if _, err := s.stack(base, overlays[:i]); err != nil {
+			return catalog.StackDescription{}, err
+		}
+	}
 	s.stacks[key] = description
+	s.states = append(s.states, stackState{base: base, overlays: slices.Clone(overlays), digest: description.Digest})
 	return description, nil
 }
 
@@ -342,12 +395,12 @@ func (s *scan) admit(name string) error {
 			doc.refs = append(doc.refs, Reference{Path: member.Path, Relation: "member " + member.Name, Digest: member.Digest})
 		}
 	case "SourceBuildRegistry":
+		if path.Base(name) != catalog.RegistryFile {
+			return e.New(e.CodeInvalidCatalog, "catalog entrypoint must be %s", catalog.RegistryFile)
+		}
 		stack, err := s.stack(path.Dir(name), nil)
 		if err != nil {
 			return err
-		}
-		if path.Base(name) != catalog.RegistryFile {
-			return e.New(e.CodeInvalidCatalog, "catalog entrypoint must be %s", catalog.RegistryFile)
 		}
 		doc.summary = fmt.Sprintf("Catalog %q declares %d producers with recorded local pins.", stack.Name, len(stack.Components))
 		doc.refs = append(doc.refs, Reference{Path: path.Join(path.Dir(name), catalog.LockFile), Relation: "recorded pins"})
@@ -362,7 +415,7 @@ func (s *scan) admit(name string) error {
 			for _, mapping := range []struct {
 				label  string
 				values map[string]string
-			}{{"fragment sources", imp.Sources}, {"fragment components", imp.Components}, {"fragment source bindings", imp.SourceNames}} {
+			}{{"fragment sources (local -> fragment)", imp.Sources}, {"fragment components (local -> fragment)", imp.Components}, {"fragment source bindings (fragment -> local)", imp.SourceNames}} {
 				if len(mapping.values) > 0 {
 					doc.refs = append(doc.refs, Reference{Path: ref, Relation: mapping.label, Digest: "sha256:" + imp.SHA256, Mappings: mapping.values})
 				}
@@ -376,20 +429,25 @@ func (s *scan) admit(name string) error {
 		doc.overlay = &overlay
 		doc.summary = fmt.Sprintf("Overlay %q requires predecessor catalog %s.", overlay.Name, overlay.RequiresCatalogDigest)
 	case "CatalogFragment":
-		fragment, err := catalog.DescribeFragmentContext(s.ctx, file)
+		fragment, err := catalog.DescribeFragmentContext(s.ctx, s.root, name)
 		if err != nil {
 			return err
 		}
 		doc.summary = fmt.Sprintf("Fragment declares %d sources and %d components; importing registries own local names and pins.", len(fragment.Sources), len(fragment.Components))
-	case "GeneratedLock":
+	case "PinLock":
 		if path.Base(name) != catalog.LockFile {
 			return e.New(e.CodeInvalidCatalog, "generated lock must be named %s", catalog.LockFile)
 		}
 		if _, err := s.stack(path.Dir(name), nil); err != nil {
 			return err
 		}
-		doc.summary = fmt.Sprintf("Machine-managed catalog pins. Generate with nvkr catalog pin --dir %q SOURCE or update with nvkr catalog bump --dir %q SOURCE.", path.Dir(name), path.Dir(name))
+		doc.summary = fmt.Sprintf("Machine-managed catalog pins. From the printed scan root, generate with nvkr catalog pin --dir %q SOURCE or update with nvkr catalog bump --dir %q SOURCE.", path.Dir(name), path.Dir(name))
 		doc.refs = append(doc.refs, Reference{Path: path.Join(path.Dir(name), catalog.RegistryFile), Relation: "owning catalog"})
+	case "LocalQualificationPolicy":
+		if _, err := lifecycle.LoadLocalQualificationPolicy(s.ctx, file); err != nil {
+			return err
+		}
+		doc.summary = "Independent local qualification policy binds exact input identities and public verification keys; it does not authenticate a Run."
 	case "QualificationPolicy":
 		if _, err := lifecycle.LoadQualificationPolicy(s.ctx, file); err != nil {
 			return err
@@ -401,32 +459,70 @@ func (s *scan) admit(name string) error {
 	return nil
 }
 
-func (s *scan) bindOverlays() error {
-	for _, name := range s.paths {
-		doc := s.docs[name]
-		if doc.overlay == nil || len(doc.refs) > 0 {
+func (s *scan) predecessorStates(name, digest string) []stackState {
+	var found []stackState
+	seen := map[string]bool{}
+	for _, state := range s.states {
+		if state.digest != digest || slices.Contains(state.overlays, name) {
 			continue
 		}
-		var matches []string
-		for _, candidate := range s.paths {
-			if s.docs[candidate].kind != "SourceBuildRegistry" {
+		owner := path.Join(state.base, catalog.RegistryFile)
+		if len(state.overlays) > 0 {
+			owner = state.overlays[len(state.overlays)-1]
+		}
+		if !seen[owner] {
+			seen[owner] = true
+			found = append(found, state)
+		}
+	}
+	return found
+}
+
+func (s *scan) bindOverlays() error {
+	pending := []string{}
+	inferred := []string{}
+	for _, name := range s.paths {
+		if s.docs[name].overlay != nil && len(s.docs[name].refs) == 0 {
+			pending = append(pending, name)
+		}
+	}
+	for len(pending) > 0 {
+		next := []string{}
+		for _, name := range pending {
+			if err := s.ctx.Err(); err != nil {
+				return e.Wrap(e.CodeTimeout, err, "overlay explanation canceled")
+			}
+			doc := s.docs[name]
+			matches := s.predecessorStates(name, doc.overlay.RequiresCatalogDigest)
+			if len(matches) == 0 {
+				next = append(next, name)
 				continue
 			}
-			stack, err := s.stack(path.Dir(candidate), nil)
-			if err != nil {
+			if len(matches) > 1 {
+				return e.New(e.CodeUnverifiedRef, "overlay %s predecessor %s is ambiguous: %d matching input locations within root %s; select an explicit Definition overlay chain", name, doc.overlay.RequiresCatalogDigest, len(matches), s.root)
+			}
+			state := matches[0]
+			if _, err := s.stack(state.base, append(slices.Clone(state.overlays), name)); err != nil {
 				return err
 			}
-			if stack.Digest == doc.overlay.RequiresCatalogDigest {
-				matches = append(matches, candidate)
+			owner := path.Join(state.base, catalog.RegistryFile)
+			if len(state.overlays) > 0 {
+				owner = state.overlays[len(state.overlays)-1]
 			}
+			doc.refs = append(doc.refs, Reference{Path: owner, Relation: "predecessor", Digest: doc.overlay.RequiresCatalogDigest})
+			inferred = append(inferred, name)
 		}
-		if len(matches) != 1 {
-			return e.New(e.CodeUnverifiedRef, "overlay %s predecessor %s has %d matching catalogs within root %s (missing or ambiguous); select an explicit Definition overlay chain", name, doc.overlay.RequiresCatalogDigest, len(matches), s.root)
+		if len(next) == len(pending) {
+			name := next[0]
+			return e.New(e.CodeUnverifiedRef, "overlay %s predecessor %s is unmatched within root %s; no catalog or acyclic overlay chain supplies it", name, s.docs[name].overlay.RequiresCatalogDigest, s.root)
 		}
-		if _, err := s.stack(path.Dir(matches[0]), []string{name}); err != nil {
-			return err
+		pending = next
+	}
+	// A later inferred intermediate state may reveal an additional candidate.
+	for _, name := range inferred {
+		if len(s.predecessorStates(name, s.docs[name].overlay.RequiresCatalogDigest)) > 1 {
+			return e.New(e.CodeUnverifiedRef, "overlay %s predecessor is ambiguous within root %s; select an explicit Definition overlay chain", name, s.root)
 		}
-		doc.refs = append(doc.refs, Reference{Path: matches[0], Relation: "predecessor", Digest: doc.overlay.RequiresCatalogDigest})
 	}
 	return nil
 }

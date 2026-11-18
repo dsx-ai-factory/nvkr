@@ -5,19 +5,27 @@ package inputinspect
 
 import (
 	"context"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"sigs.k8s.io/yaml"
 )
 
@@ -72,7 +80,7 @@ func TestExplainDirectAndReverseDeterministic(t *testing.T) {
 	}{
 		{"definition.json", "Definition", 2, 0},
 		{"catalog/registry.yaml", "SourceBuildRegistry", 1, 3},
-		{"catalog/pins.lock.yaml", "GeneratedLock", 1, 1},
+		{"catalog/pins.lock.yaml", "PinLock", 1, 1},
 	} {
 		t.Run(tc.kind, func(t *testing.T) {
 			got, err := Explain(t.Context(), root, filepath.Join(root, tc.file))
@@ -270,5 +278,185 @@ func TestExplainEnvironmentAndComposite(t *testing.T) {
 		if _, err := Explain(t.Context(), root, filepath.Join(root, name)); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestExplainIgnoresOtherSchemas(t *testing.T) {
+	root := fixture(t)
+	for i, field := range []string{"apiVersion", "schemaVersion"} {
+		writeJSON(t, root, fmt.Sprintf("other-%d.json", i), map[string]any{field: "nvkr.dev/toolchain-refresh/v1"})
+	}
+	if _, err := Explain(t.Context(), root, filepath.Join(root, "definition.json")); err != nil {
+		t.Fatal(err)
+	}
+	_, err := Explain(t.Context(), root, filepath.Join(root, "other-0.json"))
+	code(t, err, e.CodeInvalidCatalog)
+}
+
+func TestExplainRejectsEscapeBeforeReadingFragment(t *testing.T) {
+	original := fixture(t)
+	parent := t.TempDir()
+	root := filepath.Join(parent, "inputs")
+	if err := os.Rename(original, root); err != nil {
+		t.Fatal(err)
+	}
+	write(t, parent, "outside.yaml", []byte("not a fragment"))
+	raw, err := os.ReadFile(filepath.Join(root, "catalog/registry.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var reg map[string]any
+	if err := yaml.Unmarshal(raw, &reg); err != nil {
+		t.Fatal(err)
+	}
+	reg["imports"] = []any{map[string]any{"path": "../../outside.yaml", "sha256": strings.Repeat("a", 64), "components": map[string]string{"extra": "x"}}}
+	writeJSON(t, root, "catalog/registry.yaml", reg)
+	_, err = Explain(t.Context(), root, filepath.Join(root, "definition.json"))
+	code(t, err, e.CodeInvalidCatalog)
+	if !strings.Contains(err.Error(), "leaves --root") {
+		t.Fatalf("read escaped input before admission: %v", err)
+	}
+}
+
+func TestExplainPolicyKinds(t *testing.T) {
+	root := fixture(t)
+	raw, err := os.ReadFile("../../../inputs/policies/nvke-qualification.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, root, "policy.yaml", raw)
+	key := func() string {
+		k, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		der, err := x509.MarshalPKIXPublicKey(&k.PublicKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return string(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: der}))
+	}
+	digest := "sha256:" + strings.Repeat("1", 64)
+	local := lifecycle.LocalQualificationPolicy{SchemaVersion: lifecycle.LocalQualificationPolicySchema, Lane: factory.TierLocalExecution.String(), DefinitionDigest: digest, EnvironmentDigest: digest, PlanDigest: digest, Platform: "linux/amd64", CosignDigest: digest, BuilderKey: key(), SmokeKey: key(), QualifierKey: key(), Smoke: lifecycle.QualificationSmokePolicy{Images: map[string]string{"linux/amd64": "registry.example.test/smoke@" + digest}, Tools: map[string]string{"tool": "helm-version"}}}
+	writeJSON(t, root, "local-policy.json", local)
+	for _, tc := range []struct{ file, kind string }{{"policy.yaml", "QualificationPolicy"}, {"local-policy.json", "LocalQualificationPolicy"}} {
+		got, err := Explain(t.Context(), root, filepath.Join(root, tc.file))
+		if err != nil || got.Kind != tc.kind {
+			t.Fatalf("policy %s: %+v %v", tc.file, got, err)
+		}
+	}
+}
+
+func TestExplainCompositeMismatch(t *testing.T) {
+	root := fixture(t)
+	writeJSON(t, root, "composite.json", definition.CompositeDefinition{APIVersion: definition.CompositeAPIVersion, Kind: definition.CompositeKind, Metadata: definition.Metadata{Name: "joined"}, Members: []definition.CompositeMember{{Name: "tiny", Definition: "definition.json", Digest: "sha256:" + strings.Repeat("a", 64)}}})
+	_, err := Explain(t.Context(), root, filepath.Join(root, "composite.json"))
+	code(t, err, e.CodeUnverifiedRef)
+}
+
+func TestExplainOrderedOverlayChain(t *testing.T) {
+	root := fixture(t)
+	overlay(t, root, true)
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "catalog")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := catalog.LoadOverlayContext(t.Context(), filepath.Join(root, "overlay.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacement := *first.Components["pause"].Component
+	replacement.Tag = "v2.0.0"
+	first.Components["pause"] = catalog.ComponentReplacement{Component: &replacement}
+	writeJSON(t, root, "overlay.json", first)
+	applied, err := catalog.ApplyStack(base, first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second := first
+	second.Name = "second"
+	second.RequiresCatalogDigest = applied.Digest
+	replacement.Tag = "v3.0.0"
+	second.Components = map[string]catalog.ComponentReplacement{"pause": {Component: &replacement}}
+	writeJSON(t, root, "second.json", second)
+	def, err := definition.LoadDefinition(t.Context(), filepath.Join(root, "definition.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	def.Catalog.Overlays = []string{"overlay.json", "second.json"}
+	writeJSON(t, root, "definition.json", def)
+	got, err := Explain(t.Context(), root, filepath.Join(root, "definition.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.References[1].Path != "overlay.json" || got.References[2].Path != "second.json" {
+		t.Fatalf("reordered: %+v", got.References)
+	}
+	// An unselected sibling can bind to an intermediate selected state.
+	third := first
+	third.Name = "third"
+	third.RequiresCatalogDigest = applied.Digest
+	thirdReplacement := replacement
+	thirdReplacement.Tag = "v4.0.0"
+	third.Components = map[string]catalog.ComponentReplacement{"pause": {Component: &thirdReplacement}}
+	writeJSON(t, root, "third.json", third)
+	if got, err := Explain(t.Context(), root, filepath.Join(root, "third.json")); err != nil || got.References[0].Path != "overlay.json" {
+		t.Fatalf("intermediate predecessor: %+v %v", got, err)
+	}
+	// Remove explicit selection: the same chain must resolve by its distinct states.
+	def.Catalog.Overlays = nil
+	writeJSON(t, root, "definition.json", def)
+	got, err = Explain(t.Context(), root, filepath.Join(root, "second.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.References) != 1 || got.References[0].Path != "overlay.json" {
+		t.Fatalf("wrong predecessor: %+v", got)
+	}
+}
+
+type cancelDuringScan struct {
+	context.Context
+	remaining atomic.Int32
+	cancel    context.CancelFunc
+}
+
+func (c *cancelDuringScan) Err() error {
+	if c.remaining.Add(-1) == 0 {
+		c.cancel()
+	}
+	return c.Context.Err()
+}
+func TestExplainCancellationDuringScan(t *testing.T) {
+	root := fixture(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	counted := &cancelDuringScan{Context: ctx, cancel: cancel}
+	counted.remaining.Store(12)
+	got, err := Explain(counted, root, filepath.Join(root, "definition.json"))
+	code(t, err, e.CodeTimeout)
+	if got.Kind != "" {
+		t.Fatalf("partial report: %+v", got)
+	}
+}
+
+func TestExplainRootBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		setup func(*testing.T, string)
+	}{
+		{"depth", func(t *testing.T, r string) { write(t, r, strings.Repeat("deep/", 18)+"file.txt", nil) }},
+		{"entries", func(t *testing.T, r string) {
+			for i := 0; i < maxEntries; i++ {
+				write(t, r, fmt.Sprintf("entry-%d.txt", i), nil)
+			}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := fixture(t)
+			tc.setup(t, r)
+			_, err := Explain(t.Context(), r, filepath.Join(r, "definition.json"))
+			code(t, err, e.CodeInvalidCatalog)
+		})
 	}
 }
