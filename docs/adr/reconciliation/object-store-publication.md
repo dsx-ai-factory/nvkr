@@ -40,11 +40,39 @@ matching transport bytes cannot resolve that product decision. No live boot/inst
 
 ### Selective boot-asset publication
 
-[#514](https://github.com/dsx-ai-factory/nvkr/issues/514) proposes the [ADR-20 selective contract](../0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding). It has no implementation, ratification or selective test/provider/boot evidence yet; existing full-mirror evidence is unchanged.
+The [ADR-20 selective contract](../0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding)
+has core APIs for explicit Environment v3 selection, Plan v7 phase budgets, raw QCOW2/EFI member ownership,
+preliminary availability, final original membership/proof publication and independent S3-only consumption.
+`PrepareBootInputs` issues the compiled expectation; `WithPreparedBootAssets` lends a revocable preliminary
+receipt. `PublishBootSelection` and `VerifyBootSelection` issue only `SelectedBootReceipt` after cleanup.
+Original full Release metadata remains intact; unselected payloads and proofs are not required by this route.
+Old Environment, BinaryBundle and full-mirror inventory bytes retain compatibility coverage.
+
+`TestBootMembershipAuthenticatesOnlySelectedOriginalProofs` and its rejection table cover original aggregate,
+local-root/descriptor, input/invocation, member/platform/profile and disk-evidence joins. Delivery tests cover
+independent full pinned/HTTPS reads, bounded sparse restoration, deterministic inventory-last publication,
+cancellation/owner cleanup and exact-attempt recovery. `TestBootS3OnlySelectedProofRoundTrip` uses the AWS SDK
+against a local TLS fixture with original proof bytes and disabled registry proof discovery. Its cryptographic
+runner is synthetic; it is not a live Sigstore or S3 acceptance transcript.
+The round trip obtains its expectation and limits from a compiled v7 Plan and calls the exported
+preparation, publication, retry and verification APIs. Private test adapters replace trust and OCI acquisition;
+they preserve phase bounds and exercise post-inventory cleanup failure without claiming integrated live trust acceptance.
+
+Bounded keyless verification authenticates public-good Sigstore trust through the same pinned TUF libraries
+and bootstrap as cosign 3.1.3, with a fresh private cache and one phase read budget. Cosign receives that exact
+trusted-root snapshot; ambient metadata and unmetered verifier trust fetches are excluded. Signed synthetic TUF
+fixtures cover authentic updates, rollback-cache isolation, tampered targets, cancellation and exhausted budgets.
+Live Linux cosign/TUF service acceptance remains unexercised. No new signing trust, IAM, bucket, credential,
+provisioning network or retention policy is configured here.
+
+Generated selective execution remains rejected before effects pending its configuration/generation owner;
+static Plan compilation and lifecycle APIs do not establish hosted Run completion. No selective provider,
+independent provisioning-client, chainload, boot, qualification or organizational ratification evidence is claimed.
+Existing full-mirror evidence is unchanged. See the [operator boundary](../../publication-architecture.md#selective-boot-assets).
 
 | Owner | Outstanding scope |
 |---|---|
-| [#515](https://github.com/dsx-ai-factory/nvkr/issues/515) | Selection, raw-member proofs, receipts, S3-only verification, serving, recovery and compatibility tests. |
+| [#515](https://github.com/dsx-ai-factory/nvkr/issues/515) | Core selection, raw-member proofs, limited receipts, serving, recovery and S3-only verification are contract-tested; external acceptance remains with the owners below. |
 | [#517](https://github.com/dsx-ai-factory/nvkr/issues/517) | Predeclared render, pinned schema/profile, dependency joins, trusted import and chainload/imaging/first-boot evidence. |
 | [#516](https://github.com/dsx-ai-factory/nvkr/issues/516) | Signed EFI member/platform/profile binding; separate mkosi producer lane. |
 | [#384](https://github.com/dsx-ai-factory/nvkr/issues/384) | Selective configuration, regeneration and required finalization, preserving full-mirror defaults. |
