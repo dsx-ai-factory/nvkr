@@ -88,6 +88,44 @@ Both outputs use the default catalog. `components` selects exact producer keys; 
 them. Neither output selects `app-cli-alt` yet. Each output remains
 independently required even when it shares a component with another output.
 
+## Share catalog selections across outputs
+
+Keep `catalog` for shared action and utility pins. Add an optional ordered `catalogs` list when outputs
+select producers from several stacks:
+
+```yaml
+catalog:
+  base: ./tools
+catalogs:
+  - base: ./applications
+  - base: ./images
+    overlays: [./image-toolchains.yaml]
+outputs:
+  - name: client-bundle
+    components: [app-cli]
+    platform: linux/amd64
+    format: executable
+```
+
+An output without an override must find its complete component selection and every required platform
+in exactly one listed stack. No match returns `NVKR-E-NO-MATCH`; multiple matches return
+`NVKR-E-AMBIGUOUS`, even if their producers are identical. List order never resolves a collision.
+Set that output's `catalog` explicitly to choose a stack. All listed stacks are validated, including
+unused candidates. At most 64 distinct stacks are admitted; an omitted or empty list retains the
+singular catalog behavior. Internal tools use the same selection rule. Composite members must share
+the same ordered list after rebasing paths.
+
+`run plan` shows each selected catalog, overlays and digest in its producer section. Its JSON view
+records `builds[].selectedCatalog` and the complete `catalogCandidates` snapshots. Validation rechecks
+the whole output's choice, including every native child of a platform set.
+
+The maintained NVKE Definition uses six stacks and two explicit `nvkectl` overrides because that
+producer exists in both the release and module-tag catalogs. Its 69 output names and all 73 native
+producer selections stay unchanged. Source-built image outputs already use platform sets. Acquired
+image pairs remain separate: aggregate packaging currently requires built OCI exports. Disk outputs
+remain native, and executable-index migration belongs to issues #297, #296 and #376 with their
+qualification prerequisites. No output rename or consumer mapping changes in this migration.
+
 ## Find components
 
 Browse all catalogs without first choosing a producer:

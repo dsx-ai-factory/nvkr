@@ -24,7 +24,18 @@ complete required build graph directly from those producers.
 ### 1. Exact producer selection
 
 Each Definition output declares a concrete target platform, or an explicit required platform set for an OCI image index, and a nonempty explicit component selection.
-The output uses the Definition's catalog stack unless it supplies its own.
+An explicit output catalog stack takes precedence. Otherwise, an optional ordered `catalogs` list
+selects from at most 64 distinct stacks. One stack must contain every explicitly selected component
+and support every required platform; selection never unions producers across stacks. Zero matching
+stacks returns `no-match`; multiple matching stacks return `ambiguous`, even when their producers
+are identical. The author must provide an output override to disambiguate. Order fixes inspection and
+snapshot order, never precedence among matches. All candidates are admitted before selection.
+Without this list, the output uses the Definition's singular `catalog` stack as before. Internal tool
+selections follow the same rule. The singular stack continues to own shared action and utility pins.
+Generated Plans retain all candidate snapshots and their ordered authored locators; executable Plan
+validation rechecks selection against those snapshots and binds each native Build to its selected
+catalog digest. A platform set must select one stack for the whole set, not one per child.
+Composite members must share the same rebased ordered list, just as they share the singular stack.
 Catalog sources, tools and components are reusable. There is no authored Recipe, reusable build
 group, criteria query, wildcard, specificity rule, inheritance chain, mixin, enable/disable merge, or reserved-axis
 activation. Removed fields and reserved legacy `overlays/` and `mixins/` directory layouts fail closed; they

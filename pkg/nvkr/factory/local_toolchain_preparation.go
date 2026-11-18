@@ -229,11 +229,18 @@ func (p *LocalToolchainPreparation) substitute(ctx context.Context, image string
 	for i := range definition.Outputs {
 		if definition.Outputs[i].Catalog == nil {
 			selection := definition.Catalog
+			if len(baseline.CatalogCandidates) != 0 {
+				candidate, err := selectCatalogCandidate(definition.Outputs[i], baseline.CatalogCandidates)
+				if err != nil {
+					return nil, nil, err
+				}
+				selection = candidate.Selection
+			}
 			definition.Outputs[i].Catalog = &selection
 		}
 	}
 	base := &catalog.Stack{Catalog: baseline.CatalogSnapshot, Digest: baseline.CatalogDigest, Applied: baseline.AppliedOverlays}
-	candidate, err := compileWithTargetStacks(ctx, definition, baseline.Environment, base, stacks, baseline.GeneratorVersion, baseline.DefinitionPath, baseline.EnvironmentPath, baseline.RuntimeSourceCommit)
+	candidate, err := compileWithTargetStacksFor(ctx, definition, baseline.Environment, base, stacks, baseline.GeneratorVersion, baseline.DefinitionPath, baseline.EnvironmentPath, nil, baseline.CatalogCandidates, baseline.RuntimeSourceCommit)
 	return candidate, scopes, err
 }
 
@@ -257,6 +264,16 @@ func (p *LocalToolchainPreparation) Verify(ctx context.Context, selected *Plan, 
 	actualDefinition := selected.Definition.Clone()
 	expectedDefinition := expected.Definition.Clone()
 	actualDefinition.Catalog = expectedDefinition.Catalog
+	actualDefinition.Catalogs = expectedDefinition.Catalogs
+	if len(selected.CatalogCandidates) != len(expected.CatalogCandidates) {
+		return e.New(e.CodeVerifyFailed, "local preparation changed candidate membership")
+	}
+	for i, candidate := range selected.CatalogCandidates {
+		want := expected.CatalogCandidates[i]
+		if candidate.CatalogDigest != want.CatalogDigest || !reflect.DeepEqual(candidate.AppliedOverlays, want.AppliedOverlays) {
+			return e.New(e.CodeVerifyFailed, "local preparation changed candidate %d", i)
+		}
+	}
 	for i := range actualDefinition.Outputs {
 		actualDefinition.Outputs[i].Catalog = nil
 	}
