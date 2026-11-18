@@ -9,6 +9,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	nativeyaml "go.yaml.in/yaml/v3"
 	"sigs.k8s.io/yaml"
 )
 
@@ -150,5 +151,44 @@ func TestBootFieldsRefusedByOldEnvironmentSchemas(t *testing.T) {
 				requireCode(t, err, e.CodeInvalidCatalog)
 			}
 		}
+	}
+}
+
+func TestBootFieldsPreserveNativeYAMLVersionedRoundTrip(t *testing.T) {
+	maintained, err := LoadEnvironment(t.Context(), "../../../inputs/environments/github-release.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, version := range []string{EnvironmentAPIVersion, EnvironmentObjectStoresAPIVersion, EnvironmentBootAPIVersion} {
+		t.Run(version, func(t *testing.T) {
+			environment := maintained.Clone()
+			switch version {
+			case EnvironmentObjectStoresAPIVersion:
+				environment.Publication = objectEnvironment().Publication
+			case EnvironmentBootAPIVersion:
+				environment.Publication = bootEnvironmentFixture().Publication
+			}
+			environment.APIVersion = version
+			environment.Publication.Transports = []string{PublicationTransportOCI}
+			before, err := environment.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := nativeyaml.Marshal(environment)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if version != EnvironmentBootAPIVersion && (bytes.Contains(bytes.ToLower(raw), []byte("bootselection:")) || bytes.Contains(raw, []byte("serving:"))) {
+				t.Fatal("native YAML added boot fields to a legacy Environment")
+			}
+			decoded, err := DecodeEnvironment(raw)
+			if err != nil {
+				t.Fatal(err)
+			}
+			after, err := decoded.Digest()
+			if err != nil || before != after {
+				t.Fatalf("native YAML roundtrip changed identity: before=%s after=%s err=%v", before, after, err)
+			}
+		})
 	}
 }

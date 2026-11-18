@@ -163,7 +163,7 @@ type Publication struct {
 	// OCIRepresentation is an authored construction choice, never negotiated by push.
 	OCIRepresentation ociformat.Representation `json:"ociRepresentation,omitempty"`
 	ObjectStores      []ObjectStoreDestination `json:"objectStores,omitempty" yaml:"objectStores,omitempty"`
-	BootSelection     *BootSelection           `json:"bootSelection,omitempty"`
+	BootSelection     *BootSelection           `json:"bootSelection,omitempty" yaml:"bootSelection,omitempty"`
 	// Transports is a sorted, unique selection. Omission preserves the OCI route.
 	// APT is recognized but unavailable until its publication adapter is admitted.
 	Transports []string `json:"transports,omitempty"`

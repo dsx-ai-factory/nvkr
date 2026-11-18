@@ -18,10 +18,10 @@ import (
 // immutable destination. Credentials remain references to workload roles.
 type ObjectStoreDestination struct {
 	Name     string                    `json:"name"`
-	Mode     string                    `json:"mode,omitempty"`
+	Mode     string                    `json:"mode,omitempty" yaml:"mode,omitempty"`
 	Provider string                    `json:"provider"`
 	S3       *S3ObjectStoreDestination `json:"s3,omitempty"`
-	Serving  *BootServing              `json:"serving,omitempty"`
+	Serving  *BootServing              `json:"serving,omitempty" yaml:"serving,omitempty"`
 	Transfer ObjectStoreTransfer       `json:"transfer,omitempty"`
 }
 
