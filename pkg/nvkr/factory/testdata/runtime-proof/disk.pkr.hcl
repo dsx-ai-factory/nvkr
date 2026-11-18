@@ -28,7 +28,7 @@ source "qemu" "disk" {
   format           = "qcow2"
   headless         = true
   iso_url          = "${path.root}/seed.raw"
-  iso_checksum     = "sha256:${filesha256("${path.root}/seed.raw")}"
+  iso_checksum     = "file:${path.root}/seed.raw.sha256"
   memory           = 128
   cpus             = 1
   output_directory = "${var.output_directory}/build"

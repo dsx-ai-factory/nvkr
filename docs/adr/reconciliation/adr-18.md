@@ -9,7 +9,8 @@ archive. Extraction rejects memory-backed storage and verifies the entire stream
 private root; that root is removed after inspection or consumption joins. Focused tests cover original
 inode retention, ownership, read-only descriptors, tampering, tmpfs rejection and cleanup. Cgroup memory
 observation excludes only inactive file pages from usage, preserves host and ancestor limits, and rejects
-missing or malformed statistics. Native consumer execution with these changes remains unexercised. The native namespace
+missing or malformed statistics. Native consumer admission and offline Packer validation have run with
+these changes, but the guest build remains unproved, as scoped below. The native namespace
 [VM proof](https://github.com/njhensley/nvkr/actions/runs/44194123590) at
 `0dbb69bb55dc190884ef3ca2b9d673a6c365284d` exercised both assembly and consumer launchers on stock
 Ubuntu 24.04 AMD64 with kernel `7.0.0-1014-aws`. The separately owned executable tmpfs retained its
@@ -98,8 +99,15 @@ The [disk-retention attempt](https://github.com/njhensley/nvkr/actions/runs/4426
 Its consumer admission failed with 3/4096 MiB memory and 14647/16384 MiB workspace available/required.
 The service reported 5057 MiB file cache (5054 MiB inactive), 20 MiB anonymous memory and 45 MiB process
 RSS; the retained layer was a 1852 MiB disk snapshot. No OOM kill or Packer execution occurred. The
-current storage path removes that extra retained snapshot and retains the original OCI tar. Budgets
-remain unchanged; the working-set measurement and resulting workspace headroom need a fresh native proof.
+current storage path removes that extra retained snapshot and retains the original OCI tar.
+The [single-copy working-set attempt](https://github.com/njhensley/nvkr/actions/runs/44272566156) at
+`dc7020d7c58f25549ab89d221cf887a04aaced83` completed production, terminal observation and SBOM, then
+passed consumer admission under unchanged budgets. Its diagnostic sample showed a 167 MiB cgroup
+working set, 4953 MiB cgroup headroom and 16500 MiB available workspace. The filesystem used 2447 MiB;
+one root-owned 1852 MiB OCI tar remained, with no unlinked non-memfd descriptor copy. Packer validation
+rejected the fixture's unsupported `filesha256` function before QEMU execution. The fixture now supplies
+a generated checksum file. This failed attempt establishes neither a completed consumer receipt nor a
+disk result, and it exported no standalone OCI subject or SBOM documents.
 The earlier assembly digest above describes the closure before the outbound helper was added and does
 not evidence the changed runtime.
 

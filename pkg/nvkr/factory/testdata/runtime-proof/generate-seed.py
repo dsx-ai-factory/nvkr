@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Generate the BIOS guest; no assembler or downloaded guest is required."""
+from hashlib import sha256
 from pathlib import Path
 
 # Real-mode x86: establish DS/SS/SP, wait ten seconds through BIOS int 15h,
@@ -22,3 +23,6 @@ seed[:len(code)] = code
 seed[0x80:0x90] = bytes.fromhex("1000 0100 007c 0000 0800000000000000")
 seed[510:512] = bytes.fromhex("55aa")
 Path(__file__).with_name("seed.raw").write_bytes(seed)
+Path(__file__).with_name("seed.raw.sha256").write_text(
+    f"{sha256(seed).hexdigest()}  seed.raw\n", encoding="ascii"
+)
