@@ -19,6 +19,8 @@ _Avoid_: Factory, FactoryDefinition, cluster definition
 Separately selected execution settings, required publication transports and namespace, credential references,
 and signing identity policy. Container execution defaults to Docker; local Runs inherit the Environment
 runtime and reject conflicting executable overrides before work. Podman is an explicit alternative.
+Local execution may resolve a versioned build-only default instead of an authored Environment; the exact
+policy bytes and digest are frozen with the Plan and Run. This grants no signing, publication or VM capability.
 Selecting an unavailable transport fails before work; a supported sibling cannot
 substitute for it. An explicit OCI representation selects construction before packaging and signing;
 it changes Environment and Plan identity, not logical Build identity or existing publication bytes.
