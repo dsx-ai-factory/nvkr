@@ -4,9 +4,11 @@
 package factory
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -30,7 +32,9 @@ func (s *outputSigner) SignAndAttest(ctx context.Context, subject sign.Subject, 
 	return s.fakeOCISigner.SignAndAttest(ctx, subject, predicate)
 }
 func (s *outputSigner) Verify(_ context.Context, subject sign.Subject, policy sign.VerifyPolicy) (sign.VerificationRecord, error) {
+	s.mu.Lock()
 	s.verified = append(s.verified, subject)
+	s.mu.Unlock()
 	if subject.Ref == s.failRef {
 		return sign.VerificationRecord{}, e.New(e.CodeVerifyFailed, "verification refused")
 	}
@@ -86,15 +90,25 @@ func TestDeliverableSigningAndVerification(t *testing.T) {
 				t.Fatalf("signed subjects: %+v", signer.signed)
 			}
 			profile.Mode = SigningModeCosign
-			err = verifyPublicationOutputs(t.Context(), signer, ref, inspection, profile, io.Discard)
+			var log bytes.Buffer
+			err = verifyPublicationOutputs(t.Context(), signer, ref, inspection, profile, &log)
 			if tc.fail || tc.missingSignature || tc.missingAttestation || tc.substituted {
 				assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
 			} else {
 				if err != nil {
 					t.Fatal(err)
 				}
+				slices.SortFunc(signer.verified, func(a, b sign.Subject) int { return strings.Compare(a.Ref, b.Ref) })
 				if !reflect.DeepEqual(signer.verified, expected) {
 					t.Fatalf("verified subjects: %+v", signer.verified)
+				}
+				previous := -1
+				for _, subject := range expected {
+					position := strings.Index(log.String(), subject.Ref)
+					if position <= previous {
+						t.Fatalf("noncanonical verification log: %s", &log)
+					}
+					previous = position
 				}
 			}
 		})

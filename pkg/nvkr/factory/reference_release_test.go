@@ -11,6 +11,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -29,10 +30,14 @@ type referenceSigner struct {
 	sbomErr          error
 	dry              bool
 	observedIdentity string
+	distinctBundles  bool
+	bundleSequence   int
 }
 
 func (s *referenceSigner) Verify(ctx context.Context, subject sign.Subject, policy sign.VerifyPolicy) (sign.VerificationRecord, error) {
+	s.mu.Lock()
 	s.verifiedPolicy = policy
+	s.mu.Unlock()
 	if s.verifyErr != nil {
 		return sign.VerificationRecord{}, s.verifyErr
 	}
@@ -52,7 +57,14 @@ func (s *referenceSigner) AttestSBOM(_ context.Context, subject string, document
 	if err != nil {
 		return nil, err
 	}
-	return json.Marshal(map[string]any{"mediaType": sbom.BundleMediaType, "verificationMaterial": map[string]any{}, "dsseEnvelope": map[string]any{"payloadType": "application/vnd.in-toto+json", "payload": base64.StdEncoding.EncodeToString(statement), "signatures": []any{map[string]string{"sig": "Zml4dHVyZQ=="}}}})
+	signature := "Zml4dHVyZQ=="
+	if s.distinctBundles {
+		s.mu.Lock()
+		s.bundleSequence++
+		signature = base64.StdEncoding.EncodeToString([]byte("fixture signature " + strconv.Itoa(s.bundleSequence)))
+		s.mu.Unlock()
+	}
+	return json.Marshal(map[string]any{"mediaType": sbom.BundleMediaType, "verificationMaterial": map[string]any{}, "dsseEnvelope": map[string]any{"payloadType": "application/vnd.in-toto+json", "payload": base64.StdEncoding.EncodeToString(statement), "signatures": []any{map[string]string{"sig": signature}}}})
 }
 func (s *referenceSigner) VerifySBOM(context.Context, string, []byte) error { return s.sbomErr }
 func referenceSignerFactory(s *referenceSigner) signerFor {
@@ -66,6 +78,11 @@ func referenceMetadataFixture(t *testing.T, attempts ...string) (*Plan, map[stri
 }
 
 func referenceMetadataFixtureForPlan(t *testing.T, plan *Plan, attempts ...string) (*Plan, map[string]Artifact, *referenceSigner) {
+	t.Helper()
+	return referenceMetadataFixtureWithSigner(t, plan, &referenceSigner{}, attempts...)
+}
+
+func referenceMetadataFixtureWithSigner(t *testing.T, plan *Plan, signer *referenceSigner, attempts ...string) (*Plan, map[string]Artifact, *referenceSigner) {
 	t.Helper()
 	t.Chdir(t.TempDir())
 	for key, value := range map[string]string{"GITHUB_ACTIONS": "true", "GITHUB_SERVER_URL": "https://github.com", "GITHUB_REPOSITORY": "example/nvkr", "GITHUB_WORKFLOW_REF": "example/nvkr/.github/workflows/nvkr-factory.yml@refs/heads/main", "GITHUB_RUN_ID": "12345", "GITHUB_RUN_ATTEMPT": "1"} {
@@ -90,7 +107,6 @@ func referenceMetadataFixtureForPlan(t *testing.T, plan *Plan, attempts ...strin
 			}
 		}
 	}
-	signer := &referenceSigner{}
 	if plan.Environment.GitHubDevelopment {
 		signer.observedIdentity = "https://github.com/example/nvkr/" + workflow + "@refs/heads/feature/pipeline"
 	}
