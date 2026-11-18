@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -27,8 +28,9 @@ func TestSharedSourceSeedAuthenticatesEachConsumer(t *testing.T) {
 				seed, directory, options := pristineClosureFixture(t)
 				if strings.HasPrefix(scenario, "shallow ") {
 					parent := seed.Commit
-					if _, err := gitOut(t.Context(), directory, "-c", "user.name=Test", "-c", "user.email=test@example.test", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "shallow tip"); err != nil {
-						t.Fatal(err)
+					cmd := exec.CommandContext(t.Context(), "git", "-C", directory, "-c", "user.name=Test", "-c", "user.email=test@example.test", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-qm", "shallow tip")
+					if output, err := cmd.CombinedOutput(); err != nil {
+						t.Fatalf("create shallow fixture: %s, %v", output, err)
 					}
 					var err error
 					seed.Commit, err = gitOut(t.Context(), directory, "rev-parse", "HEAD")
