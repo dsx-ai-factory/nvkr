@@ -1043,6 +1043,10 @@ replace each consumer's own admission. Owner selection is deterministic from the
 consumer can change the selected owner. Prepared closure sharing additionally requires the same native platform; cross-platform consumers
 reconstruct the pristine Git tree and run their own vendor operation.
 
+Ordinary source carriers omit the checkout's immediate Git administrative directory. A shared owner's
+carrier explicitly includes only its Git object store and optional shallow boundary beside the closure;
+the archive refuses missing object stores and symlinked Git metadata. It does not carry config, hooks,
+refs, attributes or index state. These additional transport bytes do not enter logical Build identity.
 The source module authenticates the restored owner's receipt and complete closure. It copies only the
 Git object store and shallow boundary into a fresh repository, refuses alternate object sources, and
 uses Git's full object-integrity check before binding the pinned commit/tree. Seed config, attributes,

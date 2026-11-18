@@ -730,8 +730,9 @@ complete bundle regeneration and checking. Static validation expands templates w
 bytes, preserving credential scope and per-job finalizer results. Edit locality preserves ordinary jobs when
 an independent output is added; shared source selection and image publication batches can change membership.
 On GitHub a job is one authority class on one runner, normally for one Build target or publication route
-(ADR-18 §8). Source fetch without a credential, build, acquisition,
-terminal observation, SBOM and packaging share a producer job. SBOM attestation, publication, signing,
+(ADR-18 §8). Eligible non-owner source fetches without a credential, build, acquisition,
+terminal observation, SBOM and packaging may share a producer job. Shared source owners always run in
+source-only jobs before producer work. SBOM attestation, publication, signing,
 publication verification and release assembly share a release job with step-scoped credentials. An
 operation joins a job only when it has the same class, runner label and native platform and adds no
 prerequisite, except the image batches and same-target source-fetch groups described below.

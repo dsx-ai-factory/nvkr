@@ -5,10 +5,13 @@ package factory
 
 import (
 	"bytes"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
@@ -217,6 +220,70 @@ func TestGitHubSharedSourcesKeepConsumerAdmission(t *testing.T) {
 	}
 	t.Logf("%d logical fetches, %d network owners, %d vendor closure owners", fetches, len(networkOwners), len(closureOwners))
 	t.Logf("%d operation jobs, %d source-closure carriers", len(stages), carriers)
+}
+
+func TestGitHubSharedSourceOwnerCarrierPreservesGitObjects(t *testing.T) {
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ordered, _, err := githubSchedulingProjection(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	seeds, err := githubSourceSeeds(plan, ordered)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var owner Node
+	for _, node := range ordered {
+		if seed, ok := seeds[node.ID]; ok {
+			owner = seed
+			break
+		}
+	}
+	if owner.ID == "" {
+		t.Fatal("fixture requires a shared source owner")
+	}
+	_, artifacts := planIndex(plan)
+	t.Chdir(t.TempDir())
+	var source Artifact
+	for _, id := range owner.Outputs {
+		artifact := artifacts[id]
+		if err := os.MkdirAll(filepath.Dir(artifact.Path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if artifact.Kind == "source-closure" {
+			source = artifact
+			if err := os.MkdirAll(filepath.Join(source.Path, ".git/objects"), 0700); err != nil {
+				t.Fatal(err)
+			}
+			for _, name := range []string{"input", ".git/objects/fixture", ".git/config"} {
+				if err := os.WriteFile(filepath.Join(source.Path, name), []byte(name), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+		} else if err := os.WriteFile(artifact.Path, []byte("fixture receipt"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if source.ID == "" {
+		t.Fatal("owner has no source closure")
+	}
+	if err := PackGitHubOutputs(t.Context(), plan, owner.ID, GitHubStepOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	destination := t.TempDir()
+	if err := transportarchive.Unpack(t.Context(), carrierPath(source.ID), destination, []string{source.Path}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(destination, source.Path, ".git/objects/fixture"))
+	if err != nil || string(got) != ".git/objects/fixture" {
+		t.Fatalf("source owner lost Git objects in transport: %q, %v", got, err)
+	}
+	if _, err := os.Lstat(filepath.Join(destination, source.Path, ".git/config")); !os.IsNotExist(err) {
+		t.Fatalf("source owner transported Git config: %v", err)
+	}
 }
 
 func TestGitHubSeededFetchesShareSourceStage(t *testing.T) {

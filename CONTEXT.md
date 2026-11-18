@@ -208,8 +208,9 @@ visible policy and required inline action pins stay unchanged. Stable provider s
 the complete bundle still requires regeneration and checking.
 Edit locality preserves ordinary output jobs when an independent output is added; shared source selection
 and image publication batches can change membership. A GitHub job is one authority class on one runner,
-normally for one Build target or publication route. Source fetch, build,
-observation, SBOM and packaging share a producer job; attestation, publication, signing and remote
+normally for one Build target or publication route. Eligible non-owner source fetches, build,
+observation, SBOM and packaging may share a producer job. Shared source owners always run in source-only
+jobs before producer work. Attestation, publication, signing and remote
 verification share a release job with step-scoped credentials. An operation joins a job only when it adds
 no prerequisite, except bounded single-platform image publication batches and same-target source-fetch groups.
 Image batches admit acyclic cross-output dependencies and at most two output routes per batch.
