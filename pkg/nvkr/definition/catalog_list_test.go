@@ -81,6 +81,19 @@ func TestCompositeCatalogLists(t *testing.T) {
 			if len(effective.Catalogs) != 2 || effective.Outputs[0].Catalog != nil {
 				t.Fatal("composite discarded list selection")
 			}
+			found := false
+			for _, output := range effective.Outputs {
+				if output.Name != "controller-image" {
+					continue
+				}
+				found = true
+				if output.Catalog == nil || output.Catalog.Base != "../images" || len(output.Catalog.Overlays) != 1 || output.Catalog.Overlays[0] != "../defs/overlay.yaml" {
+					t.Fatalf("list mode lost rebased explicit override: %+v", output.Catalog)
+				}
+			}
+			if !found {
+				t.Fatal("explicit output omitted")
+			}
 		})
 	}
 }

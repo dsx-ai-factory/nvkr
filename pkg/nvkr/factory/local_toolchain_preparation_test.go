@@ -101,6 +101,37 @@ func TestLocalToolchainPreparationCatalogList(t *testing.T) {
 			}
 		})
 	}
+	t.Run("unused candidate membership", func(t *testing.T) {
+		selected, _, err := preparation.substitute(t.Context(), image)
+		if err != nil {
+			t.Fatal(err)
+		}
+		unused, err := catalog.ApplyStack(selected.CatalogCandidates[0].CatalogSnapshot)
+		if err != nil {
+			t.Fatal(err)
+		}
+		delete(unused.Catalog.Components, "image")
+		unused, err = catalog.ApplyStack(unused.Catalog)
+		if err != nil {
+			t.Fatal(err)
+		}
+		spec := authored.Catalog{Base: "unused"}
+		selected.Definition.Catalogs = append(selected.Definition.Catalogs, spec)
+		selected.CatalogCandidates = append(selected.CatalogCandidates, CatalogCandidate{Selection: spec, CatalogSnapshot: unused.Catalog, CatalogDigest: unused.Digest})
+		selected.DefinitionDigest, err = selected.Definition.Digest()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := selected.Validate(); err != nil {
+			t.Fatalf("membership fixture must otherwise validate: %v", err)
+		}
+		err = preparation.Verify(t.Context(), selected, image)
+		assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+		if !strings.Contains(err.Error(), "candidate membership") {
+			t.Fatalf("wrong verification boundary: %v", err)
+		}
+	})
+
 }
 
 func TestLocalToolchainPreparationCompleteCompiledSelections(t *testing.T) {

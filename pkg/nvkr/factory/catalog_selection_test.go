@@ -41,6 +41,33 @@ func TestCatalogListRequiresOneWholePlatformSet(t *testing.T) {
 	}
 }
 
+func TestCatalogListRequiresOneWholeComponentSet(t *testing.T) {
+	output := authored.DefinitionOutput{Name: "bundle", Components: []string{"a", "b"}, Platform: "linux/amd64", Format: authored.OutputOCI}
+	for _, tc := range []struct {
+		name       string
+		components [][]string
+		code       e.Code
+	}{
+		{"cannot union component catalogs", [][]string{{"a"}, {"b"}}, e.CodeNoMatch},
+		{"one complete stack", [][]string{{"a"}, {"a", "b"}}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var candidates []CatalogCandidate
+			for _, names := range tc.components {
+				components := map[string]catalog.Component{}
+				for _, name := range names {
+					components[name] = catalog.Component{Platforms: []string{"linux/amd64"}}
+				}
+				candidates = append(candidates, CatalogCandidate{CatalogSnapshot: &catalog.Catalog{Components: components}})
+			}
+			_, err := selectCatalogCandidate(output, candidates)
+			if factoryErrorCode(err) != tc.code {
+				t.Fatalf("got %v, want %s", err, tc.code)
+			}
+		})
+	}
+}
+
 func TestCatalogListUnusedPinSetSourceAccess(t *testing.T) {
 	unused, _, pinEnv := pinSetSemanticInputs(t)
 	base, err := catalog.LoadContext(t.Context(), testCatalogProvider(t))
