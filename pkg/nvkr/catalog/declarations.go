@@ -67,6 +67,7 @@ type rawComponent struct {
 	OutputType             string              `json:"outputType,omitempty"`
 	Disk                   *DiskSpec           `json:"disk,omitempty"`
 	Packer                 *PackerConfig       `json:"packer,omitempty"`
+	Mkosi                  *mkosiDeclaration   `json:"mkosi,omitempty"`
 	BuildCommand           []string            `json:"buildCommand,omitempty"`
 	BuildCommandByPlatform map[string][]string `json:"buildCommandByPlatform,omitempty"`
 	Materials              map[string]string   `json:"materials,omitempty"`

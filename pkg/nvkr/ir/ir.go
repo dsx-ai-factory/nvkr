@@ -11,6 +11,7 @@ package ir
 import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/material"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/mkosi"
 )
 
 // SchemaVersion identifies the IR shape; it participates in the digest so a schema
@@ -40,6 +41,7 @@ const (
 	BuilderBuildKit    = "buildkit-rootless" // networked wrapped Dockerfile build; not qualified execution
 	BuilderVMImage     = "vm-image"          // source-owned command or Packer project producing one disk image
 	BuilderNativeGo    = "native-go"         // local, unqualified compilation with an observed installed SDK
+	BuilderMkosi       = "mkosi"             // source-pinned offline package assembly
 	BuilderPinnedTool  = "pinned-tool"       // one pinned release executable run offline, with no source fetch (ADR-27)
 )
 
@@ -236,6 +238,7 @@ type Node struct {
 	// entry is also represented by an exact producer dependency in Needs.
 	Disk         *DiskSpec         `json:"disk,omitempty"`
 	Packer       *PackerConfig     `json:"packer,omitempty"`
+	Mkosi        *mkosi.Spec       `json:"mkosi,omitempty"`
 	Materials    []MaterialBinding `json:"materials,omitempty"`
 	OutputType   string            `json:"outputType,omitempty"`   // host-package | oci-image | ...
 	ArtifactPath string            `json:"artifactPath,omitempty"` // built artifact, relative to Workdir

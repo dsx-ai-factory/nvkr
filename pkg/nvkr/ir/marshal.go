@@ -12,6 +12,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/material"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/mkosi"
 	"sigs.k8s.io/yaml"
 )
 
@@ -53,6 +54,7 @@ type LogicalNode struct {
 	WriteDir          string             `json:"writeDir,omitempty"`
 	Disk              *DiskSpec          `json:"disk,omitempty"`
 	Packer            *PackerConfig      `json:"packer,omitempty"`
+	Mkosi             *mkosi.LogicalSpec `json:"mkosi,omitempty"`
 	Materials         []MaterialBinding  `json:"materials,omitempty"`
 	OutputType        string             `json:"outputType,omitempty"`
 	ArtifactPath      string             `json:"artifactPath,omitempty"`
@@ -118,6 +120,7 @@ var nodeBuildIdentityRules = map[string]buildIdentityFieldRule{
 	"WriteDir":          includeLogicalValueInBuildIdentity,
 	"Disk":              includeLogicalValueInBuildIdentity,
 	"Packer":            includeLogicalValueInBuildIdentity,
+	"Mkosi":             includeContentReferenceInBuildIdentity,
 	"Materials":         includeLogicalValueInBuildIdentity,
 	"OutputType":        includeLogicalValueInBuildIdentity,
 	"ArtifactPath":      includeLogicalValueInBuildIdentity,
@@ -164,6 +167,7 @@ func (g Graph) normalizedCopy() Graph {
 			c.Nodes[i].Disk = &disk
 		}
 		c.Nodes[i].Packer = clonePackerConfig(g.Nodes[i].Packer)
+		c.Nodes[i].Mkosi = mkosi.Clone(g.Nodes[i].Mkosi)
 		c.Nodes[i].Materials = append([]MaterialBinding(nil), g.Nodes[i].Materials...)
 		c.Nodes[i].ExecutableArchive = cloneExecutableArchive(g.Nodes[i].ExecutableArchive)
 	}
@@ -219,6 +223,7 @@ func (g Graph) logicalGraph() LogicalGraph {
 			SourceTreeHash: node.SourceTreeHash, VendorSpecDigest: node.VendorSpecDigest,
 			SourceReadOnly: node.SourceReadOnly, WriteDir: node.WriteDir,
 			Disk: cloneDiskSpec(node.Disk), Packer: clonePackerConfig(node.Packer),
+			Mkosi:      node.Mkosi.Logical(),
 			Materials:  append([]MaterialBinding(nil), node.Materials...),
 			OutputType: node.OutputType, ArtifactPath: node.ArtifactPath, Version: node.Version,
 		})

@@ -17,6 +17,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/material"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/mkosi"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
@@ -191,7 +192,7 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		} else if t, ok := nc.ToolchainImages[toolchainArch]; ok {
 			vendorImage = t
 		}
-		if vendorImage == "" {
+		if vendorImage == "" && nc.BuilderType != catalog.BuilderMkosi {
 			return nil, e.New(e.CodeUnpinnedSource,
 				"component %q has no toolchain pin for execution architecture %q", nc.Name, toolchainArch)
 		}
@@ -201,6 +202,9 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		// authenticates the exact argv the fetch node will execute.
 		vendorCommand := renderArchAll(nc.VendorCommand, arch)
 		vendorSpecDigest, err := ir.VendorSpecIdentity(vendorCommand, vendorImage)
+		if nc.BuilderType == catalog.BuilderMkosi {
+			vendorSpecDigest, err = ir.MkosiSourceIdentity(nc.Mkosi)
+		}
 		if err != nil {
 			return nil, e.Wrap(e.CodeInvalidCatalog, err, "component %q vendor specification", nc.Name)
 		}
@@ -240,6 +244,7 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 				VendorCmd:        vendorCommand,
 				VendorImage:      vendorImage,
 				VendorSpecDigest: vendorSpecDigest,
+				Mkosi:            mkosi.Clone(nc.Mkosi),
 			})
 		}
 		bid := "build-" + nc.Name
@@ -295,6 +300,10 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 		if builderType == ir.BuilderNativeGo {
 			sourceReadOnly = false // Native builds get their own authenticated source copy.
 		}
+		if builderType == ir.BuilderMkosi {
+			env, command = nil, nil
+			sourceReadOnly, writeDir = true, ""
+		}
 		var disk *ir.DiskSpec
 		var packer *ir.PackerConfig
 		if builderType == catalog.BuilderVMImage {
@@ -310,6 +319,7 @@ func compile(r *Resolved, vmHosts map[string]execution.HostPlatform) (*ir.Graph,
 			Requirements:      execution.Clone(nc.BuildRequirements),
 			Component:         nc.Name,
 			BuilderType:       builderType,
+			Mkosi:             mkosi.Clone(nc.Mkosi),
 			FlakeRef:          flakeRef,
 			FlakeOutput:       flakeOutput,
 			FlakeLockDigest:   flakeLock,

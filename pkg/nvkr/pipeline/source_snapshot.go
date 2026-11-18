@@ -210,7 +210,7 @@ func ensureSourceClosure(n ir.Node, dir string, opts RunOptions, runVendor func(
 	if status != "" {
 		return e.New(e.CodeFetchFailed, "source %q has unreceipted tracked, untracked, or ignored files; use a fresh source root", n.Dest)
 	}
-	if len(n.VendorCmd) > 0 {
+	if len(n.VendorCmd) > 0 || n.Mkosi != nil {
 		if runVendor == nil {
 			return e.New(e.CodeFetchFailed, "source %q requires vendoring but no vendor runner was provided", n.Dest)
 		}
@@ -826,7 +826,13 @@ func copyCollectedArtifactContext(ctx context.Context, sourceRoot, sourceRelativ
 }
 
 func fetchVendorSpecDigest(n ir.Node) (string, error) {
-	digest, err := ir.VendorSpecIdentity(n.VendorCmd, n.VendorImage)
+	var digest string
+	var err error
+	if n.Mkosi != nil {
+		digest, err = ir.MkosiSourceIdentity(n.Mkosi)
+	} else {
+		digest, err = ir.VendorSpecIdentity(n.VendorCmd, n.VendorImage)
+	}
 	if err != nil {
 		return "", err
 	}

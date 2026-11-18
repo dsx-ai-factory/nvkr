@@ -172,6 +172,19 @@ func (l Local) fetchWithSourceVendorAdmission(n ir.Node, opts RunOptions,
 }
 
 func (l Local) completeFetch(n ir.Node, dir string, opts RunOptions, vendor *sourceVendor) error {
+	if n.Mkosi != nil {
+		return ensureSourceClosure(n, dir, opts, func() error {
+			inputRoot := dir
+			if opts.fetchDirectory != nil {
+				var err error
+				inputRoot, err = sourceFetchDescriptorPath(opts.fetchDirectory.Fd())
+				if err != nil {
+					return err
+				}
+			}
+			return acquireMkosiInputs(opts.ctx(), n.Mkosi, inputRoot)
+		})
+	}
 	if opts.SourceWorkspace == nil || len(n.VendorCmd) == 0 {
 		return l.vendor(n, dir, opts)
 	}

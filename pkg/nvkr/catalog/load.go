@@ -88,6 +88,9 @@ func load(ctx context.Context, p DataProvider) (*Catalog, error) {
 		if err := resolvePatches(p, name, &c, reg.Components[name].Patches); err != nil {
 			return nil, err
 		}
+		if err := resolveMkosi(p, name, &c, reg.Components[name].Mkosi); err != nil {
+			return nil, err
+		}
 		cat.Components[name] = c
 		if c.FromSource {
 			cat.stampDeclarations[name] = sourceStampDeclarationFor(c, reg.Components[name].VersionStamp)

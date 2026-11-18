@@ -1,0 +1,116 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: nvkr-vm-runtime
+sources:
+  mkosi:
+    repo: https://github.com/systemd/mkosi
+    constraint: '*'
+  packer-amd64:
+    repo: https://github.com/hashicorp/packer
+    constraint: 1.16.2
+    tool:
+      format: zip
+      platform: linux/amd64
+      url: https://releases.hashicorp.com/packer/{{.Version}}/packer_{{.Version}}_linux_amd64.zip
+      executablePath: packer
+      companions: [LICENSE.txt]
+  packer-plugin-qemu-amd64:
+    repo: https://github.com/hashicorp/packer-plugin-qemu
+    constraint: 1.1.8
+    tool:
+      format: zip
+      platform: linux/amd64
+      url: https://releases.hashicorp.com/packer-plugin-qemu/{{.Version}}/packer-plugin-qemu_{{.Version}}_linux_amd64.zip
+      executablePath: packer-plugin-qemu_v1.1.8_x5.0_linux_amd64
+      companions: [LICENSE.txt]
+components:
+  packer-amd64:
+    source: packer-amd64
+    outputType: host-package
+    platforms: [linux/amd64]
+    prebuilt:
+      releaseExecutable: true
+      evidence:
+        none: true
+  packer-plugin-qemu-amd64:
+    source: packer-plugin-qemu-amd64
+    outputType: host-package
+    platforms: [linux/amd64]
+    prebuilt:
+      releaseExecutable: true
+      evidence:
+        none: true
+  vm-runtime-amd64:
+    source: mkosi
+    fromSource: true
+    builderType: mkosi
+    outputType: oci-image
+    platforms: [linux/amd64]
+    artifactPath: nvkr-output/runtime
+    materials:
+      packer: packer-amd64
+      packer-plugin-qemu: packer-plugin-qemu-amd64
+    mkosi:
+      configuration:
+        name: mkosi.conf
+        sha256: sha256:54e54de2818e0cc029a3c35f76b74c0cbf3bd306f4ff48c29fecf88efa532616
+      roots:
+        - name: inspect
+          distribution: ubuntu
+          release: noble
+          inputs:
+            name: packages/inspect-amd64.inputs.json
+            sha256: sha256:f781a57243e5237bf93cb77c4828487deb30498457dc76c2d32ef173a4419398
+        - name: runtime
+          distribution: ubuntu
+          release: resolute
+          inputs:
+            name: packages/runtime-amd64.inputs.json
+            sha256: sha256:a2f2e50cbaedc03f9c3fa0f28a81cb8fac2b5ed80be975a369a460a36a5dec47
+          mounts:
+            - root: inspect
+              path: /opt/nvkr/inspection
+      files:
+        - material: packer-plugin-qemu
+          path: /nvkr/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v1.1.8_x5.0_linux_amd64
+          mode: 365
+        - material: packer
+          path: /usr/local/bin/packer
+          mode: 365
+      copies:
+        - source: /usr/share/AAVMF/AAVMF_CODE.no-secboot.fd
+          path: /nvkr/firmware/AAVMF_CODE.no-secboot.fd
+          digest: sha256:de01af793c9ff318ac206d8c12e404a2e89baa39bd10e12ed0437a2f69fe012a
+          mode: 292
+        - source: /usr/share/AAVMF/AAVMF_VARS.fd
+          path: /nvkr/firmware/AAVMF_VARS.fd
+          digest: sha256:b3b855c5a80310168051164986855692d1bdb06e67619856177965cd87c6774f
+          mode: 292
+        - source: /usr/share/OVMF/OVMF_CODE_4M.fd
+          path: /nvkr/firmware/OVMF_CODE_4M.fd
+          digest: sha256:874f15a7c9110e78a89db159f0f68fc97e9076b74777520de1c235426f758aa7
+          mode: 292
+        - source: /usr/share/OVMF/OVMF_VARS_4M.fd
+          path: /nvkr/firmware/OVMF_VARS_4M.fd
+          digest: sha256:5d2ac383371b408398accee7ec27c8c09ea5b74a0de0ceea6513388b15be5d1e
+          mode: 292
+        - source: /opt/nvkr/inspection/usr/lib/modules/6.8.0-149-generic/vmlinuz
+          path: /nvkr/inspection/kernel
+          digest: sha256:9e9bb539fbf5e25c3fa737180e3586dacd0922257cdffe319daf8e5ceecaeaf0
+          mode: 292
+      contents:
+        - path: /nvkr/toolchain/packer/plugins/github.com/hashicorp/qemu/packer-plugin-qemu_v1.1.8_x5.0_linux_amd64_SHA256SUM
+          source:
+            name: packer-plugin-qemu.SHA256SUM
+            sha256: sha256:e846100c30e6873465fbf9770281cefbeab67cf8cd2e1b7114c6da17d5b77c6c
+        - path: /usr/share/doc/nvkr-vm-runtime/licenses/packer-plugin-qemu/LICENSE.txt
+          source:
+            name: licenses/packer-plugin-qemu.LICENSE.txt
+            sha256: sha256:b3dc5dd3408adee55404f27662357f7ef9f6cda23ff3df7a09d8951eba069f27
+        - path: /usr/share/doc/nvkr-vm-runtime/licenses/packer/LICENSE.txt
+          source:
+            name: licenses/packer.LICENSE.txt
+            sha256: sha256:f4cd3d501f946ad75f6d7114124040ee901ccdf11aeda15d55d815c440442c2a

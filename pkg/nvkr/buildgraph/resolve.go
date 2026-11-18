@@ -16,6 +16,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/mkosi"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/target"
 )
 
@@ -208,6 +209,7 @@ func DiskRootName(components []catalog.NamedComponent) (string, error) {
 // cloneComponent preserves exact strings, including malformed bytes that downstream
 // graph validation must reject. A JSON round-trip would repair invalid UTF-8.
 func cloneComponent(component catalog.Component) catalog.Component {
+	component.Mkosi = mkosi.Clone(component.Mkosi)
 	component.Embeds = catalog.CloneEmbeddedComponents(component.Embeds)
 	component.Platforms = slices.Clone(component.Platforms)
 	if component.Helm != nil {
@@ -309,6 +311,10 @@ func requireComponentRoute(name string, component catalog.Component, platform st
 	}
 	arch := target.ExecutableArch(platform)
 	switch {
+	case component.BuilderType == catalog.BuilderMkosi:
+		if platform != "linux/amd64" && platform != "linux/arm64" {
+			return e.New(e.CodeEngineCapability, "mkosi component %q requires a native Linux target", name)
+		}
 	case component.BuilderType == catalog.BuilderPinnedTool:
 		if component.ToolExecutable == nil || component.ToolExecutable.Platform != platform {
 			return e.New(e.CodeEngineCapability, "pinned-tool component %q has no tool pinned for target %q", name, platform)

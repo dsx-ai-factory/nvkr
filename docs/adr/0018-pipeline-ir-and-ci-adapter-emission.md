@@ -488,6 +488,64 @@ qualified observers retain their held executable/daemon authentication while usi
 admission logic. No registry credential is forwarded into producer containers.
 The package owner grants the reader account access without granting the source repository Actions access.
 
+#### Plan-produced VM runtimes
+
+The native Linux route may select a Run-only VM runtime produced by mkosi under ADR-19.
+This route uses daemonless OCI transport and a root filesystem launcher. It does not enter the
+Docker/Podman prepared-image path above. Environment selects the runtime's internal-tool requirement
+for each native consumer platform; the compiler binds the selected runtime producer and invocation
+into each byte-producing consumer's logical Build. Inspection-only uses retain the observation binding
+instead. Missing, ambiguous, cyclic, cross-platform or unused selections fail before execution.
+Signing subjects, runner labels, publication policy and digest families retain their existing contracts.
+
+Assembly selects mkosi by source commit and tree, a checked-in configuration, an exact repository
+snapshot and metadata blob pins, and the complete package archive closure. Package input records use
+manager-neutral names, versions, architectures, blob digests, sizes and repository metadata bindings.
+Only the APT adapter is initially admitted. Acquisition authenticates metadata and every retained package
+before assembly, which runs without network access. The original mkosi JSON installed-package report
+must match the entire retained package selection, including dependencies; surplus, missing, duplicate
+or substituted packages fail. The report is an installed-content input to SBOM generation, not a
+replacement for acquisition materials or package/license review. Fresh assembly roots must also pass
+the byte-identical output gate before the runtime can be consumed.
+
+Native assembly receives mount and package-ownership capabilities only in a separate user namespace.
+Its root maps to an unprivileged host ID range; host root is outside the mapping. The privileged owner
+creates per-attempt scratch for that mapping. The assembler receives no KVM device. Assembly and
+consumer staging require an executable filesystem chosen by the owner; the launcher adds read-only,
+nosuid and nodev attributes without clearing any inherited restriction, including noexec or atime
+flags. An unsuitable staging filesystem or unavailable private proc mount fails capability admission.
+
+The owning Run authenticates the exact producer result, complete OCI closure, terminal observation
+and SBOM before issuing a runtime-use receipt. The opaque receipt binds the Plan, Run attempt,
+producer requirement, native platform, runtime bytes, evidence and exact consumer purpose. Neither a
+download locator nor a result JSON document grants execution authority. Cross-job restoration must
+authenticate the original same-Run producer and its evidence before issuing a local receipt. Runtime
+and evidence substitution, absent evidence and revoked owners fail closed. The receipt grants no
+Release membership, qualification, publication or reuse authority.
+
+Consumer entry requires an explicitly admitted native Linux launcher with private mount, PID, IPC,
+UTS and network namespaces. Setup requires the operator's privileged native bootstrap; the launcher
+does not invoke privilege elevation itself. It admits the required mount, network, device, ownership
+and privilege-dropping capabilities before producer work. The owner stages the authenticated root
+filesystem under a root-owned private directory and exposes it read-only, with no host root or
+container socket reachable by the payload. Source and material
+inputs remain read-only; private output and scratch locations are the only writable projections.
+The launcher drops to UID/GID 65534, removes supplementary groups and all capabilities, locks root
+privilege restoration off, and applies no-new-privileges before payload execution. These process IDs
+are an execution restriction, not a signing identity or a new publication subject.
+A private loopback interface permits Packer/QEMU communication without external network access.
+KVM access requires the existing held-device admission and selected execution class; it is never
+inferred from the runtime's contents. The existing VM resource admission, deadlines, cancellation,
+stop/join and cleanup obligations apply to the entire namespace lifetime, including descendants that
+create new process sessions. Missing namespace,
+privilege, device or resource capabilities fail before producer work. This route needs runner support
+for those operations; merely downloading the OCI artifact does not make a runner eligible.
+
+The implementation and native-run evidence for this extension are tracked in reconciliation.
+Assembly reproducibility alone does not establish disk equivalence, guest boot, ARM64 execution or
+an evidence-lane upgrade. Firmware retains its separately reviewed package provenance and exact
+baseline bytes, exposed through NVKR-owned paths; this route grants no Secure Boot key or policy change.
+
 For Plans with declared toolchain access, generated support jobs observe exact image manifests after
 all runner bootstraps have validated or refreshed the runtime Plan. Each selected runner placement
 gets its own probe job, including native ARC placements under their protected Environment. Producer

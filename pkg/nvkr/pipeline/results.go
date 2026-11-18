@@ -6,6 +6,7 @@ package pipeline
 import (
 	"context"
 	"path/filepath"
+	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -67,6 +68,21 @@ func ObserveResult(ctx context.Context, node ir.Node, payloadPath, resultPath st
 		if result.Ref != "" || result.Packaged {
 			return ArtifactResult{}, e.New(e.CodeVerifyFailed, "pull result %q does not describe a raw acquired file", node.ID)
 		}
+	}
+	if node.BuilderType == ir.BuilderMkosi {
+		if node.OutputType != "oci-image" || result.EngineClass != ir.BuilderMkosi || result.AICRValidation != nil || result.Toolchain != "" {
+			return ArtifactResult{}, e.New(e.CodeVerifyFailed, "mkosi result %q changes its native OCI assembly contract", node.ID)
+		}
+		size, err := verifyOCILayoutAndSize(ctx, payloadPath, result.SHA256)
+		if err != nil {
+			return ArtifactResult{}, err
+		}
+		if size != result.Size {
+			return ArtifactResult{}, e.New(e.CodeVerifyFailed, "mkosi result %q differs from its observed OCI closure size", node.ID)
+		}
+		result.TransportPath = payloadPath
+		result.AbsPath = filepath.Join(payloadPath, "blobs", "sha256", strings.TrimPrefix(result.SHA256, "sha256:"))
+		return result, nil
 	}
 	if node.BuilderType == ir.BuilderPinnedTool && node.OutputType == ir.OutputOCILayout {
 		result.TransportPath = payloadPath

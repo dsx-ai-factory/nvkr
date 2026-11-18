@@ -26,6 +26,12 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	if err := n.Validate(); err != nil {
 		return nil, err
 	}
+	if n.Mkosi == nil && opts.MkosiScratch != "" {
+		return nil, e.New(e.CodeEngineCapability, "mkosi scratch cannot be supplied to another producer")
+	}
+	if n.Mkosi != nil && n.Kind == ir.KindFetch && (!opts.Launch || opts.SourceWorkspace == nil || opts.MkosiScratch != "") {
+		return nil, e.New(e.CodeEngineCapability, "mkosi acquisition requires its held source workspace, separate from assembly")
+	}
 	if err := admitNativeGo(n, opts); err != nil {
 		return nil, err
 	}
@@ -47,6 +53,9 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	opts = withDefaults(opts)
 	if err := opts.ctx().Err(); err != nil {
 		return nil, e.Wrap(e.CodeTimeout, err, "exec-node %q canceled", n.ID)
+	}
+	if n.BuilderType == ir.BuilderMkosi {
+		return buildMkosi(n, opts, opts.MkosiScratch)
 	}
 	if opts.Launch {
 		return l.execNodeLaunch(n, opts)

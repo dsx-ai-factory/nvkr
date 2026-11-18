@@ -16,6 +16,7 @@ package catalog
 import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/material"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/mkosi"
 )
 
 // From-source builder types (ADR-10). Executable builders mirror ir.Builder*;
@@ -26,6 +27,7 @@ const (
 	BuilderBuildKit    = "buildkit-rootless"
 	BuilderVMImage     = "vm-image"
 	BuilderNativeGo    = "native-go"
+	BuilderMkosi       = "mkosi"
 	// BuilderPinnedTool runs one pinned release executable with no source fetch (ADR-27).
 	BuilderPinnedTool = "pinned-tool"
 )
@@ -279,6 +281,7 @@ type Component struct {
 	// Packer selects direct Packer execution for vm-image. When nil, the existing
 	// BuildCommand route remains authoritative. The two forms are mutually exclusive.
 	Packer       *PackerConfig `json:"packer,omitempty"`
+	Mkosi        *mkosi.Spec   `json:"mkosi,omitempty"`
 	BuildCommand []string      `json:"buildCommand,omitempty"`
 	// BuildCommandByPlatform supplies explicit host compiler/linker differences
 	// without duplicating a producer, its source, or its material declarations.

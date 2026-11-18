@@ -1,0 +1,41 @@
+# Machine-managed by `nvkr catalog pin` / `nvkr catalog bump`. Do not hand-edit.
+apiVersion: nvkr.dev/lock/v1
+kind: PinLock
+pins:
+  mkosi:
+    commit: 84af20892b61c8e177e391f997ded8b4cb5514f2
+    sourceDateEpoch: 1765986302
+    tag: 84af20892b61c8e177e391f997ded8b4cb5514f2
+    treeHash: ac1057bcce3ee7a9b7d0841b7538160371cc4ee7
+  packer-amd64:
+    commit: b35bf7d9523d5826a37da4d2d92df9c791a9e61c
+    goVersion: 1.26.10
+    sourceDateEpoch: 1792670012
+    tag: v1.16.2
+    tool:
+      archiveDigest: sha256:abbfe0cf74985084112659b53e3565f264f70a20914c3b7c4f789f54f61c2414
+      companions:
+      - digest: sha256:f4cd3d501f946ad75f6d7114124040ee901ccdf11aeda15d55d815c440442c2a
+        path: LICENSE.txt
+      executableDigest: sha256:6f64a1e9e71be8b3a2f0225ccf0d51b5446fbf79d9ad323e917a0126ab6ee38a
+      executablePath: packer
+      format: zip
+      platform: linux/amd64
+      url: https://releases.hashicorp.com/packer/1.16.2/packer_1.16.2_linux_amd64.zip
+    treeHash: c3a847c0201f4427b29f0c9b44fdeef3fffb5ee6
+  packer-plugin-qemu-amd64:
+    commit: ad7af6f6b764d5adf42cd3cd578c868b80f6bd87
+    goVersion: 1.26.10
+    sourceDateEpoch: 1793610585
+    tag: v1.1.8
+    tool:
+      archiveDigest: sha256:dbdec022f362c9c0c351c860deb1a52a135fdfa71e126048ba45030e12714904
+      companions:
+      - digest: sha256:b3dc5dd3408adee55404f27662357f7ef9f6cda23ff3df7a09d8951eba069f27
+        path: LICENSE.txt
+      executableDigest: sha256:7093fbbcfe8b2ace01ecb722a49c49a02187929f431c9a48188dc3c8132203d0
+      executablePath: packer-plugin-qemu_v1.1.8_x5.0_linux_amd64
+      format: zip
+      platform: linux/amd64
+      url: https://releases.hashicorp.com/packer-plugin-qemu/1.1.8/packer-plugin-qemu_1.1.8_linux_amd64.zip
+    treeHash: e1e77606746108fd9d0157238e302398398cf28b

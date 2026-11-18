@@ -16,6 +16,7 @@ import (
 
 	nvkrerr "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	"github.com/urfave/cli/v2"
 )
 
@@ -28,6 +29,13 @@ var (
 )
 
 func main() {
+	if handled, err := pipeline.RuntimeNamespaceEntry(os.Args[1:]); handled {
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "nvkr: "+err.Error())
+			os.Exit(factory.GitHubStepExitCode(err))
+		}
+		return
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	if err := newApp().RunContext(ctx, os.Args); err != nil {

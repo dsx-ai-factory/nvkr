@@ -77,6 +77,11 @@ type RunOptions struct {
 	// NativeGo is a process-local receipt over installed SDK/compiler bytes.
 	// It admits only explicitly declared local native-go producers.
 	NativeGo *NativeGoToolchain
+	// MkosiScratch selects an existing executable, root-owned scratch filesystem
+	// for native mkosi assembly. It is descriptive: the concrete executor probes
+	// its namespace capability and validates ownership/mount flags before work.
+	// No ambient directory, mount-flag relaxation or container fallback is used.
+	MkosiScratch string
 }
 
 func requireRunContext(ctx context.Context, operation string) error {

@@ -188,6 +188,12 @@ func sourceExecutableTarget(fromSource bool, builder string, output string) bool
 }
 
 func validateComponent(name string, c Component) error {
+	if c.BuilderType == BuilderMkosi {
+		return validateMkosi(name, c)
+	}
+	if c.Mkosi != nil {
+		return e.New(e.CodeInvalidCatalog, "component %q: mkosi recipe requires builderType mkosi", name)
+	}
 	if _, err := c.SourceMetadataEnv(); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "component %q", name)
 	}

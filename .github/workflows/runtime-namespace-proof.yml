@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 ---
-name: Native runtime namespace proof
+name: Native runtime assembly proof
 
 # Deliberate proof revisions trigger this job. Other implementation pushes do
 # not spend a native attempt. This workflow has no upstream or PR trigger.
@@ -18,10 +18,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  namespace:
+  assembly:
     if: github.repository == 'njhensley/nvkr'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 60
     steps:
       - name: Check out the tested source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -32,17 +32,17 @@ jobs:
         with:
           go-version-file: .go-version
           cache: false
-      - name: Check native namespace boundaries on the VM kernel
+      - name: Assemble the source-pinned runtime twice on the VM kernel
         env:
-          NAMESPACE_EVIDENCE: ${{ runner.temp }}/runtime-namespace-evidence
-        run: bash scripts/test-runtime-namespace.sh "$NAMESPACE_EVIDENCE"
+          ASSEMBLY_EVIDENCE: ${{ runner.temp }}/runtime-assembly-evidence
+        run: bash scripts/test-mkosi-assembly.sh "$ASSEMBLY_EVIDENCE"
       - name: Retain text diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
-          name: runtime-namespace-evidence
+          name: runtime-assembly-evidence
           path: |
-            ${{ runner.temp }}/runtime-namespace-evidence/inputs.txt
-            ${{ runner.temp }}/runtime-namespace-evidence/namespaces.log
+            ${{ runner.temp }}/runtime-assembly-evidence/inputs.txt
+            ${{ runner.temp }}/runtime-assembly-evidence/assembly.log
           if-no-files-found: error
           retention-days: 7

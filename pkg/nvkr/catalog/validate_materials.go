@@ -21,7 +21,7 @@ func validateMaterialBindings(name string, component Component) error {
 		return e.New(e.CodeInvalidCatalog,
 			"component %q: material bindings require a from-source component or builderType pinned-tool", name)
 	}
-	if component.BuilderType != "" && component.BuilderType != BuilderVMImage && component.BuilderType != BuilderOCIHermetic && !pinnedTool {
+	if component.BuilderType != "" && component.BuilderType != BuilderVMImage && component.BuilderType != BuilderOCIHermetic && component.BuilderType != BuilderMkosi && !pinnedTool {
 		return e.New(e.CodeInvalidCatalog,
 			"component %q: material bindings require builderType oci-hermetic or vm-image, or pinned-tool", name)
 	}

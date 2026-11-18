@@ -174,7 +174,7 @@ func (g *Graph) Validate() error {
 		}
 		fetchConsumers[fetch.ID]++
 		if node.SourceDest != fetch.Dest || node.SourceCommit != fetch.Commit ||
-			node.SourceTreeHash != fetch.TreeHash || node.VendorSpecDigest != fetch.VendorSpecDigest {
+			node.SourceTreeHash != fetch.TreeHash || node.VendorSpecDigest != fetch.VendorSpecDigest || !reflect.DeepEqual(node.Mkosi, fetch.Mkosi) {
 			return e.New(e.CodeInvalidCatalog,
 				"build node %q source pins do not exactly match dependency %q", node.ID, fetch.ID)
 		}
@@ -256,7 +256,7 @@ func validateNeeds(n Node) error {
 func validateFetchNode(n Node) error {
 	if err := rejectUnexpectedNodeFields(n, allowFields(
 		"repo", "commit", "treeHash", "dest", "vendorCmd", "vendorImage",
-		"vendorSpecDigest", "network")); err != nil {
+		"vendorSpecDigest", "network", "mkosi")); err != nil {
 		return err
 	}
 	if len(n.Needs) != 0 {
@@ -281,6 +281,12 @@ func validateFetchNode(n Node) error {
 			"fetch node %q vendor specification is not pinned by an exact sha256", n.ID)
 	}
 	wantVendorSpec, err := VendorSpecIdentity(n.VendorCmd, n.VendorImage)
+	if n.Mkosi != nil {
+		if len(n.VendorCmd) != 0 || n.VendorImage != "" {
+			return e.New(e.CodeInvalidCatalog, "mkosi fetch cannot inherit a container vendor command")
+		}
+		wantVendorSpec, err = MkosiSourceIdentity(n.Mkosi)
+	}
 	if err != nil {
 		return err
 	}
@@ -323,6 +329,9 @@ func VendorSpecIdentity(command []string, image string) (string, error) {
 }
 
 func validateBuildNode(n Node) error {
+	if n.BuilderType == BuilderMkosi {
+		return validateMkosiNode(n)
+	}
 	if n.BuilderType == BuilderVMImage {
 		return validateVMImageNode(n)
 	}

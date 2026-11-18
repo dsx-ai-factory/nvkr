@@ -2,6 +2,27 @@
 
 Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
 
+The Plan-produced VM runtime extension has manager-neutral package inputs, exact mkosi installed-package
+closure checks, source-closure acquisition, and immutable single-layer OCI capture. The native namespace
+[VM proof](https://github.com/njhensley/nvkr/actions/runs/44194123590) at
+`0dbb69bb55dc190884ef3ca2b9d673a6c365284d` exercised both assembly and consumer launchers on stock
+Ubuntu 24.04 AMD64 with kernel `7.0.0-1014-aws`. The separately owned executable tmpfs retained its
+inherited mount restrictions. Private proc/root mounts, assembly user-ID mapping, host-file protection,
+consumer capability dropping, private loopback, output projection and cancellation of descendants in
+separate process sessions passed. The test service had one CPU quota, 256 MiB memory, 96 tasks and a
+60-second lifetime limit. Its fixture does not build a VM runtime or launch QEMU, Packer, KVM or libguestfs;
+the revised launcher has no corresponding ARM64 VM proof. The production assembly backend now stages
+the source-pinned module, performs two fresh offline builds, checks original package reports and measured
+files in each packaged layer, and requires identical complete OCI closures before issuing a production
+receipt. Its focused tests cover staging, substitution rejection, closure checking and receipt revocation;
+actual source-bootstrap assembly remains unexercised. Run-bound evidence and consumer receipts,
+Environment binding and generated Plan integration remain incomplete, so maintained Run execution stays
+gated. The isolated amd64
+[assembly Run](https://github.com/njhensley/nvkr/actions/runs/44145459516) built two byte-identical runtime
+archives from fresh roots and the same revalidated snapshot inputs. It used Ubuntu's mkosi package,
+not the source-commit bootstrap now required by the contract. That Run establishes neither production
+Plan integration nor disk-output equivalence, guest boot, ARM64 operation or a stronger evidence lane.
+
 The quick machinery E2E [fork Run](https://github.com/njhensley/nvkr/actions/runs/44043009475)
 at `ee807779f8122a0cce1105853a0a82c88dbb4c56` passed on stock Ubuntu in 91 seconds (71 seconds
 for the shared Make target): real hello build, registry round-trip, unprivileged smoke and harness

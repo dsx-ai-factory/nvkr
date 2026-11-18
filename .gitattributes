@@ -8,6 +8,9 @@ docs/proposals/nvsentinel/*.patch whitespace=-blank-at-eol,-space-before-tab
 inputs/catalogs/nicosim/patches/version-interface.patch -whitespace
 inputs/catalogs/local-path-provisioner/patches/chart-image-digest.patch -whitespace
 
+# Preserve the digest-pinned upstream license companion byte for byte.
+toolchains/nvkr-vm-runtime/licenses/packer.LICENSE.txt whitespace=-blank-at-eol
+
 # Generated workflow bundles collapse in pull request diffs. Regenerate them;
 # never edit them by hand.
 .github/nvkr-*/** linguist-generated
