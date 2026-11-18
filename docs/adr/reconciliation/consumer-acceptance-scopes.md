@@ -47,8 +47,8 @@ reducing tenants alone cannot reduce the initial 6-GiB bootstrap requirement,
 and a smaller site has no recorded acceptance. The observed range leaves
 752–977 MiB above the 13-GiB peak guest allocation. Admission still fails closed
 below its selected memory or CPU requirement and reserves nothing. Contract tests
-cover both boundaries and the observed range; hosted acceptance of the new allowance
-remains pending.
+cover both boundaries and the observed range. The November 18 fork Run below
+exercised the new allowance through complete site/tenant acceptance and cleanup.
 The small profile also sets the site's system reservation and the tenant's
 Reserved/SystemReserved/KubeReserved memory to 256Mi, appends the guest kubelet
 `--kube-reserved=cpu=1000m,memory=256Mi,ephemeral-storage=1Gi` override and restarts
@@ -104,6 +104,22 @@ attempt 1, and passed the cleanup-bearing `TestEndToEnd` parent plus its site an
 tenant subtests. All job steps and post-steps succeeded; neither Run uploaded
 Actions artifacts. These records establish the hosted build/site/tenant diagnostic
 and joined cleanup only for those exact source pairs and the explicit small profile.
+
+[Fork Run 44192853985](https://github.com/njhensley/nvkr/actions/runs/44192853985)
+passed on November 18, 2026 at 00:16:10 UTC, attempt 1, at exact NVKR
+`809a0d02b068ac90596ef61894795fa2c2c450c4` and frozen NVKE
+`5d6599c7cb5916919e784fb4101987ea9cacdcc5`. It completed all 34 selected outputs,
+the site and tenant subtests, and the cleanup-bearing parent. The parent passed
+in 4894.68 seconds, site in 5.93 and tenant in 803.48. Initial admission observed
+14,181 MiB against 13,824 required; tenant admission observed 7,795 MiB against
+6,656 required. This run exercised the independent NKTP source, controller sibling
+chart selection, queue storage and revised nightly memory allowance together.
+It included a temporary fork-only private deployment capture. The failure-only
+encryption and upload steps were skipped, all post-steps passed, and Actions
+artifact count was zero. This change removes the temporary capture;
+the Run records the tested commit before that removal. It establishes
+unsigned hosted functional acceptance for this source pair, not a Release,
+qualification or a passing scheduled Run on upstream main.
 
 The obsolete requirement in [#353](https://github.com/dsx-ai-factory/nvkr/issues/353)
 to close [#228](https://github.com/dsx-ai-factory/nvkr/issues/228) is retired:
