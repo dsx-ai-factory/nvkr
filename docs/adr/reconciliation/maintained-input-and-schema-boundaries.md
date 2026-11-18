@@ -1,9 +1,10 @@
 ## Maintained input and schema boundaries
 
-The NVKE product-family split adds independent core (21 outputs), services (34), telemetry (17) and disks (4)
+The NVKE product-family split adds independent core (21 outputs), services (34), telemetry (17), disks (4)
+and disks-ubuntu24 (4)
 Definitions under `inputs/definitions/nvke/`, with corresponding `github-nvke-<family>` Environments and
-named production bundles. Their selected output union is the combined candidate's 69 outputs, except `nico-reference-profiles-fixture`, plus 8
-family-only outputs (two core, six services) that the combined Definition omits for workflow headroom, retaining
+named production bundles. Their selected output union is the combined candidate's 69 outputs, except `nico-reference-profiles-fixture`, plus 12
+family-only outputs (two core, six services and four Ubuntu 24.04 disks), retaining
 aggregate native children, bound chart/image relationships and complete disk material selections. They
 reuse shared catalog/pin owners and publish into separate family prefixes beneath the existing candidate
 namespace. `make nvke-split-generate` and `make nvke-split-check` own the family subset; the repository-wide
@@ -27,7 +28,7 @@ and catalog maintenance. The [historical 83-output hosted publication](adr-26.md
 records one complete composite Run; current-candidate execution and independent consumer verification remain
 unrecorded. The six-member finalizer fits
 ADR-18's 16 result-collector buckets.
-A fifth, `disks-ubuntu24` family selects four Ubuntu 24.04 disks that the combined candidate omits; see
+The `disks-ubuntu24` selection is described in
 [Ubuntu 24 node-image inputs](ubuntu-24-node-image-inputs.md#ubuntu-24-node-image-inputs).
 
 The [GPU system matrix](../../../inputs/definitions/nvke/README.md#gpu-system-matrix) maps GB200, GB300, VR200
