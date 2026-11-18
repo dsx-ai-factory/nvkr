@@ -243,7 +243,7 @@ jobs:
     name: 'Build and package producer evidence for nvke-node-fde-amd64'
     runs-on: 'arc-amd64-kvm'
     timeout-minutes: 1105
-    needs: [nvkr-process-nvke-node-fde-amd64-fetch-nv-f8c224795476, nvkr-process-nvke-node-fde-amd64-fetch-ov-9b482bbb2e2f]
+    needs: [nvkr-process-nvke-node-fde-amd64-fetch-ov-9b482bbb2e2f]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
     permissions:
@@ -399,7 +399,7 @@ jobs:
     name: 'Fetch pinned sources for nvke-node-fde-amd64 (part 2)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-process-nvke-node-fde-amd64-fetch-nv-f8c224795476]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: &steps-ubuntu-24-04-two-nodes
       - *check-native-linux-amd64
@@ -419,7 +419,7 @@ jobs:
     name: 'Fetch pinned sources for nvke-node-fde-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 360
-    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-process-nvke-node-fde-amd64-fetch-nv-f8c224795476]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -514,7 +514,7 @@ jobs:
     name: 'Fetch pinned sources for nvke-node-fde-arm64 (part 2)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 120
-    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-process-nvke-node-fde-amd64-fetch-nv-f8c224795476]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: &steps-ubuntu-24-04-arm-two-nodes
       - *check-native-linux-arm64
@@ -534,7 +534,7 @@ jobs:
     name: 'Fetch pinned sources for nvke-node-image-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 360
-    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-process-nvke-node-fde-amd64-fetch-nv-f8c224795476]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -617,7 +617,7 @@ jobs:
     name: 'Fetch pinned sources for nvke-node-image-amd64 (part 2)'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-process-nvke-node-fde-amd64-fetch-ov-9b482bbb2e2f]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -627,7 +627,7 @@ jobs:
     name: 'Fetch pinned sources for nvke-node-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 360
-    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-process-nvke-node-fde-arm64-fetch-nv-64dff97482f1]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions:
       actions: read
@@ -710,7 +710,7 @@ jobs:
     name: 'Fetch pinned sources for nvke-node-image-arm64 (part 2)'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 120
-    needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-process-nvke-node-fde-arm64-fetch-ov-464ac8f0f11b]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-arm-two-nodes
     permissions:

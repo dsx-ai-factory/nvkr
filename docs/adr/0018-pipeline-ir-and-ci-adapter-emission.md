@@ -1030,6 +1030,30 @@ path mapping. A receipt carrier must not include the shared receipt directory: i
 otherwise claim the same immutable destination during finalization. The path is a transport description;
 receipt authentication and no-replace restoration remain mandatory.
 
+GitHub may share source acquisition within one Run. The projection selects one network-fetch owner for
+each exact repository URL, commit and tree, and one prepared-closure owner for each additional vendor
+specification and native platform. These are transport dependencies between the existing fetch operations; the Plan, producer
+IR and Build identities remain unchanged. Every consumer still admits its own source environment and
+native vendor runtime before writing its private checkout. A source owner needed by another consumer
+finishes in a source-only job before producer work starts. Same-target source fetches may share that
+job when their combined seed prerequisites remain acyclic; credentialed fetches retain separate jobs.
+Consumers depend on the selected owner completing its vendor operation and transport its whole closure,
+even when they only reuse Git metadata. This deliberate same-Run scheduling/failure coupling does not
+replace each consumer's own admission. Owner selection is deterministic from the current Plan; adding a
+consumer can change the selected owner. Prepared closure sharing additionally requires the same native platform; cross-platform consumers
+reconstruct the pristine Git tree and run their own vendor operation.
+
+The source module authenticates the restored owner's receipt and complete closure. It copies only the
+Git object store and shallow boundary into a fresh repository, refuses alternate object sources, and
+uses Git's full object-integrity check before binding the pinned commit/tree. Seed config, attributes,
+refs, grafts, hooks and index state are not imported.
+An equal vendor specification and native platform permit copying the closure and issuing the same byte-bound receipt in
+the consumer's own slot after verification. A different specification or native platform reconstructs the pristine pinned tree from those verified
+objects; the consumer then runs its own vendor operation
+and issues its own receipt. The normal fetch and downstream build rehash their exact inputs in both
+cases. Missing, corrupt, mismatched or unsafe seed inputs fail closed without a network fallback.
+This is same-Run source preparation, not reuse of producer results or output evidence under ADR-30.
+
 ### 7. Terminal verify + granularity
 
 Every admitted Run retains component operations and an **unconditional terminal verify** (GitHub
@@ -1316,8 +1340,19 @@ one runner start in one job. A root tool acquisition never gains members; a job 
 for it and restores it first, and a failed acquisition prevents that job. Contraction therefore cannot
 create a cycle or make one output wait for another, and the projected provider graph must remain acyclic.
 A job holds at most sixteen operations, and the sum of each operation's declared or default 60-minute budget
-must fit the provider ceiling; an operation that does not fit starts a new job. Membership never depends on
-adjacency in the global topological order or on a fixed-size chunk of unrelated nodes.
+must fit the provider ceiling; an operation that does not fit starts a new job. Ordinary producer membership
+does not depend on adjacency in the global topological order.
+
+Single-platform OCI image publication operations may additionally share a release job across output
+routes when their runner, platform and publication credential reference match. A batch contains at most
+two output routes, and scheduling drains each output's ready chain before starting the next, limiting
+payload fan-in without shortening any operation budget. A deterministic first-fit
+projection retains the same operation and duration ceilings and refuses any added dependency that would
+create a cycle. At the default per-operation budget a job holds at most six operations; an output's chain
+continues in another job when the current job is full. This introduces bounded cross-output waiting and
+failure coupling and may change image-batch membership when an output is added. Disk publications,
+image indexes, other output formats and aggregate release assembly retain their existing boundaries.
+No operation's timeout, command, evidence slot, signing subject or step-scoped credential changes.
 
 Every operation keeps its pinned execution, exact command, isolation, carrier and result slot. A job's
 token scope is exactly the union of its operations' scopes. Registry credentials and the repository token
@@ -1329,8 +1364,9 @@ schedule of §7. Failure of any operation marks the whole provider job unsuccess
 complete finalization still requires every required provider job to succeed. Scheduling does not change the
 logical graph, Plan identity or Build identity.
 
-One output's attestation, publication, signing and verification share a job and a machine. The job that can
-mint the workflow identity therefore also restores that output's payload carrier. The carrier transport's
+An output's attestation, publication, signing and verification can share a job and a machine. Image batches
+may restore several outputs' carriers. The job that can mint the workflow identity therefore also restores
+the selected payload carriers. The carrier transport's
 extraction guard is the boundary, as it already was for the controls the attestation job restored.
 Step-scoped credentials limit what each operation is given; they are not a machine boundary between
 operations in one job. [Reconciliation](reconciliation/adr-18.md) owns this layout's validation status.

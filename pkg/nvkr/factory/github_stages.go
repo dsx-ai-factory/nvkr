@@ -192,12 +192,33 @@ func projectExecutionStages(plan *Plan, placement func(Node) (Node, error), byAu
 	if err != nil {
 		return nil, nil, err
 	}
+	if byAuthority {
+		ordered, err = githubSharedSourceProjection(plan, ordered, schedulingKeys)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
 	var stages []githubStage
 	diskStages := make(map[string]int)
 	observationStages := make(map[string]int)
 	nodeStages := make(map[string]int, len(ordered))
 	nodes, artifacts := planIndex(plan)
 	grouping := &authorityStages{plan: plan, artifacts: artifacts, needs: map[int]map[int]bool{}}
+	if byAuthority {
+		// Derive seeds from the original stable ordering, before transport edges.
+		original, _, err := githubSchedulingProjection(plan)
+		if err != nil {
+			return nil, nil, err
+		}
+		seeds, err := githubSourceSeeds(plan, original)
+		if err != nil {
+			return nil, nil, err
+		}
+		grouping.sourceSeedOwners = map[string]bool{}
+		for _, seed := range seeds {
+			grouping.sourceSeedOwners[seed.ID] = true
+		}
+	}
 	for _, node := range ordered {
 		node, err := placement(node)
 		if err != nil {

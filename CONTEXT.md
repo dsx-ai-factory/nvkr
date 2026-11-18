@@ -206,11 +206,16 @@ explicit cross-Run transfers remain exact-attempt. Qualification independently c
 The workflow can remain byte-identical across routine pin updates when scheduling, labels/interfaces and
 visible policy and required inline action pins stay unchanged. Stable provider scheduling keys do not replace exact executable Plan IDs;
 the complete bundle still requires regeneration and checking.
-Edit locality additionally preserves existing output jobs when an independent output is added. A GitHub
-job is one authority class on one runner for one Build target or publication route. Source fetch, build,
+Edit locality preserves ordinary output jobs when an independent output is added; shared source selection
+and image publication batches can change membership. A GitHub job is one authority class on one runner,
+normally for one Build target or publication route. Source fetch, build,
 observation, SBOM and packaging share a producer job; attestation, publication, signing and remote
 verification share a release job with step-scoped credentials. An operation joins a job only when it adds
-no prerequisite. A shared pinned root tool may be an additional prerequisite for a job,
+no prerequisite, except bounded single-platform image publication batches that admit acyclic cross-output
+dependencies and at most two output routes per batch. Each image operation retains its timeout, evidence, signing and credential scope.
+Same-Run source seeds share exact repository/commit/tree acquisition and matching vendor/platform closures;
+every consumer still authenticates its own inputs and waits for the selected owner's vendor operation. Shared source owners finish before producer work.
+A shared pinned root tool may be an additional prerequisite for a job,
 which waits for its acquisition and restoration first. Required aggregate accounting changes,
 and an identical YAML anchor may gain an earlier owner without changing expanded execution. The current Plan determines this projection; previous
 generated files do not supply scheduling state.

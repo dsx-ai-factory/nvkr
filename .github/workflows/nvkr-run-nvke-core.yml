@@ -248,11 +248,25 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-process-capnico-controller-linux-amd-a5f07f346eaa:
+  nvkr-capnico-controller-linux-amd64-fetch-d7e509f127ef:
+    name: 'Fetch pinned source for capnico-controller (capnico-controller/linux/amd64)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: &steps-ubuntu-24-04-node
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-capnico-controller-linux-amd-2a462bdf52a9:
     name: 'Build and prepare capnico-controller/linux/amd64'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-tool-syft]
+    timeout-minutes: 180
+    needs: [nvkr-capnico-controller-linux-amd64-fetch-d7e509f127ef, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -261,7 +275,6 @@ jobs:
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
-      - *operation-execute-node-part-4
     permissions:
       actions: read
       contents: read
@@ -269,7 +282,7 @@ jobs:
     name: 'Build and prepare capnico-controller/linux/arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 240
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-capnico-controller-linux-amd64-fetch-d7e509f127ef, nvkr-tool-syft-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -390,11 +403,21 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-process-cluster-api-provider-provisi-5d22804caf69:
+  nvkr-cluster-api-provider-provisioned-lin-3474f127ab2d:
+    name: 'Fetch pinned source for cluster-api-provider-provisioned (cluster-api-provider-provisioned/linux/amd64)'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 60
+    needs: [preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: *steps-ubuntu-24-04-node
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-cluster-api-provider-provisi-fceca324467e:
     name: 'Build and prepare cluster-api-provider-provisioned/linux/amd64'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-tool-syft]
+    timeout-minutes: 180
+    needs: [nvkr-cluster-api-provider-provisioned-lin-3474f127ab2d, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -403,15 +426,28 @@ jobs:
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
-      - *operation-execute-node-part-4
     permissions:
       actions: read
       contents: read
-  nvkr-process-cluster-api-provider-provisi-4b71356d87da:
+  nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc:
+    name: 'Fetch pinned source for cluster-api-provider-provisioned (cluster-api-provider-provisioned/linux/arm64)'
+    runs-on: 'ubuntu-24.04-arm'
+    timeout-minutes: 60
+    needs: [nvkr-cluster-api-provider-provisioned-lin-3474f127ab2d]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps: &steps-ubuntu-24-04-arm-node
+      - *check-native-linux-arm64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
+      - *operation-execute-node-part-1
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-cluster-api-provider-provisi-c318d75c1ef3:
     name: 'Build and prepare cluster-api-provider-provisioned/linux/arm64'
     runs-on: 'ubuntu-24.04-arm'
-    timeout-minutes: 240
-    needs: [nvkr-tool-syft-linux-arm64]
+    timeout-minutes: 180
+    needs: [nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc, nvkr-tool-syft-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -420,7 +456,6 @@ jobs:
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
-      - *operation-execute-node-part-4
     permissions:
       actions: read
       contents: read
@@ -428,7 +463,7 @@ jobs:
     name: 'Build and prepare controller-chart'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-cluster-api-provider-provisioned-lin-3474f127ab2d, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -445,7 +480,7 @@ jobs:
     name: 'Build and prepare controller-profiles/linux/amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-cluster-api-provider-provisioned-lin-3474f127ab2d, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -462,7 +497,7 @@ jobs:
     name: 'Build and prepare controller-profiles/linux/arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 240
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc, nvkr-tool-syft-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -479,7 +514,7 @@ jobs:
     name: 'Build and prepare cwe/linux/amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-cluster-api-provider-provisioned-lin-3474f127ab2d, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -496,7 +531,7 @@ jobs:
     name: 'Build and prepare cwe/linux/arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 240
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc, nvkr-tool-syft-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -513,7 +548,7 @@ jobs:
     name: 'Build and prepare nvkectl-linux-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 360
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-cluster-api-provider-provisioned-lin-3474f127ab2d, nvkr-tool-syft-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -538,7 +573,7 @@ jobs:
     name: 'Build and prepare nvkectl'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 360
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-cluster-api-provider-provisioned-lin-3474f127ab2d, nvkr-tool-syft]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -597,11 +632,7 @@ jobs:
     timeout-minutes: 60
     needs: [preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps: &steps-ubuntu-24-04-node
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
+    steps: *steps-ubuntu-24-04-node
     permissions:
       actions: read
       contents: read
@@ -615,11 +646,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-process-attest-sboms-output-capi-con-c3e2faf63100:
-    name: 'Attest, publish, sign and verify output-capi-controller-image'
+  nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12:
+    name: 'Attest, publish, sign and verify output-nvkectl'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-capi-controller-image-pull-c-2451b8875be5, nvkr-tool-cosign]
+    needs: [nvkr-process-nvkectl-fetch-nvkectl-nvkect-97c4aeeb013f, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -658,120 +689,6 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-  nvkr-process-attest-sboms-output-capi-kub-192145434453:
-    name: 'Attest, publish, sign and verify output-capi-kubeadm-bootstrap-image'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-capi-kubeadm-bootstrap-image-d042c444642a, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-capi-kub-aacc41887f04:
-    name: 'Attest, publish, sign and verify output-capi-kubeadm-control-plane-image'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-capi-kubeadm-control-plane-i-ddad2ab73e3e, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-cert-man-9a7a8eb4fbc5:
-    name: 'Attest, publish, sign and verify output-cert-manager-cainjector-image'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-cert-manager-cainjector-imag-9615473948ed, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-cert-man-d217422a8ef7:
-    name: 'Attest, publish, sign and verify output-cert-manager-controller-image'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-cert-manager-controller-imag-98c7fa7fe320, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-cert-man-674719c99ce6:
-    name: 'Attest, publish, sign and verify output-cert-manager-webhook-image'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-cert-manager-webhook-image-p-59f9d902f4a4, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12:
-    name: 'Attest, publish, sign and verify output-nvkectl'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nvkectl-fetch-nvkectl-nvkect-97c4aeeb013f, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-operator-2fd8456da854:
     name: 'Attest, publish, sign and verify output-operator-tools'
     runs-on: 'ubuntu-24.04'
@@ -791,17 +708,145 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
+  nvkr-process-attest-sboms-output-capi-con-210011b0b1fe:
+    name: 'Publish and verify images: output-capi-controller-image, output-capi-kubeadm-bootstrap-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 360
+    needs: [nvkr-process-capi-controller-image-pull-c-2451b8875be5, nvkr-process-capi-kubeadm-bootstrap-image-d042c444642a, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-publication-part-2
+      - *operation-execute-registry-part-3
+      - *operation-execute-registry-part-4
+      - *operation-execute-node-part-5
+      - &operation-execute-publication-part-6
+        name: execute publication part-6
+        uses: ./.github/nvkr-run-nvke-core/actions/shared/execute-publication
+        with:
+          nvkr-credential: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+          nvkr-registry-user: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-process-sign-output-capi-kubeadm-boo-9473f64d0f24:
+    name: 'Publish and verify images: output-capi-kubeadm-bootstrap-image, output-capi-kubeadm-control-plane-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 360
+    needs: [nvkr-process-attest-sboms-output-capi-con-210011b0b1fe, nvkr-process-capi-kubeadm-control-plane-i-ddad2ab73e3e]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - &operation-execute-registry-part-1
+        name: execute registry part-1
+        uses: ./.github/nvkr-run-nvke-core/actions/shared/execute-registry
+        with:
+          nvkr-credential: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+          nvkr-registry-user: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - &operation-execute-registry-part-2
+        name: execute registry part-2
+        uses: ./.github/nvkr-run-nvke-core/actions/shared/execute-registry
+        with:
+          nvkr-credential: '${{ secrets.NVKR_REGISTRY_READ }}'
+          nvkr-registry-user: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - *operation-execute-node-part-3
+      - &operation-execute-publication-part-4
+        name: execute publication part-4
+        uses: ./.github/nvkr-run-nvke-core/actions/shared/execute-publication
+        with:
+          nvkr-credential: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+          nvkr-registry-user: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - &operation-execute-registry-part-5
+        name: execute registry part-5
+        uses: ./.github/nvkr-run-nvke-core/actions/shared/execute-registry
+        with:
+          nvkr-credential: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+          nvkr-registry-user: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - &operation-execute-registry-part-6
+        name: execute registry part-6
+        uses: ./.github/nvkr-run-nvke-core/actions/shared/execute-registry
+        with:
+          nvkr-credential: '${{ secrets.NVKR_REGISTRY_READ }}'
+          nvkr-registry-user: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-process-attest-sboms-output-cert-man-825fd13fcf0c:
+    name: 'Publish and verify images: output-cert-manager-cainjector-image, output-cert-manager-controller-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 360
+    needs: [nvkr-process-cert-manager-cainjector-imag-9615473948ed, nvkr-process-cert-manager-controller-imag-98c7fa7fe320, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-publication-part-2
+      - *operation-execute-registry-part-3
+      - *operation-execute-registry-part-4
+      - *operation-execute-node-part-5
+      - *operation-execute-publication-part-6
+  nvkr-process-sign-output-cert-manager-con-b64b5999330c:
+    name: 'Publish and verify images: output-cert-manager-controller-image, output-cert-manager-webhook-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 360
+    needs: [nvkr-process-attest-sboms-output-cert-man-825fd13fcf0c, nvkr-process-cert-manager-webhook-image-p-59f9d902f4a4]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-registry-part-1
+      - *operation-execute-registry-part-2
+      - *operation-execute-node-part-3
+      - *operation-execute-publication-part-4
+      - *operation-execute-registry-part-5
+      - *operation-execute-registry-part-6
   nvkr-tool-syft-linux-arm64:
     name: 'Acquire pinned syft/linux/arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    steps:
-      - *check-native-linux-arm64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04-arm
-      - *operation-execute-node-part-1
+    steps: *steps-ubuntu-24-04-arm-node
     permissions:
       actions: read
       contents: read
@@ -809,7 +854,7 @@ jobs:
     name: 'Verify and package outputs: capnico-controller, publication-capnico-controller'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [nvkr-process-capnico-controller-linux-amd-a5f07f346eaa, nvkr-process-capnico-controller-linux-arm-ae87ca23780c]
+    needs: [nvkr-process-capnico-controller-linux-amd-2a462bdf52a9, nvkr-process-capnico-controller-linux-arm-ae87ca23780c]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: &steps-ubuntu-24-04-two-nodes
       - *check-native-linux-amd64
@@ -824,7 +869,7 @@ jobs:
     name: 'Verify and package outputs: cluster-api-provider-provisioned, publication-cluster-api-provider-provisioned'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [nvkr-process-cluster-api-provider-provisi-4b71356d87da, nvkr-process-cluster-api-provider-provisi-5d22804caf69]
+    needs: [nvkr-process-cluster-api-provider-provisi-c318d75c1ef3, nvkr-process-cluster-api-provider-provisi-fceca324467e]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps: *steps-ubuntu-24-04-two-nodes
     permissions:
@@ -860,125 +905,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-process-attest-sboms-output-capi-con-6535e3245e96:
-    name: 'Attest, publish, sign and verify output-capi-controller-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-capi-controller-image-arm64-7b5dfbda4bd3, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-capi-kub-a0163af701ab:
-    name: 'Attest, publish, sign and verify output-capi-kubeadm-bootstrap-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-capi-kubeadm-bootstrap-image-8aa2795ece39, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-capi-kub-0b857b2a2e2f:
-    name: 'Attest, publish, sign and verify output-capi-kubeadm-control-plane-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-capi-kubeadm-control-plane-i-d24ae27786c0, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
   nvkr-process-attest-sboms-output-capnico-c614f5167e54:
     name: 'Attest, publish, sign and verify output-capnico-controller'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
     needs: [nvkr-process-package-capnico-controller-p-5cbfb2d0ddf9, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-cert-man-070fcfa57ec9:
-    name: 'Attest, publish, sign and verify output-cert-manager-cainjector-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-cert-manager-cainjector-imag-9a88bd1a12d4, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-cert-man-694b532ec2bb:
-    name: 'Attest, publish, sign and verify output-cert-manager-controller-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-cert-manager-controller-imag-6f36b646a9f0, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-cert-man-e0cbc5b6ab19:
-    name: 'Attest, publish, sign and verify output-cert-manager-webhook-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-cert-manager-webhook-image-a-6c727f1095d4, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1107,11 +1038,95 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
+  nvkr-process-attest-sboms-output-capi-con-c10abbe36d6a:
+    name: 'Publish and verify images: output-capi-controller-image-arm64, output-capi-kubeadm-bootstrap-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 360
+    needs: [nvkr-process-capi-controller-image-arm64-7b5dfbda4bd3, nvkr-process-capi-kubeadm-bootstrap-image-8aa2795ece39, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-publication-part-2
+      - *operation-execute-registry-part-3
+      - *operation-execute-registry-part-4
+      - *operation-execute-node-part-5
+      - *operation-execute-publication-part-6
+  nvkr-process-sign-output-capi-kubeadm-boo-6961cfeeb3e9:
+    name: 'Publish and verify images: output-capi-kubeadm-bootstrap-image-arm64, output-capi-kubeadm-control-plane-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 360
+    needs: [nvkr-process-attest-sboms-output-capi-con-c10abbe36d6a, nvkr-process-capi-kubeadm-control-plane-i-d24ae27786c0]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-registry-part-1
+      - *operation-execute-registry-part-2
+      - *operation-execute-node-part-3
+      - *operation-execute-publication-part-4
+      - *operation-execute-registry-part-5
+      - *operation-execute-registry-part-6
+  nvkr-process-attest-sboms-output-cert-man-584e29997f4d:
+    name: 'Publish and verify images: output-cert-manager-cainjector-image-arm64, output-cert-manager-controller-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 360
+    needs: [nvkr-process-cert-manager-cainjector-imag-9a88bd1a12d4, nvkr-process-cert-manager-controller-imag-6f36b646a9f0, nvkr-tool-cosign]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
+      - *operation-execute-publication-part-2
+      - *operation-execute-registry-part-3
+      - *operation-execute-registry-part-4
+      - *operation-execute-node-part-5
+      - *operation-execute-publication-part-6
+  nvkr-process-sign-output-cert-manager-con-26ecaca0a9dd:
+    name: 'Publish and verify images: output-cert-manager-controller-image-arm64, output-cert-manager-webhook-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 360
+    needs: [nvkr-process-attest-sboms-output-cert-man-584e29997f4d, nvkr-process-cert-manager-webhook-image-a-6c727f1095d4]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-registry-part-1
+      - *operation-execute-registry-part-2
+      - *operation-execute-node-part-3
+      - *operation-execute-publication-part-4
+      - *operation-execute-registry-part-5
+      - *operation-execute-registry-part-6
   nvkr-process-package-release-publish-rele-e70edb401cae:
     name: 'Assemble, publish, sign and verify release'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-attest-sboms-output-capi-con-6535e3245e96, nvkr-process-attest-sboms-output-capi-con-c3e2faf63100, nvkr-process-attest-sboms-output-capi-kub-0b857b2a2e2f, nvkr-process-attest-sboms-output-capi-kub-192145434453, nvkr-process-attest-sboms-output-capi-kub-a0163af701ab, nvkr-process-attest-sboms-output-capi-kub-aacc41887f04, nvkr-process-attest-sboms-output-capnico-c614f5167e54, nvkr-process-attest-sboms-output-cert-man-070fcfa57ec9, nvkr-process-attest-sboms-output-cert-man-674719c99ce6, nvkr-process-attest-sboms-output-cert-man-694b532ec2bb, nvkr-process-attest-sboms-output-cert-man-9a7a8eb4fbc5, nvkr-process-attest-sboms-output-cert-man-d217422a8ef7, nvkr-process-attest-sboms-output-cert-man-e0cbc5b6ab19, nvkr-process-attest-sboms-output-cluster-0f08e4d1d2b1, nvkr-process-attest-sboms-output-controll-a838a306b212, nvkr-process-attest-sboms-output-controll-fbd4b2247bcf, nvkr-process-attest-sboms-output-cwe-publ-2917dd670a5b, nvkr-process-attest-sboms-output-nvkectl-33326ff307d8, nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12, nvkr-process-attest-sboms-output-operator-2fd8456da854, nvkr-process-attest-sboms-output-operator-4656296c5495]
+    needs: [nvkr-process-attest-sboms-output-capnico-c614f5167e54, nvkr-process-attest-sboms-output-cluster-0f08e4d1d2b1, nvkr-process-attest-sboms-output-controll-a838a306b212, nvkr-process-attest-sboms-output-controll-fbd4b2247bcf, nvkr-process-attest-sboms-output-cwe-publ-2917dd670a5b, nvkr-process-attest-sboms-output-nvkectl-33326ff307d8, nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12, nvkr-process-attest-sboms-output-operator-2fd8456da854, nvkr-process-attest-sboms-output-operator-4656296c5495, nvkr-process-sign-output-capi-kubeadm-boo-6961cfeeb3e9, nvkr-process-sign-output-capi-kubeadm-boo-9473f64d0f24, nvkr-process-sign-output-cert-manager-con-26ecaca0a9dd, nvkr-process-sign-output-cert-manager-con-b64b5999330c]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1137,7 +1152,7 @@ jobs:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-process-attest-sboms-output-capi-con-6535e3245e96, nvkr-process-attest-sboms-output-capi-con-c3e2faf63100, nvkr-process-attest-sboms-output-capi-kub-0b857b2a2e2f, nvkr-process-attest-sboms-output-capi-kub-192145434453, nvkr-process-attest-sboms-output-capi-kub-a0163af701ab, nvkr-process-attest-sboms-output-capi-kub-aacc41887f04, nvkr-process-attest-sboms-output-capnico-c614f5167e54, nvkr-process-attest-sboms-output-cert-man-070fcfa57ec9, nvkr-process-attest-sboms-output-cert-man-674719c99ce6, nvkr-process-attest-sboms-output-cert-man-694b532ec2bb, nvkr-process-attest-sboms-output-cert-man-9a7a8eb4fbc5, nvkr-process-attest-sboms-output-cert-man-d217422a8ef7, nvkr-process-attest-sboms-output-cert-man-e0cbc5b6ab19, nvkr-process-attest-sboms-output-cluster-0f08e4d1d2b1, nvkr-process-attest-sboms-output-controll-a838a306b212, nvkr-process-attest-sboms-output-controll-fbd4b2247bcf, nvkr-process-attest-sboms-output-cwe-publ-2917dd670a5b, nvkr-process-attest-sboms-output-nvkectl-33326ff307d8, nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12, nvkr-process-attest-sboms-output-operator-2fd8456da854, nvkr-process-attest-sboms-output-operator-4656296c5495, nvkr-process-capi-controller-image-arm64-7b5dfbda4bd3, nvkr-process-capi-controller-image-pull-c-2451b8875be5, nvkr-process-capi-kubeadm-bootstrap-image-8aa2795ece39, nvkr-process-capi-kubeadm-bootstrap-image-d042c444642a, nvkr-process-capi-kubeadm-control-plane-i-d24ae27786c0, nvkr-process-capi-kubeadm-control-plane-i-ddad2ab73e3e, nvkr-process-capnico-controller-linux-amd-a5f07f346eaa, nvkr-process-capnico-controller-linux-arm-ae87ca23780c, nvkr-process-cert-manager-cainjector-imag-9615473948ed, nvkr-process-cert-manager-cainjector-imag-9a88bd1a12d4, nvkr-process-cert-manager-controller-imag-6f36b646a9f0, nvkr-process-cert-manager-controller-imag-98c7fa7fe320, nvkr-process-cert-manager-webhook-image-a-6c727f1095d4, nvkr-process-cert-manager-webhook-image-p-59f9d902f4a4, nvkr-process-cluster-api-provider-provisi-4b71356d87da, nvkr-process-cluster-api-provider-provisi-5d22804caf69, nvkr-process-controller-chart-fetch-nvke-80a1df89e6ae, nvkr-process-controller-profiles-linux-am-0594064517bf, nvkr-process-controller-profiles-linux-ar-337ab3a17e54, nvkr-process-cwe-linux-amd64-fetch-nvke-c-366fa374bc31, nvkr-process-cwe-linux-arm64-fetch-nvke-c-420dcdb96553, nvkr-process-nvkectl-fetch-nvkectl-nvkect-97c4aeeb013f, nvkr-process-nvkectl-linux-arm64-fetch-nv-43a0c94d77a4, nvkr-process-operator-tools-linux-arm64-p-0b5c60be08f9, nvkr-process-operator-tools-pull-helm-ope-a18b8dd506d8, nvkr-process-package-capnico-controller-p-5cbfb2d0ddf9, nvkr-process-package-cluster-api-provider-0b87890035a6, nvkr-process-package-controller-chart-pac-f9fd13dcc99f, nvkr-process-package-controller-profiles-1771df7d565d, nvkr-process-package-cwe-package-publication-cwe, nvkr-process-package-release-publish-rele-e70edb401cae, nvkr-tool-cosign, nvkr-tool-syft, nvkr-tool-syft-linux-arm64, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-capnico-controller-linux-amd64-fetch-d7e509f127ef, nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc, nvkr-cluster-api-provider-provisioned-lin-3474f127ab2d, nvkr-process-attest-sboms-output-capi-con-210011b0b1fe, nvkr-process-attest-sboms-output-capi-con-c10abbe36d6a, nvkr-process-attest-sboms-output-capnico-c614f5167e54, nvkr-process-attest-sboms-output-cert-man-584e29997f4d, nvkr-process-attest-sboms-output-cert-man-825fd13fcf0c, nvkr-process-attest-sboms-output-cluster-0f08e4d1d2b1, nvkr-process-attest-sboms-output-controll-a838a306b212, nvkr-process-attest-sboms-output-controll-fbd4b2247bcf, nvkr-process-attest-sboms-output-cwe-publ-2917dd670a5b, nvkr-process-attest-sboms-output-nvkectl-33326ff307d8, nvkr-process-attest-sboms-output-nvkectl-85ff6a3a9b12, nvkr-process-attest-sboms-output-operator-2fd8456da854, nvkr-process-attest-sboms-output-operator-4656296c5495, nvkr-process-capi-controller-image-arm64-7b5dfbda4bd3, nvkr-process-capi-controller-image-pull-c-2451b8875be5, nvkr-process-capi-kubeadm-bootstrap-image-8aa2795ece39, nvkr-process-capi-kubeadm-bootstrap-image-d042c444642a, nvkr-process-capi-kubeadm-control-plane-i-d24ae27786c0, nvkr-process-capi-kubeadm-control-plane-i-ddad2ab73e3e, nvkr-process-capnico-controller-linux-amd-2a462bdf52a9, nvkr-process-capnico-controller-linux-arm-ae87ca23780c, nvkr-process-cert-manager-cainjector-imag-9615473948ed, nvkr-process-cert-manager-cainjector-imag-9a88bd1a12d4, nvkr-process-cert-manager-controller-imag-6f36b646a9f0, nvkr-process-cert-manager-controller-imag-98c7fa7fe320, nvkr-process-cert-manager-webhook-image-a-6c727f1095d4, nvkr-process-cert-manager-webhook-image-p-59f9d902f4a4, nvkr-process-cluster-api-provider-provisi-c318d75c1ef3, nvkr-process-cluster-api-provider-provisi-fceca324467e, nvkr-process-controller-chart-fetch-nvke-80a1df89e6ae, nvkr-process-controller-profiles-linux-am-0594064517bf, nvkr-process-controller-profiles-linux-ar-337ab3a17e54, nvkr-process-cwe-linux-amd64-fetch-nvke-c-366fa374bc31, nvkr-process-cwe-linux-arm64-fetch-nvke-c-420dcdb96553, nvkr-process-nvkectl-fetch-nvkectl-nvkect-97c4aeeb013f, nvkr-process-nvkectl-linux-arm64-fetch-nv-43a0c94d77a4, nvkr-process-operator-tools-linux-arm64-p-0b5c60be08f9, nvkr-process-operator-tools-pull-helm-ope-a18b8dd506d8, nvkr-process-package-capnico-controller-p-5cbfb2d0ddf9, nvkr-process-package-cluster-api-provider-0b87890035a6, nvkr-process-package-controller-chart-pac-f9fd13dcc99f, nvkr-process-package-controller-profiles-1771df7d565d, nvkr-process-package-cwe-package-publication-cwe, nvkr-process-package-release-publish-rele-e70edb401cae, nvkr-process-sign-output-capi-kubeadm-boo-6961cfeeb3e9, nvkr-process-sign-output-capi-kubeadm-boo-9473f64d0f24, nvkr-process-sign-output-cert-manager-con-26ecaca0a9dd, nvkr-process-sign-output-cert-manager-con-b64b5999330c, nvkr-tool-cosign, nvkr-tool-syft, nvkr-tool-syft-linux-arm64, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     env:
@@ -1225,7 +1240,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 59 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 58 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {

@@ -720,9 +720,10 @@ entry workflow under fallback partitioning; shared recovery precedes finalizatio
 reduce routine pin churn without changing executable Plan/IR identities. Workflow bytes remain stable only
 while topology, labels/interfaces, visible policy and required inline action pins stay unchanged; every input change still requires
 complete bundle regeneration and checking. Static validation expands templates with their invocation data and checks their exact generated
-bytes, preserving credential scope and per-job finalizer results. Edit locality separately preserves existing
-jobs when an independent output is added. On GitHub a job is one authority class on one runner for one
-Build target or publication route (ADR-18 §8). Source fetch without a credential, build, acquisition,
+bytes, preserving credential scope and per-job finalizer results. Edit locality preserves ordinary jobs when
+an independent output is added; shared source selection and image publication batches can change membership.
+On GitHub a job is one authority class on one runner, normally for one Build target or publication route
+(ADR-18 §8). Source fetch without a credential, build, acquisition,
 terminal observation, SBOM and packaging share a producer job. SBOM attestation, publication, signing,
 publication verification and release assembly share a release job with step-scoped credentials. An
 operation joins a job only when it has the same class, runner label and native platform and adds no
@@ -731,7 +732,18 @@ job unsuccessful for finalization. A shared pinned tool acquired by an independe
 an additional prerequisite; the job waits for acquisition and restores the tool first, and a failed
 acquisition prevents that job. The root tool acquisition never gains members. A source fetch that holds
 a source credential and an object publication keep their own jobs; the explicit ARC
-disk group preserves its live owner. Membership does not follow global adjacency or fixed-size chunks.
+disk group preserves its live owner. Ordinary producer membership does not follow global adjacency.
+Single-platform OCI image publication operations may share a job across routes with equal runner,
+platform and publication credential reference, within the original operation and duration ceilings and
+at most two output routes per job.
+The projection refuses cyclic dependencies; bounded cross-output waiting and failure coupling are explicit.
+Each output retains its own evidence, signing and verification operations. Source acquisition is shared
+within the Run by exact repository URL, commit and tree; prepared closures additionally require the same
+vendor specification and native platform. Consumers independently authenticate restored source and their native vendor
+runtime before writing. Shared source owners finish before producer work, and differing vendor
+specifications reconstruct pristine pinned source before their own vendoring. Consumers still depend on
+the selected owner's vendor success and transport its complete closure. These transport choices
+do not change Plan or Build identity or reuse producer results.
 Aggregate accounting and summaries change with the complete required set, and finalization still requires
 every job. The current Plan determines scheduling without previous-generated-state input.
 Identical complete host step sequences

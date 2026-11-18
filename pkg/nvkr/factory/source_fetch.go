@@ -32,11 +32,20 @@ func executeGitHubSourceFetch(ctx context.Context, plan *Plan, nodeID string, st
 	if err := admitGitHubPlan(ctx, plan); err != nil {
 		return err
 	}
-	return executeSourceFetch(ctx, plan, nodeID, os.Environ(), stdout, stderr, (pipeline.Local{}).ExecNode)
+	seed, err := githubSourceSeed(plan, nodeID)
+	if err != nil {
+		return err
+	}
+	return executeSourceFetchWithSeed(ctx, plan, nodeID, os.Environ(), stdout, stderr, (pipeline.Local{}).ExecNode, seed)
 }
 
 func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environment []string, stdout, stderr io.Writer,
-	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error)) (returnErr error) {
+	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error)) error {
+	return executeSourceFetchWithSeed(ctx, plan, nodeID, environment, stdout, stderr, run, nil)
+}
+
+func executeSourceFetchWithSeed(ctx context.Context, plan *Plan, nodeID string, environment []string, stdout, stderr io.Writer,
+	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error), sourceSeed *pipeline.SourceSeed) (returnErr error) {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "source fetch requires a context")
 	}
@@ -100,6 +109,7 @@ func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environm
 	return executeProducer(ctx, plan, node, plan.Environment.RuntimeBinary(), 1, stdout, stderr,
 		func(instruction ir.Node, options pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
 			options.SourceWorkspace = workspace
+			options.SourceSeed = sourceSeed
 			options.SourceGitEnvironment = childEnvironment
 			return run(instruction, options)
 		}, nil)

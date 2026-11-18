@@ -519,11 +519,11 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-  nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7:
-    name: 'Attest, publish, sign and verify output-nktp-collector-image'
+  nvkr-process-attest-sboms-output-nktp-col-a4e9448c85f5:
+    name: 'Publish and verify images: output-nktp-collector-image, output-nktp-kube-state-metrics-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-collector-image-pull-nk-1b2717680e5c, nvkr-tool-cosign]
+    timeout-minutes: 360
+    needs: [nvkr-process-nktp-collector-image-pull-nk-1b2717680e5c, nvkr-process-nktp-kube-state-metrics-imag-9237b3d3c42d, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -538,11 +538,82 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-kub-c8449a367a99:
-    name: 'Attest, publish, sign and verify output-nktp-kube-state-metrics-image'
+      - *operation-execute-node-part-5
+      - &operation-execute-publication-part-6
+        name: execute publication part-6
+        uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/execute-publication
+        with:
+          nvkr-credential: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+          nvkr-registry-user: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-process-sign-output-nktp-kube-state-da8aef477fa1:
+    name: 'Publish and verify images: output-nktp-kube-state-metrics-image, output-nktp-kubectl-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-kube-state-metrics-imag-9237b3d3c42d, nvkr-tool-cosign]
+    timeout-minutes: 360
+    needs: [nvkr-process-attest-sboms-output-nktp-col-a4e9448c85f5, nvkr-process-nktp-kubectl-image-pull-nktp-7a5465c5ace2]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - &operation-execute-registry-part-1
+        name: execute registry part-1
+        uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/execute-registry
+        with:
+          nvkr-credential: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+          nvkr-registry-user: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - &operation-execute-registry-part-2
+        name: execute registry part-2
+        uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/execute-registry
+        with:
+          nvkr-credential: '${{ secrets.NVKR_REGISTRY_READ }}'
+          nvkr-registry-user: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-2'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - *operation-execute-node-part-3
+      - &operation-execute-publication-part-4
+        name: execute publication part-4
+        uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/execute-publication
+        with:
+          nvkr-credential: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+          nvkr-registry-user: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - &operation-execute-registry-part-5
+        name: execute registry part-5
+        uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/execute-registry
+        with:
+          nvkr-credential: '${{ secrets.NVKR_REGISTRY_WRITE }}'
+          nvkr-registry-user: '${{ vars.NVKR_REGISTRY_WRITE_USER }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+      - &operation-execute-registry-part-6
+        name: execute registry part-6
+        uses: ./.github/nvkr-run-nvke-telemetry/actions/shared/execute-registry
+        with:
+          nvkr-credential: '${{ secrets.NVKR_REGISTRY_READ }}'
+          nvkr-registry-user: '${{ vars.NVKR_REGISTRY_READ_USER }}'
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-6'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+  nvkr-process-attest-sboms-output-nktp-lgt-6ecefe4ad398:
+    name: 'Publish and verify images: output-nktp-lgtm-image, output-nktp-metrics-server-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 360
+    needs: [nvkr-process-nktp-lgtm-image-pull-nktp-lg-0ce720331605, nvkr-process-nktp-metrics-server-image-pu-4d0ea0695597, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -557,11 +628,34 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-kub-c9a4d1b91ba8:
-    name: 'Attest, publish, sign and verify output-nktp-kubectl-image'
+      - *operation-execute-node-part-5
+      - *operation-execute-publication-part-6
+  nvkr-process-sign-output-nktp-metrics-ser-5592c2b22671:
+    name: 'Publish and verify images: output-nktp-metrics-server-image, output-nktp-node-exporter-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-kubectl-image-pull-nktp-7a5465c5ace2, nvkr-tool-cosign]
+    timeout-minutes: 360
+    needs: [nvkr-process-attest-sboms-output-nktp-lgt-6ecefe4ad398, nvkr-process-nktp-node-exporter-image-pul-68a771ea8298]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-registry-part-1
+      - *operation-execute-registry-part-2
+      - *operation-execute-node-part-3
+      - *operation-execute-publication-part-4
+      - *operation-execute-registry-part-5
+      - *operation-execute-registry-part-6
+  nvkr-process-attest-sboms-output-nktp-ope-82faa7550c78:
+    name: 'Publish and verify images: output-nktp-operator-image, output-nktp-target-allocator-image'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 360
+    needs: [nvkr-process-nktp-operator-image-pull-nkt-61fc7278e4c5, nvkr-process-nktp-target-allocator-image-112efff693b7, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -576,11 +670,13 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851:
-    name: 'Attest, publish, sign and verify output-nktp-lgtm-image'
+      - *operation-execute-node-part-5
+      - *operation-execute-publication-part-6
+  nvkr-process-sign-output-nktp-target-allo-0f22c1fcfa4e:
+    name: 'Publish and verify images: output-nktp-collector-image-arm64, output-nktp-target-allocator-image'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-lgtm-image-pull-nktp-lg-0ce720331605, nvkr-tool-cosign]
+    timeout-minutes: 360
+    needs: [nvkr-process-attest-sboms-output-nktp-ope-82faa7550c78, nvkr-process-nktp-collector-image-arm64-p-254a213ce332]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -591,86 +687,12 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-met-5bfa54ed25c3:
-    name: 'Attest, publish, sign and verify output-nktp-metrics-server-image'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-metrics-server-image-pu-4d0ea0695597, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-nod-a5920c5bad6d:
-    name: 'Attest, publish, sign and verify output-nktp-node-exporter-image'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-node-exporter-image-pul-68a771ea8298, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0:
-    name: 'Attest, publish, sign and verify output-nktp-operator-image'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-operator-image-pull-nkt-61fc7278e4c5, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d:
-    name: 'Attest, publish, sign and verify output-nktp-target-allocator-image'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-target-allocator-image-112efff693b7, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
+      - *operation-execute-registry-part-1
+      - *operation-execute-registry-part-2
+      - *operation-execute-node-part-3
+      - *operation-execute-publication-part-4
+      - *operation-execute-registry-part-5
+      - *operation-execute-registry-part-6
   nvkr-tool-syft-linux-arm64:
     name: 'Acquire pinned syft/linux/arm64'
     runs-on: 'ubuntu-24.04-arm'
@@ -685,11 +707,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81:
-    name: 'Attest, publish, sign and verify output-nktp-collector-image-arm64'
+  nvkr-process-attest-sboms-output-nktp-kub-789dc31774f4:
+    name: 'Publish and verify images: output-nktp-kube-state-metrics-image-arm64, output-nktp-kubectl-image-arm64'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-collector-image-arm64-p-254a213ce332, nvkr-tool-cosign]
+    timeout-minutes: 360
+    needs: [nvkr-process-nktp-kube-state-metrics-imag-e0532701e664, nvkr-process-nktp-kubectl-image-arm64-pul-c601d6089765, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -704,11 +726,34 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a:
-    name: 'Attest, publish, sign and verify output-nktp-kube-state-metrics-image-arm64'
+      - *operation-execute-node-part-5
+      - *operation-execute-publication-part-6
+  nvkr-process-sign-output-nktp-kubectl-ima-aea125221688:
+    name: 'Publish and verify images: output-nktp-kubectl-image-arm64, output-nktp-lgtm-image-arm64'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-kube-state-metrics-imag-e0532701e664, nvkr-tool-cosign]
+    timeout-minutes: 360
+    needs: [nvkr-process-attest-sboms-output-nktp-kub-789dc31774f4, nvkr-process-nktp-lgtm-image-arm64-pull-n-290430591175]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    environment: 'nvkr-release'
+    permissions:
+      actions: read
+      contents: read
+      id-token: write
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-registry-part-1
+      - *operation-execute-registry-part-2
+      - *operation-execute-node-part-3
+      - *operation-execute-publication-part-4
+      - *operation-execute-registry-part-5
+      - *operation-execute-registry-part-6
+  nvkr-process-attest-sboms-output-nktp-met-210b8a9465f0:
+    name: 'Publish and verify images: output-nktp-metrics-server-image-arm64, output-nktp-node-exporter-image-arm64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 360
+    needs: [nvkr-process-nktp-metrics-server-image-ar-757d08c35161, nvkr-process-nktp-node-exporter-image-arm-66bf6c6556d1, nvkr-tool-cosign]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -723,11 +768,13 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-kub-38a63daab836:
-    name: 'Attest, publish, sign and verify output-nktp-kubectl-image-arm64'
+      - *operation-execute-node-part-5
+      - *operation-execute-publication-part-6
+  nvkr-process-sign-output-nktp-node-export-b1949e12828c:
+    name: 'Publish and verify images: output-nktp-node-exporter-image-arm64, output-nktp-operator-image-arm64'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-kubectl-image-arm64-pul-c601d6089765, nvkr-tool-cosign]
+    timeout-minutes: 360
+    needs: [nvkr-process-attest-sboms-output-nktp-met-210b8a9465f0, nvkr-process-nktp-operator-image-arm64-pu-b99a053f47f2]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -738,86 +785,12 @@ jobs:
       - *check-native-linux-amd64
       - *checkout-workflow-source
       - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688:
-    name: 'Attest, publish, sign and verify output-nktp-lgtm-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-lgtm-image-arm64-pull-n-290430591175, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71:
-    name: 'Attest, publish, sign and verify output-nktp-metrics-server-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-metrics-server-image-ar-757d08c35161, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f:
-    name: 'Attest, publish, sign and verify output-nktp-node-exporter-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-node-exporter-image-arm-66bf6c6556d1, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
-  nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2:
-    name: 'Attest, publish, sign and verify output-nktp-operator-image-arm64'
-    runs-on: 'ubuntu-24.04'
-    timeout-minutes: 240
-    needs: [nvkr-process-nktp-operator-image-arm64-pu-b99a053f47f2, nvkr-tool-cosign]
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
-    environment: 'nvkr-release'
-    permissions:
-      actions: read
-      contents: read
-      id-token: write
-    steps:
-      - *check-native-linux-amd64
-      - *checkout-workflow-source
-      - *prepare-stage-nvkr-exec-ubuntu-24-04
-      - *operation-execute-node-part-1
-      - *operation-execute-publication-part-2
-      - *operation-execute-registry-part-3
-      - *operation-execute-registry-part-4
+      - *operation-execute-registry-part-1
+      - *operation-execute-registry-part-2
+      - *operation-execute-node-part-3
+      - *operation-execute-publication-part-4
+      - *operation-execute-registry-part-5
+      - *operation-execute-registry-part-6
   nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3:
     name: 'Attest, publish, sign and verify output-nktp-target-allocator-image-arm64'
     runs-on: 'ubuntu-24.04'
@@ -841,7 +814,7 @@ jobs:
     name: 'Assemble, publish, sign and verify release'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81, nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7, nvkr-process-attest-sboms-output-nktp-kub-38a63daab836, nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a, nvkr-process-attest-sboms-output-nktp-kub-c8449a367a99, nvkr-process-attest-sboms-output-nktp-kub-c9a4d1b91ba8, nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688, nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851, nvkr-process-attest-sboms-output-nktp-met-5bfa54ed25c3, nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71, nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f, nvkr-process-attest-sboms-output-nktp-nod-a5920c5bad6d, nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2, nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0, nvkr-process-attest-sboms-output-nktp-pub-10938e2cfef1, nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3, nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d]
+    needs: [nvkr-process-attest-sboms-output-nktp-pub-10938e2cfef1, nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3, nvkr-process-sign-output-nktp-kube-state-da8aef477fa1, nvkr-process-sign-output-nktp-kubectl-ima-aea125221688, nvkr-process-sign-output-nktp-metrics-ser-5592c2b22671, nvkr-process-sign-output-nktp-node-export-b1949e12828c, nvkr-process-sign-output-nktp-target-allo-0f22c1fcfa4e]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -867,7 +840,7 @@ jobs:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81, nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7, nvkr-process-attest-sboms-output-nktp-kub-38a63daab836, nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a, nvkr-process-attest-sboms-output-nktp-kub-c8449a367a99, nvkr-process-attest-sboms-output-nktp-kub-c9a4d1b91ba8, nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688, nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851, nvkr-process-attest-sboms-output-nktp-met-5bfa54ed25c3, nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71, nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f, nvkr-process-attest-sboms-output-nktp-nod-a5920c5bad6d, nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2, nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0, nvkr-process-attest-sboms-output-nktp-pub-10938e2cfef1, nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3, nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d, nvkr-process-nktp-collector-image-arm64-p-254a213ce332, nvkr-process-nktp-collector-image-pull-nk-1b2717680e5c, nvkr-process-nktp-fetch-nktp-chart-nktp-b-409641394abc, nvkr-process-nktp-kube-state-metrics-imag-9237b3d3c42d, nvkr-process-nktp-kube-state-metrics-imag-e0532701e664, nvkr-process-nktp-kubectl-image-arm64-pul-c601d6089765, nvkr-process-nktp-kubectl-image-pull-nktp-7a5465c5ace2, nvkr-process-nktp-lgtm-image-arm64-pull-n-290430591175, nvkr-process-nktp-lgtm-image-pull-nktp-lg-0ce720331605, nvkr-process-nktp-metrics-server-image-ar-757d08c35161, nvkr-process-nktp-metrics-server-image-pu-4d0ea0695597, nvkr-process-nktp-node-exporter-image-arm-66bf6c6556d1, nvkr-process-nktp-node-exporter-image-pul-68a771ea8298, nvkr-process-nktp-operator-image-arm64-pu-b99a053f47f2, nvkr-process-nktp-operator-image-pull-nkt-61fc7278e4c5, nvkr-process-nktp-target-allocator-image-112efff693b7, nvkr-process-nktp-target-allocator-image-722bca1a145d, nvkr-process-package-release-publish-rele-e70edb401cae, nvkr-tool-cosign, nvkr-tool-syft, nvkr-tool-syft-linux-arm64, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-process-attest-sboms-output-nktp-col-a4e9448c85f5, nvkr-process-attest-sboms-output-nktp-kub-789dc31774f4, nvkr-process-attest-sboms-output-nktp-lgt-6ecefe4ad398, nvkr-process-attest-sboms-output-nktp-met-210b8a9465f0, nvkr-process-attest-sboms-output-nktp-ope-82faa7550c78, nvkr-process-attest-sboms-output-nktp-pub-10938e2cfef1, nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3, nvkr-process-nktp-collector-image-arm64-p-254a213ce332, nvkr-process-nktp-collector-image-pull-nk-1b2717680e5c, nvkr-process-nktp-fetch-nktp-chart-nktp-b-409641394abc, nvkr-process-nktp-kube-state-metrics-imag-9237b3d3c42d, nvkr-process-nktp-kube-state-metrics-imag-e0532701e664, nvkr-process-nktp-kubectl-image-arm64-pul-c601d6089765, nvkr-process-nktp-kubectl-image-pull-nktp-7a5465c5ace2, nvkr-process-nktp-lgtm-image-arm64-pull-n-290430591175, nvkr-process-nktp-lgtm-image-pull-nktp-lg-0ce720331605, nvkr-process-nktp-metrics-server-image-ar-757d08c35161, nvkr-process-nktp-metrics-server-image-pu-4d0ea0695597, nvkr-process-nktp-node-exporter-image-arm-66bf6c6556d1, nvkr-process-nktp-node-exporter-image-pul-68a771ea8298, nvkr-process-nktp-operator-image-arm64-pu-b99a053f47f2, nvkr-process-nktp-operator-image-pull-nkt-61fc7278e4c5, nvkr-process-nktp-target-allocator-image-112efff693b7, nvkr-process-nktp-target-allocator-image-722bca1a145d, nvkr-process-package-release-publish-rele-e70edb401cae, nvkr-process-sign-output-nktp-kube-state-da8aef477fa1, nvkr-process-sign-output-nktp-kubectl-ima-aea125221688, nvkr-process-sign-output-nktp-metrics-ser-5592c2b22671, nvkr-process-sign-output-nktp-node-export-b1949e12828c, nvkr-process-sign-output-nktp-target-allo-0f22c1fcfa4e, nvkr-tool-cosign, nvkr-tool-syft, nvkr-tool-syft-linux-arm64, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     env:
@@ -955,7 +928,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 42 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 37 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {

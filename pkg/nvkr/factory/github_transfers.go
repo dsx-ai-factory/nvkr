@@ -64,6 +64,23 @@ func githubArtifactNeedsCarrier(plan *Plan, artifact Artifact, nodeJobs map[stri
 	if finalizerArtifact(plan, artifact) {
 		return true
 	}
+	// A shared source may also seed other fetch operations through the hosted
+	// scheduling projection, which leaves the logical Plan graph unchanged.
+	if artifact.Kind == "source-closure" {
+		ordered, _, err := githubSchedulingProjection(plan)
+		if err != nil {
+			return true
+		}
+		seeds, err := githubSourceSeeds(plan, ordered)
+		if err != nil {
+			return true
+		}
+		for consumer, seed := range seeds {
+			if seed.ID == artifact.Producer && nodeJobs[consumer] != nodeJobs[seed.ID] {
+				return true
+			}
+		}
+	}
 	switch artifact.Kind {
 	case PackageOCI, PackageDiskImage, PackageImage, PackageBinaryBundle, PackageHelm, PackageAPT,
 		"oci-image", "raw", "tarball", "host-package", "source-closure", "pipeline-tool":
