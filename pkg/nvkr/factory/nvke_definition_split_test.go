@@ -127,8 +127,23 @@ var nvkeFamilyOnlyCatalogs = map[string]bool{"../../catalogs/local-path-provisio
 func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 	nvkeSplitRepository(t)
 	combined := nvkeSplitDefinition(t, "inputs/definitions/nvke/definition.yaml")
+	baseline, err := LoadPlanContext(t.Context(), ".github/nvkr-run/plan.json")
+	if err != nil {
+		t.Fatal(err)
+	}
 	original := make(map[string][]byte, len(combined.Outputs))
 	for _, output := range combined.Outputs {
+		if output.Catalog == nil {
+			for _, build := range baseline.Builds {
+				if build.Name == nativeOutputSelections(output)[0].Name {
+					output.Catalog = build.SelectedCatalog
+					break
+				}
+			}
+			if output.Catalog == nil {
+				t.Fatalf("missing selected catalog for %s", output.Name)
+			}
+		}
 		original[output.Name] = nvkeSplitCanonical(t, output)
 	}
 	wantOutputs, wantNative := nvkeSplitExpectedTotals(combined)
@@ -160,6 +175,9 @@ func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 					}
 					native += max(1, len(output.Platforms))
 					continue
+				}
+				if output.Catalog == nil {
+					output.Catalog = &doc.Catalog
 				}
 				// The whole declaration includes catalog/overlay selection, exact
 				// material membership, native platforms and chart image bindings.
@@ -320,7 +338,9 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 		t.Fatal("transitional Plan no longer represents the combined authored selection")
 	}
 	builds := make(map[string][]byte, len(combined.Builds))
+	// SelectedCatalog describes list resolution; legacy families omit it.
 	for _, build := range combined.Builds {
+		build.SelectedCatalog = nil
 		builds[build.Name] = nvkeSplitCanonical(t, build)
 	}
 	outputs := make(map[string][]byte, len(combined.LifecycleOutputs))
@@ -422,7 +442,9 @@ func nvkeSplitCatalogLoader(t *testing.T, combined *Plan) func(context.Context, 
 			t.Fatalf("baseline build %q has no authored output", build.Name)
 		}
 		spec := combined.Definition.Catalog
-		if selection.Catalog != nil {
+		if build.SelectedCatalog != nil {
+			spec = *build.SelectedCatalog
+		} else if selection.Catalog != nil {
 			spec = *selection.Catalog
 		}
 		key := string(nvkeSplitCanonical(t, spec))
