@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"reflect"
+	"regexp"
 	"slices"
 	"strings"
 
@@ -191,6 +192,17 @@ func requireMirrorOutput(aggregate delivery.PublicationDescription, output deliv
 func retainPublicationProof(ctx context.Context, verifier portablePublicationVerifier, reference string, policy VerificationPolicy,
 	metadata delivery.ReleaseMetadata, signingInvocation, consumingInvocation string,
 ) (*sign.VerifiedOCIEvidence, error) {
+	proof, err := authenticateOriginalPublicationProof(ctx, verifier, reference, policy)
+	if err != nil {
+		return nil, err
+	}
+	if err := requirePublicationProvenance(proof, metadata, signingInvocation, consumingInvocation); err != nil {
+		return nil, err
+	}
+	return proof, nil
+}
+
+func authenticateOriginalPublicationProof(ctx context.Context, verifier portablePublicationVerifier, reference string, policy VerificationPolicy) (*sign.VerifiedOCIEvidence, error) {
 	subject := sign.Subject{Ref: reference, Digest: referenceDigest(reference)}
 	record, proof, err := verifier.VerifyAndRetain(ctx, subject, sign.VerifyPolicy{IdentityRegexp: policy.IdentityRegexp, Issuer: policy.Issuer, RequireAttestation: true})
 	if err != nil {
@@ -203,12 +215,16 @@ func retainPublicationProof(ctx context.Context, verifier portablePublicationVer
 		record.Ref != subject.Ref || record.Digest != subject.Digest || record.Identity != policy.IdentityRegexp || record.Issuer != policy.Issuer {
 		return nil, e.New(e.CodeSignatureInvalid, "original proof does not authenticate the exact subject and external policy")
 	}
+	identityPattern, err := regexp.Compile(policy.IdentityRegexp)
+	if err != nil {
+		return nil, e.Wrap(e.CodeTrustPolicyMissing, err, "compiling original proof identity policy")
+	}
+	if !identityPattern.MatchString(record.ObservedIdentity) || record.ObservedIssuer != policy.Issuer {
+		return nil, e.New(e.CodeUntrustedSigner, "observed original signer does not satisfy the requested identity and issuer policy")
+	}
 	retained, _, _, err := proof.Bundles()
 	if err != nil || retained != subject {
 		return nil, e.New(e.CodeSignatureInvalid, "retained original proof belongs to a different subject")
-	}
-	if err := requirePublicationProvenance(proof, metadata, signingInvocation, consumingInvocation); err != nil {
-		return nil, err
 	}
 	return proof, nil
 }
