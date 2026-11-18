@@ -1,6 +1,6 @@
 # What is NVKR
 
-> **Preview:** NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview status and known limitations](preview-status.md).
+> **Preview:** NVKR is available as a preview. Commands, input schemas and behavior can change between releases, and we do not recommend NVKR for production use. See [Preview limits](preview-status.md).
 
 NVIDIA Kubernetes® Recipes (NVKR) is open-source software that turns pinned source into traceable software releases for NVIDIA Kubernetes Engine (NVKE). You declare the outputs you want to ship, and NVKR resolves their pinned inputs, builds or acquires each artifact, and connects each delivered artifact to its inputs and evidence. Its CLI is `nvkr`.
 
@@ -65,7 +65,7 @@ NVKE is the Kubernetes management system that runs the artifacts NVKR builds. NV
 
 - **Build your first artifact:** [Quickstart](../quickstart.md).
 - **Let your agent drive NVKR:** [Use NVKR with your AI agent](../use-with-agents.md).
-- **Check what preview supports:** [Preview status and known limitations](preview-status.md).
+- **Check what preview supports:** [Preview limits](preview-status.md).
 
 ## Trademarks
 
