@@ -47,14 +47,14 @@ reducing tenants alone cannot reduce the initial 6-GiB bootstrap requirement,
 and a smaller site has no recorded acceptance. The observed range leaves
 752–977 MiB above the 13-GiB peak guest allocation. Admission still fails closed
 below its selected memory or CPU requirement and reserves nothing. Contract tests
-cover both boundaries and the observed range. The November 18 fork Run below
+cover both boundaries and the observed range. The November 18 fork Runs below
 exercised the new allowance through complete site/tenant acceptance and cleanup.
 The small profile also sets the site's system reservation and the tenant's
 Reserved/SystemReserved/KubeReserved memory to 256Mi, appends the guest kubelet
 `--kube-reserved=cpu=1000m,memory=256Mi,ephemeral-storage=1Gi` override and restarts
 it, sets OVN control-plane/node-zone memory requests to 128Mi, and adds 64Mi
 memory requests to the seven site telemetry collector roles and three target
-allocators. The historical small-profile runs below cover these guest settings
+allocators. The November 3–5 small-profile runs below cover these guest settings
 with the former 1-GiB host/QEMU headroom, not the revised nightly allowance or
 the default reservations.
 
@@ -120,6 +120,21 @@ artifact count was zero. This change removes the temporary capture;
 the Run records the tested commit before that removal. It establishes
 unsigned hosted functional acceptance for this source pair, not a Release,
 qualification or a passing scheduled Run on upstream main.
+
+[Fork Run 44213539138](https://github.com/njhensley/nvkr/actions/runs/44213539138)
+passed on November 18, 2026 at 02:27:38 UTC, attempt 1, at exact NVKR
+`2b552e01a3123dba50332e1d58f2775b9f10ed67` and frozen NVKE
+`d36f0b61ad1b0369087ddb3a277eec99fe63dbdb`. All 34 selected outputs, site and
+tenant subtests, and the cleanup-bearing parent passed. The parent passed in
+4190.20 seconds, site in 5.81 and tenant in 339.40. Initial admission observed
+14,308 MiB against 13,824 required; tenant admission observed 7,950 MiB against
+6,656 required. This Run used main's optional NKTP chart handling without chart
+injection or temporary diagnostics, together with the controller sibling-chart,
+queue storage, memory and checkout fixes. Every job step and post-step succeeded;
+Actions artifact count was zero and public deployment output contained only phase
+markers. Subsequent main integration and evidence-only commits are outside this
+Run. Its acceptance remains unsigned functional evidence for the exact source
+pair, not a Release, qualification or a passing upstream scheduled cycle.
 
 The obsolete requirement in [#353](https://github.com/dsx-ai-factory/nvkr/issues/353)
 to close [#228](https://github.com/dsx-ai-factory/nvkr/issues/228) is retired:

@@ -551,15 +551,9 @@ first byte provider. It reuses original artifacts, provenance and SBOMs, complet
 generated publication/finalization. External provider, workflow and downstream boot/install acceptance remain
 separate evidence; the transport adds no deployment or qualification claim.
 
-The proposed [selective boot-asset contract](adr/0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding)
-keeps complete OCI membership while copying only named QCOW2/EFI bytes and intact original membership proofs.
-Output authentication and payload readback precede the predeclared MachineImage render/sign operation;
-complete aggregate authentication then precedes proof copy and final inventory readback. The final inventory
-sits outside the aggregate member graph, preventing a render from embedding its own eventual root. Independent
-selected verification supplies its own policy and expectations and retrieves payload/proof bytes from S3;
-it grants no whole-publication or boot-enforcement claim. The
-[selective reconciliation row](adr/reconciliation/object-store-publication.md#selective-boot-asset-publication)
-owns implementation, review and acceptance status.
+The proposed [selective contract](adr/0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding)
+copies named QCOW2/EFI bytes and proofs while preserving complete OCI membership. Payload copy/readback precedes rendering;
+aggregate authentication precedes proof and final inventory publication/readback. [Reconciliation](adr/reconciliation/object-store-publication.md#selective-boot-asset-publication) tracks implementation.
 
 [Reconciliation](adr/reconciliation/README.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped
