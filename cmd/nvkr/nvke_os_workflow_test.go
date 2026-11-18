@@ -14,6 +14,13 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+func TestOSWorkflowUpstreamPushGuard(t *testing.T) {
+	const want = "github.event_name != 'push' || github.repository == 'dsx-ai-factory/nvkr'"
+	if got := osValidationWorkflow(t)["select"].If; got != want {
+		t.Fatalf("selection guard = %q, want %q to skip fork pushes while allowing manual dispatch", got, want)
+	}
+}
+
 func TestOSWorkflowToolchainLockGate(t *testing.T) {
 	var source osWorkflowStep
 	for _, step := range osValidationWorkflow(t)["select"].Steps {
