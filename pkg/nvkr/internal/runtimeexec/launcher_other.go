@@ -21,5 +21,11 @@ func executeChild(context.Context, *heldfile.File, requestRecord, []*os.File, io
 	return platformAdmission()
 }
 
+func executeOutbound(context.Context, *heldfile.File, requestRecord, []*os.File, io.Writer, io.Writer) error {
+	return platformAdmission()
+}
+
+func outboundHostAdmission(context.Context) error { return platformAdmission() }
+
 // Entry is called only by the dedicated bootstrap dispatch in the NVKR command.
 func Entry() error { return platformAdmission() }

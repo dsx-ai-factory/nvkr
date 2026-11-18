@@ -58,6 +58,15 @@ archives from fresh roots and the same revalidated snapshot inputs. It used Ubun
 not the source-commit bootstrap now required by the contract. That Run establishes neither production
 Plan integration nor disk-output equivalence, guest boot, ARM64 operation or a stronger evidence lane.
 
+The generated produced-runtime disk bootstrap has an unprivileged preflight, a fixed scrubbed sudo
+invocation and a root-owned watchdog. Scratch admission checks the actual protected executable filesystem
+and its capacity. Shell contract tests cover credential removal, exact operation selection and preflight
+failure. The outbound launcher uses the snapshot's `slirp4netns` 1.3.3-1 TAP-descriptor interface, with
+fixed arguments, numeric DNS projection, unprivileged helper execution and paired process lifetime.
+The runtime package closure adds that exact package; all four library dependencies were already pinned.
+These changes have no stock-VM or disk-build proof yet. The earlier assembly digest above describes the
+closure before this helper was added and does not evidence the changed runtime.
+
 The quick machinery E2E [fork Run](https://github.com/njhensley/nvkr/actions/runs/44043009475)
 at `ee807779f8122a0cce1105853a0a82c88dbb4c56` passed on stock Ubuntu in 91 seconds (71 seconds
 for the shared Make target): real hello build, registry round-trip, unprivileged smoke and harness

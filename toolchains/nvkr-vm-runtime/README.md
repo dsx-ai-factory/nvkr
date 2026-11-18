@@ -17,6 +17,13 @@ under `/usr/share/doc/nvkr-vm-runtime/licenses`. The plugin checksum file contai
 hex digest, matching Packer's installed-plugin format. Each pin and its dependency/license closure needs
 ordinary catalog review; no whole-image exception carries over.
 
+The outer root also pins `slirp4netns` 1.3.3-1 from the same snapshot. Its TAP-descriptor mode lets
+NVKR create the network device inside the private consumer namespace, then run the outbound helper
+without root or capabilities. The fixed invocation disables host-loopback mapping, enables seccomp,
+and provides no inbound forwarding or control API. The existing pins for libc, GLib, libseccomp and
+libslirp satisfy its full dependency closure. Its package copyright notices remain installed for
+ordinary catalog review. The new helper has not yet been exercised in a stock-VM disk build.
+
 Measured firmware bytes are copied from their packages to `/nvkr/firmware`. The inspector kernel is
 copied to `/nvkr/inspection/kernel` with readable permissions. Original package files remain present.
 These copies preserve the baseline bytes and confer no Secure Boot or signing authority.

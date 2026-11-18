@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -37,9 +38,12 @@ type Projection struct {
 }
 
 type Request struct {
-	Root           *os.File
-	Projections    []Projection
-	KVM            *os.File
+	Root        *os.File
+	Projections []Projection
+	KVM         *os.File
+	// Outbound selects the fixed TAP-only helper. It is descriptive; the
+	// original Run receipt and producer network admission remain the authority.
+	Outbound       bool
 	Command        []string
 	Environment    []string
 	Workdir        string
@@ -58,6 +62,9 @@ type requestRecord struct {
 	GID         int                `json:"gid"`
 	RootFD      int                `json:"rootFd"`
 	KVMFD       int                `json:"kvmFd,omitempty"`
+	NetworkFD   int                `json:"networkFd,omitempty"`
+	ReadyFD     int                `json:"readyFd,omitempty"`
+	Resolver    string             `json:"resolver,omitempty"`
 	Projections []projectionRecord `json:"projections,omitempty"`
 	Command     []string           `json:"command,omitempty"`
 	Environment []string           `json:"environment,omitempty"`
@@ -73,11 +80,21 @@ func validateRecord(record requestRecord) error {
 	if record.UID != wantID || record.GID != wantID {
 		return e.New(e.CodeEngineCapability, "runtime namespace requires its unprivileged execution IDs")
 	}
-	if record.Mode == "probe" || record.Mode == "probe-assembly" {
-		if record.RootFD != 0 || record.KVMFD != 0 || len(record.Projections) != 0 || len(record.Command) != 0 || len(record.Environment) != 0 || record.Workdir != "" {
+	if record.Mode == "probe" || record.Mode == "probe-assembly" || record.Mode == "probe-outbound" {
+		if record.RootFD != 0 || record.KVMFD != 0 || record.NetworkFD != 0 || record.ReadyFD != 0 || record.Resolver != "" || len(record.Projections) != 0 || len(record.Command) != 0 || len(record.Environment) != 0 || record.Workdir != "" {
 			return e.New(e.CodeUsage, "runtime admission probe contains execution inputs")
 		}
 		return nil
+	}
+	if record.Mode == "outbound" {
+		if record.RootFD != 5 || record.NetworkFD != 6 || record.ReadyFD != 7 || record.KVMFD != 0 || len(record.Projections) != 0 ||
+			record.Workdir != "/" || !slices.Equal(record.Command, outboundCommand()) || !slices.Equal(record.Environment, outboundEnvironment()) || !validResolver(record.Resolver) {
+			return e.New(e.CodeUsage, "outbound helper requires its fixed descriptor-only invocation")
+		}
+		return nil
+	}
+	if record.ReadyFD != 0 || record.Resolver != "" || (record.NetworkFD != 0 && (record.Mode != "execute" || record.NetworkFD != nextDescriptor(record))) {
+		return e.New(e.CodeUsage, "runtime network control is outside its admitted descriptor slot")
 	}
 	if (record.Mode != "execute" && record.Mode != "assemble") || record.RootFD != 5 || len(record.Projections) > 8 || len(record.Command) == 0 || len(record.Command) > 256 ||
 		!absolutePath(record.Command[0]) || !absolutePath(record.Workdir) || len(record.Environment) > 128 {
@@ -126,6 +143,14 @@ func validateRecord(record requestRecord) error {
 		return e.New(e.CodeUsage, "runtime KVM descriptor is not in its admitted slot")
 	}
 	return nil
+}
+
+func nextDescriptor(record requestRecord) int {
+	fd := 6 + len(record.Projections)
+	if record.KVMFD != 0 {
+		fd++
+	}
+	return fd
 }
 
 func absolutePath(value string) bool {

@@ -64,14 +64,39 @@ func Entry() error {
 	if err := namespaceMount("", "/", "", unix.MS_REC|unix.MS_PRIVATE, ""); err != nil {
 		return e.Wrap(e.CodeEngineCapability, err, "privatizing namespace mount propagation")
 	}
-	if err := loopbackUp(); err != nil {
-		return e.Wrap(e.CodeEngineCapability, err, "enabling private namespace loopback")
+	if record.Mode != "outbound" {
+		if err := loopbackUp(); err != nil {
+			return e.Wrap(e.CodeEngineCapability, err, "enabling private namespace loopback")
+		}
 	}
-	if record.Mode == "probe" || record.Mode == "probe-assembly" {
+	if record.Mode == "probe-outbound" {
+		tap, err := createPrivateTAP()
+		if err != nil {
+			return err
+		}
+		if err := tap.Close(); err != nil {
+			return entryError(err)
+		}
+	}
+	if record.Mode == "probe" || record.Mode == "probe-assembly" || record.Mode == "probe-outbound" {
 		return probeFilesystemAndPrivileges(record)
+	}
+	if record.Mode == "execute" && record.NetworkFD != 0 {
+		if err := connectPrivateNetwork(record.NetworkFD); err != nil {
+			return err
+		}
 	}
 	if err := enterRoot(record); err != nil {
 		return err
+	}
+	if record.NetworkFD != 0 {
+		resolver := "nameserver 10.0.2.3\n"
+		if record.Mode == "outbound" {
+			resolver = record.Resolver
+		}
+		if err := mountPrivateResolver(resolver); err != nil {
+			return err
+		}
 	}
 	if err := restrictPayload(record); err != nil {
 		return err
@@ -81,6 +106,14 @@ func Entry() error {
 	}
 	if err := unix.CloseRange(3, ^uint(0), unix.CLOSE_RANGE_CLOEXEC|unix.CLOSE_RANGE_UNSHARE); err != nil {
 		return entryError(err)
+	}
+	if record.Mode == "outbound" {
+		// Keep only the TAP and readiness channel across the fixed helper exec.
+		for _, fd := range []int{record.NetworkFD, record.ReadyFD} {
+			if _, err := unix.FcntlInt(uintptr(fd), unix.F_SETFD, 0); err != nil {
+				return entryError(err)
+			}
+		}
 	}
 	if err := unix.Exec(record.Command[0], record.Command, record.Environment); err != nil {
 		var filesystem unix.Statfs_t
@@ -109,7 +142,7 @@ func probeFilesystemAndPrivileges(record requestRecord) error {
 		return entryError(err)
 	}
 	defer func() { _ = unix.Close(mountFD) }()
-	if record.Mode == "probe" {
+	if record.Mode == "probe" || record.Mode == "probe-outbound" {
 		if err := unix.Mknodat(mountFD, "null", unix.S_IFCHR|0o600, int(unix.Mkdev(1, 3))); err != nil {
 			return e.Wrap(e.CodeEngineCapability, err, "probing private device creation")
 		}
@@ -179,6 +212,11 @@ func enterRoot(record requestRecord) error {
 	}
 	for _, projection := range record.Projections {
 		if err := prepareMountPoint(root, strings.TrimPrefix(projection.Target, "/")); err != nil {
+			return err
+		}
+	}
+	if record.NetworkFD != 0 {
+		if err := prepareResolverMountPoint(root); err != nil {
 			return err
 		}
 	}

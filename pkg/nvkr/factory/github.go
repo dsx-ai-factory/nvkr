@@ -397,7 +397,7 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 			if minutes := githubDiskStepTimeoutMinutes(stage); minutes != 0 {
 				fmt.Fprintf(&body, "        timeout-minutes: %d\n", minutes)
 			}
-			fmt.Fprintf(&body, "        run: %s\n", githubRunnerCommand(plan, "run-disk", "output", stage.DiskOutput))
+			fmt.Fprintf(&body, "        run: %s\n", githubDiskCommand(plan, stage))
 			writeGitHubPackerDiagnosticStep(&body, plan, stage, actions)
 			if githubDiskInspectionRequired(plan) {
 				// Diagnostics are short-lived descriptions, never planned evidence

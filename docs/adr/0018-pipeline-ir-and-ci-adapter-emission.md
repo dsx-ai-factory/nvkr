@@ -533,7 +533,15 @@ Release membership, qualification, publication or reuse authority.
 
 Consumer entry requires an explicitly admitted native Linux launcher with private mount, PID, IPC,
 UTS and network namespaces. Setup requires the operator's privileged native bootstrap; the launcher
-does not invoke privilege elevation itself. It admits the required mount, network, device, ownership
+does not invoke privilege elevation itself. For a produced-runtime disk group, the generated job first
+admits the exact Plan, output, native platform, resources and VM capabilities without elevation. It then
+starts the existing disk coordinator under noninteractive sudo with a fixed environment allowlist and
+a root-owned watchdog derived from the group's budget. The coordinator repeats admission, probes its
+namespace capabilities, and creates root-owned scratch under the fixed protected `/opt` parent only
+after checking execution/write permissions and available disk-backed capacity. Source fetch, carrier
+upload, registry credential preparation, signing and publication remain outside this owner. No token,
+credential directory, authored environment or executable override is forwarded across the boundary.
+It admits the required mount, network, device, ownership
 and privilege-dropping capabilities before producer work. The owner stages the authenticated root
 filesystem under a root-owned private directory and exposes it read-only, with no host root or
 container socket reachable by the payload. Source and material
@@ -541,7 +549,17 @@ inputs remain read-only; private output and scratch locations are the only writa
 The launcher drops to UID/GID 65534, removes supplementary groups and all capabilities, locks root
 privilege restoration off, and applies no-new-privileges before payload execution. These process IDs
 are an execution restriction, not a signing identity or a new publication subject.
-A private loopback interface permits Packer/QEMU communication without external network access.
+A private loopback interface permits Packer/QEMU communication. An explicitly network-admitted disk
+producer additionally uses the snapshot-pinned `slirp4netns` helper in the authenticated runtime. Setup
+creates and configures one TAP device inside the consumer's private network namespace and transfers
+only that descriptor to the helper. The helper runs with its own private root/mount/PID/IPC/UTS boundary,
+UID/GID 65534, no capabilities and no-new-privileges; only this fixed helper retains the outer network.
+Its fixed invocation enables seccomp, disables host-loopback mapping, and exposes no API socket or
+inbound forwarding. DNS projection carries at most three numeric resolver addresses, not host resolver
+search domains or other configuration. The payload sees only the private DNS proxy. Both roots remain
+read-only. A bounded readiness handshake precedes authored payload execution; either process exiting
+cancels and joins the other. This is outbound connectivity, not a destination firewall: the existing
+operator obligation to isolate metadata and credential services remains in force.
 KVM access requires the existing held-device admission and selected execution class; it is never
 inferred from the runtime's contents. The existing VM resource admission, deadlines, cancellation,
 stop/join and cleanup obligations apply to the entire namespace lifetime, including descendants that

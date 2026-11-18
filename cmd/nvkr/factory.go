@@ -220,6 +220,9 @@ func cmdFactoryGitHub() *cli.Command {
 		githubFactoryCommand("prepare-images", "stage", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
 			return factory.PrepareGitHubImages(c.Context, plan, c.String("stage"), options)
 		}),
+		githubFactoryCommand("admit-disk", "output", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
+			return factory.CheckGitHubDisk(c.Context, plan, c.String("output"))
+		}),
 		githubFactoryCommand("run-disk", "output", func(c *cli.Context, plan *factory.Plan, options factory.GitHubStepOptions) error {
 			return factory.RunGitHubDisk(c.Context, plan, c.String("output"), options)
 		}),

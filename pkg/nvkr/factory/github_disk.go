@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/diskdiagnostic"
@@ -25,32 +24,9 @@ import (
 // under the original complete Plan through either publication preparation or
 // unqualified raw export. Serialized descriptions never recreate live receipts.
 func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHubStepOptions) (returnErr error) {
-	if err := admitGitHubPlan(ctx, plan); err != nil {
-		return err
-	}
-	for _, key := range []string{sourceTokenEnv, githubImageToken, "NVKR_CREDENTIAL", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"} {
-		if os.Getenv(key) != "" {
-			return e.New(e.CodeEngineCapability, "ARC disk job contains an unrelated credential")
-		}
-	}
-	if runtime.GOOS != "linux" {
-		return e.New(e.CodeEngineCapability, "ARC disks require native Linux")
-	}
-	stages, _, err := githubStages(plan)
+	stage, root, err := selectGitHubDisk(ctx, plan, output)
 	if err != nil {
 		return err
-	}
-	var stage githubStage
-	for _, candidate := range stages {
-		if candidate.DiskOutput == output && output != "" {
-			stage = candidate
-		}
-	}
-	if stage.DiskOutput == "" {
-		return e.New(e.CodeEngineCapability, "no admitted ARC disk output %q", output)
-	}
-	if stage.Nodes[0].Platform != runtime.GOOS+"/"+runtime.GOARCH {
-		return e.New(e.CodeEngineCapability, "ARC disk host architecture differs from the Plan")
 	}
 	ctx, cancel := context.WithTimeout(ctx, stage.diskExecutionBudget)
 	defer cancel()
@@ -67,18 +43,6 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 		inspectionLog = diskdiagnostic.NewCollector()
 		defer finishGitHubInspectionDiagnostics(ctx, workspace, output, inspectionLog, options)
 	}
-	var root Node
-	for _, node := range stage.Nodes {
-		if node.Kind == NodeBuild {
-			_, instruction, resolveErr := plan.producerInstruction(node)
-			if resolveErr != nil {
-				return resolveErr
-			}
-			if instruction.BuilderType == ir.BuilderVMImage {
-				root = node
-			}
-		}
-	}
 	admission, err := AdmitLocalVMBuild(ctx, plan, root.ID, workspace)
 	if err != nil {
 		return err
@@ -88,10 +52,23 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	if err != nil {
 		return err
 	}
+	var scratch *runtimeScratch
+	if instruction.Runtime != nil {
+		scratch, err = newRuntimeScratch(ctx, instruction.ExecutionBinding.Class.Resources.EphemeralStorageMiB)
+		if err != nil {
+			return err
+		}
+		defer func() {
+			returnErr = joinFactoryCleanupError(returnErr, scratch.Close(), "close privileged runtime scratch")
+		}()
+	}
 	profile := plan.Environment.DiskInspectionProfiles[root.Platform]
 	// Preparation follows host capability admission and precedes held image
 	// admission. Consumers use the exact pinned reference, never a mutable tag.
-	images := []string{instruction.Toolchain}
+	var images []string
+	if instruction.Toolchain != "" {
+		images = append(images, instruction.Toolchain)
+	}
 	if githubDiskInspectionRequired(plan) {
 		images = append(images, profile.Image)
 	}
@@ -150,7 +127,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 			return err
 		}
 		return coordinateGitHubDiskExecution(ctx, diagnostics, func(ctx context.Context) error {
-			return executeAdmittedGitHubDisk(ctx, plan, stage, root, admission, workspace, inspector, inspectionLog, diagnostics, options)
+			return executeAdmittedGitHubDisk(ctx, plan, stage, root, admission, workspace, inspector, inspectionLog, diagnostics, scratch, options)
 		})
 	}
 	if probeHelper != nil {
@@ -179,7 +156,7 @@ func coordinateGitHubDiskExecution(ctx context.Context, diagnostics *pipeline.Pa
 }
 
 func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStage, root Node,
-	admission vmAdmission, workspace *os.File, inspector *sbom.DiskInspectionRuntime, inspectionLog *diskdiagnostic.Collector, diagnostics *pipeline.PackerDiagnosticSink,
+	admission vmAdmission, workspace *os.File, inspector *sbom.DiskInspectionRuntime, inspectionLog *diskdiagnostic.Collector, diagnostics *pipeline.PackerDiagnosticSink, scratch *runtimeScratch,
 	options GitHubStepOptions,
 ) (returnErr error) {
 	session, err := pipeline.NewNodeSession(ctx)
@@ -198,7 +175,7 @@ func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStag
 	if err != nil {
 		return err
 	}
-	owner := &LocalRunResult{SchemaVersion: LocalRunSchemaVersion, Qualification: TierLocalExecution, PlanDigest: digest, Workspace: ".nvkr/factory"}
+	owner := &LocalRunResult{SchemaVersion: LocalRunSchemaVersion, Qualification: TierLocalExecution, PlanDigest: digest, Workspace: ".nvkr/factory", runtimeScratch: scratch}
 	defer func() { returnErr = joinFactoryCleanupError(returnErr, owner.Close(), "close ARC disk owner") }()
 	_, artifacts := planIndex(plan)
 	toolSession := newOperationSession(plan, operationPlacement{runtime: plan.Environment.RuntimeBinary(), jobs: 1, producer: session.ExecNode, owner: owner,

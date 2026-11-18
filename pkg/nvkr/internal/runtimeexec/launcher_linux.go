@@ -75,6 +75,11 @@ func executeChild(ctx context.Context, self *heldfile.File, record requestRecord
 	command.Stdout, command.Stderr = stdout, stderr
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pdeathsig: syscall.SIGKILL,
 		Cloneflags: unix.CLONE_NEWNS | unix.CLONE_NEWPID | unix.CLONE_NEWIPC | unix.CLONE_NEWUTS | unix.CLONE_NEWNET}
+	if record.Mode == "outbound" {
+		// Only the fixed descriptor-only network helper retains the outer
+		// network namespace. Its root, PID, IPC and UTS remain private.
+		command.SysProcAttr.Cloneflags &^= unix.CLONE_NEWNET
+	}
 	if record.Mode == "assemble" || record.Mode == "probe-assembly" {
 		// Mkosi requires /dev/tty in its nested sandbox. Start a new session
 		// without a controlling terminal before exposing that fixed API device.

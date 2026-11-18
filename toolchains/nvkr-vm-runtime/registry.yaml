@@ -69,7 +69,7 @@ components:
           release: resolute
           inputs:
             name: packages/runtime-amd64.inputs.json
-            sha256: sha256:a2f2e50cbaedc03f9c3fa0f28a81cb8fac2b5ed80be975a369a460a36a5dec47
+            sha256: sha256:9a88bd0738240fcd04f7f814dbd5364381272ecda6e4a4f7ebf7cabcf65442ff
           mounts:
             - root: inspect
               path: /opt/nvkr/inspection

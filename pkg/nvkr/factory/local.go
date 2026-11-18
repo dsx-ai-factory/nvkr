@@ -102,6 +102,7 @@ type LocalRunResult struct {
 	internalRuntimePlans   map[string]runtimeProductionPlan
 	internalRuntimeUses    map[string]*runtimeuse.Receipt
 	internalToolEvidence   map[string]map[string]string
+	runtimeScratch         *runtimeScratch // Borrowed from the privileged disk coordinator; closes after this owner.
 }
 
 // QualificationLane returns the evidence lane recorded by this local execution.

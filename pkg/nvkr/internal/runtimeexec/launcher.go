@@ -28,20 +28,27 @@ type launcherState struct {
 	mu         sync.Mutex
 	executable *heldfile.File
 	assembly   bool
+	outbound   bool
 }
 
 func Admit(ctx context.Context) (*Launcher, error) {
-	return admit(ctx, false)
+	return admit(ctx, false, false)
+}
+
+// AdmitOutbound probes the TAP setup in a disposable private network namespace.
+// The resulting launcher can additionally supervise the fixed outbound helper.
+func AdmitOutbound(ctx context.Context) (*Launcher, error) {
+	return admit(ctx, false, true)
 }
 
 // AdmitAssembly probes an additional user namespace whose root maps to an
 // unprivileged host ID. The returned launcher can only execute assembly requests;
 // it cannot confer consumer or KVM authority.
 func AdmitAssembly(ctx context.Context) (*Launcher, error) {
-	return admit(ctx, true)
+	return admit(ctx, true, false)
 }
 
-func admit(ctx context.Context, assembly bool) (*Launcher, error) {
+func admit(ctx context.Context, assembly, outbound bool) (*Launcher, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "runtime namespace admission requires context")
 	}
@@ -50,6 +57,11 @@ func admit(ctx context.Context, assembly bool) (*Launcher, error) {
 	}
 	if err := platformAdmission(); err != nil {
 		return nil, err
+	}
+	if outbound {
+		if err := outboundHostAdmission(ctx); err != nil {
+			return nil, err
+		}
 	}
 	// /proc/self/exe is the kernel's reference to the running program, not an
 	// authored pathname. Capture and seal it before executing the private child.
@@ -103,11 +115,14 @@ func admit(ctx context.Context, assembly bool) (*Launcher, error) {
 	if assembly {
 		probe.Mode, probe.UID, probe.GID = "probe-assembly", 0, 0
 	}
+	if outbound {
+		probe.Mode = "probe-outbound"
+	}
 	if err := executeChild(probeCtx, self, probe, nil, io.Discard, &diagnostic); err != nil {
 		return nil, e.Wrap(e.CodeEngineCapability, err, "native namespace admission probe failed: %s", strings.TrimSpace(diagnostic.String()))
 	}
 	accepted = true
-	return &Launcher{state: &launcherState{executable: self, assembly: assembly}}, nil
+	return &Launcher{state: &launcherState{executable: self, assembly: assembly, outbound: outbound}}, nil
 }
 
 func (launcher *Launcher) Close() error {
@@ -151,6 +166,9 @@ func (launcher *Launcher) Execute(ctx context.Context, request Request) error {
 	if state.executable == nil {
 		return e.New(e.CodeEngineCapability, "runtime namespace admission is closed")
 	}
+	if request.Outbound && !state.outbound {
+		return e.New(e.CodeEngineCapability, "runtime outbound networking was not admitted")
+	}
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "runtime execution canceled")
 	}
@@ -178,6 +196,9 @@ func (launcher *Launcher) Execute(ctx context.Context, request Request) error {
 	}
 	if err := state.executable.AssertUnchangedContext(ctx); err != nil {
 		return e.Wrap(e.CodeVerifyFailed, err, "revalidating namespace bootstrap")
+	}
+	if request.Outbound {
+		return executeOutbound(ctx, state.executable, record, descriptors, request.Stdout, request.Stderr)
 	}
 	return executeChild(ctx, state.executable, record, descriptors, request.Stdout, request.Stderr)
 }

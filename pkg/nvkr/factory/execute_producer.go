@@ -42,6 +42,13 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 			return err
 		}
 	}
+	var mkosiScratch string
+	if selectedTool && tool.Format == definition.OutputOCI {
+		mkosiScratch, err = owner.runtimeScratch.path(ctx)
+		if err != nil {
+			return err
+		}
+	}
 	access, err := plan.runtimeImageAccess(node, plan.operationImageEngine())
 	if err != nil {
 		return err
@@ -88,7 +95,7 @@ func executeProducer(ctx context.Context, plan *Plan, node Node, runtime string,
 	}
 	opts := pipeline.RunOptions{
 		Ctx: ctx, SourceRoot: sourceRoot, Runtime: runtime, Jobs: jobs, Launch: true, ImageAccess: access,
-		BuildMaterials: buildMaterials, ToolExecutable: toolExecutable, Stdout: stdout, Stderr: stderr,
+		BuildMaterials: buildMaterials, ToolExecutable: toolExecutable, MkosiScratch: mkosiScratch, Stdout: stdout, Stderr: stderr,
 	}
 	var result *pipeline.ArtifactResult
 	var produced *pipeline.ProducedExecutable

@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -25,6 +26,13 @@ import (
 )
 
 func TestMain(tests *testing.M) {
+	if len(os.Args) > 0 && os.Args[0] == "/usr/bin/slirp4netns" {
+		if err := outboundFixture(); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 	if len(os.Args) == 2 && os.Args[1] == "runtime-test-assembly" {
 		if err := assemblyPayload(); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -247,6 +255,12 @@ func runtimePayload() error {
 			loopback = network.Flags&net.FlagUp != 0
 			continue
 		}
+		if network.Name == "tap0" && os.Getenv("NVKR_TEST_OUTBOUND") == "1" {
+			if network.Flags&net.FlagUp == 0 || network.MTU != 1500 || len(addresses) != 1 || addresses[0].String() != "10.0.2.100/24" {
+				return fmt.Errorf("private TAP configuration differs: %v %v", network, addresses)
+			}
+			continue
+		}
 		// Loaded kernel tunnel modules may create inactive, addressless fallback
 		// devices in every new namespace. They are not external connectivity.
 		if network.Flags&net.FlagUp != 0 || len(addresses) != 0 {
@@ -270,6 +284,126 @@ func runtimePayload() error {
 	}
 	fmt.Println("isolated")
 	return nil
+}
+
+func outboundFixture() error {
+	if !slices.Equal(os.Args, outboundCommand()) || !slices.Equal(os.Environ(), outboundEnvironment()) || os.Getpid() != 1 || os.Geteuid() != 65534 || os.Getegid() != 65534 {
+		return fmt.Errorf("outbound helper has unexpected invocation or identity")
+	}
+	status, err := os.ReadFile("/proc/self/status")
+	if err != nil {
+		return err
+	}
+	for _, want := range []string{"CapEff:\t0000000000000000", "CapPrm:\t0000000000000000", "CapBnd:\t0000000000000000", "NoNewPrivs:\t1"} {
+		if !bytes.Contains(status, []byte(want)) {
+			return fmt.Errorf("outbound helper omitted %s", want)
+		}
+	}
+	parent, err := os.ReadFile("/parent-netns")
+	if err != nil {
+		return err
+	}
+	namespace, err := os.Readlink("/proc/self/ns/net")
+	if err != nil || namespace != string(parent) {
+		return fmt.Errorf("helper lost its admitted outer network: %v", err)
+	}
+	if err := checkPayloadRootFlags(); err != nil {
+		return err
+	}
+	resolver, err := os.ReadFile("/etc/resolv.conf")
+	if err != nil || !validResolver(string(resolver)) {
+		return fmt.Errorf("helper resolver unavailable: %v", err)
+	}
+	device, err := unix.NewIfreq("tap0")
+	if err != nil {
+		return err
+	}
+	if err := unix.IoctlIfreq(6, unix.TUNGETIFF, device); err != nil || device.Name() != "tap0" {
+		return fmt.Errorf("helper TAP unavailable: %v", err)
+	}
+	if _, err := unix.Write(7, []byte{'1'}); err != nil {
+		return err
+	}
+	if _, err := os.Stat("/exit-helper"); err == nil {
+		time.Sleep(100 * time.Millisecond)
+		return fmt.Errorf("fixture helper exited after readiness")
+	}
+	for {
+		time.Sleep(time.Second)
+	}
+}
+
+func TestNativeOutboundRuntimeNamespace(t *testing.T) {
+	if os.Getenv("NVKR_TEST_NATIVE_RUNTIME") != "1" {
+		t.Skip("requires an explicitly selected privileged native Linux test runner")
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	launcher, err := AdmitOutbound(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer launcher.Close()
+	parent := nativeFixtureParent(t)
+	if err := os.Chmod(parent, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	root, output := filepath.Join(parent, "root"), filepath.Join(parent, "output")
+	for _, directory := range []string{filepath.Join(root, "bin"), filepath.Join(root, "usr/bin"), output} {
+		if err := os.MkdirAll(directory, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.Chown(output, 65534, 65534); err != nil {
+		t.Fatal(err)
+	}
+	source, err := os.ReadFile("/proc/self/exe")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"bin/payload", "usr/bin/slirp4netns"} {
+		if err := os.WriteFile(filepath.Join(root, name), source, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	parentNamespace, err := os.Readlink("/proc/self/ns/net")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "parent-netns"), []byte(parentNamespace), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	rootFD, err := os.Open(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rootFD.Close()
+	outFD, err := os.Open(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer outFD.Close()
+	var stdout, stderr bytes.Buffer
+	request := Request{Root: rootFD, Outbound: true, Projections: []Projection{{Directory: outFD, Target: "/out", Writable: true}},
+		Command: []string{"/bin/payload", "runtime-test-payload"}, Workdir: "/out",
+		Environment: []string{"NVKR_TEST_PARENT_NETNS=" + parentNamespace, "NVKR_TEST_OUTBOUND=1"}, Stdout: &stdout, Stderr: &stderr}
+	if err := launcher.Execute(ctx, request); err != nil {
+		t.Fatalf("outbound namespace: %v\n%s", err, stderr.String())
+	}
+	if stdout.String() != "isolated\n" {
+		t.Fatalf("consumer did not finish: %q", stdout.String())
+	}
+	checkNamespaceCancellation(t, ctx, launcher, request, output)
+	if err := os.WriteFile(filepath.Join(root, "exit-helper"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	request.Command = []string{"/bin/payload", "runtime-test-block"}
+	if err := launcher.Execute(ctx, request); err == nil {
+		t.Fatal("consumer succeeded after helper exit")
+	}
+	if ctx.Err() != nil {
+		t.Fatal("helper exit did not stop its consumer promptly")
+	}
 }
 
 func TestNativeRuntimeNamespace(t *testing.T) {
