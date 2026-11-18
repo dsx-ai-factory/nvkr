@@ -68,7 +68,7 @@ sudo -n systemd-run --quiet --wait --pipe --collect \
   --property=NoNewPrivileges=yes --property=CPUQuota=200% \
   --property=MemoryMax=5G --property=TasksMax=512 \
   --property=RuntimeMaxSec=2700 --property=KillMode=control-group \
-  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C GOMAXPROCS=2 \
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C GOMAXPROCS=2 "TMPDIR=$fixture/root/native" \
     NVKR_TEST_RUNTIME_PHASE=consume "NVKR_TEST_RUNTIME_WORKSPACE=$fixture/root/workspace" \
     "$binary" -test.run='^TestNativeRuntimeConsumer$' -test.v -test.timeout=42m \
   2>&1 | tee "$evidence/consumer.log"

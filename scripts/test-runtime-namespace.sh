@@ -53,7 +53,7 @@ sudo -n systemd-run --quiet --wait --pipe --collect \
   --property="ReadWritePaths=$fixture" --property=NoNewPrivileges=yes \
   --property=CPUQuota=100% --property=MemoryMax=256M --property=TasksMax=96 \
   --property=RuntimeMaxSec=60 --property=KillMode=control-group \
-  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C GOMAXPROCS=2 \
+  /usr/bin/env -i PATH=/usr/bin:/bin LANG=C GOMAXPROCS=2 "TMPDIR=$fixture" \
     NVKR_TEST_NATIVE_RUNTIME=1 "NVKR_TEST_RUNTIME_SCRATCH=$fixture" \
     "$binary" '-test.run=TestNative(Runtime|Assembly|OutboundRuntime)Namespace|TestManagedResolverDelegation' -test.v -test.timeout=45s \
   2>&1 | tee "$evidence/namespaces.log"

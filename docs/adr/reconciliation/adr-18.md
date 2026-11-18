@@ -72,8 +72,15 @@ The first [consumer proof attempt](https://github.com/njhensley/nvkr/actions/run
 the outbound resolver's protected-file admission before runtime production or disk execution. It does
 not prove the outbound helper, SBOM or consumer path. Resolver admission now also checks the root's
 delegation to protected systemd-resolved service-owned files; Linux ownership fixtures cover accepted
-targets and rejection of foreign inodes, owners, writable parents/files and unlisted targets. The revised
-path still needs native proof. The earlier assembly digest above describes the
+targets and rejection of foreign inodes, owners, writable parents/files and unlisted targets. The second
+[consumer proof attempt](https://github.com/njhensley/nvkr/actions/runs/44259377400) at
+`ba4c9f333dbcc57292915045e3dfeb470db587e5` passed all three native namespace tests, including outbound
+handoff with its fixture helper. The host resolver file had UID 991, mode 0644 and 945 bytes. The newly
+included ownership fixtures then failed because the service's `/tmp` was read-only, so production and
+disk execution still did not run. Both diagnostic services now direct temporary files into their owned
+scratch directories. The ownership fixtures pass in a bounded Linux container with read-only `/tmp`
+and an explicit writable scratch directory; the complete native consumer proof remains pending.
+The earlier assembly digest above describes the
 closure before this helper was added and does not evidence the changed runtime.
 
 The quick machinery E2E [fork Run](https://github.com/njhensley/nvkr/actions/runs/44043009475)
