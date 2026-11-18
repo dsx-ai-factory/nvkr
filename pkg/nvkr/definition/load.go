@@ -91,23 +91,8 @@ func decodeStrict(raw []byte, label string, output any) error {
 		return err
 	}
 	// Explicit null/empty values must not extend the old version's vocabulary.
-	if environment, ok := output.(*Environment); ok && environment.APIVersion == EnvironmentAPIVersion {
-		var fields map[string]any
-		if err := yaml.UnmarshalStrict(raw, &fields); err != nil {
-			return e.Wrap(e.CodeInvalidCatalog, err, "reading Environment fields")
-		}
-		for name, value := range fields {
-			if !strings.EqualFold(name, "publication") {
-				continue
-			}
-			if publication, ok := value.(map[string]any); ok {
-				for field := range publication {
-					if strings.EqualFold(field, "objectStores") {
-						return e.New(e.CodeInvalidCatalog, "objectStores requires Environment v2")
-					}
-				}
-			}
-		}
+	if environment, ok := output.(*Environment); ok && environment.APIVersion != EnvironmentBootAPIVersion {
+		return rejectNewEnvironmentFields(raw, environment.APIVersion)
 	}
 	return nil
 }
@@ -126,6 +111,46 @@ func requireSingleDocument(raw []byte, label string) error {
 	}
 	if err := decoder.Decode(&document); err != io.EOF {
 		return e.New(e.CodeInvalidCatalog, "%s requires exactly one YAML document", label)
+	}
+	return nil
+}
+
+func rejectNewEnvironmentFields(raw []byte, version string) error {
+	var fields map[string]any
+	if err := yaml.UnmarshalStrict(raw, &fields); err != nil {
+		return e.Wrap(e.CodeInvalidCatalog, err, "reading Environment fields")
+	}
+	for name, value := range fields {
+		if strings.EqualFold(name, "publication") {
+			publication, _ := value.(map[string]any)
+			if err := rejectNewPublicationFields(publication, version); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func rejectNewPublicationFields(publication map[string]any, version string) error {
+	for field, setting := range publication {
+		if strings.EqualFold(field, "bootSelection") {
+			return e.New(e.CodeInvalidCatalog, "bootSelection requires Environment v3")
+		}
+		if !strings.EqualFold(field, "objectStores") {
+			continue
+		}
+		if version == EnvironmentAPIVersion {
+			return e.New(e.CodeInvalidCatalog, "objectStores requires Environment v2")
+		}
+		stores, _ := setting.([]any)
+		for _, store := range stores {
+			fields, _ := store.(map[string]any)
+			for field := range fields {
+				if strings.EqualFold(field, "mode") || strings.EqualFold(field, "serving") {
+					return e.New(e.CodeInvalidCatalog, "object-store mode and serving require Environment v3")
+				}
+			}
+		}
 	}
 	return nil
 }

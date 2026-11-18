@@ -139,6 +139,9 @@ func renderProjected(ctx context.Context, plan *Plan, engine string, plugin proj
 	if plan == nil {
 		return nil, e.New(e.CodeInvalidCatalog, "projection requires a plan")
 	}
+	if err := admitBootPublicationExecution(plan); err != nil {
+		return nil, err
+	}
 	core, err := projectionCoreForEngine(engine)
 	if err != nil {
 		return nil, err
