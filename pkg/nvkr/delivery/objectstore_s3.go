@@ -25,6 +25,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/smithy-go"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
+	"github.com/dsx-ai-factory/nvkr/internal/readbudget"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -81,7 +82,7 @@ func newS3ObjectStore(ctx context.Context, options S3ObjectStoreOptions) (Object
 	transport := base.Clone()
 	transport.ResponseHeaderTimeout = min(30*time.Second, options.OperationTimeout)
 	lifetime, cancel := context.WithTimeout(ctx, options.OperationTimeout)
-	client := &http.Client{Transport: objectMetadataTransport{transport}, Timeout: options.OperationTimeout + options.CleanupTimeout,
+	client := &http.Client{Transport: objectMetadataTransport{readbudget.Transport(ctx, transport)}, Timeout: options.OperationTimeout + options.CleanupTimeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	session, err := objectSession(lifetime, options, client)
 	if err != nil {
