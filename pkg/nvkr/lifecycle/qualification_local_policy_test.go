@@ -39,6 +39,12 @@ func TestLoadLocalQualificationPolicy(t *testing.T) {
 		{"oversized", []byte(strings.Repeat(" ", maxQualificationPolicyBytes+1)), e.CodeTrustPolicyMissing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			_, decodeErr := DecodeLocalQualificationPolicy(tc.raw)
+			if tc.code != "" {
+				assertCode(t, decodeErr, tc.code)
+			} else if decodeErr != nil {
+				t.Fatal(decodeErr)
+			}
 			path := filepath.Join(t.TempDir(), "policy.json")
 			if err := os.WriteFile(path, tc.raw, 0o600); err != nil {
 				t.Fatal(err)
