@@ -45,8 +45,8 @@ func TestInspectionBootstrapSelectionPins(t *testing.T) {
 }
 
 // This tests the bootstrap protocol on the native kernel, separately from the
-// container and static-producer contracts. /bin/cat is an image-independent
-// protocol fixture; this test grants no static-helper or appliance evidence.
+// container and static-producer contracts. The required Perl interpreter is a
+// name-independent protocol fixture; this grants no static-helper or appliance evidence.
 func TestInspectionBootstrapSealedExecution(t *testing.T) {
 	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
 		t.Skip("native Linux descriptor execution")
@@ -59,10 +59,7 @@ func TestInspectionBootstrapSealedExecution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	helper, err := os.ReadFile("/bin/cat")
-	if err != nil {
-		t.Fatal(err)
-	}
+	helper := interpreterBytes
 	subject := []byte("subject suffix\x00\xff\n")
 	for _, variant := range []string{"probe", "exact", "changed helper", "truncated helper", "changed interpreter", "wrong architecture", "wrong size"} {
 		t.Run(variant, func(t *testing.T) {
@@ -89,7 +86,7 @@ func TestInspectionBootstrapSealedExecution(t *testing.T) {
 			}
 			args := inspectionBootstrapArgs(selection)
 			if !selection.bootstrapProbe {
-				args = append(args, "-")
+				args = append(args, "-f", "-C0", "-p", "-e", "", "--", "-")
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()

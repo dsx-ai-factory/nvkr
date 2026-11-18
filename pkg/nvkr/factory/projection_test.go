@@ -120,8 +120,8 @@ func recordProjectionCalls(t *testing.T) *projectionCalls {
 func projectionEquivalencePlans(t *testing.T, repo string) map[string]*Plan {
 	t.Helper()
 	committed, err := filepath.Glob(filepath.Join(repo, ".github", "nvkr*", "plan.json"))
-	if err != nil || len(committed) != 11 {
-		t.Fatalf("committed maintained Plans = %v, %v; want the eleven .github/nvkr*/plan.json", committed, err)
+	if err != nil || len(committed) != 12 {
+		t.Fatalf("committed maintained Plans = %v, %v; want the twelve .github/nvkr*/plan.json", committed, err)
 	}
 	plans := map[string]*Plan{}
 	for _, path := range committed {

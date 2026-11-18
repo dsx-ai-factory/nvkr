@@ -1,0 +1,59 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+kind: SourceBuildRegistry
+metadata:
+  name: nvidia-workload-identity
+  description: Source-built NVIDIA Workload Identity DSX IMDS NodeAttestor agent executable from public v1.15.0. Additive opt-in support; no image, chart, server-plugin or runtime acceptance.
+sources:
+  nvidia-workload-identity:
+    repo: https://github.com/dsx-ai-factory/nvidia-workload-identity
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:78773c59d6d4ecedc0845b1a8e5379e7bf0e0be62f4ea796e689bbc97dab3ceb
+      arm64: docker.io/library/golang@sha256:7117c9e4e2c0becd23d1dbede3aea73ba91d084847c68e12d7e1fa3d9b3abf20
+    vendorCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.26.10
+      export GOENV=off GOTOOLCHAIN=local GOWORK=off
+      before="$(sha256sum go.mod go.sum)"
+      go mod download
+      go mod verify
+      go mod vendor
+      after="$(sha256sum go.mod go.sum)"
+      test "$before" = "$after"
+components:
+  dsx-imds-node-attestor-agent:
+    source: nvidia-workload-identity
+    fromSource: true
+    builderType: oci-hermetic
+    cgo: false
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    outputType: host-package
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      test "$(go env GOVERSION)" = go1.26.10
+      test "$(go env GOOS)" = linux
+      test "$(go env GOARCH)" = "{{.Arch}}"
+      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off CGO_ENABLED=0
+      cd /src
+      test -f vendor/modules.txt
+      exec go build -mod=vendor -trimpath -buildvcs=false \
+        -o /src/nvkr-output/dsx-imds-node-attestor-agent ./cmd/dsx-imds-node-attestor-agent
+    writeDir: nvkr-output
+    artifactPath: nvkr-output/dsx-imds-node-attestor-agent
+
+imports:
+- sources:
+    checkout: checkout
+    download-artifact: download-artifact
+    setup-go: setup-go
+    upload-artifact: upload-artifact
+  path: "../shared/build-actions.yaml"
+  sha256: 89919dde5a129554223e63b23d9ac4f610e9c9a0e369fe8ab188b3f13575723b

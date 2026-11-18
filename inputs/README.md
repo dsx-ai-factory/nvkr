@@ -46,6 +46,7 @@ the move preserves each file's existing format.
 | [`definitions/diagnostics/os-amd64.yaml`](definitions/diagnostics/os-amd64.yaml) | [`environments/local-linux-amd64-kvm.yaml`](environments/local-linux-amd64-kvm.yaml) | Native AMD64 plain-disk diagnostic |
 | [`definitions/diagnostics/os-arm64.yaml`](definitions/diagnostics/os-arm64.yaml) | [`environments/local-linux-arm64-kvm.yaml`](environments/local-linux-arm64-kvm.yaml) | Native ARM64 plain-disk diagnostic |
 | [`definitions/diagnostics/fde-amd64.yaml`](definitions/diagnostics/fde-amd64.yaml) | [`environments/github-diagnostics.yaml`](environments/github-diagnostics.yaml) | Build-only public-bootstrap FDE diagnostic; existing branch allowlist |
+| [`definitions/nvidia-workload-identity/imds-agent.yaml`](definitions/nvidia-workload-identity/imds-agent.yaml) | [`environments/github-wli-imds-agent.yaml`](environments/github-wli-imds-agent.yaml) | Two-output source-built NVIDIA Workload Identity DSX IMDS NodeAttestor agent executable; [build-only hosted selection](definitions/nvidia-workload-identity/README.md) without publication or signing |
 | [`definitions/kubernetes-conformance-arm64/definition.yaml`](definitions/kubernetes-conformance-arm64/definition.yaml) | [`environments/local-conformance-tools-arm64.yaml`](environments/local-conformance-tools-arm64.yaml) | Local four-output ARM64 Kubernetes conformance tools; [1.34 variant](definitions/kubernetes-conformance-arm64/demo-1.34/README.md) uses the same Environment |
 
 The native local KVM Environments retain their existing diagnostic capacity and utility pins. The
@@ -81,6 +82,12 @@ change the maintained NVKE release or demonstrate current NVSentinel build/runti
 The [AICR example](definitions/aicr/README.md) selects six deployment-bundle formats
 from one pinned catalog with a local build-only Environment. Its GB200 NVKE Kubeflow
 training Definition selects three of those formats from the same catalog.
+
+The [NVIDIA Workload Identity agent selection](definitions/nvidia-workload-identity/README.md)
+builds the public v1.15.0 `dsx_imds` NodeAttestor agent executable for Linux AMD64
+and ARM64 from its own dedicated catalog and an independent build-only hosted
+bundle. It initializes no submodule, produces no image, chart or server plugin,
+and selects no publication or signing; it is additive opt-in artifact support.
 
 `definitions/diagnostics/demo-arm64/` retains the existing components, OS, profiles, providers,
 simulator, site and installer-tool loops used by the local launcher. Additional controller and OVN
