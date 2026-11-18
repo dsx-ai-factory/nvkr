@@ -511,7 +511,9 @@ the byte-identical output gate before the runtime can be consumed.
 Native assembly receives mount and package-ownership capabilities only in a separate user namespace.
 Its root maps to an unprivileged host ID range; host root is outside the mapping. The privileged owner
 creates per-attempt scratch for that mapping. The assembler receives no KVM device. Assembly and
-consumer staging require an executable filesystem chosen by the owner; the launcher adds read-only,
+its nested package sandboxes receive only fixed, inode-checked API character devices. Assembly starts
+in a fresh session without the caller's controlling terminal before exposing the required `/dev/tty` API.
+Assembly and consumer staging require an executable filesystem chosen by the owner; the launcher adds read-only,
 nosuid and nodev attributes without clearing any inherited restriction, including noexec or atime
 flags. An unsuitable staging filesystem or unavailable private proc mount fails capability admission.
 

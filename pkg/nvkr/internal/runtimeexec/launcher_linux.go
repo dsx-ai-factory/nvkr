@@ -76,6 +76,11 @@ func executeChild(ctx context.Context, self *heldfile.File, record requestRecord
 	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true, Pdeathsig: syscall.SIGKILL,
 		Cloneflags: unix.CLONE_NEWNS | unix.CLONE_NEWPID | unix.CLONE_NEWIPC | unix.CLONE_NEWUTS | unix.CLONE_NEWNET}
 	if record.Mode == "assemble" || record.Mode == "probe-assembly" {
+		// Mkosi requires /dev/tty in its nested sandbox. Start a new session
+		// without a controlling terminal before exposing that fixed API device.
+		// setsid also creates the process group used by cancellation below.
+		command.SysProcAttr.Setpgid = false
+		command.SysProcAttr.Setsid = true
 		command.SysProcAttr.Cloneflags |= unix.CLONE_NEWUSER
 		command.SysProcAttr.UidMappings = []syscall.SysProcIDMap{{ContainerID: 0, HostID: AssemblyHostID, Size: AssemblyIDCount}}
 		command.SysProcAttr.GidMappings = []syscall.SysProcIDMap{{ContainerID: 0, HostID: AssemblyHostID, Size: AssemblyIDCount}}

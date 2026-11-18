@@ -110,6 +110,26 @@ func assemblyPayload() error {
 	if _, err := os.ReadFile("/dev/null"); err != nil {
 		return fmt.Errorf("assembly null device unavailable: %w", err)
 	}
+	for _, device := range []struct {
+		name         string
+		major, minor uint32
+	}{{"full", 1, 7}, {"tty", 5, 0}} {
+		var stat unix.Stat_t
+		if err := unix.Stat("/dev/"+device.name, &stat); err != nil || stat.Mode&unix.S_IFMT != unix.S_IFCHR ||
+			unix.Major(stat.Rdev) != device.major || unix.Minor(stat.Rdev) != device.minor {
+			return fmt.Errorf("assembly %s device differs from its fixed API: %v", device.name, err)
+		}
+	}
+	if err := os.WriteFile("/dev/full", []byte("x"), 0o600); !errors.Is(err, unix.ENOSPC) {
+		return fmt.Errorf("assembly full device does not report ENOSPC: %v", err)
+	}
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if tty != nil {
+		_ = tty.Close()
+	}
+	if !errors.Is(err, unix.ENXIO) {
+		return fmt.Errorf("assembly retained a controlling terminal: %v", err)
+	}
 	if _, err := os.Stat("/dev/kvm"); !os.IsNotExist(err) {
 		return fmt.Errorf("assembly exposes a KVM device")
 	}

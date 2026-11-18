@@ -56,6 +56,10 @@ func Entry() error {
 		if err := admitAssemblyIDs(); err != nil {
 			return err
 		}
+		session, err := unix.Getsid(0)
+		if err != nil || session != os.Getpid() {
+			return e.New(e.CodeEngineCapability, "assembly must own a fresh session without the caller's controlling terminal")
+		}
 	}
 	if err := namespaceMount("", "/", "", unix.MS_REC|unix.MS_PRIVATE, ""); err != nil {
 		return e.Wrap(e.CodeEngineCapability, err, "privatizing namespace mount propagation")
@@ -349,6 +353,19 @@ func privateDevices(root string, kvmFD int, assembly bool) error {
 			return entryError(err)
 		}
 	}
+	if assembly {
+		// Pinned mkosi's nested sandbox always binds these API devices. /dev/tty
+		// resolves only the current process's controlling terminal; assembly
+		// enters a new session before either device is exposed.
+		for _, device := range []struct {
+			name         string
+			major, minor uint32
+		}{{"full", 1, 7}, {"tty", 5, 0}} {
+			if err := bindAssemblyDevice(root, device.name, device.major, device.minor); err != nil {
+				return err
+			}
+		}
+	}
 	if kvmFD != 0 {
 		var info unix.Stat_t
 		if err := unix.Fstat(kvmFD, &info); err != nil || info.Mode&unix.S_IFMT != unix.S_IFCHR || unix.Major(info.Rdev) != 10 || unix.Minor(info.Rdev) != 232 {
@@ -375,8 +392,8 @@ func privateDevices(root string, kvmFD int, assembly bool) error {
 	return namespaceMount("tmpfs", filepath.Join(root, "dev/shm"), "tmpfs", unix.MS_NOSUID|unix.MS_NODEV, "size=64m,mode=1777")
 }
 
-// User namespaces cannot create usable host device nodes. Bind only these four
-// fixed, inode-checked character devices into the private /dev; never expose the
+// User namespaces cannot create usable host device nodes. Bind only the fixed,
+// inode-checked API character devices into the private /dev; never expose the
 // host device directory or accept an authored device pathname.
 func bindAssemblyDevice(root, name string, major, minor uint32) error {
 	fd, err := unix.Open("/dev/"+name, unix.O_PATH|unix.O_NOFOLLOW|unix.O_CLOEXEC, 0)
