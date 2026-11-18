@@ -46,7 +46,7 @@ func load(ctx context.Context, p DataProvider) (*Catalog, error) {
 
 // resolveRecordedCatalog resolves locally checked declarations and recorded pins.
 // Executable loading must first authenticate derived pins in load. Offline
-// inventory uses this helper privately and returns descriptions only.
+// inspection and inventory use this helper privately and return descriptions only.
 func resolveRecordedCatalog(ctx context.Context, p DataProvider, reg *registryDoc, lock *PinLock) (*Catalog, error) {
 	cat := &Catalog{
 		APIVersion:        reg.APIVersion,
