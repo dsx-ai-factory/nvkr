@@ -321,7 +321,7 @@ PROJECTION_PILOT ?=
 PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION_PILOT))
 
 .PHONY: workflows-check
-workflows-check: workflow-generator producer-overlays-check catalog-refresh-check ## Check every maintained producer and qualification bundle from the authored inventory.
+workflows-check: workflow-generator producer-overlays-check catalog-refresh-check catalog-index-check ## Check every maintained producer and qualification bundle from the authored inventory.
 	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
 	python3 scripts/generate-maintained.py --check $(PROJECTION_PILOT_FLAG)
 
@@ -333,6 +333,17 @@ producer-overlays-generate: workflow-generator ## Regenerate configured producer
 	bin/nvkr-exec catalog regenerate-overlays --config inputs/policies/ovn-producer-overlays.json
 
 # Maintained catalog sources are public and fetched anonymously.
+
+.PHONY: catalog-index-check catalog-index-generate
+catalog-index-check: workflow-generator ## Check the offline catalog inventory for drift.
+	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
+	 bin/nvkr-exec catalog index --data inputs/catalogs --ui plain > "$$rendered" && \
+	 { diff -u inputs/catalogs/INDEX.md "$$rendered" || { echo "run 'make catalog-index-generate'" >&2; exit 1; }; }
+
+catalog-index-generate: workflow-generator ## Regenerate the offline catalog inventory.
+	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
+	 bin/nvkr-exec catalog index --data inputs/catalogs --ui plain > "$$rendered" && \
+	 chmod 0644 "$$rendered" && mv "$$rendered" inputs/catalogs/INDEX.md
 
 .PHONY: catalog-refresh-check
 catalog-refresh-check: workflow-generator ## Check the installed catalog refresh workflow against `catalog update-ci`.
