@@ -172,10 +172,17 @@ func validateDiskScannerSelection(plan *Plan, platform, pin string) error {
 		return nil
 	}
 	selected, ok := plan.CatalogSnapshot.Tools[plan.Definition.SBOMTool]
-	if _, multi := plan.CatalogSnapshot.ToolPlatforms[plan.Definition.SBOMTool]; multi {
+	if pins, multi := plan.CatalogSnapshot.ToolPlatforms[plan.Definition.SBOMTool]; multi {
 		var err error
 		selected, err = plan.CatalogSnapshot.SelectTool(plan.Definition.SBOMTool, platform)
 		if err != nil {
+			var coded *e.Error
+			if len(pins) > 0 && (platform == "linux/amd64" || platform == "linux/arm64") &&
+				errors.As(err, &coded) && coded.Code == e.CodeEngineCapability {
+				// No catalog scanner targets this supported host. Its frozen
+				// inspection profile owns the independent scanner pin.
+				return nil
+			}
 			return err
 		}
 		ok = true

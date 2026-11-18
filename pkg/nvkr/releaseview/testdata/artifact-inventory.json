@@ -1,0 +1,32 @@
+{
+  "apiVersion": "aicr.run/v1beta1",
+  "kind": "ArtifactInventory",
+  "artifacts": [
+    {
+      "name": "chart",
+      "type": "chart",
+      "reference": "oci://registry.example/product/chart",
+      "version": "8.2.1",
+      "manifestDigest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+      "archiveDigest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "image",
+      "type": "image",
+      "reference": "oci://registry.example/product/image",
+      "version": "sha256-5555555555555555555555555555555555555555555555555555555555555555",
+      "manifestDigest": "sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      }
+    },
+    {
+      "name": "multi",
+      "type": "image",
+      "reference": "oci://registry.example/product/multi",
+      "version": "sha256-6666666666666666666666666666666666666666666666666666666666666666",
+      "manifestDigest": "sha256:6666666666666666666666666666666666666666666666666666666666666666"
+    }
+  ]
+}

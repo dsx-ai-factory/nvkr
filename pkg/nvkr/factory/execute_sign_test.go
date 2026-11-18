@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -33,6 +34,7 @@ import (
 // that it authenticates the subject BEFORE any adapter is consulted, and that it
 // writes no record when the adapter refuses.
 type fakeOCISigner struct {
+	mu        sync.Mutex
 	identity  string
 	issuer    string
 	signErr   error
@@ -61,6 +63,8 @@ func (f *fakeOCISigner) SignAndAttest(_ context.Context, subject sign.Subject, p
 }
 
 func (f *fakeOCISigner) Verify(_ context.Context, subject sign.Subject, policy sign.VerifyPolicy) (sign.VerificationRecord, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.verifiedSubject, f.verifiedPolicy = subject, policy
 	if f.verifyErr != nil {
 		return sign.VerificationRecord{}, f.verifyErr
