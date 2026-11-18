@@ -25,7 +25,6 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 		if err := environment.Publication.BootSelection.ValidateOutputs(definition.Outputs); err != nil {
 			return err
 		}
-		return e.New(e.CodeEngineCapability, "selective boot publication requires its versioned execution graph")
 	}
 	if err := admitScannerPlatforms(definition, environment); err != nil {
 		return err

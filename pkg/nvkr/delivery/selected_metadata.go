@@ -24,6 +24,7 @@ import (
 type SelectedMetadata struct {
 	state     *publicationState
 	selection metadataSelection
+	binaries  map[string]BinaryBundle
 }
 
 // OpenSelectedMetadata captures a sparse metadata layout into immutable held
@@ -41,7 +42,7 @@ func OpenSelectedMetadata(ctx context.Context, root, expectedRoot string, names 
 	if err != nil {
 		return nil, e.Wrap(e.CodeImmutableViolation, err, "creating selected metadata workspace")
 	}
-	owner := &SelectedMetadata{state: &publicationState{}, selection: selection}
+	owner := &SelectedMetadata{state: &publicationState{}, selection: selection, binaries: map[string]BinaryBundle{}}
 	issued := false
 	defer func() {
 		if err := os.RemoveAll(stage); err != nil {
@@ -126,6 +127,17 @@ func OpenSelectedMetadata(ctx context.Context, root, expectedRoot string, names 
 			return nil, err
 		}
 		platforms[object.Name] = platform
+		if object.Output != nil && object.Output.Format == "executable" {
+			raw, err := readBlob(ctx, stage, Descriptor{Digest: object.DescriptorDigest, Size: object.Size}, 8<<20)
+			if err != nil {
+				return nil, err
+			}
+			_, bundle, err := readBinaryBundleConfig(ctx, stage, raw)
+			if err != nil {
+				return nil, e.Wrap(e.CodeVerifyFailed, err, "decoding retained binary metadata")
+			}
+			owner.binaries[object.Name] = bundle
+		}
 	}
 	owner.state.inspection, owner.state.outputs, owner.state.platforms = inspection, outputs, platforms
 	issued = true
