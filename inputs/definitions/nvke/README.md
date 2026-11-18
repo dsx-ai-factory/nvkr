@@ -64,10 +64,11 @@ make workflows-check
 See [development setup](../../../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch).
 Source resolution may need network access even during generation. No generated file is hand-edited.
 
-## Family pilot
+## Historical core selection failures
 
 The core family no longer selects the five NICo outputs or the ARM64 AICR CLI; their catalogs remain. A
-development Run of the [GPU site composite](#gpu-site-composite) at `ee5d61d1`, before this change, failed
+development Run of the [GPU site composite](#gpu-site-composite) at `ee5d61d1`, before those outputs were
+removed from the core member's selection, failed
 both ([41789718662](https://github.com/dsx-ai-factory/nvkr/actions/runs/41789718662)): the
 [NICo `nico-chart` fetch](https://github.com/dsx-ai-factory/nvkr/actions/runs/41789718662/job/126440623326)
 and the [AICR publication bundle](https://github.com/dsx-ai-factory/nvkr/actions/runs/41789718662/job/126445930388).
@@ -78,6 +79,7 @@ is an absolute symlink, so no NICo output can be fetched
 and the AICR executable output carries its `aicr-attestation.sigstore.json` companion as a second entry. The
 GB200 AICR bundle builds AICR from its own pinned source and does not need this CLI.
 
+## Standalone workflow retirement
 
 The standalone family bundles and the old combined production/qualification bundle are retired by the
 explicit 2026-11-17 [ADR-26 U10 decision](../../../docs/adr/0026-definition-composition.md).
@@ -132,7 +134,7 @@ detection is not implemented.
 
 ### Setting NICo image values from the Release
 
-No maintained Definition selects the NICo outputs yet ([Family pilot](#family-pilot)); these steps apply once
+No maintained Definition selects the NICo outputs yet ([historical failures](#historical-core-selection-failures)); these steps apply once
 they return to the core family.
 
 The `nico` chart is not image-bound. It renders `<repository>:<tag>`, so the consumer sets the values.

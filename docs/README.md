@@ -1,13 +1,24 @@
 # Documentation
 
-Start with the [hello demo](../demos/hello/README.md), then the [quickstart](quickstart.md): copy one block to build NVKR from source and produce
-the NVKE CLI, controller image, Helm chart and dependency SBOMs locally on macOS or Linux.
-The guide shows the resulting files and links to larger builds, publication and deployment.
-For a preview without Docker, see the [tutorial inputs](examples/nvke-tutorial/README.md#preview-the-native-build).
-[What is NVKR?](overview/what-is-nvkr.md) introduces the lifecycle.
-The [34-concept reference](user-concepts.md) explains the vocabulary and connects each concept to a worked example.
+Choose one worked journey. Each starts with prerequisites, a runnable example, an expected result and
+its next step. Keep [Preview limits](overview/preview-status.md) nearby for shared scope and evidence boundaries.
 
-## User tasks
+| Journey | Start here |
+|---|---|
+| Build a small artifact | [Build hello with a real local Run](journeys.md#build-a-small-artifact) |
+| Change a component | [Select a new source version and compare the result](journeys.md#change-a-component) |
+| Inspect a Run | [Read the recorded outcome, Plan and graph](journeys.md#inspect-a-run) |
+| Build a larger selection | [Preview and build the NVKE CLI, image and chart](journeys.md#build-a-larger-selection) |
+| Publish a Release | [Review a bundle, configure publication and dispatch it](journeys.md#publish-a-release) |
+| Verify or consume a Release | [Apply consumer policy and download a named output](journeys.md#verify-or-consume-a-release) |
+
+## Reference index
+
+[What is NVKR?](overview/what-is-nvkr.md) introduces the lifecycle.
+[Concepts](user-concepts.md) connects the vocabulary to worked examples.
+The task and reference indexes below retain the detailed command, schema, maintenance and demo guides.
+
+### User tasks
 
 | I want to… | Read |
 |---|---|
@@ -49,7 +60,7 @@ Experimental [public OS source producers](../inputs/experiments/public-os-source
 migration or maintained NVKE membership. The [v0.21.0 dependency inventory](nvke-v0.21.0-os-dependency-inventory.md)
 records source availability and remaining gaps.
 
-## Detailed references
+### Detailed references
 
 | Topic | Reference |
 |---|---|
@@ -69,7 +80,7 @@ records source availability and remaining gaps.
 | Bounded guest capture format and acquisition ownership | [OS acquisition contract](nvke-os-acquisition-contract.md) |
 | Optional live-owner disk inspection and material observations | [OS live inspection](nvke-os-live-inspection.md) |
 
-## Local ARM64 diagnostics
+### Local ARM64 diagnostics
 
 | Task | Guide |
 |---|---|
@@ -79,7 +90,7 @@ records source availability and remaining gaps.
 | Inspect older staged-installer sessions and recovery controls | [Legacy handoff and recovery](nvkr-to-nvke-demo.md) |
 | Determine what remains for a full source-built local NVKE distribution | [Full-source gap map](full-nvke-source-build.md) |
 
-## Engineering and maintenance
+### Engineering and maintenance
 
 [Input layout and consolidation](input-layout-migration.md) maps every relocated Definition and Environment,
 separates the completed ownership move from conditional consolidation, and records the remaining parity gaps.
@@ -147,7 +158,7 @@ Reconciliation cites scoped external Runs and historical observations. Unit test
 browsing, and authenticated consumer verification establish different facts. Historical captures,
 superseded plans, and completed progress reports remain in Git history.
 
-## Demos
+### Demos
 
 The [demos directory](../demos/README.md) contains the 14-slide deck, 34 concept examples,
 HTML walkthrough, offline graph explorer, facilitator guide, and self-guided scripts. The presentation
