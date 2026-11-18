@@ -119,9 +119,10 @@ the same ordered list after rebasing paths.
 records `builds[].selectedCatalog` and the complete `catalogCandidates` snapshots. Validation rechecks
 the whole output's choice, including every native child of a platform set.
 
-The maintained NVKE Definition uses six stacks and two explicit `nvkectl` overrides because that
-producer exists in both the release and module-tag catalogs. Its 69 output names and all 73 native
-producer selections stay unchanged. Source-built image outputs already use platform sets. Acquired
+The maintained NVKE Definition uses four stacks: `nvke`, `runtime-dependencies`, `node-images`
+with its native-toolchain overlay, and `tools`. Two explicit `nvkectl` overrides retain the
+module-tag producer selection within the consolidated `nvke` catalog. Its 69 output names and all
+73 native producer selections stay unchanged. Source-built image outputs already use platform sets. Acquired
 image pairs remain separate: aggregate packaging currently requires built OCI exports. Disk outputs
 remain native, and executable-index migration belongs to issues #297, #296 and #376 with their
 qualification prerequisites. No output rename or consumer mapping changes in this migration.
