@@ -5,11 +5,13 @@ package gitlab
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"os"
 	"os/exec"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -134,13 +136,20 @@ func TestGitLabRetryRespectsDeadlineAndClose(t *testing.T) {
 	for _, mode := range []string{"deadline", "close"} {
 		t.Run(mode, func(t *testing.T) {
 			client := fixtureClient(t, func(w http.ResponseWriter, _ *http.Request) {
-				w.Header().Set("Retry-After", "30")
+				// Admit the retry even within the caller's one-second budget;
+				// the hook, rather than Retry-After admission, must see cancellation.
+				w.Header().Set("Retry-After", "0")
 				w.WriteHeader(http.StatusTooManyRequests)
 			})
-			waiting := make(chan struct{})
+			waiting, cancellationSeen, releaseLookup := make(chan struct{}), make(chan struct{}), make(chan struct{})
+			release := sync.OnceFunc(func() { close(releaseLookup) })
 			client.waitRetry = func(ctx context.Context, _ time.Duration) error {
 				close(waiting)
 				<-ctx.Done()
+				if mode == "close" {
+					close(cancellationSeen)
+					<-releaseLookup
+				}
 				return ctx.Err()
 			}
 			ctx, cancel := context.WithCancel(t.Context())
@@ -151,10 +160,11 @@ func TestGitLabRetryRespectsDeadlineAndClose(t *testing.T) {
 			}
 			finished := make(chan error, 1)
 			var lookupResult, closeResult <-chan error = finished, nil
-			// Release the caller first even on a failed assertion, then join both
-			// goroutines before closing the client and its fixture transport.
+			// Always release both caller cancellation and the held hook before
+			// joining. The enclosing child watchdog also bounds cleanup regressions.
 			defer func() {
 				cancel()
+				release()
 				if lookupResult != nil {
 					<-lookupResult
 				}
@@ -166,24 +176,49 @@ func TestGitLabRetryRespectsDeadlineAndClose(t *testing.T) {
 			deadline := time.NewTimer(5 * time.Second)
 			defer deadline.Stop()
 			go func() { _, err := client.Current(ctx, id(), []string{"nvkr:finalize"}); finished <- err }()
+			// Both cases must actually enter the retry wait. A refusal before it
+			// starts cannot count as evidence of deadline or lifetime propagation.
+			select {
+			case <-waiting:
+			case err := <-finished:
+				lookupResult = nil
+				t.Fatalf("lookup returned before retry wait: %v", err)
+			case <-deadline.C:
+				t.Fatal("lookup did not enter retry wait")
+			}
 			if mode == "close" {
-				select {
-				case <-waiting:
-				case err := <-finished:
-					lookupResult = nil
-					t.Fatalf("lookup returned before retry wait: %v", err)
-				case <-deadline.C:
-					t.Fatal("lookup did not enter retry wait")
-				}
 				closed := make(chan error, 1)
 				closeResult = closed
 				go func() { closed <- client.Close() }()
+				select {
+				case <-cancellationSeen:
+				case err := <-closeResult:
+					closeResult = nil
+					t.Fatalf("Close returned before retry cancellation was observed: %v", err)
+				case <-deadline.C:
+					t.Fatal("Close did not cancel the active retry wait")
+				}
+				// Cancellation alone is insufficient: Close must still join this
+				// live lookup. Keep the hook held through a bounded observation.
+				hold := time.NewTimer(100 * time.Millisecond)
+				defer hold.Stop()
+				select {
+				case err := <-closeResult:
+					closeResult = nil
+					t.Fatalf("Close returned while the active retry lookup was held: %v", err)
+				case err := <-lookupResult:
+					lookupResult = nil
+					t.Fatalf("lookup returned before its retry hook was released: %v", err)
+				case <-hold.C:
+				}
+				release()
 			}
 			for lookupResult != nil || closeResult != nil {
 				select {
 				case err := <-lookupResult:
 					lookupResult = nil
-					if e.ExitCode(err) != e.ExitCode(e.New(e.CodeTimeout, "expected")) {
+					var coded *e.Error
+					if !errors.As(err, &coded) || coded.Code != e.CodeTimeout {
 						t.Fatalf("deadline or Close lost: %v", err)
 					}
 				case err := <-closeResult:

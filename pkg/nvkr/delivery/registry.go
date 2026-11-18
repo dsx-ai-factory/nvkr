@@ -459,10 +459,8 @@ func helmTagPublishError(err error, tag name.Tag, chart string) error {
 // push, pull, and resolve paths.
 func registryOptions(ctx context.Context, options RegistryOptions) []remote.Option {
 	remoteOptions := []remote.Option{remote.WithContext(ctx), remote.WithUserAgent("nvkr/delivery")}
-	base := readbudget.Transport(ctx, registryTransport(options))
-	if progress, ok := ctx.Value(registryPublicationProgressKey{}).(*registryPublicationProgress); ok {
-		base = registryPublicationProgressTransport{base: base, progress: progress}
-	}
+	progress, _ := ctx.Value(registryPublicationProgressKey{}).(*registryPublicationProgress)
+	base := readbudget.Transport(ctx, registryTransportWithProgress(options, progress))
 	if observer, ok := ctx.Value(registryObserverKey{}).(*registryObserver); ok {
 		base = observer.transport(base)
 	}
@@ -496,17 +494,35 @@ func (tracked registryPublicationProgressTransport) RoundTrip(request *http.Requ
 	return tracked.base.RoundTrip(request)
 }
 
+func registryWriteAttempted(ctx context.Context) bool {
+	progress, ok := ctx.Value(registryPublicationProgressKey{}).(*registryPublicationProgress)
+	return ok && progress.writeAttempted.Load()
+}
+
 func registryTransport(options RegistryOptions) http.RoundTripper {
-	if !options.IsolatedTransport {
-		return remote.DefaultTransport
+	return registryTransportWithProgress(options, nil)
+}
+
+func registryTransportWithProgress(options RegistryOptions, progress *registryPublicationProgress) http.RoundTripper {
+	base := remote.DefaultTransport
+	if options.IsolatedTransport {
+		base = &http.Transport{
+			Proxy:             http.ProxyFromEnvironment,
+			DialContext:       (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+			ForceAttemptHTTP2: true, DisableKeepAlives: true, MaxIdleConns: 100, MaxIdleConnsPerHost: 50,
+			IdleConnTimeout: 90 * time.Second, TLSHandshakeTimeout: 10 * time.Second,
+			ExpectContinueTimeout: time.Second,
+		}
 	}
-	return newHTTPSRegistryTransport(&http.Transport{
-		Proxy:             http.ProxyFromEnvironment,
-		DialContext:       (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		ForceAttemptHTTP2: true, DisableKeepAlives: true, MaxIdleConns: 100, MaxIdleConnsPerHost: 50,
-		IdleConnTimeout: 90 * time.Second, TLSHandshakeTimeout: 10 * time.Second,
-		ExpectContinueTimeout: time.Second,
-	}, options.Authority)
+	if progress != nil {
+		// Observe only a request admitted to the network transport. Wrapping
+		// outside HTTPS admission would count a locally refused POST as a write.
+		base = registryPublicationProgressTransport{base: base, progress: progress}
+	}
+	if options.IsolatedTransport {
+		return newHTTPSRegistryTransport(base, options.Authority)
+	}
+	return base
 }
 
 // Enforce HTTPS for every request, including redirects followed by net/http.

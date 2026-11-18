@@ -27,8 +27,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	provider "github.com/dsx-ai-factory/nvkr/pkg/nvkr/gitlab"
+	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/registry"
 )
 
@@ -44,9 +46,11 @@ func TestGitLabPublicationRevalidatesBeforeRegistryWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, mode := range []string{"unchanged", "superseded"} {
+	for _, mode := range []string{"unchanged", "superseded", "readback-substituted"} {
 		t.Run(mode, func(t *testing.T) {
-			var requests, writes, refreshes atomic.Int64
+			var requests, writes, refreshes, substitutions atomic.Int64
+			var rootWritten atomic.Bool
+			root := t.TempDir()
 			reg := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
 			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				job := func(id uint64, name, status string) map[string]any {
@@ -72,6 +76,22 @@ func TestGitLabPublicationRevalidatesBeforeRegistryWrite(t *testing.T) {
 					if r.Method == http.MethodPut || r.Method == http.MethodPost || r.Method == http.MethodPatch {
 						writes.Add(1)
 					}
+					expected, err := os.ReadFile(filepath.Join(root, "expected-root-path"))
+					if err != nil {
+						t.Errorf("read fixture root digest: %v", err)
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					isRoot := r.URL.Path == string(expected)
+					if isRoot && r.Method == http.MethodPut {
+						rootWritten.Store(true)
+					}
+					if mode == "readback-substituted" && rootWritten.Load() && isRoot && r.Method == http.MethodGet {
+						substitutions.Add(1)
+						w.Header().Set("Content-Type", delivery.MediaOCIIndex)
+						_, _ = w.Write([]byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[]}`))
+						return
+					}
 					reg.ServeHTTP(w, r)
 				}
 			}))
@@ -94,7 +114,6 @@ func TestGitLabPublicationRevalidatesBeforeRegistryWrite(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			root := t.TempDir()
 			if err := os.WriteFile(filepath.Join(root, "ca.pem"), pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der}), 0600); err != nil {
 				t.Fatal(err)
 			}
@@ -110,11 +129,14 @@ func TestGitLabPublicationRevalidatesBeforeRegistryWrite(t *testing.T) {
 			if refreshes.Load() != 1 {
 				t.Fatalf("pre-publication refreshes=%d, want one", refreshes.Load())
 			}
-			if mode == "unchanged" && writes.Load() == 0 {
+			if mode != "superseded" && writes.Load() == 0 {
 				t.Fatal("unchanged original closure did not publish")
 			}
 			if mode == "superseded" && requests.Load() != 0 {
 				t.Fatal("superseded original closure reached the registry")
+			}
+			if mode == "readback-substituted" && (!rootWritten.Load() || substitutions.Load() != 1) {
+				t.Fatalf("readback fixture did not follow a completed root upload: root=%v substitutions=%d", rootWritten.Load(), substitutions.Load())
 			}
 		})
 	}
@@ -145,11 +167,37 @@ func TestGitLabPublicationClosureChild(t *testing.T) {
 	state := &gitlabAdmission{client: client, names: []string{gitlabFinalizerJob, "nvkr:original"}, identity: provider.Identity{APIURL: config.APIURL, ProjectID: 123, PipelineID: 2, JobID: 3, Commit: strings.Repeat("a", 40)}, acquired: map[string]provider.Job{"nvkr:original": {ID: 9, Name: "nvkr:original", Status: "success"}}}
 	plan, artifacts := gitlabCompiledPublicationFixture(t, strings.TrimPrefix(origin, "https://")+"/fixture")
 	node := planNode(plan, "publish/release")
+	inspection, err := delivery.Inspect(t.Context(), artifacts[node.Inputs[0]].Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	target, err := runtimeTarget(plan, node.Target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	repository, err := name.NewRepository(target.Ref, name.StrictValidation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootPath := "/v2/" + repository.RepositoryStr() + "/manifests/" + inspection.RootDigest
+	if err := os.WriteFile("expected-root-path", []byte(rootPath), 0600); err != nil {
+		t.Fatal(err)
+	}
 	err = executeGitLabPublication(t.Context(), plan, node, artifacts, state)
 	if mode == "superseded" {
 		assertFactoryErrorCode(t, err, e.CodeProvenanceMissing)
 		if _, err := os.Stat(artifacts[node.Outputs[0]].Path); !os.IsNotExist(err) {
 			t.Fatal("superseded publication committed its reference")
+		}
+	} else if mode == "readback-substituted" {
+		// The pinned client rejects the substituted root before decoded
+		// publication inspection; preserve Pull's existing unavailable code.
+		assertFactoryErrorCode(t, err, e.CodeUnavailable)
+		if !strings.Contains(err.Error(), "registry push completed, but readback did not verify") {
+			t.Fatalf("completed push was omitted from readback failure: %v", err)
+		}
+		if _, err := os.Stat(artifacts[node.Outputs[0]].Path); !os.IsNotExist(err) {
+			t.Fatal("unverified readback committed a reference artifact")
 		}
 	} else if err != nil {
 		t.Fatal(err)

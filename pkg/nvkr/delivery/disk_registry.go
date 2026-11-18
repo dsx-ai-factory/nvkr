@@ -25,8 +25,21 @@ import (
 // It creates no discovery tag and confers no release or qualification authority.
 // The caller must admit space for one payload copy in scratch before calling.
 func PushDiskArtifact(ctx context.Context, artifact *DiskArtifact, repository, scratch string, options RegistryOptions) (reference string, err error) {
+	return pushDiskArtifactWithCleanup(ctx, artifact, repository, scratch, options, os.RemoveAll)
+}
+
+// The private removal seam permits deterministic cleanup-failure contracts;
+// production always supplies the filesystem owner above.
+func pushDiskArtifactWithCleanup(ctx context.Context, artifact *DiskArtifact, repository, scratch string, options RegistryOptions, remove func(string) error) (reference string, err error) {
 	ctx, observer := observeRegistry(ctx)
-	defer func(observedCtx context.Context) { err = observer.explain(observedCtx, err) }(ctx)
+	defer func(observedCtx context.Context) {
+		err = observer.explain(observedCtx, err)
+		// Classify using the original caller lifetime, not the deadline we
+		// cancel ourselves. Phase only reads the shared observation, not Err.
+		if ctx != nil && registryWriteAttempted(ctx) {
+			err = uncertainRegistryPublication(err)
+		}
+	}(ctx)
 	if err := deliveryContext(ctx); err != nil {
 		return "", err
 	}
@@ -54,7 +67,7 @@ func PushDiskArtifact(ctx context.Context, artifact *DiskArtifact, repository, s
 		return "", e.Wrap(e.CodeImmutableViolation, err, "creating disk upload scratch")
 	}
 	defer func() {
-		if cleanupErr := os.RemoveAll(stage); cleanupErr != nil {
+		if cleanupErr := remove(stage); cleanupErr != nil {
 			err = errors.Join(err, e.Wrap(e.CodeImmutableViolation, cleanupErr, "removing disk upload scratch"))
 		}
 	}()

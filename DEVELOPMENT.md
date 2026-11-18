@@ -526,6 +526,10 @@ repository allocation is two CPUs, 8 GB RAM and 14 GB storage. See the
 The supported alternative is a disposable local Docker daemon with the required capacity. Install
 the Go version in `.go-version`, Git and Docker, then use a local Unix Docker context
 with native Linux AMD64 or ARM64 execution, at least four CPUs, 12 GiB Docker memory and 35 GiB free disk.
+The selected daemon must expose `/var/run/docker.sock` on its own host or VM. The test bind-mounts
+that exact daemon-side socket and verifies that its daemon ID matches the selected context before
+checking disk space. The client-side Unix socket path may differ. A rootless daemon exposing only
+its per-user socket does not meet this prerequisite; select a compatible disposable daemon.
 The test checks Docker CPU and memory first, then pulls only the pinned Docker CLI prerequisite and
 measures available bytes on an owned daemon volume before pulling the large server images. The
 35 GiB observation is a precondition, not a reservation; concurrent use can still consume capacity.

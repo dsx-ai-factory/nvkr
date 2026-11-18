@@ -117,8 +117,12 @@ A fresh native Linux ARM64 server/Runner exercise passed on the complete 3,067-e
 review fixes. All eight generated jobs succeeded with zero retries; the test verified the executable and
 complete exact Run, exited zero in 295.101 seconds, and joined cleanup with no owned resources remaining.
 Source bytes and modes remained unchanged. The finalizer remained unstarted while the build was active;
-this success case does not establish mixed-platform skipped-branch failure scheduling. Later edits only
-change this evidence record, a development-guide status link, and the bounded Close-cancellation test.
+this success case does not establish mixed-platform skipped-branch failure scheduling. The retained Run
+contains only the unsigned executable output, with no registry publication. Later publication-error
+presentation distinguishes observed write attempts from pre-write failures and reports a completed push
+whose readback remains unverified; controlled delivery and HTTPS-fixture regressions cover those cases.
+Separate cancellation-test regressions require retry-wait entry and prove that Close joins the held lookup.
+These later source and test changes do not inherit live publication or error-path acceptance from this Run.
 The current manual GitHub workflow still selects a standard runner whose guaranteed disk is below the
 35 GiB test prerequisite. An adequately sized hosted route and hosted execution remain unverified.
 

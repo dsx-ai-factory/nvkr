@@ -526,10 +526,10 @@ func executeGitLabPublication(ctx context.Context, plan *Plan, node Node, artifa
 	}()
 	readback, err := delivery.Pull(ctx, ref, filepath.Join(dir, "release"), options)
 	if err != nil {
-		return delivery.SafeRegistryReadbackError(ctx, err)
+		return delivery.SafeRegistryPublishedReadbackError(ctx, err)
 	}
 	if readback.RootDigest != inspection.RootDigest {
-		return e.New(e.CodeVerifyFailed, "GitLab publication readback differs from the admitted release")
+		return delivery.SafeRegistryPublishedReadbackError(ctx, e.New(e.CodeVerifyFailed, "GitLab publication readback differs from the admitted release"))
 	}
 	return writeFactoryFile(ctx, output.Path, []byte(ref+"\n"), 0o644)
 }

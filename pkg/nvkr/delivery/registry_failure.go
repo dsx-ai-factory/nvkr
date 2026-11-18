@@ -21,6 +21,9 @@ import (
 // Registry publication preserves caller deadlines and otherwise bounds its own
 // work. The returned cleanup owns only a deadline installed by this boundary.
 func registryPublicationContext(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if _, ok := ctx.Value(registryPublicationProgressKey{}).(*registryPublicationProgress); !ok {
+		ctx = context.WithValue(ctx, registryPublicationProgressKey{}, &registryPublicationProgress{})
+	}
 	if _, bounded := ctx.Deadline(); bounded {
 		return ctx, func() {}
 	}
@@ -31,13 +34,7 @@ func registryPublicationContext(ctx context.Context, timeout time.Duration) (con
 // never authorizes rewriting an already identified manifest or dropping evidence.
 func registryPublishError(ctx context.Context, err error, operation string, args ...any) error {
 	classified := registryOperationError(ctx, err, fmt.Sprintf(operation, args...), true)
-	var response *transport.Error
-	var network registryNetworkError
-	readOnly := false
-	if observer, ok := ctx.Value(registryObserverKey{}).(*registryObserver); ok {
-		readOnly = observer.readOnly
-	}
-	if !readOnly && (errors.As(classified, &response) || errors.As(classified, &network)) {
+	if registryWriteAttempted(ctx) {
 		return uncertainRegistryPublication(classified)
 	}
 	return classified
@@ -77,7 +74,7 @@ func registryOperationError(ctx context.Context, err error, operation string, pu
 		publishing = false
 	}
 	suffix := ""
-	if publishing {
+	if publishing && registryWriteAttempted(ctx) {
 		suffix = "; destination may contain partial uploads"
 	}
 	var coded *e.Error
@@ -176,6 +173,22 @@ func SafeRegistryReadbackError(ctx context.Context, err error) error {
 	return redactRegistryError(err, classified, "registry readback failed")
 }
 
+// SafeRegistryPublishedReadbackError reports the caller-owned fact that its
+// push completed before readback failed. It grants no successful readback or
+// artifact authority; standalone readers use SafeRegistryReadbackError instead.
+func SafeRegistryPublishedReadbackError(ctx context.Context, err error) error {
+	classified := SafeRegistryReadbackError(ctx, err)
+	if classified == nil || ctx == nil {
+		return classified
+	}
+	code := e.CodeUnavailable
+	var coded *e.Error
+	if errors.As(classified, &coded) {
+		code = coded.Code
+	}
+	return e.Wrap(code, classified, "registry push completed, but readback did not verify the publication")
+}
+
 // SafeRegistryPublishError redacts remote details while retaining native causes.
 // Local validation errors keep their category and actionable guidance.
 func SafeRegistryPublishError(ctx context.Context, err error) error {
@@ -186,7 +199,7 @@ func SafeRegistryPublishError(ctx context.Context, err error) error {
 		return e.Wrap(e.CodeUsage, registryRedactedCause{cause: err}, "registry publication requires a context")
 	}
 	classified := registryPublishError(ctx, err, "publishing release")
-	return redactRegistryError(err, classified, "registry publication failed; destination may contain partial uploads")
+	return redactRegistryError(err, classified, "registry publication failed")
 }
 
 func redactRegistryError(err, classified error, message string) error {

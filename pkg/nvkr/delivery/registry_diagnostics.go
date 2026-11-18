@@ -230,7 +230,10 @@ func (observer *registryObserver) explain(ctx context.Context, err error) error 
 		case e.CodeInvalidCatalog:
 			action = "Check the named tag and repository tag policy; no rollback or automatic retagging is implied."
 		case e.CodeTimeout:
-			action = "The operation was canceled or timed out; reconcile partial uploads before retrying the same identified publication."
+			action = "The operation was canceled or timed out; check its outcome before retrying the same identified publication."
+			if registryWriteAttempted(ctx) {
+				action = "The operation was canceled or timed out; reconcile partial uploads before retrying the same identified publication."
+			}
 		}
 		if observer.readOnly && (coded.Code == e.CodeTimeout || coded.Code == e.CodeUnavailable) {
 			action = "Check the endpoint, TLS trust, DNS and connectivity, then retry the bounded read-only operation; no upload was attempted."

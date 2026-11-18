@@ -34,11 +34,8 @@ func PushDocumentArtifact(ctx context.Context, repository, mediaType string, raw
 	if err := admitDocumentTransport(ctx, mediaType, int64(len(raw)), options); err != nil {
 		return "", err
 	}
-	if _, bounded := ctx.Deadline(); !bounded {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
-		defer cancel()
-	}
+	ctx, cancel := registryPublicationContext(ctx, 5*time.Minute)
+	defer cancel()
 	parse := []name.Option{name.StrictValidation}
 	if options.PlainHTTP {
 		parse = append(parse, name.Insecure)
