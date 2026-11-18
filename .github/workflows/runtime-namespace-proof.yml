@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 ---
-name: Native runtime assembly proof
+name: Native runtime consumer proof
 
 # Deliberate proof revisions trigger this job. Other implementation pushes do
 # not spend a native attempt. This workflow has no upstream or PR trigger.
@@ -21,7 +21,7 @@ jobs:
   assembly:
     if: github.repository == 'njhensley/nvkr'
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
       - name: Check out the tested source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -36,19 +36,24 @@ jobs:
         env:
           NAMESPACE_EVIDENCE: ${{ runner.temp }}/runtime-namespace-evidence
         run: bash scripts/test-runtime-namespace.sh "$NAMESPACE_EVIDENCE"
-      - name: Prove two runtime builds with literal Unix filenames
+      - name: Prove original runtime receipts and bounded guest disk build
         env:
-          ASSEMBLY_EVIDENCE: ${{ runner.temp }}/runtime-assembly-evidence
-        run: bash scripts/test-mkosi-assembly.sh "$ASSEMBLY_EVIDENCE"
+          CONSUMER_EVIDENCE: ${{ runner.temp }}/runtime-consumer-evidence
+        run: bash scripts/test-runtime-consumer.sh "$CONSUMER_EVIDENCE"
       - name: Retain text diagnostics
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
-          name: runtime-assembly-evidence
+          name: runtime-consumer-evidence
           path: |
             ${{ runner.temp }}/runtime-namespace-evidence/inputs.txt
             ${{ runner.temp }}/runtime-namespace-evidence/namespaces.log
-            ${{ runner.temp }}/runtime-assembly-evidence/inputs.txt
-            ${{ runner.temp }}/runtime-assembly-evidence/assembly.log
+            ${{ runner.temp }}/runtime-consumer-evidence/inputs.txt
+            ${{ runner.temp }}/runtime-consumer-evidence/prepare.log
+            ${{ runner.temp }}/runtime-consumer-evidence/consumer.log
+            ${{ runner.temp }}/runtime-consumer-evidence/disk-result.json
+            ${{ runner.temp }}/runtime-consumer-evidence/disk-observation.json
+            ${{ runner.temp }}/runtime-consumer-evidence/runtime-sbom.json
+            ${{ runner.temp }}/runtime-consumer-evidence/runtime-observation.json
           if-no-files-found: error
           retention-days: 7
