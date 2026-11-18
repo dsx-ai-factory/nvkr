@@ -5,6 +5,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -207,7 +208,7 @@ func restoreSeedGitObjects(ctx context.Context, seedGit, consumerGit *os.File, p
 		if readErr != nil || len(names) != 0 {
 			return e.Wrap(e.CodeFetchFailed, readErr, "shared Git objects contain unsupported info or alternate object sources")
 		}
-	} else if !os.IsNotExist(err) {
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return e.Wrap(e.CodeFetchFailed, err, "opening shared Git object info")
 	}
 	if err := unix.Mkdirat(int(consumerGit.Fd()), "objects", 0700); err != nil {
@@ -238,7 +239,7 @@ func restoreSeedGitObjects(ctx context.Context, seedGit, consumerGit *os.File, p
 		if err := copyOpenSourceFileContext(ctx, shallow, consumerGit, "shallow", ".git/shallow", time.Unix(0, 0).UTC()); err != nil {
 			return e.Wrap(e.CodeFetchFailed, err, "copying shared Git shallow boundary")
 		}
-	} else if !os.IsNotExist(err) {
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return e.Wrap(e.CodeFetchFailed, err, "opening shared Git shallow boundary")
 	}
 	for _, args := range [][]string{{"init", "-q", "--template="}, {"fsck", "--full", "--no-reflogs", "--no-dangling", commit}} {
