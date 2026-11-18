@@ -14,17 +14,25 @@ separate process sessions passed. The test service had one CPU quota, 256 MiB me
 the revised launcher has no corresponding ARM64 VM proof. The production assembly backend now stages
 the source-pinned module, performs two fresh offline builds, checks original package reports and measured
 files in each packaged layer, and requires identical complete OCI closures before issuing a production
-receipt. Its focused tests cover staging, substitution rejection, closure checking and receipt revocation;
-the [source-bootstrap assembly attempt](https://github.com/njhensley/nvkr/actions/runs/44210223101) at
-`76e5420eab085b1158c5033b6a8a7aee7aa3b9fe` passed the native namespace assertions, including assembly-only
-`/dev/full` and `/dev/tty`, full-device `ENOSPC` behavior and absence of a controlling terminal. It installed
-and checked both package roots, then failed in the pinned mkosi revision's uncompressed OCI media-type
-handling. The backend now asks mkosi for tar output and wraps its unchanged bytes with NVKR's daemonless
-OCI library; this preserves the existing single uncompressed layer contract and source pin. Native
-execution of the tar-wrapping path remains pending.
-No production runtime OCI output or receipt has been observed. Run-bound evidence and consumer receipts,
-Environment binding and generated Plan integration remain incomplete, so maintained Run execution stays
-gated. The isolated amd64
+receipt. Its focused tests cover staging, substitution rejection, closure checking and receipt revocation.
+The [source-pinned production proof](https://github.com/njhensley/nvkr/actions/runs/44220466951) at
+`3a50d00c43abadfff8f959a06439662d6b01d0a9` passed on native AMD64 with kernel `7.0.0-1017-azure`.
+Both fresh assemblies passed exact installed-package closure, embedded original-report/recipe and measured
+file checks, then produced the same complete OCI closure. Mkosi emitted each tar; NVKR wrapped its bytes
+unchanged as one uncompressed layer. Literal backslashes in pinned systemd unit filenames were preserved
+without treating them as separators. The resulting manifest subject was
+`sha256:f6388e80bc29b72a368e8fd1001a6f208ee59b6dc82e9750e291f85866d6e40d`, layer digest
+`sha256:5929cc0ad843c685e250b92ad1ff76d5721f9b161874eb0ba99e2dc2bbc8355a`, and complete layout digest
+`sha256:8be63fb227252b4d15e90e6c170057289b045d412eb1383488077dca37f7c776` (1,942,375,343 layout bytes).
+The test authenticated the concrete ProducedRuntime receipt against its returned result. Namespace
+assertions also passed, including assembly-only `/dev/full` and `/dev/tty`, full-device `ENOSPC` behavior
+and absence of a controlling terminal. The assembly service used a two-CPU quota, 5 GiB memory limit,
+512-task limit and a separately owned 20 GiB scratch filesystem. The workflow retained text diagnostics,
+not the OCI payload. Host bootstrap utilities were recorded but not snapshot-pinned.
+
+Run-bound evidence and consumer receipts, runtime SBOM, Environment binding and generated Plan integration
+remain incomplete, so maintained Run execution stays gated. This proof does not establish disk-output
+equivalence, guest boot, ARM64 operation or a stronger evidence lane. The earlier isolated amd64
 [assembly Run](https://github.com/njhensley/nvkr/actions/runs/44145459516) built two byte-identical runtime
 archives from fresh roots and the same revalidated snapshot inputs. It used Ubuntu's mkosi package,
 not the source-commit bootstrap now required by the contract. That Run establishes neither production
