@@ -57,15 +57,14 @@ jobs:
           repository: dsx-ai-factory/nvke
           ref: main
           path: nvke-source
-          # The local clone also supplies the catalogs' retained baseline pins.
-          fetch-depth: 0
+          # Capture main once; builds fetch each pinned source from its public repository.
+          fetch-depth: 1
           persist-credentials: false
       - name: Freeze this cycle's product source
         run: |
           set -euo pipefail
           commit=$(git -C nvke-source rev-parse HEAD)
           printf 'NVKR_NVKE_E2E_SOURCE_COMMIT=%s\n' "$commit" >> "$GITHUB_ENV"
-          printf 'NVKE_LOCAL_CLONE=%s/nvke-source\n' "$GITHUB_WORKSPACE" >> "$GITHUB_ENV"
           printf 'NVKR commit: %s\n\nNVKE commit: %s\n' "$GITHUB_SHA" "$commit" >> "$GITHUB_STEP_SUMMARY"
       - name: Set up the repository's Go toolchain
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-nightly-tools-go-1-27-4",
-  "requiresCatalogDigest": "sha256:d168d78c6f0fb8e4358f6b6b9007f6fc0c130685697f5dbf4db51ca73754e450",
+  "requiresCatalogDigest": "sha256:dc46abac2dff084530630d339d17901faab98a309a4407e9ae5cb52ff9944065",
   "components": {
     "nvke-installer-sources": {
       "component": {
@@ -22,7 +22,7 @@
         "buildCommand": [
           "bash",
           "-euc",
-          "set -o pipefail\nprintf '%s\\n' \"${NKECTL_COMMIT:?}\" \u003e bin/SOURCE_COMMIT\nunset CAPI_VERSION\nmake --no-print-directory -s -f make/tool-versions.mk \\\n  --eval='nvkr-capi-version: ; @printf \"%s\\n\" \"$(CAPI_VERSION)\"' \\\n  nvkr-capi-version \u003e bin/CAPI_VERSION\n# NVKE releases before the in-tree NKTP chart's removal install it\n# from this path; later ones install the published chart instead.\nnktp_chart=\nif [ -d nktp/deploy/charts/nktp ]; then nktp_chart=nktp/deploy/charts/nktp; fi\ntar --sort=name --format=ustar --mtime=\"@${SOURCE_DATE_EPOCH:?}\" \\\n  --owner=0 --group=0 --numeric-owner --mode=u=rwX,go=rX \\\n  -cf - make/tool-versions.mk deploy/nvke-deploy.sh deploy/lib deploy/nico \\\n  cli/internal/bootstrap/sitespec/template.yaml \\\n  controller/deploy/charts/controller ${nktp_chart} \\\n  controller/hack/apply-capi-spiffe-exec-auth.sh \\\n  controller/deploy/k8s/capi-spiffe-exec-auth \\\n  controller/test/fixtures/releases \\\n  controller/nico-sim/internal/seed/default-seed.yaml controller/nico-sim/ui \\\n  -C bin SOURCE_COMMIT CAPI_VERSION | gzip -n \u003e bin/nvke-installer-sources.tar.gz\n"
+          "set -o pipefail\nexport LC_ALL=C\nprintf '%s\\n' \"${NKECTL_COMMIT:?}\" \u003e bin/SOURCE_COMMIT\nunset CAPI_VERSION\nmake --no-print-directory -s -f make/tool-versions.mk \\\n  --eval='nvkr-capi-version: ; @printf \"%s\\n\" \"$(CAPI_VERSION)\"' \\\n  nvkr-capi-version \u003e bin/CAPI_VERSION\n# NVKE releases before the in-tree NKTP chart's removal install it\n# from this path; later ones install the published chart instead.\nnktp_chart=\nif [ -d nktp/deploy/charts/nktp ]; then nktp_chart=nktp/deploy/charts/nktp; fi\n# Keep sibling charts together for source-owned file:// dependencies.\ncharts=(controller/deploy/charts/*/)\ntar --sort=name --format=ustar --mtime=\"@${SOURCE_DATE_EPOCH:?}\" \\\n  --owner=0 --group=0 --numeric-owner --mode=u=rwX,go=rX \\\n  -cf - make/tool-versions.mk deploy/nvke-deploy.sh deploy/lib deploy/nico \\\n  cli/internal/bootstrap/sitespec/template.yaml \\\n  \"${charts[@]%/}\" ${nktp_chart} \\\n  controller/hack/apply-capi-spiffe-exec-auth.sh \\\n  controller/deploy/k8s/capi-spiffe-exec-auth \\\n  controller/test/fixtures/releases \\\n  controller/nico-sim/internal/seed/default-seed.yaml controller/nico-sim/ui \\\n  -C bin SOURCE_COMMIT CAPI_VERSION | gzip -n \u003e bin/nvke-installer-sources.tar.gz\n"
         ],
         "artifactPath": "bin/nvke-installer-sources.tar.gz",
         "writeDir": "bin",

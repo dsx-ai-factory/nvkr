@@ -21,9 +21,10 @@ native `helm-oci` chart artifacts, and file inventories do not establish deploym
 
 Create a customer-owned input directory or edit the explicitly selected existing inputs. Copy a suitable
 example only after checking its paths and scope; rebase relative references deliberately. For a new single-output
-executable Definition, `definition init` prints a starting file from explicit catalog components; follow the
-[lifecycle guide](../../../../docs/lifecycle.md#start-a-small-executable-definition) to make its absolute catalog
-path relative before committing it. Read the current
+Definition, `definition init --destination <in-checkout-file>` prints a starting file from explicit catalog
+components and a selected format, with catalog references relative to that destination. Follow the
+[lifecycle guide](../../../../docs/lifecycle.md#start-a-small-executable-definition) for the root and Environment
+selection rules. Read the current
 loader/schema and admitted examples rather than inventing fields. Prefer declarations using supported builders
 over new NVKR Go code. Never place real credentials in YAML or generated Plans.
 

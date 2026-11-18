@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -46,9 +47,31 @@ type InputDirectory struct {
 // Logical paths remain unchanged in the Plan regardless of root's location.
 // Upstream pin-set authentication retains catalog's bounded network access.
 func CaptureCompileFiles(ctx context.Context, root, definitionPath, environmentPath, generatorVersion string) (*Plan, InputSnapshot, error) {
+	return captureCompileFiles(ctx, root, definitionPath, environmentPath, generatorVersion, nil, nil)
+}
+
+func captureCompileFiles(ctx context.Context, root, definitionPath, environmentPath, generatorVersion string, environment *authored.Environment, definition *authored.Definition) (*Plan, InputSnapshot, error) {
 	state, err := rootedInputState(ctx, root)
 	if err != nil {
 		return nil, InputSnapshot{}, err
+	}
+	if environment != nil {
+		raw, err := canonical.Marshal(environment)
+		if err != nil {
+			return nil, InputSnapshot{}, err
+		}
+		state.files[environmentPath] = raw
+		state.totalBytes = int64(len(raw))
+		state.entries = 1
+	}
+	if definition != nil {
+		raw, err := canonical.Marshal(definition)
+		if err != nil {
+			return nil, InputSnapshot{}, err
+		}
+		state.files[definitionPath] = raw
+		state.totalBytes += int64(len(raw))
+		state.entries++
 	}
 	plan, err := compileInputState(ctx, state, definitionPath, environmentPath, generatorVersion)
 	if err != nil {
