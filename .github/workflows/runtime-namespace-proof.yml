@@ -26,7 +26,7 @@ jobs:
       - name: Check out the tested source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
-          # First corrected archive run: outer and inner adapter paths, epoch zero.
+          # Second independent corrected run with the identical epoch-zero archive policy.
           ref: ${{ github.sha }}
           persist-credentials: false
       - name: Set up the repository Go toolchain
