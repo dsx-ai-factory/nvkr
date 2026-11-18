@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"net"
 	"net/http"
 	"net/url"
@@ -71,11 +72,22 @@ type Client struct {
 	http                               *http.Client
 }
 
-// Receipt holds a point-in-time authenticated map, not durable retry authority.
+// Receipt holds authenticated observations, not a server-atomic snapshot or
+// durable retry authority.
 type Receipt struct {
-	identity Identity
-	jobs     map[string]Job
-	registry ProjectRegistry
+	identity  Identity
+	jobs      map[string]Job
+	registry  ProjectRegistry
+	startedAt time.Time
+}
+
+// StartedAt returns the authenticated current job's provider-reported start.
+// Zero means it was absent; execution-budget owners must refuse that case.
+func (r *Receipt) StartedAt() time.Time {
+	if r == nil {
+		return time.Time{}
+	}
+	return r.startedAt
 }
 
 // ProjectRegistry is provider-reported metadata, not an independent authority.
@@ -125,7 +137,8 @@ func newWithHTTPClient(ctx context.Context, c Config, testClient *http.Client) (
 		return nil, e.New(e.CodeTimeout, "GitLab client context is already canceled")
 	}
 	u, err := url.Parse(c.APIURL)
-	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || u.RawPath != "" || u.Path != "/api/v4" || c.ProjectID == 0 {
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" ||
+		u.Opaque != "" || u.RawPath != "" || u.Path != "/api/v4" || strings.ContainsAny(c.APIURL, "\r\n\x00?#") || u.String() != c.APIURL || c.ProjectID == 0 {
 		return nil, e.New(e.CodeUsage, "GitLab API requires an exact HTTPS API base and project")
 	}
 	if c.JobToken == "" || c.ReadCredential == "" || (c.ReadCredentialKind != "job-token" && c.ReadCredentialKind != "private-token") || strings.ContainsAny(c.JobToken+c.ReadCredential, "\r\n") {
@@ -176,11 +189,12 @@ func (c *Client) Close() error {
 }
 
 type apiJob struct {
-	ID     uint64 `json:"id"`
-	Name   string `json:"name"`
-	Status string `json:"status"`
-	Ref    string `json:"ref"`
-	Commit struct {
+	ID        uint64     `json:"id"`
+	Name      string     `json:"name"`
+	Status    string     `json:"status"`
+	StartedAt *time.Time `json:"started_at"`
+	Ref       string     `json:"ref"`
+	Commit    struct {
 		ID string `json:"id"`
 	} `json:"commit"`
 	Pipeline struct {
@@ -341,6 +355,35 @@ func (c *Client) Current(ctx context.Context, id Identity, expectedJobNames []st
 	if !validJob(self, id) || self.ID != id.JobID || !expected[self.Name] || self.Status != "running" {
 		return nil, e.New(e.CodeVerifyFailed, "GitLab current job identity does not match")
 	}
+	found, pages, err := c.currentJobs(ctx, id, self, expected)
+	if err != nil {
+		return nil, err
+	}
+	if pages > 1 {
+		// GitLab pagination is not an atomic snapshot. Confirm a multi-page
+		// inventory once within the same lookup deadline, refusing observed
+		// membership or status changes rather than retrying toward success.
+		confirmed, _, err := c.currentJobs(ctx, id, self, expected)
+		if err != nil {
+			return nil, err
+		}
+		if !maps.Equal(found, confirmed) {
+			return nil, e.New(e.CodeVerifyFailed, "GitLab current job map changed during pagination")
+		}
+		found = confirmed
+	}
+	registry := ProjectRegistry{}
+	if project.RegistryEnabled != nil && project.RegistryPrefix != nil {
+		registry = ProjectRegistry{Present: true, Enabled: *project.RegistryEnabled, Prefix: *project.RegistryPrefix}
+	}
+	var startedAt time.Time
+	if self.StartedAt != nil {
+		startedAt = self.StartedAt.UTC()
+	}
+	return &Receipt{identity: id, jobs: found, registry: registry, startedAt: startedAt}, nil
+}
+
+func (c *Client) currentJobs(ctx context.Context, id Identity, self apiJob, expected map[string]bool) (map[string]Job, int, error) {
 	found := make(map[string]Job, len(expected))
 	ids := make(map[uint64]bool)
 	for page := 1; page <= maxPages; page++ {
@@ -350,36 +393,32 @@ func (c *Client) Current(ctx context.Context, id Identity, expectedJobNames []st
 		var jobs []apiJob
 		var next string
 		if err := c.getPage(ctx, path, query, &jobs, &next); err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 		for _, j := range jobs {
 			if !strings.HasPrefix(j.Name, "nvkr:") {
 				continue
 			}
 			if !expected[j.Name] || !validJob(j, id) || found[j.Name].ID != 0 || ids[j.ID] {
-				return nil, e.New(e.CodeVerifyFailed, "GitLab current job map is ambiguous or foreign")
+				return nil, 0, e.New(e.CodeVerifyFailed, "GitLab current job map is ambiguous or foreign")
 			}
 			found[j.Name] = Job{j.ID, j.Name, j.Status}
 			ids[j.ID] = true
 		}
 		if len(jobs) > pageSize {
-			return nil, e.New(e.CodeVerifyFailed, "GitLab page exceeds requested size")
+			return nil, 0, e.New(e.CodeVerifyFailed, "GitLab page exceeds requested size")
 		}
 		if next == "" {
 			if len(found) != len(expected) || found[self.Name].ID != self.ID || found[self.Name].Status != "running" {
-				return nil, e.New(e.CodeVerifyFailed, "GitLab current job map is incomplete")
+				return nil, 0, e.New(e.CodeVerifyFailed, "GitLab current job map is incomplete")
 			}
-			registry := ProjectRegistry{}
-			if project.RegistryEnabled != nil && project.RegistryPrefix != nil {
-				registry = ProjectRegistry{Present: true, Enabled: *project.RegistryEnabled, Prefix: *project.RegistryPrefix}
-			}
-			return &Receipt{identity: id, jobs: found, registry: registry}, nil
+			return found, page, nil
 		}
 		if next != strconv.Itoa(page+1) || len(jobs) == 0 {
-			return nil, e.New(e.CodeVerifyFailed, "GitLab pagination is inconsistent")
+			return nil, 0, e.New(e.CodeVerifyFailed, "GitLab pagination is inconsistent")
 		}
 	}
-	return nil, e.New(e.CodeVerifyFailed, "GitLab current job map exceeds page limit")
+	return nil, 0, e.New(e.CodeVerifyFailed, "GitLab current job map exceeds page limit")
 }
 func (c *Client) getPage(ctx context.Context, path, query string, out any, next *string) error {
 	return c.getQuery(ctx, path, query, c.readKind, c.readCredential, out, next)

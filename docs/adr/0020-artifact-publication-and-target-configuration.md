@@ -78,7 +78,10 @@ for the authenticated current project and a destination inside that exact projec
 Every derived output and evidence repository must remain inside it; a lexical sibling is not a child.
 The native registry username is `gitlab-ci-token`. An isolated TLS transport confines authenticated requests
 to the selected registry, admitted repositories and the selected provider's exact `/jwt/auth` token endpoint,
-with only the admitted repository scopes. No ambient registry keychain supplies publication credentials.
+with only the admitted repository scopes. Digest-addressed blob reads may follow one HTTPS redirect from
+an admitted repository to object storage. Storage requests carry no registry or API credentials; manifests
+and token requests gain no cross-origin authority. Readback still verifies each exact blob and its size.
+No ambient registry keychain supplies publication credentials.
 
 Only the compiled `publish/release` route is admitted. The publisher validates the complete local closure,
 writes its existing digest-addressed representation,

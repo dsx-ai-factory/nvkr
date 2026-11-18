@@ -4,7 +4,6 @@
 package factory
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -22,7 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -48,6 +46,10 @@ type GitLabNodeOptions struct {
 // GitLabFinalizer is a process-local, revocable carrier admission. A copied handle
 // shares revocation; neither its zero value nor serialized descriptions grant it.
 type GitLabFinalizer struct{ state *gitlabAdmission }
+
+// After admission, mu serializes access to mutable fields shared with Close.
+// The operation and finalizer paths hold it across their state helper calls;
+// Close cancels the lifetime before waiting for that lock.
 type gitlabAdmission struct {
 	mu         sync.Mutex
 	closed     bool
@@ -211,6 +213,7 @@ func AdmitGitLabFinalizer(ctx context.Context, plan *Plan, job GitLabJobContext)
 	return admitGitLabJob(ctx, plan, job, gitlabFinalizerJob)
 }
 
+// current requires the caller to hold state.mu.
 func (state *gitlabAdmission) current(ctx context.Context) (*provider.Receipt, error) {
 	if state.closed || state.client == nil {
 		return nil, e.New(e.CodeProvenanceMissing, "GitLab admission is closed")
@@ -261,12 +264,27 @@ func RunGitLabNode(ctx context.Context, plan *Plan, nodeID string, options GitLa
 	if options.Root != "" && options.Root != "." {
 		return e.New(e.CodeEngineCapability, "GitLab native operation requires its checked-out working directory")
 	}
-	owner, err := admitGitLabJob(ctx, plan, options.Job, gitlabNodeJob(nodeID))
+	budget, err := gitlabOperationBudget(plan, node)
+	if err != nil {
+		return err
+	}
+	// Bound initial native admission too. The authenticated start below narrows
+	// this bound to the actual job clock, including Runner checkout/startup.
+	admissionCtx, stopAdmission := context.WithTimeout(ctx, budget+15*time.Minute)
+	defer stopAdmission()
+	owner, err := admitGitLabJob(admissionCtx, plan, options.Job, gitlabNodeJob(nodeID))
 	if err != nil {
 		return err
 	}
 	defer func() { _ = owner.Close() }()
-	ctx = owner.state.lifetime
+	preparationDeadline, jobDeadline, err := gitlabPhaseDeadlines(ctx, owner.state.receipt.StartedAt(), time.Now(), budget)
+	if err != nil {
+		return err
+	}
+	jobCtx, stopJob := context.WithDeadline(owner.state.lifetime, jobDeadline)
+	defer stopJob()
+	ctx, stopPreparation := context.WithDeadline(jobCtx, preparationDeadline)
+	defer stopPreparation()
 	resolved, err := plan.ExecutionFor(node)
 	if err != nil {
 		return err
@@ -308,16 +326,16 @@ func RunGitLabNode(ctx context.Context, plan *Plan, nodeID string, options GitLa
 	if err := owner.state.restore(ctx, plan, node.Inputs, artifacts); err != nil {
 		return err
 	}
-	budget, err := gitlabOperationBudget(plan, node)
-	if err != nil {
-		return err
+	if time.Until(jobDeadline) < budget+gitlabCompletionAllowance {
+		return e.New(e.CodeTimeout, "GitLab preparation exhausted the reserved execution budget")
 	}
-	bounded, cancel := context.WithTimeout(ctx, budget)
+	stopPreparation()
+	bounded, cancel := context.WithTimeout(jobCtx, budget)
 	defer cancel()
 	var runErr error
 	switch node.Kind {
 	case NodeFetch:
-		runErr = executeSourceFetchInContext(bounded, plan, node.ID, os.Environ(), options.Stdout, options.Stderr, (pipeline.Local{}).ExecNode)
+		runErr = executeSourceFetchInContext(bounded, plan, node.ID, []string{"PATH=" + os.Getenv("PATH")}, options.Stdout, options.Stderr, (pipeline.Local{}).ExecNode)
 	case NodePublish:
 		runErr = executeGitLabPublication(bounded, plan, node, artifacts, owner.state)
 	default:
@@ -350,6 +368,9 @@ func RunGitLabNode(ctx context.Context, plan *Plan, nodeID string, options GitLa
 		}
 		runErr = newOperationSession(plan, placement, options.Stdout, options.Stderr).execute(bounded, node)
 	}
+	// Completion shares the native job deadline; it cannot consume the
+	// producer time reserved above or run beyond the generated allowance.
+	ctx = jobCtx
 	outcome := gitlabOutcome{Schema: "nvkr.dev/gitlab-operation/v1", APIURL: owner.state.identity.APIURL, ProjectID: options.Job.ProjectID, PipelineID: options.Job.PipelineID, JobID: options.Job.JobID, Commit: options.Job.Commit, Plan: owner.state.digest, Node: nodeID, Status: "failed", ExitCode: e.ExitCode(runErr), Carriers: []gitlabCarrier{}}
 	outcome.Inputs = make([]gitlabInput, 0, len(node.Inputs))
 	for _, id := range node.Inputs {
@@ -390,6 +411,26 @@ func RunGitLabNode(ctx context.Context, plan *Plan, nodeID string, options GitLa
 		return runErr
 	}
 	return writeErr
+}
+
+const gitlabCompletionAllowance = 5 * time.Minute
+
+// gitlabPhaseDeadlines reserves the complete compiled producer budget and a
+// completion allowance inside the native job clock. Caller deadlines can only
+// shorten that clock. The provider's own started_at is required, not CI text.
+func gitlabPhaseDeadlines(ctx context.Context, started, now time.Time, budget time.Duration) (time.Time, time.Time, error) {
+	if started.IsZero() || started.After(now) {
+		return time.Time{}, time.Time{}, e.New(e.CodeProvenanceMissing, "GitLab current job start time is missing or in the future")
+	}
+	deadline := started.Add(budget + 15*time.Minute)
+	if caller, ok := ctx.Deadline(); ok && caller.Before(deadline) {
+		deadline = caller
+	}
+	preparation := deadline.Add(-budget - gitlabCompletionAllowance)
+	if !now.Before(preparation) {
+		return time.Time{}, time.Time{}, e.New(e.CodeTimeout, "GitLab job has insufficient time for its reserved execution budget")
+	}
+	return preparation, deadline, nil
 }
 
 // executeGitLabPublication uses the native publication and closure owners. A
@@ -494,29 +535,41 @@ func (state *gitlabAdmission) restore(ctx context.Context, plan *Plan, ids []str
 		}
 		byProducer[artifact.Producer] = append(byProducer[artifact.Producer], id)
 	}
+	if len(byProducer) == 0 {
+		return state.revalidateAcquired(ctx)
+	}
+	nodes, _ := planIndex(plan)
+	// Authenticate one bounded snapshot for the complete acquisition, then
+	// compare every retained original observation after all transfers. A refresh
+	// per producer adds no atomicity and makes provider load grow with artifacts.
+	receipt, err := state.current(ctx)
+	if err != nil {
+		return err
+	}
+	jobs := gitlabJobDescriptions(receipt, state.names)
 	for _, producer := range sortedKeys(byProducer) {
-		receipt, err := state.current(ctx)
-		if err != nil {
-			return err
-		}
 		job, ok := receipt.Job(gitlabNodeJob(producer))
 		if !ok || job.Status != "success" {
 			return e.New(e.CodeReleaseIncomplete, "GitLab producer is not current and successful")
 		}
-		if state.acquired == nil {
-			state.acquired = map[string]provider.Job{}
+		if err := state.retain(gitlabNodeJob(producer), job); err != nil {
+			return err
 		}
-		if previous, ok := state.acquired[gitlabNodeJob(producer)]; ok && previous != job {
-			return e.New(e.CodeProvenanceMissing, "GitLab producer changed after admission")
-		}
-		state.acquired[gitlabNodeJob(producer)] = job
 		raw, err := state.member(ctx, job.ID, gitlabOutcomePath(producer), 4<<20)
 		if err != nil {
 			return err
 		}
-		carriers, err := validateGitLabProducerOutcome(raw, state.identity, state.digest, job.ID, producer, plan, gitlabJobDescriptions(receipt, state.names))
+		carriers, err := validateGitLabProducerOutcome(raw, state.identity, state.digest, job.ID, producer, plan, jobs)
 		if err != nil {
 			return err
+		}
+		// Outcome validation checked these exact original input attempts too.
+		// Retain them even when this consumer restores only the producer's output.
+		for _, input := range nodes[producer].Inputs {
+			name := gitlabNodeJob(artifacts[input].Producer)
+			if err := state.retain(name, jobs[name]); err != nil {
+				return err
+			}
 		}
 		for _, id := range uniqueSorted(byProducer[producer]) {
 			item, ok := carriers[id]
@@ -534,18 +587,42 @@ func (state *gitlabAdmission) restore(ctx context.Context, plan *Plan, ids []str
 				return err
 			}
 		}
-		// This is explicitly point-in-time provider admission, not an atomic retry
-		// lock. A changed current producer during acquisition invalidates this attempt.
-		after, err := state.current(ctx)
-		if err != nil {
-			return err
-		}
-		current, ok := after.Job(gitlabNodeJob(producer))
-		if !ok || current != job {
-			return e.New(e.CodeProvenanceMissing, "GitLab producer changed during carrier acquisition")
-		}
 	}
 	return state.revalidateAcquired(ctx)
+}
+
+// retain preserves the first authenticated observation. Refreshing a provider
+// description can invalidate an attempt, never silently rebind acquired bytes.
+func (state *gitlabAdmission) retain(name string, job provider.Job) error {
+	if state.acquired == nil {
+		state.acquired = map[string]provider.Job{}
+	}
+	if previous, ok := state.acquired[name]; ok && previous != job {
+		return e.New(e.CodeProvenanceMissing, "GitLab producer changed after admission")
+	}
+	state.acquired[name] = job
+	return nil
+}
+
+// Revalidate confirms the original acquired job IDs without restoring artifacts
+// or substituting refreshed producer attempts. Close revokes this operation.
+func (owner *GitLabFinalizer) Revalidate(ctx context.Context) error {
+	if ctx == nil {
+		return e.New(e.CodeUsage, "GitLab revalidation requires a context")
+	}
+	if owner == nil || owner.state == nil || owner.state.lifetime == nil {
+		return e.New(e.CodeProvenanceMissing, "GitLab revalidation requires its live native admission")
+	}
+	state := owner.state
+	if ctx.Err() != nil || state.lifetime.Err() != nil {
+		return e.New(e.CodeTimeout, "GitLab revalidation lifetime is canceled")
+	}
+	bounded, cancel := context.WithCancel(ctx)
+	stop := context.AfterFunc(state.lifetime, cancel)
+	defer func() { stop(); cancel() }()
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	return state.revalidateAcquired(bounded)
 }
 
 func (state *gitlabAdmission) revalidateAcquired(ctx context.Context) error {
@@ -640,6 +717,8 @@ func (state *gitlabAdmission) request(ctx context.Context, job uint64, path stri
 	// Reuse the CI locator owner's two-request separation: the native API
 	// authenticates the storage location, then a NEW request carries no API
 	// credential/cookie. Further redirects and unsafe locations fail closed.
+	// The selected provider controls that HTTPS storage destination; runner
+	// egress policy supplies any additional destination restrictions.
 	if response.StatusCode == http.StatusFound {
 		locations := response.Header.Values("Location")
 		_ = response.Body.Close()
@@ -701,43 +780,9 @@ func (state *gitlabAdmission) download(ctx context.Context, job uint64, path str
 func gitlabCheckout(ctx context.Context, commit string, paths []string) error {
 	root, err := filepath.Abs(".")
 	if err != nil {
-		return err
+		return e.Wrap(e.CodeProvenanceMissing, err, "resolving GitLab checkout")
 	}
-	environment := os.Environ()
-	if err := sourcegit.CheckWorktreeIndex(ctx, environment, root, 100000); err != nil {
-		return err
-	}
-	head, err := sourcegit.LocalCommand(ctx, environment, root, "rev-parse", "--verify", "HEAD")
-	if err != nil {
-		return err
-	}
-	var output bytes.Buffer
-	head.Stdout = &output
-	head.Stderr = io.Discard
-	if err := ownedcmd.Run(ctx, head); err != nil || strings.TrimSpace(output.String()) != commit {
-		return e.New(e.CodeProvenanceMissing, "GitLab checkout does not match authenticated pipeline commit")
-	}
-	args := append([]string{"ls-files", "--error-unmatch", "--"}, paths...)
-	tracked, err := sourcegit.LocalCommand(ctx, environment, root, args...)
-	if err != nil {
-		return err
-	}
-	tracked.Stdout = io.Discard
-	tracked.Stderr = io.Discard
-	if err := ownedcmd.Run(ctx, tracked); err != nil {
-		return e.New(e.CodeProvenanceMissing, "GitLab authored inputs are not tracked by the authenticated source")
-	}
-	args = append([]string{"diff", "--exit-code", "--no-ext-diff", "--no-textconv", "HEAD", "--"}, paths...)
-	changed, err := sourcegit.LocalCommand(ctx, environment, root, args...)
-	if err != nil {
-		return err
-	}
-	changed.Stdout = io.Discard
-	changed.Stderr = io.Discard
-	if err := ownedcmd.Run(ctx, changed); err != nil {
-		return e.New(e.CodeProvenanceMissing, "GitLab checked-out input bytes differ from authenticated source")
-	}
-	return nil
+	return sourcegit.VerifyCheckout(ctx, []string{"PATH=" + os.Getenv("PATH")}, root, commit, paths, 100000)
 }
 
 func validateGitLabProducerOutcome(raw []byte, identity provider.Identity, digest string, jobID uint64, producer string, plan *Plan, jobs map[string]provider.Job) (map[string]gitlabCarrier, error) {

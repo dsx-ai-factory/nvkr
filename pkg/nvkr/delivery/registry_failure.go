@@ -148,7 +148,8 @@ func SafeRegistryReadbackError(ctx context.Context, err error) error {
 	return redactRegistryError(err, classified, "registry readback failed")
 }
 
-// SafeRegistryPublishError presents a fixed message while retaining native causes.
+// SafeRegistryPublishError redacts remote details while retaining native causes.
+// Local validation errors keep their category and actionable guidance.
 func SafeRegistryPublishError(ctx context.Context, err error) error {
 	if err == nil {
 		return nil
@@ -165,6 +166,21 @@ func redactRegistryError(err, classified error, message string) error {
 	var coded *e.Error
 	if errors.As(classified, &coded) {
 		code = coded.Code
+	}
+	// Fixed guidance depends only on the owning classification. A wrapped
+	// cause can be local too; neither wrapping nor its absence establishes the
+	// upload phase. Messages and causes may contain private paths or URLs.
+	switch code {
+	case e.CodeUsage, e.CodeInvalidCatalog:
+		message = "publication input is invalid; check the selected destination and publication settings"
+	case e.CodeVerifyFailed, e.CodeUnverifiedRef:
+		message = "publication integrity verification failed; verify the exact layout and expected digest before retrying"
+	case e.CodeUnpinnedSource:
+		message = "publication reference is not pinned; select the exact repository and SHA-256 digest"
+	case e.CodeTrustPolicyMissing, e.CodeProvenanceMissing:
+		message = "publication authority is invalid or missing; check the selected registry, project and admitted scope"
+	case e.CodeEngineCapability:
+		message = "publication requires an unsupported capability; select a supported publication configuration"
 	}
 	return e.Wrap(code, registryRedactedCause{cause: err}, "%s", message)
 }

@@ -172,7 +172,7 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 				return err
 			}
 			if err := admitGitLabGenerationFlags(c); err != nil {
-				return err
+				return showCommandResult(c, view, commandDisplay{Title: "Run generation", Note: "Generation failed; no execution or release acceptance."}, err)
 			}
 			if c.IsSet("projection-pilot") {
 				if c.Context, err = selectProjectionPilot(c.Context, c.String("projection-pilot"), c.String("engine")); err != nil {

@@ -66,36 +66,58 @@ contracts remain local evidence; the renamed worker topology has no recorded hos
 
 ## GitLab ordinary unsigned profile
 
-The bounded GitLab adapter is connected in source: explicit native runner/bootstrap policy, complete-Plan
-projection, provider-authenticated current jobs, original-job outcomes/carriers and shared lifecycle finalization.
-Resolved producer placement and budgets use the executable producer view without copying fields into scheduler
-references. Signing, stronger evidence lanes, disk, private-source and unsupported execution requirements remain refused.
+The bounded adapter implements native runner/bootstrap policy, complete-Plan projection,
+provider-authenticated current jobs, original-job outcomes/carriers and shared lifecycle finalization.
+Producer placement and budgets use the executable producer view. Generated jobs select the native
+Docker-helper umask switch and fresh-clone strategy before checkout; shared exact `0644` checks remain.
+Pinned Runner source and local Git reproductions establish why both settings are needed: default helper
+`umask 0000` creates `0666` files, and fetch/forced checkout retain those non-executable permissions.
+A fresh normal-umask clone passes with identical bytes. Nonstandard helper/repository policies still fail closed.
 
-A diagnostic snapshot based on `e2fb13e74342a703d8b45b81ba5f48c18502ce89`, using Go 1.27.4 on
-`darwin/arm64`, passed all five `TestGitLabResolvedProducerExecution` subcases: native producer routes with
-unchanged utility placement; missing-route refusal; unsupported-requirement refusal; resolved budgets with
-unchanged logical fields; and source-owned timeout preservation. The tested
-`pkg/nvkr/factory/gitlab_test.go` SHA-256 was
-`ab5cc0e0d61db5a6072ea8ab6800436d28557341cb9aa684263e8ae761500b60`.
-The same snapshot passed all 26 top-level factory `^TestGitLab` tests, with zero skips, using
-`go test -mod=readonly -p=1 ./pkg/nvkr/factory -run '^TestGitLab' -count=1 -json`.
-These controlled contracts are not a native Linux producer Run, a full gate or acceptance by a GitLab provider.
-That result belongs to the historical snapshot. Against integration base
-`ef7951f1cddee46af953ff7dbca8e10debdeec4c`, the same 47-file GitLab implementation also passed the
-26-test factory selection on Go 1.27.4 `darwin/arm64`, with zero failures or skips. This scoped repeat supplies
-no native Linux, full-suite or provider-acceptance evidence. These results do not establish validation of the
-integration based on `031be28a0565f5f5dddcd959aa3cb692a5037c2b`. A native `make ci-check` attempt exited 2
-after the `govulncheck` subprocess was killed with exit 137; the cause is unproved. A completed independent
-check did not establish final source/scope conformance. The full gate and final source/scope verification
-remain incomplete; no custody acceptance is claimed.
+On November 18, 2026, `make test-gitlab-docker` passed against real GitLab CE 19.4.8 and Runner 19.4.0
+on native Linux ARM64. All eight generated jobs succeeded without retry: source-built bootstrap, real
+NVKE source fetch and `nvkectl` build, Syft acquisition, observation, SBOM, packaging and finalization.
+The test downloaded and inspected the executable bundle and exact complete `static-unqualified` Run,
+matched its original invocation and Plan, captured generator/bootstrap blob identities, exited zero and
+joined cleanup with no test-owned resources remaining. NVKE was `v0.23.0` at
+`2cfd00081b468d85a4894ec17e9deac13c9d8169`. The complete 3,055-entry tested source snapshot had SHA-256
+`88cc238746c2ff7abf75d3ed2ec895c97b212692ff2b5497156a3927d22d51c8`; all source bytes and modes
+were independently rechecked unchanged. This local acceptance has no public hosted-Run URL. Test code,
+pinned infrastructure and the manual hosted workflow are committed; private receipts retain the original
+failed attempts and successful Run. The hosted workflow has not been exercised.
 
-API-reader provisioning is a separate acceptance gap. The selected reader needs project metadata, pipeline
-metadata, current job enumeration and original-job artifacts. Standard job tokens authenticate `/job` and
-artifact downloads; fine-grained permissions additionally name pipeline/job-list reads. The complete optional
-job-token reader route, especially project-metadata access, is not established for a selected real instance.
-The configured `private-token` reader is a separate alternative, not evidence that either mechanism has been
-exercised against a provider. See GitLab's [job-token access table](https://docs.gitlab.com/ci/jobs/ci_job_token/#job-token-access)
-and [fine-grained endpoint permissions](https://docs.gitlab.com/ci/jobs/fine_grained_permissions/).
-Current-job `CI_JOB_TOKEN` authentication and same-project registry publication do not resolve API-reader access.
-Real native runner/bootstrap prerequisites, artifact retention/permissions, retry/cancellation behavior and
-live project-registry publication remain unverified. This profile grants no signing, qualification or production acceptance.
+A separate Go 1.27.4 Linux ARM64 run passed both controlled lifecycle targets, all 26 subcases with no
+failures or skips. It covers production-client publication/refusal and finalization against controlled HTTPS
+fixtures, separately from the real server/Runner acceptance above. It does not establish a live project-registry push.
+
+The real exercise used a scoped project `read_api` private-token reader, separate from native current-job
+authentication and registry-write authority. The optional job-token API-reader route remains unverified,
+especially project metadata and job-list permissions. See GitLab's
+[job-token access table](https://docs.gitlab.com/ci/jobs/ci_job_token/#job-token-access) and
+[fine-grained permissions](https://docs.gitlab.com/ci/jobs/fine_grained_permissions/).
+Native AMD64 execution, module-installed bootstrap, live registry publication and actual retry/cancellation
+recovery remain outside this acceptance. Signing, qualification, disk and private-source execution remain
+refused. Full repository checks and maintainer review are separate gates; this exercise grants no production acceptance.
+
+## GitLab SDK reuse assessment
+
+The current follow-up assessment identifies the official `gitlab.com/gitlab-org/api/client-go/v3` SDK
+`v3.52.0` at `c65d798cad511d8a1ee8d3e274eea4b0fa188fe2` as a reuse candidate for the required API
+methods and generated `testing.TestClient`. Its [pinned module](https://gitlab.com/gitlab-org/api/client-go/-/blob/c65d798cad511d8a1ee8d3e274eea4b0fa188fe2/go.mod)
+requires `go-cleanhttp v0.5.2` and `go-retryablehttp v0.7.8`; both carry MPL-2.0
+([cleanhttp license](https://github.com/hashicorp/go-cleanhttp/blob/v0.5.2/LICENSE),
+[retryablehttp license](https://github.com/hashicorp/go-retryablehttp/blob/v0.7.8/LICENSE)). The
+[SDK runtime client](https://gitlab.com/gitlab-org/api/client-go/-/blob/c65d798cad511d8a1ee8d3e274eea4b0fa188fe2/gitlab.go#L462-L466)
+constructs and uses these dependencies even when a caller supplies an HTTP client. Its Apache-2.0 top-level
+license therefore does not satisfy the repository's [Apache-clean linked-dependency policy](../../../CONTRIBUTING.md#the-invariants-your-change-must-respect).
+The [Merge Gate note](../../../.github/workflows/merge-gate.yaml) records automated license enforcement as
+planned; a green gate supplies no policy exception. This SDK closure must not enter NVKR's production import
+graph under the current policy. Its [generated test client](https://gitlab.com/gitlab-org/api/client-go/-/blob/c65d798cad511d8a1ee8d3e274eea4b0fa188fe2/testing/client.go)
+also imports the SDK; it is not a dependency-free alternative.
+
+SDK adoption remains recommended for evaluation after an upstream policy-compatible closure or explicit
+license-policy decision, followed by pinned dependency, notices, security and provider-boundary review.
+No dependency or policy exception is admitted here. External official `glab` provisioning is available at the
+permitted subprocess boundary without linking its dependency graph into NVKR; it grants no runtime provider
+or publication authority. SDK test doubles remain controlled fixtures and cannot replace real GitLab plus
+Runner acceptance.

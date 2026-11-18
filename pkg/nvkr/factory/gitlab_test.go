@@ -6,6 +6,7 @@ package factory
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -19,6 +20,7 @@ import (
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
 	yaml "go.yaml.in/yaml/v3"
 )
 
@@ -102,6 +104,73 @@ func TestGitLabCompleteGraphProjectionDifferentAuthoredSelections(t *testing.T) 
 	}
 	if len(sizes) != 2 || sizes[0] == sizes[1] {
 		t.Fatal("different authored topology was not exercised")
+	}
+}
+
+func TestGitLabNativeCheckoutModePolicy(t *testing.T) {
+	root, plan := gitlabFixture(t, 1)
+	bundle, err := RenderGitLab(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var document map[string]any
+	if err := yaml.Unmarshal(bundle.Files[GitLabWorkflowPath], &document); err != nil {
+		t.Fatal(err)
+	}
+	variables, ok := document["variables"].(map[string]any)
+	if !ok || len(variables) != 2 || variables["FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR"] != "true" || variables["GIT_STRATEGY"] != "clone" {
+		t.Fatal("exact intrinsic pre-checkout Runner mode policy missing")
+	}
+	names, err := GitLabJobNames(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range names {
+		job, ok := document[name].(map[string]any)
+		if !ok || job["inherit"] != nil || job["variables"] != nil {
+			t.Fatalf("generated job %q does not inherit the exact native checkout policy", name)
+		}
+	}
+	if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckGenerated(t.Context(), plan, EngineGitLab, root); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, field, value string
+		remove             bool
+	}{
+		{"missing umask switch", "FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR", "", true},
+		{"disabled umask switch", "FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR", "false", false},
+		{"missing fresh checkout", "GIT_STRATEGY", "", true},
+		{"reused checkout", "GIT_STRATEGY", "fetch", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			candidate := *bundle
+			candidate.Files = maps.Clone(bundle.Files)
+			changed := maps.Clone(document)
+			policy := maps.Clone(variables)
+			if tc.remove {
+				delete(policy, tc.field)
+			} else {
+				policy[tc.field] = tc.value
+			}
+			changed["variables"] = policy
+			raw, err := yaml.Marshal(changed)
+			if err != nil {
+				t.Fatal(err)
+			}
+			candidate.Files[GitLabWorkflowPath] = raw
+			candidate.WorkflowDigest = pipeline.FileDigest(raw)
+			assertFactoryErrorCode(t, ValidateGitLabBundle(t.Context(), plan, &candidate), e.CodePipelineDrift)
+			// Even coherent replacement hashes/manifest do not authorize a
+			// different native provider policy at the generated-check boundary.
+			if err := WriteGeneratedBundle(t.Context(), root, &candidate); err != nil {
+				t.Fatal(err)
+			}
+			assertFactoryErrorCode(t, CheckGenerated(t.Context(), plan, EngineGitLab, root), e.CodePipelineDrift)
+		})
 	}
 }
 
@@ -298,7 +367,7 @@ func TestGitLabNativeCheckoutSourceBinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	git("add", "--", "authored.json")
-	git("-c", "user.name=Native Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--quiet", "-m", "fixture")
+	git("-c", "user.name=Native Fixture", "-c", "user.email=fixture@example.invalid", "commit", "--no-gpg-sign", "--quiet", "-m", "fixture")
 	commit := git("rev-parse", "HEAD")
 	if err := gitlabCheckout(t.Context(), commit, []string{"authored.json"}); err != nil {
 		t.Fatal(err)
@@ -414,6 +483,9 @@ func TestGitLabResolvedProducerExecution(t *testing.T) {
 		for _, platform := range routes {
 			bootstrap := document[gitlabBootstrapJob(platform)].(map[string]any)
 			script := bootstrap["script"].([]any)[0].(string)
+			if local, probe := strings.Index(script, "export GOTOOLCHAIN=local"), strings.Index(script, "go env GOVERSION"); local < 0 || probe < 0 || local > probe {
+				t.Fatal("bootstrap consulted Go before disabling automatic toolchain downloads")
+			}
 			if !strings.Contains(script, "GOARCH="+strings.TrimPrefix(platform, "linux/")) {
 				t.Fatalf("%s bootstrap did not build its own native helper", platform)
 			}
@@ -532,6 +604,37 @@ func TestGitLabResolvedProducerExecution(t *testing.T) {
 		_, err = gitlabOperationBudget(overdue, gitlabFixtureProducer(t, overdue))
 		assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 	})
+}
+
+func TestGitLabDebianPublicationAdmission(t *testing.T) {
+	for _, publish := range []bool{false, true} {
+		t.Run(fmt.Sprintf("publication=%t", publish), func(t *testing.T) {
+			definition, environment, stack := rawDebianInputs(t)
+			_, ordinary := gitlabFixture(t, 1)
+			environment.GitLab = ordinary.Environment.GitLab
+			environment.RunsOn = ""
+			if publish {
+				environment.Publication = &authored.Publication{RepositoryPrefix: "registry.example.com/customer/release", Anonymous: true}
+			}
+			plan, err := compileDocumentsWithLoader(t.Context(), "definition.json", definition, "environment.json", environment,
+				"v0.0.0 (test)", func(context.Context, authored.Catalog) (*catalog.Stack, error) { return stack, nil })
+			if err != nil {
+				t.Fatal(err)
+			}
+			bundle, err := RenderGitLab(t.Context(), plan)
+			if publish {
+				if err != nil || bundle == nil {
+					t.Fatalf("joined Debian publication refused: %v", err)
+				}
+				return
+			}
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			assertFactoryErrorCode(t, ValidateGitLabPlan(t.Context(), plan), e.CodeEngineCapability)
+			if bundle != nil {
+				t.Fatal("unsupported raw Debian output returned a generated bundle")
+			}
+		})
+	}
 }
 
 func TestGitLabRejectsSelectiveBootBeforeRendering(t *testing.T) {

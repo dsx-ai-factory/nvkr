@@ -427,3 +427,7 @@ e2e-quick: export GOMAXPROCS := 2
 e2e-quick: export GOFLAGS := -p=2
 e2e-quick: build ## Build, publish, recover and smoke hello; unsigned qualification (Docker or CONTAINER_RUNTIME=podman).
 	go run ./internal/quicke2e
+
+.PHONY: test-gitlab-docker
+test-gitlab-docker: go-version-check ## Run the real, owned GitLab server/Runner nvkectl integration (Docker, 12 GiB RAM).
+	bash scripts/test-gitlab-docker.sh

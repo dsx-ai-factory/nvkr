@@ -98,6 +98,31 @@ func TestRenderGitLabTakesTheGenerationSeam(t *testing.T) {
 	}
 }
 
+func TestTektonGenerationRefusesGitLabPolicyInWriteAndCheckModes(t *testing.T) {
+	plan := tektonTestPlan(t)
+	root := t.TempDir()
+	if _, err := Generate(t.Context(), plan, EngineTekton, root, false); err != nil {
+		t.Fatal(err)
+	}
+	if err := CheckGenerated(t.Context(), plan, EngineTekton, root); err != nil {
+		t.Fatalf("ordinary Tekton bundle refused: %v", err)
+	}
+	_, gitlab := gitlabFixture(t, 1)
+	plan.Environment.GitLab = gitlab.Environment.GitLab
+	forbidGenerationSeam(t)
+	for _, engine := range []string{EngineTekton, " TekTon "} {
+		t.Run(engine, func(t *testing.T) {
+			_, err := Render(t.Context(), plan, engine)
+			assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			assertFactoryErrorCode(t, CheckGenerated(t.Context(), plan, engine, root), e.CodeEngineCapability)
+			for _, check := range []bool{false, true} {
+				_, err := Generate(t.Context(), plan, engine, root, check)
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			}
+		})
+	}
+}
+
 func TestGeneratedStageOwnersNeverTakeTheGenerationSeam(t *testing.T) {
 	plan, baseline, original := runtimeInputsFixture(t)
 	fresh := freshGitHubRuntimePins(t, plan)

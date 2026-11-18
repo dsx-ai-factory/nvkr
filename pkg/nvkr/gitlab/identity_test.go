@@ -191,13 +191,13 @@ func TestCurrentPaginationAndUnrelatedJobs(t *testing.T) {
 		expected = append(expected, name)
 		page = append(page, fixtureJob(uint64(n+10), name, "success"))
 	}
-	calls := 0
+	var calls atomic.Int64
 	c := fixtureClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/job") {
 			_ = json.NewEncoder(w).Encode(self)
 			return
 		}
-		calls++
+		calls.Add(1)
 		n, _ := strconv.Atoi(r.URL.Query().Get("page"))
 		if n == 1 {
 			w.Header().Set("X-Next-Page", "2")
@@ -210,10 +210,180 @@ func TestCurrentPaginationAndUnrelatedJobs(t *testing.T) {
 	if _, err := c.Current(context.Background(), id(), expected); err != nil {
 		t.Fatal(err)
 	}
-	if calls != 2 {
-		t.Fatalf("pages %d", calls)
+	if calls.Load() != 4 {
+		t.Fatalf("pages including confirmation %d", calls.Load())
 	}
 }
+
+func TestCurrentPaginationRejectsChangedConfirmation(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		code e.Code
+	}{
+		{"retried producer", e.CodeVerifyFailed},
+		{"changed status", e.CodeVerifyFailed},
+		{"canceled confirmation", e.CodeTimeout},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			self := fixtureJob(3, "nvkr:finalize", "running")
+			expected := []string{self.Name}
+			var initial []apiJob
+			for n := 0; n < 101; n++ {
+				name := fmt.Sprintf("nvkr:op:%03d", n)
+				expected = append(expected, name)
+				initial = append(initial, fixtureJob(uint64(210-n), name, "success"))
+			}
+			initial[100].Status = "pending"
+			initial = append(initial, self)
+			current := append([]apiJob(nil), initial...)
+			current[100].Status = "success"
+			if test.name == "changed status" {
+				current[0].Status = "failed"
+			} else {
+				current[0].ID = 211
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			var calls atomic.Int64
+			client := fixtureClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/v4/job" {
+					_ = json.NewEncoder(w).Encode(self)
+					return
+				}
+				request := calls.Add(1)
+				if request == 3 && test.name == "canceled confirmation" {
+					cancel()
+					<-r.Context().Done()
+					return
+				}
+				// After page one, A changes on that page and B completes on page
+				// two. The initial scan alone assembles an inconsistent result.
+				jobs := current
+				if request == 1 {
+					jobs = initial
+				}
+				switch r.URL.Query().Get("page") {
+				case "1":
+					w.Header().Set("X-Next-Page", "2")
+					_ = json.NewEncoder(w).Encode(jobs[:100])
+				case "2":
+					w.Header().Set("X-Next-Page", "")
+					_ = json.NewEncoder(w).Encode(jobs[100:])
+				default:
+					t.Error("unexpected pagination request")
+					w.WriteHeader(http.StatusBadRequest)
+				}
+			})
+			defer func() { _ = client.Close() }()
+			receipt, err := client.Current(ctx, id(), expected)
+			var coded *e.Error
+			if receipt != nil || !errors.As(err, &coded) || coded.Code != test.code {
+				t.Fatalf("receipt=%v err=%v; want no receipt and %s", receipt, err, test.code)
+			}
+			wantCalls := int64(4)
+			if test.code == e.CodeTimeout {
+				wantCalls = 3
+			}
+			if calls.Load() != wantCalls {
+				t.Fatalf("listing requests=%d, want bounded confirmation count %d", calls.Load(), wantCalls)
+			}
+		})
+	}
+}
+
+func TestClientAPIURLCanonicality(t *testing.T) {
+	for _, test := range []struct {
+		name, suffix string
+		valid        bool
+	}{
+		{"canonical", "", true},
+		{"empty query", "?", false},
+		{"empty fragment", "#", false},
+		{"query", "?token=value", false},
+		{"fragment", "#fragment", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			client, err := New(t.Context(), Config{APIURL: "https://gitlab.example.test/api/v4" + test.suffix, ProjectID: 1, JobToken: "j", ReadCredential: "r", ReadCredentialKind: "private-token"})
+			if test.valid {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := client.Close(); err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			var coded *e.Error
+			if client != nil || !errors.As(err, &coded) || coded.Code != e.CodeUsage {
+				t.Fatalf("client=%v err=%v; want no client and %s", client, err, e.CodeUsage)
+			}
+		})
+	}
+}
+
+func TestCurrentStartedAtComesOnlyFromAuthenticatedSelf(t *testing.T) {
+	const timestamp = "2026-11-18T12:00:00.123Z"
+	want, err := time.Parse(time.RFC3339Nano, timestamp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name, raw string
+		want      time.Time
+		code      e.Code
+	}{
+		{"reported", strconv.Quote(timestamp), want, ""},
+		{"missing", "", time.Time{}, ""},
+		{"null", "null", time.Time{}, ""},
+		{"invalid", `"not-a-timestamp"`, time.Time{}, e.CodeVerifyFailed},
+		{"wrong type", `123`, time.Time{}, e.CodeVerifyFailed},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			self := fixtureJob(3, "nvkr:finalize", "running")
+			listedStart := want.Add(-time.Hour)
+			listed := self
+			listed.StartedAt = &listedStart
+			client := fixtureClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/v4/job" {
+					raw, err := json.Marshal(self)
+					if err != nil {
+						t.Error(err)
+						return
+					}
+					var fields map[string]json.RawMessage
+					if err := json.Unmarshal(raw, &fields); err != nil {
+						t.Error(err)
+						return
+					}
+					delete(fields, "started_at")
+					if test.raw != "" {
+						fields["started_at"] = json.RawMessage(test.raw)
+					}
+					_ = json.NewEncoder(w).Encode(fields)
+					return
+				}
+				w.Header().Set("X-Next-Page", "")
+				_ = json.NewEncoder(w).Encode([]apiJob{listed})
+			})
+			defer func() { _ = client.Close() }()
+			receipt, err := client.Current(t.Context(), id(), []string{self.Name})
+			if test.code != "" {
+				var coded *e.Error
+				if receipt != nil || !errors.As(err, &coded) || coded.Code != test.code {
+					t.Fatalf("receipt=%v err=%v; want no receipt and %s", receipt, err, test.code)
+				}
+				return
+			}
+			if err != nil || !receipt.StartedAt().Equal(test.want) {
+				t.Fatalf("started_at=%v err=%v; want %v", receipt.StartedAt(), err, test.want)
+			}
+		})
+	}
+	if !(*Receipt)(nil).StartedAt().IsZero() || !(&Receipt{}).StartedAt().IsZero() {
+		t.Fatal("unissued receipt supplied a provider start")
+	}
+}
+
 func TestRejectCredentialsRedirectAndInvalidJSON(t *testing.T) {
 	for _, tc := range []struct {
 		name     string
@@ -336,11 +506,18 @@ func TestClientCloseCancelsAndJoinsCurrent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() { _ = client.Close() }()
 	parent, cancelParent := context.WithCancel(context.Background())
 	defer cancelParent()
 	finished := make(chan error, 1)
 	go func() { _, err := client.Current(parent, id(), []string{"nvkr:finalize"}); finished <- err }()
-	<-started
+	select {
+	case <-started:
+	case err := <-finished:
+		t.Fatalf("lookup returned before reaching transport: %v", err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("lookup never reached transport")
+	}
 	closed := make(chan struct{})
 	go func() { _ = client.Close(); close(closed) }()
 	select {
@@ -348,8 +525,14 @@ func TestClientCloseCancelsAndJoinsCurrent(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Close failed to cancel and join the lookup")
 	}
-	if err := <-finished; err == nil {
-		t.Fatal("canceled lookup succeeded")
+	select {
+	case err := <-finished:
+		var coded *e.Error
+		if !errors.As(err, &coded) || coded.Code != e.CodeTimeout {
+			t.Fatalf("canceled lookup error=%v; want %s", err, e.CodeTimeout)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("lookup did not finish after Close joined it")
 	}
 	if parent.Err() != nil {
 		t.Fatal("Close canceled the caller context")

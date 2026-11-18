@@ -229,6 +229,7 @@ func testGitLabCompiledPublishedClosureCurrentJobs(t *testing.T, mode string) {
 	var registryRequests, tokenRequests, foreignRequests, projectReads, closedConnections atomic.Int64
 	var rootPublished atomic.Bool
 	phase := "prepare"
+	startedAt := time.Now().Add(-time.Minute).UTC().Format(time.RFC3339)
 	reg := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/v2/") {
@@ -314,7 +315,7 @@ func testGitLabCompiledPublishedClosureCurrentJobs(t *testing.T, mode string) {
 					id = 42
 				}
 			}
-			return map[string]any{"id": id, "name": name, "status": status, "ref": "main", "commit": map[string]any{"id": commit}, "pipeline": map[string]any{"id": 23, "project_id": 7, "sha": commit, "ref": "main", "source": "api"}}
+			return map[string]any{"id": id, "name": name, "status": status, "started_at": startedAt, "ref": "main", "commit": map[string]any{"id": commit}, "pipeline": map[string]any{"id": 23, "project_id": 7, "sha": commit, "ref": "main", "source": "api"}}
 		}
 		switch r.URL.Path {
 		case "/api/v4/projects/7":
@@ -441,7 +442,7 @@ func testGitLabCompiledPublishedClosureCurrentJobs(t *testing.T, mode string) {
 		t.Fatal(err)
 	}
 	bin := t.TempDir()
-	if err := os.WriteFile(filepath.Join(bin, "podman"), []byte("#!/bin/sh\nexit 1\n"), 0700); err != nil {
+	if err := os.WriteFile(filepath.Join(bin, plan.Environment.RuntimeBinary()), []byte("#!/bin/sh\nexit 1\n"), 0700); err != nil {
 		t.Fatal(err)
 	}
 	exe, err := os.Executable()
@@ -461,11 +462,22 @@ func testGitLabCompiledPublishedClosureCurrentJobs(t *testing.T, mode string) {
 			if err := child.Start(); err != nil {
 				t.Fatal(err)
 			}
-			deadline := time.Now().Add(5 * time.Second)
-			for time.Now().Before(deadline) {
-				if _, err := os.Stat(filepath.Join(root, "admission-returned")); err == nil && closedConnections.Load() > 0 {
+			startupDeadline := time.Now().Add(30 * time.Second)
+			admitted := false
+			for time.Now().Before(startupDeadline) {
+				if _, err := os.Stat(filepath.Join(root, "admission-returned")); err == nil {
+					admitted = true
 					break
 				}
+				time.Sleep(10 * time.Millisecond)
+			}
+			if !admitted {
+				_ = child.Process.Kill()
+				_ = child.Wait()
+				t.Fatal("child startup or admission timed out before cleanup probe")
+			}
+			deadline := time.Now().Add(5 * time.Second)
+			for closedConnections.Load() == 0 && time.Now().Before(deadline) {
 				time.Sleep(10 * time.Millisecond)
 			}
 			if closedConnections.Load() == 0 {
@@ -503,11 +515,19 @@ func testGitLabCompiledPublishedClosureCurrentJobs(t *testing.T, mode string) {
 		if mode == "change-after-push" && !rootPublished.Load() {
 			t.Fatal("post-push revalidation case did not publish the root")
 		}
-		if mode == "foreign-realm" && tokenRequests.Load() != 0 {
-			t.Fatal("unapproved realm received job token")
+		if mode == "foreign-realm" {
+			if registryRequests.Load() == 0 {
+				t.Fatal("foreign realm refusal did not reach the registry challenge")
+			}
+			if tokenRequests.Load() != 0 {
+				t.Fatal("unapproved realm received job token")
+			}
 		}
 		if mode == "foreign-scope" && tokenRequests.Load() != 1 {
 			t.Fatal("injected scope reached the token issuer")
+		}
+		if (mode == "token-redirect" || mode == "token-denied") && tokenRequests.Load() == 0 {
+			t.Fatal("token refusal did not reach the selected token issuer")
 		}
 		if foreignRequests.Load() != 0 {
 			t.Fatal("unapproved token authority received a request")
@@ -575,6 +595,10 @@ func TestGitLabCompiledPublishedClosureChild(t *testing.T) {
 				t.Fatal("failed publication exposed a success reference")
 			}
 			if mode == "publisher-revalidated-refusal" {
+				assertCode(t, err, e.CodeProvenanceMissing)
+				if !strings.Contains(err.Error(), "project registry metadata changed") {
+					t.Fatalf("refusal did not revalidate changed registry metadata: %v", err)
+				}
 				body, readErr := os.ReadFile(factory.GitLabOutcomePath("publish/release"))
 				if readErr != nil {
 					t.Fatal(readErr)
@@ -591,7 +615,7 @@ func TestGitLabCompiledPublishedClosureChild(t *testing.T) {
 				if err := os.WriteFile(filepath.Join(root, "admission-returned"), []byte("ok"), 0600); err != nil {
 					t.Fatal(err)
 				}
-				deadline := time.Now().Add(5 * time.Second)
+				deadline := time.Now().Add(15 * time.Second)
 				for time.Now().Before(deadline) {
 					if _, err := os.Stat(filepath.Join(root, "continue")); err == nil {
 						return

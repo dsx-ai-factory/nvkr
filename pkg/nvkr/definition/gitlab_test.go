@@ -34,9 +34,23 @@ func TestGitLabEnvironmentAdmission(t *testing.T) {
 		{name: "foreign api path", change: func(e *Environment) { e.GitLab.APIURL = "https://gitlab.example.com/other" }, code: e.CodeInvalidCatalog},
 		{name: "embedded api credential", change: func(e *Environment) { e.GitLab.APIURL = "https://user:password@gitlab.example.com/api/v4" }, code: e.CodeInvalidCatalog},
 		{name: "query api", change: func(e *Environment) { e.GitLab.APIURL = "https://gitlab.example.com/api/v4?token=value" }, code: e.CodeInvalidCatalog},
+		{name: "empty query api", change: func(e *Environment) { e.GitLab.APIURL += "?" }, code: e.CodeInvalidCatalog},
+		{name: "empty fragment api", change: func(e *Environment) { e.GitLab.APIURL += "#" }, code: e.CodeInvalidCatalog},
+		{name: "fragment api", change: func(e *Environment) { e.GitLab.APIURL += "#fragment" }, code: e.CodeInvalidCatalog},
+		{name: "opaque api", change: func(e *Environment) { e.GitLab.APIURL = "https:gitlab.example.com/api/v4" }, code: e.CodeInvalidCatalog},
+		{name: "escaped api path", change: func(e *Environment) { e.GitLab.APIURL = "https://gitlab.example.com/api/%764" }, code: e.CodeInvalidCatalog},
 		{name: "wrong credential provider", change: func(e *Environment) { e.GitLab.APIReadCredentialRef = "github:NVKR_API_READ" }, code: e.CodeInvalidCatalog},
 		{name: "unknown credential kind", change: func(e *Environment) { e.GitLab.APIReadCredentialKind = "auto" }, code: e.CodeEngineCapability},
 		{name: "unsupported platform", change: func(e *Environment) { e.GitLab.Runners["darwin/arm64"] = e.GitLab.Runners["linux/amd64"] }, code: e.CodeEngineCapability},
+		{name: "two native routes", change: func(e *Environment) {
+			r := e.GitLab.Runners["linux/amd64"]
+			r.Tags = []string{"native-arm64"}
+			e.GitLab.Runners["linux/arm64"] = r
+		}},
+		{name: "too many routes", change: func(e *Environment) {
+			r := e.GitLab.Runners["linux/amd64"]
+			e.GitLab.Runners["linux/arm64"], e.GitLab.Runners["linux/ppc64le"] = r, r
+		}, code: e.CodeInvalidCatalog},
 		{name: "mixed provider", change: func(e *Environment) { e.GitHubBundle = "other" }, code: e.CodeEngineCapability},
 		{name: "legacy runner", change: func(e *Environment) { e.RunsOn = "ubuntu-latest" }, code: e.CodeEngineCapability},
 		{name: "empty tags", change: func(e *Environment) {
@@ -54,6 +68,41 @@ func TestGitLabEnvironmentAdmission(t *testing.T) {
 			r.Tags = []string{"$RUNNER_TAG"}
 			e.GitLab.Runners["linux/amd64"] = r
 		}, code: e.CodeInvalidCatalog},
+		{name: "maximum tag count", change: func(e *Environment) {
+			r := e.GitLab.Runners["linux/amd64"]
+			r.Tags = strings.Fields("a b c d e f g h i j k l m n o p")
+			e.GitLab.Runners["linux/amd64"] = r
+		}},
+		{name: "too many tags", change: func(e *Environment) {
+			r := e.GitLab.Runners["linux/amd64"]
+			r.Tags = strings.Fields("a b c d e f g h i j k l m n o p q")
+			e.GitLab.Runners["linux/amd64"] = r
+		}, code: e.CodeInvalidCatalog},
+		{name: "maximum tag length", change: func(e *Environment) {
+			r := e.GitLab.Runners["linux/amd64"]
+			r.Tags = []string{strings.Repeat("a", 128)}
+			e.GitLab.Runners["linux/amd64"] = r
+		}},
+		{name: "tag too long", change: func(e *Environment) {
+			r := e.GitLab.Runners["linux/amd64"]
+			r.Tags = []string{strings.Repeat("a", 129)}
+			e.GitLab.Runners["linux/amd64"] = r
+		}, code: e.CodeInvalidCatalog},
+		{name: "control in tag", change: func(e *Environment) {
+			r := e.GitLab.Runners["linux/amd64"]
+			r.Tags = []string{"native\nrunner"}
+			e.GitLab.Runners["linux/amd64"] = r
+		}, code: e.CodeInvalidCatalog},
+		{name: "backslash in tag", change: func(e *Environment) {
+			r := e.GitLab.Runners["linux/amd64"]
+			r.Tags = []string{"native\\runner"}
+			e.GitLab.Runners["linux/amd64"] = r
+		}, code: e.CodeInvalidCatalog},
+		{name: "backtick in tag", change: func(e *Environment) {
+			r := e.GitLab.Runners["linux/amd64"]
+			r.Tags = []string{"native`runner"}
+			e.GitLab.Runners["linux/amd64"] = r
+		}, code: e.CodeInvalidCatalog},
 		{name: "floating image", change: func(e *Environment) {
 			r := e.GitLab.Runners["linux/amd64"]
 			r.BootstrapImage = "registry.example.com/tools/go:latest"
@@ -62,6 +111,11 @@ func TestGitLabEnvironmentAdmission(t *testing.T) {
 		{name: "invalid repository", change: func(e *Environment) {
 			r := e.GitLab.Runners["linux/amd64"]
 			r.BootstrapImage = "invalid repository@sha256:" + strings.Repeat("b", 64)
+			e.GitLab.Runners["linux/amd64"] = r
+		}, code: e.CodeUnpinnedSource},
+		{name: "control in image", change: func(e *Environment) {
+			r := e.GitLab.Runners["linux/amd64"]
+			r.BootstrapImage += "\n"
 			e.GitLab.Runners["linux/amd64"] = r
 		}, code: e.CodeUnpinnedSource},
 	} {
@@ -78,6 +132,9 @@ func TestGitLabEnvironmentAdmission(t *testing.T) {
 			var coded *e.Error
 			if !errors.As(err, &coded) || coded.Code != test.code {
 				t.Fatalf("want %s, got %v", test.code, err)
+			}
+			if strings.Contains(err.Error(), "user:password") || strings.Contains(err.Error(), "token=value") {
+				t.Fatal("API URL refusal echoed credential-bearing input")
 			}
 		})
 	}

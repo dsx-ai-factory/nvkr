@@ -37,10 +37,11 @@ func (environment Environment) validateGitLab() error {
 		return nil
 	}
 	policy := environment.GitLab
-	api, err := url.Parse(policy.APIURL)
-	if err != nil || api.Scheme != "https" || api.Host == "" || api.User != nil ||
-		api.RawQuery != "" || api.Fragment != "" || api.Opaque != "" ||
-		api.RawPath != "" || api.Path != "/api/v4" || strings.ContainsAny(policy.APIURL, "\r\n\x00") {
+	if err := validateHTTPSURL("gitlab.apiURL", policy.APIURL); err != nil {
+		return e.New(e.CodeInvalidCatalog, "gitlab.apiURL requires an HTTPS API base ending in /api/v4 without credentials, query or fragment")
+	}
+	api, _ := url.Parse(policy.APIURL) // The shared URL owner admitted canonical HTTPS above.
+	if api.RawPath != "" || api.Path != "/api/v4" || strings.ContainsAny(policy.APIURL, "\r\n\x00") {
 		return e.New(e.CodeInvalidCatalog, "gitlab.apiURL requires an HTTPS API base ending in /api/v4 without credentials, query or fragment")
 	}
 	if policy.ProjectID == 0 {

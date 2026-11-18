@@ -510,3 +510,45 @@ caller-authored descriptions into authority.
 
 [CONTRIBUTING.md](CONTRIBUTING.md) owns contribution and commit rules. [Documentation guidance](docs/README.md)
 identifies active references; historical drafts and dated evidence do not override current contracts.
+
+## Test the GitLab adapter against a real server
+
+Run the same opt-in integration test locally or through the manual **GitLab Docker acceptance**
+workflow. Install the Go version in `.go-version`, Git and Docker, then use a local Unix Docker context
+with native Linux AMD64 or ARM64 execution, at least four CPUs, 12 GiB Docker memory and 35 GiB free disk.
+The test pulls several large pinned upstream images and builds the real pinned NVKE CLI; allow up to two hours.
+No existing GitLab service, registration token, SSH key or organization credential is needed.
+
+```sh
+export GOTOOLCHAIN=local
+export NVKR_GITLAB_EVIDENCE="$(mktemp -d)/evidence"
+make test-gitlab-docker
+```
+
+The test starts the official GitLab CE server and GitLab Runner in Docker, uses a fresh private project,
+and selects only `nvkectl` from the maintained native NVKE tutorial Definition. NVKR builds its own CLI,
+generates and checks the committed GitLab include, and retains ownership of every product build step.
+The official `glab` executable creates the project and masked read-only API variable, asks the real server
+to lint the complete include, submits the pipeline through its API, and polls terminal pipeline and job
+statuses. The test requires the exact generated job inventory, success with no retried jobs, a complete
+unsigned Run bound to the generated Plan, and an independently inspected downloadable `nvkectl` binary bundle.
+
+Server, Runner and its native helper, external `glab`, Go bootstrap image and Docker CLI images are
+pinned in `toolchains/gitlab-docker/pins.json`. The pinned official Go image is the bootstrap image.
+A read-only owned volume supplies only the Docker client copied from its pinned official image,
+with an explicit Runner tool path. No bootstrap registry, image build, package-manager update or product build
+script is added. External `glab` keeps its dependencies outside NVKR's linked Apache-clean binary.
+
+HTTPS uses a freshly generated test CA and server certificate with verified hostnames. Each job receives
+only the public CA and its scoped GitLab credentials. The administrator token, server private key and Runner
+authentication configuration stay outside the product checkout and job mounts. The fixture's Docker socket
+grants its registered jobs control of the selected daemon, so run on a disposable development/CI daemon.
+Named build storage is mounted at its reported daemon path so NVKR's own Docker workspace mounts refer
+to the same bytes on Linux and Docker-backed macOS. Native image checks refuse emulation or an architecture mismatch.
+
+Cleanup stops scheduling and joins the owned containers before removing this test's network and volumes.
+It never prunes Docker or removes unrelated resources. Pulled upstream images remain ordinary shared caches.
+Only bounded status, Run and executable-bundle metadata enter `NVKR_GITLAB_EVIDENCE`; credentials, raw server
+logs, Runner configuration and job traces are excluded. An unavailable dependency, failed lint, failed/skipped
+job, missing artifact or cleanup failure fails the integration test. Its result covers this one unsigned
+executable output; it does not establish publication, signing, disks, private-source access or full NVKE qualification.

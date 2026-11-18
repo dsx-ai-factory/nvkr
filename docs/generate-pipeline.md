@@ -408,6 +408,10 @@ generated Plans or logs. The optional API-reader job-token route has instance-sp
 consult the [credential-access ledger](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile)
 before choosing it. A separately provisioned `private-token` reader is the alternative mechanism.
 
+Artifact downloads may follow one authenticated provider redirect to a different HTTPS storage host,
+without forwarding API credentials. Selecting the provider also trusts its storage destinations; use
+runner egress policy when additional destination restrictions are required.
+
 The provider authenticates the exact current job and pipeline, then consumers fetch original producer
 outcomes and digest-bound carriers. They retain original job IDs across retries and reject substituted,
 failed, skipped, missing or corrupt members. The always-scheduled finalizer rechecks the complete closure,

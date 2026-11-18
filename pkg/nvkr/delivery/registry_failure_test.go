@@ -9,8 +9,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -308,5 +310,130 @@ func TestRegistryHTMLBaseKeepsExplicitResponseClassification(t *testing.T) {
 			}
 			assertRegistryCode(t, err, want)
 		})
+	}
+}
+
+func TestSafeRegistryErrorsKeepLocalGuidanceAndRedactRemoteDetails(t *testing.T) {
+	for _, boundary := range []struct {
+		name string
+		wrap func(context.Context, error) error
+	}{{"publish", SafeRegistryPublishError}, {"readback", SafeRegistryReadbackError}} {
+		for _, failure := range []struct {
+			code     e.Code
+			guidance string
+		}{{e.CodeUsage, "publication settings"}, {e.CodeVerifyFailed, "expected digest"}, {e.CodeTrustPolicyMissing, "admitted scope"}} {
+			t.Run(boundary.name+"/"+string(failure.code), func(t *testing.T) {
+				original := e.New(failure.code, "PRIVATE_SENTINEL caller value")
+				got := boundary.wrap(t.Context(), original)
+				assertRegistryCode(t, got, failure.code)
+				if !errors.Is(got, original) || !strings.Contains(got.Error(), failure.guidance) || strings.Contains(got.Error(), "PRIVATE_SENTINEL") || strings.Contains(got.Error(), "partial uploads") {
+					t.Fatalf("lost local guidance or redaction: %v", got)
+				}
+			})
+		}
+		t.Run(boundary.name+"/remote", func(t *testing.T) {
+			original := &transport.Error{StatusCode: http.StatusForbidden, Errors: []transport.Diagnostic{{Code: transport.DeniedErrorCode, Message: "PRIVATE_SENTINEL", Detail: "PRIVATE_SENTINEL"}}}
+			got := boundary.wrap(t.Context(), original)
+			assertRegistryCode(t, got, e.CodeRegistryAuthFailed)
+			var retained *transport.Error
+			if !errors.As(got, &retained) || retained != original || strings.Contains(got.Error(), "PRIVATE_SENTINEL") {
+				t.Fatalf("remote detail was disclosed or cause was lost: %v", got)
+			}
+		})
+	}
+}
+
+func TestSafeRegistryErrorsKeepWrappedCategoryGuidance(t *testing.T) {
+	for _, boundary := range []struct {
+		name string
+		wrap func(context.Context, error) error
+	}{{"publish", SafeRegistryPublishError}, {"readback", SafeRegistryReadbackError}} {
+		for _, failure := range []struct {
+			code     e.Code
+			guidance string
+		}{{e.CodeUsage, "publication settings"}, {e.CodeVerifyFailed, "expected digest"}, {e.CodeTrustPolicyMissing, "admitted scope"}} {
+			t.Run(boundary.name+"/"+string(failure.code), func(t *testing.T) {
+				cause := &os.PathError{Op: "open", Path: "/PRIVATE_SENTINEL", Err: os.ErrPermission}
+				original := e.Wrap(failure.code, cause, "PRIVATE_SENTINEL caller message")
+				got := boundary.wrap(t.Context(), original)
+				assertRegistryCode(t, got, failure.code)
+				var retained *os.PathError
+				if !errors.Is(got, original) || !errors.As(got, &retained) || retained != cause ||
+					!strings.Contains(got.Error(), failure.guidance) || strings.Contains(got.Error(), "PRIVATE_SENTINEL") || strings.Contains(got.Error(), "partial uploads") {
+					t.Fatalf("lost wrapped guidance, cause or privacy: %v", got)
+				}
+			})
+		}
+	}
+}
+
+func TestSafeRegistryMissingLayoutFailsBeforeNetwork(t *testing.T) {
+	for _, state := range []string{"missing layout", "index is directory"} {
+		t.Run(state, func(t *testing.T) {
+			var connections, requests atomic.Int64
+			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				requests.Add(1)
+				w.WriteHeader(http.StatusInternalServerError)
+			}))
+			server.Config.ConnState = func(_ net.Conn, state http.ConnState) {
+				if state == http.StateNew {
+					connections.Add(1)
+				}
+			}
+			server.Start()
+			defer server.Close()
+			layout := filepath.Join(t.TempDir(), "PRIVATE_LAYOUT_SENTINEL")
+			if state == "index is directory" {
+				if err := os.MkdirAll(filepath.Join(layout, "index.json"), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			ref, original := PushWithOptions(t.Context(), layout, strings.TrimPrefix(server.URL, "http://")+"/release", PushOptions{Registry: RegistryOptions{Anonymous: true, PlainHTTP: true}})
+			assertRegistryCode(t, original, e.CodeVerifyFailed)
+			var coded *e.Error
+			if ref != "" || !errors.As(original, &coded) || coded.Err == nil || !strings.Contains(original.Error(), "PRIVATE_LAYOUT_SENTINEL") {
+				t.Fatalf("fixture did not exercise a wrapped local layout refusal: ref=%q error=%v", ref, original)
+			}
+			for _, wrap := range []func(context.Context, error) error{SafeRegistryPublishError, SafeRegistryReadbackError} {
+				got := wrap(t.Context(), original)
+				assertRegistryCode(t, got, e.CodeVerifyFailed)
+				if !errors.Is(got, original) || !strings.Contains(got.Error(), "expected digest") || strings.Contains(got.Error(), "PRIVATE_LAYOUT_SENTINEL") ||
+					strings.Contains(got.Error(), server.URL) || strings.Contains(got.Error(), "partial uploads") {
+					t.Fatalf("actual local refusal lost guidance, cause or privacy: %v", got)
+				}
+				if state == "missing layout" && !errors.Is(got, os.ErrNotExist) {
+					t.Fatal("missing-layout filesystem cause was lost")
+				}
+			}
+			if connections.Load() != 0 || requests.Load() != 0 {
+				t.Fatalf("local layout refusal reached the registry: connections=%d requests=%d", connections.Load(), requests.Load())
+			}
+		})
+	}
+}
+
+func TestSafeRegistryErrorsKeepRemoteUncertainty(t *testing.T) {
+	for _, boundary := range []struct {
+		name, message string
+		wrap          func(context.Context, error) error
+	}{{"publish", "registry publication failed", SafeRegistryPublishError}, {"readback", "registry readback failed", SafeRegistryReadbackError}} {
+		for _, failure := range []struct {
+			name  string
+			cause error
+			code  e.Code
+		}{
+			{"authorization", &transport.Error{StatusCode: http.StatusForbidden, Errors: []transport.Diagnostic{{Code: transport.DeniedErrorCode, Message: "PRIVATE_SENTINEL", Detail: "PRIVATE_SENTINEL"}}}, e.CodeRegistryAuthFailed},
+			{"availability", &transport.Error{StatusCode: http.StatusServiceUnavailable, Errors: []transport.Diagnostic{{Code: transport.UnavailableErrorCode, Message: "PRIVATE_SENTINEL"}}}, e.CodeUnavailable},
+			{"unavailable without cause", e.New(e.CodeUnavailable, "PRIVATE_SENTINEL"), e.CodeUnavailable},
+		} {
+			t.Run(boundary.name+"/"+failure.name, func(t *testing.T) {
+				got := boundary.wrap(t.Context(), failure.cause)
+				assertRegistryCode(t, got, failure.code)
+				if !errors.Is(got, failure.cause) || !strings.Contains(got.Error(), boundary.message) ||
+					strings.Contains(got.Error(), "PRIVATE_SENTINEL") || strings.Contains(got.Error(), "partial uploads") != (boundary.name == "publish") {
+					t.Fatalf("remote uncertainty or privacy changed: %v", got)
+				}
+			})
+		}
 	}
 }

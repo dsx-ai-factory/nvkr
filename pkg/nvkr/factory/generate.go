@@ -98,6 +98,10 @@ func CheckGenerated(ctx context.Context, plan *Plan, engine, root string) error 
 	if err := ValidateGenerationEngine(engine); err != nil {
 		return err
 	}
+	if plan != nil && plan.Environment.GitLab != nil &&
+		!strings.EqualFold(strings.TrimSpace(engine), EngineGitLab) {
+		return e.New(e.CodeEngineCapability, "%s generation cannot ignore Environment.gitlab", engine)
+	}
 	if strings.EqualFold(strings.TrimSpace(engine), EngineGitLab) {
 		bundle, err := RenderGitLab(ctx, plan)
 		if err != nil {

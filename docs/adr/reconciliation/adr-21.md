@@ -86,10 +86,17 @@ modified or unowned copies. Hosted execution of the regenerated bundles remains 
 
 GitLab generation implements the fixed `.gitlab/nvkr-run/` pipeline/Plan/manifest namespace through the
 shared generated-file owner. Root `.gitlab-ci.yml` remains operator-owned; runtime admission requires its
-single exact local include and the project's default root CI configuration. Exact projection, conditional
-dependencies, custody/tampering, coexistence, ownership/retirement and symlink-refusal contracts are included
-in the [scoped Mac factory result](adr-18.md#gitlab-ordinary-unsigned-profile). That diagnostic snapshot's
-26-test result with zero skips is not a completed native/provider run or full gate. The full gate and final
-source/scope verification remain incomplete. GitLab named namespaces, arbitrary root
+single exact local include and the project's default root CI configuration.
+The exact generated transport includes the native Docker-helper switch suppressing Runner's default
+`umask 0000` and the native fresh-clone strategy before all job checkouts. Contract tests cover all-job
+inheritance and coherent missing/disabled/substituted policy refusal. Shared manifest `0644` mode checks
+remain unchanged. Fresh job-owned source checkout avoids the reproduced unchanged-file mode retention in
+reused Runner storage. The [real server/Runner acceptance](adr-18.md#gitlab-ordinary-unsigned-profile)
+exercised that policy across all eight jobs, with unchanged source and zero retries.
+
+Exact projection, conditional dependencies, custody/tampering, coexistence, ownership/retirement and symlink-refusal contracts are included
+in the [validation record](adr-18.md#gitlab-ordinary-unsigned-profile). Controlled contracts, the real ARM64
+recipe Run and full repository checks have separate scopes; none grants signing or qualification.
+GitLab named namespaces, arbitrary root
 customization, runtime/source refresh, qualification generation, catalog maintenance and projection-pilot
 selection remain outside the admitted profile.

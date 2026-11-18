@@ -23,12 +23,6 @@ const Token = "NVKR_SOURCE_TOKEN"
 // arbitrary caller-provided shell helpers in the held source route.
 const CredentialHelper = `!f() { if [ "$1" = get ]; then printf '%s\n' 'username=x-access-token' "password=$NVKR_SOURCE_TOKEN"; fi; }; f`
 
-// CredentialHelperGitLab is the one fixed GitLab CI job-token helper. It returns
-// the documented gitlab-ci-token username and reads the password only from the
-// NVKR_SOURCE_TOKEN channel; the token value never enters the helper literal,
-// Git arguments, the source URL or persisted Git configuration.
-const CredentialHelperGitLab = `!f() { if [ "$1" = get ]; then printf '%s\n' 'username=gitlab-ci-token' "password=$NVKR_SOURCE_TOKEN"; fi; }; f`
-
 // Baseline excludes ambient Git configuration, credentials and proxies. PATH is
 // explicit and contains only absolute directories with an executable Git.
 func Baseline(searchPath string) ([]string, error) {
@@ -59,10 +53,9 @@ func executable(searchPath string) (string, error) {
 	return "", e.New(e.CodeEngineCapability, "source Git requires Git on its admitted executable search path")
 }
 
-// Admit accepts only the fixed public baseline, the existing exact four-item
-// credential configuration, or the exact five-entry GitLab job-token profile,
-// each scoped to this source repository. Factory additionally binds that
-// configuration to the selected complete Plan's SourceAccess mirror.
+// Admit accepts only the fixed public baseline or the existing exact four-item
+// credential configuration scoped to this source repository. Factory additionally
+// binds that configuration to the selected complete Plan's SourceAccess mirror.
 func Admit(repository string, environment []string) (string, []string, error) {
 	fields := make(map[string]string, len(environment))
 	for _, pair := range environment {
@@ -84,7 +77,7 @@ func Admit(repository string, environment []string) (string, []string, error) {
 		key, value, _ := strings.Cut(pair, "=")
 		expected[key] = value
 	}
-	if count := fields["GIT_CONFIG_COUNT"]; count == "4" || count == "5" {
+	if fields["GIT_CONFIG_COUNT"] == "4" {
 		mirrorKey := fields["GIT_CONFIG_KEY_0"]
 		mirror := strings.TrimSuffix(strings.TrimPrefix(mirrorKey, "url."), ".insteadOf")
 		parsed, err := url.Parse(mirror)
@@ -95,21 +88,10 @@ func Admit(repository string, environment []string) (string, []string, error) {
 		if fields[Token] == "" {
 			return "", nil, e.New(e.CodeFetchFailed, "source fetch credential is empty")
 		}
-		helper := CredentialHelper
-		if count == "5" {
-			// The closed GitLab job-token profile additionally refuses every
-			// HTTP redirect; any other redirect mode or count fails closed.
-			helper = CredentialHelperGitLab
-			expected["GIT_CONFIG_KEY_4"] = "http.followRedirects"
-			expected["GIT_CONFIG_VALUE_4"] = "false"
-			if strings.ContainsAny(fields[Token], "\r\n\x00") {
-				return "", nil, e.New(e.CodeFetchFailed, "source fetch credential contains a control character")
-			}
-		}
 		for key, value := range map[string]string{
-			"GIT_CONFIG_COUNT": count, "GIT_CONFIG_KEY_0": mirrorKey, "GIT_CONFIG_VALUE_0": repository,
+			"GIT_CONFIG_COUNT": "4", "GIT_CONFIG_KEY_0": mirrorKey, "GIT_CONFIG_VALUE_0": repository,
 			"GIT_CONFIG_KEY_1": "credential.helper", "GIT_CONFIG_VALUE_1": "",
-			"GIT_CONFIG_KEY_2": "credential." + mirror + ".helper", "GIT_CONFIG_VALUE_2": helper,
+			"GIT_CONFIG_KEY_2": "credential." + mirror + ".helper", "GIT_CONFIG_VALUE_2": CredentialHelper,
 			"GIT_CONFIG_KEY_3": "credential.useHttpPath", "GIT_CONFIG_VALUE_3": "true", Token: fields[Token],
 		} {
 			expected[key] = value

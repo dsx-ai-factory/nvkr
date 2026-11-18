@@ -30,7 +30,7 @@ import (
 // bytes. They exercise the public production HTTPS adapter, native archive
 // owner and complete finalizer; they are not evidence of a live GitLab run.
 func TestFinalizeGitLabNativeHTTPSClosure(t *testing.T) {
-	for _, mode := range []string{"complete", "failed", "skipped", "missing-outcome", "corrupt-outcome", "wrong-producer-job", "corrupt-carrier", "wrong-role", "foreign-output-parent", "existing-run", "foreign-definition", "foreign-environment", "producer-retried-after-dependent"} {
+	for _, mode := range []string{"complete", "failed", "skipped", "missing-outcome", "corrupt-outcome", "wrong-producer-job", "corrupt-carrier", "wrong-role", "foreign-output-parent", "existing-run", "foreign-definition", "foreign-environment", "producer-retried-after-dependent", "producer-retried-before-commit"} {
 		t.Run(mode, func(t *testing.T) {
 			root := t.TempDir()
 			t.Chdir(root)
@@ -40,6 +40,7 @@ func TestFinalizeGitLabNativeHTTPSClosure(t *testing.T) {
 			members := map[string][]byte{}
 			var artifactReads atomic.Int64
 			var apiReads atomic.Int64
+			var mapReads atomic.Int64
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				apiReads.Add(1)
 				if r.Method != http.MethodGet {
@@ -67,7 +68,23 @@ func TestFinalizeGitLabNativeHTTPSClosure(t *testing.T) {
 						t.Error("current membership did not exclude historical retries")
 					}
 					w.Header().Set("X-Next-Page", "")
-					_ = json.NewEncoder(w).Encode(jobs)
+					// Five snapshots cover admission and complete restoration.
+					// Only the final post-observation confirmation sees this retry.
+					if mapReads.Add(1) == 6 && mode == "producer-retried-before-commit" {
+						rows := make([]map[string]any, len(jobs))
+						for i, job := range jobs {
+							rows[i] = make(map[string]any, len(job))
+							for key, value := range job {
+								rows[i][key] = value
+							}
+							if job["name"] != "nvkr:finalize" {
+								rows[i]["id"] = job["id"].(uint64) + 10000
+							}
+						}
+						_ = json.NewEncoder(w).Encode(rows)
+					} else {
+						_ = json.NewEncoder(w).Encode(jobs)
+					}
 				default:
 					artifactReads.Add(1)
 					body, ok := members[r.URL.Path]
@@ -248,6 +265,9 @@ func TestFinalizeGitLabNativeHTTPSClosure(t *testing.T) {
 			if raw, err := child.CombinedOutput(); err != nil {
 				t.Fatalf("production HTTPS finalizer fixture: %v\n%s", err, raw)
 			}
+			if mode == "producer-retried-before-commit" && mapReads.Load() != 6 {
+				t.Fatalf("did not reach final confirmation: %d", mapReads.Load())
+			}
 			if mode == "wrong-role" && artifactReads.Load() != 0 {
 				t.Fatal("foreign role performed artifact IO")
 			}
@@ -326,7 +346,7 @@ func TestFinalizeGitLabNativeHTTPSChild(t *testing.T) {
 		if mode == "failed" || mode == "skipped" {
 			assertCode(t, err, e.CodeReleaseIncomplete)
 		}
-		if mode == "producer-retried-after-dependent" {
+		if mode == "producer-retried-after-dependent" || mode == "producer-retried-before-commit" {
 			assertCode(t, err, e.CodeProvenanceMissing)
 		}
 	}

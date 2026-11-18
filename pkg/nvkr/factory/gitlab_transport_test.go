@@ -130,6 +130,9 @@ func TestGitLabSharedSourceVendorCarrierFanout(t *testing.T) {
 func TestGitLabNativeArtifactTransport(t *testing.T) {
 	for _, mode := range []string{"success", "signed-storage", "corrupt", "oversize", "redirect", "timeout"} {
 		t.Run(mode, func(t *testing.T) {
+			var insecureRequests atomic.Int64
+			insecure := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { insecureRequests.Add(1) }))
+			defer insecure.Close()
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == "/storage" {
 					if r.Header.Get("PRIVATE-TOKEN") != "" || r.Header.Get("JOB-TOKEN") != "" || r.Header.Get("Authorization") != "" || r.Header.Get("Cookie") != "" {
@@ -149,7 +152,7 @@ func TestGitLabNativeArtifactTransport(t *testing.T) {
 					return
 				}
 				if mode == "redirect" {
-					http.Redirect(w, r, "http://foreign.invalid/should-not-receive-credential", http.StatusFound)
+					http.Redirect(w, r, insecure.URL+"/should-not-receive-credential", http.StatusFound)
 					return
 				}
 				if mode == "timeout" {
@@ -173,6 +176,9 @@ func TestGitLabNativeArtifactTransport(t *testing.T) {
 			raw, err := child.CombinedOutput()
 			if err != nil {
 				t.Fatalf("native HTTPS fixture: %v\n%s", err, raw)
+			}
+			if insecureRequests.Load() != 0 {
+				t.Fatal("insecure redirect reached the destination")
 			}
 		})
 	}

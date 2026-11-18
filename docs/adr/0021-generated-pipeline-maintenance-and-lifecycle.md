@@ -47,6 +47,11 @@ operator-owned and is never generated, adopted or retired by that writer. Execut
 contain only one local include naming `.gitlab/nvkr-run/pipeline.yml`; extra root jobs, variables, includes
 and replacement policy are not customization seams. The provider project must select its default root CI
 configuration. Generated GitLab namespace paths are not authored and cannot be replaced with GitHub layouts.
+The generated include's intrinsic Docker-helper umask switch and fresh-clone strategy apply before every
+job's source checkout (ADR-18). Fresh job-owned source checkout avoids incompatible regular-file modes
+retained by fetch in reused Runner storage; the switch prevents the standard helper from widening them.
+Committed generated payloads still require their exact manifest modes, including `0644` regular files.
+No checkout chmod or mode-tolerant drift exception is admitted.
 ADR-18 owns native invocation, authenticated current-job/original-carrier admission and unsigned finalization;
 ADR-20 owns its bounded publication exception. Named GitHub bundles, GitHub runtime Plan/source refresh,
 qualification generation, catalog maintenance and the projection pilot do not extend this GitLab profile.

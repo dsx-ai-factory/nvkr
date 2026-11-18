@@ -27,6 +27,12 @@ and an in-cluster registry. The [Tekton guide](../docs/generate-pipeline.md#tekt
 lists prerequisites, trust scope and retained evidence. The GitHub acceptance workflow runs this same
 command; it needs no publishing secrets. This explicit integration test fails when prerequisites are absent.
 
+`test-gitlab-docker.sh` runs the single-output NVKE CLI Definition through a real GitLab server and
+Docker-executor Runner. It requires a local native AMD64/ARM64 Docker daemon, four CPUs and 12 GiB RAM.
+The [development guide](../DEVELOPMENT.md#test-the-gitlab-adapter-against-a-real-server) describes owned
+resources, token isolation, HTTPS trust, API submission and retained evidence. It is opt-in and fails
+when prerequisites are absent. This is an ordinary unsigned build, not signing or qualification.
+
 `ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's eleven
 test jobs. It includes examples and fuzz seed tests, and requires exact completion of the discovered
 selection. New packages and tests need no allowlist update. `make test-shard` reproduces one matrix

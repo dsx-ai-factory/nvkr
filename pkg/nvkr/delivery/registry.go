@@ -496,6 +496,16 @@ func (scoped httpsRegistryTransport) RoundTrip(request *http.Request) (*http.Res
 		return nil, e.New(e.CodeUsage, "isolated registry transport requires HTTPS")
 	}
 	if scoped.authority.enabled() {
+		if scoped.blobStorageRedirect(request) {
+			// net/http can preserve sensitive headers across a redirect to the
+			// same hostname on another port. Storage receives no credentials,
+			// regardless of that upstream forwarding policy.
+			storage := request.Clone(request.Context())
+			for _, header := range []string{"Authorization", "Proxy-Authorization", "Cookie", "PRIVATE-TOKEN", "JOB-TOKEN"} {
+				storage.Header.Del(header)
+			}
+			return scoped.base.RoundTrip(storage)
+		}
 		if request.URL.User != nil || request.URL.Fragment != "" || request.URL.RawPath != "" || (request.Host != "" && request.Host != request.URL.Host) {
 			return nil, e.New(e.CodeTrustPolicyMissing, "registry request authority is invalid")
 		}
@@ -541,6 +551,45 @@ func (scoped httpsRegistryTransport) RoundTrip(request *http.Request) (*http.Res
 		}
 	}
 	return scoped.base.RoundTrip(request)
+}
+
+// blobStorageRedirect admits one HTTPS delegation from a selected registry's
+// exact digest-addressed blob GET/HEAD. net/http supplies Response only while
+// following a redirect; use its original request rather than widening registry
+// authority to arbitrary anonymous URLs. The normal readback owner still checks
+// every blob's size and digest before accepting a publication.
+func (scoped httpsRegistryTransport) blobStorageRedirect(request *http.Request) bool {
+	if request.URL.Host == scoped.authority.RegistryHost || request.URL.User != nil || request.URL.Host == "" || request.URL.Fragment != "" || (request.Host != "" && request.Host != request.URL.Host) ||
+		(request.Method != http.MethodGet && request.Method != http.MethodHead) || request.Response == nil || request.Response.Request == nil {
+		return false
+	}
+	response := request.Response
+	switch response.StatusCode {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusSeeOther, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+	default:
+		return false
+	}
+	source := response.Request
+	if source.URL == nil || source.URL.Scheme != "https" || source.URL.Host != scoped.authority.RegistryHost || source.URL.User != nil || source.URL.RawPath != "" || source.URL.Fragment != "" ||
+		(source.Method != http.MethodGet && source.Method != http.MethodHead) || (source.Host != "" && source.Host != source.URL.Host) {
+		return false
+	}
+	location, err := response.Location()
+	if err != nil || location.String() != request.URL.String() {
+		return false
+	}
+	for _, selected := range scoped.authority.Repositories {
+		repository, err := name.NewRepository(selected, name.StrictValidation)
+		if err != nil || repository.RegistryStr() != scoped.authority.RegistryHost {
+			return false
+		}
+		prefix := "/v2/" + repository.RepositoryStr() + "/blobs/"
+		if digest, ok := strings.CutPrefix(source.URL.Path, prefix); ok {
+			_, err := v1.NewHash(digest)
+			return err == nil
+		}
+	}
+	return false
 }
 
 // AmbientKeychain returns the keychain these options consult, or nil when access

@@ -5,9 +5,13 @@ package delivery
 
 import (
 	"context"
+	"crypto/sha256"
+	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -119,5 +123,110 @@ func TestRegistryAuthorityRejectsDelete(t *testing.T) {
 	}
 	if err == nil || probe.calls != 0 {
 		t.Fatal("delete request reached registry transport")
+	}
+}
+
+func TestRegistryBlobRedirectDropsCredentialsAndRejectsOtherDelegation(t *testing.T) {
+	payload := []byte("exact redirected blob")
+	digest := fmt.Sprintf("sha256:%x", sha256.Sum256(payload))
+	for _, mode := range []string{"blob", "encoded storage path", "corrupt blob", "manifest", "token", "foreign repository", "invalid digest", "http", "storage chain"} {
+		t.Run(mode, func(t *testing.T) {
+			var storageCalls, insecureCalls atomic.Int64
+			insecure := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { insecureCalls.Add(1) }))
+			defer insecure.Close()
+			storage := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				storageCalls.Add(1)
+				for _, key := range []string{"Authorization", "Cookie", "PRIVATE-TOKEN", "JOB-TOKEN", "Proxy-Authorization"} {
+					if r.Header.Get(key) != "" {
+						t.Errorf("storage received credential header %s", key)
+					}
+				}
+				if mode == "storage chain" {
+					http.Redirect(w, r, insecure.URL+"/chain", http.StatusFound)
+					return
+				}
+				body := payload
+				if mode == "corrupt blob" {
+					body = []byte("substituted blob")
+				}
+				_, _ = w.Write(body)
+			}))
+			defer storage.Close()
+			origin := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if !strings.HasPrefix(r.URL.Path, "/jwt/auth") && r.Header.Get("Authorization") != "Bearer synthetic-token" {
+					t.Error("registry credential missing")
+				}
+				location := storage.URL + "/object?synthetic-signature=value"
+				if mode == "encoded storage path" {
+					location = storage.URL + "/bucket%2Fobject?synthetic-signature=value"
+				}
+				if mode == "http" {
+					location = insecure.URL + "/object"
+				}
+				http.Redirect(w, r, location, http.StatusFound)
+			}))
+			defer origin.Close()
+			host := strings.TrimPrefix(origin.URL, "https://")
+			scope := &RegistryAuthority{RegistryHost: host, TokenEndpoint: origin.URL + "/jwt/auth", Repositories: []string{host + "/a"}}
+			client := origin.Client()
+			client.Transport = httpsRegistryTransport{base: client.Transport, authority: scope}
+			requestPath := "/v2/a/blobs/" + digest
+			switch mode {
+			case "manifest":
+				requestPath = "/v2/a/manifests/" + digest
+			case "token":
+				requestPath = "/jwt/auth?service=container_registry&scope=repository%3Aa%3Apull"
+			case "foreign repository":
+				requestPath = "/v2/b/blobs/" + digest
+			case "invalid digest":
+				requestPath = "/v2/a/blobs/not-a-digest"
+			}
+			request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, origin.URL+requestPath, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request.Header.Set("Authorization", "Bearer synthetic-token")
+			if mode == "token" {
+				request.Header.Set("Authorization", "Basic synthetic-token")
+			}
+			request.Header.Set("Cookie", "synthetic-cookie=value")
+			request.Header.Set("PRIVATE-TOKEN", "synthetic-private")
+			request.Header.Set("JOB-TOKEN", "synthetic-job")
+			response, err := client.Do(request)
+			allowed := mode == "blob" || mode == "encoded storage path" || mode == "corrupt blob"
+			if response != nil {
+				defer response.Body.Close()
+			}
+			if allowed {
+				if err != nil {
+					t.Fatal(err)
+				}
+				got, err := io.ReadAll(response.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				matches := fmt.Sprintf("sha256:%x", sha256.Sum256(got)) == digest
+				if matches != (mode != "corrupt blob") {
+					t.Fatal("redirect altered expected blob integrity")
+				}
+				if storageCalls.Load() != 1 {
+					t.Fatal("storage delegation did not execute exactly once")
+				}
+			} else {
+				if err == nil {
+					t.Fatal("out-of-scope redirect succeeded")
+				}
+				wantStorage := int64(0)
+				if mode == "storage chain" {
+					wantStorage = 1
+				}
+				if storageCalls.Load() != wantStorage {
+					t.Fatal("unadmitted storage request reached destination")
+				}
+			}
+			if insecureCalls.Load() != 0 {
+				t.Fatal("redirect reached an insecure destination")
+			}
+		})
 	}
 }

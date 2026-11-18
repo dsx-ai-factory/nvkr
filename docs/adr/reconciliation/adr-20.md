@@ -87,8 +87,12 @@ used. Live registry/version coverage and hosted validation of these changes rema
 The GitLab publication path is implemented as anonymous HTTPS OCI transport or current-job
 `gitlab:CI_JOB_TOKEN` authentication confined to provider-reported same-project registry metadata.
 It checks every output/evidence repository, isolates registry/token endpoint traffic and independently
-reads back the complete closure before recording success. The signed publication lanes are unchanged.
-The [Mac factory contract result and exact source-file identity](adr-18.md#gitlab-ordinary-unsigned-profile)
-cover controlled HTTPS publication/refusal fixtures only. They do not establish acceptance by a live GitLab
-registry, complete native validation, signing or qualification. API-reader access remains separate from
-registry-write authority. The full gate and final source/scope verification remain incomplete.
+reads back the complete closure before recording success. A local TLS test also checks one-hop blob
+redirects to credential-free HTTPS storage, refusal of manifest/token/foreign-repository delegation, and
+zero requests to an insecure redirect destination. This is transport contract coverage, not live object-store
+acceptance. The signed publication lanes are unchanged.
+The [GitLab validation record](adr-18.md#gitlab-ordinary-unsigned-profile) separates the real server/Runner
+CLI-build acceptance from the 26 controlled Linux HTTPS lifecycle subcases. The latter exercise publication
+and refusal with the production clients; the real recipe selected no registry destination. Neither establishes
+publication to a live GitLab registry, signing or qualification. API-reader access remains separate from
+registry-write authority. Full repository checks and maintainer review remain separate gates.

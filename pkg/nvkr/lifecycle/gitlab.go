@@ -110,6 +110,9 @@ func FinalizeGitLab(ctx context.Context, definitionPath, environmentPath, planPa
 	if err != nil {
 		return recordRunFailure(ctx, outputPath, run, err, "binding GitLab release content")
 	}
+	if err := finalizer.Revalidate(ctx); err != nil {
+		return recordRunFailure(ctx, outputPath, run, err, "revalidating observed GitLab output attempts")
+	}
 	if err := writeRunRecord(ctx, outputPath, bound); err != nil {
 		return nil, err
 	}

@@ -95,6 +95,16 @@ budgets resolve through the Plan's executable producer view; an empty scheduler 
 the utility platform or hide source-owned requirements. Actual host mismatch fails before execution.
 The source-built runner follows the generator's checkout or exact module-version bootstrap contract above;
 bootstrap checks the selected Go release and native host before compiling with automatic toolchain download disabled.
+The generated include selects native `FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR=true` and
+`GIT_STRATEGY=clone` before checkout for bootstrap, operation and finalizer jobs. The first removes the
+Docker helper's default `umask 0000` override; the second creates a fresh source checkout in the job-owned
+CI workspace, including when Runner storage was previously used. Git fetch and forced checkout do not
+normalize unchanged files' non-executable permission bits. Native Runner owns this workspace lifecycle;
+NVKR does not change file permissions after checkout or relax the exact generated-file mode contract.
+These intrinsic provider settings do not admit authored job variables or arbitrary Git configuration.
+Non-root build images must supply working `id -u` / `id -g` for Runner's native ownership handling.
+The switch does not itself force a particular umask: a nonstandard helper or repository policy still fails
+the exact mode check. Source acquisition and artifacts continue through their existing owning boundaries.
 
 ADR-21 owns the fixed generated include and operator-owned root pipeline. Native GitLab pipeline invocation
 does not become a GitHub dispatch event, and no generated cron, trigger API or callable producer interface is
@@ -112,6 +122,15 @@ not a grant of API permissions; the operator must establish the selected instanc
 The current-job token is not interchangeable with that API reader. Provider clients have bounded I/O and a
 caller-derived lifetime; closing an owner cancels and joins its work.
 
+Provider-client reuse is subject to the repository's linked-dependency license and security admission.
+The official GitLab Go SDK remains a candidate for API plumbing and generated test facilities when its pinned
+runtime dependency closure can be admitted under that policy. Reuse must preserve the provider owner's
+bounded I/O, exact endpoint/token scope, redirect refusal, caller lifetime and opaque receipt issuance.
+No SDK exception is implied by its top-level license. The official `glab` CLI may instead provision the
+external acceptance fixture through an owned, bounded subprocess with explicit credentials; it does not
+replace runtime provider authentication or create a linked SDK dependency. The
+[SDK assessment ledger](reconciliation/adr-18.md#gitlab-sdk-reuse-assessment) records the current constraint and open recommendation.
+
 Each outcome binds its exact Plan operation, project, pipeline, commit, original job ID, inputs and carrier
 digests/sizes. Consumers authenticate the original provider job and bounded carrier bytes before restoration;
 workspace files and digest strings confer no authority. A retried producer replacing an acquired original job,
@@ -119,6 +138,11 @@ foreign or ambiguous membership, missing outcomes and failed/skipped jobs fail c
 revalidated before acceptance. The finalizer authenticates its role before recompilation, compares the exact
 authored-input Plan, validates the complete job/outcome closure and delegates observation, named-output
 binding and immutable Run writing to the shared lifecycle. No alternative public lifecycle object is added.
+Provider acceptance requires a real GitLab server and GitLab Runner in Docker executing the generated
+multi-job pipeline, with native job authentication, artifact transfer and finalization. Record exact server,
+runner and source identities and the resulting job/Run outcomes, including failure and transport refusals.
+Handwritten HTTP response fixtures and SDK-generated test doubles establish controlled contracts; they
+cannot satisfy this real-server acceptance requirement.
 Implementation checks, credential-access limits and external acceptance belong to
 [reconciliation](reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile).
 

@@ -1,0 +1,48 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+---
+name: GitLab Docker acceptance
+
+'on':
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitlab-docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nvkectl:
+    name: Real GitLab server and Runner, generated nvkectl pipeline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 125
+    env:
+      GOTOOLCHAIN: local
+      GOMAXPROCS: '2'
+    steps:
+      - name: Check out the tested source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up the exact repository Go toolchain
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Run the same real-server integration used locally
+        env:
+          NVKR_GITLAB_EVIDENCE: ${{ runner.temp }}/gitlab-evidence
+        run: make test-gitlab-docker
+      - name: Retain only bounded non-secret evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
+        with:
+          name: gitlab-docker-evidence
+          path: |
+            ${{ runner.temp }}/gitlab-evidence/status.json
+            ${{ runner.temp }}/gitlab-evidence/run.json
+            ${{ runner.temp }}/gitlab-evidence/executable.json
+          if-no-files-found: warn
+          retention-days: 7

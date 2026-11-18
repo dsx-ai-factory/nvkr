@@ -31,6 +31,9 @@ func ValidateGitLabPlan(ctx context.Context, plan *Plan) error {
 	if err := plan.Validate(); err != nil {
 		return err
 	}
+	if err := rejectUnjoinedDebianPlan(plan, "GitLab generation"); err != nil {
+		return err
+	}
 	if err := admitBootPublicationExecution(plan); err != nil {
 		return err
 	}
@@ -165,6 +168,16 @@ func renderGitLab(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		return nil, err
 	}
 	document := map[string]any{"stages": []string{"nvkr-bootstrap", "nvkr-execute", "nvkr-finalize"}}
+	// Runner consumes this native switch before checkout for every generated
+	// job. Its default Docker helper otherwise creates non-executable Git files
+	// with umask 0000, incompatible with the exact generated-file mode contract.
+	// Fresh source checkout avoids retained permission differences in reused
+	// CI workspaces; Git tracks only the executable bit of regular-file modes.
+	// Native Runner owns that workspace lifecycle; NVKR never chmods its inputs.
+	document["variables"] = map[string]string{
+		"FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR": "true",
+		"GIT_STRATEGY":                         "clone",
+	}
 	// Native rules run before Runner startup. Shell set+x is defense in depth,
 	// not permission to expose scoped API credentials through debug traces.
 	document["workflow"] = map[string]any{"rules": []map[string]any{
@@ -192,7 +205,7 @@ func renderGitLab(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		if release.GoVersion != "" {
 			version = release.GoVersion
 		}
-		script := "set -eu\nset +x\ntest \"$(go env GOVERSION)\" = \"go" + version + "\"\ntest \"$(go env GOHOSTOS)/$(go env GOHOSTARCH)\" = " + shellQuote(platform) + "\nexport GOTOOLCHAIN=local\nRUNNER_TEMP=$(mktemp -d)\nexport RUNNER_TEMP\ntrap 'rm -rf -- \"$RUNNER_TEMP\"' EXIT\n" + "mkdir -p \"$RUNNER_TEMP/home\"\n" + "env -i PATH=\"$PATH\" HOME=\"$RUNNER_TEMP/home\" GOTOOLCHAIN=local RUNNER_TEMP=\"$RUNNER_TEMP\" /bin/sh -c " + shellQuote(install) + "\nmkdir -p " + shellQuote(dir) + "\nmv nvkr-exec " + shellQuote(dir+"/nvkr-exec") + "\n(cd " + shellQuote(dir) + " && sha256sum nvkr-exec > SHA256SUMS)\n"
+		script := "set -eu\nset +x\nexport GOTOOLCHAIN=local\ntest \"$(go env GOVERSION)\" = \"go" + version + "\"\ntest \"$(go env GOHOSTOS)/$(go env GOHOSTARCH)\" = " + shellQuote(platform) + "\nRUNNER_TEMP=$(mktemp -d)\nexport RUNNER_TEMP\ntrap 'rm -rf -- \"$RUNNER_TEMP\"' EXIT\n" + "mkdir -p \"$RUNNER_TEMP/home\"\n" + "env -i PATH=\"$PATH\" HOME=\"$RUNNER_TEMP/home\" GOTOOLCHAIN=local RUNNER_TEMP=\"$RUNNER_TEMP\" /bin/sh -c " + shellQuote(install) + "\nmkdir -p " + shellQuote(dir) + "\nmv nvkr-exec " + shellQuote(dir+"/nvkr-exec") + "\n(cd " + shellQuote(dir) + " && sha256sum nvkr-exec > SHA256SUMS)\n"
 		document[gitlabBootstrapJob(platform)] = map[string]any{"stage": "nvkr-bootstrap", "image": route.BootstrapImage, "tags": route.Tags, "timeout": "15 minutes", "script": []string{script}, "artifacts": map[string]any{"paths": []string{dir}, "access": "developer", "expire_in": "1 day"}, "allow_failure": false}
 	}
 	leaves := map[string]bool{}
