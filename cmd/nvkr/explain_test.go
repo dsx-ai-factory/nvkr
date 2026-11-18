@@ -77,7 +77,7 @@ func TestExplainCommand(t *testing.T) {
 }
 
 func TestExplainTUIKeepsReferenceOrderAndMappings(t *testing.T) {
-	report := inputinspect.Report{Kind: "Definition", Path: "input.yaml", Scope: "test scope"}
+	report := inputinspect.Report{Root: "/selected/root", Kind: "Definition", Path: "input.yaml", Scope: "test scope"}
 	for i := 0; i < 12; i++ {
 		report.References = append(report.References, inputinspect.Reference{Path: fmt.Sprintf("overlay-%d", i), Relation: "ordered overlay"})
 	}
@@ -89,6 +89,15 @@ func TestExplainTUIKeepsReferenceOrderAndMappings(t *testing.T) {
 			t.Fatal("viewer started work")
 		}
 		snapshot := source.Snapshot()
+		foundRoot := false
+		for _, field := range snapshot.Fields {
+			if field.Label == "Scanned root" && field.Value == report.Root {
+				foundRoot = true
+			}
+		}
+		if !foundRoot {
+			t.Fatalf("terminal view omitted scan boundary: %+v", snapshot.Fields)
+		}
 		for i := 0; i < 12; i++ {
 			if snapshot.Items[i].Name != fmt.Sprintf("overlay-%d", i) {
 				t.Fatalf("overlay order changed: %+v", snapshot.Items)

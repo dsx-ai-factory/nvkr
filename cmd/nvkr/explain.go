@@ -68,7 +68,7 @@ func cmdExplain() *cli.Command {
 }
 
 func explanationDisplay(report inputinspect.Report) commandDisplay {
-	display := commandDisplay{Title: "Input explanation", Note: report.Scope, Fields: commandFields("Kind", report.Kind, "Path", report.Path, "Summary", report.Summary)}
+	display := commandDisplay{Title: "Input explanation", Note: report.Scope, Fields: commandFields("Scanned root", report.Root, "Kind", report.Kind, "Path", report.Path, "Summary", report.Summary)}
 	for i, ref := range append(slices.Clone(report.References), report.Consumers...) {
 		fields := []progress.Field{}
 		if ref.Digest != "" {
