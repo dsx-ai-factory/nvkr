@@ -684,6 +684,7 @@ func TestPlanStoreRecoveryDiagnostics(t *testing.T) {
 	for _, damage := range []string{"manifest", "shared object", "empty directory"} {
 		t.Run(damage, func(t *testing.T) {
 			root := copyGitHubRuntimeRoot(t, original)
+			before := mustCanonical(t, githubRuntimeTree(t, root))
 			var want []string
 			switch damage {
 			case "manifest":
@@ -721,6 +722,19 @@ func TestPlanStoreRecoveryDiagnostics(t *testing.T) {
 			if damage == "manifest" {
 				check(WriteGeneratedBundle(t.Context(), root, bundles[0]))
 				check(WriteGeneratedBundle(t.Context(), root, bundles[1]))
+			}
+			if damage == "shared object" {
+				if err := WriteGeneratedBundle(t.Context(), root, bundles[0]); err != nil {
+					t.Fatal("regenerating an owner must restore its missing shared object", err)
+				}
+				for _, bundle := range bundles {
+					if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
+						t.Fatal("repaired shared object must satisfy every owner", err)
+					}
+				}
+				if !bytes.Equal(mustCanonical(t, githubRuntimeTree(t, root)), before) {
+					t.Fatal("repair changed the generated tree")
+				}
 			}
 		})
 	}

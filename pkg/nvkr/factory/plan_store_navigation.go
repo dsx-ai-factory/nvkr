@@ -6,6 +6,7 @@ package factory
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"maps"
 	"os"
 	"path"
@@ -56,7 +57,7 @@ func planStoreNavigation(ctx context.Context, root string, owners map[string]pla
 				files[name] = raw
 			}
 		} else {
-			files, err = readPlanStoreNavigation(ctx, root, bundle)
+			files, err = readPlanStoreNavigation(ctx, root, bundle, incoming)
 			if err != nil {
 				return nil, err
 			}
@@ -98,7 +99,7 @@ func planStoreNavigation(ctx context.Context, root string, owners map[string]pla
 	return jobs, nil
 }
 
-func readPlanStoreNavigation(ctx context.Context, root string, bundle *GeneratedBundle) (map[string][]byte, error) {
+func readPlanStoreNavigation(ctx context.Context, root string, bundle, incoming *GeneratedBundle) (map[string][]byte, error) {
 	members, err := priorGeneratedMembers(ctx, root, bundle)
 	if err != nil {
 		return nil, err
@@ -115,6 +116,14 @@ func readPlanStoreNavigation(ctx context.Context, root string, bundle *Generated
 		}
 		filename := filepath.Join(root, member.Path)
 		info, err := os.Lstat(filename)
+		if incoming != nil && errors.Is(err, os.ErrNotExist) && isPlanStorePath(member.Path) {
+			// This generation restores the missing shared object with the owner's exact bytes.
+			if raw, ok := incoming.Files[member.Path]; ok && int64(len(raw)) <= maxPlanTreeBytes-size && pipeline.FileDigest(raw) == member.SHA256 {
+				size += int64(len(raw))
+				files[member.Path] = raw
+				continue
+			}
+		}
 		if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0o644 || info.Size() > maxPlanTreeBytes-size {
 			return nil, e.New(e.CodePipelineDrift, "unsafe or oversized navigation member %q", member.Path)
 		}
