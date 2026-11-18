@@ -288,6 +288,10 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 		return nil, err
 	}
 	plan.Targets, plan.Routes = targets, routes
+	plan.BootPublication, err = deriveBootPublicationPlan(plan)
+	if err != nil {
+		return nil, err
+	}
 	plan.Graph, err = compileArtifactGraph(*plan, tools, packageSpecs)
 	if err != nil {
 		return nil, err
@@ -297,6 +301,9 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 			return nil, err
 		}
 		plan.SchemaVersion, plan.Composition = CompositePlanSchemaVersion, record.Clone()
+	}
+	if plan.BootPublication != nil {
+		plan.SchemaVersion = BootPlanSchemaVersion
 	}
 	if err := plan.Validate(); err != nil {
 		return nil, err

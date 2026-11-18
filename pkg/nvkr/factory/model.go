@@ -144,8 +144,9 @@ type Plan struct {
 	AppliedOverlays     []catalog.AppliedOverlay     `json:"appliedOverlays,omitempty"`
 	EnvironmentDigest   string                       `json:"environmentDigest,omitempty"`
 	Definition          definition.Definition        `json:"definition"`
-	// Composition is present exactly for CompositePlanSchemaVersion Plans,
-	// whose definitionDigest names the composite and Definition is effective.
+	// Composition is required by CompositePlanSchemaVersion and optional in the
+	// selective schema. When present, definitionDigest names the composite and
+	// Definition is effective.
 	Composition      *CompositionRecord     `json:"composition,omitempty"`
 	Environment      definition.Environment `json:"environment"`
 	Targets          map[string]Target      `json:"targets,omitempty"`
@@ -154,6 +155,7 @@ type Plan struct {
 	LifecycleOutputs []LifecycleOutputPlan  `json:"lifecycleOutputs,omitempty"`
 	InternalTools    []InternalToolPlan     `json:"internalTools,omitempty"`
 	Graph            ArtifactGraph          `json:"graph"`
+	BootPublication  *BootPublicationPlan   `json:"bootPublication,omitempty"`
 
 	// identityDigest is the digest of this plan AS COMPILED, carried across the local
 	// runner's workspace relocation. It is deliberately unexported: it never reaches the
