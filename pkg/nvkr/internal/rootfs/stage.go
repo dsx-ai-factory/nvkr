@@ -247,6 +247,9 @@ type directoryMode struct {
 type hardlink struct{ name, target string }
 
 func memberName(raw string, directory bool) (string, error) {
+	// Runtime layers use Unix paths: only '/' separates components. Preserve
+	// literal backslashes (including systemd's escaped unit names) without
+	// unescaping them or interpreting them as alternate separators.
 	name := strings.TrimPrefix(raw, "./")
 	if directory {
 		name = strings.TrimSuffix(name, "/")
@@ -254,7 +257,7 @@ func memberName(raw string, directory bool) (string, error) {
 			name = "."
 		}
 	}
-	if name == "" || len(name) > 4096 || !utf8.ValidString(name) || strings.ContainsAny(name, "\x00\\") ||
+	if name == "" || len(name) > 4096 || !utf8.ValidString(name) || strings.ContainsRune(name, 0) ||
 		strings.HasPrefix(name, "/") || path.Clean(name) != name || name == ".." || strings.HasPrefix(name, "../") || (!directory && name == ".") {
 		return "", e.New(e.CodeVerifyFailed, "runtime layer path is not root-relative and canonical")
 	}

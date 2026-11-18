@@ -24,12 +24,17 @@ import (
 
 func mkosiTarFixture(t *testing.T, contents string) (string, mkosi.Invocation, []byte) {
 	t.Helper()
+	return mkosiNamedTarFixture(t, "payload", contents)
+}
+
+func mkosiNamedTarFixture(t *testing.T, name, contents string) (string, mkosi.Invocation, []byte) {
+	t.Helper()
 	var raw bytes.Buffer
 	writer := tar.NewWriter(&raw)
 	if err := writer.WriteHeader(&tar.Header{Name: "./", Mode: 0o755, Typeflag: tar.TypeDir}); err != nil {
 		t.Fatal(err)
 	}
-	if err := writer.WriteHeader(&tar.Header{Name: "payload", Mode: 0o444, Size: int64(len(contents)), Typeflag: tar.TypeReg}); err != nil {
+	if err := writer.WriteHeader(&tar.Header{Name: name, Mode: 0o444, Size: int64(len(contents)), Typeflag: tar.TypeReg}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := writer.Write([]byte(contents)); err != nil {
@@ -48,16 +53,18 @@ func mkosiTarFixture(t *testing.T, contents string) (string, mkosi.Invocation, [
 func TestMkosiTarWrappingPreservesBytesAndIdentity(t *testing.T) {
 	var baseline string
 	for _, tc := range []struct {
-		name, platform, contents string
-		equal                    bool
+		name, platform, contents, filename string
+		equal                              bool
 	}{
-		{"first", "linux/amd64", "exact tar payload", true},
-		{"fresh directory", "linux/amd64", "exact tar payload", true},
-		{"different platform", "linux/arm64", "exact tar payload", false},
-		{"different bytes", "linux/amd64", "other tar payload", false},
+		{"first", "linux/amd64", "exact tar payload", "payload", true},
+		{"fresh directory", "linux/amd64", "exact tar payload", "payload", true},
+		{"different platform", "linux/arm64", "exact tar payload", "payload", false},
+		{"different bytes", "linux/amd64", "other tar payload", "payload", false},
+		{"systemd escaped name", "linux/amd64", "exact tar payload", `system-systemd\x2dcryptsetup.slice`, false},
+		{"literal backslash dots", "linux/amd64", "exact tar payload", `..\escape`, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			work, operation, original := mkosiTarFixture(t, tc.contents)
+			work, operation, original := mkosiNamedTarFixture(t, tc.filename, tc.contents)
 			// Host timestamps do not enter the config or modify the tar payload.
 			if err := os.Chtimes(filepath.Join(work, "runtime.tar"), time.Now(), time.Now()); err != nil {
 				t.Fatal(err)
@@ -114,7 +121,7 @@ func TestMkosiTarWrappingPreservesBytesAndIdentity(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer directory.Close()
-			digest, _, mode, err := hashMkosiRootFile(t.Context(), directory, "payload")
+			digest, _, mode, err := hashMkosiRootFile(t.Context(), directory, tc.filename)
 			if err != nil || digest != FileDigest([]byte(tc.contents)) || mode != 0o444 {
 				t.Fatalf("wrapped tar failed existing runtime staging: %s %v %v", digest, mode, err)
 			}

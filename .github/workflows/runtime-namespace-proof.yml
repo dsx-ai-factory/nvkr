@@ -36,7 +36,7 @@ jobs:
         env:
           NAMESPACE_EVIDENCE: ${{ runner.temp }}/runtime-namespace-evidence
         run: bash scripts/test-runtime-namespace.sh "$NAMESPACE_EVIDENCE"
-      - name: Diagnose tar members with bounded acquisition timing
+      - name: Prove two runtime builds with literal Unix filenames
         env:
           ASSEMBLY_EVIDENCE: ${{ runner.temp }}/runtime-assembly-evidence
         run: bash scripts/test-mkosi-assembly.sh "$ASSEMBLY_EVIDENCE"

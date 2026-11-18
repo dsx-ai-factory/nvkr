@@ -123,6 +123,9 @@ func TestStageRejectsUnsafeLayersAndCleans(t *testing.T) {
 		{name: "absolute path", members: []tar.Header{{Name: "/escape", Typeflag: tar.TypeReg, Mode: 0o644}}},
 		{name: "parent escape", members: []tar.Header{{Name: "../escape", Typeflag: tar.TypeReg, Mode: 0o644}}},
 		{name: "unclean path", members: []tar.Header{{Name: "usr/../escape", Typeflag: tar.TypeReg, Mode: 0o644}}},
+		{name: "dot segment", members: []tar.Header{{Name: "usr/./file", Typeflag: tar.TypeReg}}},
+		{name: "empty segment", members: []tar.Header{{Name: "usr//file", Typeflag: tar.TypeReg}}},
+		{name: "traversal after literal backslash", members: []tar.Header{{Name: `usr\name/../escape`, Typeflag: tar.TypeReg}}},
 		{name: "duplicate root", members: []tar.Header{rootHeader()}},
 		{name: "duplicate file", members: []tar.Header{{Name: "x", Typeflag: tar.TypeReg}, {Name: "./x", Typeflag: tar.TypeReg}}},
 		{name: "device", members: []tar.Header{{Name: "device", Typeflag: tar.TypeChar, Devmajor: 1, Devminor: 3}}},
@@ -160,7 +163,7 @@ func TestStagePathDiagnosticIsBoundedEscapedAndFirstOnly(t *testing.T) {
 		name, member, want string
 	}{
 		{"traversal", "../first", `"../first"`},
-		{"control characters", "bad\\line\nname", `"bad\\line\nname"`},
+		{"control characters", "bad\\line\nname/../escape", `"bad\\line\nname/../escape"`},
 		{"long name", strings.Repeat("x", 4096) + "unprinted-tail", "4110 name bytes"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -182,6 +185,55 @@ func TestStagePathDiagnosticIsBoundedEscapedAndFirstOnly(t *testing.T) {
 			if err != nil || len(entries) != 0 {
 				t.Fatalf("diagnostic changed failed-stage cleanup: %v", err)
 			}
+		})
+	}
+}
+
+func TestStagePreservesLiteralBackslashes(t *testing.T) {
+	for _, name := range []string{`system-systemd\x2dcryptsetup.slice`, `..\escape`, `\..\escape`, `dir\..\file`, `dir\.\file`} {
+		t.Run(name, func(t *testing.T) {
+			held := layerFixture(t, []tar.Header{
+				rootHeader(),
+				{Name: "units/", Typeflag: tar.TypeDir, Mode: 0o755},
+				{Name: "units/" + name, Typeflag: tar.TypeReg, Mode: 0o444, Size: 3},
+				{Name: "hardlink", Typeflag: tar.TypeLink, Linkname: "units/" + name},
+				{Name: "symlink", Typeflag: tar.TypeSymlink, Linkname: "units/" + name},
+			}, nil)
+			tree, err := Stage(t.Context(), held, t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tree.Close()
+			file, err := tree.root.Open("units")
+			if err != nil {
+				t.Fatal(err)
+			}
+			entries, readErr := file.ReadDir(-1)
+			closeErr := file.Close()
+			if readErr != nil || closeErr != nil || len(entries) != 1 || entries[0].Name() != name {
+				t.Fatalf("literal component changed: %+v %v %v", entries, readErr, closeErr)
+			}
+			for _, path := range []string{"units/" + name, "hardlink", "symlink"} {
+				got, err := tree.root.ReadFile(path)
+				if err != nil || string(got) != "xxx" {
+					t.Fatalf("literal file/link %q was reinterpreted: %q %v", path, got, err)
+				}
+			}
+			if target, err := tree.root.Readlink("symlink"); err != nil || target != "units/"+name {
+				t.Fatalf("symlink target bytes changed: %q %v", target, err)
+			}
+			if _, err := tree.root.Stat("escape"); !os.IsNotExist(err) {
+				t.Fatal("literal backslash-dot-dot escaped its directory")
+			}
+		})
+	}
+}
+
+func TestRuntimeMemberNamesKeepUnixStructure(t *testing.T) {
+	for _, name := range []string{"", "/absolute", ".", "..", "a/./b", "a/../b", "a//b", "a\x00b", `a\.././b`, `a\../..//b`} {
+		t.Run(name, func(t *testing.T) {
+			_, err := memberName(name, false)
+			requireStageCode(t, err, e.CodeVerifyFailed)
 		})
 	}
 }
