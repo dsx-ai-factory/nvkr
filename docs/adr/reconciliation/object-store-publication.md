@@ -37,3 +37,18 @@ S3 copying does not establish actual EFI chainload, imaging/reboot, direct VM bo
 Secure Boot or qualification. Downstream serving and intended-client authentication remain separate. The pinned
 NVKE source documents its [imager parameter compatibility boundary](https://github.com/dsx-ai-factory/nvke/blob/ff21ba8c07cafff74b68e238a8876af11e5beded/os-image/efi/README.md#L36);
 matching transport bytes cannot resolve that product decision. No live boot/install acceptance is asserted.
+
+### Selective boot-asset publication
+
+[#514](https://github.com/dsx-ai-factory/nvkr/issues/514) proposes the [ADR-20 selective contract](../0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding). It has no implementation, ratification or selective test/provider/boot evidence yet; existing full-mirror evidence is unchanged.
+
+| Owner | Outstanding scope |
+|---|---|
+| [#515](https://github.com/dsx-ai-factory/nvkr/issues/515) | Selection, raw-member proofs, receipts, S3-only verification, serving, recovery and compatibility tests. |
+| [#517](https://github.com/dsx-ai-factory/nvkr/issues/517) | Predeclared render, pinned schema/profile, dependency joins, trusted import and chainload/imaging/first-boot evidence. |
+| [#516](https://github.com/dsx-ai-factory/nvkr/issues/516) | Signed EFI member/platform/profile binding; separate mkosi producer lane. |
+| [#384](https://github.com/dsx-ai-factory/nvkr/issues/384) | Selective configuration, regeneration and required finalization, preserving full-mirror defaults. |
+| [#383](https://github.com/dsx-ai-factory/nvkr/issues/383) | Provider/Run selected-only inventory, original proofs, pinned-read/fault evidence and independent S3-only client access. |
+| [#385](https://github.com/dsx-ai-factory/nvkr/issues/385) | CLI/SDK adapters with limited results and preserved full-mirror behavior. |
+
+The last three issues still describe whole-copy acceptance and need coordinated scope updates. Record contract, UI, provider/client and boot evidence separately; none substitutes for air-gap trust distribution, firmware trust, qualification or FDE confidentiality.

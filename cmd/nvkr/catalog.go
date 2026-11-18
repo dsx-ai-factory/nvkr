@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -26,6 +27,8 @@ func cmdCatalog() *cli.Command {
 		Name:  "catalog",
 		Usage: "inspect and validate a catalog",
 		Subcommands: []*cli.Command{
+			cmdCatalogInventory("find"),
+			cmdCatalogInventory("index"),
 			{
 				Name:      "source-pin",
 				Usage:     "print one validated source pin as JSON",
@@ -114,7 +117,7 @@ func cmdCatalog() *cli.Command {
 			},
 			{
 				Name:  "list",
-				Usage: "list components, optionally filtered by declared platform and output type",
+				Usage: "list components in a catalog or catalog root, optionally filtered by platform and output type",
 				Flags: []cli.Flag{
 					&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"},
 					&cli.StringSliceFlag{Name: "platform", Usage: "only components declaring this exact platform (for example linux/arm64); give at most once"},
@@ -139,6 +142,9 @@ func cmdCatalog() *cli.Command {
 					}
 					if err := catalog.ValidateSelectors(platform, outputType); err != nil {
 						return err
+					}
+					if _, err := os.Lstat(filepath.Join(c.String("data"), catalog.RegistryFile)); os.IsNotExist(err) {
+						return presentCatalogInventory(c, "", platform, outputType)
 					}
 					view, err := selectCommandPresentation(c)
 					if err != nil {
