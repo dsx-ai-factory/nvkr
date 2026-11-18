@@ -271,7 +271,7 @@ subject and grants no destination authorization, boot, installation or qualifica
 _Avoid_: New signed release, successful upload flag, mutable channel, atomic bucket transaction
 
 **Selective boot-asset publication**:
-Proposed copy of named QCOW2/EFI bytes and original proofs, with complete OCI Release membership and separate preliminary, completion and selected-artifact receipts. [ADR-20](docs/adr/0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding) owns the contract.
+Opt-in copy of named QCOW2/EFI bytes and original proofs, with complete OCI Release membership and separate preliminary, completion and selected-artifact receipts. Core APIs are implemented; generated execution and external acceptance remain deferred. [ADR-20](docs/adr/0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding) owns the contract.
 _Avoid_: Partial mirror success, new Release, checksum as membership
 
 **MachineImage render artifact**:
