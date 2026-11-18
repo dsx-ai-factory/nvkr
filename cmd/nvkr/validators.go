@@ -12,6 +12,9 @@ import (
 	"github.com/urfave/cli/v2"
 )
 
+// shippedValidatorCatalog resolves against the working directory, like other repository-relative defaults.
+const shippedValidatorCatalog = "inputs/testing/validator-catalog"
+
 func cmdValidators() *cli.Command {
 	discovery := func(describe bool) *cli.Command {
 		name := "list"
@@ -22,24 +25,23 @@ func cmdValidators() *cli.Command {
 		if describe {
 			usage, argsUsage = "describe one exact validator ID without execution", "VALIDATOR-ID"
 		}
-		return &cli.Command{Name: name, Usage: usage, ArgsUsage: argsUsage, Flags: []cli.Flag{&cli.StringFlag{Name: "catalog", Usage: "path to the versioned validator catalog index (required)"}}, Action: func(c *cli.Context) error {
+		return &cli.Command{Name: name, Usage: usage, ArgsUsage: argsUsage, Flags: []cli.Flag{&cli.StringFlag{Name: "validator-catalog", Value: shippedValidatorCatalog, Usage: "validator catalog directory; a complete replacement for the shipped catalog"}}, Action: func(c *cli.Context) error {
 			if (!describe && c.Args().Present()) || (describe && c.Args().Len() != 1) {
 				return e.New(e.CodeUsage, "invalid validator discovery arguments")
 			}
-			// Not cli's Required flag: that check runs before OnUsageError and returns an uncoded error (exit 1).
-			if c.String("catalog") == "" {
-				return e.New(e.CodeUsage, "validators %s requires --catalog", name)
+			if c.String("validator-catalog") == "" {
+				return e.New(e.CodeUsage, "validators %s requires a non-empty --validator-catalog", name)
 			}
 			sdk := client.New()
 			var result any
 			if describe {
-				description, err := sdk.DescribeValidator(c.Context, c.String("catalog"), c.Args().First())
+				description, err := sdk.DescribeValidator(c.Context, c.String("validator-catalog"), c.Args().First())
 				if err != nil {
 					return err
 				}
 				result = description
 			} else {
-				descriptions, err := sdk.ListValidators(c.Context, c.String("catalog"))
+				descriptions, err := sdk.ListValidators(c.Context, c.String("validator-catalog"))
 				if err != nil {
 					return err
 				}

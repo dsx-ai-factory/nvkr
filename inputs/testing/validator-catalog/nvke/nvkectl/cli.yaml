@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/validator-registration/v1
+kind: ValidatorRegistration
+id: nvke/nvkectl/cli
+description: Run upstream CLI source tests and supplied-executable process contracts
+inputs:
+  executable:
+    output: nvkectl
+    component: nvkectl
+    format: executable
+testOrigin:
+  fromInput: executable
+image:
+  fromInput: executable
+workingDirectory: cli
+acquisition:
+  command: [go, mod, download]
+command:
+  - make
+  - --no-print-directory
+  - test
+  - GO=go
+  - GO_TEST_FLAGS=-count=1 -timeout=15m -json
+  - COVERAGE_DIR=/cache/coverage
+environment:
+  NVKECTL: ${inputs.executable.path}
+  NVKECTL_EXPECTED_VERSION: ${inputs.executable.version}
+requires:
+  platforms: [linux/amd64, linux/arm64]
+  capabilities: [docker]
+timeout: 30m
