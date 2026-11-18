@@ -24,6 +24,9 @@ type BootProofPublication struct {
 }
 
 type BootPublicationRequest struct {
+	// Recovery requires the reconstructed inventory to match this exact attempt.
+	// It never skips original proof authentication or this phase's raw recheck.
+	Recovery     *StoredObject
 	Expected     BootInventoryExpectation
 	Availability *BootAvailability
 	Uses         []BootOriginalUse
@@ -50,6 +53,11 @@ func (phase *BootPhase) PublishProofs(ctx context.Context, request BootPublicati
 func publishBootProofs(ctx context.Context, store ObjectStore, request BootPublicationRequest, limits BootTransferLimits) (StoredObject, error) {
 	if err := request.Expected.Validate(); err != nil {
 		return StoredObject{}, err
+	}
+	if request.Recovery != nil {
+		if err := ValidateBootInventoryAttempt(request.Expected.RootReference, *request.Recovery); err != nil {
+			return StoredObject{}, err
+		}
 	}
 	available, err := request.Availability.Descriptions()
 	if err != nil {
@@ -241,12 +249,5 @@ func publishBootProofs(ctx context.Context, store ObjectStore, request BootPubli
 	if err := validateBootInventory(inventory, locator, request.Expected, limits); err != nil {
 		return StoredObject{}, err
 	}
-	result, err := putVerifiedMirrorObject(ctx, store, locator.Object, bytes.NewReader(raw))
-	if err != nil {
-		return StoredObject{}, err
-	}
-	if err := validateBootPin(result); err != nil {
-		return StoredObject{}, err
-	}
-	return result, nil
+	return commitBootInventory(ctx, store, locator.Object, raw, request.Recovery)
 }

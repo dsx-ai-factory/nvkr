@@ -68,6 +68,9 @@ func TestBootAssetStreamsRawBytesAndRevokesCopies(t *testing.T) {
 				}
 				pin = result.RootDigest
 				publication, err = openDiskPublicationFixture(t.Context(), root, pin)
+				if err != nil {
+					t.Fatal(err)
+				}
 			} else {
 				// Synthetic metadata/raw-byte fixture; no PE or compatibility claim.
 				root, pin = bootImagerPublicationFixture(t)

@@ -197,14 +197,14 @@ func TestBootServingReadUsesOperationBudgetAndCancellation(t *testing.T) {
 }
 
 func TestBootServingCloseCancelsAndJoinsRead(t *testing.T) {
-	entered, cancelled := make(chan struct{}), make(chan struct{})
+	entered, canceled := make(chan struct{}), make(chan struct{})
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Length", "7")
 		w.WriteHeader(http.StatusOK)
 		w.(http.Flusher).Flush()
 		close(entered)
 		<-r.Context().Done()
-		close(cancelled)
+		close(canceled)
 	}))
 	defer server.Close()
 	originalTransport := http.DefaultTransport
@@ -228,7 +228,7 @@ func TestBootServingCloseCancelsAndJoinsRead(t *testing.T) {
 	reader.close()
 	requireObjectCode(t, <-finished, e.CodeTimeout)
 	select {
-	case <-cancelled:
+	case <-canceled:
 	case <-time.After(5 * time.Second):
 		t.Fatal("serving close left server read active")
 	}

@@ -29,6 +29,9 @@ func TestSelectedBootMetadataBindsRawFileWithoutPayload(t *testing.T) {
 				}
 				digest, name = result.RootDigest, disk.Output
 				publication, err = openDiskPublicationFixture(t.Context(), root, digest)
+				if err != nil {
+					t.Fatal(err)
+				}
 			} else {
 				root, digest = bootImagerPublicationFixture(t)
 				name = imager.Output

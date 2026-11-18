@@ -57,7 +57,10 @@ func TestOperationReadBudgetIncludesFailedResponsesAndRetries(t *testing.T) {
 			if string(raw) != "sixs" || budget.Used() != 10 {
 				t.Fatal("retry escaped shared allowance", string(raw), budget.Used())
 			}
-			_, err = transport.RoundTrip(request)
+			response, err = transport.RoundTrip(request)
+			if response != nil {
+				_ = response.Body.Close()
+			}
 			requireBudgetCode(t, err, e.CodeEngineCapability)
 			if calls != 2 {
 				t.Fatal("exhausted operation performed another request")
@@ -72,7 +75,7 @@ func TestOperationReadBudgetAdmissionAndCompatibility(t *testing.T) {
 		_, _, err := WithLimit(t.Context(), limit)
 		requireBudgetCode(t, err, e.CodeUsage)
 	}
-	_, _, err := WithLimit(nil, 1)
+	_, _, err := WithLimit(nil, 1) //nolint:staticcheck // Exercise explicit nil-context admission.
 	requireBudgetCode(t, err, e.CodeUsage)
 	ctx, _, err := WithLimit(t.Context(), 1)
 	if err != nil {
@@ -178,7 +181,10 @@ func TestOperationReadBudgetStillAttemptsEmptyCleanupAndClosesRefusedRequest(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = transport.RoundTrip(request)
+	response, err := transport.RoundTrip(request)
+	if response != nil {
+		_ = response.Body.Close()
+	}
 	requireBudgetCode(t, err, e.CodeEngineCapability)
 	if !requestBody.closed {
 		t.Fatal("refused transport did not close request body")
@@ -187,7 +193,7 @@ func TestOperationReadBudgetStillAttemptsEmptyCleanupAndClosesRefusedRequest(t *
 	if err != nil {
 		t.Fatal(err)
 	}
-	response, err := transport.RoundTrip(request)
+	response, err = transport.RoundTrip(request)
 	if err != nil {
 		t.Fatal("cleanup was suppressed", err)
 	}
@@ -226,7 +232,7 @@ func TestOperationReadBudgetCancellationAndConcurrentBodies(t *testing.T) {
 	_, err = io.ReadAll(body)
 	requireBudgetCode(t, err, e.CodeTimeout)
 	if budget.Used() != 0 {
-		t.Fatal("cancelled response consumed bytes")
+		t.Fatal("canceled response consumed bytes")
 	}
 }
 

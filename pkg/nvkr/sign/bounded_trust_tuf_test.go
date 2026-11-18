@@ -124,11 +124,16 @@ func boundedTUFRepository(t *testing.T) ([]byte, map[string][]byte, []byte) {
 	encode := func(document interface {
 		Sign(signature.Signer) (*metadata.Signature, error)
 		ToBytes(bool) ([]byte, error)
-	}) []byte { if _, err := document.Sign(signer); err != nil {
-		t.Fatal(err)
-	}; raw, err := document.ToBytes(false); if err != nil {
-		t.Fatal(err)
-	}; return raw }
+	}) []byte {
+		if _, err := document.Sign(signer); err != nil {
+			t.Fatal(err)
+		}
+		raw, err := document.ToBytes(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return raw
+	}
 	target := []byte(`{"fixture":"authenticated trust target"}`)
 	info, err := metadata.TargetFile().FromBytes("trusted_root.json", target, "sha256")
 	if err != nil {

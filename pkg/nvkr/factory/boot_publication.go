@@ -178,11 +178,11 @@ func BootPhaseForNode(plan *Plan, nodeID string) (delivery.BootPhaseRequest, boo
 	return delivery.BootPhaseRequest{}, false, e.New(e.CodePipelineDrift, "node is not an exact compiled boot phase")
 }
 
-// Keep runtime admission closed until both lifecycle phases and inventory-only
-// completion are wired. Static compilation does not enable a publication lane.
+// Generated execution remains closed until its adapter wires the core lifecycle
+// phases and provider-observed finalization. Static compilation is not execution.
 func admitBootPublicationExecution(plan *Plan) error {
 	if plan.BootPublication != nil {
-		return e.New(e.CodeEngineCapability, "selective boot execution requires the complete lifecycle publisher")
+		return e.New(e.CodeEngineCapability, "selective boot generated execution requires phase orchestration and finalization")
 	}
 	return nil
 }

@@ -115,10 +115,11 @@ func (receipt *PreparedBootAssets) Description() (PreparedBootDescription, error
 	return result, nil
 }
 
-// The hosted executor supplies its validated invocation and fresh runtime
-// options. Public execution admission remains in that adapter; this helper
-// cannot turn transport descriptions into receipts or accept workspace payloads.
-func (consumer *Consumer) withPreparedBootAssets(ctx context.Context, expectation *BootInputExpectation, destination string,
+// WithPreparedBootAssets authenticates original output-local publications,
+// copies selected raw bytes, and supplies a live receipt to the callback. The
+// returned description is released only after cleanup and cannot restore that
+// receipt. Callers supply the validated invocation and fresh runtime access.
+func (consumer *Consumer) WithPreparedBootAssets(ctx context.Context, expectation *BootInputExpectation, destination string,
 	references map[string]string, invocation string, policy VerificationPolicy, options delivery.S3ObjectStoreOptions,
 	credential delivery.BootReaderCredential, use func(context.Context, *PreparedBootAssets) error,
 ) (PreparedBootDescription, error) {
@@ -185,7 +186,7 @@ func (consumer *Consumer) prepareBootAssets(ctx context.Context, expectation *Bo
 		return err
 	}
 	return delivery.WithBootPhase(ctx, request, options, credential, func(ctx context.Context, phase *delivery.BootPhase) error {
-		return sign.WithBoundedVerification(ctx, func(ctx context.Context) (resultErr error) {
+		return consumer.withBootTrust(ctx, func(ctx context.Context) (resultErr error) {
 			var publications []*delivery.Publication
 			var assets []*delivery.BootAsset
 			defer func() {
@@ -298,6 +299,13 @@ func (consumer *Consumer) bootVerifier(policy VerificationPolicy) (portablePubli
 		return nil, err
 	}
 	return verifier, nil
+}
+
+func (consumer *Consumer) withBootTrust(ctx context.Context, work func(context.Context) error) error {
+	if consumer.bootTrust != nil {
+		return consumer.bootTrust(ctx, work)
+	}
+	return sign.WithBoundedVerification(ctx, work)
 }
 
 func requireBootOutputInputs(expectation *ExactInputExpectation, name string, local delivery.PublicationDescription) error {

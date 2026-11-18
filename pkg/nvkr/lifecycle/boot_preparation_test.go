@@ -91,7 +91,7 @@ func TestBootPreparationAdmissionPrecedesAdapters(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			calls := 0
 			consumer := &Consumer{materialize: func(context.Context, string) (*delivery.Publication, error) { calls++; return nil, nil }}
-			_, err := consumer.withPreparedBootAssets(t.Context(), tc.expectation, "foreign", nil, "", tc.policy,
+			_, err := consumer.WithPreparedBootAssets(t.Context(), tc.expectation, "foreign", nil, "", tc.policy,
 				delivery.S3ObjectStoreOptions{}, delivery.BootReaderCredential{}, func(context.Context, *PreparedBootAssets) error { calls++; return nil })
 			requireBootPolicyCode(t, err, tc.code)
 			if calls != 0 {

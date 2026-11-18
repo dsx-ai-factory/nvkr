@@ -188,6 +188,43 @@ an inventory, ETag or S3 metadata alone is not authenticity evidence. See the
 This is artifact publication. Serving an APT repository, extracting a new boot-file format, booting a disk,
 installing a package and qualifying a release retain their separate contracts and acceptance evidence.
 
+## Selective boot assets
+
+The core lifecycle API supports an explicit Environment v3 `selective-boot-v1` destination mode with
+named QCOW2 outputs and one exact EFI bundle member/profile per selected architecture. Every selected
+asset is required at each boot destination. Plan v7 binds the selection, literal serving mapping and
+separate preparation/final phase budgets. Existing v2 destinations continue to copy the full publication.
+Generated selective execution and public CLI/client adapters remain unavailable; their owners are
+[#384](https://github.com/dsx-ai-factory/nvkr/issues/384) and [#385](https://github.com/dsx-ai-factory/nvkr/issues/385).
+
+API integrators prepare an opaque expectation with `lifecycle.PrepareBootInputs`. In a fresh bounded phase,
+`Consumer.WithPreparedBootAssets` authenticates selected original output-local publications, copies raw
+QCOW2/EFI bytes, and checks complete pinned S3 and HTTPS responses. Its callback receives a live preliminary
+receipt; the returned description cannot recreate that receipt or claim eventual Release membership.
+After aggregate signing, `PublishBootSelection` reauthenticates original membership and proofs, repeats
+both raw reads, publishes intact controls/proofs and commits/readbacks the inventory last. Completion is
+withheld until cleanup succeeds. A `delivery.BootInventoryError` retains the exact attempted inventory
+for `RetryBootSelection`; preserve any observed version pin when retrying.
+The expected invocation is always the original aggregate's exact invocation, including on a later retry;
+do not replace it with the retry process's current attempt.
+
+Independent consumers choose the original aggregate reference/invocation, exact compiled inputs, selection,
+destination, serving configuration, signer identity/issuer and disk-evidence minimum. Pass these with the
+pinned inventory locator to `VerifyBootSelection`, using `selected-boot-artifacts` policy scope. Artifacts
+and proofs come entirely from S3; missing bytes cannot fall back to OCI. Independently provisioned pinned
+cosign and certificate/transparency trust remain required. Bounded public-good TUF acquisition is online,
+so registry independence does not imply disconnected verification. The result authenticates selected
+artifact bytes and their original Release membership, with no omitted-payload, freshness or boot-safety claim.
+
+The admitted `https-content-addressed-v1` serving profile requires ordinary TLS hostname verification,
+literal content-addressed paths and complete uncompressed responses. Redirects, query strings, expiring URLs,
+userinfo and mutable aliases are rejected. Choose anonymous reads explicitly or provide the separate bearer
+credential referenced by the serving configuration. Publisher IAM is not provisioning-client access.
+Operators retain exact objects/versions and preserve DNS/CDN/TLS, digest-to-bytes mapping and read access
+for the promised period. API checks establish equality at observation time, not durable availability.
+Record actual provisioning-network retrieval under [#383](https://github.com/dsx-ai-factory/nvkr/issues/383);
+local fixtures establish no EFI chainload, Secure Boot, imaging, reboot or first-boot acceptance.
+
 ## Registry graph
 
 Solid arrows are OCI descriptors within a repository. Dashed metadata arrows bind exact sibling locations
