@@ -36,16 +36,37 @@ ARM64 build/publish/consume nightly and its legacy consumer remain uninvoked.
 The six-hour job passes its remaining deadline to Go, which reserves two hours
 for independent cleanup. Live KVM, disk and available memory are prerequisites.
 The explicit small profile selects a 7-GiB site, 3 GiB per tenant, four vCPUs and
-1 GiB headroom. Initial admission requires 14 GiB; the temporary 6-GiB bootstrap
-backend joins before tenant creation rechecks 7 GiB beside the site. This is a
+512 MiB host/QEMU headroom in the nightly configuration. Initial admission requires
+13,824 MiB; the temporary 6-GiB bootstrap backend joins before tenant creation
+rechecks 6,656 MiB beside the site. This is a
 functional-test allocation, not a minimum hardware or OOM-causality claim.
+Four attempts of [Run 44166550042](https://github.com/njhensley/nvkr/actions/runs/44166550042)
+observed 14,064–14,289 MiB available and failed the former 14,336-MiB requirement
+before exercising the installer fix. Only the nightly headroom allowance changes:
+reducing tenants alone cannot reduce the initial 6-GiB bootstrap requirement,
+and a smaller site has no recorded acceptance. The observed range leaves
+752–977 MiB above the 13-GiB peak guest allocation. Admission still fails closed
+below its selected memory or CPU requirement and reserves nothing. Contract tests
+cover both boundaries and the observed range.
+[Fork Run 44213539138](https://github.com/njhensley/nvkr/actions/runs/44213539138)
+exercised the new allowance through complete site/tenant acceptance and cleanup.
 The small profile also sets the site's system reservation and the tenant's
 Reserved/SystemReserved/KubeReserved memory to 256Mi, appends the guest kubelet
 `--kube-reserved=cpu=1000m,memory=256Mi,ephemeral-storage=1Gi` override and restarts
 it, sets OVN control-plane/node-zone memory requests to 128Mi, and adds 64Mi
 memory requests to the seven site telemetry collector roles and three target
-allocators. Recorded small-profile runtime acceptance covers these settings,
-not the default reservations.
+allocators. The November 3–5 small-profile runs below cover these guest settings
+with the former 1-GiB host/QEMU headroom, not the revised nightly allowance or
+the default reservations.
+
+The demo supplies four 1-GiB static volumes and writable guest directories for
+NKTP's persistent queues alongside the PostgreSQL and SPIRE volumes. The default
+StorageClass has no dynamic provisioner. Queue data survives Pod restarts in the
+site VM and is removed with that disposable VM; this is demo storage, not a
+production durability claim. Database volumes are reserved for their exact
+PostgreSQL and SPIRE claims so early queue claims cannot consume them while other
+volumes become Available. This reservation correction has contract and rendered-chart
+checks; it is later than the hosted Run recorded below.
 
 Runtime fixes admit the installer's legacy/current controller identity, bounded
 writable helper staging with source-supported shell, unchanged pinned-context
@@ -87,6 +108,26 @@ attempt 1, and passed the cleanup-bearing `TestEndToEnd` parent plus its site an
 tenant subtests. All job steps and post-steps succeeded; neither Run uploaded
 Actions artifacts. These records establish the hosted build/site/tenant diagnostic
 and joined cleanup only for those exact source pairs and the explicit small profile.
+
+The earlier [fork Run 44192853985](https://github.com/njhensley/nvkr/actions/runs/44192853985)
+passed the 13,824-MiB initial admission at NVKR
+`809a0d02b068ac90596ef61894795fa2c2c450c4` with NKTP chart injection and temporary
+diagnostics that were removed before the complete Run below.
+
+[Fork Run 44213539138](https://github.com/njhensley/nvkr/actions/runs/44213539138)
+passed on November 18, 2026 at 02:27:38 UTC, attempt 1, at exact NVKR
+`2b552e01a3123dba50332e1d58f2775b9f10ed67` and frozen NVKE
+`d36f0b61ad1b0369087ddb3a277eec99fe63dbdb`. All 34 selected outputs, site and
+tenant subtests, and the cleanup-bearing parent passed. The parent passed in
+4190.20 seconds, site in 5.81 and tenant in 339.40. Initial admission observed
+14,308 MiB against 13,824 required; tenant admission observed 7,950 MiB against
+6,656 required. This Run used main's optional NKTP chart handling without chart
+injection or temporary diagnostics, together with the controller sibling-chart,
+queue storage, memory and checkout fixes. Every job step and post-step succeeded;
+Actions artifact count was zero and public deployment output contained only phase
+markers. Subsequent main integration and evidence-only commits are outside this
+Run. Its acceptance remains unsigned functional evidence for the exact source
+pair, not a Release, qualification or a passing upstream scheduled cycle.
 
 The obsolete requirement in [#353](https://github.com/dsx-ai-factory/nvkr/issues/353)
 to close [#228](https://github.com/dsx-ai-factory/nvkr/issues/228) is retired:

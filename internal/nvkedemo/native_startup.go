@@ -120,6 +120,7 @@ func SiteStartupUserData(ctx context.Context, cfg NativeSiteStartup) (string, er
 		"configureSpire":   func() string { return siteSpireConfigurationScript },
 		"spireEnvironment": func(cfg NativeSiteStartup) string { return string(nativeBootstrapSpireEnvironment(cfg)) },
 		"prepareOVN":       func() string { return importOVN + "; " + valuesOVN },
+		"prepareStorage":   nativeSiteStorageDirectories,
 		"kubeletProfile": func() string {
 			if kubeletPreparation != "" {
 				return "\n" + strings.TrimSuffix(kubeletPreparation, "\n")

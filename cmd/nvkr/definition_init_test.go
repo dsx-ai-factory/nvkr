@@ -24,7 +24,7 @@ func initOperatorArgs(t *testing.T, extra ...string) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return append([]string{"nvkr", "definition", "init", "--name", "my-tools", "--catalog", catalog, "--platform", "linux/arm64"}, extra...)
+	return append([]string{"nvkr", "definition", "init", "--root", filepath.Clean(filepath.Join(catalog, "..", "..", "..", "..")), "--destination", "starter.yaml", "--name", "my-tools", "--catalog", catalog, "--platform", "linux/arm64"}, extra...)
 }
 
 func TestDefinitionInitPrintsAValidatableDefinitionAndNothingElse(t *testing.T) {
@@ -62,6 +62,8 @@ func TestDefinitionInitRefusalsPrintNoYAML(t *testing.T) {
 		{"unknown component", []string{"--component", "nope"}, e.CodeInvalidCatalog},
 		{"duplicate component", []string{"--component", "helm", "--component", "helm"}, e.CodeUsage},
 		{"unsupported platform", []string{"--platform", "linux/amd64", "--component", "helm"}, e.CodeEngineCapability},
+		{"unclassified producer image", []string{"--catalog", "../../inputs/catalogs/nicosim", "--component", "nico-sim-runtime-assets"}, e.CodeEngineCapability},
+		{"outside root", []string{"--destination", "../outside.yaml", "--component", "helm"}, e.CodeUsage},
 		{"unexpected argument", []string{"--component", "helm", "extra"}, e.CodeUsage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -76,7 +78,7 @@ func TestDefinitionInitRefusalsPrintNoYAML(t *testing.T) {
 
 func TestDefinitionInitMissingFlagIsCodedAndPrintsNothing(t *testing.T) {
 	full := initOperatorArgs(t, "--component", "helm")[3:]
-	for _, flag := range []string{"--name", "--catalog", "--platform", "--component"} {
+	for _, flag := range []string{"--name", "--catalog", "--platform", "--component", "--destination"} {
 		t.Run(flag, func(t *testing.T) {
 			args := []string{"nvkr", "definition", "init"}
 			for i := 0; i < len(full); i += 2 {
@@ -149,7 +151,7 @@ func TestDefinitionInitTUIShowsTheSelectionAndPrintsNoYAML(t *testing.T) {
 				for _, field := range shown.Fields {
 					fields[field.Label] = field.Value
 				}
-				if fields["Name"] != "my-tools" || fields["Platform"] != "linux/arm64" || fields["Components"] != "helm" || !filepath.IsAbs(fields["Catalog"]) {
+				if fields["Name"] != "my-tools" || fields["Platform"] != "linux/arm64" || fields["Components"] != "helm" || filepath.IsAbs(fields["Catalog"]) {
 					t.Fatalf("unexpected fields: %+v", shown.Fields)
 				}
 			}

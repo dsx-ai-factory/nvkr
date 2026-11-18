@@ -614,7 +614,9 @@ platforms. Artifact kinds and producer metadata govern format admission directly
 
 A Definition selects producers and output-affecting settings directly on named outputs. An Environment supplies
 runtime settings (Docker by default, with explicit Podman support), runner routes and execution classes, required publication transports and namespace,
-credential references, and signing identity/issuer policy. Image access declares private and
+credential references, and signing identity/issuer policy. Local execution and starter validation may resolve a versioned
+build-only default; compiler capture retains its exact policy bytes, the Plan records its digest and the Run
+binds both identities. It supplies no signing, publication or VM execution classes. Image access declares private and
 anonymous roots independently of publication, with one reader for private roots. Every GitHub image consumer
 is inventoried before renderer grouping; unclassified images or unsupported private routes fail generation
 before output. Exact source/location bindings preserve logical Build identity. Measured local images and
