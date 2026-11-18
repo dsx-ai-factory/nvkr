@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -26,7 +27,7 @@ func TestOfflineInvocationBoundary(t *testing.T) {
 				t.Fatalf("got %d operations", len(operations))
 			}
 			for index, operation := range operations {
-				for _, required := range []string{"--cache-only=always", "--with-network=no", "--bootable=no", "--source-date-epoch=0", "--build-sources=", "--history=no"} {
+				for _, required := range []string{"--cache-only=always", "--with-network=no", "--bootable=no", "--source-date-epoch=1794182400", "--extra-search-path=" + ArchiveToolsDirectory, "--build-sources=", "--history=no"} {
 					if !slices.Contains(operation.Command, required) {
 						t.Fatalf("operation %d omitted isolation setting %s", index, required)
 					}
@@ -52,9 +53,27 @@ func TestOfflineInvocationBoundary(t *testing.T) {
 	}
 }
 
+func TestInvocationEpochComesFromEachSnapshot(t *testing.T) {
+	t.Setenv("SOURCE_DATE_EPOCH", "1")
+	spec := specFixture("amd64")
+	spec.Roots[1].Inputs.Snapshot = "20261110T000000Z"
+	operations, err := spec.Invocations("linux/amd64", []string{"packer"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index, want := range []int64{1794182400, 1794268800, 1794268800} {
+		if operations[index].SourceDateEpoch != want || !slices.Contains(operations[index].Command, "--source-date-epoch="+strconv.FormatInt(want, 10)) {
+			t.Fatalf("operation %d did not bind its snapshot epoch", index)
+		}
+	}
+}
+
 func TestInvocationReportBinding(t *testing.T) {
 	root := specFixture("amd64").Roots[0]
-	operation := rootInvocation(root, "x86-64", "directory", "/work/roots/inspect")
+	operation, err := rootInvocation(root, "x86-64", "directory", "/work/roots/inspect")
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, tc := range []struct {
 		name   string
 		mutate func(*material.MkosiManifest)

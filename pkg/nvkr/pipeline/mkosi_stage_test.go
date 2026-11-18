@@ -42,6 +42,15 @@ func TestMkosiStagingUsesExactPrivateInputs(t *testing.T) {
 	if digest != "" || len(operations) != 2 {
 		t.Fatalf("unexpected material binding or operations: %q, %d", digest, len(operations))
 	}
+	wrapper := filepath.Join(inputs, strings.TrimPrefix(mkosi.ArchiveToolsDirectory, "/inputs/"), "tar")
+	adapter, err := os.ReadFile(wrapper)
+	if err != nil || string(adapter) != mkosi.ArchiveWrapper() {
+		t.Fatalf("fixed archive adapter was not staged: %v", err)
+	}
+	info, err := os.Stat(wrapper)
+	if err != nil || info.Mode().Perm() != 0o555 {
+		t.Fatalf("archive adapter is not read-only executable: %v", err)
+	}
 	for _, operation := range operations {
 		var mirror string
 		for _, argument := range operation.Command {

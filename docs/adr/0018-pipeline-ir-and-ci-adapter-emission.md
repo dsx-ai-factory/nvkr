@@ -507,6 +507,12 @@ must match the entire retained package selection, including dependencies; surplu
 or substituted packages fail. The report is an installed-content input to SBOM generation, not a
 replacement for acquisition materials or package/license review. Mkosi emits an uncompressed tar;
 NVKR wraps those exact bytes as one uncompressed OCI layer with deterministic config and manifest.
+Each root's exact snapshot timestamp supplies its source-date epoch and mtime ceiling. The fixed,
+read-only GNU tar adapter uses lexical traversal, numeric ownership and stable extended-header names;
+this also fixes which hard-link member carries content. Mkosi removes assembly caches and logs before
+each root is collected. The checked configuration must name the versioned adapter policy, binding it
+to the runtime Build. The adapter is selected through mkosi's extra-search-path support, without
+changing the authenticated mkosi source or rewriting the completed archive.
 The layer digest and config diff ID both equal the tar's SHA-256. Fresh assembly roots must also pass
 the byte-identical complete OCI closure gate before the runtime can be consumed.
 

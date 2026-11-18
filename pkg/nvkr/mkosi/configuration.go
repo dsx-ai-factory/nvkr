@@ -19,9 +19,10 @@ import (
 func validateConfiguration(configuration string) error {
 	allowed := map[string]string{
 		"Output/Format": "oci", "Output/CompressOutput": "no", "Output/SplitArtifacts": "", "Output/ManifestFormat": "json",
-		"Content/Bootable": "no", "Content/SourceDateEpoch": "0", "Content/WithDocs": "yes", "Content/WithRecommends": "no",
+		"Content/Bootable": "no", "Content/WithDocs": "yes", "Content/WithRecommends": "no",
 		"Content/CleanPackageMetadata": "no", "Content/RemoveFiles": "/var/cache/* /var/log/*",
 		"Build/BuildSources": "", "Build/Incremental": "no", "Build/CacheKey": "nvkr-vm-runtime",
+		"Build/ExtraSearchPaths": ArchiveToolsDirectory,
 	}
 	sections, settings := map[string]bool{}, map[string]string{}
 	section, previous := "", ""
@@ -60,6 +61,9 @@ func validateConfiguration(configuration string) error {
 	}
 	if settings["Output/Format"] != "oci" {
 		return e.New(e.CodeInvalidCatalog, "mkosi runtime configuration requires OCI output")
+	}
+	if settings["Build/ExtraSearchPaths"] != ArchiveToolsDirectory {
+		return e.New(e.CodeInvalidCatalog, "mkosi runtime configuration must pin the fixed archive policy")
 	}
 	for _, key := range slices.Sorted(maps.Keys(settings)) {
 		value := settings[key]

@@ -26,7 +26,7 @@ import (
 
 func mkosiAcquisitionFixture() (*mkosi.Spec, map[string]string) {
 	digest := func(value string) string { return fmt.Sprintf("sha256:%x", sha256.Sum256([]byte(value))) }
-	config := "[Output]\nFormat=oci\n"
+	config := "[Output]\nFormat=oci\n[Build]\nExtraSearchPaths=" + mkosi.ArchiveToolsDirectory + "\n"
 	metadata, archive := "pinned repository metadata", "pinned archive bytes"
 	return &mkosi.Spec{Configuration: config, ConfigurationDigest: digest(config), Roots: []mkosi.Root{{
 		Name: "runtime", Distribution: "ubuntu", Release: "noble", Inputs: material.PackageInputs{

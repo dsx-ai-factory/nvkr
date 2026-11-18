@@ -61,6 +61,13 @@ func prepareMkosiWork(ctx context.Context, node ir.Node, source, inputs, work st
 			return nil, "", e.Wrap(e.CodeBuildFailed, err, "creating private mkosi process state")
 		}
 	}
+	wrapper := strings.TrimPrefix(mkosi.ArchiveToolsDirectory, "/inputs/") + "/tar"
+	if err := writeMkosiFile(ctx, inputs, wrapper, []byte(mkosi.ArchiveWrapper())); err != nil {
+		return nil, "", err
+	}
+	if err := os.Chmod(filepath.Join(inputs, wrapper), 0o555); err != nil {
+		return nil, "", e.Wrap(e.CodeBuildFailed, err, "protecting fixed mkosi archive adapter")
+	}
 	for index, operation := range operations {
 		for _, directory := range []string{operation.Workspace, operation.Cache, operation.PackageCache, operation.OutputDirectory} {
 			if err := os.MkdirAll(mkosiWorkPath(work, directory), 0o755); err != nil {

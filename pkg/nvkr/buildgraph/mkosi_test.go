@@ -53,7 +53,7 @@ func TestMaintainedMkosiRuntimeCatalog(t *testing.T) {
 }
 
 func mkosiResolvedFixture() *Resolved {
-	configuration := "[Output]\nFormat=oci\nManifestFormat=json\n"
+	configuration := "[Output]\nFormat=oci\nManifestFormat=json\n[Build]\nExtraSearchPaths=" + mkosi.ArchiveToolsDirectory + "\n"
 	metadata := "sha256:" + strings.Repeat("1", 64)
 	inputs := material.PackageInputs{SchemaVersion: material.PackageInputsSchema, PackageManager: "apt", Architecture: "amd64",
 		Snapshot: "20261109T000000Z", Repositories: []material.PackageRepository{{URI: "https://example.invalid/InRelease", Digest: metadata, Size: 123}},

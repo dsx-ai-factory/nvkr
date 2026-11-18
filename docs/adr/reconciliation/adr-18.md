@@ -10,7 +10,9 @@ private root; that root is removed after inspection or consumption joins. Focuse
 inode retention, ownership, read-only descriptors, tampering, tmpfs rejection and cleanup. Cgroup memory
 observation excludes only inactive file pages from usage, preserves host and ancestor limits, and rejects
 missing or malformed statistics. A bounded native BIOS guest build and original runtime use have passed
-with these changes; the workflow's subsequent diagnostic export failed, as scoped below. The native namespace
+with these changes and complete diagnostic evidence export. Independent runs still produced different
+runtime bytes under one Build; archive normalization has focused tests but awaits its native comparison.
+The native namespace
 [VM proof](https://github.com/njhensley/nvkr/actions/runs/44194123590) at
 `0dbb69bb55dc190884ef3ca2b9d673a6c365284d` exercised both assembly and consumer launchers on stock
 Ubuntu 24.04 AMD64 with kernel `7.0.0-1014-aws`. The separately owned executable tmpfs retained its
@@ -87,7 +89,7 @@ handoff with its fixture helper. The host resolver file had UID 991, mode 0644 a
 included ownership fixtures then failed because the service's `/tmp` was read-only, so production and
 disk execution still did not run. Both diagnostic services now direct temporary files into their owned
 scratch directories. The ownership fixtures pass in a bounded Linux container with read-only `/tmp`
-and an explicit writable scratch directory; the complete native consumer proof remains pending.
+and an explicit writable scratch directory; later native consumer evidence is scoped below.
 The [factory production and SBOM attempt](https://github.com/njhensley/nvkr/actions/runs/44261280531)
 at `5d1012c7bc79b085e28b0da9b8b2f68bee8f22bb` passed initial admission, both fresh mkosi assemblies,
 the exact OCI reproduction gate, terminal observation and SBOM generation through the original owner.
@@ -122,7 +124,19 @@ observation agree on QCOW2 `sha256:890f00ca2521cc18f880f75e9051799a46db8accc533b
 the SBOM directory as a file. The complete SBOM set and runtime observation were not uploaded. The exporter
 now copies files and directories and checks both source and destination with the factory's existing
 path digest; focused fixtures cover nested contents, modes, tampering, symlinks, cancellation and an
-existing destination. A fresh export-inclusive native attempt remains pending. This BIOS fixture does
+existing destination. The [complete evidence attempt](https://github.com/njhensley/nvkr/actions/runs/44283064671)
+at `140a7e6758bbf88e4886ad5a3fb29b67f92f8565` passed the same native consumer checks and exported the
+complete three-document SBOM set plus runtime observation, each checked against its completed-use digest.
+The [entry-diagnostic baseline](https://github.com/njhensley/nvkr/actions/runs/44290280188) at
+`fcc540862614091f5a4e4b73c536aed88df9a7f3` also passed and exported metadata/content hashes for all
+39,422 tar entries. All mtimes were zero; cache/log directories had no children. Archive order was not
+lexical, with 17,745 adjacent inversions. Both attempts and the earlier bounded guest attempt share runtime
+Build `sha256:f10ba9797ad27d8edc0e54663570d925fbd15b1d2639f24a89346fe7d963150b` but produced different
+runtime layer, manifest and layout digests, while the tiny QCOW2 bytes matched. Each passed its own pair
+of fresh assemblies; that check alone does not establish equality across runners. An offline GNU tar
+fixture reproduced order-dependent hard-link representations and equal bytes with lexical traversal.
+The fixed adapter and snapshot-derived epoch have focused tests; two separate native runs have not yet
+established equal runtime bytes with that policy. This BIOS fixture does
 not establish a public Run, maintained NVKE disk equivalence, publication, signing, libguestfs inspection,
 EFI or ARM64 runtime execution.
 The earlier assembly digest above describes the closure before the outbound helper was added and does

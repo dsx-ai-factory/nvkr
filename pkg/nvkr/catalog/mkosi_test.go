@@ -12,6 +12,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/material"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/mkosi"
 )
 
 func mkosiCatalogFixture(t *testing.T) (Component, *mkosiDeclaration, bytesProvider) {
@@ -25,7 +26,7 @@ func mkosiCatalogFixture(t *testing.T) (Component, *mkosiDeclaration, bytesProvi
 	if err != nil {
 		t.Fatal(err)
 	}
-	provider := bytesProvider{"mkosi.conf": []byte("[Output]\nFormat=oci\n"), "packages.json": raw}
+	provider := bytesProvider{"mkosi.conf": []byte("[Output]\nFormat=oci\n[Build]\nExtraSearchPaths=" + mkosi.ArchiveToolsDirectory + "\n"), "packages.json": raw}
 	pin := func(name string) patchDeclaration {
 		return patchDeclaration{Name: name, SHA256: fmt.Sprintf("sha256:%x", sha256.Sum256(provider[name]))}
 	}

@@ -17,7 +17,7 @@ import (
 )
 
 func specFixture(arch string) *Spec {
-	configuration := "[Output]\nFormat=oci\nManifestFormat=json\n"
+	configuration := "[Output]\nFormat=oci\nManifestFormat=json\n[Build]\nExtraSearchPaths=" + ArchiveToolsDirectory + "\n"
 	metadata := "sha256:" + strings.Repeat("1", 64)
 	inputs := material.PackageInputs{SchemaVersion: material.PackageInputsSchema, PackageManager: "apt", Architecture: arch,
 		Snapshot: "20261109T000000Z", Repositories: []material.PackageRepository{{URI: "https://example.invalid/InRelease", Digest: metadata, Size: 123}},

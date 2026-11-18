@@ -22,7 +22,8 @@ NVKR create the network device inside the private consumer namespace, then run t
 without root or capabilities. The fixed invocation disables host-loopback mapping, enables seccomp,
 and provides no inbound forwarding or control API. The existing pins for libc, GLib, libseccomp and
 libslirp satisfy its full dependency closure. Its package copyright notices remain installed for
-ordinary catalog review. The new helper has not yet been exercised in a stock-VM disk build.
+ordinary catalog review. The native consumer fixture exercises helper egress; retained Run scope belongs
+to the [ADR-18 ledger](../../docs/adr/reconciliation/adr-18.md).
 
 Measured firmware bytes are copied from their packages to `/nvkr/firmware`. The inspector kernel is
 copied to `/nvkr/inspection/kernel` with readable permissions. Original package files remain present.
@@ -33,6 +34,10 @@ scratch filesystem. Assembly runs in a separate user namespace with no mapped ho
 network. The host's bootstrap utilities are not snapshot-pinned; this route makes no hermetic or qualified
 claim. Mkosi emits an uncompressed tar, which NVKR wraps unchanged as a single OCI layer with deterministic
 config and manifest. Two fresh assembly roots must produce identical complete OCI closures before a result is exposed.
+Each root's snapshot timestamp supplies its source-date epoch. The configuration pins the fixed archive
+adapter policy: lexical traversal, numeric ownership and stable PAX header names. The adapter is staged
+read-only and selected through mkosi's extra-search-path support. Existing per-root exclusions remove
+assembly caches and logs; installed package state remains available for evidence.
 The resulting digest changes when any selected source, package, configuration or projected file changes.
 
 The opt-in VM diagnostic is `bash scripts/test-mkosi-assembly.sh /absolute/evidence-directory` from the

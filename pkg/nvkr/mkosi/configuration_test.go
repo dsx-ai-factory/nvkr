@@ -17,6 +17,8 @@ func TestConfigurationRejectsAmbientInputs(t *testing.T) {
 		"[Output]\nFormat=oci\n[Config]\nInclude=/etc/mkosi.conf\n",
 		"[Output]\nFormat=oci\n[Content]\nBuildScripts=/host/script\n",
 		"[Output]\nFormat=oci\n[Build]\nBuildSources=/host/tree\n",
+		"[Output]\nFormat=oci\n[Build]\nExtraSearchPaths=/host/bin\n",
+		"[Output]\nFormat=oci\n[Build]\nExtraSearchPaths=/inputs/nvkr-tar-v1,/host/bin\n",
 		"[Output]\nFormat=oci\n[Content]\nPackages=unpinned\n",
 		"[Output]\nFormat=oci\n[Content]\nExtraTrees=/host/root\n",
 		"[Output]\nFormat=oci\nFormat=directory\n",
@@ -27,11 +29,28 @@ func TestConfigurationRejectsAmbientInputs(t *testing.T) {
 		"[Output]\nFormat=oci\n arbitrary-continuation\n",
 		"[Output]\nFormat=oci\n[Match]\nArchitecture=x86-64\n",
 	} {
+		// Keep the archive policy valid so each case exercises its own
+		// forbidden setting rather than merely failing on an omitted policy.
+		if !strings.Contains(raw, "ExtraSearchPaths=") {
+			if strings.Contains(raw, "[Build]\n") {
+				raw = strings.Replace(raw, "[Build]\n", "[Build]\nExtraSearchPaths="+ArchiveToolsDirectory+"\n", 1)
+			} else {
+				raw += "[Build]\nExtraSearchPaths=" + ArchiveToolsDirectory + "\n"
+			}
+		}
 		err := validateConfiguration(raw)
 		var coded *e.Error
 		if !errors.As(err, &coded) || coded.Code != e.CodeInvalidCatalog {
 			t.Fatalf("ambient configuration accepted: %q, %v", raw, err)
 		}
+	}
+}
+
+func TestConfigurationRequiresArchivePolicy(t *testing.T) {
+	err := validateConfiguration("[Output]\nFormat=oci\n")
+	var coded *e.Error
+	if !errors.As(err, &coded) || coded.Code != e.CodeInvalidCatalog {
+		t.Fatalf("configuration omitted its versioned archive policy: %v", err)
 	}
 }
 
