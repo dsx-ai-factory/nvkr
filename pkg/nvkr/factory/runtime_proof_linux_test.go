@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -161,6 +162,15 @@ func TestNativeRuntimeConsumer(t *testing.T) {
 	}
 	nativeRuntimeProofRecord(t, "disk-observation.json", observation)
 	nativeRuntimeProofRecord(t, "disk-result.json", result)
+	layer := result.RuntimeUse.Production.LayerDigest
+	layout := artifacts[plan.InternalTools[0].ArtifactID].Path
+	inventory, err := runtimeProofTarInventory(ctx, filepath.Join(layout, "blobs", "sha256", strings.TrimPrefix(layer, "sha256:")), layer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile("runtime-tar-entries.json", inventory, 0o444); err != nil {
+		t.Fatal(err)
+	}
 	if err := commitGitHubDiskFile(ctx, "disk.qcow2", func(file *os.File) error {
 		_, err := owner.ExportDiskLifecyclePayload(ctx, plan, plan.LifecycleOutputs[0], file)
 		return err

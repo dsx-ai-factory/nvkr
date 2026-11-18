@@ -44,6 +44,13 @@ logs and exported descriptions are uploaded; the disk and runtime payload remain
 This fixture does not exercise a complete public Run, maintained NVKE disk equivalence, signing,
 publication, libguestfs inspection, EFI or ARM64.
 
+The same fixture exports `runtime-tar-entries.json`: bounded per-entry metadata,
+content hashes and archive order from the original runtime layer. Compare two
+downloaded evidence directories with `python3 scripts/compare-runtime-evidence.py FIRST SECOND`.
+The check requires equal runtime Build, OCI manifest, layer, layout and size, and
+reports differing entry fields and order. It exits nonzero on differences or
+incomplete diagnostics; these descriptions grant no execution or publication authority.
+
 `test-tekton-kind.sh` runs the native AMD64 core Definition in an owned kind cluster with pinned Tekton
 and an in-cluster registry. The [Tekton guide](../docs/generate-pipeline.md#tekton-cluster-execution)
 lists prerequisites, trust scope and retained evidence. The GitHub acceptance workflow runs this same

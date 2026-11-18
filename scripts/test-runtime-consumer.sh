@@ -77,6 +77,7 @@ sudo -n systemd-run --quiet --wait --pipe --collect \
 # material remain on the disposable filesystem until runner teardown.
 sudo -n install -m 0644 "$fixture/root/workspace/disk-result.json" "$evidence/disk-result.json"
 sudo -n install -m 0644 "$fixture/root/workspace/disk-observation.json" "$evidence/disk-observation.json"
+sudo -n install -m 0644 "$fixture/root/workspace/runtime-tar-entries.json" "$evidence/runtime-tar-entries.json"
 env -i PATH=/usr/bin:/bin LANG=C GOMAXPROCS=2 \
   NVKR_TEST_RUNTIME_PHASE=export "NVKR_TEST_RUNTIME_WORKSPACE=$fixture/root/workspace" \
   "NVKR_TEST_RUNTIME_EVIDENCE=$evidence" \
