@@ -689,6 +689,20 @@ the digest-pinned output-local root reference and its original preparation and s
 These descriptions acquire authority only through the authenticated release; assembly derives them from
 the verified output receipt. A finalizer retry may authenticate an unchanged aggregate from an earlier
 attempt of the same run under the same ordering and Plan checks.
+Assembly authenticates independent output roots with a bounded worker pool; the receipt join and shared-evidence
+selection retain canonical output order. Aggregate deliverable signature/provenance verification occurs once in
+the mandatory post-sign publication-verification operation, using subjects derived from the served, digest-bound
+metadata closure and the unchanged identity/issuer policy. Aggregate signing does not repeat that check. A signed
+aggregate alone cannot authorize a successful publication or Run: any failed output check prevents the verification
+record and completion. No persisted verification record, cross-process cache or prior Run authorizes skipping a check.
+Finalization and independent consumers retain their separate authentication boundaries.
+The execution-only `NVKR_VERIFY_WORKERS` budget defaults to four and admits canonical integers from one through
+sixteen; it changes no Plan, Build, release or evidence bytes. Workers join before return, preserve input order in
+results and error reporting, and check all outputs on ordinary verification failure. Caller cancellation stops new
+checks and joins active checks. Assembly emits diagnostic timings for metadata validation, remote signature/provenance,
+SBOM verification and metadata construction; these timings never enter identity or evidence.
+Cancellation selects the timeout code, including when an earlier output failed; the error chain and diagnostic
+retain those earlier failures. A retry must perform the complete verification again.
 Assembly, aggregate signing/verification and Run finalization use bounded manifests, configs, evidence bundles
 and digest references; they never retrieve output payload layers. Metadata inspection issues no full-payload
 verification capability. It admits at most 512 MiB of control/evidence blobs per root and rejects extra blobs.
@@ -851,7 +865,9 @@ with a substituted semantic identity or subject fails with `CodeVerifyFailed`. B
 Signatures, SLSA provenance and SBOMs use the same standard Sigstore v0.3 bundle format as OCI referrers
 (ADR-04); their predicate types remain distinct. One root signature covers evidence and output repository/digest bindings through metadata; one SLSA attestation targets that
 same root. Signature/attestation attachments stay outside the signed index to avoid circular identity. Each deliverable manifest also receives its own signature and subject-bound production attestation in its
-own repository for independent consumption. Signing processes deliverables before the root; hosted verification
+own repository for independent consumption. Output-local and legacy signing process deliverables before their
+root; per-output aggregate signing binds the assembled metadata without re-signing or re-verifying deliverables.
+Hosted verification
 requires every child signature and attestation before recording success. The Release consumer still authenticates
 membership and SBOM coverage through the root. Standalone verification does not establish that release-wide claim. Run completion is a separate descriptive
 record, not signed merely because its referenced bytes are signed. Production consumers resolve only sibling repositories within the chosen release namespace and fetch every pinned manifest.

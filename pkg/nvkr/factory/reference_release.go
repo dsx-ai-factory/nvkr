@@ -6,6 +6,7 @@ package factory
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"path/filepath"
 	"reflect"
@@ -27,12 +28,19 @@ type authenticatedOutputMetadata struct {
 	inspection delivery.Inspection
 	source     string
 	origin     delivery.PublicationOrigin
+	timing     referenceAuthenticationTiming
+}
+
+// Timing is diagnostic only and is never serialized into a release or evidence.
+type referenceAuthenticationTiming struct {
+	metadata, signature, sbom time.Duration
 }
 
 // authenticateReferenceMetadata uses persisted records only as expectations.
 // The registry's signature and production predicate authenticate the exact root;
 // caller-written JSON or a successful provider job cannot issue this receipt.
 func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route, artifacts map[string]Artifact, newSigner signerFor) (authenticatedOutputMetadata, error) {
+	started := time.Now()
 	fail := func(err error) (authenticatedOutputMetadata, error) { return authenticatedOutputMetadata{}, err }
 	subject, err := readPublicationSubject(ctx, artifacts["publication/"+route.Name].Path)
 	if err != nil {
@@ -126,6 +134,7 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 	if signer == nil {
 		return fail(e.New(e.CodeEngineCapability, "metadata authentication requires a signer"))
 	}
+	metadataDone := time.Now()
 	record, err := signer.Verify(ctx, subject, sign.VerifyPolicy{IdentityRegexp: plan.Environment.Signing.Identity, Issuer: plan.Environment.Signing.Issuer, RequireAttestation: true, ExpectedPredicate: predicate})
 	if err != nil {
 		return fail(err)
@@ -138,12 +147,15 @@ func authenticateReferenceMetadata(ctx context.Context, plan *Plan, route Route,
 		record.ObservedIssuer != plan.Environment.Signing.Issuer || !regexp.MustCompile(plan.Environment.Signing.Identity).MatchString(record.ObservedIdentity) {
 		return fail(e.New(e.CodeSignatureInvalid, "metadata publication lacks authenticated signature and exact provenance"))
 	}
+	signatureDone := time.Now()
 	if err := verifyMetadataSBOMs(ctx, signer, source, inspection); err != nil {
 		return fail(err)
 	}
-	return authenticatedOutputMetadata{inspection: inspection, source: source, origin: delivery.PublicationOrigin{
-		Ref: subject.Ref, PreparedInvocationID: metadata.InvocationID, SignedInvocationID: invocation,
-	}}, nil
+	return authenticatedOutputMetadata{inspection: inspection, source: source,
+		timing: referenceAuthenticationTiming{metadata: metadataDone.Sub(started), signature: signatureDone.Sub(metadataDone), sbom: time.Since(signatureDone)},
+		origin: delivery.PublicationOrigin{
+			Ref: subject.Ref, PreparedInvocationID: metadata.InvocationID, SignedInvocationID: invocation,
+		}}, nil
 }
 
 func verifyMetadataSBOMs(ctx context.Context, signer sign.OCISigner, source string, inspection delivery.Inspection) error {
@@ -158,11 +170,25 @@ func verifyMetadataSBOMs(ctx context.Context, signer sign.OCISigner, source stri
 }
 
 func executeReferenceRelease(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, newSigner signerFor) error {
+	return executeReferenceReleaseWithProgress(ctx, plan, node, artifacts, newSigner, io.Discard)
+}
+
+func executeReferenceReleaseWithProgress(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, newSigner signerFor, stdout io.Writer) error {
 	if !PerOutputPublication(plan) || node.Kind != NodeAssembleRelease {
 		return e.New(e.CodeEngineCapability, "reference release not admitted")
 	}
-	var receipts []authenticatedOutputMetadata
-	for _, output := range plan.LifecycleOutputs {
+	workers, err := verificationWorkers()
+	if err != nil {
+		return err
+	}
+	started := time.Now()
+	receipts := make([]authenticatedOutputMetadata, len(plan.LifecycleOutputs))
+	names := make([]string, len(plan.LifecycleOutputs))
+	for i, output := range plan.LifecycleOutputs {
+		names[i] = output.Name
+	}
+	err = verifyBatch(ctx, names, workers, func(ctx context.Context, i int) error {
+		output := plan.LifecycleOutputs[i]
 		route := Route{Name: outputPublicationRoute(output.Name), Target: outputPublicationRoute(output.Name)}
 		receipt, err := authenticateReferenceMetadata(ctx, plan, route, artifacts, newSigner)
 		if err != nil {
@@ -175,9 +201,21 @@ func executeReferenceRelease(ctx context.Context, plan *Plan, node Node, artifac
 		if err := ValidateLifecycleOutputs([]LifecycleOutputPlan{output}, observed); err != nil {
 			return err
 		}
-		receipts = append(receipts, receipt)
+		receipts[i] = receipt
+		return nil
+	})
+	fmt.Fprintf(stdout, "Release assembly authentication: outputs=%d workers=%d duration_ms=%d\n", len(receipts), workers, time.Since(started).Milliseconds())
+	if err != nil {
+		return err
 	}
-	return assembleReferenceRelease(ctx, plan, artifacts[node.Outputs[0]].Path, receipts)
+	for i, receipt := range receipts {
+		fmt.Fprintf(stdout, "Release assembly output %s: metadata_ms=%d signature_ms=%d sbom_ms=%d\n", names[i],
+			receipt.timing.metadata.Milliseconds(), receipt.timing.signature.Milliseconds(), receipt.timing.sbom.Milliseconds())
+	}
+	started = time.Now()
+	err = assembleReferenceRelease(ctx, plan, artifacts[node.Outputs[0]].Path, receipts)
+	fmt.Fprintf(stdout, "Release assembly metadata construction: duration_ms=%d\n", time.Since(started).Milliseconds())
+	return err
 }
 
 func assembleReferenceRelease(ctx context.Context, plan *Plan, out string, receipts []authenticatedOutputMetadata) error {
@@ -267,6 +305,9 @@ func assembleReferenceRelease(ctx context.Context, plan *Plan, out string, recei
 func AuthenticateHostedReferenceRelease(ctx context.Context, workspace string, plan *Plan) ([]delivery.Output, error) {
 	if ctx == nil || !PerOutputPublication(plan) {
 		return nil, e.New(e.CodeEngineCapability, "hosted metadata release is not admitted")
+	}
+	if _, err := verificationWorkers(); err != nil {
+		return nil, err
 	}
 	if err := plan.Validate(); err != nil {
 		return nil, err

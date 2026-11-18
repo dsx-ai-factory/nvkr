@@ -164,6 +164,9 @@ func toolExecutableDigest(plan *Plan, name string) string {
 
 func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact,
 	newSigner signerFor, stdout io.Writer) error {
+	if _, err := verificationWorkers(); err != nil {
+		return err
+	}
 	startedOn := time.Now().UTC()
 	signing := plan.Environment.Signing
 	if signing == nil {
@@ -258,12 +261,14 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 	}
 	// Each output is independently consumable from its own repository. Derive all
 	// subjects from the inspected closure before the first signing side effect.
-	if PerOutputPublication(plan) && node.Target == "release" {
-		if err := verifyPublicationOutputs(ctx, signer, subject.Ref, inspection, signing, stdout); err != nil {
+	// Output-local routes already signed their deliverables. The aggregate's
+	// mandatory verify-publication node authenticates them once, from the served
+	// digest-bound closure under the same identity/issuer policy. A root signature
+	// alone is not a successful publication or Run; no persisted success is reused.
+	if !PerOutputPublication(plan) || node.Target != "release" {
+		if err := signPublicationOutputs(ctx, signer, subject.Ref, inspection, predicate, signing, stdout); err != nil {
 			return err
 		}
-	} else if err := signPublicationOutputs(ctx, signer, subject.Ref, inspection, predicate, signing, stdout); err != nil {
-		return err
 	}
 	record, err := signer.SignAndAttest(ctx, subject, predicate)
 	if err != nil {
@@ -285,6 +290,9 @@ func executeSign(ctx context.Context, plan *Plan, node Node, artifacts map[strin
 
 func executeVerifyPublication(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact,
 	newSigner signerFor, stdout io.Writer) error {
+	if _, err := verificationWorkers(); err != nil {
+		return err
+	}
 	signing := plan.Environment.Signing
 	if signing == nil {
 		return e.New(e.CodeTrustPolicyMissing, "factory verification node %q has no delivery signing profile", node.ID)

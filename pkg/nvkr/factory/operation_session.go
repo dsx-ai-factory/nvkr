@@ -190,7 +190,7 @@ func (session *operationSession) dispatch(ctx context.Context, plan *Plan, node 
 	case NodeSBOM:
 		return executeSBOM(ctx, plan, node, artifacts, session.stdout)
 	case NodeAssembleRelease:
-		return executeReferenceRelease(ctx, plan, node, artifacts, productionOCISigner)
+		return executeReferenceReleaseWithProgress(ctx, plan, node, artifacts, productionOCISigner, session.stdout)
 	case NodePackage:
 		return executePackage(ctx, plan, node, artifacts, session.stdout)
 	case NodePublish:
