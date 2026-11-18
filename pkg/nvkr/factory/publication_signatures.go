@@ -59,11 +59,21 @@ func signPublicationOutputs(ctx context.Context, signer sign.OCISigner, referenc
 
 func verifyPublicationOutputs(ctx context.Context, signer sign.OCISigner, reference string,
 	inspection delivery.Inspection, signing *definition.Signing, stdout io.Writer) error {
+	workers, err := verificationWorkers()
+	if err != nil {
+		return err
+	}
 	subjects, err := publicationOutputSubjects(reference, inspection)
 	if err != nil {
 		return err
 	}
-	for _, subject := range subjects {
+	names := make([]string, len(subjects))
+	records := make([]sign.VerificationRecord, len(subjects))
+	for i, subject := range subjects {
+		names[i] = subject.Ref
+	}
+	err = verifyBatch(ctx, names, workers, func(ctx context.Context, i int) error {
+		subject := subjects[i]
 		record, err := signer.Verify(ctx, subject, sign.VerifyPolicy{
 			IdentityRegexp: signing.Identity, Issuer: signing.Issuer, RequireAttestation: true,
 		})
@@ -78,7 +88,14 @@ func verifyPublicationOutputs(ctx context.Context, signer sign.OCISigner, refere
 			(!record.DryRun && (!record.SignatureVerified || !record.AttestationVerified)) {
 			return e.New(e.CodeVerifyFailed, "deliverable %s lacks its required signature and provenance", subject.Ref)
 		}
-		fmt.Fprintf(stdout, "verified artifact/evidence (mode %s, dryRun %t): %s\n", signing.Mode, record.DryRun, subject.Ref)
+		records[i] = record
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	for i, record := range records {
+		fmt.Fprintf(stdout, "verified artifact/evidence (mode %s, dryRun %t): %s\n", signing.Mode, record.DryRun, subjects[i].Ref)
 	}
 	return nil
 }
