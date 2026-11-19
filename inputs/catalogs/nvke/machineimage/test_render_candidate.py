@@ -5,11 +5,13 @@
 import argparse
 import copy
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from jsonschema.exceptions import ValidationError
 import yaml
@@ -125,6 +127,37 @@ class RendererTests(unittest.TestCase):
         changed = list(yaml.safe_load_all(self.render([publication], metadata)))[0]["metadata"]["name"]
         self.assertNotEqual(baseline, changed)
 
+    def test_missing_promisor_blob_does_not_fetch(self):
+        def git(repo, *args, **kwargs):
+            return subprocess.run(["git", "--no-replace-objects", "-C", str(repo), *args],
+                                  capture_output=True, timeout=30, **kwargs)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo = root / "partial.git"
+            subprocess.run(["git", "init", "--bare", str(repo)], capture_output=True, check=True, timeout=30)
+            # Copy the real pinned commit and only its CRD tree spine, omitting
+            # the schema blob. No checkout, remote service or source mutation.
+            objects = [("commit", COMMIT), ("tree", COMMIT + "^{tree}")]
+            objects += [("tree", COMMIT + ":" + str(p))
+                        for p in reversed(Path(candidate.CRD_PATH).parents) if str(p) != "."]
+            for kind, expression in objects:
+                raw = git(SOURCE, "cat-file", kind, expression, check=True).stdout
+                git(repo, "hash-object", "-w", "-t", kind, "--stdin", input=raw, check=True)
+            git(repo, "config", "remote.origin.promisor", "true", check=True)
+            git(repo, "config", "remote.origin.url", str(root / "absent-remote.git"), check=True)
+            control_trace = root / "control.trace"
+            control = git(repo, "cat-file", "blob", COMMIT + "^{commit}:" + candidate.CRD_PATH,
+                          env={**os.environ, "GIT_NO_LAZY_FETCH": "0", "GIT_TRACE": str(control_trace)})
+            self.assertNotEqual(control.returncode, 0)
+            self.assertIn(" fetch ", control_trace.read_text())
+            offline_trace = root / "offline.trace"
+            # Even an ambient opt-in to lazy fetching must not override the owner.
+            with patch.dict(os.environ, {"GIT_NO_LAZY_FETCH": "0", "GIT_TRACE": str(offline_trace)}):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    candidate.load_crd(repo, COMMIT)
+            self.assertNotIn(" fetch ", offline_trace.read_text())
+
     def test_cli_failure_has_no_partial_stdout(self):
         publication, metadata = fixture()
         metadata[1]["version"] = "invalid"
@@ -147,6 +180,17 @@ class RendererTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertEqual(result.stdout, b"")
             self.assertIn(b"missing selected asset", result.stderr)
+            marker = "synthetic-private-input-must-not-appear"
+            malformed, _ = fixture()
+            malformed["selection"] = marker
+            (root / "publication.json").write_text(json.dumps(malformed))
+            result = subprocess.run([sys.executable, str(candidate.HERE / "render_candidate.py"),
+                                     "--nvke-source", str(SOURCE), "--publication", str(root / "publication.json"),
+                                     "--metadata", str(root / "metadata.json")], capture_output=True, timeout=30)
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stdout, b"")
+            self.assertIn(b"rejected (TypeError)", result.stderr)
+            self.assertNotIn(marker.encode(), result.stderr)
 
 
 if __name__ == "__main__":

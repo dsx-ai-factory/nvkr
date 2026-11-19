@@ -26,7 +26,9 @@ The script always reads that catalog pin; optional `--nvke-commit` must match it
 It reads `management-engine/config/crd/bases/internal.nvke.nvidia.com_machineimages.yaml`
 using `git --no-replace-objects cat-file blob '<pin>^{commit}:<path>'`, which requires
 an actual commit and ignores replacement objects. It never uses a dirty working-tree
-copy, fetches a revision or vendors the CRD. A missing commit or CRD fails closed.
+copy, fetches a revision or vendors the CRD. The child Git process sets
+`GIT_NO_LAZY_FETCH=1`, so missing objects in partial clones cannot trigger retrieval
+from a promisor remote. A missing commit or CRD fails closed.
 
 Repeat `--publication` for each destination. Each input is the JSON description from
 the generic `PreparedBootAssets.Description` or `SelectedBootReceipt.Description`

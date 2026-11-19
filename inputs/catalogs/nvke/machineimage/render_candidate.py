@@ -6,6 +6,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import string
@@ -60,6 +61,7 @@ def load_crd(source, pin=None):
     result = subprocess.run(
         ["git", "--no-replace-objects", "-C", str(source), "cat-file", "blob", f"{catalog_pin}^{{commit}}:{CRD_PATH}"],
         capture_output=True, check=True, timeout=30,
+        env={**os.environ, "GIT_NO_LAZY_FETCH": "1"},
     )
     require(len(result.stdout) <= LIMIT, "CRD exceeds 4 MiB")
     crd = yaml.safe_load(result.stdout)
