@@ -55,8 +55,11 @@ Arguments of `command` and `acquisition.command`, and `environment` values, may 
 `${inputs.<declared role>.path|version}`; any other `${` text is refused. The catalog path must be
 a clean directory path (no trailing `/` or `.`).
 
-Registrations are not yet executed: selection, Run binding and the executor that runs
-`command` are follow-up work. `validators run --profile` below still uses the earlier indexed
+Registrations are not yet executed. The `pkg/nvkr/validation` package resolves selections
+(exact suite IDs or parent paths such as `nvke/nvkectl`, in argument order without duplicates),
+admits them against the built-in `local` test environment, and binds each input role to exactly
+one named output of a completed local Run. No command exposes this yet; the executor that runs
+`command` is follow-up work. `validators run --profile` below still uses the earlier indexed
 catalog under `inputs/testing/validators/` until it is migrated.
 
 ```sh

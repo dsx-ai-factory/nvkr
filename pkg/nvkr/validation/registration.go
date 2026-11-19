@@ -186,6 +186,10 @@ func validList(values []string, allowEmpty bool, valid func(string) bool) bool {
 // Registrations holds validated registrations discovered beneath one catalog directory.
 type Registrations struct {
 	entries map[string]Registration
+	// documents maps each registration ID to the hex SHA-256 of the exact file
+	// bytes it was decoded from, so a validation can record which version of the
+	// registration it used.
+	documents map[string]string
 }
 
 // LoadRegistrations discovers {repository}/{suite-group}/{suite}.yaml beneath
@@ -221,7 +225,7 @@ func loadRegistrationRoot(ctx context.Context, root *catalogRoot) (*Registration
 		}
 		return names, nil
 	}
-	result := &Registrations{entries: map[string]Registration{}}
+	result := &Registrations{entries: map[string]Registration{}, documents: map[string]string{}}
 	budget := maxRegistrationCatalogBytes
 	repositories, err := list("")
 	if err != nil {
@@ -267,6 +271,7 @@ func loadRegistrationRoot(ctx context.Context, root *catalogRoot) (*Registration
 					return nil, e.Wrap(e.CodeUsage, err, "registration %q", relative)
 				}
 				result.entries[registration.ID] = registration
+				result.documents[registration.ID] = blobDigest(raw)
 			}
 		}
 	}
