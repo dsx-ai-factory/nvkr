@@ -29,7 +29,9 @@ func TestMaintainedOperatorInputMembership(t *testing.T) {
 		}
 		found++
 		if output.Platform != "linux/amd64" || output.Format != definition.OutputExecutable ||
-			output.Catalog == nil || output.Catalog.Base != "../../catalogs/tools/operator-amd64" || !slices.Equal(output.Components, []string{"helm", "kubectl"}) {
+			output.Catalog != nil || !slices.ContainsFunc(authored.Catalogs, func(c definition.Catalog) bool {
+			return c.Base == "../../catalogs/tools/operator-amd64" && len(c.Overlays) == 0
+		}) || !slices.Equal(output.Components, []string{"helm", "kubectl"}) {
 			t.Fatalf("operator output differs from its explicit formal-v1 selection: %+v", output)
 		}
 	}
