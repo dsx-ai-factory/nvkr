@@ -94,6 +94,7 @@ jobs:
     # would diff against an empty range, skip every check, and let the gate go
     # green having verified nothing.
     outputs:
+      demo: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.demo }}
       code: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.code }}
       actions: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.actions }}
       pipeline: ${{ github.event_name != 'pull_request' && 'true' || steps.changes.outputs.pipeline }}
@@ -121,6 +122,30 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           filters: |
+            demo:
+              # This separate module temporarily imports root libraries. Keep
+              # those compatibility checks before merge while excluding the
+              # demo from the root module's own compile/lint/test commands.
+              - 'demos/**'
+              # The offline dependency boundary also inspects the release CLI.
+              - 'cmd/**'
+              - 'client/**'
+              - 'pkg/**'
+              - 'internal/**'
+              - 'inputs/**'
+              - 'scripts/**'
+              - 'docs/examples/**'
+              - 'testdata/contracts/**'
+              - '.github/nvkr-run-nvke/**'
+              - '.github/nvkr-plan-store/**'
+              - 'toolchains/govulncheck/**'
+              - 'go.mod'
+              - 'go.sum'
+              - 'Makefile'
+              - '.go-version'
+              - '.golangci.yml'
+              - '.github/workflows/nvkr-nightly.yml'
+              - '.github/workflows/merge-gate.yaml'
             code:
               # Everything the repository jobs compile, lint, or test, plus the
               # files that define the check itself: the Makefile recipes, the
@@ -203,6 +228,7 @@ jobs:
               # ./cmd/nvkr, plus the generator itself and the committed
               # notices file. Watching the dependency surface catches a new
               # dependency added without rerunning `make notices`.
+              - 'demos/nvke/**'
               - 'THIRD_PARTY_NOTICES.md'
               - 'scripts/gen-notices.sh'
               - 'scripts/gen_notices.py'
@@ -345,6 +371,57 @@ jobs:
           install-mode: none
           skip-cache: true
 
+  demo:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.demo == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+
+      # Verify the public tool archive before extraction. Keep the binary in
+      # runner-local temporary storage instead of rebuilding it on every PR.
+      - name: Install checksum-pinned golangci-lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          lint_version=2.14.0
+          lint_archive="golangci-lint-${lint_version}-linux-amd64.tar.gz"
+          lint_install_root=$(mktemp -d "$RUNNER_TEMP/golangci-lint.XXXXXX")
+          curl --fail --silent --show-error --location \
+            --connect-timeout 10 --max-time 60 --retry 2 --retry-max-time 90 \
+            "https://github.com/golangci/golangci-lint/releases/download/v${lint_version}/${lint_archive}" \
+            --output "$lint_install_root/$lint_archive"
+          if ! printf '%s  %s\n' \
+            'ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab' \
+            "$lint_install_root/$lint_archive" | sha256sum --check --status; then
+            echo '::error::golangci-lint checksum verification failed'
+            exit 1
+          fi
+          tar -xzf "$lint_install_root/$lint_archive" -C "$lint_install_root" \
+            "golangci-lint-${lint_version}-linux-amd64/golangci-lint"
+          echo "$lint_install_root/golangci-lint-${lint_version}-linux-amd64" >> "$GITHUB_PATH"
+
+      - name: Check nested NVKE demo module
+        env:
+          GO_TEST_TIMEOUT: 10m
+          TMPDIR: ${{ runner.temp }}
+        run: make demo-check
+
+  demo-skip:
+    needs: [check-paths]
+    if: needs.check-paths.outputs.demo != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 1
+    steps:
+      - run: echo "No demo changes — nested module checks not required"
+
   vulnerabilities:
     needs: [check-paths]
     if: needs.check-paths.outputs.code == 'true'
@@ -389,8 +466,7 @@ jobs:
     if: needs.check-paths.outputs.code == 'true'
     # Tests need disk-backed /tmp and GNU tools, unlike Ubuntu 26.04.
     runs-on: ubuntu-24.04
-    # The demo shard passed in 233s on a cold hosted runner; allow setup and
-    # result retention to finish within the same bounded job deadline.
+    # Allow setup and result retention within the bounded shard deadline.
     timeout-minutes: 10
     strategy:
       # Keep every shard's diagnostics when another fails. The aggregate gate
@@ -774,7 +850,14 @@ jobs:
           trap-caching: false
           dependency-caching: false
 
-      - run: go build ./...
+      - name: Build selected modules for CodeQL
+        env:
+          DEMO_CHANGED: ${{ needs.check-paths.outputs.demo }}
+        run: |
+          go build ./...
+          if [ "$DEMO_CHANGED" = true ]; then
+            go -C demos/nvke build ./...
+          fi
 
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
@@ -805,6 +888,8 @@ jobs:
       - tests
       - hello
       - check-skip
+      - demo
+      - demo-skip
       - actionlint
       - actionlint-skip
       - analyze
@@ -866,6 +951,8 @@ jobs:
             | [
                 {skip: "check-skip", jobs: ["check", "lint", "vulnerabilities", "tests", "hello"],
                  run: flag($paths.code; "code classification")},
+                {skip: "demo-skip", jobs: ["demo"],
+                 run: flag($paths.demo; "demo classification")},
                 {skip: "actionlint-skip", jobs: ["actionlint"],
                  run: flag($paths.actions; "actions classification")},
                 {skip: "workflows-regen-skip", jobs: ["workflows-regen"],
