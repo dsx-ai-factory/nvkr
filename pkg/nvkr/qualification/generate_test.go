@@ -47,14 +47,16 @@ func generationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPoli
 	// the real maintained Plan's exact members; no payload or authority is faked.
 	policy.Smoke.Tools = map[string]string{"nvkectl-module-tags": "nvkectl-version-json", "helm-operator": "helm-version", "kubectl-operator": "kubectl-client-version-json"}
 	for _, output := range plan.LifecycleOutputs {
-		if output.Kind == lifecycle.OutputBundle {
+		if output.Derived != nil {
+			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: []string{}, Reason: "derived-inventory"})
+		} else if output.Kind == lifecycle.OutputBundle {
 			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: append([]string(nil), output.Components...), Reason: "bundle-archive"})
 		}
 		if output.Kind == lifecycle.OutputOCI {
 			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: append([]string(nil), output.Components...), Reason: "deployment-image"})
 		}
 	}
-	if len(policy.Smoke.NonToolOutputs) != 63 {
+	if len(policy.Smoke.NonToolOutputs) != 64 {
 		t.Fatal("maintained candidate fixture changed its declared OCI membership")
 	}
 	return plan, policy
@@ -482,6 +484,15 @@ func TestQualificationProductionRegistryCredentialAdmission(t *testing.T) {
 }
 
 func TestQualificationGenerationAdmission(t *testing.T) {
+	imageRule := func(p *lifecycle.QualificationPolicy) int {
+		for i, scope := range p.Smoke.NonToolOutputs {
+			if scope.Kind == lifecycle.OutputOCI {
+				return i
+			}
+		}
+		t.Fatal("fixture has no deployment image rule")
+		return -1
+	}
 	for _, tc := range []struct {
 		name string
 		edit func(*factory.Plan, *lifecycle.QualificationPolicy, *string)
@@ -500,10 +511,11 @@ func TestQualificationGenerationAdmission(t *testing.T) {
 			p.Smoke.Tools["unselected"] = "helm-version"
 		}, e.CodeReleaseIncomplete},
 		{"missing image exemption", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
-			p.Smoke.NonToolOutputs = p.Smoke.NonToolOutputs[1:]
+			i := imageRule(p)
+			p.Smoke.NonToolOutputs = append(p.Smoke.NonToolOutputs[:i], p.Smoke.NonToolOutputs[i+1:]...)
 		}, e.CodeGateUnmet},
 		{"wrong image membership", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
-			p.Smoke.NonToolOutputs[0].Components = []string{"unselected"}
+			p.Smoke.NonToolOutputs[imageRule(p)].Components = []string{"unselected"}
 		}, e.CodeGateUnmet},
 		{"extra image exemption", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
 			p.Smoke.NonToolOutputs = append(p.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: "unselected", Kind: lifecycle.OutputOCI, Components: []string{"image"}, Reason: "deployment-image"})

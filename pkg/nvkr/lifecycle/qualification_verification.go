@@ -14,13 +14,14 @@ import (
 )
 
 // Qualification checks every payload but retains only controls, evidence and
-// executables. This private view intentionally cannot export layouts or disks.
+// executables and bounded derived inventories. This private view cannot export layouts or disks.
 // Ordinary VerifiedRelease remains backed by a complete delivery.Publication.
 type qualificationPublication interface {
 	publicationVerificationView
 	Close() error
 	Description(string) (delivery.PublicationDescription, error)
 	VisitEvidence(context.Context, func(context.Context, delivery.EvidenceBinding, []byte) error) error
+	CompareDerivedInventory(context.Context, string, []byte) error
 	ExecutableBundle(string) (delivery.BinaryBundle, error)
 	WriteExecutableMember(context.Context, string, string, io.Writer) (int64, error)
 }
