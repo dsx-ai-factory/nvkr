@@ -55,6 +55,9 @@ func loadPlanDocument(ctx context.Context, path string) (*Plan, string, error) {
 		return nil, "", classifyContext(ctx, e.Wrap(e.CodePipelineDrift, err, "reading factory plan"))
 	}
 	var plan Plan
+	if _, err := admitPlanDocumentSchema(raw); err != nil {
+		return nil, "", err
+	}
 	if err := canonical.UnmarshalExact(raw, &plan); err != nil {
 		return nil, "", e.Wrap(e.CodePipelineDrift, err, "decoding factory plan")
 	}

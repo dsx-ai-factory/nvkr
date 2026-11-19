@@ -260,6 +260,7 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 		}
 		plan.SchemaVersion, plan.Composition = CompositePlanSchemaVersion, record.Clone()
 	}
+	plan.SchemaVersion = planSchemaFor(*plan)
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}

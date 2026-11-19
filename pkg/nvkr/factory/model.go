@@ -143,7 +143,7 @@ type Plan struct {
 	AppliedOverlays     []catalog.AppliedOverlay     `json:"appliedOverlays,omitempty"`
 	EnvironmentDigest   string                       `json:"environmentDigest,omitempty"`
 	Definition          definition.Definition        `json:"definition"`
-	// Composition is present exactly for CompositePlanSchemaVersion Plans,
+	// Composition is present exactly for composite Plan schemas,
 	// whose definitionDigest names the composite and Definition is effective.
 	Composition      *CompositionRecord     `json:"composition,omitempty"`
 	Environment      definition.Environment `json:"environment"`

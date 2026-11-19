@@ -67,8 +67,7 @@ func (plan Plan) validatePlanInputs() ([]packageSpec, error) {
 			return nil, err
 		}
 	}
-	if (plan.SchemaVersion != PlanSchemaVersion && plan.SchemaVersion != CompositePlanSchemaVersion) ||
-		(plan.SchemaVersion == CompositePlanSchemaVersion) != (plan.Composition != nil) || !canonicalName.MatchString(plan.Name) {
+	if plan.SchemaVersion != planSchemaFor(plan) || !canonicalName.MatchString(plan.Name) {
 		return nil, e.New(e.CodeInvalidCatalog, "run plan schema/name is invalid")
 	}
 	if strings.TrimSpace(plan.GeneratorVersion) == "" {

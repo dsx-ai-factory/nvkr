@@ -505,8 +505,25 @@ Only the APT adapter is initially admitted. Acquisition authenticates metadata a
 before assembly, which runs without network access. The original mkosi JSON installed-package report
 must match the entire retained package selection, including dependencies; surplus, missing, duplicate
 or substituted packages fail. The report is an installed-content input to SBOM generation, not a
-replacement for acquisition materials or package/license review. Mkosi emits an uncompressed tar;
-NVKR wraps those exact bytes as one uncompressed OCI layer with deterministic config and manifest.
+replacement for acquisition materials or package/license review.
+
+Plans containing package recipes use wire schema v7 (plain) or v8 (composite). Each exact canonical
+package-input document is stored once in the Plan's `packageSnapshots` table under
+`store/package-inputs-<12-hex-blob-digest>.json`; every catalog, resolved-component and fetch/build recipe
+references the full blob digest. These paths name embedded records, not files to fetch. A prefix collision
+fails closed. Full acquisition locations remain in the authenticated bytes; the logical Build and catalog
+identities continue to use the complete restored descriptions. The Plan identity changes with this wire
+representation. Plans without package recipes retain their v5/v6 bytes; old inline package Plans require
+regeneration and are not silently converted on read.
+
+Readers authenticate every table entry and reference before restoring recipes for normal complete Plan
+validation. Missing or unused targets, mismatched bytes or paths, inline-plus-reference forms and unresolved
+references fail closed. A Plan admits at most 64 package snapshots, 1024 references and 32 MiB of aggregate
+restored package-document bytes. The serialized Plan read limit remains 4 MiB; generation applies that
+same limit before returning any bundle members. Shared input descriptions never merge named runtime
+requirements, independent production, evidence or Run-owned execution authority.
+
+Mkosi emits an uncompressed tar; NVKR wraps those exact bytes as one uncompressed OCI layer with deterministic config and manifest.
 Each root uses epoch zero for generated dates and the archive mtime ceiling. The fixed,
 read-only GNU tar adapter uses lexical traversal, numeric ownership and stable extended-header names;
 this also fixes which hard-link member carries content. Mkosi removes assembly caches and logs before

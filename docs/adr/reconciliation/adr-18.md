@@ -2,6 +2,13 @@
 
 Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
 
+Plan serialization shares exact package-input documents across all catalog, resolved-component and
+fetch/build occurrences. The v7/v8 wire codec restores complete recipes before ordinary Plan admission;
+Build identities and separately named runtime requirements retain their original descriptions. Focused
+contracts in `plan_package_snapshots_test.go` cover two/four requirements, byte-identical restoration,
+digest/path/reference rejection, expansion limits and the unchanged 4 MiB generation/read boundary.
+This representation change supplies no new native assembly or hosted execution evidence.
+
 The Plan-produced VM runtime extension has manager-neutral package inputs, exact mkosi installed-package
 closure checks, source-closure acquisition, and digest-bound single-layer OCI capture. The layer is
 retained through a read-only descriptor to the original disk-backed OCI tar, without a second retained

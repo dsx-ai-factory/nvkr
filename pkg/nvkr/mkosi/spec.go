@@ -43,8 +43,11 @@ type Root struct {
 	Name         string                 `json:"name"`
 	Distribution string                 `json:"distribution"`
 	Release      string                 `json:"release"`
-	Inputs       material.PackageInputs `json:"inputs"`
-	Mounts       []Mount                `json:"mounts,omitempty"`
+	Inputs       material.PackageInputs `json:"inputs,omitzero"`
+	// InputsDigest is a Plan transport reference. The factory must authenticate
+	// and restore it before this recipe can be validated or executed.
+	InputsDigest string  `json:"inputsDigest,omitempty"`
+	Mounts       []Mount `json:"mounts,omitempty"`
 }
 
 // Mount nests a previously assembled root at a stable path in this root.
@@ -105,6 +108,9 @@ func (spec *Spec) Validate(platform string, bindings []string) error {
 	seen := make(map[string]bool, len(spec.Roots))
 	used := make(map[string]bool, len(spec.Roots))
 	for _, root := range spec.Roots {
+		if root.InputsDigest != "" {
+			return e.New(e.CodeInvalidCatalog, "mkosi package inputs require Plan reference resolution")
+		}
 		if !recipeName.MatchString(root.Name) || seen[root.Name] || !recipeName.MatchString(root.Distribution) || !recipeName.MatchString(root.Release) {
 			return e.New(e.CodeInvalidCatalog, "mkosi roots require unique names and explicit distribution releases")
 		}

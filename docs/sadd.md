@@ -315,6 +315,10 @@ Environment values and returns a complete Plan, including the original input ide
 publication routes, and required output slots, then joins independently observed bytes into those slots.
 Required membership exists before execution, so omitting a failed output cannot make a partial run complete.
 Specialized byte-changing transformations remain explicit product intent.
+Plans with package recipes store each exact package-input document once and reference its blob digest
+from every recipe occurrence. The reader authenticates and restores complete descriptions before normal
+admission. This changes Plan representation, not logical Build identity or independent runtime obligations;
+serialized Plans remain bounded to 4 MiB, with a separate bound on restored package bytes (ADR-18).
 
 ADR-19 additionally defines internal tool artifacts: ordinary pinned catalog results required for a
 Run's execution and evidence, excluded from the named delivery-output set. Their full dependency graph

@@ -169,6 +169,9 @@ func renderStaticInputs(ctx context.Context, plan *Plan, layout generationLayout
 	if err != nil {
 		return nil, "", err
 	}
+	if int64(len(planBytes)) > MaxPlanBytes {
+		return nil, "", e.New(e.CodeEngineCapability, "generated Plan exceeds its %d-byte read bound", MaxPlanBytes)
+	}
 	return map[string][]byte{layout.planPath: planBytes}, planDigest, nil
 }
 
@@ -214,6 +217,9 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 	planBytes, ok := bundle.Files[bundle.PlanPath]
 	if !ok {
 		return nil, e.New(e.CodePipelineDrift, "%s bundle omits %s", bundle.Engine, bundle.PlanPath)
+	}
+	if int64(len(planBytes)) > MaxPlanBytes {
+		return nil, e.New(e.CodePipelineDrift, "generated Plan exceeds its %d-byte read bound", MaxPlanBytes)
 	}
 	var decodedPlan Plan
 	if err := canonical.UnmarshalExact(planBytes, &decodedPlan); err != nil {
