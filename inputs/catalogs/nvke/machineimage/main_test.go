@@ -18,8 +18,8 @@ import (
 	"testing"
 	"time"
 
+	goyaml "go.yaml.in/yaml/v2"
 	"sigs.k8s.io/yaml"
-	goyaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 // Synthetic schema exercises the admitted validator features without vendoring
@@ -372,6 +372,39 @@ func TestMissingPromisorBlobDoesNotFetch(t *testing.T) {
 		t.Fatalf("offline tried fetch: %s %v", b, err)
 	}
 }
+func TestCLISuccess(t *testing.T) {
+	source, catalog, pin := sourceFixture(t)
+	root := t.TempDir()
+	pp, mp := filepath.Join(root, "publication.json"), filepath.Join(root, "metadata.json")
+	p, m := fixture()
+	pb, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mb, err := json.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, pp, pb)
+	write(t, mp, mb)
+	var stdout, stderr bytes.Buffer
+	code := run(t.Context(), []string{"--nvke-source", source, "--nvke-commit", pin, "--catalog-dir", catalog, "--publication", pp, "--metadata", mp}, &stdout, &stderr)
+	if code != 0 || stderr.Len() != 0 {
+		t.Fatalf("code=%d stderr=%q", code, stderr.String())
+	}
+	if got := len(documents(t, stdout.String())); got != 2 {
+		t.Fatalf("got %d documents, want 2", got)
+	}
+	v, err := loadCRD(t.Context(), source, catalog, pin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expected, err := render([]any{p}, m, v, templateFixture(t))
+	if err != nil || stdout.String() != expected {
+		t.Fatalf("CLI output differs from validated render: %v", err)
+	}
+}
+
 func TestCLIFailureHasNoPartialStdout(t *testing.T) {
 	source, catalog, pin := sourceFixture(t)
 	root := t.TempDir()

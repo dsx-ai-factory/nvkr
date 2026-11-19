@@ -3,6 +3,7 @@ module github.com/dsx-ai-factory/nvkr/inputs/catalogs/nvke/machineimage
 go 1.27.4
 
 require (
+	go.yaml.in/yaml/v2 v2.4.3
 	k8s.io/kube-openapi v0.0.0-20260721132016-d427ff9ee9ad
 	sigs.k8s.io/yaml v1.6.0
 )
@@ -23,7 +24,6 @@ require (
 	github.com/go-openapi/swag/typeutils v0.27.1 // indirect
 	github.com/go-openapi/swag/yamlutils v0.27.1 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
-	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	google.golang.org/protobuf v1.35.1 // indirect
 	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2 // indirect

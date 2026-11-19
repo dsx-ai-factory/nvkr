@@ -14,8 +14,10 @@ Ordinary local source admission uses Git's bounded `ls-files --format` query to 
 an unsupported query fails with a coded diagnostic naming this Git version floor.
 The required [authoring lab regression](docs/examples/authoring-lab/README.md) uses these tools and fails
 if a prerequisite is missing. `make check` additionally requires Python 3.12 or later (`python3` on `PATH`)
-for `make test-ci-tools`, which runs the CI report parser and all local adapter contract suites using
-only the Python standard library. Go-test adapter wrappers report an explicit skip when Python is
+for `make test-ci-tools`, which runs the CI report parser and local adapter contract suites using
+the Python standard library. That target also vets and tests the separate MachineImage catalog Go module;
+its first build needs module-proxy access unless its hash-locked dependencies are already cached.
+Go-test adapter wrappers report an explicit skip when Python is
 absent; that is not full-gate coverage. The tooling gate fails if Python is missing or too old and
 runs every suite independently, so a Go-only test pass cannot stand in for the completion gate.
 The restated-status check in `make check` diffs against `origin/main`; set `STATUS_BASE` when your base

@@ -28,11 +28,11 @@ import (
 	"time"
 	"unicode/utf8"
 
+	goyaml "go.yaml.in/yaml/v2"
 	"k8s.io/kube-openapi/pkg/validation/spec"
 	"k8s.io/kube-openapi/pkg/validation/strfmt"
 	"k8s.io/kube-openapi/pkg/validation/validate"
 	"sigs.k8s.io/yaml"
-	goyaml "sigs.k8s.io/yaml/goyaml.v2"
 )
 
 const crdPath = "management-engine/config/crd/bases/internal.nvke.nvidia.com_machineimages.yaml"

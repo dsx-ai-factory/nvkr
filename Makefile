@@ -183,6 +183,7 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 test-ci-tools: ## Check CI sharding, reports, local adapters and the catalog renderer (Python and Go).
 	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
 	python3 -B -m unittest discover -s scripts -p '*_test.py'
+	go -C inputs/catalogs/nvke/machineimage vet ./...
 	go -C inputs/catalogs/nvke/machineimage test ./... -count=1
 
 # Diff-scoped: only Markdown lines added since the merge base with STATUS_BASE are checked.
@@ -200,9 +201,10 @@ cover: test-race ## Open the HTML coverage report in a browser.
 	go tool cover -html=coverage.out
 
 .PHONY: tidy
-tidy: ## Format + tidy both application modules.
+tidy: ## Format + tidy application and catalog renderer modules.
 	gofmt -s -w $(GOSRC)
 	go mod tidy
+	go -C inputs/catalogs/nvke/machineimage mod tidy
 	$(MAKE) -C demos/nvke tidy
 
 .PHONY: notices
