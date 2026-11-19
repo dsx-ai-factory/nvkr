@@ -107,7 +107,7 @@ make ci-check       # every merge-gate check that runs locally; CodeQL runs only
 make test           # fast default tests; matches PR checks
 make test-race      # opt-in race + coverage for the default suite
 make test-full      # opt-in extended fixtures, race + coverage
-make test-ci-tools  # CI timing report parser tests (requires python3)
+make test-ci-tools  # CI tooling contracts (requires Go, jq, shell tools and python3)
 make lint           # golangci-lint v2 (.golangci.yml)
 make build          # build bin/nvkr
 make nvkr-exec-helper
@@ -256,7 +256,7 @@ make vulncheck
 git diff --check
 ```
 
-`make check` runs the code gate, including the license header check, shellcheck, Python report-tool tests
+`make check` runs the code gate, including the license header check, shellcheck, CI tooling contracts
 and the Go vulnerability scan. `make ci-check` adds the build, actionlint, notices, workflow drift and Fern
 checks; workflow drift needs network access to the public NVKE source. New source files need the two-line SPDX
 header; `make license` adds it. The direct commands above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution
