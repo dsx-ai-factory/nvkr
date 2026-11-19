@@ -2,44 +2,27 @@
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: nvkr.dev/catalog-maintenance/v1
-name: nvke-m2
+name: nvke
 # The NVKE release and its derived chart pins are the one supported update path.
 # Registry constraints stay authored; this policy never widens them.
-catalog: inputs/catalogs/nvke/release
+catalog: inputs/catalogs/nvke
 sources: [nvke, nvke-helm]
 producerOverlays: inputs/policies/ovn-producer-overlays.json
 sameRelease:
   - [nvke, nvke-helm]
-definition: inputs/definitions/nvke/definition.yaml
-environment: inputs/environments/github-release.yaml
-# Generated bundles that share this catalog's pins. Each is checked, regenerated and
-# transported with the production Run; a committed bundle not named here is refused.
-# The GPU site composite owns the fixed development bundle (github-development.yaml).
-qualificationPolicy: inputs/policies/nvke-qualification.yaml
+definition: inputs/definitions/nvke/gpu-site-release.composite.yaml
+environment: inputs/environments/github-nvke-gpu-site.yaml
+qualificationPolicy: inputs/policies/nvke-gpu-site-qualification.yaml
+# Production and nightly own the derived inventory; development retains its payload-only composite.
 additionalRuns:
-  - definition: inputs/definitions/nvke/core.yaml
-    environment: inputs/environments/github-nvke-core.yaml
-  - definition: inputs/definitions/nvke/services.yaml
-    environment: inputs/environments/github-nvke-services.yaml
-  - definition: inputs/definitions/nvke/telemetry.yaml
-    environment: inputs/environments/github-nvke-telemetry.yaml
-  - definition: inputs/definitions/nvke/disks.yaml
-    environment: inputs/environments/github-nvke-disks.yaml
-  - definition: inputs/definitions/nvke/disks-ubuntu24.yaml
-    environment: inputs/environments/github-nvke-disks-ubuntu24.yaml
-  - definition: inputs/definitions/nvke/gpu-site.composite.yaml
-    environment: inputs/environments/github-nvke-gpu-site.yaml
-    qualificationPolicy: inputs/policies/nvke-gpu-site-qualification.yaml
   - definition: inputs/definitions/nvke/gpu-site.composite.yaml
     environment: inputs/environments/github-development.yaml
     qualificationPolicy: inputs/policies/nvke-gpu-site-development-qualification.yaml
-  - definition: inputs/definitions/demo/arm64-nvidia-kvm.json
-    environment: inputs/environments/github-nightly-nvidia.json
-  - definition: inputs/definitions/demo/arm64-upstream-kvm.json
-    environment: inputs/environments/github-nightly-upstream.json
-  - definition: inputs/definitions/nvke/gpu-site.composite.yaml
+  - definition: inputs/definitions/nvke/gpu-site-release.composite.yaml
     environment: inputs/environments/github-nvke-nightly-gpu-site.yaml
     qualificationPolicy: inputs/policies/nvke-nightly-gpu-site-qualification.yaml
+  # Independent build-only bundle shares action pins and the generator/store owner.
+  # Refresh checks its complete closure; it does not repin WLI or add NVKE outputs.
   - definition: inputs/definitions/nvidia-workload-identity/imds-agent.yaml
     environment: inputs/environments/github-wli-imds-agent.yaml
 validation: static

@@ -207,13 +207,13 @@ func TestRenderImageIndexShowsExactChildrenAndPlatformEvidence(t *testing.T) {
 		{Platform: "linux/amd64", Component: "controller", ManifestDigest: "sha256:" + strings.Repeat("a", 64), BuildDigest: "sha256:" + strings.Repeat("b", 64)},
 		{Platform: "linux/arm64", Component: "controller", ManifestDigest: "sha256:" + strings.Repeat("c", 64), BuildDigest: "sha256:" + strings.Repeat("d", 64)},
 	}}
-	description := delivery.PublicationDescription{Outputs: []delivery.PublicationOutput{{Output: delivery.Output{Name: "cwe", Kind: "oci", ImageIndex: binding}}}}
+	description := delivery.PublicationDescription{Outputs: []delivery.PublicationOutput{{Output: delivery.Output{Name: "nvke-controller", Kind: "oci", ImageIndex: binding}}}}
 	for _, child := range binding.Children {
-		description.Evidence = append(description.Evidence, delivery.PublicationEvidence{Kind: "sbom", Binding: delivery.EvidenceBinding{Outputs: []string{"cwe"}, Platform: child.Platform, Component: child.Component, Stage: "build-output", SubjectKind: "oci-manifest", SubjectDigest: child.ManifestDigest}})
+		description.Evidence = append(description.Evidence, delivery.PublicationEvidence{Kind: "sbom", Binding: delivery.EvidenceBinding{Outputs: []string{"nvke-controller"}, Platform: child.Platform, Component: child.Component, Stage: "build-output", SubjectKind: "oci-manifest", SubjectDigest: child.ManifestDigest}})
 	}
 	for _, format := range []string{"text", "json", "mermaid"} {
 		t.Run(format, func(t *testing.T) {
-			raw, err := Render(description, Options{Format: format, Output: "cwe"})
+			raw, err := Render(description, Options{Format: format, Output: "nvke-controller"})
 			if err != nil {
 				t.Fatal(err)
 			}

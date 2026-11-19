@@ -16,11 +16,11 @@ import (
 
 func imageIndexTestPlan(t *testing.T) *Plan {
 	t.Helper()
-	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	selected := map[string]bool{"controller-chart": true, "cwe": true, "nvkectl": true, "nvkectl-linux-arm64": true, "postgresql": true, "spire": true, "spire-crds": true, "temporal": true}
+	selected := map[string]bool{"controller-chart": true, "nvke-controller": true, "nvkectl": true, "nvkectl-linux-arm64": true, "postgresql": true, "spire": true, "spire-crds": true, "temporal": true}
 	var outputs []authored.DefinitionOutput
 	for _, output := range plan.Definition.Outputs {
 		if selected[output.Name] {
@@ -43,6 +43,9 @@ func compileImageIndexFixture(t *testing.T, original *Plan, environment authored
 	}
 	targetStacks := make(map[string]*catalog.Stack)
 	for _, output := range original.Definition.Outputs {
+		if output.Derived != nil {
+			continue
+		}
 		if output.Catalog == nil && len(original.CatalogCandidates) == 0 {
 			continue
 		}
@@ -67,7 +70,7 @@ func TestImageIndexPlanFreezesNativeMembershipAndEvidence(t *testing.T) {
 	plan := imageIndexTestPlan(t)
 	var output LifecycleOutputPlan
 	for _, candidate := range plan.LifecycleOutputs {
-		if candidate.Name == "cwe" {
+		if candidate.Name == "nvke-controller" {
 			output = candidate
 		}
 	}
@@ -77,7 +80,7 @@ func TestImageIndexPlanFreezesNativeMembershipAndEvidence(t *testing.T) {
 	children := make([]ir.ImageIndexBuildChild, 0, 2)
 	nodes, artifacts := planIndex(plan)
 	for _, child := range output.ImageIndex.Children {
-		if child.BuildTarget != "cwe/"+child.Platform {
+		if child.BuildTarget != "nvke-controller/"+child.Platform {
 			t.Fatal("noninjective child target")
 		}
 		for _, id := range []string{child.ArtifactID, child.ResultArtifactID, child.SBOMArtifactID, "observation/" + child.BuildTarget} {
@@ -143,7 +146,7 @@ func TestImageIndexPlanRejectsIncompleteOrSubstitutedMembership(t *testing.T) {
 			p := imageIndexTestPlan(t)
 			index := -1
 			for i, o := range p.LifecycleOutputs {
-				if o.Name == "cwe" {
+				if o.Name == "nvke-controller" {
 					index = i
 				}
 			}

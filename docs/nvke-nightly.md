@@ -99,7 +99,7 @@ With Helm available, replace these paths with that matching pair:
 ```sh
 NVKR_NATIVE_PROFILE_NKTP_CHART=/path/to/selected/nktp-0.2.0.tgz \
 NVKR_NATIVE_PROFILE_NKTP_VALUES=/path/to/frozen-nvke/deploy/nico/nktp/values.yaml \
-  go test ./internal/nvkedemo -run '^TestNativeSiteStorageMatchesSourceNKTPChart$' -count=1
+  go -C demos/nvke test ./internal/nvkedemo -run '^TestNativeSiteStorageMatchesSourceNKTPChart$' -count=1
 ```
 
 The check validates rendered queue count, size and binding constraints. It skips
@@ -142,14 +142,13 @@ OCI images, QCOW2 files and private diagnostics remain on the disposable runner.
 There is no public-error option. Trusted NVKE code retains sudo/Docker access on
 that runner; these unsigned diagnostics grant no release or publication authority.
 
-The ARM64 build/publish/consume nightly is retired. Generated ARM64 producer
-workflows retain their existing admission policies, but no nightly invokes them
-or the legacy published-artifact consumer.
+The ARM64 build/publish/consume nightly is retired. Its generated ARM64 producer workflows and two Definitions are removed; no nightly invokes
+the legacy published-artifact consumer. The maintained signed candidate is the composite below.
 
 ## Dispatch a complete floating GPU-site candidate
 
-The generated `nvkr-run-nvke-nightly-gpu-site.yml` producer uses the complete
-[GPU-site composite](../inputs/definitions/nvke/gpu-site.composite.yaml) with its own
+The generated `nvkr-run-nvke-nightly.yml` producer uses the complete
+[release composite](../inputs/definitions/nvke/gpu-site-release.composite.yaml), including its derived inventory, with its own
 [Environment](../inputs/environments/github-nvke-nightly-gpu-site.yaml). On first dispatch
 it freezes main once for `dsx-ai-factory/nvke`, `dsx-ai-factory/ovn-kubernetes`,
 `dsx-ai-factory/cluster-api-provider-nico` and `NVIDIA/aicr`. Toolchains, acquired
@@ -159,7 +158,7 @@ namespace and pins are separate and unchanged.
 After maintainer configuration and merge to main, dispatch the generated producer:
 
 ```sh
-gh workflow run nvkr-run-nvke-nightly-gpu-site.yml --repo dsx-ai-factory/nvkr --ref main
+gh workflow run nvkr-run-nvke-nightly.yml --repo dsx-ai-factory/nvkr --ref main
 ```
 
 The producer is manual-only. The first bootstrap uploads `nvkr-runtime-inputs`; its

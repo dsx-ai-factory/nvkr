@@ -120,7 +120,7 @@ func TestSDKLocalRuntimeInheritsEnvironmentAndRejectsConflicts(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := t.TempDir()
-	for _, path := range []string{"docs/examples/nvke-module-tags", "inputs/catalogs/nvke/module-tags", "inputs/catalogs/shared"} {
+	for _, path := range []string{"docs/examples/nvke-module-tags", "inputs/catalogs/nvke", "inputs/catalogs/shared"} {
 		if err := os.CopyFS(filepath.Join(root, path), os.DirFS(filepath.Join(repo, path))); err != nil {
 			t.Fatal(err)
 		}

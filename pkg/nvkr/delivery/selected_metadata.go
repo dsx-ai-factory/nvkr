@@ -153,13 +153,14 @@ func (owner *SelectedMetadata) Close() error {
 
 // Description retains complete original logical membership. Only selected
 // controls and required evidence were physically checked; no payload was checked.
+// An omitted evidence Source may be unchecked, not verified source absence.
 func (owner *SelectedMetadata) Description(reference string) (PublicationDescription, error) {
 	if owner == nil || owner.state == nil {
 		return PublicationDescription{}, e.New(e.CodeGateUnmet, "selected metadata is not open")
 	}
 	view, err := owner.state.description(reference)
 	if err == nil {
-		view.ReferenceScope = "original metadata; only selected controls and evidence checked, no payload verification"
+		view.ReferenceScope = "original metadata; only selected controls and evidence checked, no payload verification; omitted evidence source may be unchecked"
 	}
 	return view, err
 }

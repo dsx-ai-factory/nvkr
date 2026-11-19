@@ -76,6 +76,9 @@ func compileDocumentsFor(ctx context.Context, definitionPath string, definition 
 	}
 	targetStacks := make(map[string]*catalog.Stack)
 	for _, target := range definition.Outputs {
+		if target.Derived != nil {
+			continue
+		}
 		if target.Catalog == nil {
 			if len(candidates) != 0 {
 				selected, err := selectCatalogCandidate(target, candidates)
@@ -230,6 +233,9 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 		if err := ctx.Err(); err != nil {
 			return nil, e.Wrap(e.CodeTimeout, err, "factory compilation canceled")
 		}
+		if target.Derived != nil {
+			continue
+		}
 		targetStack := stack
 		if selected := targetStacks[target.Name]; selected != nil {
 			targetStack = selected
@@ -277,7 +283,7 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 		builds[build.Name] = build
 	}
 	for _, target := range definition.Outputs {
-		required, err := outputRequirements(target, builds)
+		required, err := allOutputRequirements(target, definition, delivery, builds)
 		if err != nil {
 			return nil, err
 		}
@@ -297,7 +303,7 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 		return nil, err
 	}
 	if record != nil {
-		if plan.DefinitionDigest, err = authored.CompositeDigest(record.Metadata, record.Members, record.Variants...); err != nil {
+		if plan.DefinitionDigest, err = record.DefinitionDigest(); err != nil {
 			return nil, err
 		}
 		plan.SchemaVersion, plan.Composition = CompositePlanSchemaVersion, record.Clone()

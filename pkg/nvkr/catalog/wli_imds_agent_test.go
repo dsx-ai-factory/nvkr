@@ -87,12 +87,17 @@ func TestWLIIMDSAgentCatalogIdentity(t *testing.T) {
 
 	// The generated workflow actions must stay on the maintained shared cohort: the
 	// dedicated lock resolves the same exact pins the maintained NVKE catalog records.
-	cohort, err := LoadLockContext(t.Context(), "../../../inputs/catalogs/nvke/module-tags")
+	cohort, err := LoadLockContext(t.Context(), "../../../inputs/catalogs/nvke")
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"checkout", "download-artifact", "setup-go", "upload-artifact"} {
-		if !reflect.DeepEqual(lock.Pins[name], cohort.Pins[name]) {
+		selected, selectedOK := lock.Pins[name]
+		maintained, maintainedOK := cohort.Pins[name]
+		if !selectedOK || !maintainedOK {
+			t.Fatalf("action pin %q is missing: selected=%t maintained=%t", name, selectedOK, maintainedOK)
+		}
+		if !reflect.DeepEqual(selected, maintained) {
 			t.Fatalf("action pin %q drifted from the maintained cohort: %+v != %+v", name, lock.Pins[name], cohort.Pins[name])
 		}
 	}

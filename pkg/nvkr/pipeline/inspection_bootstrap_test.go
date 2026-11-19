@@ -9,6 +9,7 @@ import (
 	"errors"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"testing"
@@ -45,8 +46,8 @@ func TestInspectionBootstrapSelectionPins(t *testing.T) {
 }
 
 // This tests the bootstrap protocol on the native kernel, separately from the
-// container and static-producer contracts. The required Perl interpreter is a
-// name-independent protocol fixture; this grants no static-helper or appliance evidence.
+// container and static-producer contracts. A tiny native Go copy program supplies
+// name-independent helper bytes distinct from Perl; this grants no appliance evidence.
 func TestInspectionBootstrapSealedExecution(t *testing.T) {
 	if runtime.GOOS != "linux" || (runtime.GOARCH != "amd64" && runtime.GOARCH != "arm64") {
 		t.Skip("native Linux descriptor execution")
@@ -59,9 +60,31 @@ func TestInspectionBootstrapSealedExecution(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	helper := interpreterBytes
+	workspace := t.TempDir()
+	helperPath := filepath.Join(workspace, "copy-helper")
+	source := filepath.Join(workspace, "main.go")
+	if err := os.WriteFile(source, []byte(`package main
+import("io";"os")
+func main(){if _,err:=io.Copy(os.Stdout,os.Stdin);err!=nil{os.Exit(1)}}
+`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	buildCtx, stopBuild := context.WithTimeout(t.Context(), 2*time.Minute)
+	defer stopBuild()
+	build := exec.CommandContext(buildCtx, "go", "build", "-trimpath", "-o", helperPath, source)
+	build.Env = append(os.Environ(), "CGO_ENABLED=0", "GOENV=off", "GOTOOLCHAIN=local", "GOWORK=off", "GOFLAGS=", "GOOS="+runtime.GOOS, "GOARCH="+runtime.GOARCH)
+	if raw, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build protocol helper: %v: %s", err, raw)
+	}
+	helper, err := os.ReadFile(helperPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Equal(helper, interpreterBytes) {
+		t.Fatal("helper must differ from interpreter")
+	}
 	subject := []byte("subject suffix\x00\xff\n")
-	for _, variant := range []string{"probe", "exact", "changed helper", "truncated helper", "changed interpreter", "wrong architecture", "wrong size"} {
+	for _, variant := range []string{"probe", "exact", "changed helper", "truncated helper", "changed interpreter", "changed binding digest", "swapped digests", "wrong architecture", "wrong size"} {
 		t.Run(variant, func(t *testing.T) {
 			selection := DiskInspectionSelection{Platform: "linux/" + runtime.GOARCH, BootstrapInterpreterDigest: FileDigest(interpreterBytes),
 				streamBinding: ProducedExecutableBinding{Digest: FileDigest(helper), Size: int64(len(helper))}}
@@ -79,6 +102,10 @@ func TestInspectionBootstrapSealedExecution(t *testing.T) {
 				input = input[:20]
 			case "changed interpreter":
 				selection.BootstrapInterpreterDigest = FileDigest([]byte("foreign"))
+			case "changed binding digest":
+				selection.streamBinding.Digest = FileDigest([]byte("foreign helper"))
+			case "swapped digests":
+				selection.BootstrapInterpreterDigest, selection.streamBinding.Digest = selection.streamBinding.Digest, selection.BootstrapInterpreterDigest
 			case "wrong architecture":
 				selection.Platform, wantExit = "linux/unsupported", 29
 			case "wrong size":
@@ -86,7 +113,7 @@ func TestInspectionBootstrapSealedExecution(t *testing.T) {
 			}
 			args := inspectionBootstrapArgs(selection)
 			if !selection.bootstrapProbe {
-				args = append(args, "-f", "-C0", "-p", "-e", "", "--", "-")
+				args = append(args, "-")
 			}
 			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 			defer cancel()

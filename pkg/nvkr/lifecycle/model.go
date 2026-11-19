@@ -18,6 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/signkey"
@@ -110,6 +111,7 @@ type Run struct {
 }
 
 type requiredOutput struct {
+	Derived          *derivedoutput.Binding  `json:"derived,omitempty"`
 	ImageIndex       *factory.ImageIndexPlan `json:"imageIndex,omitempty"`
 	Name             string                  `json:"name"`
 	Kind             string                  `json:"kind"`

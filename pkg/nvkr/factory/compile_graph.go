@@ -11,6 +11,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
@@ -64,6 +65,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		}
 	}
 	for _, output := range definition.Outputs {
+		if output.Derived != nil {
+			continue
+		}
 		for _, target := range nativeOutputSelections(output) {
 			build, ok := builds[target.Name]
 			if !ok || build.Graph == nil {
@@ -195,7 +199,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				inputs = append(inputs, "result/"+input.BuildTarget+"/"+input.Component)
 			}
 		}
-		if spec.Kind == PackageBundle || spec.Kind == PackageDebian {
+		if (spec.Kind == PackageBundle && spec.Derived == nil) || spec.Kind == PackageDebian {
 			for _, id := range append([]string(nil), inputs...) {
 				input := artifacts[id]
 				if nodes[input.Producer].Kind != NodeBuild && !(spec.Kind == PackageBundle && nodes[input.Producer].Kind == NodeAcquire) {
@@ -222,7 +226,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				inputs = append(inputs, child.ResultArtifactID, child.SBOMArtifactID)
 			}
 		}
-		if spec.Kind == PackageOCI {
+		if spec.Kind == PackageOCI || spec.Derived != nil {
 			inputs = append(inputs, packageProducerResults(inputs, nodes, artifacts)...)
 		}
 		if spec.Kind == PackageOCI || spec.Kind == PackageDiskImage {
@@ -236,6 +240,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		nodeID := "package/" + spec.Name
 		artifactID := "package/" + spec.Name
 		nodes[nodeID] = Node{ID: nodeID, Kind: NodePackage, PackageKind: spec.Kind,
+			Derived:      spec.Derived.Clone(),
 			HelmImage:    spec.HelmImage,
 			ImageIndex:   spec.ImageIndex.Clone(),
 			Distribution: spec.Distribution, PackageComponent: spec.Component,
@@ -384,7 +389,9 @@ func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
 			return e.New(e.CodePipelineDrift, "operation %q differs from compiler-derived operation %q", actual.ID, want.ID)
 		}
 	}
+	var executableMediaType string
 	for i, want := range expected.Artifacts {
+		actual := plan.Graph.Artifacts[i]
 		if plan.workspace != "" {
 			path, err := relocatedFactoryPath(want.Path, plan.workspace)
 			if err != nil {
@@ -392,8 +399,20 @@ func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
 			}
 			want.Path = filepath.ToSlash(path)
 		}
-		if plan.Graph.Artifacts[i] != want {
-			return e.New(e.CodePipelineDrift, "artifact %q differs from compiler-derived artifact %q", plan.Graph.Artifacts[i].ID, want.ID)
+		if want.Kind == "host-package" && want.MediaType == delivery.MediaOctetStream {
+			// Older Plans used the Debian media type for every raw executable.
+			// Accept that complete encoding without admitting mixed encodings
+			// or relaxing any other compiler-derived artifact field.
+			legacyMediaType := artifactMediaType(want.Kind, "")
+			if executableMediaType == "" {
+				executableMediaType = actual.MediaType
+			}
+			if executableMediaType == legacyMediaType {
+				want.MediaType = legacyMediaType
+			}
+		}
+		if actual != want {
+			return e.New(e.CodePipelineDrift, "artifact %q differs from compiler-derived artifact %q", actual.ID, want.ID)
 		}
 	}
 	return nil

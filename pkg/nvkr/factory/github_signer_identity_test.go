@@ -48,11 +48,13 @@ func TestGitHubCommittedSignerIdentitiesStayOnEntryWorkflow(t *testing.T) {
 				// must still mint nothing: no job in the entry workflow may request
 				// an OIDC token.
 				workflow := githubLayoutFor(plan).workflowPath
+				found := false
 				for _, candidate := range workflows {
 					name := ".github/workflows/" + path.Base(candidate)
 					if name != workflow {
 						continue
 					}
+					found = true
 					content, err := os.ReadFile(candidate)
 					if err != nil {
 						t.Fatal(err)
@@ -60,6 +62,9 @@ func TestGitHubCommittedSignerIdentitiesStayOnEntryWorkflow(t *testing.T) {
 					if ids := githubOIDCJobs(t, content); len(ids) != 0 {
 						t.Fatalf("unsigned committed bundle %s mints OIDC in %s", planPath, ids)
 					}
+				}
+				if !found {
+					t.Fatalf("unsigned bundle entry workflow %s is missing", workflow)
 				}
 				return
 			}

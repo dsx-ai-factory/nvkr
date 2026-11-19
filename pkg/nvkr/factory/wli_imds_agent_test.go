@@ -4,13 +4,17 @@
 package factory
 
 import (
+	"bytes"
 	"encoding/json"
 	"runtime"
 	"slices"
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -40,7 +44,7 @@ func wliAgentPlan(t *testing.T) *Plan {
 	return plan
 }
 
-// The maintained selection compiles exactly two single-platform executable outputs
+// The independent selection compiles exactly two single-platform executable outputs
 // from one pinned root-module source. Compilation needs no source access and no
 // execution; a Plan remains static-unqualified work description.
 func TestWLIIMDSAgentPlanOutputs(t *testing.T) {
@@ -49,7 +53,15 @@ func TestWLIIMDSAgentPlanOutputs(t *testing.T) {
 		t.Fatalf("plan carries %d outputs, want the two agent executables", len(plan.LifecycleOutputs))
 	}
 	wantNames := []string{"dsx-imds-node-attestor-agent-linux-amd64", "dsx-imds-node-attestor-agent-linux-arm64"}
+	nodes, artifacts := planIndex(plan)
 	for _, output := range plan.LifecycleOutputs {
+		payload := artifacts["artifact/"+output.Name+"/dsx-imds-node-attestor-agent"]
+		if payload.Kind != "host-package" || payload.MediaType != delivery.MediaOctetStream || nodes[payload.Producer].Kind != NodeBuild {
+			t.Fatalf("output %q raw executable metadata: %+v", output.Name, payload)
+		}
+		if nodes[output.ArtifactID].PackageKind != PackageBinaryBundle || artifacts[output.ArtifactID].MediaType != "application/vnd.nvkr.binary-bundle.v1" {
+			t.Fatalf("output %q changed its binary-bundle packaging", output.Name)
+		}
 		if !slices.Contains(wantNames, output.Name) {
 			t.Fatalf("unexpected output %q", output.Name)
 		}
@@ -67,8 +79,14 @@ func TestWLIIMDSAgentPlanOutputs(t *testing.T) {
 	if len(plan.InternalTools) != 0 {
 		t.Fatal("executable selection acquired an internal tool producer")
 	}
-	const commit = "cd76f1d5ab4a887b9577ff601ce7cda52d5003b4"
-	const tree = "b9c85948e417d42d7529d2306f1b80db61c629ae"
+	lock, err := catalog.LoadLockContext(t.Context(), "inputs/catalogs/nvidia-workload-identity")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin, ok := lock.Pins["nvidia-workload-identity"]
+	if !ok {
+		t.Fatal("agent source pin is missing")
+	}
 	for _, build := range plan.Builds {
 		if len(build.Components) != 1 || build.Components[0] != "dsx-imds-node-attestor-agent" {
 			t.Fatalf("build %q selects %v", build.Name, build.Components)
@@ -76,11 +94,12 @@ func TestWLIIMDSAgentPlanOutputs(t *testing.T) {
 		for _, node := range build.Graph.Nodes {
 			switch node.Kind {
 			case ir.KindFetch:
-				if node.Commit != commit || node.TreeHash != tree {
+				if node.Commit != pin.Commit || node.TreeHash != pin.TreeHash {
 					t.Fatalf("build %q fetch lost the exact v1.15.0 source identity", build.Name)
 				}
 			case ir.KindBuild:
-				if node.OutputType != "host-package" || strings.Contains(node.Command[len(node.Command)-1], "attestor-server") {
+				command := strings.Join(node.Command, "\n")
+				if len(node.Command) == 0 || node.OutputType != "host-package" || !strings.Contains(command, "./cmd/dsx-imds-node-attestor-agent") || strings.Contains(command, "attestor-server") {
 					t.Fatalf("build %q lost its agent host-package contract", build.Name)
 				}
 			case ir.KindVerify:
@@ -143,6 +162,14 @@ func TestWLIIMDSAgentSourceFetchDelegatesHeldWorkspace(t *testing.T) {
 		t.Skip("issued held source workspace requires Linux")
 	}
 	plan := wliAgentPlan(t)
+	lock, err := catalog.LoadLockContext(t.Context(), "inputs/catalogs/nvidia-workload-identity")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin, ok := lock.Pins["nvidia-workload-identity"]
+	if !ok {
+		t.Fatal("agent source pin is missing")
+	}
 	var fetch *Node
 	for i := range plan.Graph.Nodes {
 		if plan.Graph.Nodes[i].Kind == NodeFetch {
@@ -155,14 +182,14 @@ func TestWLIIMDSAgentSourceFetchDelegatesHeldWorkspace(t *testing.T) {
 	}
 	t.Chdir(t.TempDir())
 	called := false
-	err := executeSourceFetch(t.Context(), plan, fetch.ID, nil, nil, nil,
+	err = executeSourceFetch(t.Context(), plan, fetch.ID, nil, nil, nil,
 		func(instruction ir.Node, options pipeline.RunOptions) (*pipeline.ArtifactResult, error) {
 			called = true
 			if options.SourceWorkspace == nil || !options.Launch {
 				t.Fatal("held source workspace was not issued to the fetch operation")
 			}
 			if instruction.Repo != "https://github.com/dsx-ai-factory/nvidia-workload-identity" ||
-				instruction.Commit != "cd76f1d5ab4a887b9577ff601ce7cda52d5003b4" {
+				instruction.Commit != pin.Commit {
 				t.Fatalf("fetch instruction lost the pinned root source: %+v", instruction)
 			}
 			vendor := strings.Join(instruction.VendorCmd, "\n")
@@ -221,4 +248,61 @@ func keysOf(values map[string]json.RawMessage) []string {
 		keys = append(keys, key)
 	}
 	return keys
+}
+
+// Historical Plans retain their own bytes and identity. Compatibility admits
+// only either complete raw-executable encoding, never per-artifact exceptions.
+func TestWLIIMDSAgentCompiledGraphMediaCompatibility(t *testing.T) {
+	plan := wliAgentPlan(t)
+	var raw []int
+	for i, artifact := range plan.Graph.Artifacts {
+		if artifact.Kind == "host-package" && artifact.MediaType == delivery.MediaOctetStream {
+			raw = append(raw, i)
+		}
+	}
+	if len(raw) < 2 {
+		t.Fatal("fixture needs multiple raw executable artifacts")
+	}
+	legacy := artifactMediaType("host-package", "")
+	for _, tc := range []struct {
+		name      string
+		media     []string
+		unrelated bool
+		want      e.Code
+	}{
+		{name: "current", media: []string{delivery.MediaOctetStream, delivery.MediaOctetStream}},
+		{name: "legacy", media: []string{legacy, legacy}},
+		{name: "mixed legacy first", media: []string{legacy, delivery.MediaOctetStream}, want: e.CodePipelineDrift},
+		{name: "mixed current first", media: []string{delivery.MediaOctetStream, legacy}, want: e.CodePipelineDrift},
+		{name: "unknown", media: []string{"application/x-unrelated", "application/x-unrelated"}, want: e.CodePipelineDrift},
+		{name: "legacy unrelated edit", media: []string{legacy, legacy}, unrelated: true, want: e.CodePipelineDrift},
+		{name: "current unrelated edit", media: []string{delivery.MediaOctetStream, delivery.MediaOctetStream}, unrelated: true, want: e.CodePipelineDrift},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			candidate := *plan
+			candidate.Graph.Artifacts = slices.Clone(plan.Graph.Artifacts)
+			for i, index := range raw {
+				candidate.Graph.Artifacts[index].MediaType = tc.media[i%len(tc.media)]
+			}
+			if tc.unrelated {
+				candidate.Graph.Artifacts[raw[0]].Name += "-unrelated"
+			}
+			before, err := canonical.Marshal(candidate)
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = candidate.Validate()
+			if tc.want == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				assertFactoryErrorCode(t, err, tc.want)
+			}
+			after, err := canonical.Marshal(candidate)
+			if err != nil || !bytes.Equal(before, after) {
+				t.Fatal("validation rewrote frozen Plan bytes")
+			}
+		})
+	}
 }

@@ -36,16 +36,21 @@ func TestWLIIMDSAgentGraphs(t *testing.T) {
 	if len(doc.Outputs) != 2 {
 		t.Fatalf("definition declares %d outputs, want the two agent executables", len(doc.Outputs))
 	}
-	const commit = "cd76f1d5ab4a887b9577ff601ce7cda52d5003b4"
-	const tree = "b9c85948e417d42d7529d2306f1b80db61c629ae"
-	const amd64Image = "docker.io/library/golang@sha256:78773c59d6d4ecedc0845b1a8e5379e7bf0e0be62f4ea796e689bbc97dab3ceb"
-	const arm64Image = "docker.io/library/golang@sha256:7117c9e4e2c0becd23d1dbede3aea73ba91d084847c68e12d7e1fa3d9b3abf20"
+	lock, err := catalog.LoadLockContext(t.Context(), "../../../inputs/catalogs/nvidia-workload-identity")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin, ok := lock.Pins["nvidia-workload-identity"]
+	if !ok {
+		t.Fatal("agent source pin is missing")
+	}
+	source := cat.Sources["nvidia-workload-identity"]
 	for _, output := range doc.Outputs {
 		t.Run(output.Name, func(t *testing.T) {
 			arch := strings.TrimPrefix(output.Platform, "linux/")
-			wantImage := amd64Image
-			if arch == "arm64" {
-				wantImage = arm64Image
+			wantImage := source.ToolchainImagesByArch[arch]
+			if wantImage == "" {
+				t.Fatal("selected architecture has no toolchain image")
 			}
 			resolved, err := buildgraph.Resolve(cat, buildgraph.Selection{
 				Components: output.Components, Platform: output.Platform, OutputFormat: output.Format,
@@ -75,7 +80,7 @@ func TestWLIIMDSAgentGraphs(t *testing.T) {
 				t.Fatalf("graph kinds are %s/%s/%s", graph.Nodes[0].Kind, graph.Nodes[1].Kind, graph.Nodes[2].Kind)
 			}
 			if fetch.Repo != "https://github.com/dsx-ai-factory/nvidia-workload-identity" ||
-				fetch.Commit != commit || fetch.TreeHash != tree {
+				fetch.Commit != pin.Commit || fetch.TreeHash != pin.TreeHash {
 				t.Fatalf("fetch node lost the exact v1.15.0 root-source identity: %+v", fetch)
 			}
 			if fetch.VendorImage != wantImage {
@@ -88,11 +93,11 @@ func TestWLIIMDSAgentGraphs(t *testing.T) {
 				}
 			}
 			if build.Toolchain != wantImage ||
-				build.SourceCommit != commit || build.SourceTreeHash != tree || !build.SourceReadOnly {
+				build.SourceCommit != pin.Commit || build.SourceTreeHash != pin.TreeHash || !build.SourceReadOnly {
 				t.Fatalf("build node lost its source or toolchain binding: %+v", build)
 			}
 			if build.OutputType != "host-package" || build.WriteDir != "nvkr-output" ||
-				build.ArtifactPath != "nvkr-output/dsx-imds-node-attestor-agent" || build.Version != "1.15.0" {
+				build.ArtifactPath != "nvkr-output/dsx-imds-node-attestor-agent" || build.Version != strings.TrimPrefix(pin.Tag, "v") {
 				t.Fatalf("build node lost its host-package contract: %+v", build)
 			}
 			command := strings.Join(build.Command, "\n")
@@ -134,11 +139,15 @@ func TestWLIIMDSAgentGraphRejectsMismatchedSelections(t *testing.T) {
 		code      e.Code
 	}{
 		{"undeclared platform", buildgraph.Selection{Components: []string{"dsx-imds-node-attestor-agent"}, Platform: "linux/riscv64", OutputFormat: definition.OutputExecutable}, e.CodeInvalidCatalog},
-		{"unknown producer", buildgraph.Selection{Components: []string{"dsx-imds-node-attestor-server"}, Platform: "linux/amd64"}, e.CodeInvalidCatalog},
+		{"valid unsupported executable target", buildgraph.Selection{Components: []string{"dsx-imds-node-attestor-agent"}, Platform: "darwin/arm64", OutputFormat: definition.OutputExecutable}, e.CodeEngineCapability},
+		{"unknown producer", buildgraph.Selection{Components: []string{"dsx-imds-node-attestor-server"}, Platform: "linux/amd64", OutputFormat: definition.OutputExecutable}, e.CodeInvalidCatalog},
 		{"duplicate producer", buildgraph.Selection{Components: []string{"dsx-imds-node-attestor-agent", "dsx-imds-node-attestor-agent"}, Platform: "linux/amd64", OutputFormat: definition.OutputExecutable}, e.CodeInvalidCatalog},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			resolved, err := buildgraph.Resolve(cat, test.selection)
+			if test.name == "unknown producer" && (err == nil || !strings.Contains(err.Error(), "unknown selected component")) {
+				t.Fatalf("unknown producer refused for another reason: %v", err)
+			}
 			if resolved != nil || wliCode(err) != test.code {
 				t.Fatalf("Resolve = %+v, %v; want no result and %s", resolved, err, test.code)
 			}

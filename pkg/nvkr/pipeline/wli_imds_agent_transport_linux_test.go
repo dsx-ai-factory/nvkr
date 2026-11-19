@@ -18,8 +18,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
@@ -67,15 +69,22 @@ func wliSourceFixture(t *testing.T, dest string) ir.Node {
 			t.Fatal(err)
 		}
 	}
+	// The fixture Git children use the admitted source-Git baseline so they
+	// neither inherit caller Git configuration nor clear parent policy; the
+	// synthetic gitlinks are SHA-1 object IDs, so init pins that format exactly.
+	environment, err := sourcegit.Baseline(os.Getenv("PATH"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	git := func(arguments ...string) {
 		t.Helper()
 		command := exec.CommandContext(t.Context(), "git", append([]string{"-C", repository}, arguments...)...)
-		command.Env = append(os.Environ(), "GIT_CONFIG_COUNT=0")
+		command.Env = environment
 		if raw, err := command.CombinedOutput(); err != nil {
 			t.Fatalf("fixture git %v: %s, %v", arguments, raw, err)
 		}
 	}
-	git("init", "-q")
+	git("init", "-q", "--object-format=sha1")
 	git("add", ".")
 	git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.test", "-c", "commit.gpgsign=false", "commit", "-qm", "root module")
 	// Gitlink entries are committed directly against synthetic submodule head
@@ -89,7 +98,7 @@ func wliSourceFixture(t *testing.T, dest string) ir.Node {
 	resolve := func(revision string) string {
 		t.Helper()
 		command := exec.CommandContext(t.Context(), "git", "-C", repository, "rev-parse", revision)
-		command.Env = append(os.Environ(), "GIT_CONFIG_COUNT=0")
+		command.Env = environment
 		out, err := command.Output()
 		if err != nil {
 			t.Fatalf("fixture git rev-parse %s: %v", revision, err)
@@ -154,22 +163,19 @@ func wliVendorCarrier(t *testing.T) []byte {
 	return raw.Bytes()
 }
 
-// wliVendorCommand mirrors the catalog's exact vendor declaration for this
-// source: download, verify, and vendor the root module without changing its
-// go.mod or go.sum bytes.
-func wliVendorCommand() []string {
-	return []string{"sh", "-ec", `test "$(go env GOVERSION)" = go1.26.10
-export GOENV=off GOTOOLCHAIN=local GOWORK=off
-before="$(sha256sum go.mod go.sum)"
-go mod download
-go mod verify
-go mod vendor
-after="$(sha256sum go.mod go.sum)"
-test "$before" = "$after"`}
+// Load exact argv operands, including the YAML block's final LF, from the
+// authored opt-in catalog. The fixture models transport, not a Go build.
+func wliCatalogCommands(t *testing.T) (vendor, build []string) {
+	t.Helper()
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/nvidia-workload-identity"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return slices.Clone(cat.Sources["nvidia-workload-identity"].VendorCommand), slices.Clone(cat.Components["dsx-imds-node-attestor-agent"].BuildCommand)
 }
 
 // wliAgentBuildNode mirrors the compiled producer declaration for the materializer.
-func wliAgentBuildNode(t *testing.T, fetch ir.Node) ir.Node {
+func wliAgentBuildNode(t *testing.T, fetch ir.Node, command []string) ir.Node {
 	t.Helper()
 	build := completeTestBuild(ir.Node{
 		ID: "build-dsx-imds-node-attestor-agent", Kind: ir.KindBuild,
@@ -178,8 +184,7 @@ func wliAgentBuildNode(t *testing.T, fetch ir.Node) ir.Node {
 	build.WriteDir = "nvkr-output"
 	build.ArtifactPath = "nvkr-output/dsx-imds-node-attestor-agent"
 	build.OutputType = "host-package"
-	build.Command = []string{"sh", "-ec",
-		`exec go build -mod=vendor -trimpath -buildvcs=false -o /src/nvkr-output/dsx-imds-node-attestor-agent ./cmd/dsx-imds-node-attestor-agent`}
+	build.Command = slices.Clone(command)
 	if err := build.Validate(); err != nil {
 		t.Fatalf("fixture build node: %v", err)
 	}
@@ -197,6 +202,7 @@ func TestWLIIMDSAgentHeldSourceTransportMaterialization(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("actual held source transport requires Linux")
 	}
+	vendorCommand, buildCommand := wliCatalogCommands(t)
 	t.Chdir(t.TempDir())
 	workspace, err := HoldSourceWorkspace(t.Context())
 	if err != nil {
@@ -209,10 +215,34 @@ func TestWLIIMDSAgentHeldSourceTransportMaterialization(t *testing.T) {
 	// closure and reuses it on a second fetch.
 	plain := withDefaults(RunOptions{Ctx: t.Context(), SourceRoot: "one/src",
 		SourceWorkspace: workspace, Launch: true, Stdout: io.Discard, Stderr: io.Discard})
-	for range 2 {
-		if err := (Local{}).fetch(fetch, plain); err != nil {
-			t.Fatal(err)
-		}
+	if err := (Local{}).fetch(fetch, plain); err != nil {
+		t.Fatal(err)
+	}
+	plainReceiptPath, err := sourceReceiptPath(plain.SourceRoot, fetch.Dest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeBytes, err := os.ReadFile(plainReceiptPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	beforeInfo, err := os.Stat(plainReceiptPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := (Local{}).fetch(fetch, plain); err != nil {
+		t.Fatal(err)
+	}
+	afterBytes, err := os.ReadFile(plainReceiptPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterInfo, err := os.Stat(plainReceiptPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(beforeBytes, afterBytes) || !os.SameFile(beforeInfo, afterInfo) || !beforeInfo.ModTime().Equal(afterInfo.ModTime()) {
+		t.Fatal("unchanged held fetch rewrote its receipt")
 	}
 	checkout := filepath.Join("one/src", fetch.Dest)
 	gitmodules, err := os.ReadFile(filepath.Join(checkout, ".gitmodules"))
@@ -241,7 +271,6 @@ func TestWLIIMDSAgentHeldSourceTransportMaterialization(t *testing.T) {
 	// transfers it, copies the returned closure back, and only then issues the
 	// receipt the build materializer will authenticate.
 	vendored := fetch
-	vendorCommand := wliVendorCommand()
 	vendored.VendorCmd = vendorCommand
 	vendored.VendorImage = "sha256:" + strings.Repeat("b", 64)
 	vendored.VendorSpecDigest, err = ir.VendorSpecIdentity(vendored.VendorCmd, vendored.VendorImage)
@@ -325,7 +354,7 @@ func TestWLIIMDSAgentHeldSourceTransportMaterialization(t *testing.T) {
 	// Phase 3: the build materializer authenticates the receipt, re-hashes the
 	// closure, and copies the exact bytes into its private snapshot with the
 	// declared write mountpoint.
-	build := wliAgentBuildNode(t, vendored)
+	build := wliAgentBuildNode(t, vendored, buildCommand)
 	snapshot, err := materializeSourceUncached(build, opts)
 	if err != nil {
 		t.Fatal(err)
@@ -356,20 +385,25 @@ func TestWLIIMDSAgentHeldSourceTransportMaterialization(t *testing.T) {
 	}
 }
 
-// A tampered closure or forged receipt must fail materialization with a coded
-// error, leaving no snapshot. Each case re-issues its receipt through the real
-// held fetch; nothing here hand-writes an authenticated receipt.
+// A tampered closure or receipt inconsistent with that closure must fail
+// materialization. Held fetch issues each initial receipt; one case edits that
+// receipt afterward. Untampered controls use the same materialization options.
 func TestWLIIMDSAgentHeldSourceTransportRejectsTampering(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("actual held source transport requires Linux")
 	}
+	vendorCommand, buildCommand := wliCatalogCommands(t)
 	for _, tc := range []struct {
-		name   string
-		vendor bool
-		tamper func(t *testing.T, checkout, receiptPath string)
+		name    string
+		vendor  bool
+		message string
+		tamper  func(t *testing.T, checkout, receiptPath string)
 	}{
+		{name: "untampered plain"},
+		{name: "untampered vendored", vendor: true},
 		{
-			name: "initialized gitlink member",
+			name:    "initialized gitlink member",
+			message: "source changed after fetch",
 			tamper: func(t *testing.T, checkout, _ string) {
 				if err := os.WriteFile(filepath.Join(checkout, "third-party", "doca-platform-foundation", "intruder"),
 					[]byte("uninitialized no longer"), 0o644); err != nil {
@@ -378,8 +412,9 @@ func TestWLIIMDSAgentHeldSourceTransportRejectsTampering(t *testing.T) {
 			},
 		},
 		{
-			name:   "changed vendored member",
-			vendor: true,
+			name:    "changed vendored member",
+			vendor:  true,
+			message: "source changed after fetch",
 			tamper: func(t *testing.T, checkout, _ string) {
 				if err := os.WriteFile(filepath.Join(checkout, "vendor", "modules.txt"), []byte("drifted manifest\n"), 0o644); err != nil {
 					t.Fatal(err)
@@ -387,7 +422,8 @@ func TestWLIIMDSAgentHeldSourceTransportRejectsTampering(t *testing.T) {
 			},
 		},
 		{
-			name: "forged receipt closure",
+			name:    "receipt inconsistent with closure",
+			message: "source changed after fetch",
 			tamper: func(t *testing.T, _, receiptPath string) {
 				raw, err := os.ReadFile(receiptPath)
 				if err != nil {
@@ -417,7 +453,7 @@ func TestWLIIMDSAgentHeldSourceTransportRejectsTampering(t *testing.T) {
 			defer workspace.Close()
 			fetch := wliSourceFixture(t, "nvidia-workload-identity")
 			if tc.vendor {
-				fetch.VendorCmd = wliVendorCommand()
+				fetch.VendorCmd = slices.Clone(vendorCommand)
 				fetch.VendorImage = "sha256:" + strings.Repeat("b", 64)
 				fetch.VendorSpecDigest, err = ir.VendorSpecIdentity(fetch.VendorCmd, fetch.VendorImage)
 				if err != nil {
@@ -450,19 +486,26 @@ func TestWLIIMDSAgentHeldSourceTransportRejectsTampering(t *testing.T) {
 			if _, exists, err := readSourceReceiptContext(t.Context(), receiptPath); err != nil || !exists {
 				t.Fatalf("fixture receipt: exists=%t error=%v", exists, err)
 			}
-			tc.tamper(t, filepath.Join("src", fetch.Dest), receiptPath)
-			build := wliAgentBuildNode(t, fetch)
-			opts := withDefaults(RunOptions{Ctx: t.Context(), SourceRoot: "src", Stdout: io.Discard, Stderr: io.Discard})
+			if tc.tamper != nil {
+				tc.tamper(t, filepath.Join("src", fetch.Dest), receiptPath)
+			}
+			build := wliAgentBuildNode(t, fetch, buildCommand)
+			opts := withDefaults(RunOptions{Ctx: t.Context(), SourceRoot: "src", SourceWorkspace: workspace, Stdout: io.Discard, Stderr: io.Discard})
 			snapshot, err := materializeSourceUncached(build, opts)
 			if err == nil {
 				snapshot.cleanup()
 			}
-			if code(err) != e.CodeBuildFailed {
-				t.Fatalf("tampered %s admitted with error %v", tc.name, err)
+			if tc.tamper == nil {
+				if err != nil || snapshot == nil {
+					t.Fatalf("untampered control failed: %v", err)
+				}
+				return
 			}
-			entries, err := os.ReadDir("snapshots")
-			if err == nil && len(entries) != 0 {
-				t.Fatalf("tampered %s left snapshot artifacts: %v", tc.name, entries)
+			if code(err) != e.CodeBuildFailed || !strings.Contains(err.Error(), tc.message) || snapshot != nil {
+				t.Fatalf("tampered %s refused at wrong boundary: %v", tc.name, err)
+			}
+			if _, err := os.Stat("snapshots"); !os.IsNotExist(err) {
+				t.Fatalf("refusal created snapshot root: %v", err)
 			}
 		})
 	}

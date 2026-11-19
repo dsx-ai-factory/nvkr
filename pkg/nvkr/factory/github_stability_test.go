@@ -169,8 +169,15 @@ func TestGitHubWorkflowPinUpdateBoundaries(t *testing.T) {
 					t.Fatal("upload pin update changed more than the visible pinned action")
 				}
 			}
-			if !slices.Equal(sortedFileNames(before.Files), sortedFileNames(after.Files)) {
-				t.Fatal("routine pin update changed generated member paths")
+			beforePaths := slices.DeleteFunc(sortedFileNames(before.Files), isPlanStoreRecord)
+			afterPaths := slices.DeleteFunc(sortedFileNames(after.Files), isPlanStoreRecord)
+			if !slices.Equal(beforePaths, afterPaths) {
+				t.Fatal("routine pin update changed non-record member paths")
+			}
+			for _, name := range beforePaths {
+				if isPlanStoreScript(name) && !bytes.Equal(before.Files[name], after.Files[name]) {
+					t.Fatalf("routine pin update changed script %s", name)
+				}
 			}
 			if before.PlanDigest == after.PlanDigest || bytes.Equal(before.Files[FactoryPlanPath], after.Files[FactoryPlanPath]) {
 				t.Fatal("updated exact inputs did not change the authoritative Plan")

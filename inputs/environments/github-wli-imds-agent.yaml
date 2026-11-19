@@ -5,7 +5,7 @@ apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
   name: wli-imds-agent-github
-  description: Build-only NVIDIA Workload Identity DSX IMDS NodeAttestor agent production bundle in its independent workflow; no publication or signing selection.
+  description: Build-only NVIDIA Workload Identity DSX IMDS NodeAttestor agent independent manual workflow; no publication or signing selection.
 githubBundle: wli-imds-agent
 toolchainAccess:
   publicRoots:

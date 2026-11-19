@@ -12,7 +12,7 @@ PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
 # Bound each package explicitly; the local unsharded suite can exceed Go's
-# implicit 10-minute default. Hosted shards have a separate five-minute job budget.
+# implicit 10-minute default. Hosted shards have a separate ten-minute job budget.
 GO_TEST_TIMEOUT ?= 20m
 # CI splits the ordinary suite; reproduce any matrix entry with make test-shard.
 TEST_SHARD_GROUP ?=
@@ -56,11 +56,15 @@ build: go-version-check ## Compile the nvkr binary.
 
 .PHONY: demo demo-test-bin
 demo: go-version-check ## Build the downstream Go local NVKE demo CLI (calls nvkr).
-	go build -o $(DEMO_BIN) ./cmd/nvke-demo
+	go -C demos/nvke build -o $(abspath $(DEMO_BIN)) ./cmd/nvke-demo
 	chmod 0755 $(DEMO_BIN)
 
 demo-test-bin: go-version-check ## Compile opt-in native NVKE E2E tests; does not run them.
-	go test -c -o $(DEMO_TEST_BIN) ./internal/nvkedemo
+	go -C demos/nvke test -c -o $(abspath $(DEMO_TEST_BIN)) ./internal/nvkedemo
+
+.PHONY: demo-check
+demo-check: go-version-check ## Check the separate NVKE demo module (format, vet, build, test, lint, vulnerabilities).
+	$(MAKE) -C demos/nvke check
 
 .PHONY: install
 install: ## Install nvkr into $$(go env GOBIN).
@@ -102,11 +106,11 @@ shellcheck: ## Check executable shell surfaces for warning-or-higher defects.
 	@# same context without adding headers or changing identity-bearing file bytes.
 	@set -e; for spec in \
 	 bash:inputs/catalogs/aicr/scripts/build-nvke-bundle.sh.tmpl \
-	 bash:inputs/catalogs/node-images/release/scripts/build-nvke-cni-ovn.sh.tmpl \
-	 bash:inputs/catalogs/ovn-nvidia/scripts/build-nvke-cni-ovn.sh.tmpl \
-	 bash:inputs/catalogs/ovn-upstream/scripts/build-nvke-cni-ovn.sh.tmpl \
+	 bash:inputs/catalogs/node-images/scripts/build-nvke-cni-ovn.sh.tmpl \
+	 bash:inputs/catalogs/ovn/nvidia/scripts/build-nvke-cni-ovn.sh.tmpl \
+	 bash:inputs/catalogs/ovn/upstream/scripts/build-nvke-cni-ovn.sh.tmpl \
 	 sh:inputs/catalogs/nvsentinel/scripts/build-go-image.sh.tmpl \
-	 sh:inputs/catalogs/nvke/native-site/scripts/vendor-nktp-helm.sh.tmpl; do \
+	 sh:inputs/catalogs/nvke/scripts/vendor-nktp-helm.sh.tmpl; do \
 	 script=$${spec#*:}; dialect=$${spec%%:*}; \
 	 for arch in amd64 arm64; do \
 	   body=$$(sed 's/{{\.Arch}}/'"$$arch"'/g' "$$script"); \
@@ -195,9 +199,10 @@ cover: test-race ## Open the HTML coverage report in a browser.
 	go tool cover -html=coverage.out
 
 .PHONY: tidy
-tidy: ## Format + go mod tidy.
+tidy: ## Format + tidy both application modules.
 	gofmt -s -w $(GOSRC)
 	go mod tidy
+	$(MAKE) -C demos/nvke tidy
 
 .PHONY: notices
 notices: ## Regenerate THIRD_PARTY_NOTICES.md from the linked module set.
@@ -257,6 +262,7 @@ LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 # development bundles generate nvkr-dev-<name>.yml beside the authored files in
 # LICENSE_AUTHORED, which the second check still requires to carry a header.
 LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
+	-ignore '.github/nvkr-plan-store/**/*.sh' \
 	-ignore '.github/workflows/nvkr-run.yml' -ignore '.github/workflows/nvkr-qualify.yml' \
 	-ignore '.github/workflows/nvkr-run-*.yml' \
 	-ignore '.github/workflows/nvkr-qualify-*.yml' -ignore '.github/workflows/nvkr-smoke-*.yml' \
@@ -266,7 +272,7 @@ LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
 	-ignore '.github/workflows/nvkr-smoke.yml' -ignore '.github/workflows/nvkr-dev.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
 	-ignore '.nvkr/**' -ignore '.nvkr-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify(-[a-z0-9-]+)?|smoke(-[a-z0-9-]+)?|dev(-[a-z0-9-]+)?)(__partition-[0-9]{2}|__w-[a-z0-9-]+)?\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/nvkr-plan-store/(scripts/.+@[0-9a-f]{12}|[0-9a-f]{64})\.sh$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify(-[a-z0-9-]+)?|smoke(-[a-z0-9-]+)?|dev(-[a-z0-9-]+)?)(__partition-[0-9]{2}|__w-[a-z0-9-]+)?\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
 LICENSE_AUTHORED := ^\.github/workflows/nvkr-dev-cleanup\.yml$$
 LICENSE_SOURCES := git ls-files '*.go' '*.py' '*.sh' '*.yaml' '*.yml' '*.jq' '*Dockerfile*' '*Makefile'
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
@@ -305,7 +311,7 @@ license-header-check: ## Fail when a source file has no license header.
 .PHONY: workflow-generator
 workflow-generator: go-version-check
 	@# The generator version is an input to regeneration (ADR-21 §1) and is recorded
-	@# in .github/nvkr-run/plan.json as `generatorVersion`. Building via `make build`,
+	@# in .github/nvkr-run-nvke/plan.json as `generatorVersion`. Building via `make build`,
 	@# whose version comes from `git describe`, therefore always reports drift. Build
 	@# the generator with the same canonical version string the generated Run
 	@# workflow uses, so this target is reproducible locally and in CI.
@@ -314,7 +320,7 @@ workflow-generator: go-version-check
 		-o bin/nvkr-exec ./cmd/nvkr
 
 # Diagnostic: `make workflows-check PROJECTION_PILOT=in-process` checks the
-# production, development and NVKE family producer bundles through the reference projection
+# production and development producer bundles through the reference projection
 # plugin over that transport. Qualification workflows and runtime bundles stay core-only.
 PROJECTION_PILOT ?=
 PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION_PILOT))
@@ -322,6 +328,7 @@ PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION
 .PHONY: workflows-check
 workflows-check: workflow-generator producer-overlays-check catalog-refresh-check catalog-index-check ## Check every maintained producer and qualification bundle from the authored inventory.
 	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
+	bin/nvkr-exec definition pin --check --definition $(NVKE_RELEASE)
 	python3 scripts/generate-maintained.py --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: producer-overlays-check producer-overlays-generate
@@ -367,23 +374,18 @@ workflows-generate: workflow-generator ## Regenerate all maintained bundles from
 	python3 scripts/generate-maintained.py
 	$(MAKE) catalog-refresh-generate
 
-.PHONY: nvke-split-generate nvke-split-check
-nvke-split-generate: workflow-generator ## Regenerate the independent NVKE family bundles.
-	python3 scripts/generate-maintained.py --group split
-
-nvke-split-check: workflow-generator ## Check the independent NVKE family bundles.
-	python3 scripts/generate-maintained.py --group split --check $(PROJECTION_PILOT_FLAG)
-
 # Composite member pin admission is independent of bundle inventory admission.
 NVKE_GPU_SITE := inputs/definitions/nvke/gpu-site.composite.yaml
+NVKE_RELEASE := inputs/definitions/nvke/gpu-site-release.composite.yaml
 
-.PHONY: nvke-gpu-site-generate nvke-gpu-site-check
-nvke-gpu-site-generate: workflow-generator ## Regenerate the GPU site production bundle.
-	python3 scripts/generate-maintained.py --group gpu-site
+.PHONY: nvke-generate nvke-check
+nvke-generate: workflow-generator ## Regenerate the NVKE production bundle.
+	python3 scripts/generate-maintained.py --group main
 
-nvke-gpu-site-check: workflow-generator ## Check GPU site member pins and generation.
+nvke-check: workflow-generator ## Check NVKE member pins and generation.
 	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
-	python3 scripts/generate-maintained.py --group gpu-site --check $(PROJECTION_PILOT_FLAG)
+	bin/nvkr-exec definition pin --check --definition $(NVKE_RELEASE)
+	python3 scripts/generate-maintained.py --group main --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-generate pipeline-dev-check
 pipeline-dev-generate: workflow-generator ## Regenerate the development bundle.
@@ -404,7 +406,7 @@ check: go-version-check fmt-check definitions-location-check reconciliation-loca
 # merge gate runs. CodeQL and the DCO App run only on GitHub.
 # Checks needing extra tools or network access run before the long test suite.
 CI_CHECKS := fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check shellcheck actionlint test-workflow-scripts \
-	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test demo-hello
+	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test demo-hello demo-check
 
 .PHONY: ci-check
 ci-check: go-version-check $(CI_CHECKS) ## Complete local merge gate (needs public NVKE access, Node and Fern; see CONTRIBUTING.md).

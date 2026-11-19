@@ -1,14 +1,19 @@
 # NVIDIA Workload Identity DSX IMDS NodeAttestor agent
 
-This additive selection builds the agent half of the upstream `dsx_imds` SPIRE
+This independent selection builds the agent half of the upstream `dsx_imds` SPIRE
 NodeAttestor from public NVIDIA Workload Identity v1.15.0 as one source-built
-host-package executable per Linux architecture. Registering the selection
-changes catalog-maintenance bookkeeping only: the bundle is named as an
-additional generation Run in `inputs/policies/maintained-generation.json` and
-`inputs/policies/nvke-catalog-maintenance.yaml`, and the maintenance workflow is
-regenerated to transport it. Existing source pins, production output selections
-and pre-existing generated bundles are preserved byte for byte; no maintained
-NVKE, AICR or NVSentinel selection is added or altered.
+host-package executable per Linux architecture. It is the fourth maintained
+bundle beside the three NVKE composite bundles, without adding a member to any
+NVKE composite or changing its derived inventory.
+
+The [generation inventory](../../policies/maintained-generation.json) and
+[NVKE refresh policy](../../policies/nvke-catalog-maintenance.yaml) explicitly
+include this build-only Run. That shared refresh keeps the generator, shared Plan
+store and imported action-pin cohort coherent across every committed bundle.
+It does not advance the independently pinned WLI source or toolchain; an invalid
+WLI closure intentionally blocks that shared refresh. WLI pin changes retain the
+catalog's own `catalog pin`/`catalog bump` owner. Regeneration owns all workflow,
+Plan and manifest bytes.
 
 | Output | Platform | Producer |
 |---|---|---|
@@ -33,7 +38,7 @@ plugin is started through the SPIRE plugin SDK and has no application CLI
 contract; no `--version` or `--help` smoke check is claimed.
 
 The [Environment](../../environments/github-wli-imds-agent.yaml) generates the
-independent `nvkr-run-wli-imds-agent` production bundle on generic hosted
+independent `nvkr-run-wli-imds-agent` build-only bundle on generic hosted
 runners with manual dispatch only. It selects no publication, signing or
 qualification policy: generating the workflow and its source artifacts authorizes
 neither a dispatch nor any external publication. A Run on this selection is
@@ -46,16 +51,29 @@ The pinned source is NVIDIA Workload Identity `v1.15.0`
 resolved by `catalog pin`. Validate and inspect with the standard sequence:
 
 ```sh
-make build
-bin/nvkr definition validate --definition inputs/definitions/nvidia-workload-identity/imds-agent.yaml
-bin/nvkr run plan \
+make workflow-generator
+bin/nvkr-exec definition validate --definition inputs/definitions/nvidia-workload-identity/imds-agent.yaml
+bin/nvkr-exec run plan \
   --definition inputs/definitions/nvidia-workload-identity/imds-agent.yaml \
   --environment inputs/environments/github-wli-imds-agent.yaml
+bin/nvkr-exec run generate --engine github \
+  --definition inputs/definitions/nvidia-workload-identity/imds-agent.yaml \
+  --environment inputs/environments/github-wli-imds-agent.yaml --root .
+bin/nvkr-exec run generate --engine github \
+  --definition inputs/definitions/nvidia-workload-identity/imds-agent.yaml \
+  --environment inputs/environments/github-wli-imds-agent.yaml --root . --check
 ```
+
+The installed `.github/workflows/nvkr-run-wli-imds-agent.yml` retains the manual
+GitHub Actions dispatch entry after the change is merged onto the default branch.
+Generating or checking it locally does not dispatch it. To preview independently,
+use an existing empty output directory as `--root` for both generate and check; the same
+manual-only workflow and complete Plan store are emitted there. That output tree
+is a generated bundle, not a standalone NVKR source checkout or a hosted Run.
 
 Actual binary production for both architectures requires the real hosted source
 fetch, dependency vendoring and container builds; no such Run is recorded here,
 and a completed build does not establish node-attestation behavior. Validation
 scope and recorded evidence for this selection belong to the repository's
-[implementation and evidence record](../../../docs/adr/reconciliation/README.md);
+[implementation and evidence record](../../../docs/adr/reconciliation/adr-22.md#nvidia-workload-identity-agent);
 this guide describes declarations and generation only.

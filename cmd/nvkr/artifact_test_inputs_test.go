@@ -18,7 +18,7 @@ func TestArtifactTestInputCommand(t *testing.T) {
 	lifecycleCommandRepo(t)
 	for _, output := range []string{"nvkectl", "nvkectl-linux-arm64", "missing", ""} {
 		t.Run(output, func(t *testing.T) {
-			args := []string{"run", "artifact-test-inputs", "--plan", ".github/nvkr-run/plan.json"}
+			args := []string{"run", "artifact-test-inputs", "--plan", ".github/nvkr-run-nvke/plan.json"}
 			if output != "" {
 				args = append(args, "--output", output)
 			}
@@ -37,7 +37,7 @@ func TestArtifactTestInputCommand(t *testing.T) {
 			if err := json.Unmarshal([]byte(raw), &inputs); err != nil {
 				t.Fatal(err)
 			}
-			plan, err := factory.LoadPlanContext(t.Context(), ".github/nvkr-run/plan.json")
+			plan, err := factory.LoadPlanContext(t.Context(), ".github/nvkr-run-nvke/plan.json")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -46,10 +46,10 @@ func TestArtifactTestInputCommand(t *testing.T) {
 				if build.Name != output {
 					continue
 				}
-				component := build.CatalogSnapshot.Components["nvkectl"]
+				component := build.CatalogSnapshot.Components["nvkectl-module-tags"]
 				want = factory.CLIArtifactTestInputs{Output: output, BuildDigest: build.BuildDigest, Platform: build.Platform, Repo: component.Repo, Commit: component.Commit, TreeHash: component.TreeHash, ExpectedVersion: component.VersionStamp["NVKECTL_VERSION"]}
 				for _, node := range build.Graph.Nodes {
-					if node.Kind == ir.KindBuild && node.Component == "nvkectl" {
+					if node.Kind == ir.KindBuild && node.Component == "nvkectl-module-tags" {
 						want.ToolchainImage = node.Toolchain
 					}
 				}
@@ -72,7 +72,7 @@ func TestArtifactTestInputCommandRefusals(t *testing.T) {
 		args []string
 		code e.Code
 	}{
-		{"positional", []string{"--plan", ".github/nvkr-run/plan.json", "extra"}, e.CodeUsage},
+		{"positional", []string{"--plan", ".github/nvkr-run-nvke/plan.json", "extra"}, e.CodeUsage},
 		{"malformed", []string{"--plan", malformed}, e.CodePipelineDrift},
 		{"missing file", []string{"--plan", "missing.json"}, e.CodePipelineDrift},
 	} {

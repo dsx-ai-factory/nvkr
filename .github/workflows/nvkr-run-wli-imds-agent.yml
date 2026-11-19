@@ -99,6 +99,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-dsx-imds-node-attestor-agent-adc01ba95923:
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-dsx-imds-node-attestor-agent-adc01ba95923)
     name: 'Build and prepare dsx-imds-node-attestor-agent-linux-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
@@ -153,6 +154,7 @@ jobs:
       actions: read
       contents: read
   nvkr-process-dsx-imds-node-attestor-agent-0b5a972b58aa:
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-dsx-imds-node-attestor-agent-0b5a972b58aa)
     name: 'Build and prepare dsx-imds-node-attestor-agent-linux-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300

@@ -259,15 +259,15 @@ func testActionRefs(t *testing.T, plan *Plan) githubActionRefs {
 // Expand the generated local actions before asserting the logical job contract.
 func expandedGitHubWorkflow(t *testing.T, bundle *GeneratedBundle) []byte {
 	t.Helper()
-	var plan Plan
-	if err := canonical.UnmarshalExact(bundle.Files[bundle.PlanPath], &plan); err != nil {
-		t.Fatal(err)
-	}
-	raw, err := expandGitHubActions(&plan, bundle.Files[bundle.WorkflowPath], githubTestExpansionFiles(bundle))
+	plan, _, err := joinPlanTree(t.Context(), bundle.PlanPath, bundle.Files)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return logicalGitHubWorkflow(t, &plan, raw)
+	raw, err := expandGitHubActions(plan, bundle.Files[bundle.WorkflowPath], githubTestExpansionFiles(bundle))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return logicalGitHubWorkflow(t, plan, raw)
 }
 
 // Admit physical scheduling before examining logical artifact dependencies.
@@ -544,7 +544,11 @@ func unsharedGitHubTestBundle(t *testing.T, plan *Plan, bundle *GeneratedBundle,
 	workflow = lowerGitHubTestNeeds(t, plan, workflow)
 	changed := *bundle
 	changed.Files = files
-	changed.Files[bundle.PlanPath] = append([]byte(nil), bundle.Files[bundle.PlanPath]...)
+	for name, raw := range bundle.Files {
+		if name == bundle.PlanPath || isPlanStorePath(name) {
+			changed.Files[name] = append([]byte(nil), raw...)
+		}
+	}
 	changed.Files[bundle.WorkflowPath] = workflow
 	changed.WorkflowDigest = pipeline.FileDigest(workflow)
 	return &changed
@@ -595,6 +599,9 @@ func assertGeneratedGitHubMembers(t *testing.T, bundle *GeneratedBundle) {
 	actions := 0
 	for name := range bundle.Files {
 		if name == bundle.PlanPath || name == GitHubWorkflowPath {
+			continue
+		}
+		if isPlanStorePath(name) {
 			continue
 		}
 		if !strings.HasPrefix(name, ".github/nvkr-run/actions/") || !strings.HasSuffix(name, "/action.yml") {

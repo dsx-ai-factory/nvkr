@@ -8,7 +8,7 @@ vocabulary preserves the distinctions needed to authenticate them.
 
 **Definition**:
 Authored product intent declaring named outputs, their exact catalog producers, target platforms and packaging
-intent. An output directly selects components. Packaging intent may bind catalog-declared Helm image slots to named image outputs; the resulting digest is content, while its
+intent. An ordinary output directly selects components. Packaging intent may bind catalog-declared Helm image slots to named image outputs; the resulting digest is content, while its
 deployment repository remains transport configuration. Catalog-owned digest representation
 may retain the full OCI digest or supply SHA-256 hex to a template that owns the algorithm prefix;
 this does not change the authenticated image identity or rewrite templates.
@@ -64,6 +64,8 @@ _Avoid_: Producer, expected output, release
 
 **OCI bundle**:
 A generic archive artifact carrying a pinned producer's rendered files, including AICR deployment bundles.
+A release-derived inventory bundle may instead be owned by a composite and describe named member outputs
+after their packaging. Its declaration and composite attribution are identity-bound.
 The OCI manifest identifies the output; the archive and its file inventory retain separate exact byte bindings.
 Rendering and file integrity do not establish deployed dependency closure or hardware compatibility.
 _Avoid_: Native Helm chart, container image, cluster topology, new lifecycle object
@@ -100,6 +102,9 @@ releases their named outputs through one Plan, Run and Release.
 units U1–U8, including complete-composite hosted qualification with independent policies, are implemented
 and contract-tested. The [evidence ledger](docs/adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
 owns hosted publication, qualification and independent consumer-acceptance status.
+The composite supplies all maintained NVKE production, development and floating-source nightly bundles.
+The explicit ADR-26 U10 maintainer cutover supersedes the former retirement prerequisites; it does not
+establish independent consumer acceptance or change member Build identities.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition**:
@@ -118,6 +123,13 @@ _Avoid_: Override, pin exception, allowlist
 A Definition's declaration of exact selected producers, concrete target platform or explicit aggregate image
 platform set, and the artifact format they must produce. Each named output is an independent required use, even when two outputs share a Build Digest.
 _Avoid_: Observed artifact, delivery route
+
+**Release-derived output**:
+An explicitly selected packaging derivation from authenticated named sibling results. The first admitted
+encoding is an AICR inventory in a bundle. Its logical identity binds the publication prefix, encoding and
+sibling Build identities; runtime package digests enter the payload. It is re-derived for a new destination
+and becomes an ordinary required, signed Release member. Topology and installation remain downstream.
+_Avoid_: Release readback, unsigned description, source producer
 
 **Disk-image output**:
 A named output containing exactly one disk-producing catalog root plus every explicitly selected component in
@@ -155,7 +167,8 @@ _Avoid_: Authored selection group, artifact, release
 **Build Digest**:
 The typed identity of a generated build graph's transport-independent logical content under `nvkr.build`.
 Output names and execution settings are bound by their
-owning records and excluded from this identity. Equal Build Digests do not merge required output uses or their evidence.
+owning records and excluded from ordinary producer identity. Release-derived outputs use the distinct
+tagged derivation projection under the same typed family (ADR-20), including the publication prefix. Equal Build Digests do not merge required output uses or their evidence.
 `nvkr.recipe` is reserved and never minted. Historical `nkd.recipe` signed bytes are not renamed or converted.
 _Avoid_: Artifact digest, graph-file hash
 
@@ -169,7 +182,10 @@ The complete generated closure of admitted Definition and Environment values, in
 packaging, routes and executable dependencies for a Run. Producer operations reference the single executable
 build instruction; observations are recorded separately. There is no authored compiler-handoff document.
 Readable views, linked graph exports and semantic comparisons describe the validated Plan; they do not replace
-its canonical stored bytes or grant execution or evidence authority.
+its canonical identity bytes or grant execution or evidence authority. GitHub bundle storage splits
+the Plan into a per-bundle index and shared frozen records and command files under
+[ADR-21's storage contract](docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold).
+The loader reconstructs the same canonical bytes before execution. Packed canonical bytes remain the wire and Tekton form.
 An opted-in dispatch-frozen Plan records an explicit repository/main allowlist's exact
 commits, trees and source timestamps together with captured authored inputs. Workers,
 retries and qualification reuse that selection; independent dependency and toolchain pins
@@ -274,7 +290,7 @@ Opt-in copy of named QCOW2/EFI bytes and original proofs, with complete OCI Rele
 _Avoid_: Partial mirror success, new Release, checksum as membership
 
 **MachineImage render artifact**:
-Proposed signed CR artifact for declared disk/architecture/destination pairs. Its own Build includes byte-affecting serving configuration; its eventual aggregate/content/inventory digests are excluded. Downstream NVKE owns deployment; the artifact grants no registration, placement or disk-selection authority.
+Proposed signed CR artifact for declared disk/architecture/destination pairs. The NVKE catalog owns a script/template candidate validated against the CRD from pinned NVKE source; NVKR Go stays agnostic. Production rendering remains unavailable pending authenticated integration and boot acceptance. Its own Build includes byte-affecting serving configuration; its eventual aggregate/content/inventory digests are excluded. Downstream NVKE owns deployment; the artifact grants no registration, placement or disk-selection authority.
 _Avoid_: Final Release root, selected-verification receipt, installed machine
 
 ## Evidence and authority
@@ -350,7 +366,7 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
-documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 and the M3 MVP
+documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. NVKE and the M3 MVP
 retain producer-only disk evidence. Strict inspection and material reconciliation are deferred hardening.
 Embedded-component declarations are optional: omission is not applicable, while any authored declaration must
 match its referenced pinned upstream metadata. That comparison does not establish effective customized or

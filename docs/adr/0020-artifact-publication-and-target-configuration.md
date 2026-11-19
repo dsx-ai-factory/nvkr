@@ -26,15 +26,29 @@ This ADR fixes the target-configuration surface and the emitted publish phase.
 
 ## Decision
 
-### 1. Targets are operator/transport configuration — never part of the build identity
+### 1. Payload identity is destination-free; derived outputs are publication-bound
 
 Publishing the same verified artifact bytes to *different* registries preserves their **artifact digests**;
 only the location differs. This makes no claim that two executions reproduce identical bytes. Target registries
 and repositories are **environment configuration**, declared **outside producer instructions** and **excluded from `buildDigest`**,
 because they are transport rather than a build input. This preserves define-once / publish-many and
-cross-environment byte-identity.
+cross-environment byte-identity for ordinary payload outputs.
 
-The proposed MachineImage renderer consumes serving configuration as content. Its Build includes that configuration,
+The bounded exception is an explicitly declared release-derived inventory (`aicr-inventory-v1`), delivered as
+`bundle-oci`. Its `nvkr.build` identity hashes a tagged canonical derivation binding: encoding, exact
+publication repository prefix and sorted sibling names, formats and logical Build Digests. Observed package
+digests are runtime dataflow, not retroactive logical identity. Derivation authenticates every named sibling
+package and uses the same inventory projection as release export, then emits a deterministic archive with
+one regular `artifacts/inventory.yaml` file. It reads neither the registry nor the Release.
+
+A publication block is mandatory; missing publication and development attempt relocation fail capability
+admission before work. The destination must be fixed at Plan compilation. A different prefix requires a new
+derivation, Build Digest, evidence and publication; copying or rewriting an old inventory does not authorize
+new locations. Other Environment changes remain bound by Environment and Plan identity. This exception
+does not change source producer identities, signing policy, credentials or the downstream deployment boundary.
+Catalog and installer derivations are deferred. This member is artifact bytes, not an ADR-31 description.
+
+A proposed catalog-owned downstream renderer consumes serving configuration as content. Its Build includes that configuration,
 render profile and selected producer Build dependencies. Mapping changes alter its Build, artifact and enclosing identities;
 source QCOW2/EFI bytes and Builds remain unchanged. Copy-only relocation retains the ordinary transport rule.
 Runtime versions, read times and receipts are excluded from render Build identity and YAML.
@@ -171,7 +185,7 @@ and rejects producer-only acceptance. Neither path accepts a
 restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
 the live inspection-and-packaging operation in strict mode; producer-provenance mode skips inspection and consumes
-the original producer/material owners instead. Producer provenance is the M2 and M3 MVP disk acceptance scope;
+the original producer/material owners instead. Producer provenance is the NVKE and M3 MVP disk acceptance scope;
 full inspection and material reconciliation are deferred hardening (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
 in [reconciliation: Native ARC disk route](reconciliation/native-arc-disk-route.md#native-arc-disk-route). The ordinary local scheduler
 still rejects disk publication.
@@ -344,6 +358,31 @@ Pipeline-attested contract from [#514](https://github.com/dsx-ai-factory/nvkr/is
 [Reconciliation](reconciliation/object-store-publication.md#selective-boot-asset-publication) owns acceptance/implementation. Existing full-mirror schemas, bytes and verification stay unchanged.
 Generated execution, producer integration and rendering remain separate acceptance work; compiling the versioned Plan does not enable those routes.
 
+NVKR Go remains independent of downstream CRDs and rendering conventions. The NVKE catalog owns
+its MachineImage candidate as a small script and maintained template under
+`inputs/catalogs/nvke/machineimage/`. It consumes generic preliminary or selected boot descriptions
+(named disk/platform raw digests, imager members/profiles and destination URLs), with separately supplied
+proposed disk metadata. It reads the CRD directly from the catalog's locked `nvke-controller` source commit;
+no CRD is vendored and no floating or dirty-working-tree schema is used. Rendering validates the complete
+set against that source's served OpenAPI schema before emitting any manifests. Local JSON Schema checks
+are not Kubernetes CEL/admission or boot evidence.
+
+This catalog experiment is not a declared producer, generated execution route or NVKR lifecycle API.
+Production rendering remains unavailable. Candidate descriptions authenticate nothing; metadata bindings,
+ordinary producer/material integration, signed artifact handoff and trusted import remain unimplemented.
+The candidate names fingerprint exact pre-name YAML bytes, not a typed Build or Release identity. Its
+annotations distinguish output/destination pairs and record the imager raw digest. No eventual aggregate,
+content or inventory identity enters the rendered bytes. Existing source Build and Plan identities are
+unchanged by this unregistered candidate. Future producer admission must bind the script, template,
+source CRD, exact raw dependencies and authorized metadata through the existing material/Build owners.
+
+NVKE owns CRD compatibility, iPXE/template conventions and downstream registration. Strict imager
+profile/source admission remains with [#516](https://github.com/dsx-ai-factory/nvkr/issues/516) after mkosi
+step 3 and [NVKE #2365](https://github.com/dsx-ai-factory/nvke/issues/2365), followed by recorded amd64/arm64
+boot evidence. [#517](https://github.com/dsx-ai-factory/nvkr/issues/517) remains open for those integrations.
+The remaining render ordering and binding requirements below describe future admitted catalog producers,
+not an NVKE-specific renderer or general templating engine in NVKR Go.
+
 **Admission.** `selective-boot-v1` requires a new Environment/Plan version and explicit destination modes.
 The new schema has no mode default; old schemas keep full mirror on omission and reject selective fields. Select sorted, nonempty QCOW2 outputs, one
 compatible EFI output/regular member/profile per architecture, and named destinations. Require every selected asset
@@ -378,7 +417,8 @@ bind member name/hash/size/architecture; otherwise reject or extend its original
 raw payloads and required proofs. No unselected layers, bundle fallback, truncated documents, reference-only proofs,
 copier signatures or unsigned subset assertions.
 Delivery owns raw-member inspection/transport, `sign` proof authentication, `lifecycle` policy/input/membership joins and
-opaque receipts, factory dependencies/finalization, CLI/SDK adaptation. Structured records use canonical typed identities;
+opaque receipts, factory dependencies/finalization, CLI/SDK adaptation. Catalog producers own downstream schema/template rendering;
+NVKR consumes their ordinary artifacts without CRD-specific Go types or logic. Structured records use canonical typed identities;
 raw SHA-256 is blob integrity only.
 
 **Limits.** Preparation/rendering and final publication each admit a fresh store/session and operation/cleanup deadlines
@@ -393,6 +433,15 @@ deadline/read allowance; restarted phases admit fresh limits. Per destination, r
 | Total/count | Exact payload sizes plus all reservations and Plan-derived maximum control/proof object count. Count shared bytes once; check every use. |
 | Reads | Plan-declared finite allowance per phase covering acquisition, proof verification, pinned/HTTPS reads and retry/failed responses. Reject insufficient mandatory-pass allowance before I/O; debit actual bytes locally. |
 
+The conservative source-read reservation uses the delivery source-layer ceiling (64 GiB per selected
+output-local disk or executable), independently of the destination raw-object ceiling. Preparation acquires
+the whole executable bundle before extracting the selected EFI; unselected bundle members can be larger
+than that EFI. Phase accounting bounds response reads during acquisition; `OpenPublication` enforces
+source-layer admission after staging. The reservation covers successful sources, not a per-layer preflight
+check. Selected destination object/total limits remain unchanged. Both compiled phase allowances retain this conservative source
+reservation. This correction changes opt-in v7 Plan Digests on recompilation when the destination object
+ceiling is below 64 GiB; it changes neither producer Build Digests nor existing full-mirror Plans.
+
 Reject insufficient reservations or oversized documents. Later phases recompute unique bytes/count from the Plan,
 authenticated controls and checked destination objects, never transported counters. Controls must fit owner caps and
 reservations.
@@ -403,7 +452,9 @@ reservations.
 2. Copy raw QCOW2/EFI to immutable keys; fully hash/size-check pinned S3 readback and declared HTTPS responses.
    Issue a live preliminary receipt bound to output/member, inputs/invocations, policy, bytes, destination pins and mapping.
    It proves bytes and observed availability, never aggregate membership.
-3. In that lifecycle process, render the predeclared artifact from receipts/authenticated metadata using its pinned schema/profile.
+3. Hand generic receipt-bound inputs and authenticated metadata to the predeclared catalog producer.
+   Its script/template renders the artifact using the CRD from its locked NVKE source and admitted profile;
+   lifecycle owns the authority handoff, without interpreting downstream CRD fields.
    Exclude its eventual aggregate root, release-content and inventory digests from bytes and identity inputs. Predicted URLs
    cannot replace receipts. The ordinary output job publishes/signs the prepared artifact through authenticated producer handoff.
 4. Assemble/publish/sign/verify every required OCI member. A separate final selective job reauthenticates aggregate membership
@@ -694,9 +745,9 @@ for another named output/platform use. Consumer validation checks the complete m
 it, and release navigation describes the index and each child without claiming signature authority. Helm
 bindings require their chart platform to belong to the index's declared and observed coverage and embed the
 complete index digest. No post-build manifest rewrite or `platform: multi` is admitted. Explicit discovery
-aliases follow the post-readback rule in section 2. M2 ARC/per-output metadata-only publication composition
+aliases follow the post-readback rule in section 2. NVKE ARC/per-output metadata-only publication composition
 and a dual-native hosted build/sign/publication remain separate, unexercised integration work. See
-[multi-architecture CWE delivery](../multiarch-cwe-delivery.md).
+[multi-architecture nvke-controller delivery](../multiarch-nvke-controller-delivery.md).
 
 ### 5. Credentials by reference, never embedded
 
@@ -970,7 +1021,7 @@ config under OCI's empty-config media type, subject and bundle layer in the owni
 no raw SBOM copy is published. Its OCI subject is the associated deliverable manifest, while the statement
 subject remains the exact inventoried binary, native image manifest, or source/final archive. Shared evidence
 belongs to the first sorted output membership's repository. Membership binds the exact subject, stage,
-canonical document digest, bundle blob and manifest digests, and typed document identity. The CLI inventories its exact binary; CWE inventories
+canonical document digest, bundle blob and manifest digests, and typed document identity. The CLI inventories its exact binary; nvke-controller inventories
 the native manifest and records the scanned OCI-export input; Helm has distinct source-archive and final-bound-
 package inventories. Identical evidence may have one published document with sorted output memberships only
 after each output's exact producer/evidence handoff is validated. Equal Build Digests cannot satisfy missing
@@ -1009,7 +1060,7 @@ its name discovered from the archive itself rather than assumed, the same shape 
 — extracted through the bounded transport adapter and repacked deterministically, re-rooted onto the chart's
 own declared name exactly as `helm package` would produce it. Lifecycle observation checks the exact archive
 against its producer result and independently reproduces the publication payload. Optional Definition Helm
-settings contain only a named relationship map: `helm.images: {controller: cwe}` binds a chart slot to an OCI
+settings contain only a named relationship map: `helm.images: {controller: nvke-controller}` binds a chart slot to an OCI
 output on the same platform, or an aggregate output containing that platform. The selected source producer owns `helm.chart` (`.` for the archive root or a
 direct child directory) and each slot's `values.digest` path in `values.yaml`. Compilation joins the relationships with that output's resolved catalog,
 including catalog overrides. Every catalog slot must be bound exactly once; missing mappings, unbound slots
@@ -1040,7 +1091,7 @@ Acquired charts remain immutable and cannot use these bindings.
 Contract tests cover multiple slots, admission, unchanged templates and identical package bytes across
 Environment repository choices. Opt-in real Helm tests render the pinned NVKE controller chart for two
 repositories using the packaged digest value. This does not establish installation, signatures, runtime
-availability or a new full CWE-plus-charts build. See the [binding implementation guide](../declarative-helm-bindings.md).
+availability or a new full nvke-controller-plus-charts build. See the [binding implementation guide](../declarative-helm-bindings.md).
 
 A Helm output may instead select one acquired `raw` chart package. The compiler requires an acquisition
 producer and transports its result explicitly. Packaging checks the result and a bounded, no-follow held
@@ -1191,7 +1242,7 @@ The container-image delivery adapter has contract tests for exact OCI-export arc
 manifest/config/layer closure, decompressed layer identities, platform selection, safe archive members and
 unchanged image identities inside a publication root. Public OCI outputs lower to one built OCI-export
 component, checked against its producer bytes before publication; consumer projection checks the native image
-and its platform. The [combined hosted Run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md) exercises CLI, CWE and
+and its platform. The [combined hosted Run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md) exercises CLI, nvke-controller and
 source Helm production, image-bound chart packaging, GHCR publication, real keyless signing and complete
 finalization. This historical layout had three duplicated publications. Independent consumers authenticated all three; downloaded payload checks
 exercise the native image, recovered CLI and rendered chart binding. Acquired native OCI and Docker-schema-2

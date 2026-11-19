@@ -1,5 +1,8 @@
 # Build and run NVKE locally
 
+The demo/site implementation is a [separate Go module](../demos/nvke/README.md).
+`make demo` still builds `bin/nvke-demo` from the repository root.
+
 ## Native Linux and Mac path
 
 The Go demo runs `nvkr`, `nvke-demo`, `nvkectl` and NICoSim on the execution
@@ -234,7 +237,7 @@ For the native Mac workflow, install:
 - A seed ISO builder on `PATH`: `cloud-localds`, `mkisofs` or `genisoimage`.
   Homebrew `cdrtools` supplies `mkisofs`. The CLI checks this prerequisite before deployment work; it does not install the tool.
 - Homebrew `swtpm` and its installed `libtpms` dependency. The Mac site uses a real software TPM through the supported NICoSim QEMU executable override; NVKE sources stay unchanged. These dynamically linked dependencies remain installed on the host.
-- The matched vmnet client/helper from the [shared native catalog](../inputs/catalogs/tools/native/README.md), installed at the paths required there. Private tool extraction alone does not install these prerequisites.
+- The matched vmnet client/helper from the [shared native catalog](../inputs/catalogs/tools/notes/tools-native-README.md), installed at the paths required there. Private tool extraction alone does not install these prerequisites.
 - Packer **1.15.4** and the installed QEMU plugin **1.1.6**. `packer plugins installed`
   must identify `packer-plugin-qemu_v1.1.6_x5.0_darwin_arm64` and its sibling
   `_SHA256SUM` file. BUILD discovers and captures this installation; it does not install it.
@@ -707,7 +710,7 @@ export NVKR_NVKE_E2E_REPO="$(pwd -P)"
 export NVKR_NVKE_E2E_OUT="$PWD/.nvkr/native-test-01"
 export NVKR_NVKE_E2E_ATTEMPT=native-test-01
 # Optional: NVKR_NVKE_E2E_BINARY selects the same-revision helper at another path.
-GOTOOLCHAIN=local go test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -timeout 10h
+GOTOOLCHAIN=local go -C demos/nvke test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -timeout 10h
 ```
 
 On Mac, use `NVKR_NVKE_E2E_CONFIG` with `run.accelerator: tcg` for the retained
@@ -720,7 +723,7 @@ existing `run` mapping. Then run:
 ```sh
 export NVKR_NVKE_E2E=1
 export NVKR_NVKE_E2E_CONFIG=/absolute/path/to/native-mac.yaml
-GOTOOLCHAIN=local go test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -timeout 10h
+GOTOOLCHAIN=local go -C demos/nvke test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -timeout 10h
 ```
 
 The optional selections are:
@@ -757,7 +760,7 @@ Go flow on public hosted AMD64; its exact-run evidence is recorded separately.
 
 ### Reuse a native site from Go tests
 
-Go tests in NVKE or a separate customer module can import `pkg/nvkr/demo` and call
+Go tests in NVKE or a separate customer module can import `demos/nvke/pkg/nvkr/demo` and call
 `demo.WithSite` with the same descriptive native configuration and
 completed artifact/tool Runs used by the CLI. This provisional diagnostic facade
 delegates to the existing owner; it adds no NVKR lifecycle or qualification API.
@@ -768,11 +771,16 @@ requests one control plane and two workers independently of suite selection.
 Select `Config.Conformance` before opening the site to admit the conformance
 tool outputs; it requires two workers.
 
+For local development in another Go module, replace both modules with the matching
+checkout: `github.com/dsx-ai-factory/nvkr` with the repository root and
+`github.com/dsx-ai-factory/nvkr/demos/nvke` with its `demos/nvke` directory.
+The demo module temporarily imports core packages; it is not yet a binary-only consumer.
+
 For a combined product Run and its matching native-tools Run, the explicit
 selection is:
 
 ```go
-import "github.com/dsx-ai-factory/nvkr/pkg/nvkr/demo"
+import "github.com/dsx-ai-factory/nvkr/demos/nvke/pkg/nvkr/demo"
 
 cfg := demo.Config{
     Repository: repo,
@@ -840,7 +848,7 @@ race-test coverage; a real site-reuse test remains externally unverified.
 ## Private site identity operation helper
 
 The shared site-startup tool catalog builds a Linux helper matching the selected
-guest architecture for execution in an existing admitted NVKE controller container. `pkg/nvkr/siteidentity` owns its
+guest architecture for execution in an existing admitted NVKE controller container. `demos/nvke/pkg/nvkr/siteidentity` owns its
 mTLS probe, upstream SPIRE reconfiguration and authenticated fresh-peer observation;
 the executable only adapts bounded standard input/output and coded errors.
 ARM64 guests consume `site-startup-tools-arm64`; AMD64 guests consume
@@ -937,11 +945,11 @@ below. NVKR verifies the pinned commit and tree; NVIDIA OVN retains its separate
 
 | Part | Selected source | Owning input |
 | --- | --- | --- |
-| Native host CLI, installer and NICoSim | `v0.23.0` / `2cfd0008` | [Shared tools lock](../inputs/catalogs/tools/native/pins.lock.yaml) |
-| Site CLI/controller/charts and provisioned provider | `v0.23.0` / `2cfd0008` | [Native site lock](../inputs/catalogs/nvke/native-site/pins.lock.yaml) |
-| OS, agent and kubeadm | `v0.23.0` / `2cfd0008` | [Shared release OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) |
-| Profiles and runbooks | `v0.23.0` / `2cfd0008` | [Native profiles lock](../inputs/catalogs/controller-profiles/native-nvidia/pins.lock.yaml) |
-| Upstream SPIRE/TPM agent packaging | `v0.23.0` / `2cfd0008` | [Shared release OS lock](../inputs/catalogs/node-images/release/pins.lock.yaml) |
+| Native host CLI, installer and NICoSim | `v0.23.0` / `2cfd0008` | [Shared tools lock](../inputs/catalogs/tools/pins.lock.yaml) |
+| Site CLI/controller/charts and provisioned provider | `v0.23.0` / `2cfd0008` | [Native site lock](../inputs/catalogs/nvke/pins.lock.yaml) |
+| OS, agent and kubeadm | `v0.23.0` / `2cfd0008` | [Shared release OS lock](../inputs/catalogs/node-images/pins.lock.yaml) |
+| Profiles and runbooks | `v0.23.0` / `2cfd0008` | [Native profiles lock](../inputs/catalogs/nvke/pins.lock.yaml) |
+| Upstream SPIRE/TPM agent packaging | `v0.23.0` / `2cfd0008` | [Shared release OS lock](../inputs/catalogs/node-images/pins.lock.yaml) |
 | NVIDIA OVN image/chart | [`8af51273`](https://github.com/dsx-ai-factory/ovn-kubernetes/commit/8af51273d52dfa07454435d18d37230e582d797a), 2.4.2 | [Native NVIDIA overlay](../inputs/catalogs/node-images/variants/native-nvidia.json) |
 
 These host architectures use the same NVKE source selections. SPIRE packaging

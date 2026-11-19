@@ -14,6 +14,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
@@ -52,6 +53,64 @@ func evidenceFixture() Evidence {
 	worker := lifecycle.NativeToolSmokeReport{SchemaVersion: lifecycle.NativeToolSmokeSchema, ArtifactChecks: evidence.ArtifactChecks, Invocation: invocation, PolicyDigest: policyDigest, Platform: "linux/amd64", Image: policy.Smoke.Images["linux/amd64"], RuntimeImage: digest, RuntimeIdentity: digest, Status: "pass", Members: []lifecycle.ToolSmokeMember{{Output: "chart-a", Member: "chart-a", Subject: digest, BuildDigest: digest, Platform: "linux/amd64", PayloadDigest: digest, Size: 100, Profile: "helm-version", ExpectedVersion: "v1.2.3", ObservedVersion: "v1.2.3"}}}
 	evidence.ToolSmoke = lifecycle.ToolSmokeDescription{ArtifactChecks: evidence.ArtifactChecks, Invocation: invocation, PolicyDigest: policyDigest, Policy: policy, Workers: []lifecycle.NativeToolSmokeReport{worker}}
 	return evidence
+}
+
+func TestQualificationDerivedInventoryEvidence(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edit func(*lifecycle.ArtifactCheckOutput)
+		code e.Code
+	}{
+		{"exact", nil, ""},
+		{"missing marker", func(o *lifecycle.ArtifactCheckOutput) { o.Derived = nil }, e.CodeVerifyFailed},
+		{"invented native platform", func(o *lifecycle.ArtifactCheckOutput) { o.Platform = "linux/amd64" }, e.CodeVerifyFailed},
+		{"missing re-projection", func(o *lifecycle.ArtifactCheckOutput) { o.Checks = append(o.Checks[:1], o.Checks[2:]...) }, e.CodeGateUnmet},
+		{"fake producer", func(o *lifecycle.ArtifactCheckOutput) {
+			o.BuildSubjects = []delivery.BuildSubject{{Component: "fake", Digest: o.Subject}}
+		}, e.CodeVerifyFailed},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			v := evidenceFixture()
+			digest := "sha256:" + strings.Repeat("a", 64)
+			binding := &derivedoutput.Binding{Encoding: derivedoutput.InventoryV1, RepositoryPrefix: "registry.example.test/nvke", Inputs: []derivedoutput.Input{{Name: "chart-b", Kind: "helm-oci", BuildDigest: digest}}}
+			build, err := binding.BuildDigest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			o := lifecycle.ArtifactCheckOutput{Name: "inventory", Kind: lifecycle.OutputBundle, Reference: "registry.example.test/nvke/inventory@" + digest, Subject: digest, BuildDigest: build, Derived: binding, Overall: "pass"}
+			names := append([]string{"derived-inventory"}, requiredArtifactChecks...)
+			slices.Sort(names)
+			for _, name := range names {
+				o.Checks = append(o.Checks, lifecycle.ArtifactCheckResult{Name: name, Status: "pass"})
+			}
+			if tc.edit != nil {
+				tc.edit(&o)
+			}
+			v.ArtifactChecks.Outputs = append(v.ArtifactChecks.Outputs, o)
+			v.ToolSmoke.ArtifactChecks = v.ArtifactChecks
+			v.ToolSmoke.Policy.Smoke.NonToolOutputs = []lifecycle.QualificationNonToolOutput{{Output: "inventory", Kind: lifecycle.OutputBundle, Reason: "derived-inventory", Components: []string{}}}
+			v.ToolSmoke.PolicyDigest, err = v.ToolSmoke.Policy.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			v.ToolSmoke.Workers[0].ArtifactChecks = v.ArtifactChecks
+			v.ToolSmoke.Workers[0].PolicyDigest = v.ToolSmoke.PolicyDigest
+			v.Smoke, err = smokeVerdicts(v.ToolSmoke)
+			if err != nil && tc.code == "" {
+				t.Fatal(err)
+			}
+			// Keep complete set shape even for intentionally invalid worker claims.
+			if len(v.Smoke) != len(v.ArtifactChecks.Outputs) {
+				v.Smoke = make([]Verdict, len(v.ArtifactChecks.Outputs))
+			}
+			err = v.Validate()
+			if tc.code != "" {
+				requireCode(t, err, tc.code)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
 }
 
 func requireCode(t *testing.T, err error, code e.Code) {
