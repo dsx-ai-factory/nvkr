@@ -317,6 +317,7 @@ func sortedPinNames(m map[string]Pin) []string {
 func clonePinLock(lock *PinLock) *PinLock {
 	out := &PinLock{APIVersion: lockAPIVersion, Kind: lockKind, Pins: make(map[string]Pin, len(lock.Pins))}
 	for name, pin := range lock.Pins {
+		pin.Tools = cloneToolPins(pin.Tools)
 		if pin.Tool != nil {
 			copy := pin.Tool.clone()
 			pin.Tool = &copy

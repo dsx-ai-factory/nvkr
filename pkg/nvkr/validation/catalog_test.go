@@ -379,7 +379,7 @@ func TestCatalogProductionCLIAdmissionParityAndRefusal(t *testing.T) {
 			if err := os.WriteFile(artifact, []byte("supplied"), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			plan, err := filepath.Abs("../../../.github/nvkr-run/plan.json")
+			plan, err := filepath.Abs("../../../.github/nvkr-run-nvke/plan.json")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -553,7 +553,7 @@ func TestCatalogCLIAdmissionRefusesArtifactAndPlatformBeforeWorkspace(t *testing
 			if err := os.WriteFile(artifact, []byte("supplied"), tc.mode); err != nil {
 				t.Fatal(err)
 			}
-			plan, err := filepath.Abs("../../../.github/nvkr-run/plan.json")
+			plan, err := filepath.Abs("../../../.github/nvkr-run-nvke/plan.json")
 			if err != nil {
 				t.Fatal(err)
 			}

@@ -14,6 +14,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualification"
 )
 
@@ -35,7 +36,7 @@ func qualificationFixture(t *testing.T) (Config, func(string)) {
 	t.Helper()
 	cfg, promote := maintenanceFixture(t)
 	// Borrow the maintained catalog's pinned signing tools; nothing downloads them here.
-	maintained, err := filepath.Abs(filepath.Join(packageDir, "../../../inputs/catalogs/nvke/module-tags"))
+	maintained, err := filepath.Abs(filepath.Join(packageDir, "../../../inputs/catalogs/nvke"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +156,7 @@ func TestRefreshRegeneratesTheQualificationPairThatBindsTheChangedPlan(t *testin
 		case "catalog/pins.lock.yaml", ".github/workflows/nvkr-run.yml", ".github/workflows/nvkr-qualify.yml", ".github/workflows/nvkr-smoke.yml":
 			return true
 		}
-		return strings.HasPrefix(path, ".github/nvkr-run/") || strings.HasPrefix(path, ".github/nvkr-qualification/")
+		return strings.HasPrefix(path, ".github/nvkr-run/") || strings.HasPrefix(path, ".github/nvkr-qualification/") || strings.HasPrefix(path, factory.PlanStoreDirectory+"/")
 	}
 	changed := 0
 	for path, content := range after {

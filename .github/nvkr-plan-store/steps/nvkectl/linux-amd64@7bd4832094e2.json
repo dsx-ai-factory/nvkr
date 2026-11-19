@@ -1,0 +1,158 @@
+{
+  "buildDigest": "sha256:4a62276189870779fe46bfdcc8fd6447c144c7368047fa4b6410b3886ea5a8d6",
+  "catalogDigest": "sha256:cfdd2ac46b19b3d786987d53709b459a8964a32fadc4230ec3a41d68d9c470b7",
+  "components": [
+    "nvkectl-module-tags"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifactPath": "cli/bin/nvkectl",
+        "builderType": "oci-hermetic",
+        "command": [
+          "bash",
+          "-euc",
+          {
+            "file": ".github/nvkr-plan-store/scripts/nvkectl-module-tags/build@1dad2107593f.sh"
+          }
+        ],
+        "component": "nvkectl-module-tags",
+        "env": [
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GOAMD64",
+            "value": "v1"
+          },
+          {
+            "name": "GOARCH",
+            "value": "amd64"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "NVKECTL_COMMIT",
+            "value": "2cfd00081b468d85a4894ec17e9deac13c9d8169"
+          },
+          {
+            "name": "NVKECTL_DATE",
+            "value": "2026-10-29T01:07:19Z"
+          },
+          {
+            "name": "NVKECTL_VERSION",
+            "value": "v0.23.0"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1793236039"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-nvkectl-module-tags",
+        "kind": "build",
+        "needs": [
+          "fetch-source-7121efda008ae5ec9b97ac786045cce017bb45fe22275641d5499efbcd734bfa"
+        ],
+        "network": "none",
+        "outputType": "host-package",
+        "platform": "linux/amd64",
+        "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "sourceDest": "source-7121efda008ae5ec9b97ac786045cce017bb45fe22275641d5499efbcd734bfa",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "toolchain": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+        "vendorSpecDigest": "sha256:6c589ca0fff8276151a31b28404b28bbc0eaf64bcbee182b59f39795f1ad565c",
+        "version": "0.23.0",
+        "workdir": "/src",
+        "writeDir": "cli/bin"
+      },
+      {
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "dest": "source-7121efda008ae5ec9b97ac786045cce017bb45fe22275641d5499efbcd734bfa",
+        "id": "fetch-source-7121efda008ae5ec9b97ac786045cce017bb45fe22275641d5499efbcd734bfa",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/nvke",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "vendorCmd": [
+          "bash",
+          "-euc",
+          {
+            "file": ".github/nvkr-plan-store/scripts/nvke/vendor@093f880cf15a.sh"
+          }
+        ],
+        "vendorImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+        "vendorSpecDigest": "sha256:6c589ca0fff8276151a31b28404b28bbc0eaf64bcbee182b59f39795f1ad565c"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "build-nvkectl-module-tags"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "nvkectl",
+  "platform": "linux/amd64",
+  "resolvedComponents": [
+    {
+      "Name": "nvkectl-module-tags",
+      "artifactPath": "cli/bin/nvkectl",
+      "buildCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvkectl-module-tags/build@1dad2107593f.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": true,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0",
+      "toolchainImage": "golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b",
+      "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+      "vendorCommand": [
+        "bash",
+        "-euc",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@093f880cf15a.sh"
+        }
+      ],
+      "versionStamp": {
+        "NVKECTL_COMMIT": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "NVKECTL_DATE": "2026-10-29T01:07:19Z",
+        "NVKECTL_VERSION": "v0.23.0"
+      },
+      "writeDir": "cli/bin"
+    }
+  ]
+}

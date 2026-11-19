@@ -74,7 +74,7 @@ func TestGitHubImagePreflightGatesProducerFanout(t *testing.T) {
 					}
 					checked, probed := -1, -1
 					for index, step := range job.Steps {
-						if strings.Contains(step.Run, "check-runtime-inputs") {
+						if strings.Contains(step.Run, "factory github install-stage-runtime-inputs --plan ") {
 							checked = index
 						}
 						if strings.Contains(step.Run, "factory github preflight-images ") {

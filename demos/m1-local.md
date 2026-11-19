@@ -1,12 +1,12 @@
 # Local NVKE walkthrough and M1 evidence
 
 The script name is historical: `demo-m1-local.sh` now runs the combined NVKE Definition, producing the NVKE
-CLI, CWE runtime image, and quickstart Helm bundle. **M1 itself requires only the CLI vertical slice.** The
+CLI, nvke-controller runtime image, and quickstart Helm bundle. **M1 itself requires only the CLI vertical slice.** The
 script builds all three outputs, publishes one release index, then extracts and consumes its CLI artifact. It does not
-independently pull or smoke-test the CWE image or render the Helm charts.
+independently pull or smoke-test the nvke-controller image or render the Helm charts.
 
 Plans are `static-unqualified`; executed local Run records use `unqualified-local-execution`. Dry-run signing executes no cosign and produces no authenticated
-signature or attestation. The CLI build is offline; the CWE wrapped build uses network access. Calling the
+signature or attestation. The CLI build is offline; the nvke-controller wrapped build uses network access. Calling the
 whole journey hermetic, signed, or M1-complete would be incorrect.
 
 Real hosted signing and independent consumption were [recorded for the combined outputs](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md)
@@ -17,8 +17,8 @@ this checkout's combined local journey or transfer acceptance to newer wire sche
 ## Prepare and run
 
 Requires the repository's Go toolchain, Docker, Git, curl, an NVKE clone containing both pinned module commits,
-and network access for pinned tool downloads, container acquisition, and the CWE build's upstream dependencies.
-The Docker Linux VM must support rootless BuildKit with overlayfs; the CWE build needs substantially more
+and network access for pinned tool downloads, container acquisition, and the nvke-controller build's upstream dependencies.
+The Docker Linux VM must support rootless BuildKit with overlayfs; the nvke-controller build needs substantially more
 disk, memory and time than the CLI alone. Docker must support execution of linux/amd64 images; an arm64 laptop uses
 emulation. The default registry binds loopback port 5000. Its `registry:3` service image is tag-selected demo
 infrastructure, not a digest-pinned build input.
@@ -52,7 +52,7 @@ you finish reviewing it; the script does not remove it automatically.
 | Step | Inspect | What it establishes |
 |---|---|---|
 | Build and validate | Definition, catalog pins and local Environment | The current checkout accepts the intended pinned inputs |
-| Check hosted generation | Fresh scratch bundle and matching drift check | The selected example regenerates exactly; the committed M2 workflow is untouched and no provider job runs |
+| Check hosted generation | Fresh scratch bundle and matching drift check | The selected example regenerates exactly; the committed NVKE workflow is untouched and no provider job runs |
 | Execute | `lifecycle.json` in the new attempt | All three required outputs must complete; observations and failures are recorded |
 | Inspect SBOM | CLI output `nvkectl/sbom/index.json` and component documents | The CLI bill of materials names the observed binary digest and includes configured dependency inspection |
 | Inspect signing | `signatures/`, `predicates/`, `verifications/` | Dry-run records name the published digest and exact predicate bytes; signature verification remains false |

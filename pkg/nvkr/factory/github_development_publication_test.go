@@ -323,7 +323,9 @@ func TestDevelopmentPreservesProducerGraphAndPrivateToolchainReads(t *testing.T)
 	// full maintained product adds no distinct development credential boundary.
 	base := recompileGitHubStabilityPlan(t, privateImageTestPlan(t, "github:GITHUB_TOKEN"), func(inputs *githubStabilityInputs) {
 		inputs.environment.Publication.Mode = "per-output-v1"
-		inputs.environment.Publication.RepositoryPrefix = "ghcr.io/dsx-ai-factory/nvkr/m2-candidate"
+		inputs.environment.Publication.RepositoryPrefix = "ghcr.io/dsx-ai-factory/nvkr/candidate"
+		// Published private toolchains keep their independently approved root; changing
+		// product publication does not relocate them. See docs/toolchain-maintenance.md.
 		inputs.environment.ToolchainAccess.PrivateRoots = []string{"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains"}
 		root := inputs.catalog.Components["image"]
 		for arch, image := range root.ToolchainImages {

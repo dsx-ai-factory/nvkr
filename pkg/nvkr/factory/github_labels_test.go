@@ -39,7 +39,7 @@ func TestGitHubOperationLabels(t *testing.T) {
 
 func TestMaintainedWorkflowMakesImageBindingVisible(t *testing.T) {
 	testutil.RequireExtended(t)
-	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}

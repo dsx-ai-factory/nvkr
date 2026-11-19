@@ -110,7 +110,7 @@ func TestGitHubExecutionBoundsMatchRenderedTimeouts(t *testing.T) {
 	}
 	t.Chdir(repo)
 	kinds := map[string]bool{}
-	for _, path := range []string{FactoryPlanPath, ".github/nvkr-run-nvke-disks/plan.json"} {
+	for _, path := range []string{maintainedNVKEPlanPath, ".github/nvkr-run-nvke-nightly/plan.json"} {
 		plan, err := LoadPlanContext(t.Context(), path)
 		if err != nil {
 			t.Fatal(err)

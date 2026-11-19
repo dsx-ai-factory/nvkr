@@ -197,6 +197,7 @@ type Prebuilt struct {
 	ReleaseExecutable bool `json:"releaseExecutable,omitempty"`
 	// Executable is loader-resolved only; registries must not author it.
 	Executable        *ToolPin          `json:"executable,omitempty"`
+	Executables       []ToolPin         `json:"executables,omitempty"`
 	OCIArchive        string            `json:"ociArchive,omitempty"` // resolved OCI layer reference, never an OCI image
 	Chart             *HelmChart        `json:"chart,omitempty"`      // authored acquisition; resolved catalogs contain URL instead
 	URL               string            `json:"url,omitempty"`
