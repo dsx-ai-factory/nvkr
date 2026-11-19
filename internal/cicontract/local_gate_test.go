@@ -40,6 +40,7 @@ var (
 		{"workflows-regen", "Fetch public NVKE validation inputs"},
 		{"docs", "Install Fern CLI"},
 		{"lint", "Install checksum-pinned golangci-lint"},
+		{"demo", "Install checksum-pinned golangci-lint"},
 		{"tests", "Summarize test timings"},
 		// D1 diagnostics are report-only, not local/hosted merge gates.
 		{"vulnerabilities", "Nested Go tool vulnerabilities (report-only)"},

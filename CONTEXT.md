@@ -283,7 +283,7 @@ Opt-in copy of named QCOW2/EFI bytes and original proofs, with complete OCI Rele
 _Avoid_: Partial mirror success, new Release, checksum as membership
 
 **MachineImage render artifact**:
-Proposed signed CR artifact for declared disk/architecture/destination pairs. Its own Build includes byte-affecting serving configuration; its eventual aggregate/content/inventory digests are excluded. Downstream NVKE owns deployment; the artifact grants no registration, placement or disk-selection authority.
+Proposed signed CR artifact for declared disk/architecture/destination pairs. The NVKE catalog owns a script/template candidate validated against the CRD from pinned NVKE source; NVKR Go stays agnostic. Production rendering remains unavailable pending authenticated integration and boot acceptance. Its own Build includes byte-affecting serving configuration; its eventual aggregate/content/inventory digests are excluded. Downstream NVKE owns deployment; the artifact grants no registration, placement or disk-selection authority.
 _Avoid_: Final Release root, selected-verification receipt, installed machine
 
 ## Evidence and authority

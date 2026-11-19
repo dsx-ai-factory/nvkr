@@ -2,11 +2,11 @@ apiVersion: nvkr.dev/lock/v1
 kind: PinLock
 pins:
   aicr:
-    commit: 935e0746dc54da890a23c1ecca998244b3a25de7
-    goVersion: 1.27.3
-    sourceDateEpoch: 1793648938
-    tag: v1.2.0
-    treeHash: 1d4bfa6d824159dbb4c8077303fe8de154946405
+    commit: d3493485869ca0a3f49f1058b3985d6ed536b6b2
+    goVersion: 1.27.4
+    sourceDateEpoch: 1794869656
+    tag: v1.3.0
+    treeHash: a593245facd939ea9f569e1aa9fdf7497d378e43
   aicr-aicr:
     commit: 2bf662b86c21a97b6e79e90035382ea252a44798
     goVersion: 1.27.3
@@ -24,15 +24,15 @@ pins:
       url: https://github.com/NVIDIA/aicr/releases/download/v1.1.2/aicr_1.1.2_linux_arm64.tar.gz
     treeHash: 60fa9de5b313d80d7a675c41921cb9798aec4bfb
   aicr-tool-arm64:
-    commit: 935e0746dc54da890a23c1ecca998244b3a25de7
-    goVersion: 1.27.3
-    sourceDateEpoch: 1793648938
-    tag: v1.2.0
+    commit: d3493485869ca0a3f49f1058b3985d6ed536b6b2
+    goVersion: 1.27.4
+    sourceDateEpoch: 1794869656
+    tag: v1.3.0
     tool:
-      archiveDigest: sha256:26824146cd0743229239899cb75d3b68e0bc262bcdb357fccc98eca0a5b75976
-      executableDigest: sha256:16e5ac98250cdcdb0ecf18e6a9a05b041b3b3cc83aa3181f755aa0e5c5e0fe24
+      archiveDigest: sha256:15c50d4c356a33bfcbf86ec45f391c4e8e098dc88aaea4fd9d6176cd543e5c35
+      executableDigest: sha256:76d92901efa44bfa5a424c91c26c76ef83446e46350f6ed6a8f44d3ec556657d
       executablePath: aicr
       format: tar-gzip
       platform: linux/arm64
-      url: https://github.com/NVIDIA/aicr/releases/download/v1.2.0/aicr_1.2.0_linux_arm64.tar.gz
-    treeHash: 1d4bfa6d824159dbb4c8077303fe8de154946405
+      url: https://github.com/NVIDIA/aicr/releases/download/v1.3.0/aicr_1.3.0_linux_arm64.tar.gz
+    treeHash: a593245facd939ea9f569e1aa9fdf7497d378e43
