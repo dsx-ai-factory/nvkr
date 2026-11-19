@@ -128,14 +128,11 @@ if [ "$EXECUTION_RUNTIME" = docker ]; then
     case "$REGISTRY_CONFIG" in /*) ;; *) REGISTRY_CONFIG="$CALLER_DIR/$REGISTRY_CONFIG" ;; esac
     [ -f "$REGISTRY_CONFIG/config.json" ] && [ ! -L "$REGISTRY_CONFIG/config.json" ] ||
       demo_die "--registry-config requires a regular config.json file"
-    demo_need_command python3
-    python3 - "$REGISTRY_CONFIG/config.json" <<'PY'
-import json, sys
-with open(sys.argv[1], encoding="utf-8") as f:
-    config = json.load(f)
-if config.get("credsStore") or config.get("credHelpers"):
-    sys.exit("demo: container registry config requires inline auth, not host credential helpers")
-PY
+    demo_need_command jq
+    jq -e 'def populated: . != null and . != false and . != "" and . != {} and . != [] and . != 0;
+      if (.credsStore | populated) or (.credHelpers | populated)
+      then error("demo: container registry config requires inline auth, not host credential helpers")
+      else true end' "$REGISTRY_CONFIG/config.json" >/dev/null
   fi
 else
   [ -z "$REGISTRY_CONFIG" ] || demo_die "--registry-config requires Docker mode; native verification uses DOCKER_CONFIG"

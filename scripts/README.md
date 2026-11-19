@@ -32,7 +32,7 @@ test jobs. It includes examples and fuzz seed tests, and requires exact completi
 selection. New packages and tests need no allowlist update. `make test-shard` reproduces one matrix
 entry; `make test` still runs the full suite. Each child command may retain at most 32 MiB of stdout;
 exceeding that limit fails the shard and stops its process group while preserving diagnostics already
-read. `ci-test-summary.py` summarizes the retained Go JSON events. Partition, completeness, parser and
+read. `ci-test-summary.jq` summarizes the retained Go JSON events. Partition, completeness, parser and
 small offline Go composition contracts run with `make test-ci-tools`; the Go fixture exercises every
 matrix entry without rebuilding the product suite.
 
@@ -65,7 +65,7 @@ results from committed regressions.
 
 ## Definition → Run
 
-`generate-maintained.py` drives `make workflows-generate` and `make workflows-check` from
+`generate-maintained.sh` drives `make workflows-generate` and `make workflows-check` from
 `inputs/policies/maintained-generation.json`. That authored list selects every maintained Plan bundle and
 the default qualifier policy. Contract tests compare the list with committed Plans and manifests, so a
 new bundle must enter the same image-access contract. Group-specific Make targets use this list too.

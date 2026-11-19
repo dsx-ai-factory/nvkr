@@ -17,7 +17,7 @@ Usage: bash demos/demo-team-os.sh [--arch arm64|amd64] [--out NEW_DIR] [--non-in
 Export the maintained native KVM OS-image Plan and native producer graph, then
 inspect a dry-run. No Docker, KVM, Packer execution, registry access or OS image
 build is required for this tour.
-Prerequisites: Python 3 and a built nvkr from this checkout (make build, exact Go in .go-version),
+Prerequisites: jq and a built nvkr from this checkout (make build, exact Go in .go-version),
 or NVKR_BIN pointing to that binary. Output is retained in a new temporary
 directory; --out requires a nonexistent directory whose parent already exists.
 Full commands and dry-run output are saved with the exports. Set NO_COLOR to disable color.
@@ -66,7 +66,7 @@ while [ "$#" -gt 0 ]; do
 done
 case "$ARCH" in arm64|amd64) ;; *) die '--arch must be arm64 or amd64' ;; esac
 [ -x "$NVKR" ] || die "build nvkr first (make build), or set NVKR_BIN to an executable: $NVKR"
-command -v python3 >/dev/null || die 'Python 3 is required for the readable summary'
+command -v jq >/dev/null || die 'jq is required for the readable summary'
 NVKR=$(cd "$(dirname "$NVKR")" && printf '%s/%s\n' "$PWD" "$(basename "$NVKR")")
 if [ "$NON_INTERACTIVE" -eq 0 ] && [ ! -t 0 ]; then die 'use --non-interactive when stdin is not a terminal'; fi
 if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-team-os.XXXXXX"); fi
@@ -82,14 +82,8 @@ printf 'Exports and full commands: %s\n' "$OUT"
 heading '1 / 3  Choose the disk output'
 show_command definition inspect --definition "$DEFINITION"
 export_command "$OUT/os-definition-$ARCH.json" "$NVKR" definition inspect --definition "$DEFINITION"
-python3 - "$OUT/os-definition-$ARCH.json" <<'PY'
-import json
-import sys
-definition = json.load(open(sys.argv[1]))
-for output in definition['outputs']:
-    print(f"  {output['name']} | {output['format']} | {output['platform']}")
-    print(f"  {len(output['components'])} selected components, including the disk producer and all its materials.")
-PY
+jq -r '.outputs[] | "  \(.name) | \(.format) | \(.platform)",
+  "  \(.components | length) selected components, including the disk producer and all its materials."' "$OUT/os-definition-$ARCH.json"
 printf 'Read the selection: %s\n' "$DEFINITION"
 pause
 
@@ -99,21 +93,12 @@ export_command "$OUT/os-plan-$ARCH.json" "$NVKR" run plan --definition "$DEFINIT
 export_command "$OUT/os-plan-$ARCH.txt" "$NVKR" run plan --plan "$OUT/os-plan-$ARCH.json"
 export_command "$OUT/os-producers-$ARCH.mermaid" "$NVKR" run graph --plan "$OUT/os-plan-$ARCH.json" --view producers --format mermaid
 export_command "$OUT/os-graph-$ARCH.json" "$NVKR" run graph --plan "$OUT/os-plan-$ARCH.json" --view complete --format json
-python3 - "$OUT/os-plan-$ARCH.json" <<'PY'
-import json
-import sys
-plan = json.load(open(sys.argv[1]))
-for build in plan['builds']:
-    for node in build['executionGraph']['nodes']:
-        if node.get('outputType') != 'disk-image' or 'packer' not in node:
-            continue
-        print(f"  {node['component']} uses Packer to produce {node['disk']['format']}.")
-        print(f"  {'Material slot':<20} Supplied by")
-        for material in node['materials']:
-            print(f"  {material['binding']:<20} {material['component']}")
-        resource = node['requirements']['resources']
-        print(f"  Host requirements: {resource['cpuMillis'] / 1000:g} CPUs, {resource['memoryMiB'] / 1024:g} GiB memory, {resource['ephemeralStorageMiB'] / 1024:g} GiB workspace, KVM.")
-PY
+jq -r 'def pad($n): . + (" " * ([$n - length, 0] | max));
+  .builds[].executionGraph.nodes[] | select(.outputType == "disk-image" and has("packer")) |
+  "  \(.component) uses Packer to produce \(.disk.format).",
+  "  \("Material slot" | pad(20)) Supplied by",
+  (.materials[] | "  \(.binding | pad(20)) \(.component)"),
+  (.requirements.resources | "  Host requirements: \(.cpuMillis / 1000) CPUs, \(.memoryMiB / 1024) GiB memory, \(.ephemeralStorageMiB / 1024) GiB workspace, KVM.")' "$OUT/os-plan-$ARCH.json"
 printf 'Slot names bind materials to producers; component list order is irrelevant.\n'
 printf 'Load os-plan-%s.json in demos/demo-team-explorer.html.\n' "$ARCH"
 printf 'Expand the material producers to see agents, networking, charts, and installer inputs.\n'

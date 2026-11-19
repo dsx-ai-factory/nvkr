@@ -34,7 +34,7 @@ Options:
   --non-interactive   skip guided pauses
   -h, --help          show this help
 
-Prerequisites: a compatible nvkr (or NVKR_BIN), Python 3,
+Prerequisites: a compatible nvkr (or NVKR_BIN), jq,
 and registry access/credentials unless using --layout. New --out must not exist;
 its parent must exist. Registry browsing downloads bounded metadata and evidence
 documents, never artifact payload layers. --output and --mermaid each repeat the
@@ -81,7 +81,7 @@ done
 [[ "$REFERENCE" =~ ^[^[:space:]@]+/[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || die 'supply the exact registry/repository@sha256:<64 lowercase hex> release root from the Run'
 if [ -n "$LAYOUT" ] && [ "$ANONYMOUS" -eq 1 ]; then die '--layout cannot be combined with --anonymous'; fi
 [ -x "$NVKR" ] || die "build nvkr from this checkout (make build), or set NVKR_BIN: $NVKR"
-command -v python3 >/dev/null || die 'Python 3 is required for the readable summary'
+command -v jq >/dev/null || die 'jq is required for the readable summary'
 if [ "$NON_INTERACTIVE" -eq 0 ] && [ ! -t 0 ]; then die 'use --non-interactive when stdin is not a terminal'; fi
 if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-team-release.XXXXXX"); fi
 heading 'NVKR / Explore a release'
@@ -95,61 +95,40 @@ heading '1 / 3  What is in this release?'
 printf 'Reading metadata and evidence; payload layers are not read.\n'
 show_command --format json
 "$NVKR" "${ARGS[@]}" --format json > "$OUT/release-view.json"
-python3 - "$OUT/release-view.json" <<'PY'
-from collections import Counter
-import json
-import sys
-from pathlib import Path
-view = json.loads(Path(sys.argv[1]).read_text())
-safe = lambda value: json.dumps(value, ensure_ascii=True)[1:-1]
-print(f"  Outputs: {view['totalOutputs']} | Evidence records: {len(view.get('evidence', []))}")
-for kind, count in sorted(Counter(o['kind'] for o in view['outputs']).items()):
-    print(f"  {count:>3}  {safe(kind)}")
-print(f"  Root: {safe(view['rootDigest'])}")
-run = view.get('metadata', {}).get('invocationId')
-if run:
-    print(f"  Run:  {safe(run)}")
-PY
+jq -L "$DEMO_DIR" -r 'include "demo-json";
+  "  Outputs: \(.totalOutputs) | Evidence records: \((.evidence // []) | length)",
+  (.outputs | group_by(.kind)[] | (length | tostring) as $count |
+    "  \(" " * ([3 - ($count | length), 0] | max))\($count)  \(.[0].kind | safe)"),
+  "  Root: \(.rootDigest | safe)",
+  (.metadata.invocationId // empty | select(length > 0) | "  Run:  \(. | safe)")' "$OUT/release-view.json"
 printf 'The root digest identifies this exact collection of artifacts and evidence.\n'
 pause
 
 heading '2 / 3  Follow one output'
 if [ -z "$OUTPUT" ]; then
-  OUTPUT=$(python3 - "$OUT/release-view.json" <<'PY'
-import json
-import sys
-view = json.load(open(sys.argv[1]))
-names = [o['name'] for o in view['outputs']]
-print('nvke-node-image-arm64' if 'nvke-node-image-arm64' in names else names[0])
-PY
-  )
+  OUTPUT=$(jq -er '[.outputs[].name] | if index("nvke-node-image-arm64") then "nvke-node-image-arm64" else .[0] end' "$OUT/release-view.json")
 fi
 show_command --output "$OUTPUT"
 "$NVKR" "${ARGS[@]}" --output "$OUTPUT" > "$OUT/selected-output.txt"
-python3 - "$OUT/release-view.json" "$OUTPUT" <<'PY'
-import json
-import sys
-view = json.load(open(sys.argv[1]))
-output = next(o for o in view['outputs'] if o['name'] == sys.argv[2])
-safe = lambda value: json.dumps(value, ensure_ascii=True)[1:-1]
-evidence = [e for e in view.get('evidence', [])
-            if output['name'] in e.get('binding', {}).get('outputs', [])]
-platform = '/'.join(output[k] for k in ('os', 'arch') if output.get(k))
-print(f"  {safe(output['name'])} | {safe(output['kind'])}" + (f" | {safe(platform)}" if platform else ''))
-print(f"  Contributing components: {len(output['components'])} | Evidence records: {len(evidence)}")
-print(f"  Manifest: {safe(output['digest'])}")
-disk = output.get('disk')
-if disk:
-    print(f"  Payload:  {safe(disk['payloadDigest'])}")
-    print(f"  Disk: {safe(disk['format'])} | {disk['size'] / 1024**3:.2f} GiB")
-    mode = disk.get('evidenceMode') or 'inspected'
-    label = 'build provenance (no full disk filesystem inventory)' if mode == 'build-provenance-v1' else safe(mode)
-    print(f"  Disk evidence: {label}")
-print(f"    {'Component':<34} Evidence records")
-for component in output['components']:
-    count = sum(e.get('binding', {}).get('component') == component for e in evidence)
-    print(f"    {safe(component):<34} {count}")
-PY
+jq -L "$DEMO_DIR" -r --arg output "$OUTPUT" '
+  include "demo-json";
+  def pad($n): . + (" " * ([$n - length, 0] | max));
+  def gib: (. / 1073741824 * 100 | round) as $n |
+    "\($n / 100 | floor)." + ("0" + ($n % 100 | tostring))[-2:];
+  . as $view | ([.outputs[] | select(.name == $output)][0] // error("output not found")) |
+  . as $selected |
+  [$view.evidence[]? | select((.binding.outputs // []) | index($output))] as $evidence |
+  ([.os, .arch] | map(select(. != null and . != "")) | join("/")) as $platform |
+  "  \(.name | safe) | \(.kind | safe)" + (if $platform == "" then "" else " | \($platform | safe)" end),
+  "  Contributing components: \(.components | length) | Evidence records: \($evidence | length)",
+  "  Manifest: \(.digest | safe)",
+  (.disk // empty | "  Payload:  \(.payloadDigest | safe)",
+    "  Disk: \(.format | safe) | \(.size | gib) GiB",
+    "  Disk evidence: \(if .evidenceMode == "build-provenance-v1" then "build provenance (no full disk filesystem inventory)" else (.evidenceMode // "inspected" | safe) end)"),
+  "    \("Component" | pad(34)) Evidence records",
+  ($selected.components[] | . as $component |
+    "    \(. | safe | pad(34)) \([$evidence[] | select(.binding.component == $component)] | length)")
+' "$OUT/release-view.json"
 printf 'Components identify contributors; evidence records bind their recorded subjects to this output.\n'
 printf '\nOpen demos/demo-team-explorer.html and load:\n  %s/release-view.json\n' "$OUT"
 if [ "$MERMAID" -eq 1 ]; then
