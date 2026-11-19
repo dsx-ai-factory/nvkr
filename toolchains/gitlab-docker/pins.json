@@ -1,0 +1,11 @@
+{
+  "server": "docker.io/gitlab/gitlab-ce:19.4.8-ce.0@sha256:798929a9c80d45a0396ec8d534fdc52301d13082f358e224e67fba035e2e916e",
+  "runner": "docker.io/gitlab/gitlab-runner:alpine-v19.4.0@sha256:a4838319e55b510c05b36d701d06362b9197458558c7b0d3d63f2c7588c7cd2f",
+  "glab": "docker.io/gitlab/glab:v1.131.0@sha256:fc499cf163a192f07b46f8ac1d40fbda6a0abea592a9a3d5cdcd2210317a1799",
+  "go": "docker.io/library/golang:1.27.4@sha256:205c7636d74e0ffbe3d007162df7d74f859f5a8c8322dfb9f907977686c126cf",
+  "docker": "docker.io/library/docker:29.2.1-cli@sha256:cab69e2d0a1a2ea9a1ce1060252f439e83483ae41ec09317aecb33b08a0656a5",
+  "helpers": {
+    "arm64": "docker.io/gitlab/gitlab-runner-helper:arm64-v19.4.0@sha256:f0d1f052272d365b9c70ec0de13482333bba7804176e20eae9a3fac09d90d9bc",
+    "amd64": "docker.io/gitlab/gitlab-runner-helper:x86_64-v19.4.0@sha256:13188cca15a2d44fc621d42da4efb42b81c9527e072d07aab29468dea15af831"
+  }
+}

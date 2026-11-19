@@ -16,7 +16,6 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	orasremote "oras.land/oras-go/v2/registry/remote"
 	orasauth "oras.land/oras-go/v2/registry/remote/auth"
@@ -231,7 +230,10 @@ func (observer *registryObserver) explain(ctx context.Context, err error) error 
 		case e.CodeInvalidCatalog:
 			action = "Check the named tag and repository tag policy; no rollback or automatic retagging is implied."
 		case e.CodeTimeout:
-			action = "The operation was canceled or timed out; reconcile partial uploads before retrying the same identified publication."
+			action = "The operation was canceled or timed out; check its outcome before retrying the same identified publication."
+			if registryWriteAttempted(ctx) {
+				action = "The operation was canceled or timed out; reconcile partial uploads before retrying the same identified publication."
+			}
 		}
 		if observer.readOnly && (coded.Code == e.CodeTimeout || coded.Code == e.CodeUnavailable) {
 			action = "Check the endpoint, TLS trust, DNS and connectivity, then retry the bounded read-only operation; no upload was attempted."
@@ -282,7 +284,7 @@ func CheckRegistry(ctx context.Context, repository string, options RegistryOptio
 		return report, e.Wrap(e.CodeUsage, err, "parsing registry check endpoint")
 	}
 	registry.PlainHTTP = options.PlainHTTP
-	registry.Client = &orasauth.Client{Client: &http.Client{Transport: observer.transport(remote.DefaultTransport)},
+	registry.Client = &orasauth.Client{Client: &http.Client{Transport: observer.transport(registryTransport(ctx, options))},
 		Credential: func(ctx context.Context, host string) (orasauth.Credential, error) {
 			if host != repo.RegistryStr() || options.Anonymous {
 				return orasauth.EmptyCredential, nil

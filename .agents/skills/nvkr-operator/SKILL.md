@@ -67,6 +67,12 @@ perform unrelated cleanup.
 Linux-only authority paths must remain Linux-only. Explain capability errors and supported alternatives
 without silently substituting a platform, provider, builder or evidence lane.
 
+For GitLab generation, follow the [native GitLab guide](../../../docs/generate-pipeline.md#native-gitlab-execution).
+Require explicit native runner/bootstrap and API-reader policy. Keep same-project registry job-token access
+separate from API-reader permissions. The bounded route stays unsigned and `static-unqualified`, including
+after publication; use [reconciliation](../../../docs/adr/reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile)
+for its exact validation and provider-acceptance limits.
+
 For an explicitly requested local qualification, follow
 [local qualification](../../../docs/local-development.md#qualify-local-artifacts) and inspect
 `run qualify-local --help`. Require the complete captured attempt, independent policy, three distinct
