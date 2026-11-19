@@ -22,10 +22,6 @@ import (
 
 func TestGitHubBootstrapDeadlineStopsDescendants(t *testing.T) {
 	requireGitHubBootstrapTimeout(t)
-	python, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("Python 3 required for fixture")
-	}
 	for _, phase := range []string{"download", "build"} {
 		t.Run(phase, func(t *testing.T) {
 			root, cache := t.TempDir(), t.TempDir()
@@ -34,21 +30,23 @@ func TestGitHubBootstrapDeadlineStopsDescendants(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			script := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import os, pathlib, signal, sys, time
-phase = "download" if sys.argv[1] == "mod" else "build"
-if phase != ` + strconv.Quote(phase) + `: sys.exit(0)
+			script := `#!/bin/bash
+set -eu
+phase=build
+[ "$1" != mod ] || phase=download
+[ "$phase" = ` + shellQuote(phase) + ` ] || exit 0
 # Both leader and descendant resist TERM, exercising timeout's KILL escalation.
-signal.signal(signal.SIGTERM, signal.SIG_IGN)
-if os.fork() == 0:
-    pathlib.Path("descendant.pid").write_text(str(os.getpid()))
-    # Coreutils timeout leads this process group and handles SIGALRM as timer
-    # expiry. Deliver it only after readiness, so startup is outside the test's
-    # deadline assertion; the real timeout still owns TERM/KILL escalation.
-    os.kill(os.getpgrp(), signal.SIGALRM)
-deadline = time.monotonic() + 120
-while time.monotonic() < deadline: time.sleep(0.01)
-PY
+trap '' TERM
+group=$(ps -o pgid= -p "$$" | tr -d ' ')
+bash -c '
+  printf "%s" "$$" > descendant.pid
+  # Readiness triggers TERM/KILL escalation in the real timeout.
+  kill -ALRM "$1"
+  while :; do sleep 1; done
+' descendant "$group" &
+wait
 `
+
 			if err := os.WriteFile(filepath.Join(root, "go"), []byte(script), 0700); err != nil {
 				t.Fatal(err)
 			}

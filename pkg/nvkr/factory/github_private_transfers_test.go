@@ -23,10 +23,6 @@ import (
 
 func TestGitHubPrivateBootstrapOwnsAndDiscardsItsCaches(t *testing.T) {
 	requireGitHubBootstrapTimeout(t)
-	python, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("Python 3 is required to exercise the hosted bootstrap owner")
-	}
 	bash, err := exec.LookPath("bash")
 	if err != nil {
 		t.Skip("Bash is required to exercise the hosted bootstrap owner")
@@ -56,41 +52,58 @@ func TestGitHubPrivateBootstrapOwnsAndDiscardsItsCaches(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			fakeGo := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import json, os, pathlib, signal, sys, time
-for key in ("NVKR_CREDENTIAL", "NVKR_CI_STORAGE_TOKEN", "ACTIONS_ID_TOKEN_REQUEST_TOKEN"):
-    assert key not in os.environ
-assert os.environ["GOTOOLCHAIN"] == "local" and os.environ["GOENV"] == "off"
-assert os.environ["CGO_ENABLED"] == "0" and os.environ["GOWORK"] == "off"
-build, modules = pathlib.Path(os.environ["GOCACHE"]), pathlib.Path(os.environ["GOMODCACHE"])
-assert build.parent == modules.parent
-assert build.parent.stat().st_mode & 0o077 == 0
-modfile = pathlib.Path(next(value.removeprefix("-modfile=") for value in sys.argv if value.startswith("-modfile=")))
-assert modfile.parent == build.parent / "inputs"
-assert modfile.read_text() == modfile.with_suffix(".sum").read_text() == "unchanged source manifest"
-mode = ` + strconv.Quote(test.name) + `
-phase = "download" if sys.argv[1:3] == ["mod", "download"] else "build"
-if phase == "download" and mode != "download cancellation":
-    assert "GOPROXY" not in os.environ and "GOSUMDB" not in os.environ
-    print(json.dumps({"Path": "example.com/module", "Version": "v1.0.0"}))
-    sys.exit(0)
-if phase == "build":
-    assert os.environ["GOPROXY"] == "off" and os.environ["GOSUMDB"] == "off"
-    for directory in (build, modules / "read-only-module"):
-        directory.mkdir(parents=True)
-        (directory / "cached").write_text("disposable")
-        directory.chmod(0o500)
-    pathlib.Path(".nvkr/ci-bootstrap/nvkr-exec").write_text("compiled helper")
-pathlib.Path("bootstrap-observation.json").write_text(json.dumps({"pid": os.getpid(), "cache": str(build.parent), "args": sys.argv[1:]}))
-if mode in ("cancellation", "download cancellation", "interrupt"):
-    signal.signal(signal.SIGTERM, signal.SIG_IGN)
-    os.kill(int(pathlib.Path("step.pid").read_text()), signal.SIGINT if mode == "interrupt" else signal.SIGTERM)
-    deadline = time.monotonic() + 120
-    while time.monotonic() < deadline:
-        if not build.parent.exists(): pathlib.Path("cleanup-before-stop").write_text("violation")
-        time.sleep(0.01)
-sys.exit(7 if mode == "build failure" else 0)
-PY
+			fakeGo := `#!/bin/bash
+set -eu
+for key in NVKR_CREDENTIAL NVKR_CI_STORAGE_TOKEN ACTIONS_ID_TOKEN_REQUEST_TOKEN; do
+  [ -z "${!key+x}" ]
+done
+[ "$GOTOOLCHAIN" = local ] && [ "$GOENV" = off ] && [ "$CGO_ENABLED" = 0 ] && [ "$GOWORK" = off ]
+cache=${GOCACHE%/*}
+[ "$cache" = "${GOMODCACHE%/*}" ]
+[ "$(LC_ALL=C ls -ld "$cache" | cut -c1-10)" = drwx------ ]
+modfile=''
+for arg in "$@"; do case "$arg" in -modfile=*) modfile=${arg#-modfile=};; esac; done
+[ "$modfile" = "$cache/inputs/go.mod" ]
+[ "$(cat "$modfile")" = 'unchanged source manifest' ]
+[ "$(cat "${modfile%.mod}.sum")" = 'unchanged source manifest' ]
+mode=` + shellQuote(test.name) + `
+phase=build
+if [ "$1" = mod ] && [ "$2" = download ]; then phase=download; fi
+if [ "$phase" = download ] && [ "$mode" != 'download cancellation' ]; then
+  [ -z "${GOPROXY+x}" ] && [ -z "${GOSUMDB+x}" ]
+  exit 0
+fi
+if [ "$phase" = build ]; then
+  [ "$GOPROXY" = off ] && [ "$GOSUMDB" = off ]
+  mkdir -p "$GOCACHE" "$GOMODCACHE/read-only-module"
+  for directory in "$GOCACHE" "$GOMODCACHE/read-only-module"; do
+    printf disposable > "$directory/cached"
+    chmod 500 "$directory"
+  done
+  printf 'compiled helper' > .nvkr/ci-bootstrap/nvkr-exec
+fi
+# Fixture paths and fixed arguments contain no JSON escapes.
+printf '{"pid":%s,"cache":"%s","args":[' "$$" "$cache" > bootstrap-observation.json
+separator=''
+for arg in "$@"; do
+  printf '%s"%s"' "$separator" "$arg" >> bootstrap-observation.json
+  separator=,
+done
+printf ']}' >> bootstrap-observation.json
+case "$mode" in
+  cancellation|'download cancellation'|interrupt)
+    trap '' TERM
+    signal=TERM
+    [ "$mode" != interrupt ] || signal=INT
+    kill -"$signal" "$(cat step.pid)"
+    while :; do
+      [ -d "$cache" ] || printf violation > cleanup-before-stop
+      sleep 0.01
+    done ;;
+esac
+[ "$mode" != 'build failure' ] || exit 7
 `
+
 			if err := os.WriteFile(filepath.Join(root, "go"), []byte(fakeGo), 0o700); err != nil {
 				t.Fatal(err)
 			}
@@ -325,7 +338,7 @@ func TestGitHubPrivateBootstrapCapabilities(t *testing.T) {
 	}{
 		{"missing Go", "go", false},
 		{"missing timeout", "timeout", false},
-		{"published requires Python", "python3", true},
+		{"published needs no Python", "python3", true},
 		{"development needs no Python", "python3", false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -343,7 +356,7 @@ func TestGitHubPrivateBootstrapCapabilities(t *testing.T) {
 				}
 			}
 			if test.missing != "go" {
-				if err := os.WriteFile(filepath.Join(root, "go"), []byte("#!/bin/sh\nprintf called >> "+shellQuote(filepath.Join(root, "called"))+"\n"), 0700); err != nil {
+				if err := os.WriteFile(filepath.Join(root, "go"), []byte("#!/bin/sh\nprintf called >> "+shellQuote(filepath.Join(root, "called"))+"\nif [ \"$1\" = run ]; then printf '%s' "+shellQuote(root)+"; fi\n"), 0700); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -362,9 +375,9 @@ func TestGitHubPrivateBootstrapCapabilities(t *testing.T) {
 			command.Dir = root
 			command.Env = []string{"PATH=" + root, "RUNNER_TEMP=" + cache, "HOME=" + root}
 			output, runErr := command.CombinedOutput()
-			if test.name == "development needs no Python" {
+			if test.missing == "python3" {
 				if runErr != nil {
-					t.Fatalf("development acquired Python requirement: %v %s", runErr, output)
+					t.Fatalf("bootstrap acquired Python requirement: %v %s", runErr, output)
 				}
 			} else {
 				var exit *exec.ExitError
@@ -848,11 +861,8 @@ var testRunnerRelease = githubRunnerRelease{Version: "v1.2.3", Sum: "h1:" + stri
 // builds it from a private copy, and leaves the module cache and the checkout's
 // own files untouched. Any other module, version or checksum is refused.
 func TestGitHubPrivateBootstrapBuildsPinnedPublishedRelease(t *testing.T) {
+	parser := buildGitHubModulePinParser(t)
 	requireGitHubBootstrapTimeout(t)
-	python, err := exec.LookPath("python3")
-	if err != nil {
-		t.Skip("Python 3 is required to exercise the hosted bootstrap owner")
-	}
 	bash, err := exec.LookPath("bash")
 	if err != nil {
 		t.Skip("Bash is required to exercise the hosted bootstrap owner")
@@ -878,26 +888,41 @@ func TestGitHubPrivateBootstrapBuildsPinnedPublishedRelease(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			fakeGo := "#!/bin/sh\nexec " + shellQuote(python) + " -I - \"$@\" <<'PY'\n" + `import json, os, pathlib, sys
-published, workspace = ` + strconv.Quote(published) + `, ` + strconv.Quote(root) + `
-cache = pathlib.Path(os.environ["GOCACHE"]).parent
-source = cache / "source"
-if sys.argv[1:] == ["mod", "download", "-json", ` + strconv.Quote(githubRunnerModule+"@"+testRunnerRelease.Version) + `]:
-    assert "GOPROXY" not in os.environ and os.path.realpath(os.getcwd()) == os.path.realpath(cache)
-    print(json.dumps({"Path": ` + strconv.Quote(test.path) + `, "Version": ` + strconv.Quote(test.version) + `, "Sum": ` + strconv.Quote(test.sum) + `, "Dir": published}))
-    sys.exit(0)
-assert os.path.realpath(os.getcwd()) == os.path.realpath(source)
-modfile = pathlib.Path(next(value.removeprefix("-modfile=") for value in sys.argv if value.startswith("-modfile=")))
-assert modfile.parent == cache / "inputs" and modfile.read_text() == "published go.mod"
-if sys.argv[1:3] == ["mod", "download"]:
-    print(json.dumps({"Path": "example.com/dependency", "Version": "v1.0.0"}))
-    sys.exit(0)
-assert sys.argv[1] == "build" and os.environ["GOPROXY"] == "off" and sys.argv[-1] == "./cmd/nvkr"
-output = pathlib.Path(sys.argv[sys.argv.index("-o") + 1])
-assert output.is_absolute() and os.path.realpath(output.parent.parent.parent) == os.path.realpath(workspace)
-output.write_text("published helper")
-PY
+			moduleJSON, err := json.Marshal(map[string]string{"Path": test.path, "Version": test.version, "Sum": test.sum, "Dir": published})
+			if err != nil {
+				t.Fatal(err)
+			}
+			fakeGo := `#!/bin/bash
+set -eu
+published=` + shellQuote(published) + `
+workspace=` + shellQuote(root) + `
+cache=${GOCACHE%/*}
+if [ "$1" = mod ] && [ "$2" = download ] && [ "${3:-}" = -json ]; then
+  [ "$#" = 4 ] && [ "$4" = ` + shellQuote(githubRunnerModule+"@"+testRunnerRelease.Version) + ` ]
+  [ -z "${GOPROXY+x}" ] && [ "$(pwd -P)" = "$(cd "$cache" && pwd -P)" ]
+  printf '%s\n' ` + shellQuote(string(moduleJSON)) + `
+  exit 0
+fi
+if [ "$1" = run ]; then
+  [ "$2" = module-pin.go ] && [ "$GOPROXY" = off ] && [ "$GOSUMDB" = off ]
+  shift 2
+  exec ` + shellQuote(parser) + ` "$@"
+fi
+[ "$(pwd -P)" = "$(cd "$cache/source" && pwd -P)" ]
+modfile='' output=''
+previous=''
+for arg in "$@"; do
+  case "$arg" in -modfile=*) modfile=${arg#-modfile=};; esac
+  if [ "$previous" = -o ]; then output=$arg; fi
+  previous=$arg
+done
+[ "$modfile" = "$cache/inputs/go.mod" ] && [ "$(cat "$modfile")" = 'published go.mod' ]
+if [ "$1" = mod ] && [ "$2" = download ]; then exit 0; fi
+[ "$1" = build ] && [ "$GOPROXY" = off ] && [ "${!#}" = ./cmd/nvkr ]
+[ "$output" = "$(cd "$workspace" && pwd -P)/.nvkr/ci-bootstrap/nvkr-exec" ]
+printf 'published helper' > "$output"
 `
+
 			if err := os.WriteFile(filepath.Join(root, "go"), []byte(fakeGo), 0o700); err != nil {
 				t.Fatal(err)
 			}
@@ -962,5 +987,61 @@ func assertGitHubBootstrapProcessStopped(ctx context.Context, t *testing.T, pid 
 			t.Fatalf("bootstrap process %d still executing: %s", pid, state)
 		}
 		time.Sleep(10 * time.Millisecond)
+	}
+}
+
+func buildGitHubModulePinParser(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	source, binary := filepath.Join(root, "module-pin.go"), filepath.Join(root, "module-pin")
+	if err := os.WriteFile(source, []byte(githubCIModulePinGo), 0600); err != nil {
+		t.Fatal(err)
+	}
+	command := exec.CommandContext(t.Context(), "go", "build", "-o", binary, source)
+	command.Dir = root // No go.mod, as in the emitted private cache.
+	command.Env = append(os.Environ(), "GOENV=off", "GOWORK=off", "GOTOOLCHAIN=local", "GOPROXY=off", "GOSUMDB=off")
+	if output, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("build module pin parser: %v %s", err, output)
+	}
+	return binary
+}
+
+func TestGitHubModulePinParser(t *testing.T) {
+	parser := buildGitHubModulePinParser(t)
+	valid := `{"Path":"example.com/module","Version":"v1.0.0","Sum":"h1:pin","Dir":"/cache/module with spaces"}`
+	for _, test := range []struct {
+		name, input string
+		valid       bool
+	}{
+		{"valid", valid, true},
+		{"unknown metadata", strings.TrimSuffix(valid, "}") + `,"Origin":{"VCS":"git"}}`, true},
+		{"missing sum", strings.ReplaceAll(valid, `"Sum":"h1:pin",`, ""), false},
+		{"wrong sum", strings.ReplaceAll(valid, "h1:pin", "h1:other"), false},
+		{"wrong version", strings.ReplaceAll(valid, "v1.0.0", "v1.0.1"), false},
+		{"wrong path", strings.ReplaceAll(valid, "example.com/module", "example.com/other"), false},
+		{"relative directory", strings.ReplaceAll(valid, "/cache/module with spaces", "relative"), false},
+		{"directory newline", strings.ReplaceAll(valid, "spaces", `spaces\n`), false},
+		{"directory null", strings.ReplaceAll(valid, `"/cache/module with spaces"`, `null`), false},
+		{"directory number", strings.ReplaceAll(valid, `"/cache/module with spaces"`, `42`), false},
+		{"duplicate key", strings.TrimSuffix(valid, "}") + `,"Sum":"h1:pin"}`, false},
+		{"nested duplicate", strings.TrimSuffix(valid, "}") + `,"Origin":{"VCS":"git","VCS":"git"}}`, false},
+		{"array duplicate", strings.TrimSuffix(valid, "}") + `,"Extra":[{"key":1,"key":2}]}`, false},
+		{"trailing object", valid + valid, false},
+		{"trailing garbage", valid + "garbage", false},
+		{"array", "[" + valid + "]", false},
+		{"truncated", strings.TrimSuffix(valid, "}"), false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			command := exec.CommandContext(t.Context(), parser, "example.com/module", "v1.0.0", "h1:pin")
+			command.Stdin = strings.NewReader(test.input)
+			output, err := command.Output()
+			if test.valid {
+				if err != nil || string(output) != "/cache/module with spaces" {
+					t.Fatalf("valid pin: %v %q", err, output)
+				}
+			} else if err == nil || len(output) != 0 {
+				t.Fatalf("invalid pin produced directory: %v %q", err, output)
+			}
+		})
 	}
 }
