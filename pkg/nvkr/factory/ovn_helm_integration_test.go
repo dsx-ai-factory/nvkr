@@ -45,7 +45,7 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
 	defer cancel()
-	cat, err := catalog.LoadContext(ctx, catalog.Dir("../../../inputs/catalogs/ovn-nvidia"))
+	cat, err := catalog.LoadContext(ctx, catalog.Dir("../../../inputs/catalogs/ovn/nvidia"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestOVNForkHelmDigestRendering(t *testing.T) {
 	if err != nil || before != after {
 		t.Fatal("binding changed upstream subchart bytes")
 	}
-	for _, repository := range []string{"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/ovn-image-arm64", "mirror.example.test/ovn"} {
+	for _, repository := range []string{"ghcr.io/dsx-ai-factory/nvkr/candidate/ovn-image-arm64", "mirror.example.test/ovn"} {
 		args := []string{"template", "ovn", chart, "--set", "global.useImageDigest=true", "--set", "global.skipCallToK8s=true", "--set-string", "global.imagePullSecretName=", "--set-string", "k8sAPIServer=https://127.0.0.1:6443", "--set-string", "podNetwork=10.244.0.0/16"}
 		for _, image := range mapping.Images {
 			repositoryPath := strings.TrimSuffix(image.Values.Digest, ".sha256") + ".repository"

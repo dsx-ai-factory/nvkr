@@ -127,7 +127,7 @@ type Environment struct {
 	// GitHubARC explicitly selects the trusted native KVM pool policy. It is
 	// configuration, not provider isolation or runtime-capacity evidence.
 	GitHubARC string `json:"githubARC,omitempty"`
-	// DiskEvidence selects the M2 producer-evidence contract; empty requires deep inspection.
+	// DiskEvidence selects the NVKE producer-evidence contract; empty requires deep inspection.
 	DiskEvidence string `json:"diskEvidence,omitempty"`
 	// GitHubDispatchBranches adds exact branch names to default-branch manual execution.
 	GitHubDispatchBranches []string                         `json:"githubDispatchBranches,omitempty"`

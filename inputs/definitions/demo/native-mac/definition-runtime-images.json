@@ -11,7 +11,7 @@
   "outputs": [
     {
       "catalog": {
-        "base": "../../../catalogs/tools/native"
+        "base": "../../../catalogs/tools"
       },
       "components": [
         "native-capi-exec-init-image"
@@ -22,7 +22,7 @@
     },
     {
       "catalog": {
-        "base": "../../../catalogs/tools/native"
+        "base": "../../../catalogs/tools"
       },
       "components": [
         "native-capi-exec-plugin-image"
@@ -129,7 +129,7 @@
     },
     {
       "catalog": {
-        "base": "../../../catalogs/tools/native"
+        "base": "../../../catalogs/tools"
       },
       "components": [
         "native-workload-image"

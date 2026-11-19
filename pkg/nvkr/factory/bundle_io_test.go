@@ -281,7 +281,18 @@ func TestWriteGeneratedBundleStagingFailureKeepsPublishedBytes(t *testing.T) {
 	if !errors.As(err, &pathErr) || pathErr.Op != "sync" || pathErr.Path != staged || !errors.Is(err, cause) {
 		t.Fatalf("staging error lost its os.PathError or cause: %v", err)
 	}
-	first := sortedFileNames(bundle.Files)[0]
+	// Existing immutable store objects are reused. The first staged file is
+	// therefore the first private member, whose error must keep its logical name.
+	var first string
+	for _, name := range sortedFileNames(bundle.Files) {
+		if !isPlanStorePath(name) {
+			first = name
+			break
+		}
+	}
+	if first == "" {
+		t.Fatal("fixture has no private member to stage")
+	}
 	if !strings.Contains(err.Error(), "staging generated member "+first+":") {
 		t.Fatalf("staging error does not name logical member %s: %v", first, err)
 	}

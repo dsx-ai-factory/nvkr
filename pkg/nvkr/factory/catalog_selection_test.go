@@ -247,6 +247,7 @@ func TestCatalogListSelection(t *testing.T) {
 			if len(plan.CatalogCandidates) != len(tc.candidates) {
 				t.Fatal("missing candidate snapshots")
 			}
+			assertCatalogCandidateTree(t, plan)
 			legacy := def.Clone()
 			legacy.Catalogs = nil
 			legacy.Outputs[0].Catalog = &authored.Catalog{Base: "selected"}

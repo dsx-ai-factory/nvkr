@@ -37,12 +37,12 @@ For NVIDIA OVN, open these in this order:
 | `inputs/definitions/demo/arm64-nvidia-local-kvm-conformance.json` | The same selection plus version-matched Kubernetes conformance tools and images. |
 | Each selected stack's `registry.yaml` | Reusable build/acquisition producers, dependencies and instructions. |
 | Each selected stack's `pins.lock.yaml` | CLI-managed exact source, artifact and tool identities. |
-| `inputs/catalogs/node-images/release` | The shared release OS and material producers. |
+| `inputs/catalogs/node-images` | The shared release OS and material producers. |
 | `inputs/catalogs/node-images/variants/native-nvidia.json` | NVIDIA OVN producers, identical to the shared release catalog's. |
 | `inputs/catalogs/node-images/variants/native-local-kvm.json` | Native agent stamp, MAC-stable DHCP staging and KVM settings. |
 | `inputs/environments/local-arm64-kvm.json` | Native Linux ARM64 Docker/KVM build execution; publication and signing are absent. |
 
-The default catalog is `inputs/catalogs/nvke/module-cli-arm64`; other outputs select their own complete stacks. The Go
+The default catalog is `inputs/catalogs/nvke`; other outputs select their own complete stacks. The Go
 `e2e --walkthrough` introduction enumerates the selected catalog and overlay paths from the actual
 Definition and prints the actual output count. For explicit `upstream-ovn`, it instead reads
 `inputs/definitions/demo/arm64-upstream-local-kvm.json`. It never changes the NVIDIA default to make a demo pass.
@@ -50,9 +50,9 @@ Definition and prints the actual output count. For explicit `upstream-ovn`, it i
 These read-only commands inspect the NVIDIA selection:
 
 ```sh
-bin/nvkr catalog validate --data inputs/catalogs/nvke/module-cli-arm64
-bin/nvkr catalog list --data inputs/catalogs/nvke/module-cli-arm64
-bin/nvkr catalog source-pin --data inputs/catalogs/nvke/module-cli-arm64 nvke
+bin/nvkr catalog validate --data inputs/catalogs/nvke
+bin/nvkr catalog list --data inputs/catalogs/nvke
+bin/nvkr catalog source-pin --data inputs/catalogs/nvke nvke
 bin/nvkr definition validate --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json
 bin/nvkr definition inspect --definition inputs/definitions/demo/arm64-nvidia-local-kvm.json
 ```

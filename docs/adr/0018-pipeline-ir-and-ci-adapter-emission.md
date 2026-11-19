@@ -543,7 +543,7 @@ inside the producer deadline, uses the same guarded Docker device projection, an
 Published native Packer pins remain required. The strict disk-evidence mode additionally requires the full
 inspector image and measured executable pins. Explicit candidate `diskEvidence: build-provenance-v1` omits inspector
 preparation and execution; it authenticates live producer/material evidence under ADR-13/20 instead.
-This is the M2 and M3 MVP producer-provenance scope; full inspection and material reconciliation remain
+This is the NVKE and M3 MVP producer-provenance scope; full inspection and material reconciliation remain
 deferred hardening (ADR-13 §6).
 The ARC group sums only executed material-producer budgets, applying the selected VM class ceiling to its
 root producer. Synthetic SBOM/package nodes do not each add an adapter-default hour. One shared adapter-default
@@ -573,7 +573,7 @@ remain unqualified descriptions; the complete hosted finalizer, signing and cons
 
 Native preparation is a separate read-only-permission workflow that builds both images and records exact local
 image/tool measurements on matching native hosts. Measurements do not supply publication approval or registry
-pins. Toolchain publication gates and full generated M2 operational acceptance remain unresolved until separately
+pins. Toolchain publication gates and full generated NVKE operational acceptance remain unresolved until separately
 recorded; the generation contract must not fill those inputs with placeholders.
 
 Held Linux Podman execution uses a package-owned, initially empty `XDG_CONFIG_HOME`, removed by the same
@@ -1267,7 +1267,7 @@ Definition, Environment and Plan bindings are authenticated separately from the 
 Earlier successful output publications may be retained within the same producer run under ADR-20; earlier
 successful native workers may be retained within the same qualifier run under ADR-16. Each keeps its original
 authenticated invocation and unchanged inputs. A manually dispatched qualification workflow
-does not itself prove that its source build succeeded or came from the approved branch. The M2 validation-branch
+does not itself prove that its source build succeeded or came from the approved branch. The NVKE validation-branch
 exception cannot authorize qualification. Any later workflow adapter must reject unrelated or unsuccessful
 Runs before downloading executable subjects or requesting qualification signing credentials.
 
@@ -1378,7 +1378,7 @@ Temporary siblings are not upload targets; publication happens only after comple
 An existing destination is rejected, not overwritten or authenticated as this attempt's log; operators must
 retain the ephemeral, single-job workspace policy. Failure snapshots are folded in job logs with the same
 truncation marker as retained files, and logs show the last accepted inspection phase. Successful operations
-do not dump the snapshot. Graceful-timeout retention does not promise recovery after runner loss or `SIGKILL`. The explicit M2
+do not dump the snapshot. Graceful-timeout retention does not promise recovery after runner loss or `SIGKILL`. The explicit NVKE
 build-provenance mode emits neither inspection work nor its diagnostic upload. Changing the helper requires
 rebuilding and repinning its complete inspection image before claiming hosted operation.
 Retention uses a separate ten-second cleanup context with cancellation checks between filesystem operations;
@@ -1515,13 +1515,16 @@ may refresh. Changed scheduling, action templates or Environment policy fails be
 reviewed regeneration. This does not resolve latest versions or silently alter pins.
 
 That bootstrap publishes the frozen data once as `nvkr-runtime-inputs`. Other native helper bootstraps
-depend on it and restore its two JSON files into a fresh staging directory. The generation owner admits
+depend on it and restore its two JSON files into a fresh staging directory. The carrier retains
+packed canonical Plan bytes; ADR-21's GitHub tree is reconstructed locally from that Plan.
+The generation owner admits
 the complete committed baseline, exact staged Plan/manifest and current authored inputs before
 installing freshly rendered bytes through the existing manifest-last writer. The generic private transport
 continues to reject existing destinations. The bootstrap then runs the ordinary complete generation check
 against the same repository inputs. Every helper artifact carries the same Plan and manifest alongside the native
-helper; ordinary jobs, ARC jobs, recovery and finalization therefore restore the dispatch's exact inputs
-before execution. This retains the existing trusted bootstrap and same-Run artifact boundary and issues
+helper; ordinary jobs, ARC jobs, recovery and finalization stage those inputs and invoke the same
+installer before execution. They do not copy packed wire bytes over the tree root. This retains the
+existing trusted bootstrap and same-Run artifact boundary and issues
 no new execution receipt. CI uses `run generate --runtime --check` to admit unchanged scheduling and
 policy without requiring current source pins in the committed baseline. Ordinary `--check` remains
 byte-exact, including after bootstrap restoration. Default and development generation remain unchanged.

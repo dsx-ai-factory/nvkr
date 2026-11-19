@@ -24,7 +24,7 @@ that checkout is distinct from the PR head. CI durations below identify prioriti
 
 | Expensive work in the linked CI run | Seconds | Decision |
 |---|---:|---|
-| Maintained M2 private-image credential mutations | 103.05 | Keep one maintained positive check; exercise mutations with one native disk and its vendor fetch. Remove repeated caller substitutions already covered by the owning validator, retaining one composed substitution. |
+| Maintained NVKE private-image credential mutations | 103.05 | Keep one maintained positive check; exercise mutations with one native disk and its vendor fetch. Remove repeated caller substitutions already covered by the owning validator, retaining one composed substitution. |
 | Output addition/removal matrix | 54.77 | Reduce 15 combinations to seven: all three insertion positions once, plus each distinct execution policy and the real collector boundary. Retain exact restoration and existing-job comparisons. |
 | Maintained inline-job checks | 42.22 | Share the same four maintained renders with credential checks; consolidate three additional default-bundle regeneration tests into that parent. Retain byte-exact drift, input selection and size headroom. |
 | Qualification evidence mutations | 36.43 | Assemble the release once, then copy its files for every mutation. Keep all eight rejection cases and no-partial-evidence assertions. |
@@ -45,7 +45,7 @@ publications along the way. Smoke tables share authenticated artifact preparatio
 invocations and mutable runtime state. The FDE regression checks the complete authored output
 list, then compiles and renders its four native disks without rebuilding unrelated controllers and charts.
 That deliberately removes full-product compilation from the default FDE test; the existing opt-in
-`TestMaintainedM2AllOutputGraphs` and separate generated-bundle drift gate retain their broader scope.
+`TestMaintainedNVKEAllOutputGraphs` and separate generated-bundle drift gate retain their broader scope.
 
 Diagnostic operations now borrow one authenticated fixture, with source revocation last; joining and
 close admission retain their own destructive fixture. Executable-source revocation checks both the active
@@ -67,7 +67,7 @@ into this branch unchanged.
 The five-minute CI target also requires shortening the critical path: the linked job spent 70 seconds
 in vet and 160 seconds in lint before starting tests. Its other jobs already finished within three minutes
 (generated-bundle checks: 2m14s; CodeQL: 2m50s). Repository checks therefore separate static checks, lint,
-vulnerability scanning and ordinary tests into concurrent jobs. Eleven deterministic test shards split
+vulnerability scanning and ordinary tests into concurrent jobs. The initial eleven-shard distribution split
 factory across four jobs, lifecycle across two, and the remaining packages across five. Discovery includes
 new tests automatically; sharding must preserve each ordinary test exactly once and propagate failures.
 The existing local `make test` and `make check` remain available without sharding or new opt-in conditions.

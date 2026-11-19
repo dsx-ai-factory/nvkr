@@ -16,12 +16,13 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
-// developmentGenerationFixture retains the historical 69-output combined Plan
-// without source access. That input pairing is retired: the current combined
-// Definition includes a publication-bound inventory and rejects development
-// attempt relocation. Do not regenerate this compatibility fixture from it.
-// The maintained development bundle belongs to the GPU site composite, covered
-// separately by TestGPUCompositeQualificationPairs.
+// developmentGenerationFixture loads a historical Plan of the combined Definition
+// under the development Environment, so the test needs no source access. The
+// committed fixed development bundle belongs to the GPU site composite, covered
+// separately by TestGPUCompositeQualificationPairs. Regenerate this fixture with
+// run plan --definition inputs/definitions/nvke/definition.yaml
+// --environment inputs/environments/github-development.yaml --json,
+// saving the canonical output as testdata/development-plan.json.
 func developmentGenerationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPolicy) {
 	t.Helper()
 	plan, err := factory.LoadPlanContext(t.Context(), "testdata/development-plan.json")

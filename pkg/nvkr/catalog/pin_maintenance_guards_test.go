@@ -60,11 +60,11 @@ func TestToolArchiveLimits(t *testing.T) {
 
 func TestReleaseExecutableMaintenanceDoesNotCreateArtifactPin(t *testing.T) {
 	fixture := newPinSetIntegrationFixture(t, "")
-	source := fixture.registry.Sources["cwe"]
+	source := fixture.registry.Sources["nvke-controller"]
 	source.Tool = &ToolSource{Format: "raw", URL: "https://example.invalid/{{.Version}}/tool", Platform: "linux/amd64", ExecutablePath: "tool"}
-	fixture.registry.Sources["cwe"] = source
+	fixture.registry.Sources["nvke-controller"] = source
 	fixture.registry.Components["controller"] = rawComponent{
-		Source: "cwe", Platforms: []string{"linux/amd64"}, OutputType: "host-package",
+		Source: "nvke-controller", Platforms: []string{"linux/amd64"}, OutputType: "host-package",
 		Prebuilt: &Prebuilt{ReleaseExecutable: true, Evidence: &ExternalEvidence{None: true}},
 	}
 	fixture.writeRegistry(t)
@@ -91,7 +91,7 @@ func TestReleaseExecutableMaintenanceDoesNotCreateArtifactPin(t *testing.T) {
 		t.Fatalf("source tool update=%+v error=%v", update, err)
 	}
 	lock := fixture.lock(t)
-	if len(lock.Artifacts) != 0 || lock.Pins["cwe"].Tool == nil {
+	if len(lock.Artifacts) != 0 || lock.Pins["nvke-controller"].Tool == nil {
 		t.Fatal("tool pins did not remain solely source-owned")
 	}
 	targets, err := prebuiltTargetsFrom(fixture.registry, lock)

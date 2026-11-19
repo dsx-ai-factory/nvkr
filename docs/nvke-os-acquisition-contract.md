@@ -7,7 +7,7 @@ acquisition-origin authority, installed inventory, a live-Run receipt or a full 
 [ADR-13](adr/0013-supply-chain-evidence.md) owns evidence authority.
 
 The standalone [OS development inputs](../inputs/definitions/diagnostics/README.md) and the newer
-[M2 candidate](../inputs/definitions/nvke/README.md) have different source selections. M2 pins the
+[NVKE candidate](../inputs/definitions/nvke/README.md) have different source selections. NVKE pins the
 merged capture-capable NVKE source and explicitly enables capture. Its generic disk collector can retain
 the declared carrier under the original Run/QCOW2 owner; that integration does not strengthen this
 standalone verifier's claim.
@@ -95,6 +95,6 @@ The source carrier collector is implemented. Complete capture acceptance still n
 installer-to-target coverage and evidence joining the exact capture, producer, live Run and final QCOW2.
 Base-ISO content, downloads outside APT and events outside the capture window require separate coverage.
 Missing historical repository metadata fails closed; a guessed package URL is never substituted.
-Do not promote this diagnostic to complete acquisition closure or a full disk SBOM. M2's explicit
+Do not promote this diagnostic to complete acquisition closure or a full disk SBOM. NVKE's explicit
 build-provenance scope defers deep disk reconciliation beyond the approved M3 MVP; current status belongs in
 [reconciliation](adr/reconciliation/README.md).

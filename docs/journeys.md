@@ -137,9 +137,9 @@ process. Do not copy a scratch workflow over an existing generated bundle or edi
 
 Once the reviewed bundle is installed on the repository's admitted default branch, a maintainer with
 GitHub CLI access can dispatch it (for this example, the workflow is `nvkr-run.yml` on `main`).
-Dispatch runs whichever bundle is committed at that ref. In `dsx-ai-factory/nvkr`, that workflow is the
-combined candidate, **not this three-output example**. Use your configured repository only after checking
-its committed Plan and output membership:
+Dispatch runs whichever bundle is committed at that ref. The maintained production workflow in
+`dsx-ai-factory/nvkr` is `nvkr-run-nvke.yml`, which selects the NVKE composite. This scratch example
+uses `nvkr-run.yml` in your configured fork. Check its committed Plan and output membership before dispatch:
 
 ```sh
 : "${NVKR_PUBLISH_REPO:?Set the configured publishing repository as owner/name}"

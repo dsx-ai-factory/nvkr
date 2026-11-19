@@ -10,7 +10,7 @@ metadata:
   name: nvke-deploy-github
 publication:
   imageTags:
-    cwe: candidate
+    nvke-controller: candidate
   credentialRef: github:GITHUB_TOKEN
   repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr
 runtime:

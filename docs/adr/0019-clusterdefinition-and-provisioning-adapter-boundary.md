@@ -26,8 +26,8 @@ byte-changing packaging relationships, including an explicit inventory describin
 role affinity, deployment category, cluster context, CNI declaration or cluster validation-requirement list.
 Different deliverable sets can use separate Definitions. No replacement grouping object is introduced.
 [ADR-26](0026-definition-composition.md) designs a composite Definition, implemented and contract-tested only,
-whose Release membership is the exact union of complete member Definitions' named outputs; it selects,
-overrides and deduplicates nothing.
+whose Release membership is the exact union of complete member Definitions' named outputs plus explicitly
+declared composite-owned release-derived bundles. It does not override or deduplicate member outputs.
 
 Each output remains an independent required use even if another output has the same Build Digest. Preparation
 freezes the exact required set; execution and hosted finalization join producer results, terminal observations,

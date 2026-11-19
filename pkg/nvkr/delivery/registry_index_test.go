@@ -27,7 +27,7 @@ import (
 )
 
 // This is a transport-only diagnostic fixture. Its descriptive build fields do
-// not stand for native CWE production, signed SBOMs or authenticated release use.
+// not stand for native nvke-controller production, signed SBOMs or authenticated release use.
 func registryImageIndexFixture(t *testing.T) (string, Result, ImageIndexDescription) {
 	t.Helper()
 	return registryImageIndexWithRepresentation(t, "")
@@ -55,9 +55,9 @@ func registryImageIndexWithRepresentation(t *testing.T, representation OCIRepres
 		t.Fatal(err)
 	}
 	objects := []ObjectInput{{
-		Name: "cwe", Kind: "container-image", ArtifactType: MediaOCIIndex, Path: path, Layout: true,
+		Name: "nvke-controller", Kind: "container-image", ArtifactType: MediaOCIIndex, Path: path, Layout: true,
 		SemanticDigest: description.Digest, BlobDigest: description.Digest,
-		Output: &OutputBinding{Repository: "cwe", Format: "oci", BuildDigest: build, Components: []string{"controller"}, ImageIndex: binding},
+		Output: &OutputBinding{Repository: "nvke-controller", Format: "oci", BuildDigest: build, Components: []string{"controller"}, ImageIndex: binding},
 	}}
 	for _, child := range binding.Children {
 		bom, err := sbom.NewSubject(child.BuildDigest, child.Component, child.ManifestDigest)
@@ -80,12 +80,12 @@ func registryImageIndexWithRepresentation(t *testing.T, representation OCIRepres
 			Name: "sbom-" + strings.TrimPrefix(semantic, "sha256:"), Kind: "sbom",
 			ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json",
 			SemanticDigest: semantic, Bytes: raw,
-			Evidence: &EvidenceBinding{Outputs: []string{"cwe"}, Platform: child.Platform, Component: child.Component,
+			Evidence: &EvidenceBinding{Outputs: []string{"nvke-controller"}, Platform: child.Platform, Component: child.Component,
 				Stage: "build-output", SubjectKind: "oci-manifest", SubjectDigest: child.ManifestDigest,
 				InspectionInputDigest: child.BuildSubject},
 		})
 	}
-	content, err := ContentDigest([]Output{{Name: "cwe", Kind: "oci", Digest: description.Digest,
+	content, err := ContentDigest([]Output{{Name: "nvke-controller", Kind: "oci", Digest: description.Digest,
 		BuildDigest: build, Components: []string{"controller"}, ImageIndex: binding}})
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +130,7 @@ func registryImageIndexRoundTrip(t *testing.T, representation OCIRepresentation)
 	if err != nil || ref != repository+"@"+result.RootDigest {
 		t.Fatalf("push=%s/%v", ref, err)
 	}
-	childRef, err := name.NewDigest(strings.TrimPrefix(server.URL, "http://")+"/product/cwe@"+expected.Digest, name.StrictValidation, name.Insecure)
+	childRef, err := name.NewDigest(strings.TrimPrefix(server.URL, "http://")+"/product/nvke-controller@"+expected.Digest, name.StrictValidation, name.Insecure)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func registryImageIndexRoundTrip(t *testing.T, representation OCIRepresentation)
 		t.Fatalf("pull=%+v/%v", inspection, err)
 	}
 	for _, object := range inspection.Root.Objects {
-		if object.Name != "cwe" {
+		if object.Name != "nvke-controller" {
 			continue
 		}
 		held, err := openPublishedImageIndex(t.Context(), out, object)
@@ -189,7 +189,7 @@ func registryImageIndexRoundTrip(t *testing.T, representation OCIRepresentation)
 	// The registry fixture lacks OCI's Referrers API. The pinned client keeps
 	// SBOM attachments in its subject-digest fallback index; this is distinct
 	// from giving the runnable image an operator-selected discovery alias.
-	fallback := "/v2/product/cwe/manifests/" + strings.Replace(expected.Digest, ":", "-", 1)
+	fallback := "/v2/product/nvke-controller/manifests/" + strings.Replace(expected.Digest, ":", "-", 1)
 	for _, path := range writes {
 		if !strings.Contains(path, "/manifests/sha256:") && path != fallback {
 			t.Fatalf("unexpected image/root discovery tag write %s", path)
@@ -235,10 +235,10 @@ func TestRegistryImageIndexRejectsUnreadableChildBeforeRoot(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			target := "/v2/product/cwe/manifests/" + child.ManifestDigest
+			target := "/v2/product/nvke-controller/manifests/" + child.ManifestDigest
 			wantCode := e.CodeUnavailable
 			if mode != "missing-manifest" {
-				target = "/v2/product/cwe/blobs/" + manifest.Layers[0].Digest
+				target = "/v2/product/nvke-controller/blobs/" + manifest.Layers[0].Digest
 			}
 			if mode == "corrupt-layer" {
 				wantCode = e.CodeVerifyFailed
@@ -278,7 +278,7 @@ func TestRegistryImageIndexPullFailureDoesNotExposePartialLayout(t *testing.T) {
 	handler := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
 	var broken atomic.Bool
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if broken.Load() && r.Method == http.MethodGet && r.URL.Path == "/v2/product/cwe/manifests/"+description.Children[1].ManifestDigest {
+		if broken.Load() && r.Method == http.MethodGet && r.URL.Path == "/v2/product/nvke-controller/manifests/"+description.Children[1].ManifestDigest {
 			http.NotFound(w, r)
 			return
 		}

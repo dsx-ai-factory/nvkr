@@ -12,17 +12,17 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
-// OutputAttribution names the member that declared one effective output.
+// OutputAttribution names the declaring member, or the composite when Member is empty.
 type OutputAttribution struct {
 	Output string `json:"output"`
-	Member string `json:"member"`
+	Member string `json:"member,omitempty"`
 }
 
 // Effective returns an independent copy of the derived v5 Definition. It is an
 // internal record: it has no file and is never an authored input.
 func (composition Composition) Effective() Definition { return composition.effective.Clone() }
 
-// Attribution returns every effective output's declaring member, sorted by output.
+// Attribution returns every effective output's owner, sorted by output.
 func (composition Composition) Attribution() []OutputAttribution {
 	return slices.Clone(composition.attribution)
 }

@@ -32,25 +32,25 @@ func TestImageTagSyntaxAdmission(t *testing.T) {
 		valid bool
 	}{
 		{"absent", nil, true}, {"empty", map[string]string{}, true},
-		{"version", map[string]string{"cwe": "v1.2.3-rc.1_build"}, true},
-		{"underscore", map[string]string{"cwe": "_channel"}, true},
-		{"limit", map[string]string{"cwe": strings.Repeat("a", 128)}, true},
-		{"empty tag", map[string]string{"cwe": ""}, false},
+		{"version", map[string]string{"nvke-controller": "v1.2.3-rc.1_build"}, true},
+		{"underscore", map[string]string{"nvke-controller": "_channel"}, true},
+		{"limit", map[string]string{"nvke-controller": strings.Repeat("a", 128)}, true},
+		{"empty tag", map[string]string{"nvke-controller": ""}, false},
 		{"empty output", map[string]string{"": "v1"}, false},
-		{"selector", map[string]string{"cwe/*": "v1"}, false},
-		{"leading dot", map[string]string{"cwe": ".v1"}, false},
-		{"leading dash", map[string]string{"cwe": "-v1"}, false},
-		{"long", map[string]string{"cwe": strings.Repeat("a", 129)}, false},
-		{"repository", map[string]string{"cwe": "repo:v1"}, false},
-		{"path", map[string]string{"cwe": "other/v1"}, false},
-		{"digest", map[string]string{"cwe": "sha256:" + strings.Repeat("a", 64)}, false},
-		{"referrer", map[string]string{"cwe": "sha256-" + strings.Repeat("a", 64)}, false},
-		{"signature", map[string]string{"cwe": "sha256-" + strings.Repeat("a", 64) + ".sig"}, false},
-		{"reserved prefix", map[string]string{"cwe": "sha256-channel"}, false},
-		{"template", map[string]string{"cwe": "${version}"}, false},
-		{"space", map[string]string{"cwe": "v1 "}, false},
-		{"control", map[string]string{"cwe": "v1\n"}, false},
-		{"unicode", map[string]string{"cwe": "rélease"}, false},
+		{"selector", map[string]string{"nvke-controller/*": "v1"}, false},
+		{"leading dot", map[string]string{"nvke-controller": ".v1"}, false},
+		{"leading dash", map[string]string{"nvke-controller": "-v1"}, false},
+		{"long", map[string]string{"nvke-controller": strings.Repeat("a", 129)}, false},
+		{"repository", map[string]string{"nvke-controller": "repo:v1"}, false},
+		{"path", map[string]string{"nvke-controller": "other/v1"}, false},
+		{"digest", map[string]string{"nvke-controller": "sha256:" + strings.Repeat("a", 64)}, false},
+		{"referrer", map[string]string{"nvke-controller": "sha256-" + strings.Repeat("a", 64)}, false},
+		{"signature", map[string]string{"nvke-controller": "sha256-" + strings.Repeat("a", 64) + ".sig"}, false},
+		{"reserved prefix", map[string]string{"nvke-controller": "sha256-channel"}, false},
+		{"template", map[string]string{"nvke-controller": "${version}"}, false},
+		{"space", map[string]string{"nvke-controller": "v1 "}, false},
+		{"control", map[string]string{"nvke-controller": "v1\n"}, false},
+		{"unicode", map[string]string{"nvke-controller": "rélease"}, false},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			err := ValidateImageTags(test.tags)
@@ -120,7 +120,7 @@ func TestImageTagSelectionRejectsBeforeNetwork(t *testing.T) {
 			binding.ImageIndex = nil
 			root.Objects[0].Output = &binding
 		}
-		_, err := prepareImageAliases(root, refs, map[string]string{"cwe": "v1"})
+		_, err := prepareImageAliases(root, refs, map[string]string{"nvke-controller": "v1"})
 		assertRegistryCode(t, err, e.CodeInvalidCatalog)
 	}
 }
@@ -324,14 +324,14 @@ func TestImageTagsDoNotAdvanceAfterAnyClosureReadbackFailure(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			target := "/v2/product/cwe/manifests/" + index.Children[0].ManifestDigest
+			target := "/v2/product/nvke-controller/manifests/" + index.Children[0].ManifestDigest
 			want := e.CodeUnavailable
 			switch mode {
 			case "layer corrupt":
-				target = "/v2/product/cwe/blobs/" + child.Layers[0].Digest
+				target = "/v2/product/nvke-controller/blobs/" + child.Layers[0].Digest
 				want = e.CodeVerifyFailed
 			case "evidence missing":
-				target = "/v2/product/cwe/blobs/" + evidence.Layers[0].Digest
+				target = "/v2/product/nvke-controller/blobs/" + evidence.Layers[0].Digest
 			case "root missing", "canceled":
 				target = "/v2/product/release/manifests/" + result.RootDigest
 			}
@@ -344,7 +344,7 @@ func TestImageTagsDoNotAdvanceAfterAnyClosureReadbackFailure(t *testing.T) {
 				if r.Method == http.MethodPut && r.URL.Path == "/v2/product/release/manifests/"+result.RootDigest {
 					rootWritten.Store(true)
 				}
-				if r.Method == http.MethodPut && r.URL.Path == "/v2/product/cwe/manifests/candidate" {
+				if r.Method == http.MethodPut && r.URL.Path == "/v2/product/nvke-controller/manifests/candidate" {
 					aliases.Add(1)
 				}
 				if rootWritten.Load() && r.Method == http.MethodGet && r.URL.Path == target {
@@ -367,7 +367,7 @@ func TestImageTagsDoNotAdvanceAfterAnyClosureReadbackFailure(t *testing.T) {
 			workspace := t.TempDir()
 			t.Setenv("TMPDIR", workspace)
 			ref, err := PushWithOptions(ctx, publication, strings.TrimPrefix(server.URL, "http://")+"/product/release",
-				PushOptions{Registry: RegistryOptions{PlainHTTP: true, Anonymous: true}, ImageTags: map[string]string{"cwe": "candidate"}})
+				PushOptions{Registry: RegistryOptions{PlainHTTP: true, Anonymous: true}, ImageTags: map[string]string{"nvke-controller": "candidate"}})
 			assertRegistryCode(t, err, want)
 			entries, readErr := os.ReadDir(workspace)
 			if readErr != nil || len(entries) != 0 {
@@ -389,7 +389,7 @@ func TestImageTagMutationFailuresPreserveRetryContract(t *testing.T) {
 			defer cancel()
 			var active atomic.Bool
 			var writes atomic.Int32
-			aliasPath := "/v2/product/cwe/manifests/candidate"
+			aliasPath := "/v2/product/nvke-controller/manifests/candidate"
 			oldRaw := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.index.v1+json","manifests":[]}`)
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				if r.URL.Path == aliasPath && r.Method == http.MethodPut {
@@ -448,8 +448,8 @@ func TestImageTagMutationFailuresPreserveRetryContract(t *testing.T) {
 				handler.ServeHTTP(w, r)
 			}))
 			defer server.Close()
-			options := PushOptions{Registry: RegistryOptions{PlainHTTP: true, Anonymous: true}, ImageTags: map[string]string{"cwe": "candidate"}}
-			tag, err := name.NewTag(strings.TrimPrefix(server.URL, "http://")+"/product/cwe:candidate", name.Insecure)
+			options := PushOptions{Registry: RegistryOptions{PlainHTTP: true, Anonymous: true}, ImageTags: map[string]string{"nvke-controller": "candidate"}}
+			tag, err := name.NewTag(strings.TrimPrefix(server.URL, "http://")+"/product/nvke-controller:candidate", name.Insecure)
 			if err != nil {
 				t.Fatal(err)
 			}

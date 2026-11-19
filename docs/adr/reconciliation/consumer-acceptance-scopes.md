@@ -80,6 +80,13 @@ inventory, changed ownership and unsafe or canceled work are not retryable. Temp
 classifiers, failure-only health/curl probes, console drop-ins and the resource
 sampler are removed; required behavior retains focused regression coverage.
 
+During the controller output rename, installer admission accepts `cwe` and
+`nvke-controller` as the source's `imageArtifact` value. Both remain bound to the
+exact checked metadata bytes; changing between them invalidates that selection.
+This local admission contract does not translate Release output names for NVKE:
+its source metadata must select `nvke-controller` to consume newly named Releases.
+Hosted acceptance of that source-metadata transition remains unrecorded.
+
 [Run #38](https://github.com/depohmel/nvkr/actions/runs/41684210103) completed on
 November 3, 2026 (New York) on exact NVKR `6c9c0ec4b82876db5b9db9bdcf421a7c48f1fcbd`,
 with frozen NVKE `cd0093ec4db83447f4cbab423d2948b75427d6af`. Fresh local builds,
