@@ -169,7 +169,7 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 | Raw `sha256.Sum256` as a structured identity | Use the canonical codec and an existing typed digest family |
 | Log a warning and continue on a validation, pin, or signature problem | Return a coded error; fail closed |
 | Emit an arbitrary self-hosted runner label or a `git tag` trigger in a generated workflow | Generic hosted runners, with only ADR-18's explicitly admitted native ARC disk exception; sign through the admitted default-branch workflow |
-| Hand-edit `.github/workflows/nvkr-run.yml` or `pins.lock.yaml` | Regenerate with `run generate` from the Definition and Environment, or `catalog pin`; edit authored inputs, not generated output |
+| Hand-edit `.github/workflows/nvkr-run-nvke.yml` or `pins.lock.yaml` | Regenerate with `run generate` from the Definition and Environment, or `catalog pin`; edit authored inputs, not generated output |
 | Claim a feature works because a unit test with a fake passes | Cite the exact external Run or release artifact and its scope in reconciliation |
 | Write repo paths, commands, or code identifiers into a product spec or epic | Specs use product nouns only; implementation detail belongs in ADRs and code |
 | Append an amendment chain for an existing decision | Update its owning ADR section and reconciliation directly; label lane and deferred behavior |
@@ -214,7 +214,7 @@ Use `docs/README.md` for documentation, `demos/README.md` for presentations and 
 contains the retained three-output NVKE inputs; `inputs/definitions/nvke/` supplies the maintained release candidate,
 and `inputs/definitions/diagnostics/fde-amd64.yaml` supplies the build-only FDE selection. `make workflows-check` repeats the exact input
 paths in the committed Plan. A branch's selection is not a ratified canonical-product decision.
-`.github/workflows/nvkr-run.yml` and `.github/nvkr-run/manifest.json` are generated. `toolchains/` owns toolchain
+`.github/workflows/nvkr-run-nvke.yml` and `.github/nvkr-run-nvke/manifest.json` are generated. `toolchains/` owns toolchain
 sources and helper pins. `CONTRIBUTING.md` owns contribution rules.
 
 `.agents/skills/nvkr-operator/` is the customer agent entry point; maintainers keep it consistent with

@@ -1,0 +1,123 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/catalog/v3
+components:
+  nvke-cni-ovn:
+    artifactPath: nvkr-output/nvke-cni-ovn.tar
+    buildCommand:
+    - bash
+    - -ec
+    - {file: scripts/build-nvke-cni-ovn.sh.tmpl}
+    fromSource: true
+    materials:
+      ovn-chart: ovn-kubernetes-chart
+      ovn-image: ovn-kube-ubuntu
+    outputType: tarball
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: ovn-kubernetes
+    sourceMetadata:
+      NVKR_SOURCE_COMMIT: '{{.Commit}}'
+      NVKR_SOURCE_REVISION: 1+git.{{printf "%.12s" .Commit}}
+      NVKR_SOURCE_STREAM: '{{.ReleaseVersion}}'
+    writeDir: nvkr-output
+  ovn-kube-ubuntu:
+    artifactPath: nvkr-output/ovn-kube-ubuntu.oci.tar
+    buildCommand:
+    - sh
+    - -ec
+    - |
+      echo 'OVN IMAGE BUILD: source-owned Dockerfile acquires OVS/OVN and kubectl through APT; not hermetic or NV FIPS/STIG.' >&2
+      exec buildctl-daemonless.sh build --frontend dockerfile.v0 \
+        --local context=/src --local dockerfile=/src/dist/images \
+        --opt filename=Dockerfile.ubuntu.nv --opt platform=linux/{{.Arch}} \
+        --opt build-arg:OVN_K8S_SRC_ROOT=. \
+        --opt build-arg:BASE_IMAGE=docker.io/library/ubuntu:24.04@sha256:534baea6a22c03a63003dbc8dbe78fe34bc0d7e595d9a9dc9834884ff530eb55 \
+        --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+        --opt build-arg:OVS_SOURCE=doca \
+        --opt build-arg:OVN_SOURCE=uca \
+        --opt build-arg:CLOUD_ARCHIVE=gazpacho \
+        --opt build-arg:UCA_OVN_VER=26.03.0-2~cloud0 \
+        --opt build-arg:DOCA_RELEASE=3.5.0 \
+        --opt build-arg:K8S_VER=v1.36 \
+        --output type=oci,dest=/src/nvkr-output/ovn-kube-ubuntu.oci.tar,oci-mediatypes=true,rewrite-timestamp=true,name=localhost/nvke/ovn-kubernetes:git-"${NVKR_SOURCE_COMMIT:?}"
+    builderType: buildkit-rootless
+    fromSource: true
+    outputType: oci-image
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: ovn-kubernetes
+    sourceMetadata:
+      NVKR_SOURCE_COMMIT: '{{.Commit}}'
+    toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
+    writeDir: nvkr-output
+  ovn-kubernetes-chart:
+    artifactPath: nvkr-output/ovn-kubernetes-chart.tar
+    buildCommand:
+    - bash
+    - -ec
+    - |
+      readonly chart=/src/charts/ovn-kubernetes
+      readonly out=/src/nvkr-output/ovn-kubernetes
+      readonly stream="${NVKR_SOURCE_STREAM:?}"
+      [[ "$stream" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.+-]+)?$ ]]
+      test -f "$chart/Chart.yaml"
+      grep -Fqx "version: $stream" "$chart/Chart.yaml"
+      mkdir -p "$out"
+      cp -a "$chart/." "$out/"
+      # The pinned chart aliases upstream's values filename onto values.yaml.
+      test "$(readlink "$out/values-single-node-zone.yaml")" = values.yaml
+      rm "$out/values-single-node-zone.yaml"
+      test ! -e "$out/values-single-node-zone.yaml"
+      tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" --owner=0 --group=0 \
+        --numeric-owner -C /src/nvkr-output -cf /src/nvkr-output/ovn-kubernetes-chart.tar ovn-kubernetes
+    fromSource: true
+    helm:
+      chart: .
+      images:
+        control-plane:
+          values:
+            digest: ovnkube-control-plane.ovnkubeControlPlane.image.sha256
+            digestFormat: sha256-hex
+        nbdb:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZoneNbdb.image.sha256
+            digestFormat: sha256-hex
+        node:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZone.image.sha256
+            digestFormat: sha256-hex
+        northd:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZoneNorthd.image.sha256
+            digestFormat: sha256-hex
+        ovn-host:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZoneOvnHost.image.sha256
+            digestFormat: sha256-hex
+        sbdb:
+          values:
+            digest: ovnkube-single-node-zone.ovnkubeSingleNodeZoneSbdb.image.sha256
+            digestFormat: sha256-hex
+    outputType: tarball
+    platforms:
+    - linux/amd64
+    - linux/arm64
+    source: ovn-kubernetes
+    sourceMetadata:
+      NVKR_SOURCE_STREAM: '{{.ReleaseVersion}}'
+    writeDir: nvkr-output
+kind: SourceBuildRegistry
+metadata:
+  description: Shared ovn/nvidia domain catalog; explicit producer variants preserve
+    existing build and acquisition contracts.
+  name: ovn-nvidia
+sources:
+  ovn-kubernetes:
+    repo: https://github.com/dsx-ai-factory/ovn-kubernetes
+    toolchainImagesByArch:
+      amd64: docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90
+      arm64: docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b

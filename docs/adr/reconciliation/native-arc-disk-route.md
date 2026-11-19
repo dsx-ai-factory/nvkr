@@ -1,15 +1,15 @@
 ## Native ARC disk route
-The single checked-in `nvkr-run.yml` selects the 69-output M2 Definition and its main-only publication
-Environment, including plain and public-bootstrap FDE disks on both native architectures. The Makefile drift
-gate uses the authored maintained generation inventory, whose Definition and Environment paths are
-contract-checked against the committed Plans. Dispatch does not
-choose among Definitions. Alternate selections can be generated into a scratch root with their matching
-byte-exact check. The standalone `codex/fde-image-pipeline` branch used the separate one-output FDE Definition
-and build-only Environment for the recorded diagnostic below. Neither candidate selection is a ratified
-canonical-product/path migration or publication-namespace decision; that named-decider governance remains
-pending. On October 13, 2026, the
-`nkd-arc` Environment admitted the exact FDE branch through deployment policy `62934956`, preserving its
-existing `main` and M2 validation-branch policies. That provider configuration is not execution evidence.
+The maintained `nvkr-run-nvke.yml` selects the 83-output composite, including eight plain and
+public-bootstrap FDE disks across both Ubuntu series and native architectures. The production,
+development and floating-source nightly selections are checked from the maintained inventory.
+ADR-26 U10 records the explicit 2026-11-17 product cutover; no new hosted acceptance is inferred.
+Alternate diagnostic selections can still be generated into scratch roots. The records below describe
+the earlier combined candidate and standalone FDE diagnostic at their exact revisions.
+
+The standalone `codex/fde-image-pipeline` branch used the separate one-output FDE Definition
+and build-only Environment for the recorded diagnostic below. On October 13, 2026, the
+`nkd-arc` Environment admitted that exact branch through deployment policy `62934956`, preserving its
+existing `main` and NVKE validation-branch policies. That provider configuration is not execution evidence.
 
 The build-only finalizer uses the selected native ARC pool and matching helper with a two-hour bound,
 restoring and rehashing the complete raw-disk closure without publication authority. Comparable AMD64
@@ -49,18 +49,18 @@ ADR-18 now permits the explicit `githubARC: native-kvm-v1` operator-trusted poli
 The grouped helper retains original material and disk owners through reconciliation and packaging; generation
 contracts cover both architectures, individual-node bypass rejection and unsupported policy rejection. For
 publication workflows, source fetch, bootstrap and release credentials remain outside ARC jobs. Native preparation/measurement is provided
-separately. M2 now generates all 69 named outputs with four native disk jobs from the same Definition,
+separately. NVKE now generates all 69 named outputs with four native disk jobs from the same Definition,
 an exact catalog overlay and measured native inspection profiles. Four toolchain images were
 published to internal GHCR packages under the user's scoped candidate exception, with exact
 manifest/config read-back. This is not completed organizational license/security review.
 Private pulls use a separate packages:read step whose temporary credentials are removed before
 execution; cached exact image identities are revalidated by the held runtime.
 Both native plain-image builds and terminal checks completed in run `37445475840`; both deep disk inspections timed out.
-The user earlier moved deep disk/content inspection and dependent reconciliation out of M2. The narrower candidate
+The user earlier moved deep disk/content inspection and dependent reconciliation out of NVKE. The narrower candidate
 `diskEvidence: build-provenance-v1` selects live producer/material evidence with signed uninspected scope,
 normal packaging/signing/publication and unchanged subject/provenance/membership/completeness gates.
 The [inspection deferral record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-06-m2-inspection-deferral.md) records the scope and validation.
-The plain-image strict inspection path remains available. M2 retains its AMD64-only product acceptance floor and accepts
+The plain-image strict inspection path remains available. NVKE retains its AMD64-only product acceptance floor and accepts
 producer provenance with its remaining delivery/consumer gates. The approved initial scope also
 retains producer-only disk evidence and defers inspection/material reconciliation to hardening. This task
 scope supersedes the earlier M3 assignment without changing any historical signed bytes or establishing
@@ -96,7 +96,7 @@ The GPU site production [Run 42116623552](https://github.com/dsx-ai-factory/nvkr
 at `ab3fe8a7` failed before native toolchain materialization; the
 [source-fetch job](https://github.com/dsx-ai-factory/nvkr/actions/runs/42116623552/job/127558874072)
 omitted private-image preparation because the generator did not admit the GPU site publication prefix
-for the existing M2 toolchain pins. The Environment now declares private/public toolchain roots and one independent reader, instead of using
+for the existing NVKE toolchain pins. The Environment now declares private/public toolchain roots and one independent reader, instead of using
 publication prefixes for image access. Contract tests cover missing classifications/readers, publication
 independence, native preparation, reader projection, and foreign/lookalike roots. Environment admission
 also rejects the configured publication credential and fixed writer references as readers, including

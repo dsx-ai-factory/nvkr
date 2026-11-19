@@ -171,7 +171,7 @@ and rejects producer-only acceptance. Neither path accepts a
 restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
 the live inspection-and-packaging operation in strict mode; producer-provenance mode skips inspection and consumes
-the original producer/material owners instead. Producer provenance is the M2 and M3 MVP disk acceptance scope;
+the original producer/material owners instead. Producer provenance is the NVKE and M3 MVP disk acceptance scope;
 full inspection and material reconciliation are deferred hardening (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
 in [reconciliation: Native ARC disk route](reconciliation/native-arc-disk-route.md#native-arc-disk-route). The ordinary local scheduler
 still rejects disk publication.
@@ -694,9 +694,9 @@ for another named output/platform use. Consumer validation checks the complete m
 it, and release navigation describes the index and each child without claiming signature authority. Helm
 bindings require their chart platform to belong to the index's declared and observed coverage and embed the
 complete index digest. No post-build manifest rewrite or `platform: multi` is admitted. Explicit discovery
-aliases follow the post-readback rule in section 2. M2 ARC/per-output metadata-only publication composition
+aliases follow the post-readback rule in section 2. NVKE ARC/per-output metadata-only publication composition
 and a dual-native hosted build/sign/publication remain separate, unexercised integration work. See
-[multi-architecture CWE delivery](../multiarch-cwe-delivery.md).
+[multi-architecture nvke-controller delivery](../multiarch-nvke-controller-delivery.md).
 
 ### 5. Credentials by reference, never embedded
 
@@ -972,7 +972,7 @@ config under OCI's empty-config media type, subject and bundle layer in the owni
 no raw SBOM copy is published. Its OCI subject is the associated deliverable manifest, while the statement
 subject remains the exact inventoried binary, native image manifest, or source/final archive. Shared evidence
 belongs to the first sorted output membership's repository. Membership binds the exact subject, stage,
-canonical document digest, bundle blob and manifest digests, and typed document identity. The CLI inventories its exact binary; CWE inventories
+canonical document digest, bundle blob and manifest digests, and typed document identity. The CLI inventories its exact binary; nvke-controller inventories
 the native manifest and records the scanned OCI-export input; Helm has distinct source-archive and final-bound-
 package inventories. Identical evidence may have one published document with sorted output memberships only
 after each output's exact producer/evidence handoff is validated. Equal Build Digests cannot satisfy missing
@@ -1011,7 +1011,7 @@ its name discovered from the archive itself rather than assumed, the same shape 
 — extracted through the bounded transport adapter and repacked deterministically, re-rooted onto the chart's
 own declared name exactly as `helm package` would produce it. Lifecycle observation checks the exact archive
 against its producer result and independently reproduces the publication payload. Optional Definition Helm
-settings contain only a named relationship map: `helm.images: {controller: cwe}` binds a chart slot to an OCI
+settings contain only a named relationship map: `helm.images: {controller: nvke-controller}` binds a chart slot to an OCI
 output on the same platform, or an aggregate output containing that platform. The selected source producer owns `helm.chart` (`.` for the archive root or a
 direct child directory) and each slot's `values.digest` path in `values.yaml`. Compilation joins the relationships with that output's resolved catalog,
 including catalog overrides. Every catalog slot must be bound exactly once; missing mappings, unbound slots
@@ -1042,7 +1042,7 @@ Acquired charts remain immutable and cannot use these bindings.
 Contract tests cover multiple slots, admission, unchanged templates and identical package bytes across
 Environment repository choices. Opt-in real Helm tests render the pinned NVKE controller chart for two
 repositories using the packaged digest value. This does not establish installation, signatures, runtime
-availability or a new full CWE-plus-charts build. See the [binding implementation guide](../declarative-helm-bindings.md).
+availability or a new full nvke-controller-plus-charts build. See the [binding implementation guide](../declarative-helm-bindings.md).
 
 A Helm output may instead select one acquired `raw` chart package. The compiler requires an acquisition
 producer and transports its result explicitly. Packaging checks the result and a bounded, no-follow held
@@ -1193,7 +1193,7 @@ The container-image delivery adapter has contract tests for exact OCI-export arc
 manifest/config/layer closure, decompressed layer identities, platform selection, safe archive members and
 unchanged image identities inside a publication root. Public OCI outputs lower to one built OCI-export
 component, checked against its producer bytes before publication; consumer projection checks the native image
-and its platform. The [combined hosted Run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md) exercises CLI, CWE and
+and its platform. The [combined hosted Run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md) exercises CLI, nvke-controller and
 source Helm production, image-bound chart packaging, GHCR publication, real keyless signing and complete
 finalization. This historical layout had three duplicated publications. Independent consumers authenticated all three; downloaded payload checks
 exercise the native image, recovered CLI and rendered chart binding. Acquired native OCI and Docker-schema-2

@@ -138,7 +138,7 @@ func checkNativePublicationBinding(release lifecycle.Release, exact lifecycle.Ex
 
 func nativePublicationRequiredOutputs(arch string) map[string]string {
 	outputs := map[string]string{"native-tools-linux-" + arch: "executable", "site-startup-tools-" + arch: "executable", "nvke-node-image-" + arch: "disk-image",
-		"cwe": "oci", "controller-profiles": "oci", "capnico-controller-" + arch: "oci", "cluster-api-provider-provisioned-" + arch: "oci",
+		"nvke-controller": "oci", "controller-profiles": "oci", "capnico-controller-" + arch: "oci", "cluster-api-provider-provisioned-" + arch: "oci",
 		"ovn-image-" + arch: "oci", "workload-image-" + arch: "oci", "capi-exec-init-image-" + arch: "oci", "capi-exec-plugin-image-" + arch: "oci"}
 	for _, role := range runtimeImages {
 		outputs[role+"-image-"+arch] = "oci"
@@ -329,7 +329,7 @@ func (inputs *nativePublicationInputs) prepareImages(ctx context.Context, public
 	if err != nil {
 		return err
 	}
-	roles := map[string]string{"controller": "cwe", "profiles": "controller-profiles", "ovn": "ovn-image-" + inputs.arch,
+	roles := map[string]string{"controller": "nvke-controller", "profiles": "controller-profiles", "ovn": "ovn-image-" + inputs.arch,
 		"capnico": "capnico-controller-" + inputs.arch, "provisioned-provider": "cluster-api-provider-provisioned-" + inputs.arch,
 		"workload": "workload-image-" + inputs.arch, "capi-exec-init": "capi-exec-init-image-" + inputs.arch, "capi-exec-plugin": "capi-exec-plugin-image-" + inputs.arch}
 	for _, role := range runtimeImages {

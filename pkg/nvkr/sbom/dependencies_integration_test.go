@@ -22,7 +22,7 @@ func TestRealArtifactDependencies(t *testing.T) {
 	scanner := Scanner{Path: os.Getenv("NVKR_SBOM_SCANNER"), Digest: os.Getenv("NVKR_SBOM_SCANNER_DIGEST")}
 	for _, tc := range []struct{ name, file, kind, prefix string }{
 		{"nvkectl", "nvkectl", "host-package", "pkg:golang/"},
-		{"cwe", "cwe.oci.tar", "oci-image", "pkg:apk/"},
+		{"nvke-controller", "nvke-controller.oci.tar", "oci-image", "pkg:apk/"},
 		{"nvke-helm", "nvke-helm.tar", "tarball", "pkg:helm/"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

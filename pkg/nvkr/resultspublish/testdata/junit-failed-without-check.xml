@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="nvke-m2" tests="5" failures="1" skipped="2">
+<testsuite name="nvke" tests="5" failures="1" skipped="2">
   <testcase name="tool/build-signature-and-provenance"></testcase>
   <testcase name="tool/delivered-tool-version"></testcase>
   <testcase name="tool/sbom-attestation">

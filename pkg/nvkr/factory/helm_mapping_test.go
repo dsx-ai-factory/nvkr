@@ -142,14 +142,14 @@ func TestMappedBindingsWithHelm(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, registry := range []string{"registry.operator-a.test/nvke", "mirror.operator-b.test/platform"} {
-		out, err := exec.CommandContext(t.Context(), helm, "template", "demo", root, "--set-string", "controller.repository="+registry+"/cwe", "--set-string", "helper.repository="+registry+"/helper").CombinedOutput()
+		out, err := exec.CommandContext(t.Context(), helm, "template", "demo", root, "--set-string", "controller.repository="+registry+"/nvke-controller", "--set-string", "helper.repository="+registry+"/helper").CombinedOutput()
 		if err != nil {
 			t.Fatalf("Helm: %v\n%s", err, out)
 		}
 		for slot, digest := range d {
 			name := slot
 			if slot == "controller" {
-				name = "cwe"
+				name = "nvke-controller"
 			}
 			if err := verifyRenderedContainerImage(out, slot, registry+"/"+name, digest); err != nil {
 				t.Fatal(err)
@@ -234,7 +234,7 @@ func TestNVKEDeclarativeBindingWithHelm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, repository := range []string{"registry.operator-a.test/nvke/cwe", "mirror.operator-b.test/platform/cwe"} {
+	for _, repository := range []string{"registry.operator-a.test/nvke/nvke-controller", "mirror.operator-b.test/platform/nvke-controller"} {
 		out, err := exec.CommandContext(t.Context(), helm, "template", "controller", chart, "--set-string", "nodeAgent.spireAttestationMethod=tpm", "--set-string", "image.repository="+repository, "--set-string", "nameOverride=nvkr-binding-controller").CombinedOutput()
 		if err != nil {
 			t.Fatalf("rendering pinned NVKE chart: %v\n%s", err, out)

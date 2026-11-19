@@ -110,7 +110,7 @@ func TestDashboardProjectionFailureDoesNotInventCapReason(t *testing.T) {
 
 func TestDashboardSelectedPlansReplaceRunState(t *testing.T) {
 	t.Chdir("../..")
-	artifacts, err := factory.LoadPlanContext(t.Context(), ".github/nvkr-run/plan.json")
+	artifacts, err := factory.LoadPlanContext(t.Context(), ".github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +383,7 @@ func TestDashboardGraphDisplayBounds(t *testing.T) {
 // source-selector rename must update the display deliberately, rather than
 // silently losing the fixed, privacy-safe Packer reports.
 func TestDashboardGuestReportsFollowMaintainedPackerSelectors(t *testing.T) {
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../inputs/catalogs/node-images/release"))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../inputs/catalogs/node-images"))
 	if err != nil {
 		t.Fatal(err)
 	}

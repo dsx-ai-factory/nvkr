@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="nvke-m2" tests="6" failures="0" skipped="1">
+<testsuite name="nvke" tests="6" failures="0" skipped="1">
   <testcase name="image/build-signature-and-provenance sha256:1111111111111111111111111111111111111111111111111111111111111111"></testcase>
   <testcase name="image/build-signature-and-provenance sha256:2222222222222222222222222222222222222222222222222222222222222222"></testcase>
   <testcase name="tool/build-signature-and-provenance"></testcase>

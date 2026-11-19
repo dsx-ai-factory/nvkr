@@ -19,7 +19,7 @@ const (
 	SchemaVersion = "nvkr.dev/qualification-outcome/v1"
 	// LanePipelineAttested is factory.TierPipelineAttested. The leaf cannot import factory.
 	LanePipelineAttested = "pipeline-attested"
-	// MaxBytes bounds one encoded outcome. A complete nvke-m2 RunResult is about 435 KiB.
+	// MaxBytes bounds one encoded outcome. A complete nvke RunResult is about 435 KiB.
 	MaxBytes = 4 << 20
 	// Directory holds the generated qualify job's outcome file. The job uploads it
 	// as ArtifactPrefix followed by <run>-<attempt>.

@@ -16,11 +16,11 @@ import (
 )
 
 func TestLaptopNICoSimSourceBuild(t *testing.T) {
-	testNICoSimSourceBuild(t, "nicosim", true)
+	testNICoSimSourceBuild(t, "tools", true)
 }
 
 func TestNativeNICoSimSourceBuild(t *testing.T) {
-	testNICoSimSourceBuild(t, "tools/native", false)
+	testNICoSimSourceBuild(t, "tools", false)
 }
 
 func testNICoSimSourceBuild(t *testing.T, directory string, patched bool) {
@@ -52,6 +52,11 @@ func testNICoSimSourceBuild(t *testing.T, directory string, patched bool) {
 			if patched && (tc.platform == "darwin/arm64" || tc.platform == "linux/amd64") {
 				wantCode = e.CodeEngineCapability
 			}
+			if patched {
+				for i := range tc.components {
+					tc.components[i] += "-nicosim"
+				}
+			}
 			resolved, err := Resolve(cat, Selection{Components: tc.components, Platform: tc.platform, OutputFormat: "executable"})
 			if wantCode != "" {
 				var coded *e.Error
@@ -76,6 +81,7 @@ func testNICoSimSourceBuild(t *testing.T, directory string, patched bool) {
 						t.Fatalf("prepared source must retain module integrity checks: %s", command)
 					}
 				case ir.KindBuild:
+					componentName := strings.TrimSuffix(node.Component, "-nicosim")
 					builds++
 					if node.SourceCommit != cat.Components[node.Component].Commit || node.Network != ir.NetworkNone || node.BuilderType != ir.BuilderOCIHermetic || !node.SourceReadOnly {
 						t.Fatalf("pinned offline source producer changed: %+v", node)
@@ -93,11 +99,11 @@ func testNICoSimSourceBuild(t *testing.T, directory string, patched bool) {
 					if node.Platform != tc.platform || arch != target.ExecutableArch(tc.platform) {
 						t.Fatalf("simulator build target differs from selection: platform=%s GOARCH=%s", node.Platform, arch)
 					}
-					wantCGO := node.Component == "nico-sim" || (patched && node.Component == "nico-simctl")
+					wantCGO := componentName == "nico-sim" || (patched && componentName == "nico-simctl")
 					if cgo != wantCGO {
 						t.Fatalf("unexpected CGO selection for %s: got %t, want %t", node.Component, cgo, wantCGO)
 					}
-					if patched && node.Component != "nico-sim-runtime-assets" {
+					if patched && componentName != "nico-sim-runtime-assets" {
 						if len(node.Patches) != 1 || node.Patches[0].Content == "" || node.Patches[0].SHA256 != "sha256:186d3ca32819bdb0f299732414de8982e67e0b5561b9914c16a26f11641b6cde" {
 							t.Fatal("NICoSim version interface must be a byte-bound source patch")
 						}
@@ -117,13 +123,13 @@ func testNICoSimSourceBuild(t *testing.T, directory string, patched bool) {
 					if patched {
 						makeCommand = "make -C controller/nico-sim build-static"
 					}
-					if node.Component == "nico-sim" && !strings.Contains(command, makeCommand) {
+					if componentName == "nico-sim" && !strings.Contains(command, makeCommand) {
 						t.Fatal("server must invoke the source-owned static Make target")
 					}
-					if patched && node.Component == "nico-simctl" && !strings.Contains(command, "-extldflags -static") {
+					if patched && componentName == "nico-simctl" && !strings.Contains(command, "-extldflags -static") {
 						t.Fatal("qualified-lane CLI must retain the declared static Linux link")
 					}
-					if node.Component == "nico-sim-runtime-assets" {
+					if componentName == "nico-sim-runtime-assets" {
 						if cgo || node.OutputType != "tarball" {
 							t.Fatal("runtime data is an archive, not another CGO executable")
 						}

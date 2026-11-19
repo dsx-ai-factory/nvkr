@@ -122,10 +122,7 @@ func TestNVKECompositeAdmission(t *testing.T) {
 func TestNVKECompositeIdentityInvariance(t *testing.T) {
 	testutil.RequireExtended(t)
 	nvkeSplitRepository(t)
-	combined, err := LoadPlanContext(t.Context(), FactoryPlanPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	combined := nvkeCombinedPlan(t)
 	loadStack := nvkeSplitCatalogLoader(t, combined)
 	composition, err := admitNVKEComposite(t, nvkeComposite(t))
 	if err != nil {

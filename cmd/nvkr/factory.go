@@ -197,8 +197,11 @@ func cmdFactoryGitHub() *cli.Command {
 		cmdFactoryCIUpload(),
 		cmdFactoryCIFetchLocators(),
 		cmdFactoryCIDownload(),
-		githubFactoryCommand("check-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
-			return factory.CheckGitHubRuntimeInputs(c.Context, plan, ".")
+		githubFactoryCommand("stage-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
+			return factory.StageGitHubRuntimeInputs(c.Context, plan, ".")
+		}),
+		githubFactoryCommand("install-stage-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
+			return factory.InstallGitHubStageRuntimeInputs(c.Context, plan, ".")
 		}),
 		githubFactoryCommand("install-runtime-inputs", "", func(c *cli.Context, plan *factory.Plan, _ factory.GitHubStepOptions) error {
 			return factory.InstallGitHubRuntimeInputs(c.Context, plan, ".")
