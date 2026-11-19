@@ -72,7 +72,7 @@ func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 			if err := factory.ValidateGitHubBundle(ctx, plan, bundle); err != nil {
 				t.Fatal(err)
 			}
-			assertGitHubSharedNodeInvocation(t, plan, bundle, "nvke-controller/build-nvke-controller")
+			assertGitHubSharedNodeInvocation(t, plan, bundle, "nvke-controller/build-nvke-controller-module-tags")
 		})
 	}
 }

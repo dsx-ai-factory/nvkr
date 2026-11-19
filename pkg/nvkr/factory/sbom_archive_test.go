@@ -26,7 +26,7 @@ func archiveAssetPlan(t *testing.T) *Plan {
 	if err != nil {
 		t.Fatal(err)
 	}
-	native, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/tools/native"))
+	native, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/tools"))
 	if err != nil {
 		t.Fatal(err)
 	}
