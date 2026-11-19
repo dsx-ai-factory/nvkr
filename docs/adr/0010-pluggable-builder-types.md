@@ -14,7 +14,7 @@
   ADR-18's explicit native ARC pipeline-attested route. Qualified Nix/VM execution, general hosted VM
   adapters and general fused large-output wrapped jobs remain capability-gated. Direct-Packer LUKS2 with the
   explicit public bootstrap value below is admitted for raw diagnostics and native ARC build-provenance publication. The BuildKit lane and
-  strict/M2 disk evidence modes retain their separate contracts.
+  strict/NVKE disk evidence modes retain their separate contracts.
 
 ## Context
 
@@ -261,7 +261,7 @@ the adapter does not retain the generated SSH key, environment, home, configurat
 directories. The [2026-10-01 ARC evidence](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-01-nke-arc-os-builds.md) records committed-code
 Docker/Packer/NVKE ARM64 and AMD64 execution and boot smoke at the recorded source pin. These use the local
 adapter on ARC, separate from generated hosted execution. The later
-[M2 candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) exercised the generated native route with
+[NVKE candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) exercised the generated native route with
 explicit `build-provenance-v1` evidence and a validation-branch signing exception. Main-only execution,
 independent full-payload disk consumption, strict inspection and qualification remain unproved; the
 candidate does not establish complete maintained-release acceptance. A local 2026-09-22 framing probe used the official Packer 1.15.4 Darwin ARM64 ZIP
@@ -467,7 +467,7 @@ variables or material substitutions, and therefore cannot establish effective cu
 contents. A new upstream component manifest is not an MVP prerequisite. Exact source, patch, configuration and
 material identities remain part of the build/evidence contract, alongside signatures, provenance and complete
 output membership. ADR-13 separately requires traced materials and read-only final-disk inspection for the
-strict evidence route. Its explicit M2 and M3 MVP `build-provenance-v1` mode instead binds live producer/material
+strict evidence route. Its explicit NVKE and M3 MVP `build-provenance-v1` mode instead binds live producer/material
 evidence and records inspection as not performed; strict inspection is deferred hardening. Current implementation
 and evidence remain in [reconciliation](reconciliation/README.md). Embedded-software correctness and runtime validation
 remain the upstream build owner's duty. ADR-22's future curated-set derivation remains deferred.

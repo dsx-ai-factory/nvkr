@@ -259,7 +259,7 @@ func TestPublicationImageFilesAggregateValidatesUnselectedSibling(t *testing.T) 
 	defer publication.Close()
 	for _, platform := range []string{"linux/amd64", "linux/arm64"} {
 		out := filepath.Join(t.TempDir(), "files")
-		if err := publication.ExtractImageFiles(t.Context(), "cwe", platform, []string{"usr"}, out); err != nil {
+		if err := publication.ExtractImageFiles(t.Context(), "nvke-controller", platform, []string{"usr"}, out); err != nil {
 			t.Fatal(err)
 		}
 		raw, err := os.ReadFile(filepath.Join(out, "usr/local/bin/worker"))
@@ -276,7 +276,7 @@ func TestPublicationImageFilesAggregateValidatesUnselectedSibling(t *testing.T) 
 		t.Fatal(err)
 	}
 	out := filepath.Join(t.TempDir(), "refused")
-	assertRegistryCode(t, publication.ExtractImageFiles(t.Context(), "cwe", index.Children[0].Platform, []string{"usr"}, out), e.CodeVerifyFailed)
+	assertRegistryCode(t, publication.ExtractImageFiles(t.Context(), "nvke-controller", index.Children[0].Platform, []string{"usr"}, out), e.CodeVerifyFailed)
 	if _, err := os.Stat(out); !os.IsNotExist(err) {
 		t.Fatal("unselected sibling fault exposed output", err)
 	}

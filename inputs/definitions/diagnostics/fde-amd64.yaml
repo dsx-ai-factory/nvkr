@@ -2,29 +2,31 @@
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: nvkr.dev/definition/v5
+catalog:
+  base: ../../catalogs/nvke
 kind: Definition
 metadata:
+  description: Build one native AMD64 FDE image with its required materials and the
+    public bootstrap placeholder for feature-branch iteration.
   name: nvke-fde
-  description: Build one native AMD64 FDE image with its required materials and the public bootstrap placeholder for feature-branch iteration.
-catalog:
-  base: ../../catalogs/nvke/module-tags
 outputs:
-  - name: nvke-node-fde-amd64
-    platform: linux/amd64
-    catalog:
-      base: ../../catalogs/node-images/release
-      overlays: [../../catalogs/node-images/variants/native-toolchains.yaml]
-    format: disk-image
-    components:
-      - nvke-agent
-      - nvke-cni-calico
-      - nvke-cni-ovn
-      - nvke-doca-ovs
-      - nvke-image-inputs
-      - nvke-kubeadm-distro
-      - nvke-node-fde-amd64
-      - nvke-patched-installer-iso-amd64
-      - nvke-spire-agent
-      - ovn-kube-ubuntu
-      - ovn-kubernetes-chart
-      - ubuntu-installer-iso-amd64
+- catalog:
+    base: ../../catalogs/node-images
+    overlays:
+    - ../../catalogs/node-images/variants/native-toolchains.yaml
+  components:
+  - nvke-agent
+  - nvke-cni-calico
+  - nvke-cni-ovn
+  - nvke-doca-ovs
+  - nvke-image-inputs
+  - nvke-kubeadm-distro
+  - nvke-node-fde-amd64
+  - nvke-patched-installer-iso-amd64
+  - nvke-spire-agent
+  - ovn-kube-ubuntu
+  - ovn-kubernetes-chart
+  - ubuntu-installer-iso-amd64
+  format: disk-image
+  name: nvke-node-fde-amd64
+  platform: linux/amd64

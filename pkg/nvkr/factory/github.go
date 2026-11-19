@@ -86,7 +86,7 @@ func githubBundleLayout(name string) generationLayout {
 		manifestPath: root + "/manifest.json", planPath: root + "/plan.json"}
 }
 
-// RenderGitHub emits a locally inspectable workflow and its complete canonical Plan,
+// RenderGitHub emits a locally inspectable workflow and its complete Plan tree,
 // then runs the semantic static validator before returning any bytes.
 func RenderGitHub(ctx context.Context, plan *Plan) (*GeneratedBundle, error) {
 	return renderGitHub(ctx, plan, true)
@@ -109,6 +109,9 @@ func renderGitHub(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 			bundle.Files[path] = raw
 		}
 		bundle.Files[bundle.WorkflowPath] = entry
+		if err := addGitHubScriptIndex(plan, bundle.Files); err != nil {
+			return nil, err
+		}
 		data := bundle.githubActionData
 		bundle = newGeneratedBundle(EngineGitHub, githubLayoutFor(plan), bundle.Files, bundle.PlanDigest)
 		bundle.githubActionData = data
@@ -274,11 +277,14 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 					command = githubRuntimeGenerationCommand(plan) + " --check"
 				}
 				if len(plan.Environment.GitHubRuntimeSources) != 0 {
-					command = "./nvkr-exec factory github check-runtime-inputs --plan " + shellQuote(layout.planPath)
+					command = "./nvkr-exec factory github stage-runtime-inputs --plan " + shellQuote(layout.planPath)
 				}
 			}
 		}
 		writeCatalogValidationStep(&body, plan, "Verify committed Run generation is current", "validate-catalog", command)
+		if plan.Environment.GitHubRuntimePlan && !(runner != sortedKeys(bootstrapJobs)[0] && len(plan.Environment.GitHubRuntimeSources) != 0) {
+			writeGitHubShellStep(&body, "Stage packed runtime inputs", []string{"./nvkr-exec factory github stage-runtime-inputs --plan " + shellQuote(layout.planPath)})
+		}
 		if plan.Environment.GitHubRuntimePlan && runner == sortedKeys(bootstrapJobs)[0] {
 			writeGitHubRuntimeInputsUpload(&body, plan, actions)
 		}
@@ -532,6 +538,14 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 		}
 	}
 	files[layout.workflowPath] = append([]byte(nil), workflow...)
+	if err := addGitHubScriptIndex(plan, files); err != nil {
+		return nil, err
+	}
+	if !plan.Environment.GitHubExecutionPartitions {
+		if err := validateGitHubWorkflowSize(files[layout.workflowPath]); err != nil {
+			return nil, err
+		}
+	}
 	data := files[githubActionDataPathFor(plan)]
 	delete(files, githubActionDataPathFor(plan))
 	bundle := newGeneratedBundle(EngineGitHub, layout, files, planDigest)
@@ -702,7 +716,7 @@ func (actions githubActionRefs) writeUploadStep(out *bytes.Buffer, plan *Plan, l
 	}
 	if plan.Environment.GitHubRuntimePlan && label == "NVKR runner" {
 		fmt.Fprintf(out, "      - name: %s\n        uses: %s\n        with:\n          name: %s\n          path: |\n            nvkr-exec\n", yamlSingle("Upload "+label), actions.Upload, yamlSingle(name))
-		for _, member := range githubRuntimeInputPaths(plan) {
+		for _, member := range githubRuntimeInputPaths() {
 			fmt.Fprintf(out, "            %s\n", member)
 		}
 		fmt.Fprintf(out, "          include-hidden-files: 'true'\n          if-no-files-found: error\n          retention-days: %d\n", days)
@@ -717,9 +731,8 @@ func githubRuntimeInstallCommand(plan *Plan) string {
 	return "./nvkr-exec factory github install-runtime-inputs --plan " + shellQuote(githubLayoutFor(plan).planPath)
 }
 
-func githubRuntimeInputPaths(plan *Plan) []string {
-	layout := githubLayoutFor(plan)
-	return []string{layout.planPath, layout.manifestPath}
+func githubRuntimeInputPaths() []string {
+	return []string{githubRuntimeExportDirectory + "/plan.json", githubRuntimeExportDirectory + "/manifest.json"}
 }
 
 func githubRuntimeGenerationCommand(plan *Plan) string {
@@ -736,7 +749,7 @@ func writeGitHubRuntimeInputsUpload(out *bytes.Buffer, plan *Plan, actions githu
 		fmt.Fprint(out, "        if: ${{ github.run_attempt == 1 }}\n")
 	}
 	fmt.Fprintf(out, "        with:\n          name: %s\n          path: |\n", githubRuntimeInputsArtifact)
-	for _, member := range githubRuntimeInputPaths(plan) {
+	for _, member := range githubRuntimeInputPaths() {
 		fmt.Fprintf(out, "            %s\n", member)
 	}
 	fmt.Fprintf(out, "          include-hidden-files: 'true'\n          if-no-files-found: error\n          retention-days: %d\n", plan.GitHubArtifactRetentionDays())
@@ -878,16 +891,21 @@ func prepareHelperRunFor(plan *Plan) string {
 	}
 	var command strings.Builder
 	fmt.Fprintln(&command, "set -eu")
-	members := append([]string{"nvkr-exec"}, githubRuntimeInputPaths(plan)...)
+	members := append([]string{"nvkr-exec"}, githubRuntimeInputPaths()...)
 	for _, member := range members {
 		source := shellQuote(githubHelperDownloadPath(plan) + "/" + member)
 		fmt.Fprintf(&command, "[ -f %s ] && [ ! -L %s ] || { printf 'nvkr: [NVKR-E-PIPELINE-DRIFT] incomplete runtime input carrier\\n' >&2; exit %d; }\n", source, source, e.ExitCode(e.New(e.CodePipelineDrift, "")))
 	}
+	fmt.Fprintf(&command, "mkdir -- %s\n", shellQuote(githubRuntimeInputDirectory))
 	for _, member := range members {
-		fmt.Fprintf(&command, "mv -- %s %s\n", shellQuote(githubHelperDownloadPath(plan)+"/"+member), shellQuote(member))
+		destination := member
+		if member != "nvkr-exec" {
+			destination = githubRuntimeInputDirectory + "/" + filepath.Base(member)
+		}
+		fmt.Fprintf(&command, "mv -- %s %s\n", shellQuote(githubHelperDownloadPath(plan)+"/"+member), shellQuote(destination))
 	}
 	fmt.Fprintln(&command, prepareHelperRun)
-	fmt.Fprintf(&command, "./nvkr-exec factory github check-runtime-inputs --plan %s\n", shellQuote(githubLayoutFor(plan).planPath))
+	fmt.Fprintln(&command, "./nvkr-exec factory github install-stage-runtime-inputs --plan "+shellQuote(githubLayoutFor(plan).planPath))
 	return strings.TrimSuffix(command.String(), "\n")
 }
 

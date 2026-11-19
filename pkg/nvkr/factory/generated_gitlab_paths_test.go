@@ -55,12 +55,23 @@ func TestGitLabStorageCoexistsWithOperatorAndGitHubFiles(t *testing.T) {
 }
 
 func TestGitLabStorageRefusesEscapedAndCrossProviderMembers(t *testing.T) {
-	for _, member := range []string{".gitlab-ci.yml", GitHubWorkflowPath, ".gitlab/nvkr-run-other/plan.json", GitLabManifestPath, GitLabManifestPath + ".lease", ".gitlab/nvkr-run/../outside.json"} {
+	raw := []byte(`{"fixture":"cross-provider"}`)
+	sharedMember, err := namedPlanStorePath("plan/cross-provider", raw, ".json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, member := range []string{".gitlab-ci.yml", GitHubWorkflowPath, sharedMember, ".gitlab/nvkr-run-other/plan.json", GitLabManifestPath, GitLabManifestPath + ".lease", ".gitlab/nvkr-run/../outside.json"} {
 		t.Run(member, func(t *testing.T) {
 			bundle := gitlabStorageBundle()
-			bundle.Files[member] = []byte("unowned")
+			bundle.Files[member] = raw
 			_, _, err := ManifestFor(bundle)
 			assertFactoryErrorCode(t, err, e.CodeInvalidCatalog)
+			root := t.TempDir()
+			assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), root, bundle), e.CodeInvalidCatalog)
+			entries, err := os.ReadDir(root)
+			if err != nil || len(entries) != 0 {
+				t.Fatalf("rejected cross-provider member produced output: %v", err)
+			}
 		})
 	}
 	for _, engine := range []string{EngineGitHub, EngineGitLab} {

@@ -18,7 +18,7 @@ import (
 // to other workers and collectors. A new preflight ahead of every root must not
 // renumber existing workers or spend a split budget belonging to another depth.
 func TestGitHubPartitionRootAdditionChurn(t *testing.T) {
-	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,15 +14,9 @@ import (
 func TestNVKEReleasePinsStayAligned(t *testing.T) {
 	// These catalogs package the NKTP chart. Each selects the NKTP release that
 	// NVKE v0.23.0's deploy/nico/nktp/values.yaml targets.
-	buildsNKTP := map[string]bool{
-		"nvke/release-components": true, "nvke/local-site-arm64": true, "nvke/native-site": true, "nvke/nightly-site-arm64": true,
-	}
+	buildsNKTP := map[string]int{"nvke": 4}
 	for _, directory := range []string{
-		"nvke/release", "nvke/release-components", "nvke/module-tags", "nvke/module-cli-arm64",
-		"nvke/local-site-arm64", "nvke/native-site", "nvke/nightly-site-arm64",
-		"node-images/release", "node-images/diagnostic",
-		"controller-profiles/nvidia-arm64", "controller-profiles/upstream-arm64", "controller-profiles/native-nvidia",
-		"nicosim", "tools/native", "runtime-dependencies",
+		"nvke", "node-images", "tools", "runtime-dependencies",
 	} {
 		t.Run(directory, func(t *testing.T) {
 			root := filepath.Join("../../../inputs/catalogs", directory)
@@ -60,10 +54,7 @@ func TestNVKEReleasePinsStayAligned(t *testing.T) {
 					}
 				}
 			}
-			want := 0
-			if buildsNKTP[directory] {
-				want = 1
-			}
+			want := buildsNKTP[directory]
 			if nktpSources != want {
 				t.Fatalf("%s selects %d NKTP sources, want %d", directory, nktpSources, want)
 			}
@@ -109,7 +100,7 @@ func TestNVKEOverlayPinsStayAligned(t *testing.T) {
 // NVKE v0.23.0's image-input composer requires a doca-ovs archive whose debs
 // match the image's Ubuntu series.
 func TestNVKEImageInputsSelectSeriesDOCAOVS(t *testing.T) {
-	for _, directory := range []string{"node-images/release", "node-images/diagnostic"} {
+	for _, directory := range []string{"node-images"} {
 		t.Run(directory, func(t *testing.T) {
 			bound, err := BindContext(t.Context(), Dir(filepath.Join("../../../inputs/catalogs", directory)))
 			if err != nil {

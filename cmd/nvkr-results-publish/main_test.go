@@ -88,7 +88,7 @@ func selectArgs(outcomes, event string, qualify qualifyReport, write string) []s
 }
 
 func publishArgs(outcomes, event string, qualify qualifyReport, extra ...string) []string {
-	return append(append([]string{"publish"}, admission(outcomes, event, qualify)...), append([]string{"--group", "nvke", "--definition", "nvke-m2"}, extra...)...)
+	return append(append([]string{"publish"}, admission(outcomes, event, qualify)...), append([]string{"--group", "nvke", "--definition", "nvke"}, extra...)...)
 }
 
 // builtOutcome runs select for a failed producer and returns the outcomes
@@ -163,11 +163,11 @@ func TestResultsPublishCLI(t *testing.T) {
 				t.Fatalf("publish: %+v", got)
 			}
 		}
-		finished, err := filepath.Glob(filepath.Join(local, "groups", "nvkr", "nvke", "nvke-m2", "*-101-1-202-1", "finished.json"))
+		finished, err := filepath.Glob(filepath.Join(local, "groups", "nvkr", "nvke", "nvke", "*-101-1-202-1", "finished.json"))
 		if err != nil || len(finished) != 1 {
 			t.Fatalf("finished.json: %v, %v", finished, err)
 		}
-		if _, err := os.Stat(filepath.Join(local, "results", "nvke", "nvke-m2", "101-1", "202-1", "outcome.json")); err != nil {
+		if _, err := os.Stat(filepath.Join(local, "results", "nvke", "nvke", "101-1", "202-1", "outcome.json")); err != nil {
 			t.Fatal(err)
 		}
 		if err := os.WriteFile(finished[0], []byte("{}"), 0o600); err != nil {
@@ -237,11 +237,11 @@ func TestResultsPublishCLI(t *testing.T) {
 			return selectArgs(t.TempDir(), producerEvent(t, "success", "push"), qualifyReport{"failure", "1", "true"}, filepath.Join(t.TempDir(), "x.json"))
 		}},
 		{name: "publish without a group", code: e.CodeUsage, args: func(t *testing.T) []string {
-			return append(append([]string{"publish"}, admission(t.TempDir(), producerEvent(t, "failure", "push"), skipped)...), "--definition", "nvke-m2")
+			return append(append([]string{"publish"}, admission(t.TempDir(), producerEvent(t, "failure", "push"), skipped)...), "--definition", "nvke")
 		}},
 		{name: "publish with a malformed group, even with nothing to publish", code: e.CodeUsage, args: func(t *testing.T) []string {
 			return append(append([]string{"publish"}, admission(t.TempDir(), producerEvent(t, "success", "push"), skipped)...),
-				"--group", "NVKE", "--definition", "nvke-m2")
+				"--group", "NVKE", "--definition", "nvke")
 		}},
 		{name: "publish before select's record exists", code: e.CodeVerifyFailed, args: func(t *testing.T) []string {
 			return publishArgs(t.TempDir(), producerEvent(t, "failure", "push"), skipped, "--local-dir", t.TempDir())

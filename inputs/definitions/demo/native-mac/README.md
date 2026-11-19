@@ -1,6 +1,6 @@
 # Native Mac demo inputs
 
-These Definitions select Apple Silicon host tools, the Linux site runtime companion and local runtime images. All native source producers, executable acquisition pins are owned once by the [shared native tool catalog](../../../catalogs/tools/native/README.md). The acquired-only [Mac tools selection](../native-mac-tools/README.md) uses it too.
+These Definitions select Apple Silicon host tools, the Linux site runtime companion and local runtime images. All native source producers, executable acquisition pins are owned once by the [shared native tool catalog](../../../catalogs/tools/notes/tools-native-README.md). The acquired-only [Mac tools selection](../native-mac-tools/README.md) uses it too.
 
 | Definition | Purpose |
 | --- | --- |

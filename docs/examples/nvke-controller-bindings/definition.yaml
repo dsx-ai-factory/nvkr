@@ -11,9 +11,9 @@ outputs:
     platform: linux/amd64
     helm:
       images:
-        controller: cwe
-  - name: cwe
-    components: [cwe]
+        controller: nvke-controller
+  - name: nvke-controller
+    components: [nvke-controller]
     format: oci
     platform: linux/amd64
   - name: postgresql

@@ -14,8 +14,8 @@ Native artifact builds have been exercised on Apple Silicon macOS and Ubuntu ARM
 Intel Mac input selection and SDK checksums are present, but native Intel Mac execution remains unverified.
 
 Both selections use the existing NVKE producers and source pins from
-[`inputs/catalogs/nvke/release`](../../../inputs/catalogs/nvke/release). The ARM64 selection uses the
-[native ARM64 scanner](../../../inputs/catalogs/tools/sbom-arm64/README.md) at the same Syft version.
+[`inputs/catalogs/nvke`](../../../inputs/catalogs/nvke). The ARM64 selection uses the
+[native ARM64 scanner](../../../inputs/catalogs/tools/notes/tools-sbom-arm64-README.md) at the same Syft version.
 Each Environment runs utility helpers on its matching architecture. No catalog edits or NVKE source
 checkout are required. The host NVKR CLI runs directly on macOS or Linux; Docker runs the build tools.
 
@@ -54,4 +54,4 @@ The local Run is unsigned and publishes nothing. For hosted builds, signing and
 publication, continue with [pipeline generation](../../generate-pipeline.md).
 
 The separate [module-tags example](../nvke-module-tags/README.md) retains the
-older `cwe` and `nvke-helm` output names for scratch hosted generation.
+older `nvke-controller` and `nvke-helm` output names for scratch hosted generation.

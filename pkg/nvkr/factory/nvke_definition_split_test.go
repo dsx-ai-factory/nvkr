@@ -41,14 +41,14 @@ var nvkeFamilyOnlyOutputs = map[string]struct {
 	family string
 	output definition.DefinitionOutput
 }{
-	"controller-profiles":                {"core", definition.DefinitionOutput{Name: "controller-profiles", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nvke/release-components"}, Components: []string{"nvke-nico-reference-profiles"}, Format: definition.OutputOCI}},
+	"controller-profiles":                {"core", definition.DefinitionOutput{Name: "controller-profiles", Platforms: []string{"linux/amd64", "linux/arm64"}, Catalog: &definition.Catalog{Base: "../../catalogs/nvke"}, Components: []string{"nvke-nico-reference-profiles"}, Format: definition.OutputOCI}},
 	"local-path-helper-image":            {"services", nvkeFamilyOnlyOutput("local-path-helper-image", "linux/amd64", "local-path-provisioner", definition.OutputOCI, "local-path-helper-image", nil)},
 	"local-path-helper-image-arm64":      {"services", nvkeFamilyOnlyOutput("local-path-helper-image-arm64", "linux/arm64", "local-path-provisioner", definition.OutputOCI, "local-path-helper-image", nil)},
 	"local-path-provisioner":             {"services", nvkeFamilyOnlyOutput("local-path-provisioner", "linux/amd64", "local-path-provisioner", definition.OutputHelm, "local-path-provisioner-chart", map[string]string{"helper": "local-path-helper-image", "provisioner": "local-path-provisioner-image"})},
 	"local-path-provisioner-arm64":       {"services", nvkeFamilyOnlyOutput("local-path-provisioner-arm64", "linux/arm64", "local-path-provisioner", definition.OutputHelm, "local-path-provisioner-chart", map[string]string{"helper": "local-path-helper-image-arm64", "provisioner": "local-path-provisioner-image-arm64"})},
 	"local-path-provisioner-image":       {"services", nvkeFamilyOnlyOutput("local-path-provisioner-image", "linux/amd64", "local-path-provisioner", definition.OutputOCI, "local-path-provisioner-image", nil)},
 	"local-path-provisioner-image-arm64": {"services", nvkeFamilyOnlyOutput("local-path-provisioner-image-arm64", "linux/arm64", "local-path-provisioner", definition.OutputOCI, "local-path-provisioner-image", nil)},
-	"operator-tools-linux-arm64":         {"core", definition.DefinitionOutput{Name: "operator-tools-linux-arm64", Platform: "linux/arm64", Catalog: &definition.Catalog{Base: "../../catalogs/tools/operator-arm64"}, Components: []string{"helm", "kubectl"}, Format: definition.OutputExecutable}},
+	"operator-tools-linux-arm64":         {"core", definition.DefinitionOutput{Name: "operator-tools-linux-arm64", Platform: "linux/arm64", Catalog: &definition.Catalog{Base: "../../catalogs/tools"}, Components: []string{"helm-operator", "kubectl-operator"}, Format: definition.OutputExecutable}},
 	"nvke-node-fde-ubuntu24-amd64":       {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-fde-ubuntu24-amd64", "linux/amd64", "nvke-node-fde-amd64")},
 	"nvke-node-fde-ubuntu24-arm64":       {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-fde-ubuntu24-arm64", "linux/arm64", "nvke-node-fde-arm64")},
 	"nvke-node-image-ubuntu24-amd64":     {"disks-ubuntu24", nvkeUbuntu24Disk("nvke-node-image-ubuntu24-amd64", "linux/amd64", "nvke-node-image-amd64")},
@@ -98,7 +98,7 @@ func nvkeUbuntu24Disk(name, platform, root string) definition.DefinitionOutput {
 	return definition.DefinitionOutput{
 		Name:     name,
 		Platform: platform,
-		Catalog: &definition.Catalog{Base: "../../catalogs/node-images/release", Overlays: []string{
+		Catalog: &definition.Catalog{Base: "../../catalogs/node-images", Overlays: []string{
 			"../../catalogs/node-images/variants/native-toolchains.yaml", "../../catalogs/node-images/variants/ubuntu24.json"}},
 		Format: definition.OutputDiskImage,
 		Components: []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-doca-ovs", "nvke-image-inputs",
@@ -122,27 +122,23 @@ func nvkeFamilyOnlyOutput(name, platform, catalog, format, component string, ima
 
 // Family-only catalogs declare no pin set to revalidate, so they load from disk:
 // these public catalogs, plus each pinned family-only overlay stack.
-var nvkeFamilyOnlyCatalogs = map[string]bool{"../../catalogs/local-path-provisioner": true, "../../catalogs/tools/operator-arm64": true}
+var nvkeFamilyOnlyCatalogs = map[string]bool{"../../catalogs/local-path-provisioner": true, "../../catalogs/tools": true}
 
 func TestNVKEDefinitionSplitPreservesCompleteMembership(t *testing.T) {
 	nvkeSplitRepository(t)
 	combined := nvkeSplitDefinition(t, "inputs/definitions/nvke/definition.yaml")
-	baseline, err := LoadPlanContext(t.Context(), ".github/nvkr-run/plan.json")
+	candidates, err := loadCatalogCandidates(t.Context(), combined.Catalogs, nvkeSplitCatalogLoader(t, nvkeBaselinePlan(t)))
 	if err != nil {
 		t.Fatal(err)
 	}
 	original := make(map[string][]byte, len(combined.Outputs))
 	for _, output := range combined.Outputs {
 		if output.Catalog == nil {
-			for _, build := range baseline.Builds {
-				if build.Name == nativeOutputSelections(output)[0].Name {
-					output.Catalog = build.SelectedCatalog
-					break
-				}
+			candidate, err := selectCatalogCandidate(output, candidates)
+			if err != nil {
+				t.Fatal(err)
 			}
-			if output.Catalog == nil {
-				t.Fatalf("missing selected catalog for %s", output.Name)
-			}
+			output.Catalog = &candidate.Selection
 		}
 		original[output.Name] = nvkeSplitCanonical(t, output)
 	}
@@ -285,22 +281,29 @@ func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
 // compares complete producer records and every generated bundle member.
 func TestNVKEDefinitionSplitCommittedPlanBindings(t *testing.T) {
 	nvkeSplitRepository(t)
+	plan, err := LoadPlanContext(t.Context(), maintainedNVKEPlanPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plan.Composition == nil {
+		t.Fatal("maintained NVKE Plan must bind its family members")
+	}
 	for _, family := range nvkeSplitFamilies {
 		t.Run(family.name, func(t *testing.T) {
-			definitionPath, environmentPath := nvkeSplitPaths(family.name)
-			plan, err := LoadPlanContext(t.Context(), ".github/nvkr-run-nvke-"+family.name+"/plan.json")
+			path, _ := nvkeSplitPaths(family.name)
+			digest, err := nvkeSplitDefinition(t, path).Digest()
 			if err != nil {
 				t.Fatal(err)
 			}
-			if plan.DefinitionPath != definitionPath || plan.EnvironmentPath != environmentPath {
-				t.Fatal("committed family Plan binds different authored input paths")
+			for _, member := range plan.Composition.Members {
+				if member.Name == "nvke-"+family.name {
+					if member.Digest != digest {
+						t.Fatal("stale family member digest")
+					}
+					return
+				}
 			}
-			if !bytes.Equal(nvkeSplitCanonical(t, plan.Definition), nvkeSplitCanonical(t, nvkeSplitDefinition(t, definitionPath))) {
-				t.Fatal("committed family Plan has a stale authored Definition")
-			}
-			if !bytes.Equal(nvkeSplitCanonical(t, plan.Environment), nvkeSplitCanonical(t, nvkeSplitEnvironment(t, environmentPath))) {
-				t.Fatal("committed family Plan has a stale authored Environment")
-			}
+			t.Fatal("family missing from maintained composite")
 		})
 	}
 }
@@ -330,10 +333,7 @@ func TestNVKEDefinitionSplitRejectsCrossFamilyChartBinding(t *testing.T) {
 func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 	testutil.RequireExtended(t)
 	nvkeSplitRepository(t)
-	combined, err := LoadPlanContext(t.Context(), FactoryPlanPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	combined := nvkeCombinedPlan(t)
 	if !bytes.Equal(nvkeSplitCanonical(t, combined.Definition), nvkeSplitCanonical(t, nvkeSplitDefinition(t, combined.DefinitionPath))) {
 		t.Fatal("transitional Plan no longer represents the combined authored selection")
 	}
@@ -402,7 +402,11 @@ func TestNVKEDefinitionSplitCompiledIdentityAndGeneratedBundles(t *testing.T) {
 				}
 				ownedFiles[name] = family.name
 			}
-			if err := CheckGeneratedBundle(t.Context(), ".", bundle); err != nil {
+			root := t.TempDir()
+			if err := WriteGeneratedBundle(t.Context(), root, bundle); err != nil {
+				t.Fatal(err)
+			}
+			if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
 				t.Fatal(err)
 			}
 			assertFactoryErrorCode(t, ValidateGitHubBundle(t.Context(), combined, bundle), e.CodePipelineDrift)
@@ -430,7 +434,8 @@ func nvkeSplitCatalogLoader(t *testing.T, combined *Plan) func(context.Context, 
 	// Compare compilation against the validated baseline's exact resolved
 	// catalogs, without fetching private pin sets in a local regression test.
 	// CLI generation and workflows-check separately authenticate current inputs;
-	// CheckGeneratedBundle above binds this comparison to those generated bytes.
+	// CheckGeneratedBundle above checks the scratch bundle produced by this comparison.
+	// Standalone family bytes are no longer committed; maintained drift is checked separately.
 	stacks := map[string]*catalog.Stack{
 		string(nvkeSplitCanonical(t, combined.Definition.Catalog)): {
 			Catalog: combined.CatalogSnapshot, Digest: combined.CatalogDigest, Applied: combined.AppliedOverlays,
@@ -526,4 +531,42 @@ func nvkeSplitCanonical(t *testing.T, value any) []byte {
 		t.Fatal(err)
 	}
 	return raw
+}
+
+// Maintained repository selection is distinct from the generic default namespace.
+const maintainedNVKEPlanPath = ".github/nvkr-run-nvke/plan.json"
+
+func nvkeBaselinePlan(t *testing.T) *Plan {
+	t.Helper()
+	plan, err := LoadPlanContext(t.Context(), maintainedNVKEPlanPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan
+}
+
+func nvkeFamilyPlan(t *testing.T, family string) *Plan {
+	t.Helper()
+	baseline := nvkeBaselinePlan(t)
+	path, env := nvkeSplitPaths(family)
+	plan, err := compileDocumentsWithLoader(t.Context(), path, nvkeSplitDefinition(t, path), env,
+		nvkeSplitEnvironment(t, env), baseline.GeneratorVersion, nvkeSplitCatalogLoader(t, baseline))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan
+}
+
+// The former combined selection remains a comparison fixture, never a maintained bundle.
+func nvkeCombinedPlan(t *testing.T) *Plan {
+	t.Helper()
+	baseline := nvkeBaselinePlan(t)
+	const path = "inputs/definitions/nvke/definition.yaml"
+	const env = "inputs/environments/github-release.yaml"
+	plan, err := compileDocumentsWithLoader(t.Context(), path, nvkeSplitDefinition(t, path), env,
+		nvkeSplitEnvironment(t, env), baseline.GeneratorVersion, nvkeSplitCatalogLoader(t, baseline))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan
 }

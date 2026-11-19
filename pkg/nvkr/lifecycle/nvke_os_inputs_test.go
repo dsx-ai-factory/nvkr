@@ -34,11 +34,11 @@ func TestNVKEOSExecutionModesSelectArchitectureSpecificDiskMaterials(t *testing.
 	}{
 		{name: "native KVM", definition: "inputs/definitions/diagnostics/os-arm64.yaml",
 			environment: "inputs/environments/local-linux-arm64-kvm.yaml", arch: "arm64",
-			root: "nvke-node-image", installer: "ubuntu-installer-iso",
+			root: "nvke-node-image-diagnostic", installer: "ubuntu-installer-iso",
 			patched: "nvke-patched-installer-iso", wantKVM: true},
 		{name: "amd64 native KVM", definition: "inputs/definitions/diagnostics/os-amd64.yaml",
 			environment: "inputs/environments/local-linux-amd64-kvm.yaml", arch: "amd64",
-			root: "nvke-node-image-amd64", installer: "ubuntu-installer-iso-amd64",
+			root: "nvke-node-image-amd64-diagnostic", installer: "ubuntu-installer-iso-amd64",
 			patched: "nvke-patched-installer-iso-amd64", wantKVM: true},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -87,9 +87,9 @@ func TestNVKEOSExecutionModesSelectArchitectureSpecificDiskMaterials(t *testing.
 				t.Fatalf("cpu_model = %q, want %q", got, test.wantCPU)
 			}
 			if !slices.Equal(plan.Builds[0].Components, []string{
-				"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-doca-ovs", "nvke-image-inputs", "nvke-kubeadm-distro",
-				test.root, test.patched, "nvke-spire-agent", "ovn-kube-ubuntu",
-				"ovn-kubernetes-chart", test.installer,
+				"nvke-agent-diagnostic", "nvke-cni-calico-diagnostic", "nvke-cni-ovn-diagnostic", "nvke-doca-ovs", "nvke-image-inputs-diagnostic", "nvke-kubeadm-distro-diagnostic",
+				test.root, test.patched, "nvke-spire-agent", "ovn-kube-ubuntu-diagnostic",
+				"ovn-kubernetes-chart-diagnostic", test.installer,
 			}) {
 				t.Fatalf("selected component graph = %v", plan.Builds[0].Components)
 			}

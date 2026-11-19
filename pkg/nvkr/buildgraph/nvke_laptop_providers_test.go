@@ -17,7 +17,7 @@ import (
 )
 
 func TestLaptopCAPNICoSourceBuild(t *testing.T) {
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs/catalogs/capnico/local")))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "..", "inputs/catalogs/capnico")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,11 +69,11 @@ func TestLaptopCAPNICoSourceBuild(t *testing.T) {
 }
 
 func TestNativeHelmVendoringBindsTargetArchitecture(t *testing.T) {
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/nvke/native-site"))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/nvke"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, component := range []string{"nvke-controller-chart", "nktp-chart"} {
+	for _, component := range []string{"nvke-controller-chart-native-site", "nktp-chart-native-site"} {
 		t.Run(component, func(t *testing.T) {
 			identities := map[string]bool{}
 			for _, arch := range target.Arches() {

@@ -28,8 +28,8 @@ func TestCommittedPlanMatchesGeneratedExecution(t *testing.T) {
 			if err := canonical.UnmarshalExact(bundle.githubActionData, &actionData); err != nil {
 				t.Fatal(err)
 			}
-			var decoded Plan
-			if err := canonical.UnmarshalExact(bundle.Files[bundle.PlanPath], &decoded); err != nil {
+			decoded, _, err := joinPlanTree(t.Context(), bundle.PlanPath, bundle.Files)
+			if err != nil {
 				t.Fatal(err)
 			}
 			digest, err := decoded.Digest()

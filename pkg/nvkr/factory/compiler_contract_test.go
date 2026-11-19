@@ -164,7 +164,7 @@ func TestHelmCatalogSlotAccounting(t *testing.T) {
 		{name: "bound"},
 		{name: "missing relationship", change: func(o *authored.DefinitionOutput, _ *[]BuildPlan) { o.Helm = nil }},
 		{name: "unknown slot", change: func(o *authored.DefinitionOutput, _ *[]BuildPlan) {
-			o.Helm.Images = map[string]string{"unknown": "cwe"}
+			o.Helm.Images = map[string]string{"unknown": "nvke-controller"}
 		}},
 		{name: "unbound catalog member", change: func(_ *authored.DefinitionOutput, b *[]BuildPlan) {
 			m := (*b)[0].ResolvedComponents[0].Helm
@@ -175,9 +175,9 @@ func TestHelmCatalogSlotAccounting(t *testing.T) {
 		{name: "wrong selected producer", change: func(_ *authored.DefinitionOutput, b *[]BuildPlan) { (*b)[0].ResolvedComponents[0].Name = "other" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			image := testHelmBinding("package/cwe", ".").Images["controller"]
+			image := testHelmBinding("package/nvke-controller", ".").Images["controller"]
 			mapping := &catalog.HelmPackaging{Chart: ".", Images: map[string]catalog.HelmImage{"controller": {Values: image.Values}}}
-			output := authored.DefinitionOutput{Name: "chart", Components: []string{"producer"}, Helm: &authored.HelmOutput{Images: map[string]string{"controller": "cwe"}}}
+			output := authored.DefinitionOutput{Name: "chart", Components: []string{"producer"}, Helm: &authored.HelmOutput{Images: map[string]string{"controller": "nvke-controller"}}}
 			builds := []BuildPlan{{Name: "chart", ResolvedComponents: []catalog.NamedComponent{{Name: "producer", Component: catalog.Component{Helm: mapping}}}}}
 			if tc.change != nil {
 				tc.change(&output, &builds)
@@ -190,7 +190,7 @@ func TestHelmCatalogSlotAccounting(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if binding.Images["controller"].From != "package/cwe" || binding.Images["controller"].Values != image.Values {
+			if binding.Images["controller"].From != "package/nvke-controller" || binding.Images["controller"].Values != image.Values {
 				t.Fatalf("lost catalog mapping: %+v", binding)
 			}
 			delete(mapping.Images, "controller")

@@ -85,7 +85,7 @@ all byte-exact checks to pass. Keep excluded variants and downstream profile str
 lock-derived command values, use the catalog guide's opt-in `sourceMetadata` bindings; commit-only pins
 require explicit, chart-validated stream metadata. Report changed Build Digests when migrating bindings.
 
-Never hand-edit `pins.lock.yaml`, generated `.github/workflows/nvkr-run.yml`, managed `.github/nvkr-run/`
+Never hand-edit `pins.lock.yaml`, generated `.github/workflows/nvkr-run-nvke.yml`, managed `.github/nvkr-run-nvke/`
 members or generated `.gitlab/nvkr-run/` members. GitLab's root `.gitlab-ci.yml` stays operator-owned but must
 contain only its exact generated local include; follow the [native GitLab guide](../../../../docs/generate-pipeline.md#native-gitlab-execution).
 Use the selected inputs and same CLI identity for generation and `--check`. Root generation is

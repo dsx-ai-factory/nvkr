@@ -69,7 +69,9 @@ Under that scratch root, inspect:
 
 - `.github/workflows/nvkr-run.yml`: named GitHub Actions jobs, dependencies, runners and credential policies.
 - `.github/nvkr-run/actions/`: shared actions with fixed interfaces for execution, preparation and transport.
-- `.github/nvkr-run/plan.json`: the canonical Plan consumed by the workflow.
+- `.github/nvkr-run/plan.json`: the per-bundle Plan index.
+- `.github/nvkr-plan-store/`: frozen Plan records and command files shared by generated bundles; [ADR-21](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold) owns the storage contract.
+- `.github/nvkr-plan-store/index.json`: object variants grouped by logical name, with full digests and the bundles that use them.
 - `.github/nvkr-run/manifest.json`: the generated bundle's ownership and content record.
 
 Those are the default production paths when the Environment omits `githubBundle`
@@ -290,10 +292,12 @@ fixed native smoke worker. The qualifier uses `workflow_run`; the worker uses
 independent policy, credentials and ownership are separate from the producer
 bundle and the downstream nightly E2E adapter. They add no generated cron or
 general callable producer interface.
-Current qualification policy admission selects the default producer workflow,
-`.github/workflows/nvkr-run.yml`; named-producer qualification is not an admitted
-configuration. No maintained nightly dispatches the named nightly producers; the separate
-downstream AMD64 E2E adapter builds its inputs locally.
+The maintained NVKE composite selects `githubBundle: nvke` for production and
+`githubBundle: nvke-nightly` for floating-source candidates. Their generated workflows are
+`nvkr-run-nvke.yml` and `nvkr-run-nvke-nightly.yml`; each has its own explicitly bound
+qualification policy and qualifier/smoke pair. See the [NVKE inputs](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md).
+The NVKE nightly producer is manually dispatched. The separate scheduled AMD64 E2E adapter builds
+its inputs locally.
 
 Read the top-level workflow to review which jobs can run, their dependency order, permissions, protected
 Environments and time limits. Follow a job's local `uses: ./.github/nvkr-run/actions/...` reference to inspect

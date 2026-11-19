@@ -178,12 +178,12 @@ func TestNativeInstallerSelectionReplaysCapturedRun(t *testing.T) {
 						c.Commit = strings.Repeat("2", 40)
 					case name == "missing installer" && c.Name == "nvke-installer-sources":
 						c.Name = "unselected"
-					case name == "unstable clusterctl" && c.Name == "clusterctl-linux":
+					case name == "unstable clusterctl" && c.Name == "clusterctl":
 						c.Tag = "v1.13.6-beta.1"
 					}
 				}
 				if name == "ambiguous clusterctl" {
-					b.ResolvedComponents = append(b.ResolvedComponents, catalog.NamedComponent{Name: "clusterctl", Component: catalog.Component{Tag: selection.capiVersion}})
+					b.ResolvedComponents = append(b.ResolvedComponents, catalog.NamedComponent{Name: "clusterctl-linux", Component: catalog.Component{Tag: selection.capiVersion}})
 				}
 			}
 			if name == "wrong build" {
@@ -222,7 +222,7 @@ func TestNativeInstallerSelectedSourceMakeContract(t *testing.T) {
 	if source == "" {
 		t.Skip("requires the selected NVKE Git source")
 	}
-	loaded, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "inputs/catalogs/tools/native")))
+	loaded, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join("..", "..", "inputs/catalogs/tools")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +267,7 @@ func TestNativeInstallerSelectedSourceMakeContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"clusterctl", "clusterctl-linux"} {
+	for _, name := range []string{"clusterctl"} {
 		if string(selected) != loaded.Components[name].Tag+"\n" {
 			t.Fatalf("source provider %q differs from %s %s", selected, name, loaded.Components[name].Tag)
 		}

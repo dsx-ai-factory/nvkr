@@ -50,14 +50,14 @@ fresh NVIDIA OVN demo or conformance run.
 Local unencrypted direct-Packer execution retains an exact held QCOW2, observes its bytes and commits the
 disk with its immutable Run record. Ordinary local disk publication remains closed. The explicit native
 ARC hosted route is separately admitted under ADR-18. The
-[recorded 34-output M2 candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed generated native
+[recorded 34-output NVKE candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) completed generated native
 disk builds, publication, signing, verification and Run finalization under a validation-branch exception.
 Its `build-provenance-v1` evidence binds live producer/material subjects and explicitly defers inspection.
 This is scoped candidate pipeline-attested delivery, not a claim of main-only workflow execution,
 independent full-payload disk consumption, strict full-disk inspection, organizational toolchain approval
 or completed M1–M4 acceptance.
 
-On October 16, 2026, the user extended the internal M2 candidate publication exception to the four
+On October 16, 2026, the user extended the internal NVKE candidate publication exception to the four
 renamed toolchain subjects below. They were published from the previously measured local archives under
 `ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/`. Exact-digest read-back compared every manifest and
 configuration byte with its archive and downloaded every compressed layer through the registry client's
@@ -85,7 +85,7 @@ contracts and retained-disk diagnostics exist, but a successful real native NVKE
 has not been demonstrated. Qualified release authorization, full v1 qualification/tag/revocation automation,
 qualified provider adapters, secret-valued encrypted VM execution and air-gap operation remain unavailable.
 
-The maintained M2 candidate selects 69 named outputs, retaining the previous 37 and adding CAPNICo,
+The maintained NVKE candidate selects 69 named outputs, retaining the previous 37 and adding CAPNICo,
 explicitly named reference-profile fixtures, the provisioned infrastructure provider, NVKE telemetry pipelines and native bootstrap/telemetry
 images. Both native architectures retain plain and public-bootstrap FDE disks. Native ARC publication admits those disks only with explicit
 `build-provenance-v1`: actual producer encryption, wrapper annotations, signed disk metadata and expected

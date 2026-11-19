@@ -172,9 +172,8 @@ type generationLayout struct {
 	planPath     string
 }
 
-// The complete Plan owns every producer graph. Provider jobs all execute that
-// single canonical document; standalone per-build graph files would duplicate
-// executable inputs without a separate owner or consumer.
+// The complete Plan owns every producer graph. GitHub stores its fields in a
+// tree; wire, GitLab and Tekton documents retain the same packed canonical bytes.
 func renderStaticInputs(ctx context.Context, plan *Plan, layout generationLayout) (map[string][]byte, string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, "", e.Wrap(e.CodeTimeout, err, "factory rendering canceled")
@@ -182,6 +181,10 @@ func renderStaticInputs(ctx context.Context, plan *Plan, layout generationLayout
 	planDigest, err := plan.Digest()
 	if err != nil {
 		return nil, "", err
+	}
+	if _, github := githubWorkflowNamespace(layout.workflowPath); github {
+		files, err := renderPlanTree(ctx, plan, layout.planPath)
+		return files, planDigest, err
 	}
 	planBytes, err := canonical.Marshal(plan)
 	if err != nil {
@@ -234,19 +237,19 @@ func validateGeneratedInputs(ctx context.Context, plan *Plan, bundle *GeneratedB
 	if !ok || pipeline.FileDigest(workflow) != bundle.WorkflowDigest {
 		return nil, e.New(e.CodePipelineDrift, "%s workflow bytes do not match workflowDigest", bundle.Engine)
 	}
-	planBytes, ok := bundle.Files[bundle.PlanPath]
+	_, ok = bundle.Files[bundle.PlanPath]
 	if !ok {
 		return nil, e.New(e.CodePipelineDrift, "%s bundle omits %s", bundle.Engine, bundle.PlanPath)
 	}
-	var decodedPlan Plan
-	if err := canonical.UnmarshalExact(planBytes, &decodedPlan); err != nil {
+	decodedPlan, _, err := joinPlanTree(ctx, bundle.PlanPath, bundle.Files)
+	if err != nil {
 		return nil, e.Wrap(e.CodePipelineDrift, err, "decoding generated factory plan")
 	}
 	digest, err := decodedPlan.Digest()
 	if err != nil || digest != expectedPlanDigest {
 		return nil, e.New(e.CodePipelineDrift, "generated factory plan does not match planDigest")
 	}
-	if err := admitGitHubRequirements(&decodedPlan, bundle.Engine+" bundle validation"); err != nil {
+	if err := admitGitHubRequirements(decodedPlan, bundle.Engine+" bundle validation"); err != nil {
 		return nil, err
 	}
 

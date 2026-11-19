@@ -4,6 +4,7 @@
 package factory
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"maps"
@@ -176,8 +177,29 @@ func TestGitLabNativeCheckoutModePolicy(t *testing.T) {
 
 func TestGitLabBundleCustodyAndTampering(t *testing.T) {
 	root, plan := gitlabFixture(t, 1)
+	bundle, err := RenderGitLab(t.Context(), plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	packed := mustCanonicalPlan(t, plan)
+	if len(bundle.Files) != 2 || !bytes.Equal(bundle.Files[GitLabPlanPath], packed) {
+		t.Fatal("GitLab bundle did not retain its exact packed Plan and workflow")
+	}
+	for member := range bundle.Files {
+		if isPlanStorePath(member) {
+			t.Fatal("GitLab acquired a GitHub shared-store member")
+		}
+	}
 	if _, err := Generate(t.Context(), plan, EngineGitLab, root, false); err != nil {
 		t.Fatal(err)
+	}
+	loaded, err := LoadPlanContext(t.Context(), filepath.Join(root, GitLabPlanPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	loadedDigest, err := loaded.Digest()
+	if err != nil || loadedDigest != bundle.PlanDigest || !bytes.Equal(mustCanonicalPlan(t, loaded), packed) {
+		t.Fatalf("GitLab packed Plan round-trip changed its bytes or identity: %v", err)
 	}
 	if err := CheckGenerated(t.Context(), plan, " GitLab ", root); err != nil {
 		t.Fatal(err)

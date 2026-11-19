@@ -64,7 +64,24 @@ and cross-worker exports use the lowest member job ID; capacity remains 64 jobs 
 and bounds the changed worker files to two. Split-boundary, namespace, exact bundle and inline-signer
 contracts remain local evidence; the renamed worker topology has no recorded hosted execution.
 
+GitHub runtime-input carriers contain exactly two files: a packed canonical Plan and the manifest.
+The bootstrap stages them separately from the committed Plan tree;
+the helper invokes the installer to admit and regenerate that tree. Bootstrap installation renders
+the baseline and candidate once each. Stage installation verifies the saved baseline Plan and fixed
+checkout members, then renders only the candidate. Secondary multi-source bootstraps combine the
+runtime-input check and carrier staging in one render. Frozen JSON record addresses may change during a source-pin refresh,
+while target membership, script bytes, consumer cohorts and non-Plan members remain fixed.
+A vendor cohort split requires normal regeneration even when its script bytes and addresses are unchanged.
+Packed-carrier and cohort-split refusal fixtures exercise these boundaries locally. The retained
+`nvke-nightly` selection passes synthetic source-pin refresh with unchanged scripts and exact reconstructed
+Plan bytes. The local source fixture restores and replays the frozen commit through the packed carrier. No hosted carrier
+transfer with the tree layout has been recorded.
+
 ## GitLab ordinary unsigned profile
+
+This GitLab extension remains proposed for maintainer review. The provider runs below cover only their
+exact recorded source snapshots; they do not establish acceptance for the integration with upstream
+`12e0badb` (shared Plan storage and catalog consolidation) or later source changes.
 
 The bounded adapter implements native runner/bootstrap policy, complete-Plan projection,
 provider-authenticated current jobs, original-job outcomes/carriers and shared lifecycle finalization.

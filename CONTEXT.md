@@ -100,6 +100,9 @@ releases their named outputs through one Plan, Run and Release.
 units U1–U8, including complete-composite hosted qualification with independent policies, are implemented
 and contract-tested. The [evidence ledger](docs/adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
 owns hosted publication, qualification and independent consumer-acceptance status.
+The composite supplies all maintained NVKE production, development and floating-source nightly bundles.
+The explicit ADR-26 U10 maintainer cutover supersedes the former retirement prerequisites; it does not
+establish independent consumer acceptance or change member Build identities.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition**:
@@ -169,7 +172,10 @@ The complete generated closure of admitted Definition and Environment values, in
 packaging, routes and executable dependencies for a Run. Producer operations reference the single executable
 build instruction; observations are recorded separately. There is no authored compiler-handoff document.
 Readable views, linked graph exports and semantic comparisons describe the validated Plan; they do not replace
-its canonical stored bytes or grant execution or evidence authority.
+its canonical identity bytes or grant execution or evidence authority. GitHub bundle storage splits
+the Plan into a per-bundle index and shared frozen records and command files under
+[ADR-21's storage contract](docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold).
+The loader reconstructs the same canonical bytes before execution. Packed canonical bytes remain the wire and Tekton form.
 An opted-in dispatch-frozen Plan records an explicit repository/main allowlist's exact
 commits, trees and source timestamps together with captured authored inputs. Workers,
 retries and qualification reuse that selection; independent dependency and toolchain pins
@@ -354,7 +360,7 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
-documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 and the M3 MVP
+documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. NVKE and the M3 MVP
 retain producer-only disk evidence. Strict inspection and material reconciliation are deferred hardening.
 Embedded-component declarations are optional: omission is not applicable, while any authored declaration must
 match its referenced pinned upstream metadata. That comparison does not establish effective customized or

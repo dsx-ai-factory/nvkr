@@ -8,6 +8,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -233,9 +234,15 @@ func TestNamedGitHubBundleCannotRetireAnotherNamespace(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, bundle.ManifestPath), append(raw, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	before := githubRuntimeTree(t, root)
 	assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), root, bundle), e.CodePipelineDrift)
-	if err := CheckGeneratedBundle(t.Context(), root, other); err != nil {
-		t.Fatalf("hostile manifest changed another namespace: %v", err)
+	if !reflect.DeepEqual(before, githubRuntimeTree(t, root)) {
+		t.Fatal("hostile manifest changed another namespace's bytes")
+	}
+	// Drift owns the repository-wide inventory; loading owns only this Plan.
+	assertFactoryErrorCode(t, CheckGeneratedBundle(t.Context(), root, other), e.CodePipelineDrift)
+	if _, err := LoadPlanContext(t.Context(), filepath.Join(root, other.PlanPath)); err != nil {
+		t.Fatalf("hostile manifest blocked another namespace's load: %v", err)
 	}
 }
 
