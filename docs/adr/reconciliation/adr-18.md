@@ -1,5 +1,13 @@
 ## Support by owner
 
+GitHub per-output recovery preserves an original failed job's ID and Plan-derived display label for the
+finalizer's completeness error, prioritizing actual failure over cancellation/skips. Local contracts cover
+failure selection, recovery-to-finalizer propagation, legacy/malformed/foreign diagnostics and unchanged
+failure codes; partitioned recovery still expands original provider results before selecting diagnostics.
+`TestGitHubRecoveryPreservesUpstreamFailureForFinalizer` uses controlled provider descriptions and no live
+GitHub jobs. The provider data has no timestamps or original error text, so chronological first failure and
+upstream error-code reproduction are not claimed. No hosted exercise of the revised finalizer is recorded.
+
 Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
 
 The quick machinery E2E [fork Run](https://github.com/njhensley/nvkr/actions/runs/44043009475)

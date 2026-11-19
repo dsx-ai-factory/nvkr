@@ -130,23 +130,23 @@ func recoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 	if err != nil {
 		return err
 	}
+	var upstreamFailure string
 	if PerOutputPublication(plan) {
-		status := "restored:success"
-		for _, job := range jobs {
-			if results[job] != "success" {
-				status = "job-failed"
-				break
-			}
-		}
+		status := githubProviderClosureStatus(jobs, results)
 		if err := writeGitHubRestoreOutcome(ctx, "all-provider-jobs", status); err != nil {
 			return err
 		}
+		upstreamFailure = githubProviderFailureMessage(plan, status)
 	}
 	carriers := append([]Artifact(nil), plan.Graph.Artifacts...)
 	sort.Slice(carriers, func(i, j int) bool { return carriers[i].ID < carriers[j].ID })
-	return githubProgress(ctx, options, "Recover artifacts for finalization", []string{
+	details := []string{
 		"Transport outcomes are diagnostic; the finalizer authenticates completeness.",
-	}, func(progress *githubStepProgress) error {
+	}
+	if upstreamFailure != "" {
+		details = append(details, upstreamFailure)
+	}
+	return githubProgress(ctx, options, "Recover artifacts for finalization", details, func(progress *githubStepProgress) error {
 		counts := map[string]int{}
 		visited, restoreNoSpace, outcomeWriteFailed, outcomeNoSpace := 0, 0, 0, 0
 		defer func() {
