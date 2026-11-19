@@ -6,7 +6,8 @@ Plan serialization shares exact package-input documents across all catalog, reso
 fetch/build occurrences. The v8/v9/v10 wire codec restores complete recipes before ordinary Plan admission;
 Build identities and separately named runtime requirements retain their original descriptions. Focused
 contracts in `plan_package_snapshots_test.go` cover two/four requirements, byte-identical restoration,
-digest/path/reference rejection, expansion limits and the unchanged 8 MiB generation/read boundary.
+digest/path/reference rejection, substitution of valid snapshots into the wrong producer, expansion limits
+and the unchanged 8 MiB generation/read boundary.
 This representation change supplies no new native assembly or hosted execution evidence.
 
 The Plan-produced VM runtime extension has manager-neutral snapshot/package inputs, source-pinned mkosi
@@ -86,8 +87,9 @@ and hard-link representation intentionally change. Secret-file comparison used w
 These proofs establish independent runtime reproduction and a bounded BIOS guest build, not a completed public
 Run or maintained NVKE old-image/new-runtime disk equivalence. The latter remains a required hosted development
 gate using its existing registry-read boundary. Publication, signing, libguestfs inspection, EFI, ARM64 runtime
-execution and any stronger evidence lane remain unproven by these fixtures. The workflow retains diagnostics
-and complete SBOM documents, not the OCI payload.
+execution and any stronger evidence lane remain unproven by these fixtures. The recorded Runs retained
+diagnostics and complete SBOM documents, not the OCI payload. Their fork-only proof workflow is removed
+from the upstream change; hosted consumer proof uses the maintained development workflow.
 
 The quick machinery E2E [fork Run](https://github.com/njhensley/nvkr/actions/runs/44043009475)
 at `ee807779f8122a0cce1105853a0a82c88dbb4c56` passed on stock Ubuntu in 91 seconds (71 seconds

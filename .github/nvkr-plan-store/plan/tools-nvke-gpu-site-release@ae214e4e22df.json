@@ -1,0 +1,50 @@
+[
+  {
+    "artifactId": "artifact/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64",
+    "buildDigest": "sha256:b146cd100a8abb76b2f48e15ef04231a026bb9879e003592f13d23c7d8cda5f7",
+    "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+    "component": "vm-runtime-amd64",
+    "format": "oci",
+    "name": "nvke-node-fde-amd64-runtime",
+    "observationArtifactId": "observation/internal/nvke-node-fde-amd64-runtime",
+    "platform": "linux/amd64",
+    "resultArtifactId": "result/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64",
+    "sbomArtifactId": "sbom/internal/nvke-node-fde-amd64-runtime"
+  },
+  {
+    "artifactId": "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64",
+    "buildDigest": "sha256:b146cd100a8abb76b2f48e15ef04231a026bb9879e003592f13d23c7d8cda5f7",
+    "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+    "component": "vm-runtime-amd64",
+    "format": "oci",
+    "name": "nvke-node-fde-ubuntu24-amd64-runtime",
+    "observationArtifactId": "observation/internal/nvke-node-fde-ubuntu24-amd64-runtime",
+    "platform": "linux/amd64",
+    "resultArtifactId": "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64",
+    "sbomArtifactId": "sbom/internal/nvke-node-fde-ubuntu24-amd64-runtime"
+  },
+  {
+    "artifactId": "artifact/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64",
+    "buildDigest": "sha256:b146cd100a8abb76b2f48e15ef04231a026bb9879e003592f13d23c7d8cda5f7",
+    "buildTarget": "internal/nvke-node-image-amd64-runtime",
+    "component": "vm-runtime-amd64",
+    "format": "oci",
+    "name": "nvke-node-image-amd64-runtime",
+    "observationArtifactId": "observation/internal/nvke-node-image-amd64-runtime",
+    "platform": "linux/amd64",
+    "resultArtifactId": "result/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64",
+    "sbomArtifactId": "sbom/internal/nvke-node-image-amd64-runtime"
+  },
+  {
+    "artifactId": "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64",
+    "buildDigest": "sha256:b146cd100a8abb76b2f48e15ef04231a026bb9879e003592f13d23c7d8cda5f7",
+    "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+    "component": "vm-runtime-amd64",
+    "format": "oci",
+    "name": "nvke-node-image-ubuntu24-amd64-runtime",
+    "observationArtifactId": "observation/internal/nvke-node-image-ubuntu24-amd64-runtime",
+    "platform": "linux/amd64",
+    "resultArtifactId": "result/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64",
+    "sbomArtifactId": "sbom/internal/nvke-node-image-ubuntu24-amd64-runtime"
+  }
+]

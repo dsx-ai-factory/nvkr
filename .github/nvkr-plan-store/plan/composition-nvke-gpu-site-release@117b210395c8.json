@@ -1,5 +1,23 @@
 {
-  "effectiveDefinitionDigest": "sha256:4ddb789b8fc92e32570358827dcf82a7365778a447da1a7d42380fefe7c3b109",
+  "derivedOutputs": [
+    {
+      "derived": {
+        "encoding": "aicr-inventory-v1",
+        "outputs": [
+          "controller-chart",
+          "nktp",
+          "nvke-controller",
+          "postgresql",
+          "spire",
+          "spire-crds",
+          "temporal"
+        ]
+      },
+      "name": "aicr-inventory",
+      "platform": "linux/amd64"
+    }
+  ],
+  "effectiveDefinitionDigest": "sha256:737aafeceea2646045c9c28c1f7bdbb820ac322054e2aac2b951d519701bea08",
   "kind": "CompositeDefinition",
   "members": [
     {
@@ -11,11 +29,11 @@
       "name": "nvke-core"
     },
     {
-      "digest": "sha256:6d0770da5060e5a17620ee6678f16218172234b76f65a95fa37dd1c53fdec7b5",
+      "digest": "sha256:1eb4c0d2610e39c29a8d4f560e588355e988c63eec63c4acdf34005a7945e3bb",
       "name": "nvke-disks"
     },
     {
-      "digest": "sha256:4590053e9d1e607e9b37faf697a72d93237cebe3ba7139527b106da6715c61cf",
+      "digest": "sha256:5faac7103ad079f73ed13e80113ba8572e0c7136d3189b2a2237b0fc3238951a",
       "name": "nvke-disks-ubuntu24"
     },
     {
@@ -28,10 +46,13 @@
     }
   ],
   "metadata": {
-    "description": "Build and publish an NVKE GPU site as one Release from the five NVKE family Definitions and the GB200 AICR bundles.",
-    "name": "nvke-gpu-site"
+    "description": "Publish the NVKE GPU site and its package-derived inventory as one Release.",
+    "name": "nvke-gpu-site-release"
   },
   "outputs": [
+    {
+      "output": "aicr-inventory"
+    },
     {
       "member": "aicr-nvke-gb200",
       "output": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"

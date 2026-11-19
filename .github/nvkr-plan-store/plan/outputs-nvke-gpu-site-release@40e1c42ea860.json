@@ -1,5 +1,53 @@
 [
   {
+    "artifactId": "package/aicr-inventory",
+    "buildDigest": "sha256:5290c5b5ef03e2d3df3f5c3e5524267c9b89801bc68ffae21c79150341239036",
+    "components": null,
+    "derived": {
+      "encoding": "aicr-inventory-v1",
+      "inputs": [
+        {
+          "buildDigest": "sha256:456d2d4697a8e36468e66fc7b16fb356f675b0deb617d7f86e1d6ac6f255af3b",
+          "kind": "helm-oci",
+          "name": "controller-chart"
+        },
+        {
+          "buildDigest": "sha256:13f79b9767087322fbc44ac5cb60892e68eeb622ecbd978d41fe34e00aa57fad",
+          "kind": "helm-oci",
+          "name": "nktp"
+        },
+        {
+          "buildDigest": "sha256:6ff4ce3e7c4e361e60a2c3d31ddea52b1c8168f8b5e18d568e7c9dbd0b58efe9",
+          "kind": "oci",
+          "name": "nvke-controller"
+        },
+        {
+          "buildDigest": "sha256:52f24a801a287763679c9cec540af6751c4fea63781922b45409af5a98dee20d",
+          "kind": "helm-oci",
+          "name": "postgresql"
+        },
+        {
+          "buildDigest": "sha256:fd6fb5db96727b10307394ff1d158dfcf60fdfa0f7ea32d9a7a5bb9bf5b4dc12",
+          "kind": "helm-oci",
+          "name": "spire"
+        },
+        {
+          "buildDigest": "sha256:d73672244fa7ed51044ae2c8654eae25e0921f567ba480e3f92626361bd9948a",
+          "kind": "helm-oci",
+          "name": "spire-crds"
+        },
+        {
+          "buildDigest": "sha256:e09c78f63d4bcdbf48bb19ccbd75395aba819a3d8dbd48f88bca8364ea11f6fe",
+          "kind": "helm-oci",
+          "name": "temporal"
+        }
+      ],
+      "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/candidate/gpu-site"
+    },
+    "kind": "bundle-oci",
+    "name": "aicr-inventory"
+  },
+  {
     "artifactId": "package/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
     "buildDigest": "sha256:2b5bccc736d21dc33fa769d973f2fcd21c56319927b640c80f62e67e958b3e84",
     "components": [
@@ -510,7 +558,7 @@
   },
   {
     "artifactId": "artifact/nvke-node-fde-amd64/nvke-node-fde-amd64",
-    "buildDigest": "sha256:d8ae881b5c827413b56d34b0370e12e9942bac923c4cdcb0bee5e0491cea7558",
+    "buildDigest": "sha256:5d82ed4df916465e9c2f60a6d592ddd20dd81481a4f2595db8e98c49d679aaa6",
     "components": [
       "nvke-agent",
       "nvke-cni-calico",
@@ -550,7 +598,7 @@
   },
   {
     "artifactId": "artifact/nvke-node-fde-ubuntu24-amd64/nvke-node-fde-amd64",
-    "buildDigest": "sha256:b72887ec78cb1261d0d04ed1feb0d97c085e0bb952865fb63548b6c3a0db6f87",
+    "buildDigest": "sha256:043e4de5309f936466a2c7f2f05890d5b75dac3d1535d4be38b7991c4ef39ac8",
     "components": [
       "nvke-agent",
       "nvke-cni-calico",
@@ -590,7 +638,7 @@
   },
   {
     "artifactId": "artifact/nvke-node-image-amd64/nvke-node-image-amd64",
-    "buildDigest": "sha256:5ef0195d2c3ff292dc854a7e571f007fb89c35c41caa702463a5deff52a71738",
+    "buildDigest": "sha256:367ff06c98cbedcac8ecf49df6f395bf6951ad41efcf651d3516892a9b0f2f01",
     "components": [
       "nvke-agent",
       "nvke-cni-calico",
@@ -630,7 +678,7 @@
   },
   {
     "artifactId": "artifact/nvke-node-image-ubuntu24-amd64/nvke-node-image-amd64",
-    "buildDigest": "sha256:d913f8d16e1f404b2cb1f4c4545e459f6a04657ba49902b8ae60b163eec1d50e",
+    "buildDigest": "sha256:aac6364359445c61844e0e3b75cfc113d5d58c171484bad2cd6c4064d698a4c4",
     "components": [
       "nvke-agent",
       "nvke-cni-calico",

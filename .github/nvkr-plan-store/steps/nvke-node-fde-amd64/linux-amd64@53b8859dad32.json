@@ -1,20 +1,14 @@
 {
   "appliedOverlays": [
     {
-      "inputCatalogDigest": "sha256:4afb4e97f617e3c348fca7b42e9f9cb5fd2d627c58bec8242cff9ea43b77c663",
+      "inputCatalogDigest": "sha256:8633f77f146b6e5e6a3a45fb9a741a7a7890ad37213710dac857172927a69c58",
       "name": "nvke-native-toolchains",
-      "outputCatalogDigest": "sha256:db146195c3ef82e670bd5dfdacd63a91fd643e0ca79daf42b18da65e82d67261",
-      "overlayDigest": "sha256:803aec253046ffb477a60aeadbf549cdf4d282b62edbbba0a2341bd55c88f384"
-    },
-    {
-      "inputCatalogDigest": "sha256:db146195c3ef82e670bd5dfdacd63a91fd643e0ca79daf42b18da65e82d67261",
-      "name": "nvke-os-ubuntu24",
-      "outputCatalogDigest": "sha256:339b74d541845eb20dc53f2bc5b8302c79cdb5d7789d1bb2ed590855e2877872",
-      "overlayDigest": "sha256:cb29de50ad3b9afbd75f1d5444473d0464337b53f44c51c726119beea765e5ca"
+      "outputCatalogDigest": "sha256:07f741bbac823109bd7747106cd4852b4c4f54bc4fa099acad00a17dd5d9717a",
+      "overlayDigest": "sha256:77d6ca3a81786ea94eab7426a6d272330a033df54fba8494fc377d0482b4e79c"
     }
   ],
-  "buildDigest": "sha256:d810eca8a3ac8934a505b3ba2f87ca1ab3c29712b87946d8fc8a8e2f795f1a48",
-  "catalogDigest": "sha256:339b74d541845eb20dc53f2bc5b8302c79cdb5d7789d1bb2ed590855e2877872",
+  "buildDigest": "sha256:5d82ed4df916465e9c2f60a6d592ddd20dd81481a4f2595db8e98c49d679aaa6",
+  "catalogDigest": "sha256:07f741bbac823109bd7747106cd4852b4c4f54bc4fa099acad00a17dd5d9717a",
   "components": [
     "nvke-agent",
     "nvke-cni-calico",
@@ -22,12 +16,12 @@
     "nvke-doca-ovs",
     "nvke-image-inputs",
     "nvke-kubeadm-distro",
-    "nvke-node-image",
-    "nvke-patched-installer-iso",
+    "nvke-node-fde-amd64",
+    "nvke-patched-installer-iso-amd64",
     "nvke-spire-agent",
     "ovn-kube-ubuntu",
     "ovn-kubernetes-chart",
-    "ubuntu-installer-iso"
+    "ubuntu-installer-iso-amd64"
   ],
   "executionGraph": {
     "nodes": [
@@ -38,22 +32,26 @@
           "bash",
           "-ec",
           {
-            "file": ".github/nvkr-plan-store/scripts/nvke-agent/build@d645f2f15430.sh"
+            "file": ".github/nvkr-plan-store/scripts/nvke-agent/build@7ac6bc99cec5.sh"
           }
         ],
         "component": "nvke-agent",
         "env": [
           {
+            "name": "BUILD_VERSION",
+            "value": "v0.23.0"
+          },
+          {
             "name": "CGO_ENABLED",
             "value": "1"
           },
           {
-            "name": "GOARCH",
-            "value": "arm64"
+            "name": "GOAMD64",
+            "value": "v1"
           },
           {
-            "name": "GOARM64",
-            "value": "v8.0"
+            "name": "GOARCH",
+            "value": "amd64"
           },
           {
             "name": "GOFLAGS",
@@ -83,17 +81,17 @@
         "id": "build-nvke-agent",
         "kind": "build",
         "needs": [
-          "fetch-source-bcc689ba3513502342c56fe8d6522f466bfb5685dc7bf61f4ea7704daa15d65c"
+          "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327"
         ],
         "network": "none",
         "outputType": "host-package",
-        "platform": "linux/arm64",
+        "platform": "linux/amd64",
         "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "sourceDest": "source-bcc689ba3513502342c56fe8d6522f466bfb5685dc7bf61f4ea7704daa15d65c",
+        "sourceDest": "source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
         "sourceReadOnly": true,
         "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "toolchain": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9",
-        "vendorSpecDigest": "sha256:00b96bdefc97e661ef679e89418b73fb0da8e8b46724be3ce3d4c1ac1000b480",
+        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "vendorSpecDigest": "sha256:03ff8a2f79ef76fc00a05ede7ead4ceb0f160e6b01700e3a561d5ff492a52c22",
         "version": "0.23.0",
         "workdir": "/src",
         "writeDir": "agent/bin"
@@ -105,7 +103,7 @@
           "bash",
           "-ec",
           {
-            "file": ".github/nvkr-plan-store/scripts/nvke-cni-calico/build@0eb2b7a9699b.sh"
+            "file": ".github/nvkr-plan-store/scripts/nvke-cni-calico/build@4f2458d1cee2.sh"
           }
         ],
         "component": "nvke-cni-calico",
@@ -115,12 +113,12 @@
             "value": "0"
           },
           {
-            "name": "GOARCH",
-            "value": "arm64"
+            "name": "GOAMD64",
+            "value": "v1"
           },
           {
-            "name": "GOARM64",
-            "value": "v8.0"
+            "name": "GOARCH",
+            "value": "amd64"
           },
           {
             "name": "GOFLAGS",
@@ -150,17 +148,17 @@
         "id": "build-nvke-cni-calico",
         "kind": "build",
         "needs": [
-          "fetch-source-abd685f47b063613303c0ec842ed5e0a0cf3575d6784c4807d6e37a1cacbef27"
+          "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32"
         ],
         "network": "none",
         "outputType": "tarball",
-        "platform": "linux/arm64",
+        "platform": "linux/amd64",
         "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "sourceDest": "source-abd685f47b063613303c0ec842ed5e0a0cf3575d6784c4807d6e37a1cacbef27",
+        "sourceDest": "source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
         "sourceReadOnly": true,
         "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
-        "vendorSpecDigest": "sha256:9f50bddde276fbe256340ea1752e5c49e5b43179b93d35e5b4037654a8f3ee2a",
+        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "vendorSpecDigest": "sha256:cb528ae00504bebb9a2cd429f6dd783a9a50d6c6c9f73f8763974ef4eb6164b9",
         "version": "0.23.0",
         "workdir": "/src",
         "writeDir": "nvkr-output"
@@ -172,7 +170,7 @@
           "bash",
           "-ec",
           {
-            "file": ".github/nvkr-plan-store/scripts/nvke-cni-ovn/build@e67e6f362ebf.sh"
+            "file": ".github/nvkr-plan-store/scripts/nvke-cni-ovn/build@b55209798c62.sh"
           }
         ],
         "component": "nvke-cni-ovn",
@@ -182,12 +180,12 @@
             "value": "0"
           },
           {
-            "name": "GOARCH",
-            "value": "arm64"
+            "name": "GOAMD64",
+            "value": "v1"
           },
           {
-            "name": "GOARM64",
-            "value": "v8.0"
+            "name": "GOARCH",
+            "value": "amd64"
           },
           {
             "name": "GOFLAGS",
@@ -231,17 +229,17 @@
         "needs": [
           "build-ovn-kube-ubuntu",
           "build-ovn-kubernetes-chart",
-          "fetch-source-615a19d5c5d39a2a460117522cf181e3794d0b3dc4b487d05c5d3597a7740ed3"
+          "fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e"
         ],
         "network": "none",
         "outputType": "tarball",
-        "platform": "linux/arm64",
+        "platform": "linux/amd64",
         "sourceCommit": "8af51273d52dfa07454435d18d37230e582d797a",
-        "sourceDest": "source-615a19d5c5d39a2a460117522cf181e3794d0b3dc4b487d05c5d3597a7740ed3",
+        "sourceDest": "source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
         "sourceReadOnly": true,
         "sourceTreeHash": "c4a54b0b3b615e5bd6df2d591451d7ab03dffc08",
-        "toolchain": "docker.io/library/golang@sha256:288557fbc328e4ef9a78bae2eb44f24447029ff08667be883d79eeaa9029cf0c",
-        "vendorSpecDigest": "sha256:a5eeed57d104751ff7fa08360073af8a0ffc4848c23e79bb20a1dac3baf54079",
+        "toolchain": "docker.io/library/golang@sha256:8aa2821993207ae840ce09e4223217efcd14e01f71525db734faf4232bd59999",
+        "vendorSpecDigest": "sha256:ad55c6b93c6c342c39871290a3a3ffc9c031ac3fab4965893866d05da43c4f02",
         "version": "2.4.2",
         "workdir": "/src",
         "writeDir": "nvkr-output"
@@ -253,7 +251,7 @@
           "bash",
           "-ec",
           {
-            "file": ".github/nvkr-plan-store/scripts/nvke-doca-ovs/build@1d989bd01897.sh"
+            "file": ".github/nvkr-plan-store/scripts/nvke-doca-ovs/build@5d088c5a59a8.sh"
           }
         ],
         "component": "nvke-doca-ovs",
@@ -263,12 +261,12 @@
             "value": "0"
           },
           {
-            "name": "GOARCH",
-            "value": "arm64"
+            "name": "GOAMD64",
+            "value": "v1"
           },
           {
-            "name": "GOARM64",
-            "value": "v8.0"
+            "name": "GOARCH",
+            "value": "amd64"
           },
           {
             "name": "GOFLAGS",
@@ -298,17 +296,17 @@
         "id": "build-nvke-doca-ovs",
         "kind": "build",
         "needs": [
-          "fetch-source-6d108226c242e99f9110382b2e43567b6195d044e8d68211b3da4548e661b082"
+          "fetch-source-fc79d914a84c5a2d16ed611af2de37f44e3bc2fa146e00750b197e686ff0baf9"
         ],
         "network": "none",
         "outputType": "tarball",
-        "platform": "linux/arm64",
+        "platform": "linux/amd64",
         "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "sourceDest": "source-6d108226c242e99f9110382b2e43567b6195d044e8d68211b3da4548e661b082",
+        "sourceDest": "source-fc79d914a84c5a2d16ed611af2de37f44e3bc2fa146e00750b197e686ff0baf9",
         "sourceReadOnly": true,
         "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
-        "vendorSpecDigest": "sha256:7f4491e031d0520fb2cf7f2248fa0e93f67c0a3c800275ce008fb0562abe33a4",
+        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "vendorSpecDigest": "sha256:7133f1076a4f0110e314e5041273ad0f9222a74de1ad60d5678aea53d8fd0c94",
         "version": "0.23.0",
         "workdir": "/src",
         "writeDir": "nvkr-output"
@@ -320,7 +318,7 @@
           "bash",
           "-ec",
           {
-            "file": ".github/nvkr-plan-store/scripts/nvke-image-inputs/build@ee9f2d3a35c7.sh"
+            "file": ".github/nvkr-plan-store/scripts/nvke-image-inputs/build@37c14e2f11c1.sh"
           }
         ],
         "component": "nvke-image-inputs",
@@ -330,12 +328,12 @@
             "value": "0"
           },
           {
-            "name": "GOARCH",
-            "value": "arm64"
+            "name": "GOAMD64",
+            "value": "v1"
           },
           {
-            "name": "GOARM64",
-            "value": "v8.0"
+            "name": "GOARCH",
+            "value": "amd64"
           },
           {
             "name": "GOFLAGS",
@@ -403,17 +401,17 @@
           "build-nvke-doca-ovs",
           "build-nvke-kubeadm-distro",
           "build-nvke-spire-agent",
-          "fetch-source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb"
+          "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327"
         ],
         "network": "none",
         "outputType": "tarball",
-        "platform": "linux/arm64",
+        "platform": "linux/amd64",
         "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "sourceDest": "source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
+        "sourceDest": "source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
         "sourceReadOnly": true,
         "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
-        "vendorSpecDigest": "sha256:f71ff610cfaebd1e535c68212cbe34ad91efd8454f8e8b5625958f34763dbc3b",
+        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "vendorSpecDigest": "sha256:03ff8a2f79ef76fc00a05ede7ead4ceb0f160e6b01700e3a561d5ff492a52c22",
         "version": "0.23.0",
         "workdir": "/src",
         "writeDir": "nvkr-output"
@@ -425,7 +423,7 @@
           "bash",
           "-ec",
           {
-            "file": ".github/nvkr-plan-store/scripts/nvke-kubeadm-distro/build@f7ac5d5ea8e4.sh"
+            "file": ".github/nvkr-plan-store/scripts/nvke-kubeadm-distro/build@c273b5773bbe.sh"
           }
         ],
         "component": "nvke-kubeadm-distro",
@@ -435,12 +433,12 @@
             "value": "0"
           },
           {
-            "name": "GOARCH",
-            "value": "arm64"
+            "name": "GOAMD64",
+            "value": "v1"
           },
           {
-            "name": "GOARM64",
-            "value": "v8.0"
+            "name": "GOARCH",
+            "value": "amd64"
           },
           {
             "name": "GOFLAGS",
@@ -470,27 +468,27 @@
         "id": "build-nvke-kubeadm-distro",
         "kind": "build",
         "needs": [
-          "fetch-source-30caf73dc37371b95a0ca1cfae338290c6f63286bce05e9951613389aba761fc"
+          "fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51"
         ],
         "network": "none",
         "outputType": "tarball",
-        "platform": "linux/arm64",
+        "platform": "linux/amd64",
         "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "sourceDest": "source-30caf73dc37371b95a0ca1cfae338290c6f63286bce05e9951613389aba761fc",
+        "sourceDest": "source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
         "sourceReadOnly": true,
         "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
-        "vendorSpecDigest": "sha256:cf1f237524878a7382f0bfe34556dabbed3b47b2d23b8395e794bc7b7e69852e",
+        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "vendorSpecDigest": "sha256:774c5bd9371845bfb953aa8812f6950b551f33ae2d165e3f27523e9470a1f140",
         "version": "0.23.0",
         "workdir": "/src",
         "writeDir": "nvkr-output"
       },
       {
-        "artifactPath": "non-fde/nvke-node.qcow2",
+        "artifactPath": "fde/nvke-node.qcow2",
         "builderType": "vm-image",
-        "component": "nvke-node-image",
+        "component": "nvke-node-fde-amd64",
         "disk": {
-          "encryption": "none",
+          "encryption": "luks2",
           "format": "qcow2"
         },
         "executionBinding": {
@@ -504,18 +502,18 @@
             "capabilities": [
               "kvm"
             ],
-            "hostPlatform": "linux/arm64",
+            "hostPlatform": "linux/amd64",
             "maxTimeoutSeconds": 21600,
-            "name": "arc-arm64-kvm",
+            "name": "arc-amd64-kvm",
             "resources": {
               "cpuMillis": 8000,
               "ephemeralStorageMiB": 229376,
               "memoryMiB": 36864
             },
-            "runsOn": "arc-arm64-kvm"
+            "runsOn": "arc-amd64-kvm"
           }
         },
-        "id": "build-nvke-node-image",
+        "id": "build-nvke-node-fde-amd64",
         "kind": "build",
         "materials": [
           {
@@ -525,23 +523,23 @@
           },
           {
             "binding": "installer-iso",
-            "component": "nvke-patched-installer-iso",
-            "producer": "build-nvke-patched-installer-iso"
+            "component": "nvke-patched-installer-iso-amd64",
+            "producer": "build-nvke-patched-installer-iso-amd64"
           }
         ],
         "needs": [
           "build-nvke-image-inputs",
-          "build-nvke-patched-installer-iso",
-          "fetch-source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb"
+          "build-nvke-patched-installer-iso-amd64",
+          "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
         ],
         "network": "default",
         "outputType": "disk-image",
         "packer": {
           "acceleratorVariable": "accelerator",
-          "acquisitionArchive": "non-fde/apt-acquisitions.tar",
+          "acquisitionArchive": "fde/apt-acquisitions.tar",
           "architectureVariable": "architecture",
           "buildLogDirectoryVariable": "build_log_directory",
-          "buildName": "nvke-node-non-fde.qemu.nvke-non-fde",
+          "buildName": "nvke-node-fde.qemu.nvke-fde",
           "materialManifest": {
             "kinds": {
               "image-inputs": "archive",
@@ -562,15 +560,15 @@
             },
             {
               "name": "efi_firmware_code",
-              "value": "/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd"
+              "value": "/usr/share/OVMF/OVMF_CODE_4M.fd"
             },
             {
               "name": "efi_firmware_vars",
-              "value": "/usr/share/AAVMF/AAVMF_VARS.fd"
+              "value": "/usr/share/OVMF/OVMF_VARS_4M.fd"
             },
             {
-              "name": "guest_memory_mib",
-              "value": "4096"
+              "name": "luks_passphrase",
+              "value": "changeit"
             },
             {
               "name": "ssh_timeout",
@@ -578,7 +576,7 @@
             },
             {
               "name": "ubuntu_series",
-              "value": "24.04"
+              "value": "26.04"
             }
           ]
         },
@@ -589,10 +587,10 @@
             "sha256": "sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227"
           }
         ],
-        "platform": "linux/arm64",
+        "platform": "linux/amd64",
         "requirements": {
           "allowedHostPlatforms": [
-            "linux/arm64"
+            "linux/amd64"
           ],
           "capabilities": [
             {
@@ -607,12 +605,18 @@
           },
           "timeoutSeconds": 21600
         },
+        "runtime": {
+          "buildDigest": "sha256:b146cd100a8abb76b2f48e15ef04231a026bb9879e003592f13d23c7d8cda5f7",
+          "component": "vm-runtime-amd64",
+          "invocation": "nvkr-packer-rootfs/v1",
+          "platform": "linux/amd64",
+          "tool": "nvke-node-fde-amd64-runtime"
+        },
         "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "sourceDest": "source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
+        "sourceDest": "source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
         "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
-        "toolchainPlatform": "linux/arm64",
-        "vendorSpecDigest": "sha256:f71ff610cfaebd1e535c68212cbe34ad91efd8454f8e8b5625958f34763dbc3b",
+        "toolchainPlatform": "linux/amd64",
+        "vendorSpecDigest": "sha256:acaf31f7b71460a16da9db736ac20201a319d03989680840e037a999a93380ec",
         "version": "0.23.0",
         "workdir": "/src"
       },
@@ -625,19 +629,19 @@
           "/nvkr/inputs/materials/installer-source",
           "/src/nvkr-output/installer.iso"
         ],
-        "component": "nvke-patched-installer-iso",
+        "component": "nvke-patched-installer-iso-amd64",
         "env": [
           {
             "name": "CGO_ENABLED",
             "value": "0"
           },
           {
-            "name": "GOARCH",
-            "value": "arm64"
+            "name": "GOAMD64",
+            "value": "v1"
           },
           {
-            "name": "GOARM64",
-            "value": "v8.0"
+            "name": "GOARCH",
+            "value": "amd64"
           },
           {
             "name": "GOFLAGS",
@@ -664,28 +668,28 @@
             "value": "UTC"
           }
         ],
-        "id": "build-nvke-patched-installer-iso",
+        "id": "build-nvke-patched-installer-iso-amd64",
         "kind": "build",
         "materials": [
           {
             "binding": "installer-source",
-            "component": "ubuntu-installer-iso",
-            "producer": "pull-ubuntu-installer-iso"
+            "component": "ubuntu-installer-iso-amd64",
+            "producer": "pull-ubuntu-installer-iso-amd64"
           }
         ],
         "needs": [
-          "fetch-source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
-          "pull-ubuntu-installer-iso"
+          "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
+          "pull-ubuntu-installer-iso-amd64"
         ],
         "network": "none",
         "outputType": "raw",
-        "platform": "linux/arm64",
+        "platform": "linux/amd64",
         "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "sourceDest": "source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
+        "sourceDest": "source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
         "sourceReadOnly": true,
         "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
-        "vendorSpecDigest": "sha256:f71ff610cfaebd1e535c68212cbe34ad91efd8454f8e8b5625958f34763dbc3b",
+        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "vendorSpecDigest": "sha256:03ff8a2f79ef76fc00a05ede7ead4ceb0f160e6b01700e3a561d5ff492a52c22",
         "version": "0.23.0",
         "workdir": "/src",
         "writeDir": "nvkr-output"
@@ -697,7 +701,7 @@
           "bash",
           "-ec",
           {
-            "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@69af79f5f659.sh"
+            "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@9a63f34844c8.sh"
           }
         ],
         "component": "nvke-spire-agent",
@@ -707,12 +711,12 @@
             "value": "0"
           },
           {
-            "name": "GOARCH",
-            "value": "arm64"
+            "name": "GOAMD64",
+            "value": "v1"
           },
           {
-            "name": "GOARM64",
-            "value": "v8.0"
+            "name": "GOARCH",
+            "value": "amd64"
           },
           {
             "name": "GOFLAGS",
@@ -742,17 +746,17 @@
         "id": "build-nvke-spire-agent",
         "kind": "build",
         "needs": [
-          "fetch-source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c"
+          "fetch-source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8"
         ],
         "network": "none",
         "outputType": "tarball",
-        "platform": "linux/arm64",
+        "platform": "linux/amd64",
         "sourceCommit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "sourceDest": "source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c",
+        "sourceDest": "source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
         "sourceReadOnly": true,
         "sourceTreeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
-        "vendorSpecDigest": "sha256:7badc97151bf5c4cc9866f165c5aeda795ccd62852693badfd6631ec7cdfcc1a",
+        "toolchain": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "vendorSpecDigest": "sha256:824f5d1d7f2d45a952d5ea326e27ff5eb063f781eded292b4d93c3216428a8cd",
         "version": "0.23.0",
         "workdir": "/src",
         "writeDir": "nvkr-output"
@@ -764,7 +768,7 @@
           "sh",
           "-ec",
           {
-            "file": ".github/nvkr-plan-store/scripts/ovn-kube-ubuntu/build@65112a5e207f.sh"
+            "file": ".github/nvkr-plan-store/scripts/ovn-kube-ubuntu/build@4be6ec0a72a0.sh"
           }
         ],
         "component": "ovn-kube-ubuntu",
@@ -774,12 +778,12 @@
             "value": "0"
           },
           {
-            "name": "GOARCH",
-            "value": "arm64"
+            "name": "GOAMD64",
+            "value": "v1"
           },
           {
-            "name": "GOARM64",
-            "value": "v8.0"
+            "name": "GOARCH",
+            "value": "amd64"
           },
           {
             "name": "GOFLAGS",
@@ -813,7 +817,7 @@
         ],
         "network": "default",
         "outputType": "oci-image",
-        "platform": "linux/arm64",
+        "platform": "linux/amd64",
         "sourceCommit": "8af51273d52dfa07454435d18d37230e582d797a",
         "sourceDest": "source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
         "sourceReadOnly": true,
@@ -841,12 +845,12 @@
             "value": "0"
           },
           {
-            "name": "GOARCH",
-            "value": "arm64"
+            "name": "GOAMD64",
+            "value": "v1"
           },
           {
-            "name": "GOARM64",
-            "value": "v8.0"
+            "name": "GOARCH",
+            "value": "amd64"
           },
           {
             "name": "GOFLAGS",
@@ -876,25 +880,100 @@
         "id": "build-ovn-kubernetes-chart",
         "kind": "build",
         "needs": [
-          "fetch-source-6db798cc7bc7243527ac02c1b70f9d82ebcfe348999c6ce9deb8fd09f897cb0d"
+          "fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1"
         ],
         "network": "none",
         "outputType": "tarball",
-        "platform": "linux/arm64",
+        "platform": "linux/amd64",
         "sourceCommit": "8af51273d52dfa07454435d18d37230e582d797a",
-        "sourceDest": "source-6db798cc7bc7243527ac02c1b70f9d82ebcfe348999c6ce9deb8fd09f897cb0d",
+        "sourceDest": "source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
         "sourceReadOnly": true,
         "sourceTreeHash": "c4a54b0b3b615e5bd6df2d591451d7ab03dffc08",
-        "toolchain": "docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b",
-        "vendorSpecDigest": "sha256:f3eda7db412a6b8c78d7645fc038d75b668a4f5c5e3501c043ea7d664d05af48",
+        "toolchain": "docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90",
+        "vendorSpecDigest": "sha256:d9f577eea342aa04dd430023727865602c96c68f2e2c49c2dba413ab6984e7e5",
         "version": "2.4.2",
         "workdir": "/src",
         "writeDir": "nvkr-output"
       },
       {
         "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "dest": "source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
-        "id": "fetch-source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
+        "dest": "source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
+        "id": "fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "vendorCmd": [
+          "bash",
+          "-ec",
+          {
+            "file": ".github/nvkr-plan-store/scripts/nvke/vendor@957935cbd691.sh"
+          }
+        ],
+        "vendorImage": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "vendorSpecDigest": "sha256:774c5bd9371845bfb953aa8812f6950b551f33ae2d165e3f27523e9470a1f140"
+      },
+      {
+        "commit": "8af51273d52dfa07454435d18d37230e582d797a",
+        "dest": "source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
+        "id": "fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/ovn-kubernetes",
+        "treeHash": "c4a54b0b3b615e5bd6df2d591451d7ab03dffc08",
+        "vendorImage": "docker.io/library/golang@sha256:8aa2821993207ae840ce09e4223217efcd14e01f71525db734faf4232bd59999",
+        "vendorSpecDigest": "sha256:ad55c6b93c6c342c39871290a3a3ffc9c031ac3fab4965893866d05da43c4f02"
+      },
+      {
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "dest": "source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
+        "id": "fetch-source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "vendorCmd": [
+          "bash",
+          "-ec",
+          {
+            "file": ".github/nvkr-plan-store/scripts/nvke/vendor@a3ada540cfe5.sh"
+          }
+        ],
+        "vendorImage": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "vendorSpecDigest": "sha256:824f5d1d7f2d45a952d5ea326e27ff5eb063f781eded292b4d93c3216428a8cd"
+      },
+      {
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "dest": "source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
+        "id": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "vendorCmd": [
+          "bash",
+          "-ec",
+          {
+            "file": ".github/nvkr-plan-store/scripts/nvke/vendor@f04574786e4a.sh"
+          }
+        ],
+        "vendorImage": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "vendorSpecDigest": "sha256:cb528ae00504bebb9a2cd429f6dd783a9a50d6c6c9f73f8763974ef4eb6164b9"
+      },
+      {
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "dest": "source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+        "id": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "vendorSpecDigest": "sha256:acaf31f7b71460a16da9db736ac20201a319d03989680840e037a999a93380ec"
+      },
+      {
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "dest": "source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
+        "id": "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
         "kind": "fetch",
         "network": "default",
         "repo": "https://github.com/dsx-ai-factory/nvke.git",
@@ -906,120 +985,19 @@
             "file": ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
           }
         ],
-        "vendorImage": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
-        "vendorSpecDigest": "sha256:f71ff610cfaebd1e535c68212cbe34ad91efd8454f8e8b5625958f34763dbc3b"
-      },
-      {
-        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "dest": "source-30caf73dc37371b95a0ca1cfae338290c6f63286bce05e9951613389aba761fc",
-        "id": "fetch-source-30caf73dc37371b95a0ca1cfae338290c6f63286bce05e9951613389aba761fc",
-        "kind": "fetch",
-        "network": "default",
-        "repo": "https://github.com/dsx-ai-factory/nvke.git",
-        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "vendorCmd": [
-          "bash",
-          "-ec",
-          {
-            "file": ".github/nvkr-plan-store/scripts/nvke/vendor@a8b9849732c8.sh"
-          }
-        ],
-        "vendorImage": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
-        "vendorSpecDigest": "sha256:cf1f237524878a7382f0bfe34556dabbed3b47b2d23b8395e794bc7b7e69852e"
-      },
-      {
-        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "dest": "source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c",
-        "id": "fetch-source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c",
-        "kind": "fetch",
-        "network": "default",
-        "repo": "https://github.com/dsx-ai-factory/nvke.git",
-        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "vendorCmd": [
-          "bash",
-          "-ec",
-          {
-            "file": ".github/nvkr-plan-store/scripts/nvke/vendor@1830846271a1.sh"
-          }
-        ],
-        "vendorImage": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
-        "vendorSpecDigest": "sha256:7badc97151bf5c4cc9866f165c5aeda795ccd62852693badfd6631ec7cdfcc1a"
+        "vendorImage": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "vendorSpecDigest": "sha256:03ff8a2f79ef76fc00a05ede7ead4ceb0f160e6b01700e3a561d5ff492a52c22"
       },
       {
         "commit": "8af51273d52dfa07454435d18d37230e582d797a",
-        "dest": "source-615a19d5c5d39a2a460117522cf181e3794d0b3dc4b487d05c5d3597a7740ed3",
-        "id": "fetch-source-615a19d5c5d39a2a460117522cf181e3794d0b3dc4b487d05c5d3597a7740ed3",
+        "dest": "source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
+        "id": "fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
         "kind": "fetch",
         "network": "default",
         "repo": "https://github.com/dsx-ai-factory/ovn-kubernetes",
         "treeHash": "c4a54b0b3b615e5bd6df2d591451d7ab03dffc08",
-        "vendorImage": "docker.io/library/golang@sha256:288557fbc328e4ef9a78bae2eb44f24447029ff08667be883d79eeaa9029cf0c",
-        "vendorSpecDigest": "sha256:a5eeed57d104751ff7fa08360073af8a0ffc4848c23e79bb20a1dac3baf54079"
-      },
-      {
-        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "dest": "source-6d108226c242e99f9110382b2e43567b6195d044e8d68211b3da4548e661b082",
-        "id": "fetch-source-6d108226c242e99f9110382b2e43567b6195d044e8d68211b3da4548e661b082",
-        "kind": "fetch",
-        "network": "default",
-        "repo": "https://github.com/dsx-ai-factory/nvke.git",
-        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "vendorCmd": [
-          "bash",
-          "-ec",
-          {
-            "file": ".github/nvkr-plan-store/scripts/nvke/vendor@3ac0f4daf970.sh"
-          }
-        ],
-        "vendorImage": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
-        "vendorSpecDigest": "sha256:7f4491e031d0520fb2cf7f2248fa0e93f67c0a3c800275ce008fb0562abe33a4"
-      },
-      {
-        "commit": "8af51273d52dfa07454435d18d37230e582d797a",
-        "dest": "source-6db798cc7bc7243527ac02c1b70f9d82ebcfe348999c6ce9deb8fd09f897cb0d",
-        "id": "fetch-source-6db798cc7bc7243527ac02c1b70f9d82ebcfe348999c6ce9deb8fd09f897cb0d",
-        "kind": "fetch",
-        "network": "default",
-        "repo": "https://github.com/dsx-ai-factory/ovn-kubernetes",
-        "treeHash": "c4a54b0b3b615e5bd6df2d591451d7ab03dffc08",
-        "vendorImage": "docker.io/library/golang@sha256:27da97ffaed4bbb1263c44a8e423a72a1547830ee14a70fdb0cef3f6268a1b8b",
-        "vendorSpecDigest": "sha256:f3eda7db412a6b8c78d7645fc038d75b668a4f5c5e3501c043ea7d664d05af48"
-      },
-      {
-        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "dest": "source-abd685f47b063613303c0ec842ed5e0a0cf3575d6784c4807d6e37a1cacbef27",
-        "id": "fetch-source-abd685f47b063613303c0ec842ed5e0a0cf3575d6784c4807d6e37a1cacbef27",
-        "kind": "fetch",
-        "network": "default",
-        "repo": "https://github.com/dsx-ai-factory/nvke.git",
-        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "vendorCmd": [
-          "bash",
-          "-ec",
-          {
-            "file": ".github/nvkr-plan-store/scripts/nvke/vendor@0741a9b00b2c.sh"
-          }
-        ],
-        "vendorImage": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140",
-        "vendorSpecDigest": "sha256:9f50bddde276fbe256340ea1752e5c49e5b43179b93d35e5b4037654a8f3ee2a"
-      },
-      {
-        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-        "dest": "source-bcc689ba3513502342c56fe8d6522f466bfb5685dc7bf61f4ea7704daa15d65c",
-        "id": "fetch-source-bcc689ba3513502342c56fe8d6522f466bfb5685dc7bf61f4ea7704daa15d65c",
-        "kind": "fetch",
-        "network": "default",
-        "repo": "https://github.com/dsx-ai-factory/nvke.git",
-        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-        "vendorCmd": [
-          "bash",
-          "-ec",
-          {
-            "file": ".github/nvkr-plan-store/scripts/nvke/vendor@c31a131d6257.sh"
-          }
-        ],
-        "vendorImage": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9",
-        "vendorSpecDigest": "sha256:00b96bdefc97e661ef679e89418b73fb0da8e8b46724be3ce3d4c1ac1000b480"
+        "vendorImage": "docker.io/library/golang@sha256:e114385c58e7280d2f56d6cf374219dda33fef8eb77f72e9f290ccae6160bd90",
+        "vendorSpecDigest": "sha256:d9f577eea342aa04dd430023727865602c96c68f2e2c49c2dba413ab6984e7e5"
       },
       {
         "commit": "8af51273d52dfa07454435d18d37230e582d797a",
@@ -1033,16 +1011,34 @@
         "vendorSpecDigest": "sha256:21687f128768974ac8bcdb14ba9906a8bed7006248c4d8fcfcb5eb3a67785f00"
       },
       {
-        "artifact": "https://cdimage.ubuntu.com/ubuntu/releases/24.04.5/release/ubuntu-24.04.5-live-server-arm64.iso",
-        "artifactPath": "ubuntu-installer-iso",
-        "component": "ubuntu-installer-iso",
-        "digest": "sha256:f12484464c7d4d73e2167e0a7dbda1e669f8fae9bcf778dc0944937034b320cb",
-        "id": "pull-ubuntu-installer-iso",
+        "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+        "dest": "source-fc79d914a84c5a2d16ed611af2de37f44e3bc2fa146e00750b197e686ff0baf9",
+        "id": "fetch-source-fc79d914a84c5a2d16ed611af2de37f44e3bc2fa146e00750b197e686ff0baf9",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/nvke.git",
+        "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
+        "vendorCmd": [
+          "bash",
+          "-ec",
+          {
+            "file": ".github/nvkr-plan-store/scripts/nvke/vendor@6e921a9a87f1.sh"
+          }
+        ],
+        "vendorImage": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "vendorSpecDigest": "sha256:7133f1076a4f0110e314e5041273ad0f9222a74de1ad60d5678aea53d8fd0c94"
+      },
+      {
+        "artifact": "https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-live-server-amd64.iso",
+        "artifactPath": "ubuntu-installer-iso-amd64",
+        "component": "ubuntu-installer-iso-amd64",
+        "digest": "sha256:cc8a95cde20f6ced61a322420de00f10cc3c90ced545daa46cb9c1a117f1d927",
+        "id": "pull-ubuntu-installer-iso-amd64",
         "kind": "pull",
         "network": "default",
         "outputType": "raw",
-        "platform": "linux/arm64",
-        "version": "24.04.5"
+        "platform": "linux/amd64",
+        "version": "0.23.0"
       },
       {
         "id": "verify",
@@ -1054,20 +1050,20 @@
           "build-nvke-doca-ovs",
           "build-nvke-image-inputs",
           "build-nvke-kubeadm-distro",
-          "build-nvke-node-image",
-          "build-nvke-patched-installer-iso",
+          "build-nvke-node-fde-amd64",
+          "build-nvke-patched-installer-iso-amd64",
           "build-nvke-spire-agent",
           "build-ovn-kube-ubuntu",
           "build-ovn-kubernetes-chart",
-          "pull-ubuntu-installer-iso"
+          "pull-ubuntu-installer-iso-amd64"
         ]
       }
     ],
-    "platform": "linux/arm64",
+    "platform": "linux/amd64",
     "schemaVersion": "nvkr.dev/ir/v4"
   },
-  "name": "nvke-node-image-ubuntu24-arm64",
-  "platform": "linux/arm64",
+  "name": "nvke-node-fde-amd64",
+  "platform": "linux/amd64",
   "resolvedComponents": [
     {
       "Name": "nvke-agent",
@@ -1076,7 +1072,7 @@
         "bash",
         "-ec",
         {
-          "file": ".github/nvkr-plan-store/scripts/nvke-agent/build@708c184d26f9.sh"
+          "file": ".github/nvkr-plan-store/scripts/nvke-agent/build@6d74f4b38e48.sh"
         }
       ],
       "builderType": "oci-hermetic",
@@ -1092,17 +1088,20 @@
       "sourceDateEpoch": 1793236039,
       "tag": "v0.23.0",
       "toolchainImages": {
-        "amd64": "docker.io/library/golang@sha256:55395706e9703db746cc507abfc4eb2aea75918f8a8024e4848e2cb81004f5ad",
-        "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
+        "amd64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
+        "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
       },
       "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
       "vendorCommand": [
         "bash",
         "-ec",
         {
-          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@42481e224c2f.sh"
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
         }
       ],
+      "versionStamp": {
+        "BUILD_VERSION": "v0.23.0"
+      },
       "writeDir": "agent/bin"
     },
     {
@@ -1182,6 +1181,7 @@
           "file": ".github/nvkr-plan-store/scripts/nvke-doca-ovs/build@f80bc8ab2915.sh"
         }
       ],
+      "builderType": "oci-hermetic",
       "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
       "fromSource": true,
       "outputType": "tarball",
@@ -1201,7 +1201,7 @@
         "bash",
         "-ec",
         {
-          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@ee674ffa04d7.sh"
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@5406111272af.sh"
         }
       ],
       "writeDir": "nvkr-output"
@@ -1285,12 +1285,12 @@
       "writeDir": "nvkr-output"
     },
     {
-      "Name": "nvke-node-image",
-      "artifactPath": "non-fde/nvke-node.qcow2",
+      "Name": "nvke-node-fde-amd64",
+      "artifactPath": "fde/nvke-node.qcow2",
       "buildNetwork": "default",
       "buildRequirements": {
         "allowedHostPlatforms": [
-          "linux/arm64"
+          "linux/amd64"
         ],
         "capabilities": [
           {
@@ -1308,21 +1308,21 @@
       "builderType": "vm-image",
       "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
       "disk": {
-        "encryption": "none",
+        "encryption": "luks2",
         "format": "qcow2"
       },
       "fromSource": true,
       "materials": {
         "image-inputs": "nvke-image-inputs",
-        "installer-iso": "nvke-patched-installer-iso"
+        "installer-iso": "nvke-patched-installer-iso-amd64"
       },
       "outputType": "disk-image",
       "packer": {
         "acceleratorVariable": "accelerator",
-        "acquisitionArchive": "non-fde/apt-acquisitions.tar",
+        "acquisitionArchive": "fde/apt-acquisitions.tar",
         "architectureVariable": "architecture",
         "buildLogDirectoryVariable": "build_log_directory",
-        "buildName": "nvke-node-non-fde.qemu.nvke-non-fde",
+        "buildName": "nvke-node-fde.qemu.nvke-fde",
         "materialManifest": {
           "kinds": {
             "image-inputs": "archive",
@@ -1338,11 +1338,11 @@
         "sshPublicKeyVariable": "ssh_public_key_file",
         "variables": {
           "capture_apt_acquisitions": "true",
-          "efi_firmware_code": "/usr/share/AAVMF/AAVMF_CODE.no-secboot.fd",
-          "efi_firmware_vars": "/usr/share/AAVMF/AAVMF_VARS.fd",
-          "guest_memory_mib": "4096",
+          "efi_firmware_code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
+          "efi_firmware_vars": "/usr/share/OVMF/OVMF_VARS_4M.fd",
+          "luks_passphrase": "changeit",
           "ssh_timeout": "180m",
-          "ubuntu_series": "24.04"
+          "ubuntu_series": "26.04"
         }
       },
       "patches": [
@@ -1353,26 +1353,19 @@
         }
       ],
       "platforms": [
-        "linux/arm64"
+        "linux/amd64"
       ],
       "repo": "https://github.com/dsx-ai-factory/nvke.git",
       "sourceDateEpoch": 1793236039,
       "tag": "v0.23.0",
       "toolchainImages": {
-        "amd64": "sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd",
+        "amd64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
         "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
       },
-      "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-      "vendorCommand": [
-        "bash",
-        "-ec",
-        {
-          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
-        }
-      ]
+      "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53"
     },
     {
-      "Name": "nvke-patched-installer-iso",
+      "Name": "nvke-patched-installer-iso-amd64",
       "artifactPath": "nvkr-output/installer.iso",
       "buildCommand": [
         "bash",
@@ -1384,17 +1377,17 @@
       "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
       "fromSource": true,
       "materials": {
-        "installer-source": "ubuntu-installer-iso"
+        "installer-source": "ubuntu-installer-iso-amd64"
       },
       "outputType": "raw",
       "platforms": [
-        "linux/arm64"
+        "linux/amd64"
       ],
       "repo": "https://github.com/dsx-ai-factory/nvke.git",
       "sourceDateEpoch": 1793236039,
       "tag": "v0.23.0",
       "toolchainImages": {
-        "amd64": "sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd",
+        "amd64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
         "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
       },
       "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
@@ -1537,23 +1530,25 @@
       "writeDir": "nvkr-output"
     },
     {
-      "Name": "ubuntu-installer-iso",
+      "Name": "ubuntu-installer-iso-amd64",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
       "fromSource": false,
       "outputType": "raw",
       "platforms": [
-        "linux/arm64"
+        "linux/amd64"
       ],
       "prebuilt": {
         "digests": {
-          "arm64": "sha256:f12484464c7d4d73e2167e0a7dbda1e669f8fae9bcf778dc0944937034b320cb"
+          "amd64": "sha256:cc8a95cde20f6ced61a322420de00f10cc3c90ced545daa46cb9c1a117f1d927"
         },
         "evidence": {
           "none": true
         },
-        "url": "https://cdimage.ubuntu.com/ubuntu/releases/24.04.5/release/ubuntu-24.04.5-live-server-arm64.iso"
+        "url": "https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-live-server-amd64.iso"
       },
-      "sourceDateEpoch": 1791257393,
-      "tag": "24.04.5"
+      "repo": "https://github.com/dsx-ai-factory/nvke.git",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0"
     }
   ]
 }

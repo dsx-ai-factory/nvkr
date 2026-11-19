@@ -4,9 +4,40 @@
       {
         "operations": [
           {
+            "node": "internal/nvke-node-fde-amd64-runtime/pull-packer-amd64",
+            "producer": "pull-packer-amd64",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-fde-amd64-runtime/linux-amd64@ccee6b6defc5.json",
+            "step": "run-disk",
+            "target": "internal/nvke-node-fde-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-fde-amd64-runtime/pull-packer-plugin-qemu-amd64",
+            "producer": "pull-packer-plugin-qemu-amd64",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-fde-amd64-runtime/linux-amd64@ccee6b6defc5.json",
+            "step": "run-disk",
+            "target": "internal/nvke-node-fde-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-fde-amd64-runtime/build-vm-runtime-amd64",
+            "producer": "build-vm-runtime-amd64",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-fde-amd64-runtime/linux-amd64@ccee6b6defc5.json",
+            "step": "run-disk",
+            "target": "internal/nvke-node-fde-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-fde-amd64-runtime/terminal-observe",
+            "step": "run-disk",
+            "target": "internal/nvke-node-fde-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-fde-amd64-runtime/sbom",
+            "step": "run-disk",
+            "target": "internal/nvke-node-fde-amd64-runtime"
+          },
+          {
             "node": "nvke-node-fde-amd64/build-nvke-agent",
             "producer": "build-nvke-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-agent/build@7ac6bc99cec5.sh"
             ],
@@ -16,7 +47,7 @@
           {
             "node": "nvke-node-fde-amd64/build-nvke-cni-calico",
             "producer": "build-nvke-cni-calico",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-calico/build@4f2458d1cee2.sh"
             ],
@@ -26,7 +57,7 @@
           {
             "node": "nvke-node-fde-amd64/build-nvke-doca-ovs",
             "producer": "build-nvke-doca-ovs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-doca-ovs/build@5d088c5a59a8.sh"
             ],
@@ -36,7 +67,7 @@
           {
             "node": "nvke-node-fde-amd64/build-nvke-kubeadm-distro",
             "producer": "build-nvke-kubeadm-distro",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-kubeadm-distro/build@c273b5773bbe.sh"
             ],
@@ -46,7 +77,7 @@
           {
             "node": "nvke-node-fde-amd64/build-nvke-spire-agent",
             "producer": "build-nvke-spire-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@9a63f34844c8.sh"
             ],
@@ -56,7 +87,7 @@
           {
             "node": "nvke-node-fde-amd64/build-ovn-kube-ubuntu",
             "producer": "build-ovn-kube-ubuntu",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kube-ubuntu/build@4be6ec0a72a0.sh"
             ],
@@ -66,7 +97,7 @@
           {
             "node": "nvke-node-fde-amd64/build-ovn-kubernetes-chart",
             "producer": "build-ovn-kubernetes-chart",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kubernetes-chart/build@375fe15cc8a8.sh"
             ],
@@ -76,7 +107,7 @@
           {
             "node": "nvke-node-fde-amd64/build-nvke-cni-ovn",
             "producer": "build-nvke-cni-ovn",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-ovn/build@b55209798c62.sh"
             ],
@@ -86,7 +117,7 @@
           {
             "node": "nvke-node-fde-amd64/build-nvke-image-inputs",
             "producer": "build-nvke-image-inputs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-image-inputs/build@37c14e2f11c1.sh"
             ],
@@ -96,21 +127,21 @@
           {
             "node": "nvke-node-fde-amd64/pull-ubuntu-installer-iso-amd64",
             "producer": "pull-ubuntu-installer-iso-amd64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "step": "run-disk",
             "target": "nvke-node-fde-amd64"
           },
           {
             "node": "nvke-node-fde-amd64/build-nvke-patched-installer-iso-amd64",
             "producer": "build-nvke-patched-installer-iso-amd64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "step": "run-disk",
             "target": "nvke-node-fde-amd64"
           },
           {
             "node": "nvke-node-fde-amd64/build-nvke-node-fde-amd64",
             "producer": "build-nvke-node-fde-amd64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "step": "run-disk",
             "target": "nvke-node-fde-amd64"
           },
@@ -155,7 +186,7 @@
           {
             "node": "nvke-node-fde-arm64/build-nvke-agent",
             "producer": "build-nvke-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-agent/build@d82539022f9c.sh"
             ],
@@ -165,7 +196,7 @@
           {
             "node": "nvke-node-fde-arm64/build-nvke-cni-calico",
             "producer": "build-nvke-cni-calico",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-calico/build@0eb2b7a9699b.sh"
             ],
@@ -175,7 +206,7 @@
           {
             "node": "nvke-node-fde-arm64/build-nvke-doca-ovs",
             "producer": "build-nvke-doca-ovs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-doca-ovs/build@1d989bd01897.sh"
             ],
@@ -185,7 +216,7 @@
           {
             "node": "nvke-node-fde-arm64/build-nvke-kubeadm-distro",
             "producer": "build-nvke-kubeadm-distro",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-kubeadm-distro/build@f7ac5d5ea8e4.sh"
             ],
@@ -195,7 +226,7 @@
           {
             "node": "nvke-node-fde-arm64/build-nvke-spire-agent",
             "producer": "build-nvke-spire-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@69af79f5f659.sh"
             ],
@@ -205,7 +236,7 @@
           {
             "node": "nvke-node-fde-arm64/build-ovn-kube-ubuntu",
             "producer": "build-ovn-kube-ubuntu",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kube-ubuntu/build@65112a5e207f.sh"
             ],
@@ -215,7 +246,7 @@
           {
             "node": "nvke-node-fde-arm64/build-ovn-kubernetes-chart",
             "producer": "build-ovn-kubernetes-chart",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kubernetes-chart/build@375fe15cc8a8.sh"
             ],
@@ -225,7 +256,7 @@
           {
             "node": "nvke-node-fde-arm64/build-nvke-cni-ovn",
             "producer": "build-nvke-cni-ovn",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-ovn/build@e67e6f362ebf.sh"
             ],
@@ -235,7 +266,7 @@
           {
             "node": "nvke-node-fde-arm64/build-nvke-image-inputs",
             "producer": "build-nvke-image-inputs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-image-inputs/build@ee9f2d3a35c7.sh"
             ],
@@ -245,21 +276,21 @@
           {
             "node": "nvke-node-fde-arm64/pull-ubuntu-installer-iso",
             "producer": "pull-ubuntu-installer-iso",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "step": "run-disk",
             "target": "nvke-node-fde-arm64"
           },
           {
             "node": "nvke-node-fde-arm64/build-nvke-patched-installer-iso",
             "producer": "build-nvke-patched-installer-iso",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "step": "run-disk",
             "target": "nvke-node-fde-arm64"
           },
           {
             "node": "nvke-node-fde-arm64/build-nvke-node-fde-arm64",
             "producer": "build-nvke-node-fde-arm64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "step": "run-disk",
             "target": "nvke-node-fde-arm64"
           },
@@ -302,9 +333,40 @@
       {
         "operations": [
           {
+            "node": "internal/nvke-node-fde-ubuntu24-amd64-runtime/pull-packer-amd64",
+            "producer": "pull-packer-amd64",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-fde-ubuntu24-amd64-runtime/linux-amd64@146ed0f7e7a8.json",
+            "step": "run-disk",
+            "target": "internal/nvke-node-fde-ubuntu24-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-fde-ubuntu24-amd64-runtime/pull-packer-plugin-qemu-amd64",
+            "producer": "pull-packer-plugin-qemu-amd64",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-fde-ubuntu24-amd64-runtime/linux-amd64@146ed0f7e7a8.json",
+            "step": "run-disk",
+            "target": "internal/nvke-node-fde-ubuntu24-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-fde-ubuntu24-amd64-runtime/build-vm-runtime-amd64",
+            "producer": "build-vm-runtime-amd64",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-fde-ubuntu24-amd64-runtime/linux-amd64@146ed0f7e7a8.json",
+            "step": "run-disk",
+            "target": "internal/nvke-node-fde-ubuntu24-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-fde-ubuntu24-amd64-runtime/terminal-observe",
+            "step": "run-disk",
+            "target": "internal/nvke-node-fde-ubuntu24-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-fde-ubuntu24-amd64-runtime/sbom",
+            "step": "run-disk",
+            "target": "internal/nvke-node-fde-ubuntu24-amd64-runtime"
+          },
+          {
             "node": "nvke-node-fde-ubuntu24-amd64/build-nvke-agent",
             "producer": "build-nvke-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-agent/build@401834c12347.sh"
             ],
@@ -314,7 +376,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-amd64/build-nvke-cni-calico",
             "producer": "build-nvke-cni-calico",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-calico/build@4f2458d1cee2.sh"
             ],
@@ -324,7 +386,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-amd64/build-nvke-doca-ovs",
             "producer": "build-nvke-doca-ovs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-doca-ovs/build@5d088c5a59a8.sh"
             ],
@@ -334,7 +396,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-amd64/build-nvke-kubeadm-distro",
             "producer": "build-nvke-kubeadm-distro",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-kubeadm-distro/build@c273b5773bbe.sh"
             ],
@@ -344,7 +406,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-amd64/build-nvke-spire-agent",
             "producer": "build-nvke-spire-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@9a63f34844c8.sh"
             ],
@@ -354,7 +416,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-amd64/build-ovn-kube-ubuntu",
             "producer": "build-ovn-kube-ubuntu",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kube-ubuntu/build@4be6ec0a72a0.sh"
             ],
@@ -364,7 +426,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-amd64/build-ovn-kubernetes-chart",
             "producer": "build-ovn-kubernetes-chart",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kubernetes-chart/build@375fe15cc8a8.sh"
             ],
@@ -374,7 +436,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-amd64/build-nvke-cni-ovn",
             "producer": "build-nvke-cni-ovn",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-ovn/build@b55209798c62.sh"
             ],
@@ -384,7 +446,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-amd64/build-nvke-image-inputs",
             "producer": "build-nvke-image-inputs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-image-inputs/build@37c14e2f11c1.sh"
             ],
@@ -394,21 +456,21 @@
           {
             "node": "nvke-node-fde-ubuntu24-amd64/pull-ubuntu-installer-iso-amd64",
             "producer": "pull-ubuntu-installer-iso-amd64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "step": "run-disk",
             "target": "nvke-node-fde-ubuntu24-amd64"
           },
           {
             "node": "nvke-node-fde-ubuntu24-amd64/build-nvke-patched-installer-iso-amd64",
             "producer": "build-nvke-patched-installer-iso-amd64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "step": "run-disk",
             "target": "nvke-node-fde-ubuntu24-amd64"
           },
           {
             "node": "nvke-node-fde-ubuntu24-amd64/build-nvke-node-fde-amd64",
             "producer": "build-nvke-node-fde-amd64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "step": "run-disk",
             "target": "nvke-node-fde-ubuntu24-amd64"
           },
@@ -453,7 +515,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/build-nvke-agent",
             "producer": "build-nvke-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-agent/build@d645f2f15430.sh"
             ],
@@ -463,7 +525,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/build-nvke-cni-calico",
             "producer": "build-nvke-cni-calico",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-calico/build@0eb2b7a9699b.sh"
             ],
@@ -473,7 +535,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/build-nvke-doca-ovs",
             "producer": "build-nvke-doca-ovs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-doca-ovs/build@1d989bd01897.sh"
             ],
@@ -483,7 +545,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/build-nvke-kubeadm-distro",
             "producer": "build-nvke-kubeadm-distro",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-kubeadm-distro/build@f7ac5d5ea8e4.sh"
             ],
@@ -493,7 +555,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/build-nvke-spire-agent",
             "producer": "build-nvke-spire-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@69af79f5f659.sh"
             ],
@@ -503,7 +565,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/build-ovn-kube-ubuntu",
             "producer": "build-ovn-kube-ubuntu",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kube-ubuntu/build@65112a5e207f.sh"
             ],
@@ -513,7 +575,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/build-ovn-kubernetes-chart",
             "producer": "build-ovn-kubernetes-chart",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kubernetes-chart/build@375fe15cc8a8.sh"
             ],
@@ -523,7 +585,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/build-nvke-cni-ovn",
             "producer": "build-nvke-cni-ovn",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-ovn/build@e67e6f362ebf.sh"
             ],
@@ -533,7 +595,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/build-nvke-image-inputs",
             "producer": "build-nvke-image-inputs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-image-inputs/build@ee9f2d3a35c7.sh"
             ],
@@ -543,21 +605,21 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/pull-ubuntu-installer-iso",
             "producer": "pull-ubuntu-installer-iso",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "step": "run-disk",
             "target": "nvke-node-fde-ubuntu24-arm64"
           },
           {
             "node": "nvke-node-fde-ubuntu24-arm64/build-nvke-patched-installer-iso",
             "producer": "build-nvke-patched-installer-iso",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "step": "run-disk",
             "target": "nvke-node-fde-ubuntu24-arm64"
           },
           {
             "node": "nvke-node-fde-ubuntu24-arm64/build-nvke-node-fde-arm64",
             "producer": "build-nvke-node-fde-arm64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "step": "run-disk",
             "target": "nvke-node-fde-ubuntu24-arm64"
           },
@@ -600,9 +662,40 @@
       {
         "operations": [
           {
+            "node": "internal/nvke-node-image-amd64-runtime/pull-packer-amd64",
+            "producer": "pull-packer-amd64",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-image-amd64-runtime/linux-amd64@db3b033f1d9b.json",
+            "step": "run-disk",
+            "target": "internal/nvke-node-image-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-image-amd64-runtime/pull-packer-plugin-qemu-amd64",
+            "producer": "pull-packer-plugin-qemu-amd64",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-image-amd64-runtime/linux-amd64@db3b033f1d9b.json",
+            "step": "run-disk",
+            "target": "internal/nvke-node-image-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-image-amd64-runtime/build-vm-runtime-amd64",
+            "producer": "build-vm-runtime-amd64",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-image-amd64-runtime/linux-amd64@db3b033f1d9b.json",
+            "step": "run-disk",
+            "target": "internal/nvke-node-image-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-image-amd64-runtime/terminal-observe",
+            "step": "run-disk",
+            "target": "internal/nvke-node-image-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-image-amd64-runtime/sbom",
+            "step": "run-disk",
+            "target": "internal/nvke-node-image-amd64-runtime"
+          },
+          {
             "node": "nvke-node-image-amd64/build-nvke-agent",
             "producer": "build-nvke-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-agent/build@7ac6bc99cec5.sh"
             ],
@@ -612,7 +705,7 @@
           {
             "node": "nvke-node-image-amd64/build-nvke-cni-calico",
             "producer": "build-nvke-cni-calico",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-calico/build@4f2458d1cee2.sh"
             ],
@@ -622,7 +715,7 @@
           {
             "node": "nvke-node-image-amd64/build-nvke-doca-ovs",
             "producer": "build-nvke-doca-ovs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-doca-ovs/build@5d088c5a59a8.sh"
             ],
@@ -632,7 +725,7 @@
           {
             "node": "nvke-node-image-amd64/build-nvke-kubeadm-distro",
             "producer": "build-nvke-kubeadm-distro",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-kubeadm-distro/build@c273b5773bbe.sh"
             ],
@@ -642,7 +735,7 @@
           {
             "node": "nvke-node-image-amd64/build-nvke-spire-agent",
             "producer": "build-nvke-spire-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@9a63f34844c8.sh"
             ],
@@ -652,7 +745,7 @@
           {
             "node": "nvke-node-image-amd64/build-ovn-kube-ubuntu",
             "producer": "build-ovn-kube-ubuntu",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kube-ubuntu/build@4be6ec0a72a0.sh"
             ],
@@ -662,7 +755,7 @@
           {
             "node": "nvke-node-image-amd64/build-ovn-kubernetes-chart",
             "producer": "build-ovn-kubernetes-chart",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kubernetes-chart/build@375fe15cc8a8.sh"
             ],
@@ -672,7 +765,7 @@
           {
             "node": "nvke-node-image-amd64/build-nvke-cni-ovn",
             "producer": "build-nvke-cni-ovn",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-ovn/build@b55209798c62.sh"
             ],
@@ -682,7 +775,7 @@
           {
             "node": "nvke-node-image-amd64/build-nvke-image-inputs",
             "producer": "build-nvke-image-inputs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-image-inputs/build@37c14e2f11c1.sh"
             ],
@@ -692,21 +785,21 @@
           {
             "node": "nvke-node-image-amd64/pull-ubuntu-installer-iso-amd64",
             "producer": "pull-ubuntu-installer-iso-amd64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "step": "run-disk",
             "target": "nvke-node-image-amd64"
           },
           {
             "node": "nvke-node-image-amd64/build-nvke-patched-installer-iso-amd64",
             "producer": "build-nvke-patched-installer-iso-amd64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "step": "run-disk",
             "target": "nvke-node-image-amd64"
           },
           {
             "node": "nvke-node-image-amd64/build-nvke-node-image-amd64",
             "producer": "build-nvke-node-image-amd64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "step": "run-disk",
             "target": "nvke-node-image-amd64"
           },
@@ -751,7 +844,7 @@
           {
             "node": "nvke-node-image-arm64/build-nvke-agent",
             "producer": "build-nvke-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-agent/build@d82539022f9c.sh"
             ],
@@ -761,7 +854,7 @@
           {
             "node": "nvke-node-image-arm64/build-nvke-cni-calico",
             "producer": "build-nvke-cni-calico",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-calico/build@0eb2b7a9699b.sh"
             ],
@@ -771,7 +864,7 @@
           {
             "node": "nvke-node-image-arm64/build-nvke-doca-ovs",
             "producer": "build-nvke-doca-ovs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-doca-ovs/build@1d989bd01897.sh"
             ],
@@ -781,7 +874,7 @@
           {
             "node": "nvke-node-image-arm64/build-nvke-kubeadm-distro",
             "producer": "build-nvke-kubeadm-distro",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-kubeadm-distro/build@f7ac5d5ea8e4.sh"
             ],
@@ -791,7 +884,7 @@
           {
             "node": "nvke-node-image-arm64/build-nvke-spire-agent",
             "producer": "build-nvke-spire-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@69af79f5f659.sh"
             ],
@@ -801,7 +894,7 @@
           {
             "node": "nvke-node-image-arm64/build-ovn-kube-ubuntu",
             "producer": "build-ovn-kube-ubuntu",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kube-ubuntu/build@65112a5e207f.sh"
             ],
@@ -811,7 +904,7 @@
           {
             "node": "nvke-node-image-arm64/build-ovn-kubernetes-chart",
             "producer": "build-ovn-kubernetes-chart",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kubernetes-chart/build@375fe15cc8a8.sh"
             ],
@@ -821,7 +914,7 @@
           {
             "node": "nvke-node-image-arm64/build-nvke-cni-ovn",
             "producer": "build-nvke-cni-ovn",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-ovn/build@e67e6f362ebf.sh"
             ],
@@ -831,7 +924,7 @@
           {
             "node": "nvke-node-image-arm64/build-nvke-image-inputs",
             "producer": "build-nvke-image-inputs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-image-inputs/build@ee9f2d3a35c7.sh"
             ],
@@ -841,21 +934,21 @@
           {
             "node": "nvke-node-image-arm64/pull-ubuntu-installer-iso",
             "producer": "pull-ubuntu-installer-iso",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "step": "run-disk",
             "target": "nvke-node-image-arm64"
           },
           {
             "node": "nvke-node-image-arm64/build-nvke-patched-installer-iso",
             "producer": "build-nvke-patched-installer-iso",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "step": "run-disk",
             "target": "nvke-node-image-arm64"
           },
           {
             "node": "nvke-node-image-arm64/build-nvke-node-image",
             "producer": "build-nvke-node-image",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "step": "run-disk",
             "target": "nvke-node-image-arm64"
           },
@@ -898,9 +991,40 @@
       {
         "operations": [
           {
+            "node": "internal/nvke-node-image-ubuntu24-amd64-runtime/pull-packer-amd64",
+            "producer": "pull-packer-amd64",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-image-ubuntu24-amd64-runtime/linux-amd64@e832a6ecfcda.json",
+            "step": "run-disk",
+            "target": "internal/nvke-node-image-ubuntu24-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-image-ubuntu24-amd64-runtime/pull-packer-plugin-qemu-amd64",
+            "producer": "pull-packer-plugin-qemu-amd64",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-image-ubuntu24-amd64-runtime/linux-amd64@e832a6ecfcda.json",
+            "step": "run-disk",
+            "target": "internal/nvke-node-image-ubuntu24-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-image-ubuntu24-amd64-runtime/build-vm-runtime-amd64",
+            "producer": "build-vm-runtime-amd64",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-image-ubuntu24-amd64-runtime/linux-amd64@e832a6ecfcda.json",
+            "step": "run-disk",
+            "target": "internal/nvke-node-image-ubuntu24-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-image-ubuntu24-amd64-runtime/terminal-observe",
+            "step": "run-disk",
+            "target": "internal/nvke-node-image-ubuntu24-amd64-runtime"
+          },
+          {
+            "node": "internal/nvke-node-image-ubuntu24-amd64-runtime/sbom",
+            "step": "run-disk",
+            "target": "internal/nvke-node-image-ubuntu24-amd64-runtime"
+          },
+          {
             "node": "nvke-node-image-ubuntu24-amd64/build-nvke-agent",
             "producer": "build-nvke-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-agent/build@401834c12347.sh"
             ],
@@ -910,7 +1034,7 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/build-nvke-cni-calico",
             "producer": "build-nvke-cni-calico",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-calico/build@4f2458d1cee2.sh"
             ],
@@ -920,7 +1044,7 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/build-nvke-doca-ovs",
             "producer": "build-nvke-doca-ovs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-doca-ovs/build@5d088c5a59a8.sh"
             ],
@@ -930,7 +1054,7 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/build-nvke-kubeadm-distro",
             "producer": "build-nvke-kubeadm-distro",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-kubeadm-distro/build@c273b5773bbe.sh"
             ],
@@ -940,7 +1064,7 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/build-nvke-spire-agent",
             "producer": "build-nvke-spire-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@9a63f34844c8.sh"
             ],
@@ -950,7 +1074,7 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/build-ovn-kube-ubuntu",
             "producer": "build-ovn-kube-ubuntu",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kube-ubuntu/build@4be6ec0a72a0.sh"
             ],
@@ -960,7 +1084,7 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/build-ovn-kubernetes-chart",
             "producer": "build-ovn-kubernetes-chart",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kubernetes-chart/build@375fe15cc8a8.sh"
             ],
@@ -970,7 +1094,7 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/build-nvke-cni-ovn",
             "producer": "build-nvke-cni-ovn",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-ovn/build@b55209798c62.sh"
             ],
@@ -980,7 +1104,7 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/build-nvke-image-inputs",
             "producer": "build-nvke-image-inputs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-image-inputs/build@37c14e2f11c1.sh"
             ],
@@ -990,21 +1114,21 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/pull-ubuntu-installer-iso-amd64",
             "producer": "pull-ubuntu-installer-iso-amd64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "step": "run-disk",
             "target": "nvke-node-image-ubuntu24-amd64"
           },
           {
             "node": "nvke-node-image-ubuntu24-amd64/build-nvke-patched-installer-iso-amd64",
             "producer": "build-nvke-patched-installer-iso-amd64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "step": "run-disk",
             "target": "nvke-node-image-ubuntu24-amd64"
           },
           {
             "node": "nvke-node-image-ubuntu24-amd64/build-nvke-node-image-amd64",
             "producer": "build-nvke-node-image-amd64",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "step": "run-disk",
             "target": "nvke-node-image-ubuntu24-amd64"
           },
@@ -1049,7 +1173,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/build-nvke-agent",
             "producer": "build-nvke-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-agent/build@d645f2f15430.sh"
             ],
@@ -1059,7 +1183,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/build-nvke-cni-calico",
             "producer": "build-nvke-cni-calico",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-calico/build@0eb2b7a9699b.sh"
             ],
@@ -1069,7 +1193,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/build-nvke-doca-ovs",
             "producer": "build-nvke-doca-ovs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-doca-ovs/build@1d989bd01897.sh"
             ],
@@ -1079,7 +1203,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/build-nvke-kubeadm-distro",
             "producer": "build-nvke-kubeadm-distro",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-kubeadm-distro/build@f7ac5d5ea8e4.sh"
             ],
@@ -1089,7 +1213,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/build-nvke-spire-agent",
             "producer": "build-nvke-spire-agent",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@69af79f5f659.sh"
             ],
@@ -1099,7 +1223,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/build-ovn-kube-ubuntu",
             "producer": "build-ovn-kube-ubuntu",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kube-ubuntu/build@65112a5e207f.sh"
             ],
@@ -1109,7 +1233,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/build-ovn-kubernetes-chart",
             "producer": "build-ovn-kubernetes-chart",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/ovn-kubernetes-chart/build@375fe15cc8a8.sh"
             ],
@@ -1119,7 +1243,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/build-nvke-cni-ovn",
             "producer": "build-nvke-cni-ovn",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-cni-ovn/build@e67e6f362ebf.sh"
             ],
@@ -1129,7 +1253,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/build-nvke-image-inputs",
             "producer": "build-nvke-image-inputs",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke-image-inputs/build@ee9f2d3a35c7.sh"
             ],
@@ -1139,21 +1263,21 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/pull-ubuntu-installer-iso",
             "producer": "pull-ubuntu-installer-iso",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "step": "run-disk",
             "target": "nvke-node-image-ubuntu24-arm64"
           },
           {
             "node": "nvke-node-image-ubuntu24-arm64/build-nvke-patched-installer-iso",
             "producer": "build-nvke-patched-installer-iso",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "step": "run-disk",
             "target": "nvke-node-image-ubuntu24-arm64"
           },
           {
             "node": "nvke-node-image-ubuntu24-arm64/build-nvke-node-image",
             "producer": "build-nvke-node-image",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "step": "run-disk",
             "target": "nvke-node-image-ubuntu24-arm64"
           },
@@ -1174,6 +1298,114 @@
           {
             "node": "package/publication-nvke-node-image-ubuntu24-arm64",
             "step": "run-disk"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-internal-nvke-node-fde-amd64-runtime-2d0e603259eb": [
+      {
+        "operations": [
+          {
+            "node": "internal/nvke-node-fde-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+            "producer": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-fde-amd64-runtime/linux-amd64@ccee6b6defc5.json",
+            "step": "nvkr-internal-nvke-node-fde-amd64-runtime-721b448c9548",
+            "target": "internal/nvke-node-fde-amd64-runtime"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-internal-nvke-node-fde-ubuntu24-amd6-aee182df6896": [
+      {
+        "operations": [
+          {
+            "node": "internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+            "producer": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-fde-ubuntu24-amd64-runtime/linux-amd64@146ed0f7e7a8.json",
+            "step": "nvkr-internal-nvke-node-fde-ubuntu24-amd6-8627ef91f4b5",
+            "target": "internal/nvke-node-fde-ubuntu24-amd64-runtime"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-internal-nvke-node-image-amd64-runti-dee381bea2a9": [
+      {
+        "operations": [
+          {
+            "node": "internal/nvke-node-image-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+            "producer": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-image-amd64-runtime/linux-amd64@db3b033f1d9b.json",
+            "step": "nvkr-internal-nvke-node-image-amd64-runti-ffa829973818",
+            "target": "internal/nvke-node-image-amd64-runtime"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-internal-nvke-node-image-ubuntu24-am-7a40ada7120d": [
+      {
+        "operations": [
+          {
+            "node": "internal/nvke-node-image-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+            "producer": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+            "record": ".github/nvkr-plan-store/steps/internal/nvke-node-image-ubuntu24-amd64-runtime/linux-amd64@e832a6ecfcda.json",
+            "step": "nvkr-internal-nvke-node-image-ubuntu24-am-035fc61837c2",
+            "target": "internal/nvke-node-image-ubuntu24-amd64-runtime"
           }
         ],
         "workflows": [
@@ -6461,64 +6693,31 @@
         ]
       }
     ],
-    "nvkr-process-nvke-node-fde-amd64-fetch-nv-f8c224795476": [
+    "nvkr-process-nvke-node-fde-amd64-fetch-nv-6b1f778c7275": [
       {
         "operations": [
           {
-            "node": "nvke-node-fde-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
-            "producer": "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
-            ],
-            "step": "nvkr-nvke-node-fde-amd64-fetch-source-87e-cc7ef35aebf8",
-            "target": "nvke-node-fde-amd64"
-          },
-          {
-            "node": "nvke-node-fde-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
-            "producer": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@f04574786e4a.sh"
-            ],
-            "step": "nvkr-nvke-node-fde-amd64-fetch-source-480-81d68f01da81",
-            "target": "nvke-node-fde-amd64"
-          },
-          {
-            "node": "nvke-node-fde-amd64/fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
-            "producer": "fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
-            "step": "nvkr-nvke-node-fde-amd64-fetch-source-108-b7859e8dea2e",
-            "target": "nvke-node-fde-amd64"
-          },
-          {
-            "node": "nvke-node-fde-amd64/fetch-source-fc79d914a84c5a2d16ed611af2de37f44e3bc2fa146e00750b197e686ff0baf9",
-            "producer": "fetch-source-fc79d914a84c5a2d16ed611af2de37f44e3bc2fa146e00750b197e686ff0baf9",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@6e921a9a87f1.sh"
-            ],
-            "step": "nvkr-nvke-node-fde-amd64-fetch-source-fc7-e574e10156fc",
-            "target": "nvke-node-fde-amd64"
-          },
-          {
-            "node": "nvke-node-fde-amd64/fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
-            "producer": "fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@957935cbd691.sh"
-            ],
-            "step": "nvkr-nvke-node-fde-amd64-fetch-source-0a3-f88fb8693f0b",
-            "target": "nvke-node-fde-amd64"
-          },
-          {
             "node": "nvke-node-fde-amd64/fetch-source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
             "producer": "fetch-source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@a3ada540cfe5.sh"
             ],
             "step": "nvkr-nvke-node-fde-amd64-fetch-source-366-07a6cc846235",
+            "target": "nvke-node-fde-amd64"
+          },
+          {
+            "node": "nvke-node-fde-amd64/fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
+            "producer": "fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
+            "step": "nvkr-nvke-node-fde-amd64-fetch-source-cf1-6d2cb832fd82",
+            "target": "nvke-node-fde-amd64"
+          },
+          {
+            "node": "nvke-node-fde-amd64/fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
+            "producer": "fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
+            "step": "nvkr-nvke-node-fde-amd64-fetch-source-cae-ff8241b0e5b3",
             "target": "nvke-node-fde-amd64"
           }
         ],
@@ -6538,21 +6737,61 @@
         ]
       }
     ],
-    "nvkr-process-nvke-node-fde-amd64-fetch-ov-9b482bbb2e2f": [
+    "nvkr-process-nvke-node-fde-amd64-fetch-nv-8e30cdb5d420": [
       {
         "operations": [
           {
-            "node": "nvke-node-fde-amd64/fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
-            "producer": "fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
-            "step": "nvkr-nvke-node-fde-amd64-fetch-source-cf1-6d2cb832fd82",
+            "node": "nvke-node-fde-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
+            "producer": "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
+            ],
+            "step": "nvkr-nvke-node-fde-amd64-fetch-source-87e-cc7ef35aebf8",
             "target": "nvke-node-fde-amd64"
           },
           {
-            "node": "nvke-node-fde-amd64/fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
-            "producer": "fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
-            "step": "nvkr-nvke-node-fde-amd64-fetch-source-cae-ff8241b0e5b3",
+            "node": "nvke-node-fde-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
+            "producer": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvke/vendor@f04574786e4a.sh"
+            ],
+            "step": "nvkr-nvke-node-fde-amd64-fetch-source-480-81d68f01da81",
+            "target": "nvke-node-fde-amd64"
+          },
+          {
+            "node": "nvke-node-fde-amd64/fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
+            "producer": "fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
+            "step": "nvkr-nvke-node-fde-amd64-fetch-source-108-b7859e8dea2e",
+            "target": "nvke-node-fde-amd64"
+          },
+          {
+            "node": "nvke-node-fde-amd64/fetch-source-fc79d914a84c5a2d16ed611af2de37f44e3bc2fa146e00750b197e686ff0baf9",
+            "producer": "fetch-source-fc79d914a84c5a2d16ed611af2de37f44e3bc2fa146e00750b197e686ff0baf9",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvke/vendor@6e921a9a87f1.sh"
+            ],
+            "step": "nvkr-nvke-node-fde-amd64-fetch-source-fc7-e574e10156fc",
+            "target": "nvke-node-fde-amd64"
+          },
+          {
+            "node": "nvke-node-fde-amd64/fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
+            "producer": "fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvke/vendor@957935cbd691.sh"
+            ],
+            "step": "nvkr-nvke-node-fde-amd64-fetch-source-0a3-f88fb8693f0b",
+            "target": "nvke-node-fde-amd64"
+          },
+          {
+            "node": "nvke-node-fde-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+            "producer": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
+            "step": "nvkr-nvke-node-fde-amd64-fetch-source-6c9-d4abd417a275",
             "target": "nvke-node-fde-amd64"
           }
         ],
@@ -6578,7 +6817,7 @@
           {
             "node": "nvke-node-fde-arm64/fetch-source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
             "producer": "fetch-source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
             ],
@@ -6588,7 +6827,7 @@
           {
             "node": "nvke-node-fde-arm64/fetch-source-abd685f47b063613303c0ec842ed5e0a0cf3575d6784c4807d6e37a1cacbef27",
             "producer": "fetch-source-abd685f47b063613303c0ec842ed5e0a0cf3575d6784c4807d6e37a1cacbef27",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@0741a9b00b2c.sh"
             ],
@@ -6598,14 +6837,14 @@
           {
             "node": "nvke-node-fde-arm64/fetch-source-615a19d5c5d39a2a460117522cf181e3794d0b3dc4b487d05c5d3597a7740ed3",
             "producer": "fetch-source-615a19d5c5d39a2a460117522cf181e3794d0b3dc4b487d05c5d3597a7740ed3",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "step": "nvkr-nvke-node-fde-arm64-fetch-source-615-be698a2b70e1",
             "target": "nvke-node-fde-arm64"
           },
           {
             "node": "nvke-node-fde-arm64/fetch-source-c32ed65eb2b29a84c8a4925f3bbb98887baaf077508d41e6178ff9f5c7c9c9ee",
             "producer": "fetch-source-c32ed65eb2b29a84c8a4925f3bbb98887baaf077508d41e6178ff9f5c7c9c9ee",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@b3fdd775e448.sh"
             ],
@@ -6615,7 +6854,7 @@
           {
             "node": "nvke-node-fde-arm64/fetch-source-30caf73dc37371b95a0ca1cfae338290c6f63286bce05e9951613389aba761fc",
             "producer": "fetch-source-30caf73dc37371b95a0ca1cfae338290c6f63286bce05e9951613389aba761fc",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@a8b9849732c8.sh"
             ],
@@ -6625,7 +6864,7 @@
           {
             "node": "nvke-node-fde-arm64/fetch-source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c",
             "producer": "fetch-source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@1830846271a1.sh"
             ],
@@ -6655,14 +6894,14 @@
           {
             "node": "nvke-node-fde-arm64/fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
             "producer": "fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "step": "nvkr-nvke-node-fde-arm64-fetch-source-cf1-d53ec5eab54c",
             "target": "nvke-node-fde-arm64"
           },
           {
             "node": "nvke-node-fde-arm64/fetch-source-6db798cc7bc7243527ac02c1b70f9d82ebcfe348999c6ce9deb8fd09f897cb0d",
             "producer": "fetch-source-6db798cc7bc7243527ac02c1b70f9d82ebcfe348999c6ce9deb8fd09f897cb0d",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
             "step": "nvkr-nvke-node-fde-arm64-fetch-source-6db-debe81907bca",
             "target": "nvke-node-fde-arm64"
           }
@@ -6683,64 +6922,38 @@
         ]
       }
     ],
-    "nvkr-process-nvke-node-fde-ubuntu24-amd64-1d015a140907": [
+    "nvkr-process-nvke-node-fde-ubuntu24-amd64-374dc8322a65": [
       {
         "operations": [
           {
-            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-bdb2b57b9ea0ffac9bc287c32d6c60124f48115ec0e2b47d07068b9d4d148937",
-            "producer": "fetch-source-bdb2b57b9ea0ffac9bc287c32d6c60124f48115ec0e2b47d07068b9d4d148937",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@f015af8f3d9b.sh"
-            ],
-            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-1cd542b01999",
+            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+            "producer": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
+            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-70772d0f4347",
             "target": "nvke-node-fde-ubuntu24-amd64"
           },
           {
-            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
-            "producer": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
+            "producer": "fetch-source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@f04574786e4a.sh"
+              ".github/nvkr-plan-store/scripts/nvke/vendor@a3ada540cfe5.sh"
             ],
-            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-95dea7ffbb7f",
+            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-cc73ab8dea78",
             "target": "nvke-node-fde-ubuntu24-amd64"
           },
           {
-            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
-            "producer": "fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
-            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-b32801d1bfd7",
+            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
+            "producer": "fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
+            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-176deb86d99e",
             "target": "nvke-node-fde-ubuntu24-amd64"
           },
           {
-            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-021a9344c4dca116d1324d31c985fdb4d704b231ac2619a2f8d349327d72fa35",
-            "producer": "fetch-source-021a9344c4dca116d1324d31c985fdb4d704b231ac2619a2f8d349327d72fa35",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@52a7226da45e.sh"
-            ],
-            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-7d09b1ac4cc0",
-            "target": "nvke-node-fde-ubuntu24-amd64"
-          },
-          {
-            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
-            "producer": "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
-            ],
-            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-7f486a44894d",
-            "target": "nvke-node-fde-ubuntu24-amd64"
-          },
-          {
-            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
-            "producer": "fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@957935cbd691.sh"
-            ],
-            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-be92fd462c35",
+            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
+            "producer": "fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
+            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-d1ae3a31fdec",
             "target": "nvke-node-fde-ubuntu24-amd64"
           }
         ],
@@ -6760,31 +6973,64 @@
         ]
       }
     ],
-    "nvkr-process-nvke-node-fde-ubuntu24-amd64-68929548ea3f": [
+    "nvkr-process-nvke-node-fde-ubuntu24-amd64-cd00e8cf5a9f": [
       {
         "operations": [
           {
-            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
-            "producer": "fetch-source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
+            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-bdb2b57b9ea0ffac9bc287c32d6c60124f48115ec0e2b47d07068b9d4d148937",
+            "producer": "fetch-source-bdb2b57b9ea0ffac9bc287c32d6c60124f48115ec0e2b47d07068b9d4d148937",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
             "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@a3ada540cfe5.sh"
+              ".github/nvkr-plan-store/scripts/nvke/vendor@f015af8f3d9b.sh"
             ],
-            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-cc73ab8dea78",
+            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-1cd542b01999",
             "target": "nvke-node-fde-ubuntu24-amd64"
           },
           {
-            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
-            "producer": "fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
-            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-176deb86d99e",
+            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
+            "producer": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvke/vendor@f04574786e4a.sh"
+            ],
+            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-95dea7ffbb7f",
             "target": "nvke-node-fde-ubuntu24-amd64"
           },
           {
-            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
-            "producer": "fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
-            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-d1ae3a31fdec",
+            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
+            "producer": "fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
+            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-b32801d1bfd7",
+            "target": "nvke-node-fde-ubuntu24-amd64"
+          },
+          {
+            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-021a9344c4dca116d1324d31c985fdb4d704b231ac2619a2f8d349327d72fa35",
+            "producer": "fetch-source-021a9344c4dca116d1324d31c985fdb4d704b231ac2619a2f8d349327d72fa35",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvke/vendor@52a7226da45e.sh"
+            ],
+            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-7d09b1ac4cc0",
+            "target": "nvke-node-fde-ubuntu24-amd64"
+          },
+          {
+            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
+            "producer": "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
+            ],
+            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-7f486a44894d",
+            "target": "nvke-node-fde-ubuntu24-amd64"
+          },
+          {
+            "node": "nvke-node-fde-ubuntu24-amd64/fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
+            "producer": "fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvke/vendor@957935cbd691.sh"
+            ],
+            "step": "nvkr-nvke-node-fde-ubuntu24-amd64-fetch-s-be92fd462c35",
             "target": "nvke-node-fde-ubuntu24-amd64"
           }
         ],
@@ -6810,7 +7056,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/fetch-source-bcc689ba3513502342c56fe8d6522f466bfb5685dc7bf61f4ea7704daa15d65c",
             "producer": "fetch-source-bcc689ba3513502342c56fe8d6522f466bfb5685dc7bf61f4ea7704daa15d65c",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@c31a131d6257.sh"
             ],
@@ -6820,7 +7066,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/fetch-source-abd685f47b063613303c0ec842ed5e0a0cf3575d6784c4807d6e37a1cacbef27",
             "producer": "fetch-source-abd685f47b063613303c0ec842ed5e0a0cf3575d6784c4807d6e37a1cacbef27",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@0741a9b00b2c.sh"
             ],
@@ -6830,14 +7076,14 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/fetch-source-615a19d5c5d39a2a460117522cf181e3794d0b3dc4b487d05c5d3597a7740ed3",
             "producer": "fetch-source-615a19d5c5d39a2a460117522cf181e3794d0b3dc4b487d05c5d3597a7740ed3",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "step": "nvkr-nvke-node-fde-ubuntu24-arm64-fetch-s-09df4d709504",
             "target": "nvke-node-fde-ubuntu24-arm64"
           },
           {
             "node": "nvke-node-fde-ubuntu24-arm64/fetch-source-6d108226c242e99f9110382b2e43567b6195d044e8d68211b3da4548e661b082",
             "producer": "fetch-source-6d108226c242e99f9110382b2e43567b6195d044e8d68211b3da4548e661b082",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@3ac0f4daf970.sh"
             ],
@@ -6847,7 +7093,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/fetch-source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
             "producer": "fetch-source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
             ],
@@ -6857,7 +7103,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/fetch-source-30caf73dc37371b95a0ca1cfae338290c6f63286bce05e9951613389aba761fc",
             "producer": "fetch-source-30caf73dc37371b95a0ca1cfae338290c6f63286bce05e9951613389aba761fc",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@a8b9849732c8.sh"
             ],
@@ -6887,7 +7133,7 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/fetch-source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c",
             "producer": "fetch-source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@1830846271a1.sh"
             ],
@@ -6897,14 +7143,14 @@
           {
             "node": "nvke-node-fde-ubuntu24-arm64/fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
             "producer": "fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "step": "nvkr-nvke-node-fde-ubuntu24-arm64-fetch-s-9f9e076dd25b",
             "target": "nvke-node-fde-ubuntu24-arm64"
           },
           {
             "node": "nvke-node-fde-ubuntu24-arm64/fetch-source-6db798cc7bc7243527ac02c1b70f9d82ebcfe348999c6ce9deb8fd09f897cb0d",
             "producer": "fetch-source-6db798cc7bc7243527ac02c1b70f9d82ebcfe348999c6ce9deb8fd09f897cb0d",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
             "step": "nvkr-nvke-node-fde-ubuntu24-arm64-fetch-s-0113d239be82",
             "target": "nvke-node-fde-ubuntu24-arm64"
           }
@@ -6925,21 +7171,61 @@
         ]
       }
     ],
-    "nvkr-process-nvke-node-image-amd64-fetch-a0e20b2b6193": [
+    "nvkr-process-nvke-node-image-amd64-fetch-563f1812ce2d": [
       {
         "operations": [
           {
-            "node": "nvke-node-image-amd64/fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
-            "producer": "fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
-            "step": "nvkr-nvke-node-image-amd64-fetch-source-c-9da4dec3c635",
+            "node": "nvke-node-image-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
+            "producer": "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
+            ],
+            "step": "nvkr-nvke-node-image-amd64-fetch-source-8-d7378ec7b1b1",
             "target": "nvke-node-image-amd64"
           },
           {
-            "node": "nvke-node-image-amd64/fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
-            "producer": "fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
-            "step": "nvkr-nvke-node-image-amd64-fetch-source-c-1698ac312231",
+            "node": "nvke-node-image-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
+            "producer": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvke/vendor@f04574786e4a.sh"
+            ],
+            "step": "nvkr-nvke-node-image-amd64-fetch-source-4-04c0e644a579",
+            "target": "nvke-node-image-amd64"
+          },
+          {
+            "node": "nvke-node-image-amd64/fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
+            "producer": "fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
+            "step": "nvkr-nvke-node-image-amd64-fetch-source-1-e1cdece85189",
+            "target": "nvke-node-image-amd64"
+          },
+          {
+            "node": "nvke-node-image-amd64/fetch-source-fc79d914a84c5a2d16ed611af2de37f44e3bc2fa146e00750b197e686ff0baf9",
+            "producer": "fetch-source-fc79d914a84c5a2d16ed611af2de37f44e3bc2fa146e00750b197e686ff0baf9",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvke/vendor@6e921a9a87f1.sh"
+            ],
+            "step": "nvkr-nvke-node-image-amd64-fetch-source-f-1d71fd9570aa",
+            "target": "nvke-node-image-amd64"
+          },
+          {
+            "node": "nvke-node-image-amd64/fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
+            "producer": "fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvke/vendor@957935cbd691.sh"
+            ],
+            "step": "nvkr-nvke-node-image-amd64-fetch-source-0-582f3f118838",
+            "target": "nvke-node-image-amd64"
+          },
+          {
+            "node": "nvke-node-image-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+            "producer": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
+            "step": "nvkr-nvke-node-image-amd64-fetch-source-6-ac669e75f453",
             "target": "nvke-node-image-amd64"
           }
         ],
@@ -6959,64 +7245,31 @@
         ]
       }
     ],
-    "nvkr-process-nvke-node-image-amd64-fetch-da60ac6eb51c": [
+    "nvkr-process-nvke-node-image-amd64-fetch-af1cf316bb45": [
       {
         "operations": [
           {
-            "node": "nvke-node-image-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
-            "producer": "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
-            ],
-            "step": "nvkr-nvke-node-image-amd64-fetch-source-8-d7378ec7b1b1",
-            "target": "nvke-node-image-amd64"
-          },
-          {
-            "node": "nvke-node-image-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
-            "producer": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@f04574786e4a.sh"
-            ],
-            "step": "nvkr-nvke-node-image-amd64-fetch-source-4-04c0e644a579",
-            "target": "nvke-node-image-amd64"
-          },
-          {
-            "node": "nvke-node-image-amd64/fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
-            "producer": "fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
-            "step": "nvkr-nvke-node-image-amd64-fetch-source-1-e1cdece85189",
-            "target": "nvke-node-image-amd64"
-          },
-          {
-            "node": "nvke-node-image-amd64/fetch-source-fc79d914a84c5a2d16ed611af2de37f44e3bc2fa146e00750b197e686ff0baf9",
-            "producer": "fetch-source-fc79d914a84c5a2d16ed611af2de37f44e3bc2fa146e00750b197e686ff0baf9",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@6e921a9a87f1.sh"
-            ],
-            "step": "nvkr-nvke-node-image-amd64-fetch-source-f-1d71fd9570aa",
-            "target": "nvke-node-image-amd64"
-          },
-          {
-            "node": "nvke-node-image-amd64/fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
-            "producer": "fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvke/vendor@957935cbd691.sh"
-            ],
-            "step": "nvkr-nvke-node-image-amd64-fetch-source-0-582f3f118838",
-            "target": "nvke-node-image-amd64"
-          },
-          {
             "node": "nvke-node-image-amd64/fetch-source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
             "producer": "fetch-source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@a3ada540cfe5.sh"
             ],
             "step": "nvkr-nvke-node-image-amd64-fetch-source-3-691ec2f45031",
+            "target": "nvke-node-image-amd64"
+          },
+          {
+            "node": "nvke-node-image-amd64/fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
+            "producer": "fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
+            "step": "nvkr-nvke-node-image-amd64-fetch-source-c-9da4dec3c635",
+            "target": "nvke-node-image-amd64"
+          },
+          {
+            "node": "nvke-node-image-amd64/fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
+            "producer": "fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
+            "step": "nvkr-nvke-node-image-amd64-fetch-source-c-1698ac312231",
             "target": "nvke-node-image-amd64"
           }
         ],
@@ -7042,7 +7295,7 @@
           {
             "node": "nvke-node-image-arm64/fetch-source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
             "producer": "fetch-source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
             ],
@@ -7052,7 +7305,7 @@
           {
             "node": "nvke-node-image-arm64/fetch-source-abd685f47b063613303c0ec842ed5e0a0cf3575d6784c4807d6e37a1cacbef27",
             "producer": "fetch-source-abd685f47b063613303c0ec842ed5e0a0cf3575d6784c4807d6e37a1cacbef27",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@0741a9b00b2c.sh"
             ],
@@ -7062,14 +7315,14 @@
           {
             "node": "nvke-node-image-arm64/fetch-source-615a19d5c5d39a2a460117522cf181e3794d0b3dc4b487d05c5d3597a7740ed3",
             "producer": "fetch-source-615a19d5c5d39a2a460117522cf181e3794d0b3dc4b487d05c5d3597a7740ed3",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "step": "nvkr-nvke-node-image-arm64-fetch-source-6-0f0d14a9e04b",
             "target": "nvke-node-image-arm64"
           },
           {
             "node": "nvke-node-image-arm64/fetch-source-c32ed65eb2b29a84c8a4925f3bbb98887baaf077508d41e6178ff9f5c7c9c9ee",
             "producer": "fetch-source-c32ed65eb2b29a84c8a4925f3bbb98887baaf077508d41e6178ff9f5c7c9c9ee",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@b3fdd775e448.sh"
             ],
@@ -7079,7 +7332,7 @@
           {
             "node": "nvke-node-image-arm64/fetch-source-30caf73dc37371b95a0ca1cfae338290c6f63286bce05e9951613389aba761fc",
             "producer": "fetch-source-30caf73dc37371b95a0ca1cfae338290c6f63286bce05e9951613389aba761fc",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@a8b9849732c8.sh"
             ],
@@ -7089,7 +7342,7 @@
           {
             "node": "nvke-node-image-arm64/fetch-source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c",
             "producer": "fetch-source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@1830846271a1.sh"
             ],
@@ -7119,14 +7372,14 @@
           {
             "node": "nvke-node-image-arm64/fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
             "producer": "fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "step": "nvkr-nvke-node-image-arm64-fetch-source-c-28d27da7a236",
             "target": "nvke-node-image-arm64"
           },
           {
             "node": "nvke-node-image-arm64/fetch-source-6db798cc7bc7243527ac02c1b70f9d82ebcfe348999c6ce9deb8fd09f897cb0d",
             "producer": "fetch-source-6db798cc7bc7243527ac02c1b70f9d82ebcfe348999c6ce9deb8fd09f897cb0d",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
             "step": "nvkr-nvke-node-image-arm64-fetch-source-6-6679b43caae6",
             "target": "nvke-node-image-arm64"
           }
@@ -7147,13 +7400,20 @@
         ]
       }
     ],
-    "nvkr-process-nvke-node-image-ubuntu24-amd-309e0b0b668e": [
+    "nvkr-process-nvke-node-image-ubuntu24-amd-4405c26853e9": [
       {
         "operations": [
           {
+            "node": "nvke-node-image-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+            "producer": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
+            "step": "nvkr-nvke-node-image-ubuntu24-amd64-fetch-b794b6768404",
+            "target": "nvke-node-image-ubuntu24-amd64"
+          },
+          {
             "node": "nvke-node-image-ubuntu24-amd64/fetch-source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
             "producer": "fetch-source-3667353df48043abe8e17667239fed5d9d1244cab14ebc5dae58fc0f935e28e8",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@a3ada540cfe5.sh"
             ],
@@ -7163,14 +7423,14 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
             "producer": "fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "step": "nvkr-nvke-node-image-ubuntu24-amd64-fetch-cf61fafc6246",
             "target": "nvke-node-image-ubuntu24-amd64"
           },
           {
             "node": "nvke-node-image-ubuntu24-amd64/fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
             "producer": "fetch-source-caef2667d8fa1290f6519f6f5ee98f0bb051308681ae897243bf886eddbea9e1",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "step": "nvkr-nvke-node-image-ubuntu24-amd64-fetch-635d85e1f3a7",
             "target": "nvke-node-image-ubuntu24-amd64"
           }
@@ -7191,13 +7451,13 @@
         ]
       }
     ],
-    "nvkr-process-nvke-node-image-ubuntu24-amd-414a3d348ba5": [
+    "nvkr-process-nvke-node-image-ubuntu24-amd-da40ca38c1f9": [
       {
         "operations": [
           {
             "node": "nvke-node-image-ubuntu24-amd64/fetch-source-bdb2b57b9ea0ffac9bc287c32d6c60124f48115ec0e2b47d07068b9d4d148937",
             "producer": "fetch-source-bdb2b57b9ea0ffac9bc287c32d6c60124f48115ec0e2b47d07068b9d4d148937",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@f015af8f3d9b.sh"
             ],
@@ -7207,7 +7467,7 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
             "producer": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@f04574786e4a.sh"
             ],
@@ -7217,14 +7477,14 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
             "producer": "fetch-source-1088fa6bca19a0d2c6dd68b1ff6e7a9e0300940d59dc85a3cb8d49bcd109d08e",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "step": "nvkr-nvke-node-image-ubuntu24-amd64-fetch-4f508ba6bcea",
             "target": "nvke-node-image-ubuntu24-amd64"
           },
           {
             "node": "nvke-node-image-ubuntu24-amd64/fetch-source-021a9344c4dca116d1324d31c985fdb4d704b231ac2619a2f8d349327d72fa35",
             "producer": "fetch-source-021a9344c4dca116d1324d31c985fdb4d704b231ac2619a2f8d349327d72fa35",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@52a7226da45e.sh"
             ],
@@ -7234,7 +7494,7 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
             "producer": "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
             ],
@@ -7244,7 +7504,7 @@
           {
             "node": "nvke-node-image-ubuntu24-amd64/fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
             "producer": "fetch-source-0a341799957edd2c8ce04d5171fca264a9d492796835db5ceaec0241a0be7f51",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@957935cbd691.sh"
             ],
@@ -7274,7 +7534,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/fetch-source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c",
             "producer": "fetch-source-36d80d4a605b6832c125fb7de0bcf180330aaae88614597287d599043f25818c",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@1830846271a1.sh"
             ],
@@ -7284,14 +7544,14 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
             "producer": "fetch-source-cf1266760164ee1f78d52cdae26ac814a7f02404bffbd484b73eda017ef47f2a",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "step": "nvkr-nvke-node-image-ubuntu24-arm64-fetch-d9ceb1f8a766",
             "target": "nvke-node-image-ubuntu24-arm64"
           },
           {
             "node": "nvke-node-image-ubuntu24-arm64/fetch-source-6db798cc7bc7243527ac02c1b70f9d82ebcfe348999c6ce9deb8fd09f897cb0d",
             "producer": "fetch-source-6db798cc7bc7243527ac02c1b70f9d82ebcfe348999c6ce9deb8fd09f897cb0d",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "step": "nvkr-nvke-node-image-ubuntu24-arm64-fetch-d75703104ecd",
             "target": "nvke-node-image-ubuntu24-arm64"
           }
@@ -7318,7 +7578,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/fetch-source-bcc689ba3513502342c56fe8d6522f466bfb5685dc7bf61f4ea7704daa15d65c",
             "producer": "fetch-source-bcc689ba3513502342c56fe8d6522f466bfb5685dc7bf61f4ea7704daa15d65c",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@c31a131d6257.sh"
             ],
@@ -7328,7 +7588,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/fetch-source-abd685f47b063613303c0ec842ed5e0a0cf3575d6784c4807d6e37a1cacbef27",
             "producer": "fetch-source-abd685f47b063613303c0ec842ed5e0a0cf3575d6784c4807d6e37a1cacbef27",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@0741a9b00b2c.sh"
             ],
@@ -7338,14 +7598,14 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/fetch-source-615a19d5c5d39a2a460117522cf181e3794d0b3dc4b487d05c5d3597a7740ed3",
             "producer": "fetch-source-615a19d5c5d39a2a460117522cf181e3794d0b3dc4b487d05c5d3597a7740ed3",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "step": "nvkr-nvke-node-image-ubuntu24-arm64-fetch-0391c5f798e8",
             "target": "nvke-node-image-ubuntu24-arm64"
           },
           {
             "node": "nvke-node-image-ubuntu24-arm64/fetch-source-6d108226c242e99f9110382b2e43567b6195d044e8d68211b3da4548e661b082",
             "producer": "fetch-source-6d108226c242e99f9110382b2e43567b6195d044e8d68211b3da4548e661b082",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@3ac0f4daf970.sh"
             ],
@@ -7355,7 +7615,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/fetch-source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
             "producer": "fetch-source-0025a555b67ac2c99cd43261a336fb59229c3d4b2cee2f77f558ea65d36cdcdb",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
             ],
@@ -7365,7 +7625,7 @@
           {
             "node": "nvke-node-image-ubuntu24-arm64/fetch-source-30caf73dc37371b95a0ca1cfae338290c6f63286bce05e9951613389aba761fc",
             "producer": "fetch-source-30caf73dc37371b95a0ca1cfae338290c6f63286bce05e9951613389aba761fc",
-            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
+            "record": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/nvke/vendor@a8b9849732c8.sh"
             ],
@@ -9149,8 +9409,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/catalog-node-images@d1f960385276.json",
-        "sha256": "sha256:d1f9603852761c78a38a4280ecec61bcf5b33a4c341edd45fe2abc3eed833fb6"
+        "file": "plan/catalog-node-images@066d259871a2.json",
+        "sha256": "sha256:066d259871a2bfe8c0cbf9d16d986114b2078016bb4b791526d19c1bb8c8690f"
       },
       {
         "bundles": [
@@ -9158,8 +9418,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/catalog-node-images@e71c0a37ae36.json",
-        "sha256": "sha256:e71c0a37ae366c863f2adbe60d8fd4639b54f0c09344a57e2fa4a721e15afb21"
+        "file": "plan/catalog-node-images@9de634f5a462.json",
+        "sha256": "sha256:9de634f5a4629ebc0d21f142021b307d98302c17028127bc894f7d91d5cc1d44"
       }
     ],
     "plan/catalog-nvke": [
@@ -9184,6 +9444,17 @@
         "sha256": "sha256:ad8da4320a7333ac4a0d1cb6b9002f19fd919ca1526aaf210ee3daf97da6f217"
       }
     ],
+    "plan/catalog-nvkr-vm-runtime": [
+      {
+        "bundles": [
+          "nvkr-dev",
+          "nvkr-run-nvke",
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "plan/catalog-nvkr-vm-runtime@bc420070c794.json",
+        "sha256": "sha256:bc420070c794bf90d17e2a8fd278c6c337e64c2e711d913ad85ead71e1d3a91c"
+      }
+    ],
     "plan/catalog-tools": [
       {
         "bundles": [
@@ -9200,8 +9471,8 @@
         "bundles": [
           "nvkr-dev"
         ],
-        "file": "plan/composition-nvke-gpu-site@657b11c3ba7b.json",
-        "sha256": "sha256:657b11c3ba7bb6787dfbd5194f6fc2c801d9e26cbedca7da77ff6f9d25d84f80"
+        "file": "plan/composition-nvke-gpu-site@12d7c67a5ed3.json",
+        "sha256": "sha256:12d7c67a5ed39c22cac60511284cf7a568b87364a133fd5c20d45af4f67bccad"
       }
     ],
     "plan/composition-nvke-gpu-site-release": [
@@ -9210,8 +9481,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/composition-nvke-gpu-site-release@166e086ba75e.json",
-        "sha256": "sha256:166e086ba75e2a044307e50a214789b53b7d5f56c7b9860f8cdd8c520b8401fa"
+        "file": "plan/composition-nvke-gpu-site-release@117b210395c8.json",
+        "sha256": "sha256:117b210395c894402de8747d9306d046479dba075f8cf9eb190e0902f0b46707"
       }
     ],
     "plan/definition-nvke-gpu-site": [
@@ -9219,8 +9490,8 @@
         "bundles": [
           "nvkr-dev"
         ],
-        "file": "plan/definition-nvke-gpu-site@b3a77aa2c9f8.json",
-        "sha256": "sha256:b3a77aa2c9f8bb1c8db27e43f1233d54978cae98b08e1c92e975718daf440cf8"
+        "file": "plan/definition-nvke-gpu-site@b6ca0f4c8cb6.json",
+        "sha256": "sha256:b6ca0f4c8cb6b0c674c1bfd27780ef7fa55ce9a4282aa672011fe106516b2a96"
       }
     ],
     "plan/definition-nvke-gpu-site-release": [
@@ -9229,8 +9500,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/definition-nvke-gpu-site-release@c1f9d69a5b64.json",
-        "sha256": "sha256:c1f9d69a5b64fc7a1ac4af23ca20a6e576b378da752ce657b714c3adb04bc27a"
+        "file": "plan/definition-nvke-gpu-site-release@e873d80066ff.json",
+        "sha256": "sha256:e873d80066ffb9e76cf15521cf5640a96770acc415103ff87a15c454fd675106"
       }
     ],
     "plan/environment-nvke-github": [
@@ -9238,8 +9509,8 @@
         "bundles": [
           "nvkr-run-nvke"
         ],
-        "file": "plan/environment-nvke-github@05bbd75616a5.json",
-        "sha256": "sha256:05bbd75616a5bebc9d293b7c97001b6cee0e466daa7388a4afffb4ddd254cfc3"
+        "file": "plan/environment-nvke-github@f6f96af77c4b.json",
+        "sha256": "sha256:f6f96af77c4ba22e7c498545bc7b442188c9b3573a47b2ee3e41999c7a94e90e"
       }
     ],
     "plan/environment-nvke-github-dev": [
@@ -9247,8 +9518,8 @@
         "bundles": [
           "nvkr-dev"
         ],
-        "file": "plan/environment-nvke-github-dev@ba7cef0162c0.json",
-        "sha256": "sha256:ba7cef0162c0130e91cd733a2d2cca3bc9acd1e73eeca09a1463ac0c31843c04"
+        "file": "plan/environment-nvke-github-dev@2cc31fe1d5f2.json",
+        "sha256": "sha256:2cc31fe1d5f25b2c31de20cbdbb9d7112102aed0a5ce48d55d13025d7c4a7a52"
       }
     ],
     "plan/environment-nvke-nightly-github": [
@@ -9256,8 +9527,8 @@
         "bundles": [
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/environment-nvke-nightly-github@9f17df7ab4af.json",
-        "sha256": "sha256:9f17df7ab4afd780500c779d624f9ab30d2f538c1a7bc8db12544c61d831cf37"
+        "file": "plan/environment-nvke-nightly-github@830863bd20c7.json",
+        "sha256": "sha256:830863bd20c78432740c08b3de73fca621ae3aa6972acd9b916f0ff2e59c556f"
       }
     ],
     "plan/graph-nvke-gpu-site": [
@@ -9265,24 +9536,24 @@
         "bundles": [
           "nvkr-dev"
         ],
-        "file": "plan/graph-nvke-gpu-site@0d269eb7654d.json",
-        "sha256": "sha256:0d269eb7654df2a4b805e5ad0a8a95f6102ddd55268b67926ea3784665a03c3c"
+        "file": "plan/graph-nvke-gpu-site@8ed3ddca71ba.json",
+        "sha256": "sha256:8ed3ddca71ba2d095bea469a999815796edbecf89f42fe12d55fa1cd6aabd8c7"
       }
     ],
     "plan/graph-nvke-gpu-site-release": [
       {
         "bundles": [
-          "nvkr-run-nvke"
+          "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/graph-nvke-gpu-site-release@265a67324475.json",
-        "sha256": "sha256:265a673244751e003d17e59ea287c31162756641d07b8f4e7b98cdd8cc409d4c"
+        "file": "plan/graph-nvke-gpu-site-release@2c8a5453a67e.json",
+        "sha256": "sha256:2c8a5453a67e860c483b28b73a4ed84138c9abd63244e02ac6c6af87715808ff"
       },
       {
         "bundles": [
-          "nvkr-run-nvke-nightly"
+          "nvkr-run-nvke"
         ],
-        "file": "plan/graph-nvke-gpu-site-release@8d953733a97e.json",
-        "sha256": "sha256:8d953733a97efd2b4188a5080e42b68793d8cf737c11bc6e42a74e688f07cfc2"
+        "file": "plan/graph-nvke-gpu-site-release@a3493cee7b02.json",
+        "sha256": "sha256:a3493cee7b0277a55df6bb95944e4ab77e50a951286826a1d6c7f86fbc7b155a"
       }
     ],
     "plan/outputs-nvke-gpu-site": [
@@ -9290,24 +9561,44 @@
         "bundles": [
           "nvkr-dev"
         ],
-        "file": "plan/outputs-nvke-gpu-site@e05bc404d447.json",
-        "sha256": "sha256:e05bc404d44719ae851077590e8e59d107269f294b58fb7796ce94d0e6fe18dc"
+        "file": "plan/outputs-nvke-gpu-site@183653f42a03.json",
+        "sha256": "sha256:183653f42a03c4752f4008c2a6c3839c6ad0912419ef668195a3d8fcff8c40c5"
       }
     ],
     "plan/outputs-nvke-gpu-site-release": [
       {
         "bundles": [
-          "nvkr-run-nvke-nightly"
+          "nvkr-run-nvke"
         ],
-        "file": "plan/outputs-nvke-gpu-site-release@9affba4a4e4b.json",
-        "sha256": "sha256:9affba4a4e4bd24d1a4f466e7d5ea8a958be23a8b202e2c8a840c757d9c2ad7f"
+        "file": "plan/outputs-nvke-gpu-site-release@40e1c42ea860.json",
+        "sha256": "sha256:40e1c42ea86049c8d16819cdadb066fa39a4faae4fbea0a96ea111b7f77ccce0"
       },
       {
         "bundles": [
-          "nvkr-run-nvke"
+          "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/outputs-nvke-gpu-site-release@bb58e68a7d8a.json",
-        "sha256": "sha256:bb58e68a7d8a5409c33c35652b0cc005aaa0c9c45cd89d4e8d6ad1a13bc106d0"
+        "file": "plan/outputs-nvke-gpu-site-release@60477d31cce3.json",
+        "sha256": "sha256:60477d31cce33c00e3889222f35faeeab9695ac6e88d35846d6fa48829e121f9"
+      }
+    ],
+    "plan/package-inputs": [
+      {
+        "bundles": [
+          "nvkr-dev",
+          "nvkr-run-nvke",
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "plan/package-inputs@da4fd4ac5466.json",
+        "sha256": "sha256:da4fd4ac5466ff170aa2be3d8f9179c4229d57d9cdf3969d300dfdc21514af1c"
+      },
+      {
+        "bundles": [
+          "nvkr-dev",
+          "nvkr-run-nvke",
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "plan/package-inputs@ef146ff3b9ee.json",
+        "sha256": "sha256:ef146ff3b9ee532d67f1c2e6e474d07bdb2f28532838f4870b330b1325e529ad"
       }
     ],
     "plan/routes-nvke-gpu-site": [
@@ -9352,6 +9643,25 @@
         ],
         "file": "plan/targets-nvke-gpu-site-release@9dd766654878.json",
         "sha256": "sha256:9dd766654878a1641a7bcc9c42e286d92ea6ea2ba9c8a746ddbba85fe79ba87f"
+      }
+    ],
+    "plan/tools-nvke-gpu-site": [
+      {
+        "bundles": [
+          "nvkr-dev"
+        ],
+        "file": "plan/tools-nvke-gpu-site@ae214e4e22df.json",
+        "sha256": "sha256:ae214e4e22df174dd676443a2034d3a37ded8496cd3153469df4665db3c9c915"
+      }
+    ],
+    "plan/tools-nvke-gpu-site-release": [
+      {
+        "bundles": [
+          "nvkr-run-nvke",
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "plan/tools-nvke-gpu-site-release@ae214e4e22df.json",
+        "sha256": "sha256:ae214e4e22df174dd676443a2034d3a37ded8496cd3153469df4665db3c9c915"
       }
     ],
     "scripts/aicr-gb300-generic-training-argocd-helm/build": [
@@ -10730,6 +11040,50 @@
         "sha256": "sha256:52b0768091167b9b4765bfc9771d4483f2aa411bedb2f1e63bafa0ebbec64b31"
       }
     ],
+    "steps/internal/nvke-node-fde-amd64-runtime/linux-amd64": [
+      {
+        "bundles": [
+          "nvkr-dev",
+          "nvkr-run-nvke",
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "steps/internal/nvke-node-fde-amd64-runtime/linux-amd64@ccee6b6defc5.json",
+        "sha256": "sha256:ccee6b6defc520045dd52c703425cb301e22c3431f598d71c8806ffa0db4ebd1"
+      }
+    ],
+    "steps/internal/nvke-node-fde-ubuntu24-amd64-runtime/linux-amd64": [
+      {
+        "bundles": [
+          "nvkr-dev",
+          "nvkr-run-nvke",
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "steps/internal/nvke-node-fde-ubuntu24-amd64-runtime/linux-amd64@146ed0f7e7a8.json",
+        "sha256": "sha256:146ed0f7e7a8b48485c664ce91be41e03b24c318d9a5395d3f819fb2c5eb2b8a"
+      }
+    ],
+    "steps/internal/nvke-node-image-amd64-runtime/linux-amd64": [
+      {
+        "bundles": [
+          "nvkr-dev",
+          "nvkr-run-nvke",
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "steps/internal/nvke-node-image-amd64-runtime/linux-amd64@db3b033f1d9b.json",
+        "sha256": "sha256:db3b033f1d9b826b4a4d4afe22cf9e440c722f56faa548e5ff0054b07c24b654"
+      }
+    ],
+    "steps/internal/nvke-node-image-ubuntu24-amd64-runtime/linux-amd64": [
+      {
+        "bundles": [
+          "nvkr-dev",
+          "nvkr-run-nvke",
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "steps/internal/nvke-node-image-ubuntu24-amd64-runtime/linux-amd64@e832a6ecfcda.json",
+        "sha256": "sha256:e832a6ecfcdaf56704a635db7bb61180a26d1c955736cfe4c533dc062c2a18f5"
+      }
+    ],
     "steps/local-path-helper-image-arm64/linux-arm64": [
       {
         "bundles": [
@@ -11012,8 +11366,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
-        "sha256": "sha256:6a9cb3ad988e63c0536a59e80aa43b54e1f03de00b35b8c6c9006cd96ceed2b2"
+        "file": "steps/nvke-node-fde-amd64/linux-amd64@53b8859dad32.json",
+        "sha256": "sha256:53b8859dad32731d4429b986f6a2299b563728ede80f9bf48c96d3eecaa9c5a4"
       }
     ],
     "steps/nvke-node-fde-arm64/linux-arm64": [
@@ -11023,8 +11377,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
-        "sha256": "sha256:fb5bea0d4db1c4ba1caebbd7cac1de35412c1a50ec18f99732f8f85d2ec8175f"
+        "file": "steps/nvke-node-fde-arm64/linux-arm64@95f803f67bf6.json",
+        "sha256": "sha256:95f803f67bf6df04e9949eadf5e3affc64bb674387e9cb0a76026866b2db623c"
       }
     ],
     "steps/nvke-node-fde-ubuntu24-amd64/linux-amd64": [
@@ -11034,8 +11388,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@833848f8cf30.json",
-        "sha256": "sha256:833848f8cf303460d77cd13427d6525a11d420f023b503fd9aff9ad6bd814eaf"
+        "file": "steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@93faa02610bb.json",
+        "sha256": "sha256:93faa02610bb59c0a607d732c5c37767ab8c130cad4cf913bc663f92fe383edd"
       }
     ],
     "steps/nvke-node-fde-ubuntu24-arm64/linux-arm64": [
@@ -11045,8 +11399,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@713d27e22e12.json",
-        "sha256": "sha256:713d27e22e1240b991955a2a4dd66a60bb8bc0c7f5ab8dc2ecea8e08f53f5b83"
+        "file": "steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@d34a546f4e13.json",
+        "sha256": "sha256:d34a546f4e13a2f63e681a33d5925cb9ffb9650652a00389d07cf3b19a834bf4"
       }
     ],
     "steps/nvke-node-image-amd64/linux-amd64": [
@@ -11056,8 +11410,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
-        "sha256": "sha256:3a08511f2e5f91e506bb754ab585515f9497af877fb1fa0906528aabb8956516"
+        "file": "steps/nvke-node-image-amd64/linux-amd64@4c719bc90de4.json",
+        "sha256": "sha256:4c719bc90de4058123a1f5cf311b0c4a486014474482cbe27f97d841bdd53006"
       }
     ],
     "steps/nvke-node-image-arm64/linux-arm64": [
@@ -11067,8 +11421,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
-        "sha256": "sha256:34af8b7a0ddf132d0072a751dfc46024549314eefb6ea93a0ed1fe81f9bdd67f"
+        "file": "steps/nvke-node-image-arm64/linux-arm64@a849d9e28af1.json",
+        "sha256": "sha256:a849d9e28af15b5432e06bae1a1cf1d611fcd9a0b96c93f5c0c88fbd52cab0ef"
       }
     ],
     "steps/nvke-node-image-ubuntu24-amd64/linux-amd64": [
@@ -11078,8 +11432,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "steps/nvke-node-image-ubuntu24-amd64/linux-amd64@2e34eb37e37a.json",
-        "sha256": "sha256:2e34eb37e37a31c9c623a96427d39bc86075f91d3ab3b72a62b76b7e960ab57a"
+        "file": "steps/nvke-node-image-ubuntu24-amd64/linux-amd64@045fc251db15.json",
+        "sha256": "sha256:045fc251db15857bbf7c0a36c083b51977d2c1a3992d3190b0d150616ec994b8"
       }
     ],
     "steps/nvke-node-image-ubuntu24-arm64/linux-arm64": [
@@ -11089,8 +11443,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "steps/nvke-node-image-ubuntu24-arm64/linux-arm64@f1fbf2ffb528.json",
-        "sha256": "sha256:f1fbf2ffb528a2edef49a4c850b820f57ce31e6e830449556dcf525b438c19ac"
+        "file": "steps/nvke-node-image-ubuntu24-arm64/linux-arm64@cfc6c15c107c.json",
+        "sha256": "sha256:cfc6c15c107c4253b87aad8a7e5e7777070649e8b9c0bf61d616f86ae65049da"
       }
     ],
     "steps/nvkectl-linux-arm64/linux-arm64": [

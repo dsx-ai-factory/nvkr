@@ -4,6 +4,64 @@
     "base": "../../catalogs/nvke"
   },
   "cosignTool": "cosign-module-tags",
+  "internalTools": [
+    {
+      "catalog": {
+        "base": "../../../toolchains/nvkr-vm-runtime"
+      },
+      "components": [
+        "packer-amd64",
+        "packer-plugin-qemu-amd64",
+        "vm-runtime-amd64"
+      ],
+      "format": "oci",
+      "name": "nvke-node-fde-amd64-runtime",
+      "platform": "linux/amd64",
+      "result": "vm-runtime-amd64"
+    },
+    {
+      "catalog": {
+        "base": "../../../toolchains/nvkr-vm-runtime"
+      },
+      "components": [
+        "packer-amd64",
+        "packer-plugin-qemu-amd64",
+        "vm-runtime-amd64"
+      ],
+      "format": "oci",
+      "name": "nvke-node-fde-ubuntu24-amd64-runtime",
+      "platform": "linux/amd64",
+      "result": "vm-runtime-amd64"
+    },
+    {
+      "catalog": {
+        "base": "../../../toolchains/nvkr-vm-runtime"
+      },
+      "components": [
+        "packer-amd64",
+        "packer-plugin-qemu-amd64",
+        "vm-runtime-amd64"
+      ],
+      "format": "oci",
+      "name": "nvke-node-image-amd64-runtime",
+      "platform": "linux/amd64",
+      "result": "vm-runtime-amd64"
+    },
+    {
+      "catalog": {
+        "base": "../../../toolchains/nvkr-vm-runtime"
+      },
+      "components": [
+        "packer-amd64",
+        "packer-plugin-qemu-amd64",
+        "vm-runtime-amd64"
+      ],
+      "format": "oci",
+      "name": "nvke-node-image-ubuntu24-amd64-runtime",
+      "platform": "linux/amd64",
+      "result": "vm-runtime-amd64"
+    }
+  ],
   "kind": "Definition",
   "metadata": {
     "description": "Publish the NVKE GPU site and its package-derived inventory as one Release.",

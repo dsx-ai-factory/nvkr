@@ -138,10 +138,12 @@ Runtime pin refresh retains the existing target/script-binding and exact workflo
 shared index is rebuilt when generation publishes changed records. Navigation does not change executable identity.
 Each bundle's `plan.json` retains scalar metadata, ordered build names and references, and a `catalogSnapshots` map keyed by the existing `catalogDigest`.
 Every distinct snapshot is stored once; identical snapshots across bundles share the same object under `plan/`.
-Snapshots keep component and source configuration inline. Each step record keeps its resolved component
-configuration inline beside the unchanged target name, platform, Build Digest, component selection,
-overlays and execution graph, whose source operations carry their exact source commits. There are no
-separate component, source or resolved-component pointer records. Loading never resolves them again.
+Snapshots keep component and source configuration inline, except for ADR-18’s exact package-input
+documents shared through authenticated full-digest references. Each step record keeps its resolved component
+configuration beside the unchanged target name, platform, Build Digest, component selection, overlays and
+execution graph, whose source operations carry their exact source commits. Package inputs use the same
+shared records there. There are no separate component, source or resolved-component pointer records.
+Loading restores package-input descriptions from the captured records; it never resolves inputs again.
 Structured top-level fields, including the complete graph with its nodes and artifacts, are shared records too.
 Byte-identical graphs share one object across bundles; differing graphs retain distinct objects without changing graph or Plan identity.
 Full target names remain unchanged, including aggregate targets such as `output/linux/arm64`.

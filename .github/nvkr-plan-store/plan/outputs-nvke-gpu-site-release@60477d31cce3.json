@@ -1,7 +1,7 @@
 [
   {
     "artifactId": "package/aicr-inventory",
-    "buildDigest": "sha256:5290c5b5ef03e2d3df3f5c3e5524267c9b89801bc68ffae21c79150341239036",
+    "buildDigest": "sha256:85830e79660a0bd4e1a2a1e824378ef6bb2ba163707b4ae84002b347741bb65a",
     "components": null,
     "derived": {
       "encoding": "aicr-inventory-v1",
@@ -42,7 +42,7 @@
           "name": "temporal"
         }
       ],
-      "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/candidate/gpu-site"
+      "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site"
     },
     "kind": "bundle-oci",
     "name": "aicr-inventory"
@@ -558,7 +558,7 @@
   },
   {
     "artifactId": "artifact/nvke-node-fde-amd64/nvke-node-fde-amd64",
-    "buildDigest": "sha256:d8ae881b5c827413b56d34b0370e12e9942bac923c4cdcb0bee5e0491cea7558",
+    "buildDigest": "sha256:5d82ed4df916465e9c2f60a6d592ddd20dd81481a4f2595db8e98c49d679aaa6",
     "components": [
       "nvke-agent",
       "nvke-cni-calico",
@@ -598,7 +598,7 @@
   },
   {
     "artifactId": "artifact/nvke-node-fde-ubuntu24-amd64/nvke-node-fde-amd64",
-    "buildDigest": "sha256:b72887ec78cb1261d0d04ed1feb0d97c085e0bb952865fb63548b6c3a0db6f87",
+    "buildDigest": "sha256:043e4de5309f936466a2c7f2f05890d5b75dac3d1535d4be38b7991c4ef39ac8",
     "components": [
       "nvke-agent",
       "nvke-cni-calico",
@@ -638,7 +638,7 @@
   },
   {
     "artifactId": "artifact/nvke-node-image-amd64/nvke-node-image-amd64",
-    "buildDigest": "sha256:5ef0195d2c3ff292dc854a7e571f007fb89c35c41caa702463a5deff52a71738",
+    "buildDigest": "sha256:367ff06c98cbedcac8ecf49df6f395bf6951ad41efcf651d3516892a9b0f2f01",
     "components": [
       "nvke-agent",
       "nvke-cni-calico",
@@ -678,7 +678,7 @@
   },
   {
     "artifactId": "artifact/nvke-node-image-ubuntu24-amd64/nvke-node-image-amd64",
-    "buildDigest": "sha256:d913f8d16e1f404b2cb1f4c4545e459f6a04657ba49902b8ae60b163eec1d50e",
+    "buildDigest": "sha256:aac6364359445c61844e0e3b75cfc113d5d58c171484bad2cd6c4064d698a4c4",
     "components": [
       "nvke-agent",
       "nvke-cni-calico",

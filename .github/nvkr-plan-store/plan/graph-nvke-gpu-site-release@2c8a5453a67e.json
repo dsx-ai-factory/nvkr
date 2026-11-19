@@ -241,6 +241,126 @@
       "producer": "csi-node-driver-registrar-image/pull-csi-node-driver-registrar-image"
     },
     {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "component": "packer-amd64",
+      "id": "artifact/internal/nvke-node-fde-amd64-runtime/packer-amd64",
+      "kind": "host-package",
+      "mediaType": "application/vnd.debian.binary-package",
+      "name": "packer-amd64",
+      "path": ".nvkr/factory/internal/nvke-node-fde-amd64-runtime/fetch/packer-amd64/packer-amd64",
+      "producer": "internal/nvke-node-fde-amd64-runtime/pull-packer-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "component": "packer-plugin-qemu-amd64",
+      "id": "artifact/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64",
+      "kind": "host-package",
+      "mediaType": "application/vnd.debian.binary-package",
+      "name": "packer-plugin-qemu-amd64",
+      "path": ".nvkr/factory/internal/nvke-node-fde-amd64-runtime/fetch/packer-plugin-qemu-amd64/packer-plugin-qemu-amd64",
+      "producer": "internal/nvke-node-fde-amd64-runtime/pull-packer-plugin-qemu-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "component": "vm-runtime-amd64",
+      "id": "artifact/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64",
+      "kind": "oci-image",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "name": "vm-runtime-amd64",
+      "path": ".nvkr/factory/internal/nvke-node-fde-amd64-runtime/out/vm-runtime-amd64/nvkr-output/runtime",
+      "producer": "internal/nvke-node-fde-amd64-runtime/build-vm-runtime-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "component": "packer-amd64",
+      "id": "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64",
+      "kind": "host-package",
+      "mediaType": "application/vnd.debian.binary-package",
+      "name": "packer-amd64",
+      "path": ".nvkr/factory/internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch/packer-amd64/packer-amd64",
+      "producer": "internal/nvke-node-fde-ubuntu24-amd64-runtime/pull-packer-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "component": "packer-plugin-qemu-amd64",
+      "id": "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+      "kind": "host-package",
+      "mediaType": "application/vnd.debian.binary-package",
+      "name": "packer-plugin-qemu-amd64",
+      "path": ".nvkr/factory/internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch/packer-plugin-qemu-amd64/packer-plugin-qemu-amd64",
+      "producer": "internal/nvke-node-fde-ubuntu24-amd64-runtime/pull-packer-plugin-qemu-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "component": "vm-runtime-amd64",
+      "id": "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64",
+      "kind": "oci-image",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "name": "vm-runtime-amd64",
+      "path": ".nvkr/factory/internal/nvke-node-fde-ubuntu24-amd64-runtime/out/vm-runtime-amd64/nvkr-output/runtime",
+      "producer": "internal/nvke-node-fde-ubuntu24-amd64-runtime/build-vm-runtime-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "component": "packer-amd64",
+      "id": "artifact/internal/nvke-node-image-amd64-runtime/packer-amd64",
+      "kind": "host-package",
+      "mediaType": "application/vnd.debian.binary-package",
+      "name": "packer-amd64",
+      "path": ".nvkr/factory/internal/nvke-node-image-amd64-runtime/fetch/packer-amd64/packer-amd64",
+      "producer": "internal/nvke-node-image-amd64-runtime/pull-packer-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "component": "packer-plugin-qemu-amd64",
+      "id": "artifact/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64",
+      "kind": "host-package",
+      "mediaType": "application/vnd.debian.binary-package",
+      "name": "packer-plugin-qemu-amd64",
+      "path": ".nvkr/factory/internal/nvke-node-image-amd64-runtime/fetch/packer-plugin-qemu-amd64/packer-plugin-qemu-amd64",
+      "producer": "internal/nvke-node-image-amd64-runtime/pull-packer-plugin-qemu-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "component": "vm-runtime-amd64",
+      "id": "artifact/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64",
+      "kind": "oci-image",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "name": "vm-runtime-amd64",
+      "path": ".nvkr/factory/internal/nvke-node-image-amd64-runtime/out/vm-runtime-amd64/nvkr-output/runtime",
+      "producer": "internal/nvke-node-image-amd64-runtime/build-vm-runtime-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "component": "packer-amd64",
+      "id": "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64",
+      "kind": "host-package",
+      "mediaType": "application/vnd.debian.binary-package",
+      "name": "packer-amd64",
+      "path": ".nvkr/factory/internal/nvke-node-image-ubuntu24-amd64-runtime/fetch/packer-amd64/packer-amd64",
+      "producer": "internal/nvke-node-image-ubuntu24-amd64-runtime/pull-packer-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "component": "packer-plugin-qemu-amd64",
+      "id": "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+      "kind": "host-package",
+      "mediaType": "application/vnd.debian.binary-package",
+      "name": "packer-plugin-qemu-amd64",
+      "path": ".nvkr/factory/internal/nvke-node-image-ubuntu24-amd64-runtime/fetch/packer-plugin-qemu-amd64/packer-plugin-qemu-amd64",
+      "producer": "internal/nvke-node-image-ubuntu24-amd64-runtime/pull-packer-plugin-qemu-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "component": "vm-runtime-amd64",
+      "id": "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64",
+      "kind": "oci-image",
+      "mediaType": "application/vnd.oci.image.manifest.v1+json",
+      "name": "vm-runtime-amd64",
+      "path": ".nvkr/factory/internal/nvke-node-image-ubuntu24-amd64-runtime/out/vm-runtime-amd64/nvkr-output/runtime",
+      "producer": "internal/nvke-node-image-ubuntu24-amd64-runtime/build-vm-runtime-amd64"
+    },
+    {
       "buildTarget": "local-path-helper-image-arm64",
       "component": "local-path-helper-image",
       "id": "artifact/local-path-helper-image-arm64/local-path-helper-image",
@@ -1771,6 +1891,14 @@
       "producer": "temporal/pull-temporal-chart"
     },
     {
+      "id": "attested-controls/output-aicr-inventory",
+      "kind": "attested-evidence-metadata",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/attested-controls/output-aicr-inventory",
+      "producer": "attest-sboms/output-aicr-inventory",
+      "target": "output-aicr-inventory"
+    },
+    {
       "id": "attested-controls/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "kind": "attested-evidence-metadata",
       "name": "output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -2433,6 +2561,94 @@
       "path": ".nvkr/factory/attested-controls/output-temporal-ui-image-arm64",
       "producer": "attest-sboms/output-temporal-ui-image-arm64",
       "target": "output-temporal-ui-image-arm64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "component": "packer-amd64",
+      "id": "companion/internal/nvke-node-fde-amd64-runtime/packer-amd64/name/4c4943454e53452e747874",
+      "kind": "release-companion",
+      "mediaType": "application/octet-stream",
+      "name": "LICENSE.txt",
+      "path": ".nvkr/factory/internal/nvke-node-fde-amd64-runtime/fetch/packer-amd64/LICENSE.txt",
+      "producer": "internal/nvke-node-fde-amd64-runtime/pull-packer-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "component": "packer-plugin-qemu-amd64",
+      "id": "companion/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64/name/4c4943454e53452e747874",
+      "kind": "release-companion",
+      "mediaType": "application/octet-stream",
+      "name": "LICENSE.txt",
+      "path": ".nvkr/factory/internal/nvke-node-fde-amd64-runtime/fetch/packer-plugin-qemu-amd64/LICENSE.txt",
+      "producer": "internal/nvke-node-fde-amd64-runtime/pull-packer-plugin-qemu-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "component": "packer-amd64",
+      "id": "companion/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64/name/4c4943454e53452e747874",
+      "kind": "release-companion",
+      "mediaType": "application/octet-stream",
+      "name": "LICENSE.txt",
+      "path": ".nvkr/factory/internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch/packer-amd64/LICENSE.txt",
+      "producer": "internal/nvke-node-fde-ubuntu24-amd64-runtime/pull-packer-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "component": "packer-plugin-qemu-amd64",
+      "id": "companion/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64/name/4c4943454e53452e747874",
+      "kind": "release-companion",
+      "mediaType": "application/octet-stream",
+      "name": "LICENSE.txt",
+      "path": ".nvkr/factory/internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch/packer-plugin-qemu-amd64/LICENSE.txt",
+      "producer": "internal/nvke-node-fde-ubuntu24-amd64-runtime/pull-packer-plugin-qemu-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "component": "packer-amd64",
+      "id": "companion/internal/nvke-node-image-amd64-runtime/packer-amd64/name/4c4943454e53452e747874",
+      "kind": "release-companion",
+      "mediaType": "application/octet-stream",
+      "name": "LICENSE.txt",
+      "path": ".nvkr/factory/internal/nvke-node-image-amd64-runtime/fetch/packer-amd64/LICENSE.txt",
+      "producer": "internal/nvke-node-image-amd64-runtime/pull-packer-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "component": "packer-plugin-qemu-amd64",
+      "id": "companion/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64/name/4c4943454e53452e747874",
+      "kind": "release-companion",
+      "mediaType": "application/octet-stream",
+      "name": "LICENSE.txt",
+      "path": ".nvkr/factory/internal/nvke-node-image-amd64-runtime/fetch/packer-plugin-qemu-amd64/LICENSE.txt",
+      "producer": "internal/nvke-node-image-amd64-runtime/pull-packer-plugin-qemu-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "component": "packer-amd64",
+      "id": "companion/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64/name/4c4943454e53452e747874",
+      "kind": "release-companion",
+      "mediaType": "application/octet-stream",
+      "name": "LICENSE.txt",
+      "path": ".nvkr/factory/internal/nvke-node-image-ubuntu24-amd64-runtime/fetch/packer-amd64/LICENSE.txt",
+      "producer": "internal/nvke-node-image-ubuntu24-amd64-runtime/pull-packer-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "component": "packer-plugin-qemu-amd64",
+      "id": "companion/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64/name/4c4943454e53452e747874",
+      "kind": "release-companion",
+      "mediaType": "application/octet-stream",
+      "name": "LICENSE.txt",
+      "path": ".nvkr/factory/internal/nvke-node-image-ubuntu24-amd64-runtime/fetch/packer-plugin-qemu-amd64/LICENSE.txt",
+      "producer": "internal/nvke-node-image-ubuntu24-amd64-runtime/pull-packer-plugin-qemu-amd64"
+    },
+    {
+      "id": "metadata/output-aicr-inventory",
+      "kind": "publication-metadata",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/metadata/output-aicr-inventory",
+      "producer": "verify-publication/output-aicr-inventory",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "metadata/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -3299,6 +3515,38 @@
       "producer": "csi-node-driver-registrar-image-arm64/terminal-observe"
     },
     {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "id": "observation/internal/nvke-node-fde-amd64-runtime",
+      "kind": "unqualified-terminal-observation",
+      "name": "internal/nvke-node-fde-amd64-runtime-terminal-observation",
+      "path": ".nvkr/factory/internal/nvke-node-fde-amd64-runtime/terminal-observation.json",
+      "producer": "internal/nvke-node-fde-amd64-runtime/terminal-observe"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "id": "observation/internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "kind": "unqualified-terminal-observation",
+      "name": "internal/nvke-node-fde-ubuntu24-amd64-runtime-terminal-observation",
+      "path": ".nvkr/factory/internal/nvke-node-fde-ubuntu24-amd64-runtime/terminal-observation.json",
+      "producer": "internal/nvke-node-fde-ubuntu24-amd64-runtime/terminal-observe"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "id": "observation/internal/nvke-node-image-amd64-runtime",
+      "kind": "unqualified-terminal-observation",
+      "name": "internal/nvke-node-image-amd64-runtime-terminal-observation",
+      "path": ".nvkr/factory/internal/nvke-node-image-amd64-runtime/terminal-observation.json",
+      "producer": "internal/nvke-node-image-amd64-runtime/terminal-observe"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "id": "observation/internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "kind": "unqualified-terminal-observation",
+      "name": "internal/nvke-node-image-ubuntu24-amd64-runtime-terminal-observation",
+      "path": ".nvkr/factory/internal/nvke-node-image-ubuntu24-amd64-runtime/terminal-observation.json",
+      "producer": "internal/nvke-node-image-ubuntu24-amd64-runtime/terminal-observe"
+    },
+    {
       "buildTarget": "local-path-helper-image",
       "id": "observation/local-path-helper-image",
       "kind": "unqualified-terminal-observation",
@@ -3803,6 +4051,14 @@
       "producer": "temporal-ui-image-arm64/terminal-observe"
     },
     {
+      "id": "package/aicr-inventory",
+      "kind": "bundle-oci",
+      "mediaType": "application/vnd.nvkr.bundle.v1",
+      "name": "aicr-inventory",
+      "path": ".nvkr/factory/packages/aicr-inventory",
+      "producer": "package/aicr-inventory"
+    },
+    {
       "id": "package/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "kind": "bundle-oci",
       "mediaType": "application/vnd.nvkr.bundle.v1",
@@ -4281,6 +4537,14 @@
       "name": "postgresql-image-arm64",
       "path": ".nvkr/factory/packages/postgresql-image-arm64",
       "producer": "package/postgresql-image-arm64"
+    },
+    {
+      "id": "package/publication-aicr-inventory",
+      "kind": "oci-root",
+      "mediaType": "application/vnd.nvkr.publication-root.v4",
+      "name": "publication-aicr-inventory",
+      "path": ".nvkr/factory/prepared/output-aicr-inventory",
+      "producer": "package/publication-aicr-inventory"
     },
     {
       "id": "package/publication-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -5139,6 +5403,15 @@
       "producer": "package/temporal-ui-image-arm64"
     },
     {
+      "id": "predicate/output-aicr-inventory",
+      "kind": "provenance-predicate",
+      "mediaType": "application/vnd.in-toto.provenance.v1+json",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/predicates/output-aicr-inventory.json",
+      "producer": "sign/output-aicr-inventory",
+      "target": "output-aicr-inventory"
+    },
+    {
       "id": "predicate/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "kind": "provenance-predicate",
       "mediaType": "application/vnd.in-toto.provenance.v1+json",
@@ -5895,6 +6168,14 @@
       "target": "release"
     },
     {
+      "id": "prepared-controls/output-aicr-inventory",
+      "kind": "prepared-evidence-metadata",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/prepared-controls/output-aicr-inventory",
+      "producer": "package/publication-aicr-inventory",
+      "target": "output-aicr-inventory"
+    },
+    {
       "id": "prepared-controls/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "kind": "prepared-evidence-metadata",
       "name": "output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -6557,6 +6838,14 @@
       "path": ".nvkr/factory/prepared-controls/output-temporal-ui-image-arm64",
       "producer": "package/publication-temporal-ui-image-arm64",
       "target": "output-temporal-ui-image-arm64"
+    },
+    {
+      "id": "publication/output-aicr-inventory",
+      "kind": "published-reference",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/publications/output-aicr-inventory.txt",
+      "producer": "publish/output-aicr-inventory",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -7445,6 +7734,114 @@
       "name": "csi-node-driver-registrar-image-result",
       "path": ".nvkr/factory/csi-node-driver-registrar-image/results/pull-csi-node-driver-registrar-image.json",
       "producer": "csi-node-driver-registrar-image/pull-csi-node-driver-registrar-image"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "component": "packer-amd64",
+      "id": "result/internal/nvke-node-fde-amd64-runtime/packer-amd64",
+      "kind": "producer-result",
+      "name": "packer-amd64-result",
+      "path": ".nvkr/factory/internal/nvke-node-fde-amd64-runtime/results/pull-packer-amd64.json",
+      "producer": "internal/nvke-node-fde-amd64-runtime/pull-packer-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "component": "packer-plugin-qemu-amd64",
+      "id": "result/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64",
+      "kind": "producer-result",
+      "name": "packer-plugin-qemu-amd64-result",
+      "path": ".nvkr/factory/internal/nvke-node-fde-amd64-runtime/results/pull-packer-plugin-qemu-amd64.json",
+      "producer": "internal/nvke-node-fde-amd64-runtime/pull-packer-plugin-qemu-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "component": "vm-runtime-amd64",
+      "id": "result/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64",
+      "kind": "producer-result",
+      "name": "vm-runtime-amd64-result",
+      "path": ".nvkr/factory/internal/nvke-node-fde-amd64-runtime/results/build-vm-runtime-amd64.json",
+      "producer": "internal/nvke-node-fde-amd64-runtime/build-vm-runtime-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "component": "packer-amd64",
+      "id": "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64",
+      "kind": "producer-result",
+      "name": "packer-amd64-result",
+      "path": ".nvkr/factory/internal/nvke-node-fde-ubuntu24-amd64-runtime/results/pull-packer-amd64.json",
+      "producer": "internal/nvke-node-fde-ubuntu24-amd64-runtime/pull-packer-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "component": "packer-plugin-qemu-amd64",
+      "id": "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+      "kind": "producer-result",
+      "name": "packer-plugin-qemu-amd64-result",
+      "path": ".nvkr/factory/internal/nvke-node-fde-ubuntu24-amd64-runtime/results/pull-packer-plugin-qemu-amd64.json",
+      "producer": "internal/nvke-node-fde-ubuntu24-amd64-runtime/pull-packer-plugin-qemu-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "component": "vm-runtime-amd64",
+      "id": "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64",
+      "kind": "producer-result",
+      "name": "vm-runtime-amd64-result",
+      "path": ".nvkr/factory/internal/nvke-node-fde-ubuntu24-amd64-runtime/results/build-vm-runtime-amd64.json",
+      "producer": "internal/nvke-node-fde-ubuntu24-amd64-runtime/build-vm-runtime-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "component": "packer-amd64",
+      "id": "result/internal/nvke-node-image-amd64-runtime/packer-amd64",
+      "kind": "producer-result",
+      "name": "packer-amd64-result",
+      "path": ".nvkr/factory/internal/nvke-node-image-amd64-runtime/results/pull-packer-amd64.json",
+      "producer": "internal/nvke-node-image-amd64-runtime/pull-packer-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "component": "packer-plugin-qemu-amd64",
+      "id": "result/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64",
+      "kind": "producer-result",
+      "name": "packer-plugin-qemu-amd64-result",
+      "path": ".nvkr/factory/internal/nvke-node-image-amd64-runtime/results/pull-packer-plugin-qemu-amd64.json",
+      "producer": "internal/nvke-node-image-amd64-runtime/pull-packer-plugin-qemu-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "component": "vm-runtime-amd64",
+      "id": "result/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64",
+      "kind": "producer-result",
+      "name": "vm-runtime-amd64-result",
+      "path": ".nvkr/factory/internal/nvke-node-image-amd64-runtime/results/build-vm-runtime-amd64.json",
+      "producer": "internal/nvke-node-image-amd64-runtime/build-vm-runtime-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "component": "packer-amd64",
+      "id": "result/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64",
+      "kind": "producer-result",
+      "name": "packer-amd64-result",
+      "path": ".nvkr/factory/internal/nvke-node-image-ubuntu24-amd64-runtime/results/pull-packer-amd64.json",
+      "producer": "internal/nvke-node-image-ubuntu24-amd64-runtime/pull-packer-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "component": "packer-plugin-qemu-amd64",
+      "id": "result/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+      "kind": "producer-result",
+      "name": "packer-plugin-qemu-amd64-result",
+      "path": ".nvkr/factory/internal/nvke-node-image-ubuntu24-amd64-runtime/results/pull-packer-plugin-qemu-amd64.json",
+      "producer": "internal/nvke-node-image-ubuntu24-amd64-runtime/pull-packer-plugin-qemu-amd64"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "component": "vm-runtime-amd64",
+      "id": "result/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64",
+      "kind": "producer-result",
+      "name": "vm-runtime-amd64-result",
+      "path": ".nvkr/factory/internal/nvke-node-image-ubuntu24-amd64-runtime/results/build-vm-runtime-amd64.json",
+      "producer": "internal/nvke-node-image-ubuntu24-amd64-runtime/build-vm-runtime-amd64"
     },
     {
       "buildTarget": "local-path-helper-image-arm64",
@@ -9040,6 +9437,42 @@
       "producer": "csi-node-driver-registrar-image-arm64/sbom"
     },
     {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "id": "sbom/internal/nvke-node-fde-amd64-runtime",
+      "kind": "sbom-set",
+      "mediaType": "application/vnd.nvkr.sbom-set.v1+json",
+      "name": "internal/nvke-node-fde-amd64-runtime-sbom",
+      "path": ".nvkr/factory/internal/nvke-node-fde-amd64-runtime/sbom",
+      "producer": "internal/nvke-node-fde-amd64-runtime/sbom"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "id": "sbom/internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "kind": "sbom-set",
+      "mediaType": "application/vnd.nvkr.sbom-set.v1+json",
+      "name": "internal/nvke-node-fde-ubuntu24-amd64-runtime-sbom",
+      "path": ".nvkr/factory/internal/nvke-node-fde-ubuntu24-amd64-runtime/sbom",
+      "producer": "internal/nvke-node-fde-ubuntu24-amd64-runtime/sbom"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "id": "sbom/internal/nvke-node-image-amd64-runtime",
+      "kind": "sbom-set",
+      "mediaType": "application/vnd.nvkr.sbom-set.v1+json",
+      "name": "internal/nvke-node-image-amd64-runtime-sbom",
+      "path": ".nvkr/factory/internal/nvke-node-image-amd64-runtime/sbom",
+      "producer": "internal/nvke-node-image-amd64-runtime/sbom"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "id": "sbom/internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "kind": "sbom-set",
+      "mediaType": "application/vnd.nvkr.sbom-set.v1+json",
+      "name": "internal/nvke-node-image-ubuntu24-amd64-runtime-sbom",
+      "path": ".nvkr/factory/internal/nvke-node-image-ubuntu24-amd64-runtime/sbom",
+      "producer": "internal/nvke-node-image-ubuntu24-amd64-runtime/sbom"
+    },
+    {
       "buildTarget": "local-path-helper-image",
       "id": "sbom/local-path-helper-image",
       "kind": "sbom-set",
@@ -9605,6 +10038,15 @@
       "name": "temporal-ui-image-arm64-sbom",
       "path": ".nvkr/factory/temporal-ui-image-arm64/sbom",
       "producer": "temporal-ui-image-arm64/sbom"
+    },
+    {
+      "id": "signature/output-aicr-inventory",
+      "kind": "signing-record",
+      "mediaType": "application/vnd.nvkr.signing-record.v1+json",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/signatures/output-aicr-inventory.json",
+      "producer": "sign/output-aicr-inventory",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "signature/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -10363,6 +10805,14 @@
       "target": "release"
     },
     {
+      "id": "signing-metadata/output-aicr-inventory",
+      "kind": "publication-signing-metadata",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/signing-metadata/output-aicr-inventory",
+      "producer": "publish/output-aicr-inventory",
+      "target": "output-aicr-inventory"
+    },
+    {
       "id": "signing-metadata/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "kind": "publication-signing-metadata",
       "name": "output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -11107,6 +11557,38 @@
       "producer": "controller-profiles/linux/arm64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd"
     },
     {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "id": "source-receipt/internal/nvke-node-fde-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "kind": "source-receipt",
+      "name": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5-receipt",
+      "path": ".nvkr/factory/internal/nvke-node-fde-amd64-runtime/source-receipts/source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5-7708235f8668.json",
+      "producer": "internal/nvke-node-fde-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "id": "source-receipt/internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "kind": "source-receipt",
+      "name": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5-receipt",
+      "path": ".nvkr/factory/internal/nvke-node-fde-ubuntu24-amd64-runtime/source-receipts/source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5-7708235f8668.json",
+      "producer": "internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "id": "source-receipt/internal/nvke-node-image-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "kind": "source-receipt",
+      "name": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5-receipt",
+      "path": ".nvkr/factory/internal/nvke-node-image-amd64-runtime/source-receipts/source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5-7708235f8668.json",
+      "producer": "internal/nvke-node-image-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "id": "source-receipt/internal/nvke-node-image-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "kind": "source-receipt",
+      "name": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5-receipt",
+      "path": ".nvkr/factory/internal/nvke-node-image-ubuntu24-amd64-runtime/source-receipts/source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5-7708235f8668.json",
+      "producer": "internal/nvke-node-image-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+    },
+    {
       "buildTarget": "local-path-provisioner-arm64",
       "id": "source-receipt/local-path-provisioner-arm64/fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
       "kind": "source-receipt",
@@ -11177,6 +11659,14 @@
       "name": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32-receipt",
       "path": ".nvkr/factory/nvke-node-fde-amd64/source-receipts/source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32-e5a4261382f5.json",
       "producer": "nvke-node-fde-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32"
+    },
+    {
+      "buildTarget": "nvke-node-fde-amd64",
+      "id": "source-receipt/nvke-node-fde-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "kind": "source-receipt",
+      "name": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2-receipt",
+      "path": ".nvkr/factory/nvke-node-fde-amd64/source-receipts/source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2-8e70658ef618.json",
+      "producer": "nvke-node-fde-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
     },
     {
       "buildTarget": "nvke-node-fde-amd64",
@@ -11316,6 +11806,14 @@
     },
     {
       "buildTarget": "nvke-node-fde-ubuntu24-amd64",
+      "id": "source-receipt/nvke-node-fde-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "kind": "source-receipt",
+      "name": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2-receipt",
+      "path": ".nvkr/factory/nvke-node-fde-ubuntu24-amd64/source-receipts/source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2-8e70658ef618.json",
+      "producer": "nvke-node-fde-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
+    },
+    {
+      "buildTarget": "nvke-node-fde-ubuntu24-amd64",
       "id": "source-receipt/nvke-node-fde-ubuntu24-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
       "kind": "source-receipt",
       "name": "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327-receipt",
@@ -11452,6 +11950,14 @@
     },
     {
       "buildTarget": "nvke-node-image-amd64",
+      "id": "source-receipt/nvke-node-image-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "kind": "source-receipt",
+      "name": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2-receipt",
+      "path": ".nvkr/factory/nvke-node-image-amd64/source-receipts/source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2-8e70658ef618.json",
+      "producer": "nvke-node-image-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
+    },
+    {
+      "buildTarget": "nvke-node-image-amd64",
       "id": "source-receipt/nvke-node-image-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
       "kind": "source-receipt",
       "name": "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327-receipt",
@@ -11585,6 +12091,14 @@
       "name": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32-receipt",
       "path": ".nvkr/factory/nvke-node-image-ubuntu24-amd64/source-receipts/source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32-e5a4261382f5.json",
       "producer": "nvke-node-image-ubuntu24-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32"
+    },
+    {
+      "buildTarget": "nvke-node-image-ubuntu24-amd64",
+      "id": "source-receipt/nvke-node-image-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "kind": "source-receipt",
+      "name": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2-receipt",
+      "path": ".nvkr/factory/nvke-node-image-ubuntu24-amd64/source-receipts/source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2-8e70658ef618.json",
+      "producer": "nvke-node-image-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
     },
     {
       "buildTarget": "nvke-node-image-ubuntu24-amd64",
@@ -11787,6 +12301,38 @@
       "producer": "controller-profiles/linux/arm64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd"
     },
     {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "id": "source/internal/nvke-node-fde-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "kind": "source-closure",
+      "name": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "path": ".nvkr/factory/internal/nvke-node-fde-amd64-runtime/src/source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "producer": "internal/nvke-node-fde-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "id": "source/internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "kind": "source-closure",
+      "name": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "path": ".nvkr/factory/internal/nvke-node-fde-ubuntu24-amd64-runtime/src/source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "producer": "internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "id": "source/internal/nvke-node-image-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "kind": "source-closure",
+      "name": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "path": ".nvkr/factory/internal/nvke-node-image-amd64-runtime/src/source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "producer": "internal/nvke-node-image-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "id": "source/internal/nvke-node-image-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "kind": "source-closure",
+      "name": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "path": ".nvkr/factory/internal/nvke-node-image-ubuntu24-amd64-runtime/src/source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "producer": "internal/nvke-node-image-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+    },
+    {
       "buildTarget": "local-path-provisioner-arm64",
       "id": "source/local-path-provisioner-arm64/fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
       "kind": "source-closure",
@@ -11857,6 +12403,14 @@
       "name": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
       "path": ".nvkr/factory/nvke-node-fde-amd64/src/source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
       "producer": "nvke-node-fde-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32"
+    },
+    {
+      "buildTarget": "nvke-node-fde-amd64",
+      "id": "source/nvke-node-fde-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "kind": "source-closure",
+      "name": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "path": ".nvkr/factory/nvke-node-fde-amd64/src/source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "producer": "nvke-node-fde-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
     },
     {
       "buildTarget": "nvke-node-fde-amd64",
@@ -11996,6 +12550,14 @@
     },
     {
       "buildTarget": "nvke-node-fde-ubuntu24-amd64",
+      "id": "source/nvke-node-fde-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "kind": "source-closure",
+      "name": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "path": ".nvkr/factory/nvke-node-fde-ubuntu24-amd64/src/source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "producer": "nvke-node-fde-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
+    },
+    {
+      "buildTarget": "nvke-node-fde-ubuntu24-amd64",
       "id": "source/nvke-node-fde-ubuntu24-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
       "kind": "source-closure",
       "name": "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
@@ -12132,6 +12694,14 @@
     },
     {
       "buildTarget": "nvke-node-image-amd64",
+      "id": "source/nvke-node-image-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "kind": "source-closure",
+      "name": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "path": ".nvkr/factory/nvke-node-image-amd64/src/source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "producer": "nvke-node-image-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
+    },
+    {
+      "buildTarget": "nvke-node-image-amd64",
       "id": "source/nvke-node-image-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
       "kind": "source-closure",
       "name": "fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
@@ -12265,6 +12835,14 @@
       "name": "fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
       "path": ".nvkr/factory/nvke-node-image-ubuntu24-amd64/src/source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
       "producer": "nvke-node-image-ubuntu24-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32"
+    },
+    {
+      "buildTarget": "nvke-node-image-ubuntu24-amd64",
+      "id": "source/nvke-node-image-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "kind": "source-closure",
+      "name": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "path": ".nvkr/factory/nvke-node-image-ubuntu24-amd64/src/source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "producer": "nvke-node-image-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
     },
     {
       "buildTarget": "nvke-node-image-ubuntu24-amd64",
@@ -12409,6 +12987,15 @@
       "name": "syft-module-tags/linux/arm64",
       "path": ".nvkr/factory/tools/syft-module-tags/linux/arm64/syft",
       "producer": "tool/syft-module-tags/linux/arm64"
+    },
+    {
+      "id": "verification/output-aicr-inventory",
+      "kind": "verification-record",
+      "mediaType": "application/vnd.nvkr.verification-record.v1+json",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/verifications/output-aicr-inventory.json",
+      "producer": "verify-publication/output-aicr-inventory",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "verification/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -13341,6 +13928,20 @@
       ],
       "platform": "linux/arm64",
       "runsOn": "ubuntu-latest"
+    },
+    {
+      "id": "attest-sboms/output-aicr-inventory",
+      "inputs": [
+        "prepared-controls/output-aicr-inventory",
+        "tool/cosign-module-tags"
+      ],
+      "kind": "attest-sboms",
+      "network": "default",
+      "outputs": [
+        "attested-controls/output-aicr-inventory"
+      ],
+      "runsOn": "ubuntu-latest",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "attest-sboms/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -15527,6 +16128,378 @@
       "runsOn": "ubuntu-latest"
     },
     {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "id": "internal/nvke-node-fde-amd64-runtime/build-vm-runtime-amd64",
+      "inputs": [
+        "artifact/internal/nvke-node-fde-amd64-runtime/packer-amd64",
+        "artifact/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-fde-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64",
+        "source-receipt/internal/nvke-node-fde-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+        "source/internal/nvke-node-fde-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+      ],
+      "irNode": "build-vm-runtime-amd64",
+      "kind": "build",
+      "outputs": [
+        "artifact/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64",
+        "result/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "id": "internal/nvke-node-fde-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "irNode": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "kind": "fetch",
+      "outputs": [
+        "source-receipt/internal/nvke-node-fde-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+        "source/internal/nvke-node-fde-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "id": "internal/nvke-node-fde-amd64-runtime/pull-packer-amd64",
+      "irNode": "pull-packer-amd64",
+      "kind": "acquire",
+      "outputs": [
+        "artifact/internal/nvke-node-fde-amd64-runtime/packer-amd64",
+        "companion/internal/nvke-node-fde-amd64-runtime/packer-amd64/name/4c4943454e53452e747874",
+        "result/internal/nvke-node-fde-amd64-runtime/packer-amd64"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "id": "internal/nvke-node-fde-amd64-runtime/pull-packer-plugin-qemu-amd64",
+      "irNode": "pull-packer-plugin-qemu-amd64",
+      "kind": "acquire",
+      "outputs": [
+        "artifact/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64",
+        "companion/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64/name/4c4943454e53452e747874",
+        "result/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "id": "internal/nvke-node-fde-amd64-runtime/sbom",
+      "inputs": [
+        "artifact/internal/nvke-node-fde-amd64-runtime/packer-amd64",
+        "artifact/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64",
+        "artifact/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64",
+        "observation/internal/nvke-node-fde-amd64-runtime",
+        "result/internal/nvke-node-fde-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64"
+      ],
+      "kind": "sbom",
+      "network": "none",
+      "outputs": [
+        "sbom/internal/nvke-node-fde-amd64-runtime"
+      ],
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest",
+      "runtimeEvidence": "nvke-node-fde-amd64-runtime"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-amd64-runtime",
+      "id": "internal/nvke-node-fde-amd64-runtime/terminal-observe",
+      "inputs": [
+        "artifact/internal/nvke-node-fde-amd64-runtime/packer-amd64",
+        "artifact/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64",
+        "artifact/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64",
+        "companion/internal/nvke-node-fde-amd64-runtime/packer-amd64/name/4c4943454e53452e747874",
+        "companion/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64/name/4c4943454e53452e747874",
+        "result/internal/nvke-node-fde-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64"
+      ],
+      "kind": "terminal-observe",
+      "network": "none",
+      "outputs": [
+        "observation/internal/nvke-node-fde-amd64-runtime"
+      ],
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest",
+      "runtimeEvidence": "nvke-node-fde-amd64-runtime"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "id": "internal/nvke-node-fde-ubuntu24-amd64-runtime/build-vm-runtime-amd64",
+      "inputs": [
+        "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64",
+        "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "source-receipt/internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+        "source/internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+      ],
+      "irNode": "build-vm-runtime-amd64",
+      "kind": "build",
+      "outputs": [
+        "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "id": "internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "irNode": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "kind": "fetch",
+      "outputs": [
+        "source-receipt/internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+        "source/internal/nvke-node-fde-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "id": "internal/nvke-node-fde-ubuntu24-amd64-runtime/pull-packer-amd64",
+      "irNode": "pull-packer-amd64",
+      "kind": "acquire",
+      "outputs": [
+        "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64",
+        "companion/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64/name/4c4943454e53452e747874",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "id": "internal/nvke-node-fde-ubuntu24-amd64-runtime/pull-packer-plugin-qemu-amd64",
+      "irNode": "pull-packer-plugin-qemu-amd64",
+      "kind": "acquire",
+      "outputs": [
+        "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "companion/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64/name/4c4943454e53452e747874",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "id": "internal/nvke-node-fde-ubuntu24-amd64-runtime/sbom",
+      "inputs": [
+        "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64",
+        "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64",
+        "observation/internal/nvke-node-fde-ubuntu24-amd64-runtime",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64"
+      ],
+      "kind": "sbom",
+      "network": "none",
+      "outputs": [
+        "sbom/internal/nvke-node-fde-ubuntu24-amd64-runtime"
+      ],
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest",
+      "runtimeEvidence": "nvke-node-fde-ubuntu24-amd64-runtime"
+    },
+    {
+      "buildTarget": "internal/nvke-node-fde-ubuntu24-amd64-runtime",
+      "id": "internal/nvke-node-fde-ubuntu24-amd64-runtime/terminal-observe",
+      "inputs": [
+        "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64",
+        "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64",
+        "companion/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64/name/4c4943454e53452e747874",
+        "companion/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64/name/4c4943454e53452e747874",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64"
+      ],
+      "kind": "terminal-observe",
+      "network": "none",
+      "outputs": [
+        "observation/internal/nvke-node-fde-ubuntu24-amd64-runtime"
+      ],
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest",
+      "runtimeEvidence": "nvke-node-fde-ubuntu24-amd64-runtime"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "id": "internal/nvke-node-image-amd64-runtime/build-vm-runtime-amd64",
+      "inputs": [
+        "artifact/internal/nvke-node-image-amd64-runtime/packer-amd64",
+        "artifact/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-image-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64",
+        "source-receipt/internal/nvke-node-image-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+        "source/internal/nvke-node-image-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+      ],
+      "irNode": "build-vm-runtime-amd64",
+      "kind": "build",
+      "outputs": [
+        "artifact/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64",
+        "result/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "id": "internal/nvke-node-image-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "irNode": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "kind": "fetch",
+      "outputs": [
+        "source-receipt/internal/nvke-node-image-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+        "source/internal/nvke-node-image-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "id": "internal/nvke-node-image-amd64-runtime/pull-packer-amd64",
+      "irNode": "pull-packer-amd64",
+      "kind": "acquire",
+      "outputs": [
+        "artifact/internal/nvke-node-image-amd64-runtime/packer-amd64",
+        "companion/internal/nvke-node-image-amd64-runtime/packer-amd64/name/4c4943454e53452e747874",
+        "result/internal/nvke-node-image-amd64-runtime/packer-amd64"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "id": "internal/nvke-node-image-amd64-runtime/pull-packer-plugin-qemu-amd64",
+      "irNode": "pull-packer-plugin-qemu-amd64",
+      "kind": "acquire",
+      "outputs": [
+        "artifact/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64",
+        "companion/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64/name/4c4943454e53452e747874",
+        "result/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "id": "internal/nvke-node-image-amd64-runtime/sbom",
+      "inputs": [
+        "artifact/internal/nvke-node-image-amd64-runtime/packer-amd64",
+        "artifact/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64",
+        "artifact/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64",
+        "observation/internal/nvke-node-image-amd64-runtime",
+        "result/internal/nvke-node-image-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64"
+      ],
+      "kind": "sbom",
+      "network": "none",
+      "outputs": [
+        "sbom/internal/nvke-node-image-amd64-runtime"
+      ],
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest",
+      "runtimeEvidence": "nvke-node-image-amd64-runtime"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-amd64-runtime",
+      "id": "internal/nvke-node-image-amd64-runtime/terminal-observe",
+      "inputs": [
+        "artifact/internal/nvke-node-image-amd64-runtime/packer-amd64",
+        "artifact/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64",
+        "artifact/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64",
+        "companion/internal/nvke-node-image-amd64-runtime/packer-amd64/name/4c4943454e53452e747874",
+        "companion/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64/name/4c4943454e53452e747874",
+        "result/internal/nvke-node-image-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64"
+      ],
+      "kind": "terminal-observe",
+      "network": "none",
+      "outputs": [
+        "observation/internal/nvke-node-image-amd64-runtime"
+      ],
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest",
+      "runtimeEvidence": "nvke-node-image-amd64-runtime"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "id": "internal/nvke-node-image-ubuntu24-amd64-runtime/build-vm-runtime-amd64",
+      "inputs": [
+        "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64",
+        "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "source-receipt/internal/nvke-node-image-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+        "source/internal/nvke-node-image-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+      ],
+      "irNode": "build-vm-runtime-amd64",
+      "kind": "build",
+      "outputs": [
+        "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "id": "internal/nvke-node-image-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "irNode": "fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+      "kind": "fetch",
+      "outputs": [
+        "source-receipt/internal/nvke-node-image-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5",
+        "source/internal/nvke-node-image-ubuntu24-amd64-runtime/fetch-source-07aa99e97fcca7c8ee2b5d011998836862b83e05c0969096c91e05b72aaeb7f5"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "id": "internal/nvke-node-image-ubuntu24-amd64-runtime/pull-packer-amd64",
+      "irNode": "pull-packer-amd64",
+      "kind": "acquire",
+      "outputs": [
+        "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64",
+        "companion/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64/name/4c4943454e53452e747874",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "id": "internal/nvke-node-image-ubuntu24-amd64-runtime/pull-packer-plugin-qemu-amd64",
+      "irNode": "pull-packer-plugin-qemu-amd64",
+      "kind": "acquire",
+      "outputs": [
+        "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "companion/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64/name/4c4943454e53452e747874",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64"
+      ]
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "id": "internal/nvke-node-image-ubuntu24-amd64-runtime/sbom",
+      "inputs": [
+        "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64",
+        "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64",
+        "observation/internal/nvke-node-image-ubuntu24-amd64-runtime",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64"
+      ],
+      "kind": "sbom",
+      "network": "none",
+      "outputs": [
+        "sbom/internal/nvke-node-image-ubuntu24-amd64-runtime"
+      ],
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest",
+      "runtimeEvidence": "nvke-node-image-ubuntu24-amd64-runtime"
+    },
+    {
+      "buildTarget": "internal/nvke-node-image-ubuntu24-amd64-runtime",
+      "id": "internal/nvke-node-image-ubuntu24-amd64-runtime/terminal-observe",
+      "inputs": [
+        "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64",
+        "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64",
+        "companion/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64/name/4c4943454e53452e747874",
+        "companion/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64/name/4c4943454e53452e747874",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64"
+      ],
+      "kind": "terminal-observe",
+      "network": "none",
+      "outputs": [
+        "observation/internal/nvke-node-image-ubuntu24-amd64-runtime"
+      ],
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest",
+      "runtimeEvidence": "nvke-node-image-ubuntu24-amd64-runtime"
+    },
+    {
       "buildTarget": "local-path-helper-image-arm64",
       "id": "local-path-helper-image-arm64/pull-local-path-helper-image",
       "irNode": "pull-local-path-helper-image",
@@ -16800,12 +17773,19 @@
       "buildTarget": "nvke-node-fde-amd64",
       "id": "nvke-node-fde-amd64/build-nvke-node-fde-amd64",
       "inputs": [
+        "artifact/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64",
         "artifact/nvke-node-fde-amd64/nvke-image-inputs",
         "artifact/nvke-node-fde-amd64/nvke-patched-installer-iso-amd64",
+        "observation/internal/nvke-node-fde-amd64-runtime",
+        "result/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64",
         "result/nvke-node-fde-amd64/nvke-image-inputs",
         "result/nvke-node-fde-amd64/nvke-patched-installer-iso-amd64",
-        "source-receipt/nvke-node-fde-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
-        "source/nvke-node-fde-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327"
+        "sbom/internal/nvke-node-fde-amd64-runtime",
+        "source-receipt/nvke-node-fde-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+        "source/nvke-node-fde-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
+      ],
+      "internalTools": [
+        "nvke-node-fde-amd64-runtime"
       ],
       "irNode": "build-nvke-node-fde-amd64",
       "kind": "build",
@@ -16910,6 +17890,16 @@
       "outputs": [
         "source-receipt/nvke-node-fde-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
         "source/nvke-node-fde-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32"
+      ]
+    },
+    {
+      "buildTarget": "nvke-node-fde-amd64",
+      "id": "nvke-node-fde-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "irNode": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "kind": "fetch",
+      "outputs": [
+        "source-receipt/nvke-node-fde-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+        "source/nvke-node-fde-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
       ]
     },
     {
@@ -17486,12 +18476,19 @@
       "buildTarget": "nvke-node-fde-ubuntu24-amd64",
       "id": "nvke-node-fde-ubuntu24-amd64/build-nvke-node-fde-amd64",
       "inputs": [
+        "artifact/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64",
         "artifact/nvke-node-fde-ubuntu24-amd64/nvke-image-inputs",
         "artifact/nvke-node-fde-ubuntu24-amd64/nvke-patched-installer-iso-amd64",
+        "observation/internal/nvke-node-fde-ubuntu24-amd64-runtime",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64",
         "result/nvke-node-fde-ubuntu24-amd64/nvke-image-inputs",
         "result/nvke-node-fde-ubuntu24-amd64/nvke-patched-installer-iso-amd64",
-        "source-receipt/nvke-node-fde-ubuntu24-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
-        "source/nvke-node-fde-ubuntu24-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327"
+        "sbom/internal/nvke-node-fde-ubuntu24-amd64-runtime",
+        "source-receipt/nvke-node-fde-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+        "source/nvke-node-fde-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
+      ],
+      "internalTools": [
+        "nvke-node-fde-ubuntu24-amd64-runtime"
       ],
       "irNode": "build-nvke-node-fde-amd64",
       "kind": "build",
@@ -17606,6 +18603,16 @@
       "outputs": [
         "source-receipt/nvke-node-fde-ubuntu24-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
         "source/nvke-node-fde-ubuntu24-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32"
+      ]
+    },
+    {
+      "buildTarget": "nvke-node-fde-ubuntu24-amd64",
+      "id": "nvke-node-fde-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "irNode": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "kind": "fetch",
+      "outputs": [
+        "source-receipt/nvke-node-fde-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+        "source/nvke-node-fde-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
       ]
     },
     {
@@ -18192,12 +19199,19 @@
       "buildTarget": "nvke-node-image-amd64",
       "id": "nvke-node-image-amd64/build-nvke-node-image-amd64",
       "inputs": [
+        "artifact/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64",
         "artifact/nvke-node-image-amd64/nvke-image-inputs",
         "artifact/nvke-node-image-amd64/nvke-patched-installer-iso-amd64",
+        "observation/internal/nvke-node-image-amd64-runtime",
+        "result/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64",
         "result/nvke-node-image-amd64/nvke-image-inputs",
         "result/nvke-node-image-amd64/nvke-patched-installer-iso-amd64",
-        "source-receipt/nvke-node-image-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
-        "source/nvke-node-image-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327"
+        "sbom/internal/nvke-node-image-amd64-runtime",
+        "source-receipt/nvke-node-image-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+        "source/nvke-node-image-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
+      ],
+      "internalTools": [
+        "nvke-node-image-amd64-runtime"
       ],
       "irNode": "build-nvke-node-image-amd64",
       "kind": "build",
@@ -18302,6 +19316,16 @@
       "outputs": [
         "source-receipt/nvke-node-image-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
         "source/nvke-node-image-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32"
+      ]
+    },
+    {
+      "buildTarget": "nvke-node-image-amd64",
+      "id": "nvke-node-image-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "irNode": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "kind": "fetch",
+      "outputs": [
+        "source-receipt/nvke-node-image-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+        "source/nvke-node-image-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
       ]
     },
     {
@@ -18878,12 +19902,19 @@
       "buildTarget": "nvke-node-image-ubuntu24-amd64",
       "id": "nvke-node-image-ubuntu24-amd64/build-nvke-node-image-amd64",
       "inputs": [
+        "artifact/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64",
         "artifact/nvke-node-image-ubuntu24-amd64/nvke-image-inputs",
         "artifact/nvke-node-image-ubuntu24-amd64/nvke-patched-installer-iso-amd64",
+        "observation/internal/nvke-node-image-ubuntu24-amd64-runtime",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64",
         "result/nvke-node-image-ubuntu24-amd64/nvke-image-inputs",
         "result/nvke-node-image-ubuntu24-amd64/nvke-patched-installer-iso-amd64",
-        "source-receipt/nvke-node-image-ubuntu24-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327",
-        "source/nvke-node-image-ubuntu24-amd64/fetch-source-87e85dfed4125f69317f46996e30e0305241c1c79c670544b1e3f4024cb20327"
+        "sbom/internal/nvke-node-image-ubuntu24-amd64-runtime",
+        "source-receipt/nvke-node-image-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+        "source/nvke-node-image-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
+      ],
+      "internalTools": [
+        "nvke-node-image-ubuntu24-amd64-runtime"
       ],
       "irNode": "build-nvke-node-image-amd64",
       "kind": "build",
@@ -18998,6 +20029,16 @@
       "outputs": [
         "source-receipt/nvke-node-image-ubuntu24-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32",
         "source/nvke-node-image-ubuntu24-amd64/fetch-source-48059193cba8be36acd98782b295989423f79781ff7ea61abcee3cad8c2e0a32"
+      ]
+    },
+    {
+      "buildTarget": "nvke-node-image-ubuntu24-amd64",
+      "id": "nvke-node-image-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "irNode": "fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+      "kind": "fetch",
+      "outputs": [
+        "source-receipt/nvke-node-image-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2",
+        "source/nvke-node-image-ubuntu24-amd64/fetch-source-6c99ff81aa62967ad70d5ab1f90ad902773d8f7dae98995e100bb6608cba86a2"
       ]
     },
     {
@@ -19709,6 +20750,86 @@
       "outputs": [
         "observation/operator-tools"
       ],
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "derived": {
+        "encoding": "aicr-inventory-v1",
+        "inputs": [
+          {
+            "buildDigest": "sha256:456d2d4697a8e36468e66fc7b16fb356f675b0deb617d7f86e1d6ac6f255af3b",
+            "kind": "helm-oci",
+            "name": "controller-chart"
+          },
+          {
+            "buildDigest": "sha256:13f79b9767087322fbc44ac5cb60892e68eeb622ecbd978d41fe34e00aa57fad",
+            "kind": "helm-oci",
+            "name": "nktp"
+          },
+          {
+            "buildDigest": "sha256:6ff4ce3e7c4e361e60a2c3d31ddea52b1c8168f8b5e18d568e7c9dbd0b58efe9",
+            "kind": "oci",
+            "name": "nvke-controller"
+          },
+          {
+            "buildDigest": "sha256:52f24a801a287763679c9cec540af6751c4fea63781922b45409af5a98dee20d",
+            "kind": "helm-oci",
+            "name": "postgresql"
+          },
+          {
+            "buildDigest": "sha256:fd6fb5db96727b10307394ff1d158dfcf60fdfa0f7ea32d9a7a5bb9bf5b4dc12",
+            "kind": "helm-oci",
+            "name": "spire"
+          },
+          {
+            "buildDigest": "sha256:d73672244fa7ed51044ae2c8654eae25e0921f567ba480e3f92626361bd9948a",
+            "kind": "helm-oci",
+            "name": "spire-crds"
+          },
+          {
+            "buildDigest": "sha256:e09c78f63d4bcdbf48bb19ccbd75395aba819a3d8dbd48f88bca8364ea11f6fe",
+            "kind": "helm-oci",
+            "name": "temporal"
+          }
+        ],
+        "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site"
+      },
+      "id": "package/aicr-inventory",
+      "inputs": [
+        "artifact/controller-chart/nvke-controller-chart",
+        "artifact/nktp/nktp-chart-release",
+        "artifact/nvke-controller/linux/amd64/nvke-controller",
+        "artifact/nvke-controller/linux/arm64/nvke-controller",
+        "artifact/postgresql/postgresql-chart",
+        "artifact/spire-crds/spire-crds-chart",
+        "artifact/spire/spire-chart",
+        "artifact/temporal/temporal-chart",
+        "package/controller-chart",
+        "package/nktp",
+        "package/nvke-controller",
+        "package/postgresql",
+        "package/spire",
+        "package/spire-crds",
+        "package/temporal",
+        "result/controller-chart/nvke-controller-chart",
+        "result/nktp/nktp-chart-release",
+        "result/nvke-controller/linux/amd64/nvke-controller",
+        "result/nvke-controller/linux/arm64/nvke-controller",
+        "result/postgresql/postgresql-chart",
+        "result/spire-crds/spire-crds-chart",
+        "result/spire/spire-chart",
+        "result/temporal/temporal-chart",
+        "sbom/nvke-controller/linux/amd64",
+        "sbom/nvke-controller/linux/arm64"
+      ],
+      "kind": "package",
+      "network": "none",
+      "outputs": [
+        "package/aicr-inventory"
+      ],
+      "packageKind": "bundle-oci",
       "platform": "linux/amd64",
       "runsOn": "ubuntu-latest"
     },
@@ -21085,6 +22206,53 @@
       "runsOn": "ubuntu-latest"
     },
     {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "id": "package/publication-aicr-inventory",
+      "inputs": [
+        "artifact/controller-chart/nvke-controller-chart",
+        "artifact/nktp/nktp-chart-release",
+        "artifact/nvke-controller/linux/amd64/nvke-controller",
+        "artifact/nvke-controller/linux/arm64/nvke-controller",
+        "artifact/postgresql/postgresql-chart",
+        "artifact/spire-crds/spire-crds-chart",
+        "artifact/spire/spire-chart",
+        "artifact/temporal/temporal-chart",
+        "package/aicr-inventory",
+        "package/controller-chart",
+        "package/nktp",
+        "package/nvke-controller",
+        "package/postgresql",
+        "package/spire",
+        "package/spire-crds",
+        "package/temporal",
+        "result/controller-chart/nvke-controller-chart",
+        "result/nktp/nktp-chart-release",
+        "result/nvke-controller/linux/amd64/nvke-controller",
+        "result/nvke-controller/linux/arm64/nvke-controller",
+        "result/postgresql/postgresql-chart",
+        "result/spire-crds/spire-crds-chart",
+        "result/spire/spire-chart",
+        "result/temporal/temporal-chart",
+        "sbom/controller-chart",
+        "sbom/nktp",
+        "sbom/nvke-controller/linux/amd64",
+        "sbom/nvke-controller/linux/arm64",
+        "sbom/postgresql",
+        "sbom/spire",
+        "sbom/spire-crds",
+        "sbom/temporal"
+      ],
+      "kind": "package",
+      "network": "none",
+      "outputs": [
+        "package/publication-aicr-inventory",
+        "prepared-controls/output-aicr-inventory"
+      ],
+      "packageKind": "oci-root",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    {
       "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
       "id": "package/publication-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "inputs": [
@@ -21991,6 +23159,9 @@
         "artifact/nvke-node-fde-amd64/ovn-kubernetes-chart",
         "artifact/nvke-node-fde-amd64/ubuntu-installer-iso-amd64",
         "package/nvke-node-fde-amd64",
+        "result/internal/nvke-node-fde-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-fde-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-fde-amd64-runtime/vm-runtime-amd64",
         "result/nvke-node-fde-amd64/nvke-agent",
         "result/nvke-node-fde-amd64/nvke-cni-calico",
         "result/nvke-node-fde-amd64/nvke-cni-ovn",
@@ -22003,6 +23174,7 @@
         "result/nvke-node-fde-amd64/ovn-kube-ubuntu",
         "result/nvke-node-fde-amd64/ovn-kubernetes-chart",
         "result/nvke-node-fde-amd64/ubuntu-installer-iso-amd64",
+        "sbom/internal/nvke-node-fde-amd64-runtime",
         "sbom/nvke-node-fde-amd64"
       ],
       "kind": "package",
@@ -22073,6 +23245,9 @@
         "artifact/nvke-node-fde-ubuntu24-amd64/ovn-kubernetes-chart",
         "artifact/nvke-node-fde-ubuntu24-amd64/ubuntu-installer-iso-amd64",
         "package/nvke-node-fde-ubuntu24-amd64",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-fde-ubuntu24-amd64-runtime/vm-runtime-amd64",
         "result/nvke-node-fde-ubuntu24-amd64/nvke-agent",
         "result/nvke-node-fde-ubuntu24-amd64/nvke-cni-calico",
         "result/nvke-node-fde-ubuntu24-amd64/nvke-cni-ovn",
@@ -22085,6 +23260,7 @@
         "result/nvke-node-fde-ubuntu24-amd64/ovn-kube-ubuntu",
         "result/nvke-node-fde-ubuntu24-amd64/ovn-kubernetes-chart",
         "result/nvke-node-fde-ubuntu24-amd64/ubuntu-installer-iso-amd64",
+        "sbom/internal/nvke-node-fde-ubuntu24-amd64-runtime",
         "sbom/nvke-node-fde-ubuntu24-amd64"
       ],
       "kind": "package",
@@ -22155,6 +23331,9 @@
         "artifact/nvke-node-image-amd64/ovn-kubernetes-chart",
         "artifact/nvke-node-image-amd64/ubuntu-installer-iso-amd64",
         "package/nvke-node-image-amd64",
+        "result/internal/nvke-node-image-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-image-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-image-amd64-runtime/vm-runtime-amd64",
         "result/nvke-node-image-amd64/nvke-agent",
         "result/nvke-node-image-amd64/nvke-cni-calico",
         "result/nvke-node-image-amd64/nvke-cni-ovn",
@@ -22167,6 +23346,7 @@
         "result/nvke-node-image-amd64/ovn-kube-ubuntu",
         "result/nvke-node-image-amd64/ovn-kubernetes-chart",
         "result/nvke-node-image-amd64/ubuntu-installer-iso-amd64",
+        "sbom/internal/nvke-node-image-amd64-runtime",
         "sbom/nvke-node-image-amd64"
       ],
       "kind": "package",
@@ -22237,6 +23417,9 @@
         "artifact/nvke-node-image-ubuntu24-amd64/ovn-kubernetes-chart",
         "artifact/nvke-node-image-ubuntu24-amd64/ubuntu-installer-iso-amd64",
         "package/nvke-node-image-ubuntu24-amd64",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-amd64",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/packer-plugin-qemu-amd64",
+        "result/internal/nvke-node-image-ubuntu24-amd64-runtime/vm-runtime-amd64",
         "result/nvke-node-image-ubuntu24-amd64/nvke-agent",
         "result/nvke-node-image-ubuntu24-amd64/nvke-cni-calico",
         "result/nvke-node-image-ubuntu24-amd64/nvke-cni-ovn",
@@ -22249,6 +23432,7 @@
         "result/nvke-node-image-ubuntu24-amd64/ovn-kube-ubuntu",
         "result/nvke-node-image-ubuntu24-amd64/ovn-kubernetes-chart",
         "result/nvke-node-image-ubuntu24-amd64/ubuntu-installer-iso-amd64",
+        "sbom/internal/nvke-node-image-ubuntu24-amd64-runtime",
         "sbom/nvke-node-image-ubuntu24-amd64"
       ],
       "kind": "package",
@@ -22879,6 +24063,7 @@
     {
       "id": "package/release",
       "inputs": [
+        "metadata/output-aicr-inventory",
         "metadata/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
         "metadata/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
         "metadata/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
@@ -22962,6 +24147,7 @@
         "metadata/output-temporal-server-image-arm64",
         "metadata/output-temporal-ui-image",
         "metadata/output-temporal-ui-image-arm64",
+        "predicate/output-aicr-inventory",
         "predicate/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
         "predicate/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
         "predicate/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
@@ -23045,6 +24231,7 @@
         "predicate/output-temporal-server-image-arm64",
         "predicate/output-temporal-ui-image",
         "predicate/output-temporal-ui-image-arm64",
+        "publication/output-aicr-inventory",
         "publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
         "publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
         "publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
@@ -23128,6 +24315,7 @@
         "publication/output-temporal-server-image-arm64",
         "publication/output-temporal-ui-image",
         "publication/output-temporal-ui-image-arm64",
+        "signature/output-aicr-inventory",
         "signature/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
         "signature/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
         "signature/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
@@ -23212,6 +24400,7 @@
         "signature/output-temporal-ui-image",
         "signature/output-temporal-ui-image-arm64",
         "tool/cosign-module-tags",
+        "verification/output-aicr-inventory",
         "verification/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
         "verification/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
         "verification/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
@@ -23827,6 +25016,22 @@
       ],
       "platform": "linux/amd64",
       "runsOn": "ubuntu-latest"
+    },
+    {
+      "id": "publish/output-aicr-inventory",
+      "inputs": [
+        "attested-controls/output-aicr-inventory",
+        "package/publication-aicr-inventory",
+        "tool/cosign-module-tags"
+      ],
+      "kind": "publish",
+      "network": "default",
+      "outputs": [
+        "publication/output-aicr-inventory",
+        "signing-metadata/output-aicr-inventory"
+      ],
+      "runsOn": "ubuntu-latest",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "publish/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -25168,6 +26373,22 @@
       ],
       "runsOn": "ubuntu-latest",
       "target": "release"
+    },
+    {
+      "id": "sign/output-aicr-inventory",
+      "inputs": [
+        "publication/output-aicr-inventory",
+        "signing-metadata/output-aicr-inventory",
+        "tool/cosign-module-tags"
+      ],
+      "kind": "sign",
+      "network": "default",
+      "outputs": [
+        "predicate/output-aicr-inventory",
+        "signature/output-aicr-inventory"
+      ],
+      "runsOn": "ubuntu-latest",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "sign/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -27569,6 +28790,23 @@
       "runsOn": "ubuntu-latest",
       "toolFormat": "tar-gzip",
       "url": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_arm64.tar.gz"
+    },
+    {
+      "id": "verify-publication/output-aicr-inventory",
+      "inputs": [
+        "predicate/output-aicr-inventory",
+        "publication/output-aicr-inventory",
+        "signature/output-aicr-inventory",
+        "tool/cosign-module-tags"
+      ],
+      "kind": "verify-publication",
+      "network": "default",
+      "outputs": [
+        "metadata/output-aicr-inventory",
+        "verification/output-aicr-inventory"
+      ],
+      "runsOn": "ubuntu-latest",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "verify-publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
