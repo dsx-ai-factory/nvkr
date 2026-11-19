@@ -1,0 +1,1 @@
+{"attempt":"attempt","contentSubject":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","lane":"unqualified-local-execution","publication":{"disks":null,"evidence":"localhost:5000/demo@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"},"schemaVersion":"nvkr.dev/local-qualification-result/v1","status":"passed"}
