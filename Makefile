@@ -21,7 +21,7 @@ TEST_SHARD_INDEX ?=
 PIPELINE_DEV_REPO ?=
 export PIPELINE_DEV_REPO
 # Module source dirs only (never the vendored trees checked out under .nvkr/).
-GOSRC       := client cmd internal pkg
+GOSRC       := client cmd internal pkg inputs/catalogs/nvke/machineimage
 GO_VERSION  := $(shell cat .go-version 2>/dev/null)
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -180,9 +180,10 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 	NVKR_TEST_EXTENDED=1 $(MAKE) test-race
 
 .PHONY: test-ci-tools
-test-ci-tools: ## Require Python and check CI sharding, reports and local adapters.
+test-ci-tools: ## Check CI sharding, reports, local adapters and the catalog renderer (Python and Go).
 	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
 	python3 -B -m unittest discover -s scripts -p '*_test.py'
+	go -C inputs/catalogs/nvke/machineimage test ./... -count=1
 
 # Diff-scoped: only Markdown lines added since the merge base with STATUS_BASE are checked.
 # An empty STATUS_HEAD checks the working tree, including uncommitted and untracked files;

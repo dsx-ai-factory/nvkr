@@ -1,19 +1,19 @@
 # NVKE MachineImage catalog candidate
 
-`render_candidate.py` renders the maintained `machineimage.yaml.tmpl` and checks each
+This catalog-local Go program renders the maintained `machineimage.yaml.tmpl` and checks each
 result against the MachineImage CRD from the catalog's pinned NVKE controller source commit.
-This is an offline catalog experiment, not an NVKR Go capability or a registered
+This is an offline catalog experiment in a separate Go module, not an NVKR lifecycle capability or a registered
 producer. No Definition or generated workflow invokes it. Production rendering,
 signing, import and registration remain disabled/unimplemented.
 
-Use Python 3.10 or newer, Git, and the dependencies in `requirements.txt` in an
-isolated environment. For example, from this directory:
+Use Go 1.27.4 (the repository's `.go-version`) and Git. The separate `go.mod` and
+`go.sum` pin the schema validator and all transitive dependencies; the root module
+does not import this renderer. Acquire the Go modules once before working offline.
+For example, from this directory:
 
 ```sh
-candidate_venv="$(mktemp -d)/venv"
-python3 -m venv "$candidate_venv"
-"$candidate_venv/bin/python" -m pip install -r requirements.txt
-"$candidate_venv/bin/python" render_candidate.py \
+GOTOOLCHAIN=local go mod download
+GOTOOLCHAIN=local GOPROXY=off go run . \
   --nvke-source /path/to/nvke-git-repository \
   --nvke-commit 2cfd00081b468d85a4894ec17e9deac13c9d8169 \
   --publication /path/to/primary-boot-description.json \
@@ -22,7 +22,9 @@ python3 -m venv "$candidate_venv"
 
 The source can be a normal or bare Git repository containing the `nvke-controller`
 commit in the adjacent `../pins.lock.yaml` (currently NVKE v0.23.0 at `2cfd0008`).
-The script always reads that catalog pin; optional `--nvke-commit` must match it.
+The program always reads that catalog pin; optional `--nvke-commit` must match it.
+When invoking a compiled binary from another directory, set `--catalog-dir` to this
+directory, which owns the template and adjacent catalog pin file.
 It reads `management-engine/config/crd/bases/internal.nvke.nvidia.com_machineimages.yaml`
 using `git --no-replace-objects cat-file blob '<pin>^{commit}:<path>'`, which requires
 an actual commit and ignores replacement objects. It never uses a dirty working-tree
@@ -36,7 +38,7 @@ API: `selection.disks`, `selection.imagers`, `destination.name`, and `assets` co
 `binding` plus `url`. Named raw bindings supply platform, member/profile, SHA-256 and
 size. One selected imager must match each disk architecture, and all selected assets
 must be present exactly once. These descriptions cannot restore receipts and the
-script does not verify signatures, Release membership, object-store bytes or URL
+program does not verify signatures, Release membership, object-store bytes or URL
 availability. No CLI export/verification adapter is introduced here.
 
 Supply a JSON array of proposed metadata keyed by exact disk output and platform:
@@ -51,31 +53,35 @@ binding it to authenticated producer evidence remains future integration work.
 
 The candidate emits one CR per disk/platform/destination in sorted order, after the
 whole set passes validation. Names fingerprint exact pre-name YAML bytes; they are
-neither NVKR Build Digests nor Release identities. Destination/output and imager raw
-digest annotations distinguish pairs without embedding final aggregate/inventory
+neither NVKR Build Digests nor Release identities. Names differ from the previous
+Python renderer because Go serializes YAML differently; nothing consumes these candidate names.
+Destination/output and imager raw digest annotations distinguish pairs without embedding final aggregate/inventory
 identities. Inputs and errors release no partial manifest set. The template retains
 literal `{{ .DiskSelectionStrategy }}` and `${cloudinit-url}` for downstream use;
 URLs have a restricted literal HTTPS grammar to prevent script/template injection.
 
-Validation uses the served `v1` CRD's OpenAPI schema through JSON Schema Draft 4,
-including required fields, types, bounds, patterns and date formats. It does not run
-Kubernetes CEL, defaulting, pruning, admission or update-immutability checks. The
-candidate separately checks the iPXE header and balanced template delimiters. It
+Validation uses the served `v1` CRD's OpenAPI schema through `k8s.io/kube-openapi`,
+including required fields, types, length bounds, patterns and date formats. Supported
+schema features are explicitly admitted; unknown features and references fail closed.
+A guarded table maps exact CEL rule text and schema location to Go predicates for
+the iPXE header, nonempty command and balanced template delimiters. Any unknown CEL
+rule anywhere in the CRD fails closed. The known `self == oldSelf` transition rule
+does not apply when creating a candidate. This does not run a CEL interpreter or
+Kubernetes defaulting, pruning, admission or update-immutability checks. It
 does not establish an admitted imager argument/profile contract, firmware trust,
 checksum-before-write behavior or successful boot. Those require the EFI producer
 and NVKE integration work plus amd64/arm64 external evidence.
 
-Run the focused contracts against that same source without a vendored schema:
+Run the focused contracts against synthetic schemas, or opt into that same pinned
+source without a vendored CRD:
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 "$candidate_venv/bin/python" test_render_candidate.py \
-  --nvke-source /path/to/nvke-git-repository \
-  --nvke-commit 2cfd00081b468d85a4894ec17e9deac13c9d8169
+GOTOOLCHAIN=local go test ./... -count=1
+NVKE_SOURCE=/path/to/nvke-git-repository GOTOOLCHAIN=local go test ./... -count=1
 ```
 
-These standalone tests require the supplied source and Python dependencies; the
-repository's default Go suite does not run them. This directory is not referenced
-by a producer, so changing it does not change existing Plan or Build Digests.
+`make test-ci-tools`, included in `make check` and the merge gate, runs the synthetic
+contracts in this nested module. Root `go test ./...` does not traverse nested modules.
+This directory is not referenced by a producer, so changing it does not change existing Plan or Build Digests.
 
-Dependency follow-up: lock transitive Python dependencies and distribution hashes before
-producer/toolchain admission. `requirements.txt` currently pins only the direct packages.
+Producer/toolchain admission remains separate from this experiment's hash-locked dependencies.

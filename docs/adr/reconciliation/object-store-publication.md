@@ -74,13 +74,16 @@ Live Linux cosign/TUF service acceptance remains unexercised. No new signing tru
 provisioning network or retention policy is configured here.
 
 The MachineImage formatting candidate belongs to the NVKE catalog under
-`inputs/catalogs/nvke/machineimage/`, not NVKR Go. A small script and maintained template consume generic
+`inputs/catalogs/nvke/machineimage/`, outside NVKR's root Go module. A separate Go program and maintained template consume generic
 boot descriptions and proposed disk metadata, read the CRD from the catalog's locked `nvke-controller` Git commit, and
 validate all rendered documents against its served OpenAPI schema before output. No CRD is vendored.
-Standalone Python contracts exercise both architectures, complete pair ordering, schema rejection,
-selection/metadata checks, literal URLs and no partial output. They require pinned NVKE source and the
-catalog's Python dependencies; they are not part of the default Go suite. JSON Schema validation and
-script checks do not establish Kubernetes CEL/API-server admission or EFI execution.
+Go contracts exercise both architectures, complete pair ordering, schema rejection,
+selection/metadata checks, literal URLs, exact pins, offline partial-clone reads and no partial output.
+The nested-module suite runs through `make test-ci-tools` with synthetic schemas; `NVKE_SOURCE` selects
+the catalog's actual pinned CRD for the rendering contracts. kube-openapi validates the admitted schema
+subset. Exact CEL rule text and locations select guarded Go predicates; unknown rules anywhere in the
+CRD, unsupported schema features and schema panics fail closed. The known immutability rule is skipped
+for new candidates. These checks do not establish CEL-interpreter/API-server admission or EFI execution.
 No producer or workflow invokes the candidate, and no production rendering API is added. Descriptions
 remain unauthenticated; authorized metadata, declared producer/material integration, signed packaging,
 trusted import and external boot acceptance remain unimplemented. The admitted imager profile/source pin
@@ -95,7 +98,7 @@ Existing full-mirror evidence is unchanged. See the [operator boundary](../../pu
 | Owner | Outstanding scope |
 |---|---|
 | [#515](https://github.com/dsx-ai-factory/nvkr/issues/515) | Core selection, raw-member proofs, limited receipts, serving, recovery and S3-only verification are contract-tested; external acceptance remains with the owners below. |
-| [#517](https://github.com/dsx-ai-factory/nvkr/issues/517) | Catalog script/template candidate uses the CRD from pinned NVKE source; NVKR Go remains agnostic. Production integration, admitted imager profile, authority/dependency joins, signed packaging, trusted import and chainload/imaging/first-boot evidence remain. |
+| [#517](https://github.com/dsx-ai-factory/nvkr/issues/517) | Catalog Go module/template candidate uses the CRD from pinned NVKE source; NVKR's root module remains agnostic. Production integration, admitted imager profile, authority/dependency joins, signed packaging, trusted import and chainload/imaging/first-boot evidence remain. |
 | [#516](https://github.com/dsx-ai-factory/nvkr/issues/516) | Signed EFI member/platform/profile binding; separate mkosi producer lane. |
 | [#384](https://github.com/dsx-ai-factory/nvkr/issues/384) | Selective configuration, regeneration and required finalization, preserving full-mirror defaults. |
 | [#383](https://github.com/dsx-ai-factory/nvkr/issues/383) | Provider/Run selected-only inventory, original proofs, pinned-read/fault evidence and independent S3-only client access. |
