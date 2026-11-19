@@ -45,15 +45,18 @@ type PublicationOutput struct {
 }
 
 type PublicationEvidence struct {
-	Name           string             `json:"name"`
-	Kind           string             `json:"kind"`
-	Reference      string             `json:"reference"`
-	ArtifactType   string             `json:"artifactType"`
-	ManifestDigest string             `json:"manifestDigest"`
-	BlobDigest     string             `json:"blobDigest"`
-	SemanticDigest string             `json:"semanticDigest"`
-	Binding        EvidenceBinding    `json:"binding"`
-	Source         *PublicationSource `json:"source,omitempty"`
+	Name           string          `json:"name"`
+	Kind           string          `json:"kind"`
+	Reference      string          `json:"reference"`
+	ArtifactType   string          `json:"artifactType"`
+	ManifestDigest string          `json:"manifestDigest"`
+	BlobDigest     string          `json:"blobDigest"`
+	SemanticDigest string          `json:"semanticDigest"`
+	Binding        EvidenceBinding `json:"binding"`
+	// Source describes checked source-built evidence when present. In a
+	// SelectedMetadata description, omission can mean unchecked evidence;
+	// callers must not interpret it as verified absence of source.
+	Source *PublicationSource `json:"source,omitempty"`
 }
 
 // PublicationSource describes the source-built subject of exact release evidence.

@@ -1,5 +1,8 @@
 # Build and run NVKE locally
 
+The demo/site implementation is a [separate Go module](../demos/nvke/README.md).
+`make demo` still builds `bin/nvke-demo` from the repository root.
+
 ## Native Linux and Mac path
 
 The Go demo runs `nvkr`, `nvke-demo`, `nvkectl` and NICoSim on the execution
@@ -707,7 +710,7 @@ export NVKR_NVKE_E2E_REPO="$(pwd -P)"
 export NVKR_NVKE_E2E_OUT="$PWD/.nvkr/native-test-01"
 export NVKR_NVKE_E2E_ATTEMPT=native-test-01
 # Optional: NVKR_NVKE_E2E_BINARY selects the same-revision helper at another path.
-GOTOOLCHAIN=local go test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -timeout 10h
+GOTOOLCHAIN=local go -C demos/nvke test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -timeout 10h
 ```
 
 On Mac, use `NVKR_NVKE_E2E_CONFIG` with `run.accelerator: tcg` for the retained
@@ -720,7 +723,7 @@ existing `run` mapping. Then run:
 ```sh
 export NVKR_NVKE_E2E=1
 export NVKR_NVKE_E2E_CONFIG=/absolute/path/to/native-mac.yaml
-GOTOOLCHAIN=local go test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -timeout 10h
+GOTOOLCHAIN=local go -C demos/nvke test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -timeout 10h
 ```
 
 The optional selections are:
@@ -757,7 +760,7 @@ Go flow on public hosted AMD64; its exact-run evidence is recorded separately.
 
 ### Reuse a native site from Go tests
 
-Go tests in NVKE or a separate customer module can import `pkg/nvkr/demo` and call
+Go tests in NVKE or a separate customer module can import `demos/nvke/pkg/nvkr/demo` and call
 `demo.WithSite` with the same descriptive native configuration and
 completed artifact/tool Runs used by the CLI. This provisional diagnostic facade
 delegates to the existing owner; it adds no NVKR lifecycle or qualification API.
@@ -768,11 +771,16 @@ requests one control plane and two workers independently of suite selection.
 Select `Config.Conformance` before opening the site to admit the conformance
 tool outputs; it requires two workers.
 
+For local development in another Go module, replace both modules with the matching
+checkout: `github.com/dsx-ai-factory/nvkr` with the repository root and
+`github.com/dsx-ai-factory/nvkr/demos/nvke` with its `demos/nvke` directory.
+The demo module temporarily imports core packages; it is not yet a binary-only consumer.
+
 For a combined product Run and its matching native-tools Run, the explicit
 selection is:
 
 ```go
-import "github.com/dsx-ai-factory/nvkr/pkg/nvkr/demo"
+import "github.com/dsx-ai-factory/nvkr/demos/nvke/pkg/nvkr/demo"
 
 cfg := demo.Config{
     Repository: repo,
@@ -840,7 +848,7 @@ race-test coverage; a real site-reuse test remains externally unverified.
 ## Private site identity operation helper
 
 The shared site-startup tool catalog builds a Linux helper matching the selected
-guest architecture for execution in an existing admitted NVKE controller container. `pkg/nvkr/siteidentity` owns its
+guest architecture for execution in an existing admitted NVKE controller container. `demos/nvke/pkg/nvkr/siteidentity` owns its
 mTLS probe, upstream SPIRE reconfiguration and authenticated fresh-peer observation;
 the executable only adapts bounded standard input/output and coded errors.
 ARM64 guests consume `site-startup-tools-arm64`; AMD64 guests consume
