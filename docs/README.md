@@ -43,6 +43,7 @@ The task and reference indexes below retain the detailed command, schema, mainte
 | Plan an NVKE GPU site from NVKR Releases (not yet runnable end to end) | [Working Definitions and GPU system matrix](../inputs/definitions/nvke/README.md#working-definitions-for-an-nvke-gpu-site), [site install outline](release-quickstart.md#install-an-nvke-site-from-the-releases) |
 | Run the nightly NVKE build and end-to-end test | [Nightly workflow and current admission](nvke-nightly.md) |
 | Run full build/site/tenant E2E on my PR before merging | [Run E2E tests for your pull request](nvke-nightly.md#run-a-workflow-branch-before-merging) |
+| Run NVKE's Forge site-controller suite on real hardware against NVKR-built or subject-commit artifacts, or publish the node images it boots | [Forge hardware end-to-end lane](qualify-e2e.md) |
 | Check a producing Run and configure qualification once | [Artifact checks and hosted qualification](lifecycle.md#authenticate-a-qualification-candidate), [candidate readiness](../inputs/definitions/nvke/README.md#qualification-readiness) |
 | Try component replacements locally | [Runnable authoring lab](examples/authoring-lab/README.md) |
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |

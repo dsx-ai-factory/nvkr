@@ -68,9 +68,13 @@ fresh local products on a disposable GitHub-hosted AMD64 runner and invokes the
 existing native Go site/tenant workload and DNS tests. Natural tenant deletion and
 VM/backend/network cleanup must join before success. Product bytes and raw
 deployment captures stay private on that runner; no products are published or
-uploaded. The ARM64 dispatch-and-consume nightly is retired. These trusted-code
-integration results remain outside product lifecycle and v1 qualification
-acceptance (ADR-16/18).
+uploaded. The ARM64 dispatch-and-consume nightly is retired. A second,
+dispatch-only workflow runs NVKE's Forge site-controller suite on real Forge
+machines, against either NVKR-built outputs or artifacts built from the plan's
+subject commit and labelled NVKE-built; its credentials live in a protected
+environment and its run summary asserts `qualificationAuthority: "none"`. These
+trusted-code integration results remain outside product lifecycle and v1
+qualification acceptance (ADR-16/18).
 
 [ADR-24](adr/0024-imported-validator-catalog.md) separates imported-validator discovery from upstream
 test ownership and binds named artifact roles through explicit diagnostic profiles. The provisional CLI

@@ -1,0 +1,141 @@
+{
+  "subject": "nvke",
+  "version": "v0.24.0-beta.12",
+  "scope": "golden-path",
+  "commit": "c044392984cdd74149d00110cbb68adfd1075024",
+  "combinations": [
+    {
+      "id": "capi-provisioned-v0.24.0-beta.12_cli-v0.24.0-beta.12_controller-v0.24.0-beta.12_os-image-v0.24.0-beta.12",
+      "components": [
+        {
+          "name": "controller",
+          "version": "v0.24.0-beta.12",
+          "url": "oci://nvcr.io/<ngc-org>/nvke-controller:v0.24.0-beta.12",
+          "versionStrategy": "commitDescribe",
+          "locationStrategy": "ociArtifact"
+        },
+        {
+          "name": "cli",
+          "version": "v0.24.0-beta.12",
+          "versionStrategy": "commitDescribe"
+        },
+        {
+          "name": "os-image",
+          "version": "v0.24.0-beta.12",
+          "versionStrategy": "commitDescribe"
+        },
+        {
+          "name": "capi-provisioned",
+          "version": "v0.24.0-beta.12",
+          "url": "oci://nvcr.io/<ngc-org>/cluster-api-provider-provisioned:v0.24.0-beta.12",
+          "versionStrategy": "commitDescribe",
+          "locationStrategy": "ociArtifact"
+        }
+      ],
+      "dependencies": [
+        {
+          "name": "cni-ovn",
+          "version": "2.4.2",
+          "versionStrategy": "lockedPackage"
+        },
+        {
+          "name": "os-image-bootloader-amd64",
+          "url": "https://d1veq6e8nuk2fy.cloudfront.net/nke-isos/qcow/efi/x86_64/2026-06-25/1782410681/qcow-imager.efi",
+          "locationStrategy": "url"
+        },
+        {
+          "name": "os-image-bootloader-arm64",
+          "url": "https://d1veq6e8nuk2fy.cloudfront.net/nke-isos/qcow/efi/aarch64/2026-06-25/1782410719/qcow-imager.efi",
+          "locationStrategy": "url"
+        },
+        {
+          "name": "cli-amd64",
+          "version": "v0.24.0-beta.12",
+          "url": "oci://nvcr.io/<ngc-org>/nvkectl:v0.24.0-beta.12-linux-amd64",
+          "locationStrategy": "ociArtifact"
+        },
+        {
+          "name": "cli-arm64",
+          "version": "v0.24.0-beta.12",
+          "url": "oci://nvcr.io/<ngc-org>/nvkectl:v0.24.0-beta.12-linux-arm64",
+          "locationStrategy": "ociArtifact"
+        },
+        {
+          "name": "kind",
+          "version": "v0.32.0",
+          "versionStrategy": "makeVar"
+        },
+        {
+          "name": "clusterctl",
+          "version": "v1.13.6",
+          "versionStrategy": "makeVar"
+        },
+        {
+          "name": "nerdctl",
+          "version": "2.3.5",
+          "versionStrategy": "makeVar"
+        }
+      ],
+      "streams": [
+        {
+          "name": "forge-gb200-amd64-ubuntu-24.04-kube-1.36",
+          "capabilities": {
+            "arch": "amd64",
+            "gpu": "gb200",
+            "kube": "1.36",
+            "provider": "forge",
+            "ubuntu": "24.04"
+          },
+          "dependencies": [
+            {
+              "name": "kube",
+              "version": "1.36.3",
+              "versionStrategy": "lockedPackage"
+            },
+            {
+              "name": "os-image-amd64",
+              "version": "v0.24.0-beta.12",
+              "url": "https://d1veq6e8nuk2fy.cloudfront.net/nvke-packages/os-image/releases/v0.24.0-beta.12/amd64/nvke-node-non-fde-ubuntu-24.04.5-amd64.qcow2",
+              "locationStrategy": "osImage"
+            },
+            {
+              "name": "os-image-arm64",
+              "version": "v0.24.0-beta.12",
+              "url": "https://d1veq6e8nuk2fy.cloudfront.net/nvke-packages/os-image/releases/v0.24.0-beta.12/arm64/nvke-node-non-fde-ubuntu-24.04.5-arm64.qcow2",
+              "locationStrategy": "osImage"
+            }
+          ]
+        },
+        {
+          "name": "forge-gb200-arm64-ubuntu-24.04-kube-1.36",
+          "capabilities": {
+            "arch": "arm64",
+            "gpu": "gb200",
+            "kube": "1.36",
+            "provider": "forge",
+            "ubuntu": "24.04"
+          },
+          "dependencies": [
+            {
+              "name": "kube",
+              "version": "1.36.3",
+              "versionStrategy": "lockedPackage"
+            },
+            {
+              "name": "os-image-amd64",
+              "version": "v0.24.0-beta.12",
+              "url": "https://d1veq6e8nuk2fy.cloudfront.net/nvke-packages/os-image/releases/v0.24.0-beta.12/amd64/nvke-node-non-fde-ubuntu-24.04.5-amd64.qcow2",
+              "locationStrategy": "osImage"
+            },
+            {
+              "name": "os-image-arm64",
+              "version": "v0.24.0-beta.12",
+              "url": "https://d1veq6e8nuk2fy.cloudfront.net/nvke-packages/os-image/releases/v0.24.0-beta.12/arm64/nvke-node-non-fde-ubuntu-24.04.5-arm64.qcow2",
+              "locationStrategy": "osImage"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

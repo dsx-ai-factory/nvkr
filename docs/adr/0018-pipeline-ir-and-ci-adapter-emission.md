@@ -702,6 +702,52 @@ reconciliation.
 Trusted source code has sudo and Docker access on the disposable hosted VM.
 Results remain unsigned local diagnostics, outside qualified release acceptance.
 
+#### Repository NVKE Forge E2E adapter outside generated execution
+
+A second authored workflow, dispatch-only, runs NVKE's Forge site-controller suite on real Forge machines. The
+[operator guide](../qualify-e2e.md) owns commands, inputs and limits. The workflow is not generated, uses only
+generic hosted `ubuntu-24.04` runners, and has no schedule, push or producer-release trigger, so nothing takes a
+Forge machine except a person's dispatch. It signs, publishes and tags nothing, uploads nothing to TestGrid, and
+cannot gate an NVKR Release. Its run summary states `qualificationAuthority: "none"`, and the final job fails
+the run unless the summary meets that contract.
+
+The suite runs from an NVKE checkout at a pinned harness commit, against a committed copy of NVKE's `qualify plan`
+output whose bytes are checked against a provenance record before use. A required `artifact-source` input, with no
+default, selects one of two admitted sources. `nvkr-outputs` runs the controller, capi-provisioned and nvkectl images
+NVKR built, pulled by digest, with the node image NVKR built served at an HTTPS URL. The outputs manifest names,
+for each node image, how its bytes are checked before any machine is taken: fetched and hashed from the runner
+(`http-get`), or the read-back a publication run recorded (`s3-readback`), which the lane records without
+fetching and labels as not observed by its own run. A node image with no named method is refused.
+`build-subject` runs the same three built from the plan's subject commit by NVKE's own
+build, keeps the plan unmodified and labels every artifact NVKE-built. In both, the deploy path, the imager EFI and
+the site profiles are NVKE's, and the summary says so. A source that is not one of the two is refused before any
+checkout.
+
+Unlike the nightly, the Forge job holds credentials, scoped to a protected environment with required reviewers:
+the Forge API key reaches only the suite's own step, and the Teleport join uses a provision token whose allow rule
+covers this repository. A real run starts only from `refs/heads/main` and only as its first attempt, enforced by
+the plan job and by each leg. Legs run one at a time, amd64 before arm64, never fail fast and are never cancelled,
+because a cancelled leg dies before its teardown and leaks its machines.
+
+Each leg lists the specs its label filter selects with a Ginkgo dry run and requires the real run's JUnit to contain
+every one as passed, run nothing else, and use the same label filter. This is a coverage check on a report; it does
+not judge a spec or prove anything about the hardware.
+
+A third authored workflow, dispatch-only, stands in for NVKR's own boot-asset publication. It pulls one disk output
+of an NVKR release by exact digest, requires a plain qcow2 of the declared architecture, copies it in a protected
+environment that holds the object-store role to a key that contains its SHA-256, reads the object back from the
+store with credentials and hashes it, and leaves an unsigned record naming the entry an outputs manifest cites. A
+real publication starts only from `refs/heads/main`. A later attempt is allowed because the key holds the digest, so
+a different image can never replace an existing object. It signs, verifies and gates nothing, and its record states
+`qualificationAuthority: "none"`. The hardware lane does not look up the publication run a manifest cites, so the
+citation is a description.
+
+Deferred: serving boot assets through NVKR's own publication (the selective boot-asset contract in ADR-20),
+binding an NVKR-built artifact to the NVKE commit it was built from, authenticating the publication run an outputs
+manifest cites, any automatic trigger, and any use of a result to gate a Release. The node image's HTTPS host is
+operated outside NVKR; neither a fetch from a runner nor a recorded read-back shows that Forge's network or imager
+can use it. Reconciliation owns what has run.
+
 ### 4. Runner provenance and conditional self-hosting bootstrap
 
 - Qualified execution requires the exact runner bytes that execute from-source nodes to be measured and

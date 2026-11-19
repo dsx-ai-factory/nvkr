@@ -1,0 +1,685 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package cicontract
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"reflect"
+	"regexp"
+	"sort"
+	"strings"
+	"testing"
+
+	"sigs.k8s.io/yaml"
+)
+
+// These contracts read the Forge lane's workflow as text. They prove its authored
+// boundaries (what can start it, what it may hold, what it runs and what makes it
+// fail), not that GitHub accepts it or that Forge, Teleport or a registry answer;
+// docs/qualify-e2e.md states what has been exercised.
+
+const forgeE2EWorkflowFile = ".github/workflows/nvkr-nvke-forge-e2e.yml"
+
+type forgeE2EWorkflowStep struct {
+	Name             string            `json:"name"`
+	ID               string            `json:"id"`
+	If               string            `json:"if"`
+	Run              string            `json:"run"`
+	Uses             string            `json:"uses"`
+	WorkingDirectory string            `json:"working-directory"`
+	Env              map[string]string `json:"env"`
+	With             map[string]any    `json:"with"`
+}
+
+type forgeE2EWorkflowJob struct {
+	Name           string            `json:"name"`
+	If             string            `json:"if"`
+	Needs          json.RawMessage   `json:"needs"`
+	RunsOn         string            `json:"runs-on"`
+	Environment    string            `json:"environment"`
+	TimeoutMinutes any               `json:"timeout-minutes"`
+	Permissions    map[string]string `json:"permissions"`
+	Env            map[string]string `json:"env"`
+	Strategy       struct {
+		FailFast    *bool  `json:"fail-fast"`
+		MaxParallel int    `json:"max-parallel"`
+		Matrix      string `json:"matrix"`
+	} `json:"strategy"`
+	Steps []forgeE2EWorkflowStep `json:"steps"`
+}
+
+type forgeE2EWorkflowInput struct {
+	Type     string   `json:"type"`
+	Required bool     `json:"required"`
+	Default  any      `json:"default"`
+	Options  []string `json:"options"`
+}
+
+type forgeE2EWorkflowDoc struct {
+	On          map[string]json.RawMessage `json:"on"`
+	Permissions map[string]string          `json:"permissions"`
+	Concurrency struct {
+		Group            string `json:"group"`
+		CancelInProgress *bool  `json:"cancel-in-progress"`
+	} `json:"concurrency"`
+	Jobs map[string]forgeE2EWorkflowJob `json:"jobs"`
+}
+
+func forgeE2ELoadWorkflow(t *testing.T) (forgeE2EWorkflowDoc, string) {
+	t.Helper()
+	var doc forgeE2EWorkflowDoc
+	return doc, forgeE2ELoadWorkflowFile(t, forgeE2EWorkflowFile, &doc)
+}
+
+// forgeE2ELoadWorkflowFile parses one workflow into doc and returns its text.
+func forgeE2ELoadWorkflowFile(t *testing.T, file string, doc any) string {
+	t.Helper()
+	raw, err := os.ReadFile(filepath.Join(forgeE2ERoot(t), file))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := yaml.Unmarshal(raw, doc); err != nil {
+		t.Fatalf("%s does not parse: %v", file, err)
+	}
+	return string(raw)
+}
+
+func forgeE2EWorkflowInputs(t *testing.T, doc forgeE2EWorkflowDoc) map[string]forgeE2EWorkflowInput {
+	t.Helper()
+	var dispatch struct {
+		Inputs map[string]forgeE2EWorkflowInput `json:"inputs"`
+	}
+	if err := json.Unmarshal(doc.On["workflow_dispatch"], &dispatch); err != nil {
+		t.Fatalf("workflow_dispatch does not parse: %v", err)
+	}
+	return dispatch.Inputs
+}
+
+func forgeE2EWorkflowStepNamed(t *testing.T, job forgeE2EWorkflowJob, name string) (int, forgeE2EWorkflowStep) {
+	t.Helper()
+	for index, step := range job.Steps {
+		if step.Name == name {
+			return index, step
+		}
+	}
+	t.Fatalf("the job has no step named %q", name)
+	return -1, forgeE2EWorkflowStep{}
+}
+
+func forgeE2EWorkflowNeeds(t *testing.T, job forgeE2EWorkflowJob) []string {
+	t.Helper()
+	var many []string
+	if err := json.Unmarshal(job.Needs, &many); err == nil {
+		sort.Strings(many)
+		return many
+	}
+	var one string
+	if err := json.Unmarshal(job.Needs, &one); err != nil {
+		t.Fatalf("needs is neither a list nor a name: %v", err)
+	}
+	return []string{one}
+}
+
+func TestForgeE2EWorkflowIsDispatchOnlyAndNeverCancelsALeg(t *testing.T) {
+	doc, raw := forgeE2ELoadWorkflow(t)
+	if len(doc.On) != 1 || doc.On["workflow_dispatch"] == nil {
+		t.Fatalf("the lane may start only from workflow_dispatch, got triggers %v", doc.On)
+	}
+	if doc.Permissions == nil || len(doc.Permissions) != 0 {
+		t.Fatalf("the workflow must start with no permissions so each job names its own, got %v", doc.Permissions)
+	}
+	if doc.Concurrency.CancelInProgress == nil || *doc.Concurrency.CancelInProgress {
+		t.Fatal("a canceled leg dies before its teardown and leaks its machines; cancel-in-progress must be false")
+	}
+	for _, want := range []string{"github.ref", "inputs.dry-run"} {
+		if !strings.Contains(doc.Concurrency.Group, want) {
+			t.Fatalf("the concurrency group must separate refs and dry runs from real runs: missing %q in %q", want, doc.Concurrency.Group)
+		}
+	}
+	leg := doc.Jobs["forge-e2e"]
+	if leg.Strategy.FailFast == nil || *leg.Strategy.FailFast {
+		t.Fatal("a failing leg must not cancel its siblings; fail-fast must be false")
+	}
+	if leg.Strategy.MaxParallel != 1 {
+		t.Fatalf("legs share one Forge site that GitHub concurrency cannot count across repositories; max-parallel must be 1, got %d", leg.Strategy.MaxParallel)
+	}
+	if leg.Strategy.Matrix != "${{ fromJSON(needs.plan.outputs.matrix) }}" {
+		t.Fatalf("the matrix must come from the plan job's harness-derived matrix, got %q", leg.Strategy.Matrix)
+	}
+	for _, forbidden := range []string{"pull_request", "push:", "schedule:", "workflow_run", "secrets: inherit", "cancel-in-progress: true", "self-hosted", "runs-on: ${{"} {
+		if strings.Contains(raw, forbidden) {
+			t.Fatalf("the Forge workflow must not contain %q", forbidden)
+		}
+	}
+}
+
+func TestForgeE2EWorkflowInputsAreExplicit(t *testing.T) {
+	doc, raw := forgeE2ELoadWorkflow(t)
+	inputs := forgeE2EWorkflowInputs(t, doc)
+	for name, want := range map[string]forgeE2EWorkflowInput{
+		"artifact-source": {Type: "choice", Required: true, Default: nil, Options: []string{"nvkr-outputs", "build-subject"}},
+		"stage":           {Type: "choice", Default: "full", Options: []string{"provision", "bootstrap", "deployment", "full"}},
+		"harness-commit":  {Type: "string", Default: ""},
+		"outputs-manifest": {
+			Type: "string", Default: "",
+		},
+		"node-user":                     {Type: "string", Default: ""},
+		"allow-node-image-version-skew": {Type: "boolean", Default: false},
+		"verify-plan":                   {Type: "boolean", Default: false},
+		"dry-run":                       {Type: "boolean", Default: false},
+		"keep-site":                     {Type: "boolean", Default: false},
+	} {
+		got, ok := inputs[name]
+		if !ok {
+			t.Fatalf("input %q is missing", name)
+		}
+		if !reflect.DeepEqual(got, want) {
+			t.Fatalf("input %q is %+v, want %+v", name, got, want)
+		}
+	}
+	if len(inputs) != 9 {
+		t.Fatalf("the workflow takes exactly nine inputs, got %d", len(inputs))
+	}
+	// A 40-hex literal anywhere authored as a default would pin a commit outside the committed plan.
+	if regexp.MustCompile(`default:\s*['"]?[0-9a-f]{40}`).MatchString(raw) {
+		t.Fatal("no input may default to a commit; the plan fixture and its provenance own the subject commit")
+	}
+}
+
+func TestForgeE2EWorkflowJobsUseHostedRunnersAndNamedPermissions(t *testing.T) {
+	doc, _ := forgeE2ELoadWorkflow(t)
+	want := map[string]struct {
+		permissions map[string]string
+		environment string
+		needs       []string
+	}{
+		"plan":               {permissions: map[string]string{"contents": "read"}},
+		"verify-node-images": {permissions: map[string]string{"contents": "read"}, needs: []string{"plan"}},
+		"forge-e2e": {
+			permissions: map[string]string{"contents": "read", "packages": "read", "id-token": "write"},
+			environment: "nvke-forge",
+			needs:       []string{"plan", "verify-node-images"},
+		},
+		"summarize": {permissions: map[string]string{"contents": "read"}, needs: []string{"forge-e2e", "plan", "verify-node-images"}},
+	}
+	if len(doc.Jobs) != len(want) {
+		t.Fatalf("the workflow has jobs %v, want exactly %d", forgeE2EJobNames(doc), len(want))
+	}
+	for name, expected := range want {
+		job, ok := doc.Jobs[name]
+		if !ok {
+			t.Fatalf("job %q is missing", name)
+		}
+		if job.RunsOn != "ubuntu-24.04" {
+			t.Fatalf("job %s must run on the generic hosted runner, got %q", name, job.RunsOn)
+		}
+		if !reflect.DeepEqual(job.Permissions, expected.permissions) {
+			t.Fatalf("job %s permissions are %v, want %v", name, job.Permissions, expected.permissions)
+		}
+		if job.Environment != expected.environment {
+			t.Fatalf("job %s environment is %q, want %q: Forge credentials are scoped to the protected environment", name, job.Environment, expected.environment)
+		}
+		if name != "plan" && !reflect.DeepEqual(forgeE2EWorkflowNeeds(t, job), expected.needs) {
+			t.Fatalf("job %s needs %v, want %v", name, forgeE2EWorkflowNeeds(t, job), expected.needs)
+		}
+		if job.TimeoutMinutes == nil {
+			t.Fatalf("job %s needs a timeout", name)
+		}
+	}
+	if doc.Jobs["plan"].If != "github.repository == 'dsx-ai-factory/nvkr'" {
+		t.Fatalf("the plan job must run only in the upstream repository, got %q", doc.Jobs["plan"].If)
+	}
+	if got := doc.Jobs["forge-e2e"].TimeoutMinutes; got != "${{ matrix.job_timeout_minutes }}" {
+		t.Fatalf("a leg's timeout must be the harness matrix's, got %v", got)
+	}
+	// verify-node-images is skipped for build-subject, so a skipped result may be accepted only there.
+	for _, name := range []string{"forge-e2e", "summarize"} {
+		condition := doc.Jobs[name].If
+		for _, part := range []string{
+			"!cancelled()", //nolint:misspell // GitHub expression function spelling.
+			"needs.plan.result == 'success'",
+			"(inputs.artifact-source == 'build-subject' || needs.verify-node-images.result == 'success')",
+		} {
+			if !strings.Contains(condition, part) {
+				t.Fatalf("job %s condition %q lacks %q", name, condition, part)
+			}
+		}
+	}
+	if !strings.Contains(doc.Jobs["summarize"].If, "needs.forge-e2e.result == 'success'") || !strings.Contains(doc.Jobs["summarize"].If, "!inputs.dry-run") {
+		t.Fatalf("the summary job must follow a successful real run only, got %q", doc.Jobs["summarize"].If)
+	}
+	if doc.Jobs["verify-node-images"].If != "inputs.artifact-source == 'nvkr-outputs'" {
+		t.Fatalf("node image fetches belong to NVKR outputs only, got %q", doc.Jobs["verify-node-images"].If)
+	}
+}
+
+func forgeE2EJobNames(doc forgeE2EWorkflowDoc) []string {
+	names := make([]string, 0, len(doc.Jobs))
+	for name := range doc.Jobs {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+func TestForgeE2EWorkflowStepsArePinnedAndKeepNoCredentials(t *testing.T) {
+	doc, _ := forgeE2ELoadWorkflow(t)
+	pinned := regexp.MustCompile(`^[A-Za-z0-9._/-]+@[0-9a-f]{40}$`)
+	for _, name := range forgeE2EJobNames(doc) {
+		for _, step := range doc.Jobs[name].Steps {
+			label := name + "/" + step.Name
+			if step.Uses == "" {
+				continue
+			}
+			if !pinned.MatchString(step.Uses) {
+				t.Fatalf("%s: an action must be pinned by a full commit SHA, got %q", label, step.Uses)
+			}
+			switch {
+			case strings.HasPrefix(step.Uses, "actions/checkout@"):
+				if step.With["persist-credentials"] != false {
+					t.Fatalf("%s: a checkout must not keep credentials", label)
+				}
+			case strings.HasPrefix(step.Uses, "actions/setup-go@"):
+				if step.With["cache"] != false {
+					t.Fatalf("%s: setup-go must set cache: false so no cache is restored into a run that holds Forge credentials", label)
+				}
+			case strings.HasPrefix(step.Uses, "actions/upload-artifact@"):
+				if step.With["retention-days"] == nil || step.With["if-no-files-found"] == nil {
+					t.Fatalf("%s: an upload must bound its retention and say what a missing file means", label)
+				}
+			}
+		}
+	}
+}
+
+func TestForgeE2EWorkflowKeepsExpressionsOutOfScripts(t *testing.T) {
+	doc, _ := forgeE2ELoadWorkflow(t)
+	for _, name := range forgeE2EJobNames(doc) {
+		for _, step := range doc.Jobs[name].Steps {
+			if strings.Contains(step.Run, "${{") {
+				t.Fatalf("%s/%s: a script must read its values from the environment, never from an expression: %q", name, step.Name, step.Run)
+			}
+		}
+	}
+}
+
+func TestForgeE2EWorkflowHoldsCredentialsOnlyWhereTheyAreUsed(t *testing.T) {
+	doc, raw := forgeE2ELoadWorkflow(t)
+	secretRef := regexp.MustCompile(`secrets\.([A-Z0-9_]+)`)
+	allowed := map[string]bool{
+		"GITHUB_TOKEN":           true,
+		"FORGE_API_KEY":          true,
+		"FORGE_JUMP_HOST":        true,
+		"FORGE_SITE_2_JUMP_HOST": true,
+		"NGC_API_KEY":            true,
+	}
+	for _, match := range secretRef.FindAllStringSubmatch(raw, -1) {
+		if !allowed[match[1]] {
+			t.Fatalf("the workflow reads secret %q, which the lane has not admitted", match[1])
+		}
+	}
+	for name, job := range doc.Jobs {
+		if name == "forge-e2e" {
+			continue
+		}
+		serialized, err := json.Marshal(job)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(serialized), "secrets.") || strings.Contains(string(serialized), "vars.FORGE_") {
+			t.Fatalf("job %s must not hold Forge credentials or secrets; they belong to the protected-environment job", name)
+		}
+	}
+	leg := doc.Jobs["forge-e2e"]
+	// The Forge API key reaches the suite's own process and nothing else.
+	if _, ok := leg.Env["FORGE_API_KEY"]; ok {
+		t.Fatal("FORGE_API_KEY must not be job-level")
+	}
+	for _, step := range leg.Steps {
+		_, has := step.Env["FORGE_API_KEY"]
+		if has != strings.HasPrefix(step.Name, "Run the e2e suite") {
+			t.Fatalf("FORGE_API_KEY must reach only the suite's run step, found at %q", step.Name)
+		}
+	}
+	for _, name := range []string{"FORGE_JUMP_HOST", "FORGE_SITE_2_JUMP_HOST"} {
+		if leg.Env[name] != "${{ secrets."+name+" }}" {
+			t.Fatalf("%s must be a job-level secret so the log masks it, got %q", name, leg.Env[name])
+		}
+	}
+	for _, step := range leg.Steps {
+		if strings.Contains(step.Run, "secrets.") || strings.Contains(step.Run, "FORGE_API_KEY") {
+			t.Fatalf("step %q must not read a secret in its script", step.Name)
+		}
+	}
+}
+
+func TestForgeE2EWorkflowUploadsNothingThatCarriesRemoteOutput(t *testing.T) {
+	doc, _ := forgeE2ELoadWorkflow(t)
+	for _, name := range forgeE2EJobNames(doc) {
+		for _, step := range doc.Jobs[name].Steps {
+			if !strings.HasPrefix(step.Uses, "actions/upload-artifact@") {
+				continue
+			}
+			path, _ := step.With["path"].(string)
+			for _, forbidden := range []string{"report.json", "e2e-config.yaml", "identity", "tbot.yaml"} {
+				if strings.Contains(path, forbidden) {
+					t.Fatalf("%s/%s uploads %q, which carries remote command output or a credential", name, step.Name, forbidden)
+				}
+			}
+		}
+	}
+	// withhold runs after the suite whatever its outcome, before anything is uploaded.
+	leg := doc.Jobs["forge-e2e"]
+	firstUpload := len(leg.Steps)
+	for index, step := range leg.Steps {
+		if strings.HasPrefix(step.Uses, "actions/upload-artifact@") {
+			firstUpload = index
+			break
+		}
+	}
+	index, withhold := forgeE2EWorkflowStepNamed(t, leg, "Withhold credentials from the run files")
+	runIndex, _ := forgeE2EWorkflowStepNamed(t, leg, "Run the e2e suite${{ inputs.dry-run && ' (dry run)' || '' }}")
+	if withhold.If != "always()" || index <= runIndex || index >= firstUpload || withhold.Run != "nvke/release/hack/qualify-e2e.sh withhold" {
+		t.Fatal("the run files must be redacted, even after a failure, after the suite and before the first upload")
+	}
+}
+
+func TestForgeE2EWorkflowAdmitsOnlyARealRunFromMainAndItsFirstAttempt(t *testing.T) {
+	doc, _ := forgeE2ELoadWorkflow(t)
+	plan := doc.Jobs["plan"]
+	_, admit := forgeE2EWorkflowStepNamed(t, plan, "Admit the dispatch")
+	if plan.Steps[0].Name != "Admit the dispatch" {
+		t.Fatal("everything that can be refused before a checkout or a machine is refused first")
+	}
+	for _, want := range []string{
+		`nvkr-outputs | build-subject) ;;`,
+		`[ "$REF" = refs/heads/main ]`,
+		`[ "$RUN_ATTEMPT" = 1 ]`,
+		`if [ "$DRY_RUN" != true ]; then`,
+		`^inputs/qualification/[A-Za-z0-9._-]+\.json$`,
+		`[ -z "$MANIFEST" ]`,
+		`[ "$SKEW" != true ]`,
+	} {
+		if !strings.Contains(admit.Run, want) {
+			t.Fatalf("the admission step lacks %q", want)
+		}
+	}
+	if admit.Env["REF"] != "${{ github.ref }}" || admit.Env["RUN_ATTEMPT"] != "${{ github.run_attempt }}" {
+		t.Fatalf("the admission step must read the ref and attempt from the run, got %v", admit.Env)
+	}
+	// The harness refuses a real run from any other ref; the workflow refuses before the harness does.
+	_, commits := forgeE2EWorkflowStepNamed(t, plan, "Resolve the subject and harness commits")
+	for _, want := range []string{
+		`.source.commit | select(test("^[0-9a-f]{40}$"))`,
+		`[ "$SOURCE" = build-subject ] && [ "$harness" != "$subject" ]`,
+	} {
+		if !strings.Contains(commits.Run, want) {
+			t.Fatalf("the commit step lacks %q", want)
+		}
+	}
+	if plan.Env["PLAN_FIXTURE"] != "nvkr/"+forgeE2EPlanFile || plan.Env["PLAN_PROVENANCE"] != "nvkr/"+forgeE2EProvenanceFile {
+		t.Fatalf("the workflow must name the committed plan fixture and its provenance, got %q and %q", plan.Env["PLAN_FIXTURE"], plan.Env["PLAN_PROVENANCE"])
+	}
+	_, nvke := forgeE2EWorkflowStepNamed(t, plan, "Check out the NVKE harness")
+	if nvke.With["repository"] != "dsx-ai-factory/nvke" || nvke.With["ref"] != "${{ steps.commits.outputs.harness }}" ||
+		nvke.With["fetch-depth"] != float64(0) || nvke.With["fetch-tags"] != true {
+		t.Fatalf("the harness checkout must be NVKE at the resolved commit with its whole history and tags, got %v", nvke.With)
+	}
+}
+
+func TestForgeE2EWorkflowReferencesScriptsThatExist(t *testing.T) {
+	_, raw := forgeE2ELoadWorkflow(t)
+	root := forgeE2ERoot(t)
+	reference := regexp.MustCompile(`scripts/(forge-e2e-[a-z-]+\.(sh|py))`)
+	seen := map[string]bool{}
+	for _, match := range reference.FindAllStringSubmatch(raw, -1) {
+		seen[match[1]] = true
+	}
+	for _, want := range []string{
+		"forge-e2e-substitute-plan.sh", "forge-e2e-matrix.sh", "forge-e2e-check-node-image.py", "forge-e2e-stage-inputs.sh",
+		"forge-e2e-build-subject.sh", "forge-e2e-check-junit.py", "forge-e2e-summary.sh",
+	} {
+		if !seen[want] {
+			t.Fatalf("the workflow does not use %s", want)
+		}
+	}
+	for script := range seen {
+		info, err := os.Stat(filepath.Join(root, "scripts", script))
+		if err != nil {
+			t.Fatalf("the workflow names a script that does not exist: %v", err)
+		}
+		if strings.HasSuffix(script, ".sh") && info.Mode()&0o111 == 0 {
+			t.Fatalf("scripts/%s is run directly and must be executable", script)
+		}
+	}
+}
+
+func TestForgeE2EWorkflowCallsOnlyTheHarnessStepsItIsMeantTo(t *testing.T) {
+	doc, _ := forgeE2ELoadWorkflow(t)
+	call := regexp.MustCompile(`qualify-e2e\.sh\s+([a-z-]+)`)
+	// matrix, controller-image, site-inputs and artifacts are NVKE's: the first is replaced by
+	// forge-e2e-matrix.sh and the others would build or pull what this lane stages itself.
+	allowed := map[string]bool{"stream-env": true, "resolve": true, "config": true, "run": true, "withhold": true}
+	used := map[string]bool{}
+	for _, name := range forgeE2EJobNames(doc) {
+		for _, step := range doc.Jobs[name].Steps {
+			for _, match := range call.FindAllStringSubmatch(step.Run, -1) {
+				if !allowed[match[1]] {
+					t.Fatalf("%s/%s calls the harness step %q, which this lane does not use", name, step.Name, match[1])
+				}
+				used[match[1]] = true
+			}
+		}
+	}
+	for step := range allowed {
+		if !used[step] {
+			t.Fatalf("the lane never calls the harness step %q it needs", step)
+		}
+	}
+}
+
+func TestForgeE2EWorkflowSelectsItsArtifactSourceBeforeAnyMachine(t *testing.T) {
+	doc, _ := forgeE2ELoadWorkflow(t)
+	leg := doc.Jobs["forge-e2e"]
+	positions := map[string]int{}
+	for index, step := range leg.Steps {
+		positions[step.Name] = index
+	}
+	want := map[string]string{
+		"Stage the NVKR-built inputs":              "inputs.artifact-source == 'nvkr-outputs'",
+		"Build the inputs from the subject commit": "inputs.artifact-source == 'build-subject'",
+		"Log in to GHCR":                           "inputs.artifact-source == 'nvkr-outputs'",
+		"Set up ORAS":                              "inputs.artifact-source == 'nvkr-outputs'",
+		"Read the pinned ORAS version":             "inputs.artifact-source == 'nvkr-outputs'",
+		"Install tsh and tbot":                     "env.DRY_RUN != 'true'",
+		"Start the Teleport identity daemon":       "env.DRY_RUN != 'true'",
+		"Check the run covered what it selected":   "always() && env.DRY_RUN != 'true'",
+		"Record the qualification result":          "always() && env.DRY_RUN != 'true'",
+		"Check every artifact the plan names":      "inputs.verify-plan",
+	}
+	for name, condition := range want {
+		_, step := forgeE2EWorkflowStepNamed(t, leg, name)
+		if step.If != condition {
+			t.Fatalf("step %q runs when %q, want %q", name, step.If, condition)
+		}
+	}
+	run := positions["Run the e2e suite${{ inputs.dry-run && ' (dry run)' || '' }}"]
+	for _, name := range []string{
+		"Stage the NVKR-built inputs", "Build the inputs from the subject commit", "Start the Teleport identity daemon",
+		"Write the e2e config", "List the specs the run selects", "Resolve the stream", "Check the leg is what the plan job prepared",
+	} {
+		if positions[name] >= run {
+			t.Fatalf("step %q must run before the suite takes a machine", name)
+		}
+	}
+	// The stamp precedes every step that takes time, so the recorded start belongs to the leg.
+	if positions["Admit a GitHub-hosted AMD64 runner and the first attempt"] != 0 || positions["Check out NVKR"] != 1 || positions["Stamp the leg"] != 2 {
+		t.Fatal("a leg must admit its runner, fetch NVKR's scripts and stamp its start before it does any other work")
+	}
+	// "Re-run failed jobs" does not run the plan job again, so the plan job's own attempt check cannot
+	// stop a leg from running a second time beside the first attempt's legs.
+	_, admit := forgeE2EWorkflowStepNamed(t, leg, "Admit a GitHub-hosted AMD64 runner and the first attempt")
+	for _, want := range []string{
+		`test "$RUNNER_ENVIRONMENT" = github-hosted`,
+		`test "$(uname -s)/$(uname -m)" = Linux/x86_64`,
+		`if [ "$DRY_RUN" != true ] && [ "$GITHUB_RUN_ATTEMPT" != 1 ]; then`,
+		"exit 1",
+	} {
+		if !strings.Contains(admit.Run, want) {
+			t.Fatalf("a leg's admission lacks %q", want)
+		}
+	}
+	if positions["Stage the NVKR-built inputs"] <= positions["Resolve the stream"] || positions["Build the inputs from the subject commit"] <= positions["Resolve the stream"] {
+		t.Fatal("inputs are staged for the versions the stream resolved, so staging follows the resolution")
+	}
+	if positions["Write the e2e config"] <= positions["Stage the NVKR-built inputs"] {
+		t.Fatal("the e2e config names the staged images, so it is written after staging")
+	}
+	_, list := forgeE2EWorkflowStepNamed(t, leg, "List the specs the run selects")
+	for _, flag := range []string{
+		"-ginkgo.dry-run", `-ginkgo.label-filter="site-controller && !${SITE_TENANT_EXCLUDE}"`,
+		`-ginkgo.junit-report="$GITHUB_WORKSPACE/leg/dry-run.junit.xml"`, `-e2e.site-stage="${SITE_STAGE}"`,
+		"-e2e.capabilities=",
+	} {
+		if !strings.Contains(list.Run, flag) {
+			t.Fatalf("the spec list must use the real run's selection; it lacks %q", flag)
+		}
+	}
+}
+
+func TestForgeE2EWorkflowSummaryIsWrittenAndCheckedBeforeTheRunPasses(t *testing.T) {
+	doc, _ := forgeE2ELoadWorkflow(t)
+	job := doc.Jobs["summarize"]
+	write, writeStep := forgeE2EWorkflowStepNamed(t, job, "Write the run summary")
+	check, checkStep := forgeE2EWorkflowStepNamed(t, job, "Check the run summary")
+	upload, uploadStep := forgeE2EWorkflowStepNamed(t, job, "Upload the run summary")
+	if !(write < check && check < upload) {
+		t.Fatal("the summary is written, then checked from its bytes, then published")
+	}
+	for _, want := range []string{
+		`--artifact-source "$SOURCE"`, `--stage "$SITE_STAGE"`, `--harness-commit "$HARNESS_COMMIT"`,
+		`--orchestrator-commit "$ORCHESTRATOR_COMMIT"`, `--orchestrator-run "$ORCHESTRATOR_RUN"`,
+		"--plan plan-out/plan.json", "--substitutions plan-out/substitutions.json", "--matrix matrix.json",
+		`--node-image-check "$check"`, `--leg "${leg%/}"`, `scripts/forge-e2e-summary.sh "${args[@]}"`,
+	} {
+		if !strings.Contains(writeStep.Run, want) {
+			t.Fatalf("the summary write lacks %q", want)
+		}
+	}
+	// Node image checks belong to NVKR outputs only; a build from the subject commit passes none.
+	if !strings.Contains(writeStep.Run, `if [ "$SOURCE" = nvkr-outputs ]; then`) {
+		t.Fatal("node image checks must be passed only for NVKR outputs")
+	}
+	if checkStep.Run != "scripts/forge-e2e-summary.sh assert run-summary.json" {
+		t.Fatalf("the check must run the contract over the file on disk, got %q", checkStep.Run)
+	}
+	if uploadStep.With["path"] != "run-summary.json" || uploadStep.With["if-no-files-found"] != "error" {
+		t.Fatal("the summary upload must require the summary")
+	}
+	// A failed check must fail the run: nothing after it may mask the result.
+	for _, step := range job.Steps[check+1:] {
+		if step.If != "" || strings.Contains(step.Run, "|| true") {
+			t.Fatalf("step %q after the check must not mask its result", step.Name)
+		}
+	}
+	if checkStep.If != "" || writeStep.If != "" {
+		t.Fatal("the summary write and check run unconditionally once the job runs")
+	}
+	if job.Env["SOURCE"] != "${{ inputs.artifact-source }}" || job.Env["SITE_STAGE"] != "${{ inputs.stage }}" {
+		t.Fatalf("the summary reads the dispatched source and stage, got %v", job.Env)
+	}
+}
+
+func TestForgeE2EWorkflowChecksEachNodeImageByTheMethodItsOutputNamed(t *testing.T) {
+	doc, raw := forgeE2ELoadWorkflow(t)
+	job := doc.Jobs["verify-node-images"]
+	var check *forgeE2EWorkflowStep
+	for index := range job.Steps {
+		if job.Steps[index].Name == "Check each node image" {
+			check = &job.Steps[index]
+		}
+	}
+	if check == nil {
+		t.Fatal("verify-node-images has no step that checks each node image")
+	}
+	for _, want := range []string{
+		"set -euo pipefail",
+		"for slot in os-image-amd64 os-image-arm64; do",
+		`python3 nvkr/scripts/forge-e2e-check-node-image.py --slot "$slot" --substitutions plan-out/substitutions.json --out "checks/$slot.json"`,
+	} {
+		if !strings.Contains(check.Run, want) {
+			t.Fatalf("the node image check lacks %q", want)
+		}
+	}
+	// The method and the bytes come from the substituted plan's record, which the outputs manifest
+	// wrote. A URL or a digest assembled here would let the workflow pick a method for itself.
+	for _, forbidden := range []string{"--url", "--sha256", "curl", "wget", "jq "} {
+		if strings.Contains(check.Run, forbidden) {
+			t.Fatalf("the node image check must take everything from the substitution record, not %q", forbidden)
+		}
+	}
+	// The lane never holds an object store credential: publishing and checking are separate runs.
+	for _, forbidden := range []string{"configure-aws-credentials", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "role-to-assume", "S3_PUBLISH", "aws s3"} {
+		if strings.Contains(raw, forbidden) {
+			t.Fatalf("the hardware lane must not contain %q: the publication workflow owns the object store", forbidden)
+		}
+	}
+}
+
+// The checks only count if the summary job receives exactly what the check job wrote, and the check
+// job reads the substitution record the plan job wrote. A renamed or moved artifact would leave a
+// run green with the checks missing or the wrong plan checked.
+func TestForgeE2EWorkflowHandsTheNodeImageChecksToTheSummary(t *testing.T) {
+	doc, _ := forgeE2ELoadWorkflow(t)
+	const (
+		plan   = "nvkr-forge-plan-${{ github.run_id }}"
+		checks = "nvkr-forge-node-image-checks-${{ github.run_id }}"
+	)
+	only := func(job, uses, name string) forgeE2EWorkflowStep {
+		t.Helper()
+		var found []forgeE2EWorkflowStep
+		for _, step := range doc.Jobs[job].Steps {
+			if strings.HasPrefix(step.Uses, uses+"@") && step.With["name"] == name {
+				found = append(found, step)
+			}
+		}
+		if len(found) != 1 {
+			t.Fatalf("job %s has %d steps using %s for artifact %q, want exactly one", job, len(found), uses, name)
+		}
+		return found[0]
+	}
+	download := only("verify-node-images", "actions/download-artifact", plan)
+	if download.With["path"] != "plan-out" {
+		t.Fatalf("the check job must download the plan into plan-out, where the check reads substitutions.json, got %v", download.With["path"])
+	}
+	upload := only("verify-node-images", "actions/upload-artifact", checks)
+	if upload.With["path"] != "checks" || upload.With["if-no-files-found"] != "error" {
+		t.Fatalf("the check job must upload checks and fail when it is empty, got path %v and if-no-files-found %v", upload.With["path"], upload.With["if-no-files-found"])
+	}
+	summary := only("summarize", "actions/download-artifact", checks)
+	if summary.With["path"] != "checks" || summary.If != "inputs.artifact-source == 'nvkr-outputs'" {
+		t.Fatalf("the summary job must download the checks into checks for NVKR outputs only, got path %v if %q", summary.With["path"], summary.If)
+	}
+}
+
+func TestForgeE2EWorkflowNamesNoQualificationOrReleaseAuthority(t *testing.T) {
+	_, raw := forgeE2ELoadWorkflow(t)
+	// The lane informs and gates nothing: no step signs, pushes, publishes or tags, and the
+	// qualify tool's result stays in the run's own artifacts.
+	for _, forbidden := range []string{
+		"cosign", "docker push", "oras push", "gh release", "git tag", "git push", "testgrid", "TESTGRID",
+		"qualify publish", "qualify gate", "release publish", "--publish",
+	} {
+		if strings.Contains(raw, forbidden) {
+			t.Fatalf("the Forge workflow must not contain %q: it publishes and gates nothing", forbidden)
+		}
+	}
+	// The authority field is the summary script's contract, covered by its own tests; the workflow's
+	// part is to record the tool's result per leg and to run that contract at the end.
+	if want := `"$GITHUB_WORKSPACE/qualify-bin/qualify" result`; !strings.Contains(raw, want) {
+		t.Fatalf("the workflow lacks %q", want)
+	}
+}

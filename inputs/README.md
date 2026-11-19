@@ -13,6 +13,7 @@ inputs/
   environments/  # Execution, credentials, signing and publication policy
   policies/      # Verification policy and maintained generation selections
   testing/       # Retained downstream test inputs; maintained hosted nightly configuration lives in demos/
+  qualification/ # Committed NVKE plan fixtures and their provenance for the Forge hardware lane
   experiments/   # Producers outside the maintained release catalog
 ```
 
@@ -85,6 +86,19 @@ The [three-output tutorial](../docs/examples/nvke-tutorial/README.md) and
 [deploy example](../docs/examples/nvke-deploy/README.md) keep their example-specific Environments
 beside their Definitions. The [module-tags build-only development Environment](../docs/examples/nvke-module-tags/environment-github-dev.yaml)
 remains supported per the migration map. Other authoring and pin-set teaching fixtures remain in `docs/examples/`.
+
+## Forge hardware lane plan
+
+`qualification/` holds the copy of NVKE's `qualify plan` output that the [Forge hardware lane](../docs/qualify-e2e.md)
+runs against, with a provenance record naming the NVKE run, commit, tag, retrieval date and the SHA-256 of both the
+original artifact and the committed bytes. The fixture masks the NGC organization identifier in its `nvcr.io`
+references. It is a description of NVKE's plan, not an authored Definition: the lane substitutes NVKR-built references
+for the slots NVKR produces, and leaves NVKE's imager and tool pins as they are. Replace the fixture only by
+retrieving a newer NVKE plan and updating both files in one reviewed change.
+
+An outputs manifest for the lane's `nvkr-outputs` source also belongs directly under `qualification/`, added in a
+reviewed change after a producer run. Each node image entry names its verification, `http-get` or `s3-readback`
+with the publication run it cites; the [guide](../docs/qualify-e2e.md#run-nvkr-outputs) owns the schema.
 
 ## Maintenance
 
