@@ -19,7 +19,7 @@ import (
 // or operational compatibility with NVKE's composition script is claimed.
 func TestMaintainedM2CustomerMaterialReplacement(t *testing.T) {
 	const root = "../../../inputs/definitions/nvke"
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir(root+"/../../catalogs/node-images/release"))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir(root+"/../../catalogs/node-images"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "scripts" / "ci-test-shard.py"
 MODULE = "example.com/shardfixture"
 
-# Eleven targets suffice to keep all eleven shards nonempty. The prefix pair
+# Thirteen targets keep all thirteen shards nonempty. The prefix pair
 # deliberately lands in different factory shards, detecting unanchored -run.
 FACTORY = '''package fixture
 
@@ -39,6 +39,8 @@ func TestExact(t *testing.T) {
 }
 
 func TestExactSuffix(t *testing.T) {}
+func TestShardTarget2(t *testing.T) {}
+func TestShardTarget6(t *testing.T) {}
 
 func Example() {
     fmt.Println("example ran")
@@ -120,7 +122,7 @@ class RealGoShardTest(unittest.TestCase):
             baseline = self.run_command(directory, environment, "go", "test", "-json",
                                         "-count=1", "-timeout=10s", "./...")
             expected = terminal_tests(baseline.stdout)
-            self.assertEqual(sum(expected.values()), 11)
+            self.assertEqual(sum(expected.values()), 13)
             self.assertTrue(all(action == "pass" and count == 1
                                 for (_, _, action), count in expected.items()))
             self.assertIn('"Test":"TestExact/child"', baseline.stdout)
@@ -128,7 +130,7 @@ class RealGoShardTest(unittest.TestCase):
 
             matrix = json.loads(self.run_command(directory, environment, sys.executable,
                                                  str(RUNNER), "--matrix").stdout)["include"]
-            self.assertEqual(len(matrix), 11)
+            self.assertEqual(len(matrix), 13)
             actual, failure_command = Counter(), None
             for entry in matrix:
                 command = (sys.executable, str(RUNNER), "--group", entry["group"],

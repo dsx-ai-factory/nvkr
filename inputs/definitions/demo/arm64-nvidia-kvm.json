@@ -1,39 +1,40 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
   "catalog": {
-    "base": "../../catalogs/nvke/module-tags"
+    "base": "../../catalogs/nvke"
   },
+  "cosignTool": "cosign-module-tags",
   "kind": "Definition",
   "metadata": {
-    "name": "nvke-nightly-arm64",
-    "description": "Pipeline-attested ARM64 nightly producer with the existing NVIDIA OVN 2.4.2 native site bootstrap closure and complete host/site tools. All 29 prior output names remain; five native runtime outputs are added. Publication, VM bootstrap, cleanup and qualification require independent recorded evidence."
+    "description": "Pipeline-attested ARM64 nightly producer with the existing NVIDIA OVN 2.4.2 native site bootstrap closure and complete host/site tools. All 29 prior output names remain; five native runtime outputs are added. Publication, VM bootstrap, cleanup and qualification require independent recorded evidence.",
+    "name": "nvke-nightly-arm64"
   },
   "outputs": [
     {
-      "name": "capi-exec-init-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools"
       },
       "components": [
         "native-capi-exec-init-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "capi-exec-init-image-arm64",
+      "platform": "linux/arm64"
     },
     {
-      "name": "capi-exec-plugin-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools"
       },
       "components": [
         "native-capi-exec-plugin-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "capi-exec-plugin-image-arm64",
+      "platform": "linux/arm64"
     },
     {
       "catalog": {
-        "base": "../../catalogs/capnico/local"
+        "base": "../../catalogs/capnico"
       },
       "components": [
         "capnico-controller"
@@ -44,10 +45,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "cluster-api-provider-provisioned"
+        "cluster-api-provider-provisioned-native-site"
       ],
       "format": "oci",
       "name": "cluster-api-provider-provisioned-arm64",
@@ -55,10 +56,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nvke-controller-chart"
+        "nvke-controller-chart-native-site"
       ],
       "format": "helm-oci",
       "helm": {
@@ -71,7 +72,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/controller-profiles/native-nvidia"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "nvke-local-profiles"
@@ -93,10 +94,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nvke-controller"
+        "nvke-controller-native-site"
       ],
       "format": "oci",
       "name": "cwe",
@@ -104,42 +105,42 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/installer-hosted-arm64"
+        "base": "../../catalogs/tools"
       },
       "components": [
-        "clusterctl",
+        "clusterctl-installer-hosted",
         "helm",
-        "kind",
-        "kubectl",
-        "oras"
+        "kind-installer-hosted",
+        "kubectl-installer-hosted",
+        "oras-installer-hosted"
       ],
       "format": "executable",
       "name": "installer-tools-arm64",
       "platform": "linux/arm64"
     },
     {
-      "name": "native-tools-linux-arm64",
-      "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools"
       },
       "components": [
-        "clusterctl-linux",
-        "helm-linux",
-        "kind-linux",
-        "kubectl-linux",
+        "clusterctl",
+        "helm",
+        "kind",
+        "kubectl",
         "nerdctl",
         "nico-sim",
         "nico-simctl",
         "nvke-installer-sources",
         "nvkectl",
-        "oras-linux"
+        "oras"
       ],
-      "format": "executable"
+      "format": "executable",
+      "name": "native-tools-linux-arm64",
+      "platform": "linux/arm64"
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools"
       },
       "components": [
         "nico-sim",
@@ -152,10 +153,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nktp-chart"
+        "nktp-chart-native-site"
       ],
       "format": "helm-oci",
       "name": "nktp",
@@ -163,7 +164,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/node-images/release",
+        "base": "../../catalogs/node-images",
         "overlays": [
           "../../catalogs/node-images/variants/native-nvidia.json",
           "../../catalogs/node-images/variants/native-local-kvm.json",
@@ -189,10 +190,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "nvkectl"
+        "nvkectl-native-site"
       ],
       "format": "executable",
       "name": "nvkectl",
@@ -200,11 +201,11 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/operator-arm64"
+        "base": "../../catalogs/tools"
       },
       "components": [
-        "helm",
-        "kubectl"
+        "helm-operator",
+        "kubectl-operator"
       ],
       "format": "executable",
       "name": "operator-tools",
@@ -212,7 +213,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/ovn-nvidia"
+        "base": "../../catalogs/ovn/nvidia"
       },
       "components": [
         "ovn-kubernetes-chart"
@@ -221,11 +222,11 @@
       "helm": {
         "images": {
           "control-plane": "ovn-image-arm64",
-          "node": "ovn-image-arm64",
           "nbdb": "ovn-image-arm64",
-          "sbdb": "ovn-image-arm64",
+          "node": "ovn-image-arm64",
           "northd": "ovn-image-arm64",
-          "ovn-host": "ovn-image-arm64"
+          "ovn-host": "ovn-image-arm64",
+          "sbdb": "ovn-image-arm64"
         }
       },
       "name": "ovn-chart-arm64",
@@ -233,7 +234,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/ovn-nvidia"
+        "base": "../../catalogs/ovn/nvidia"
       },
       "components": [
         "ovn-kube-ubuntu"
@@ -244,10 +245,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "postgresql-chart"
+        "postgresql-chart-native-site"
       ],
       "format": "helm-oci",
       "name": "postgresql",
@@ -265,16 +266,16 @@
       "platform": "linux/arm64"
     },
     {
-      "name": "site-startup-tools-arm64",
-      "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools"
       },
       "components": [
         "nerdctl",
         "nvkr-site-identity-helper"
       ],
-      "format": "executable"
+      "format": "executable",
+      "name": "site-startup-tools-arm64",
+      "platform": "linux/arm64"
     },
     {
       "catalog": {
@@ -289,10 +290,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "spire-chart"
+        "spire-chart-native-site"
       ],
       "format": "helm-oci",
       "name": "spire",
@@ -333,10 +334,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "spire-crds-chart"
+        "spire-crds-chart-native-site"
       ],
       "format": "helm-oci",
       "name": "spire-crds",
@@ -377,10 +378,10 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site"
+        "base": "../../catalogs/nvke"
       },
       "components": [
-        "temporal-chart"
+        "temporal-chart-native-site"
       ],
       "format": "helm-oci",
       "name": "temporal",
@@ -420,17 +421,16 @@
       "platform": "linux/arm64"
     },
     {
-      "name": "workload-image-arm64",
-      "platform": "linux/arm64",
       "catalog": {
-        "base": "../../catalogs/tools/native"
+        "base": "../../catalogs/tools"
       },
       "components": [
         "native-workload-image"
       ],
-      "format": "oci"
+      "format": "oci",
+      "name": "workload-image-arm64",
+      "platform": "linux/arm64"
     }
   ],
-  "sbomTool": "syft",
-  "cosignTool": "cosign"
+  "sbomTool": "syft-module-tags"
 }

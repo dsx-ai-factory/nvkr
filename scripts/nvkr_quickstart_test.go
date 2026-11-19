@@ -233,7 +233,7 @@ printf 'synthetic-version\n'
 				t.Fatalf("incorrect completion message:\n%s", out)
 			}
 			if tc.status == 0 && !tc.buildOnly {
-				for _, want := range []string{"Definition:", "Plan summary:", "run inspect --record", "--output nvke-controller-chart", "catalog show --data inputs/catalogs/nvke/release nvkectl"} {
+				for _, want := range []string{"Definition:", "Plan summary:", "run inspect --record", "--output nvke-controller-chart", "catalog show --data inputs/catalogs/nvke nvkectl"} {
 					if !strings.Contains(string(out), want) {
 						t.Fatalf("missing teaching output %q: %s", want, out)
 					}

@@ -175,7 +175,7 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 	// pins. The image expectations below remain specific to that release: a bump
 	// that moves the controller must also review them. Catalog maintenance does
 	// not refresh these inputs, so its failure messages name the coordination guide.
-	controllerLock, err := catalog.LoadLockContext(t.Context(), "../../../inputs/catalogs/nvke/release")
+	controllerLock, err := catalog.LoadLockContext(t.Context(), "../../../inputs/catalogs/nvke")
 	if err != nil {
 		t.Fatal(err)
 	}

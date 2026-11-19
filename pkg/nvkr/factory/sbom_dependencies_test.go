@@ -77,7 +77,7 @@ func TestMaintainedSBOMGraphRequiresScannerAndPayloads(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if plan.Definition.SBOMTool != "syft" {
+				if plan.Definition.SBOMTool != "syft-module-tags" {
 					t.Fatal("maintained workflow does not request dependency inspection")
 				}
 				found, removed := false, false

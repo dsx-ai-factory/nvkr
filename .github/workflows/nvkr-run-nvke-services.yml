@@ -102,7 +102,7 @@ jobs:
     name: 'Acquire and prepare csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -156,7 +156,7 @@ jobs:
     name: 'Acquire and prepare csi-node-driver-registrar-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -180,7 +180,7 @@ jobs:
     name: 'Acquire and prepare local-path-helper-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -198,7 +198,7 @@ jobs:
     name: 'Acquire and prepare local-path-helper-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -216,7 +216,7 @@ jobs:
     name: 'Build and prepare local-path-provisioner-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 240
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -233,7 +233,7 @@ jobs:
     name: 'Acquire and prepare local-path-provisioner-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -251,7 +251,7 @@ jobs:
     name: 'Acquire and prepare local-path-provisioner-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -269,7 +269,7 @@ jobs:
     name: 'Build and prepare local-path-provisioner'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -316,7 +316,7 @@ jobs:
     name: 'Acquire and prepare postgresql-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -334,7 +334,7 @@ jobs:
     name: 'Acquire and prepare postgresql-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -352,7 +352,7 @@ jobs:
     name: 'Acquire and prepare postgresql'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -370,7 +370,7 @@ jobs:
     name: 'Acquire and prepare spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -388,7 +388,7 @@ jobs:
     name: 'Acquire and prepare spiffe-csi-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -406,7 +406,7 @@ jobs:
     name: 'Acquire and prepare spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -424,7 +424,7 @@ jobs:
     name: 'Acquire and prepare spire-agent-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -442,7 +442,7 @@ jobs:
     name: 'Acquire and prepare spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -460,7 +460,7 @@ jobs:
     name: 'Acquire and prepare spire-bash-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -478,7 +478,7 @@ jobs:
     name: 'Acquire and prepare spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -496,7 +496,7 @@ jobs:
     name: 'Acquire and prepare spire-controller-manager-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -514,7 +514,7 @@ jobs:
     name: 'Acquire and prepare spire-crds'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -532,7 +532,7 @@ jobs:
     name: 'Acquire and prepare spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -550,7 +550,7 @@ jobs:
     name: 'Acquire and prepare spire-oidc-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -568,7 +568,7 @@ jobs:
     name: 'Acquire and prepare spire-server-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -586,7 +586,7 @@ jobs:
     name: 'Acquire and prepare spire-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -604,7 +604,7 @@ jobs:
     name: 'Acquire and prepare spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -622,7 +622,7 @@ jobs:
     name: 'Acquire and prepare spire-tpm-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -640,7 +640,7 @@ jobs:
     name: 'Acquire and prepare spire'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -658,7 +658,7 @@ jobs:
     name: 'Acquire and prepare temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -676,7 +676,7 @@ jobs:
     name: 'Acquire and prepare temporal-admin-tools-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -694,7 +694,7 @@ jobs:
     name: 'Acquire and prepare temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -712,7 +712,7 @@ jobs:
     name: 'Acquire and prepare temporal-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -730,7 +730,7 @@ jobs:
     name: 'Acquire and prepare temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-tool-syft-module-tags-linux-arm64]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -748,7 +748,7 @@ jobs:
     name: 'Acquire and prepare temporal-ui-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -766,7 +766,7 @@ jobs:
     name: 'Acquire and prepare temporal'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 300
-    needs: [nvkr-tool-syft]
+    needs: [nvkr-tool-syft-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -780,8 +780,8 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-tool-cosign:
-    name: 'Acquire pinned cosign'
+  nvkr-tool-cosign-module-tags:
+    name: 'Acquire pinned cosign-module-tags'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -794,8 +794,8 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-tool-syft:
-    name: 'Acquire pinned syft'
+  nvkr-tool-syft-module-tags:
+    name: 'Acquire pinned syft-module-tags'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -808,7 +808,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-csi-node-driver-registrar-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-csi-node-driver-registrar-im-68f54e676223, nvkr-tool-cosign]
+    needs: [nvkr-process-csi-node-driver-registrar-im-68f54e676223, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -851,7 +851,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-local-path-helper-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-local-path-helper-image-pull-88d610813b7e, nvkr-tool-cosign]
+    needs: [nvkr-process-local-path-helper-image-pull-88d610813b7e, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -870,7 +870,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-local-path-provisioner'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-package-local-path-provision-123346265e26, nvkr-tool-cosign]
+    needs: [nvkr-process-package-local-path-provision-123346265e26, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -889,7 +889,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-local-path-provisioner-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-local-path-provisioner-image-e7b7f89ebfe0, nvkr-tool-cosign]
+    needs: [nvkr-process-local-path-provisioner-image-e7b7f89ebfe0, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -908,7 +908,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-postgresql-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-postgresql-image-pull-postgr-d4b5512a9048, nvkr-tool-cosign]
+    needs: [nvkr-process-postgresql-image-pull-postgr-d4b5512a9048, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -927,7 +927,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-postgresql'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-postgresql-pull-postgresql-c-d1405b5f9a79, nvkr-tool-cosign]
+    needs: [nvkr-process-postgresql-pull-postgresql-c-d1405b5f9a79, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -946,7 +946,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spiffe-csi-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spiffe-csi-image-pull-spiffe-4c94c6cbef8b, nvkr-tool-cosign]
+    needs: [nvkr-process-spiffe-csi-image-pull-spiffe-4c94c6cbef8b, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -965,7 +965,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-agent-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-agent-image-pull-spire-c76ada642d98, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-agent-image-pull-spire-c76ada642d98, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -984,7 +984,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-bash-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-bash-image-pull-spire-91f74df55b1c, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-bash-image-pull-spire-91f74df55b1c, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1003,7 +1003,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-controller-manager-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-controller-manager-ima-7a2ceaffb086, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-controller-manager-ima-7a2ceaffb086, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1022,7 +1022,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-crds'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-crds-pull-spire-crds-c-ab0b4a82912f, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-crds-pull-spire-crds-c-ab0b4a82912f, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1041,7 +1041,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-oidc-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-oidc-image-pull-spire-ae0d2f0a3d80, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-oidc-image-pull-spire-ae0d2f0a3d80, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1060,7 +1060,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-server-image-pull-spir-2014c4fe9a1b, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-server-image-pull-spir-2014c4fe9a1b, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1079,7 +1079,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-tpm-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-tpm-server-image-pull-5ae8c8eba120, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-tpm-server-image-pull-5ae8c8eba120, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1098,7 +1098,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-pull-spire-chart-spire-eefb94154fba, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-pull-spire-chart-spire-eefb94154fba, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1117,7 +1117,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-temporal-admin-tools-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-temporal-admin-tools-image-p-c68600141d47, nvkr-tool-cosign]
+    needs: [nvkr-process-temporal-admin-tools-image-p-c68600141d47, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1136,7 +1136,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-temporal-server-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-temporal-server-image-pull-t-198e0d1f2c8e, nvkr-tool-cosign]
+    needs: [nvkr-process-temporal-server-image-pull-t-198e0d1f2c8e, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1155,7 +1155,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-temporal-ui-image'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-temporal-ui-image-pull-tempo-ae3207201e38, nvkr-tool-cosign]
+    needs: [nvkr-process-temporal-ui-image-pull-tempo-ae3207201e38, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1174,7 +1174,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-temporal'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-temporal-pull-temporal-chart-054215f9d85b, nvkr-tool-cosign]
+    needs: [nvkr-process-temporal-pull-temporal-chart-054215f9d85b, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1189,8 +1189,8 @@ jobs:
       - *operation-execute-publication-part-2
       - *operation-execute-registry-part-3
       - *operation-execute-registry-part-4
-  nvkr-tool-syft-linux-arm64:
-    name: 'Acquire pinned syft/linux/arm64'
+  nvkr-tool-syft-module-tags-linux-arm64:
+    name: 'Acquire pinned syft-module-tags/linux/arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 60
     needs: [preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -1207,7 +1207,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-csi-node-driver-registrar-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-csi-node-driver-registrar-im-1d460e812187, nvkr-tool-cosign]
+    needs: [nvkr-process-csi-node-driver-registrar-im-1d460e812187, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1226,7 +1226,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-local-path-helper-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-local-path-helper-image-arm6-ee133d2fe086, nvkr-tool-cosign]
+    needs: [nvkr-process-local-path-helper-image-arm6-ee133d2fe086, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1245,7 +1245,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-local-path-provisioner-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-package-local-path-provision-bba011a459b5, nvkr-tool-cosign]
+    needs: [nvkr-process-package-local-path-provision-bba011a459b5, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1264,7 +1264,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-local-path-provisioner-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-local-path-provisioner-image-cb6b563d128f, nvkr-tool-cosign]
+    needs: [nvkr-process-local-path-provisioner-image-cb6b563d128f, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1283,7 +1283,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-postgresql-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-postgresql-image-arm64-pull-6ec425b8d034, nvkr-tool-cosign]
+    needs: [nvkr-process-postgresql-image-arm64-pull-6ec425b8d034, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1302,7 +1302,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spiffe-csi-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spiffe-csi-image-arm64-pull-f9c57454985a, nvkr-tool-cosign]
+    needs: [nvkr-process-spiffe-csi-image-arm64-pull-f9c57454985a, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1321,7 +1321,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-agent-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-agent-image-arm64-pull-66c5fa643afb, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-agent-image-arm64-pull-66c5fa643afb, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1340,7 +1340,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-bash-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-bash-image-arm64-pull-42dd6bbb0f7a, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-bash-image-arm64-pull-42dd6bbb0f7a, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1359,7 +1359,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-controller-manager-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-controller-manager-ima-6092c1a95230, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-controller-manager-ima-6092c1a95230, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1378,7 +1378,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-oidc-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-oidc-image-arm64-pull-1a91ecc8fde1, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-oidc-image-arm64-pull-1a91ecc8fde1, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1397,7 +1397,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-server-image-arm64-pul-c821b1c6d638, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-server-image-arm64-pul-c821b1c6d638, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1416,7 +1416,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-spire-tpm-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-spire-tpm-server-image-arm64-095a8bd3e346, nvkr-tool-cosign]
+    needs: [nvkr-process-spire-tpm-server-image-arm64-095a8bd3e346, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1435,7 +1435,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-temporal-admin-tools-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-temporal-admin-tools-image-a-64b6c9dc6020, nvkr-tool-cosign]
+    needs: [nvkr-process-temporal-admin-tools-image-a-64b6c9dc6020, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1454,7 +1454,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-temporal-server-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-temporal-server-image-arm64-bb94023fcab8, nvkr-tool-cosign]
+    needs: [nvkr-process-temporal-server-image-arm64-bb94023fcab8, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1473,7 +1473,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-temporal-ui-image-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-process-temporal-ui-image-arm64-pull-4a75ae62b2bc, nvkr-tool-cosign]
+    needs: [nvkr-process-temporal-ui-image-arm64-pull-4a75ae62b2bc, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -1557,7 +1557,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-03'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-process-attest-sboms-output-local-pa-2ae6dde17516, nvkr-process-attest-sboms-output-spire-ba-e270b70f09ef, nvkr-process-local-path-helper-image-pull-88d610813b7e, nvkr-process-local-path-provisioner-arm64-a4a16230d525, nvkr-process-package-local-path-provision-123346265e26, nvkr-process-spire-agent-image-arm64-pull-66c5fa643afb, nvkr-tool-cosign, preflight-images-ubuntu-24-04]
+    needs: [nvkr-process-attest-sboms-output-local-pa-2ae6dde17516, nvkr-process-attest-sboms-output-spire-ba-e270b70f09ef, nvkr-process-local-path-helper-image-pull-88d610813b7e, nvkr-process-local-path-provisioner-arm64-a4a16230d525, nvkr-process-package-local-path-provision-123346265e26, nvkr-process-spire-agent-image-arm64-pull-66c5fa643afb, nvkr-tool-syft-module-tags-linux-arm64, preflight-images-ubuntu-24-04]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -1570,7 +1570,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-04'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-process-attest-sboms-output-csi-node-c1d6d7794703, nvkr-process-attest-sboms-output-spire-ba-0a23387d1b9d, nvkr-process-attest-sboms-output-spire-co-e87f47677f39, nvkr-tool-syft-linux-arm64]
+    needs: [nvkr-process-attest-sboms-output-csi-node-c1d6d7794703, nvkr-process-attest-sboms-output-spire-ba-0a23387d1b9d, nvkr-process-attest-sboms-output-spire-co-e87f47677f39]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -1674,7 +1674,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0c'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-process-attest-sboms-output-local-pa-7cd55fb2cf05, nvkr-process-attest-sboms-output-postgres-6a2db7baf6de, nvkr-process-attest-sboms-output-spire-cr-3c298e3f69d6, nvkr-process-spire-server-image-pull-spir-2014c4fe9a1b, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-process-attest-sboms-output-local-pa-7cd55fb2cf05, nvkr-process-attest-sboms-output-postgres-6a2db7baf6de, nvkr-process-attest-sboms-output-spire-cr-3c298e3f69d6, nvkr-process-spire-server-image-pull-spir-2014c4fe9a1b, nvkr-tool-cosign-module-tags, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -1687,7 +1687,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0d'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-process-attest-sboms-output-spire-ag-0b9313969a96, nvkr-process-attest-sboms-output-spire-tp-671d9f2c0ee8, nvkr-process-attest-sboms-output-temporal-55456dc4a7c9, nvkr-process-spire-controller-manager-ima-6092c1a95230, nvkr-process-spire-crds-pull-spire-crds-c-ab0b4a82912f, nvkr-process-spire-oidc-image-arm64-pull-1a91ecc8fde1, nvkr-process-temporal-admin-tools-image-p-c68600141d47, nvkr-process-temporal-server-image-pull-t-198e0d1f2c8e]
+    needs: [nvkr-process-attest-sboms-output-spire-ag-0b9313969a96, nvkr-process-attest-sboms-output-spire-tp-671d9f2c0ee8, nvkr-process-attest-sboms-output-temporal-55456dc4a7c9, nvkr-process-spire-controller-manager-ima-6092c1a95230, nvkr-process-spire-crds-pull-spire-crds-c-ab0b4a82912f, nvkr-process-spire-oidc-image-arm64-pull-1a91ecc8fde1, nvkr-process-temporal-admin-tools-image-p-c68600141d47, nvkr-process-temporal-server-image-pull-t-198e0d1f2c8e, nvkr-tool-syft-module-tags]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:
@@ -1700,7 +1700,7 @@ jobs:
     name: 'Collect provider results: nvkr-results-0e'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    needs: [nvkr-process-attest-sboms-output-local-pa-076932f39eb0, nvkr-process-attest-sboms-output-spire-ag-dfb26f54c9e7, nvkr-process-local-path-provisioner-image-cb6b563d128f, nvkr-process-spire-agent-image-pull-spire-c76ada642d98, nvkr-tool-syft]
+    needs: [nvkr-process-attest-sboms-output-local-pa-076932f39eb0, nvkr-process-attest-sboms-output-spire-ag-dfb26f54c9e7, nvkr-process-local-path-provisioner-image-cb6b563d128f, nvkr-process-spire-agent-image-pull-spire-c76ada642d98]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     permissions: {}
     outputs:

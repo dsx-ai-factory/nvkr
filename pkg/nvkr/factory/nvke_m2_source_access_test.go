@@ -48,7 +48,7 @@ func TestMaintainedM2OSFetchIsAnonymous(t *testing.T) {
 		}
 		seen[output.Platform] = true
 		t.Run(output.Name, func(t *testing.T) {
-			index := slices.IndexFunc(authored.Catalogs, func(spec definition.Catalog) bool { return spec.Base == "../../catalogs/node-images/release" })
+			index := slices.IndexFunc(authored.Catalogs, func(spec definition.Catalog) bool { return spec.Base == "../../catalogs/node-images" })
 			if index < 0 || output.Catalog != nil {
 				t.Fatal("disk catalog must be declared once in the shared list")
 			}

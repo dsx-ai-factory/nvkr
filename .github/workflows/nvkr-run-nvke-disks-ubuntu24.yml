@@ -720,8 +720,8 @@ jobs:
       - *operation-execute-node-part-1
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
-  nvkr-tool-cosign:
-    name: 'Acquire pinned cosign'
+  nvkr-tool-cosign-module-tags:
+    name: 'Acquire pinned cosign-module-tags'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 60
     needs: [preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
@@ -743,7 +743,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-nvke-node-fde-ubuntu24-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-disk-nvke-node-fde-ubuntu24-amd64, nvkr-tool-cosign]
+    needs: [nvkr-disk-nvke-node-fde-ubuntu24-amd64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -791,7 +791,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-nvke-node-fde-ubuntu24-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-disk-nvke-node-fde-ubuntu24-arm64, nvkr-tool-cosign]
+    needs: [nvkr-disk-nvke-node-fde-ubuntu24-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -815,7 +815,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-nvke-node-image-ubuntu24-amd64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-disk-nvke-node-image-ubuntu24-amd64, nvkr-tool-cosign]
+    needs: [nvkr-disk-nvke-node-image-ubuntu24-amd64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -839,7 +839,7 @@ jobs:
     name: 'Attest, publish, sign and verify output-nvke-node-image-ubuntu24-arm64'
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 240
-    needs: [nvkr-disk-nvke-node-image-ubuntu24-arm64, nvkr-tool-cosign]
+    needs: [nvkr-disk-nvke-node-image-ubuntu24-arm64, nvkr-tool-cosign-module-tags]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     permissions:
@@ -889,7 +889,7 @@ jobs:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-disk-nvke-node-fde-ubuntu24-amd64, nvkr-disk-nvke-node-fde-ubuntu24-arm64, nvkr-disk-nvke-node-image-ubuntu24-amd64, nvkr-disk-nvke-node-image-ubuntu24-arm64, nvkr-process-attest-sboms-output-nvke-nod-1bc709ca4460, nvkr-process-attest-sboms-output-nvke-nod-49ea879f4e2d, nvkr-process-attest-sboms-output-nvke-nod-6c5f57895380, nvkr-process-attest-sboms-output-nvke-nod-f8e29abf6a17, nvkr-process-nvke-node-fde-ubuntu24-amd64-1d015a140907, nvkr-process-nvke-node-fde-ubuntu24-amd64-68929548ea3f, nvkr-process-nvke-node-fde-ubuntu24-arm64-a56b24fa4b5a, nvkr-process-nvke-node-fde-ubuntu24-arm64-dde6af2e8bf0, nvkr-process-nvke-node-image-ubuntu24-amd-309e0b0b668e, nvkr-process-nvke-node-image-ubuntu24-amd-414a3d348ba5, nvkr-process-nvke-node-image-ubuntu24-arm-d06d399d5548, nvkr-process-nvke-node-image-ubuntu24-arm-e2b6ca37b5c9, nvkr-process-package-release-publish-rele-e70edb401cae, nvkr-tool-cosign, preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [build-runner-arc-amd64-kvm, build-runner-arc-arm64-kvm, build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-disk-nvke-node-fde-ubuntu24-amd64, nvkr-disk-nvke-node-fde-ubuntu24-arm64, nvkr-disk-nvke-node-image-ubuntu24-amd64, nvkr-disk-nvke-node-image-ubuntu24-arm64, nvkr-process-attest-sboms-output-nvke-nod-1bc709ca4460, nvkr-process-attest-sboms-output-nvke-nod-49ea879f4e2d, nvkr-process-attest-sboms-output-nvke-nod-6c5f57895380, nvkr-process-attest-sboms-output-nvke-nod-f8e29abf6a17, nvkr-process-nvke-node-fde-ubuntu24-amd64-1d015a140907, nvkr-process-nvke-node-fde-ubuntu24-amd64-68929548ea3f, nvkr-process-nvke-node-fde-ubuntu24-arm64-a56b24fa4b5a, nvkr-process-nvke-node-fde-ubuntu24-arm64-dde6af2e8bf0, nvkr-process-nvke-node-image-ubuntu24-amd-309e0b0b668e, nvkr-process-nvke-node-image-ubuntu24-amd-414a3d348ba5, nvkr-process-nvke-node-image-ubuntu24-arm-d06d399d5548, nvkr-process-nvke-node-image-ubuntu24-arm-e2b6ca37b5c9, nvkr-process-package-release-publish-rele-e70edb401cae, nvkr-tool-cosign-module-tags, preflight-images-arc-amd64-kvm, preflight-images-arc-arm64-kvm, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-release'
     env:

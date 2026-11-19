@@ -21,7 +21,7 @@ import (
 // for CAPNICo, NKTP, profiles or customer catalogs. Producers use generic routes.
 func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 	const root = "../../../inputs/definitions/nvke"
-	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "../../catalogs/nvke/release-components")))
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir(filepath.Join(root, "../../catalogs/nvke")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +38,7 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 	}{
 		{"capnico-controller", "capnico-controller"},
 		{"nico-reference-profiles-fixture", "nvke-nico-reference-profiles"},
-		{"nktp", "nktp-chart"},
+		{"nktp", "nktp-chart-release-components"},
 		{"capi-controller-image", "capi-controller-image"},
 		{"capi-kubeadm-bootstrap-image", "capi-kubeadm-bootstrap-image"},
 		{"capi-kubeadm-control-plane-image", "capi-kubeadm-control-plane-image"},
@@ -54,8 +54,10 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 		{"nktp-operator-image", "nktp-operator-image"},
 		{"nktp-target-allocator-image", "nktp-target-allocator-image"},
 	}
-	if len(cat.Components) != len(rows) {
-		t.Fatal("additional catalog membership changed")
+	for _, row := range rows {
+		if _, ok := cat.Components[row.component]; !ok {
+			t.Fatalf("missing additional producer %s", row.component)
+		}
 	}
 	for _, row := range rows {
 		t.Run(row.output, func(t *testing.T) {
@@ -119,7 +121,7 @@ func TestMaintainedM2AdditionalReleaseComponents(t *testing.T) {
 		t.Fatal("provisioned infrastructure provider must retain its existing independent producer")
 	}
 
-	baselineBytes, err := os.ReadFile(filepath.Join(root, "../../catalogs/nvke/release/pins.lock.yaml"))
+	baselineBytes, err := os.ReadFile(filepath.Join(root, "../../catalogs/nvke/pins.lock.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}

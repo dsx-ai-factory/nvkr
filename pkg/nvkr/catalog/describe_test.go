@@ -257,7 +257,7 @@ pins:
 		t.Fatalf("release executable pin missing: %+v", tool.Acquisition)
 	}
 
-	release, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/nvke/release"))
+	release, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/nvke"))
 	if err != nil {
 		t.Fatal(err)
 	}

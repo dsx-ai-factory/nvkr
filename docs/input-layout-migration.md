@@ -152,7 +152,7 @@ publication, signing, credential or runtime policies interchangeable.
 The [catalog ownership map](../inputs/catalogs/README.md) records the registry/lock pairs
 and their exact former locations. At the relocation baseline, the nine maintained owner families were `nvke`, `capnico`, `node-images`,
 `ovn-nvidia`, `ovn-upstream`, `controller-profiles`, `runtime-dependencies`, `tools` and `nicosim`.
-The simulator catalog has since moved to `tools/native`. The 19 baseline catalogs retained explicit source
+The simulator producers now belong to the consolidated `tools` catalog. The 19 baseline catalogs retained explicit source
 and toolchain variants. The experimental public OS
 catalog remains separate at `inputs/experiments/public-os-sources/catalog`. Registry/lock pairs and
 patches moved together; lock bytes remain unchanged. Use [catalog maintenance](catalog-maintenance.md)

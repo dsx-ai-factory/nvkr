@@ -10,22 +10,22 @@ metadata:
 members:
   - name: aicr-nvke-gb200
     definition: ../aicr/nvke-gb200.yaml
-    digest: sha256:b7485bd3759591595973d17dbaa500f9bfab067811125cf8eb78c20470253862
+    digest: sha256:06013783f5647a30e988f297adfd3c83941b0d5d4e9973b72372810b0d90eae2
   - name: nvke-core
     definition: core.yaml
-    digest: sha256:4da78715fe6b6e04945ab99bf2b4c535eacbf90346d816acecd2ceefb7cc348c
+    digest: sha256:56c258d3796eb6b6a128059df97dee6449d4c329ea16dd4049ba1e954f24069d
   - name: nvke-disks
     definition: disks.yaml
-    digest: sha256:56c39c33d1413c41f9259d2e1ad12adb93426d921e10dc1da8228c9329310d5e
+    digest: sha256:6d0770da5060e5a17620ee6678f16218172234b76f65a95fa37dd1c53fdec7b5
   - name: nvke-disks-ubuntu24
     definition: disks-ubuntu24.yaml
-    digest: sha256:44a151a9f7b94342d72f83b206240a67e119dab18a8a69e94775bcde1dde8505
+    digest: sha256:4590053e9d1e607e9b37faf697a72d93237cebe3ba7139527b106da6715c61cf
   - name: nvke-services
     definition: services.yaml
-    digest: sha256:8eeba2c9b44d42684602363d68ed10b506d822017affc391045b84c0754ef49c
+    digest: sha256:3a3f5c2ac3ef6edaf6fdf2edf577e65dbcabccac3370e9647996202e57aaf8a0
   - name: nvke-telemetry
     definition: telemetry.yaml
-    digest: sha256:041225961418f7334df77541e1264ec691d6ab51701b1b7add9ac1160e0b1b65
+    digest: sha256:2b4f5c20beb24cf22852c6f9b03806dddff1f588f75cb34f53919a202c5835a9
 # The Ubuntu 24.04 overlay replaces these components, so the two disk families resolve different producers for them.
 variants:
   - component: nvke-agent

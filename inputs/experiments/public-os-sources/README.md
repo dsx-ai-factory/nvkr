@@ -2,7 +2,7 @@
 
 Experimental source-producer catalog for NVKE v0.21.0 OS inputs. It uses NVKR's existing catalog, source preparation, graph compiler and local executor. It is not selected by the maintained OS/M2 Definitions and is not yet a replacement for their package graph.
 
-The separately selectable [DSX OVN source-build option](../../catalogs/ovn-nvidia/README.md)
+The separately selectable [DSX OVN source-build option](../../catalogs/ovn/nvidia/notes/ovn-nvidia-README.md)
 adds the fork's source-owned OCI image and offline chart/image Debian packaging.
 It is kept separate because its Git repository is internal; the public-source
 diagnostic does not receive source credentials. Calico and maintained inputs are

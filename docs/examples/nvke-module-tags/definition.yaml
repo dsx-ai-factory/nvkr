@@ -3,12 +3,12 @@
 
 apiVersion: nvkr.dev/definition/v5
 catalog:
-  base: ../../../inputs/catalogs/nvke/module-tags
-cosignTool: cosign
+  base: ../../../inputs/catalogs/nvke
+cosignTool: cosign-module-tags
 kind: Definition
 metadata:
-  description: Build the NVKE CLI, CWE runtime image and upstream controller Helm chart from
-    pinned source.
+  description: Build the NVKE CLI, CWE runtime image and upstream controller Helm
+    chart from pinned source.
   name: nvke-v1
 outputs:
 - components:
@@ -25,8 +25,8 @@ outputs:
   name: nvke-helm
   platform: linux/amd64
 - components:
-  - nvkectl
+  - nvkectl-module-tags
   format: executable
   name: nvkectl
   platform: linux/amd64
-sbomTool: syft
+sbomTool: syft-module-tags

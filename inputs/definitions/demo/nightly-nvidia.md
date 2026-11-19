@@ -7,9 +7,9 @@ complete Linux host-tool bundle and the guest startup-tool bundle. The resulting
 second architecture producer is introduced.
 
 CLI, controller, provisioned-provider and chart outputs reuse
-`../../catalogs/nvke/native-site`. Simulator and host/site tool outputs reuse
-`../../catalogs/tools/native`. Controller profiles reuse
-`../../catalogs/controller-profiles/native-nvidia`. These are the existing
+`../../catalogs/nvke`. Simulator and host/site tool outputs reuse
+`../../catalogs/tools`. Controller profiles reuse
+`../../catalogs/nvke`. These are the existing
 native Go bootstrap inputs, not copied nightly catalogs. The retained
 `installer-tools-arm64` output continues to use the hosted installer catalog and
 its explicit acquired Helm exception.

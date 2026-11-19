@@ -203,7 +203,7 @@ func TestNightlyInputReadersRejectAmbiguousUnsafeAndUnboundedRecords(t *testing.
 
 func nightlyCompiledFixture(t *testing.T, profile NightlyProfile, build NightlyBuild) (*factory.Plan, lifecycle.Run) {
 	t.Helper()
-	catalog, err := filepath.Abs("../../inputs/catalogs/nvke/module-tags")
+	catalog, err := filepath.Abs("../../inputs/catalogs/nvke")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,17 +1,17 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
   "catalog": {
-    "base": "../../../catalogs/nvke/module-cli-arm64"
+    "base": "../../../catalogs/nvke"
   },
   "kind": "Definition",
   "metadata": {
-    "name": "nvke-local-dev-arm64-os-kvm",
-    "description": "Local ARM64 non-FDE disk and its exact material closure using required KVM; no publication or signing."
+    "description": "Local ARM64 non-FDE disk and its exact material closure using required KVM; no publication or signing.",
+    "name": "nvke-local-dev-arm64-os-kvm"
   },
   "outputs": [
     {
       "catalog": {
-        "base": "../../../catalogs/node-images/release",
+        "base": "../../../catalogs/node-images",
         "overlays": [
           "../../../catalogs/node-images/variants/nvidia-tcg.json",
           "../../../catalogs/node-images/variants/nvidia-local-kvm.json"

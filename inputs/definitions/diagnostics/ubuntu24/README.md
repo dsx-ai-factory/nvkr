@@ -18,7 +18,7 @@ The installer material and required `ubuntu_series=24.04` Packer variable select
 | GitHub FDE ARM64 | `definition-github-fde-arm64.yaml` | `nvke-node-fde-ubuntu24-arm64` |
 
 Each selects the complete twelve-producer closure. The ordered stack is the shared
-[release node-image catalog](../../../catalogs/node-images/release/registry.yaml), its
+[release node-image catalog](../../../catalogs/node-images/registry.yaml), its
 [native-toolchain overlay](../../../catalogs/node-images/variants/native-toolchains.yaml), then
 [Ubuntu 24 overlay](../../../catalogs/node-images/variants/ubuntu24.json). The last overlay
 replaces the two installer suppliers, the agent, DOCA OVS and four disk producers as complete declarations, bound
