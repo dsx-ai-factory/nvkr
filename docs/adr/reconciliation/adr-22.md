@@ -22,6 +22,20 @@ lock resolution. Catalog tests cover aliasing, collisions, unknown inputs, conte
 provider admission and resource bounds; factory snapshot tests cover complete capture and replay. These
 contracts preserve resolved producer values and do not establish fresh build or runtime acceptance.
 
+Multi-platform release-tool sources use sorted platform declarations and complete per-platform lock entries.
+The ordinary bounded selector resolves every asset before an atomic source-pin update; utility selection and
+release-executable graph resolution select one exact native record. Catalog and buildgraph tests cover missing,
+extra and duplicate platforms, URL/member templating, failed acquisition and unchanged native graphs. This
+is a catalog/native-selection capability; it does not implement executable image-index publication or prove
+fresh upstream builds or hosted runtime acceptance.
+
+Offline root discovery, exact-name search and the generated catalog index share a description-only
+inventory path. `TestInventoryMaintainedCatalogsOffline` covers maintained catalog membership, imported
+component locations and deterministic rendering without executable tools. Failure contracts cover missing
+locks, invalid imports and unsafe directory entries. Pin sets are not re-derived in discovery; executable
+loading and pin updates retain their upstream validation. These checks establish local description
+behavior, not producer execution or release authenticity.
+
 File operands in build/vendor argv expand through bounded context-aware catalog providers.
 `TestCommandFilesIdentityGoldens` freezes equal inline/file Build and VendorSpec identities;
 catalog contracts cover byte preservation, platform overrides, confinement and resource limits.

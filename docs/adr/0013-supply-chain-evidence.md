@@ -251,7 +251,7 @@ metadata; they do not claim dependency inspection. The separate full-disk profil
 and does not require a second catalog scanner selection; when both select the same native platform their
 pins must agree. A catalog scanner for another platform does not replace the native inspection-profile pin.
 
-The pipeline-attested M2 producer-provenance route explicitly selects `Environment.diskEvidence: build-provenance-v1`.
+The pipeline-attested NVKE producer-provenance route explicitly selects `Environment.diskEvidence: build-provenance-v1`.
 It retains the original held disk, exact producer results and authenticated transitive material handoffs,
 and publishes source-bound per-component CycloneDX producer documents under the existing signed evidence
 closure. These documents have no inspected dependency inventory and explicitly bind `nvkr:diskEvidence`

@@ -2,6 +2,13 @@
 
 Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
 
+Plan serialization shares exact package-input documents across all catalog, resolved-component and
+fetch/build occurrences. The v8/v9/v10 wire codec restores complete recipes before ordinary Plan admission;
+Build identities and separately named runtime requirements retain their original descriptions. Focused
+contracts in `plan_package_snapshots_test.go` cover two/four requirements, byte-identical restoration,
+digest/path/reference rejection, expansion limits and the unchanged 8 MiB generation/read boundary.
+This representation change supplies no new native assembly or hosted execution evidence.
+
 The Plan-produced VM runtime extension has manager-neutral snapshot/package inputs, source-pinned mkosi
 assembly, exact original installed-package report checks, measured projected files and subject-bound SBOMs.
 It produces one uncompressed OCI layer and requires two fresh assemblies to produce the same complete OCI
@@ -143,3 +150,16 @@ and cross-worker exports use the lowest member job ID; capacity remains 64 jobs 
 `TestGitHubPartitionRootAdditionChurn` renders the maintained Plan before and after inserting one root
 and bounds the changed worker files to two. Split-boundary, namespace, exact bundle and inline-signer
 contracts remain local evidence; the renamed worker topology has no recorded hosted execution.
+
+GitHub runtime-input carriers contain exactly two files: a packed canonical Plan and the manifest.
+The bootstrap stages them separately from the committed Plan tree;
+the helper invokes the installer to admit and regenerate that tree. Bootstrap installation renders
+the baseline and candidate once each. Stage installation verifies the saved baseline Plan and fixed
+checkout members, then renders only the candidate. Secondary multi-source bootstraps combine the
+runtime-input check and carrier staging in one render. Frozen JSON record addresses may change during a source-pin refresh,
+while target membership, script bytes, consumer cohorts and non-Plan members remain fixed.
+A vendor cohort split requires normal regeneration even when its script bytes and addresses are unchanged.
+Packed-carrier and cohort-split refusal fixtures exercise these boundaries locally. The retained
+`nvke-nightly` selection passes synthetic source-pin refresh with unchanged scripts and exact reconstructed
+Plan bytes. The local source fixture restores and replays the frozen commit through the packed carrier. No hosted carrier
+transfer with the tree layout has been recorded.

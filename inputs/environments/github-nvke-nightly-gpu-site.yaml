@@ -5,8 +5,8 @@ apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
   description: Dispatch-frozen NVKE GPU site composite candidate publication in its own partitioned workflow and registry namespace. Native disks retain build provenance; deep inspection and material reconciliation remain deferred.
-  name: nvke-nightly-gpu-site-github
-githubBundle: nvke-nightly-gpu-site
+  name: nvke-nightly-github
+githubBundle: nvke-nightly
 githubRuntimePlan: true
 githubRuntimeSources:
   - repository: https://github.com/NVIDIA/aicr
@@ -54,7 +54,7 @@ executionClasses:
     maxTimeoutSeconds: 21600
     capabilities: [kvm]
 # Executable pins are native measurements. Budgets cover the existing 8 GiB
-# subject / 16 GiB filesystem limits, not a measured full M2 execution.
+# subject / 16 GiB filesystem limits, not a measured full NVKE execution.
 # Private-volume admission requires 12*filesystem + 2*subject + 2 GiB scratch;
 # memory covers 2*subject + appliance + scanner/report headroom. Host capacity
 # includes the additional held subject snapshot.
@@ -100,7 +100,7 @@ runtime:
     nvke-node-image-amd64: nvke-node-image-amd64-runtime
     nvke-node-image-ubuntu24-amd64: nvke-node-image-ubuntu24-amd64-runtime
 signing:
-  identity: ^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run-nvke-nightly-gpu-site\.yml@refs/heads/main$
+  identity: ^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run-nvke-nightly\.yml@refs/heads/main$
   issuer: https://token.actions.githubusercontent.com
   mode: cosign
 utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1

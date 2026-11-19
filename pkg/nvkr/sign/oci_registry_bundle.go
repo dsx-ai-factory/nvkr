@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/dsx-ai-factory/nvkr/internal/readbudget"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
@@ -158,7 +159,7 @@ func newRegistryBundleSourceTransport(ctx context.Context, subject Subject, cred
 		auth = remote.WithAuthFromKeychain(keychain)
 	}
 	puller, err := remote.NewPuller(remote.WithContext(ctx), auth,
-		remote.WithTransport(ociBundleTransport{base: base, budget: budget}), remote.WithUserAgent("nvkr/sign"),
+		remote.WithTransport(ociBundleTransport{base: readbudget.Transport(ctx, base), budget: budget}), remote.WithUserAgent("nvkr/sign"),
 		// This is the standard OCI referrers tag schema, never cosign's legacy
 		// .sig or .att attachment lookup.
 		remote.WithReferrersTagFallback(true))

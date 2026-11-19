@@ -45,6 +45,10 @@ type Consumer struct {
 	materialize        releaseMaterializer
 	materializeChecked qualificationMaterializer
 	inspection         InspectionOptions
+	// Private adapters keep phase orchestration contract-testable. Public
+	// constructors leave them nil and use the authenticated production owners.
+	bootTrust    func(context.Context, func(context.Context) error) error
+	bootMetadata bootMetadataReader
 }
 
 // VerifiedRelease is an opaque, policy-bound live capability. Description is a

@@ -21,6 +21,11 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 	if err := environment.Validate(); err != nil {
 		return err
 	}
+	if environment.Publication != nil && environment.Publication.BootSelection != nil {
+		if err := environment.Publication.BootSelection.ValidateOutputs(definition.Outputs); err != nil {
+			return err
+		}
+	}
 	if err := admitScannerPlatforms(definition, environment); err != nil {
 		return err
 	}

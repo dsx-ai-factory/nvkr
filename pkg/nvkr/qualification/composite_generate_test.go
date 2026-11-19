@@ -15,8 +15,8 @@ import (
 func TestGPUCompositeQualificationPairs(t *testing.T) {
 	root := t.TempDir()
 	for _, tc := range []struct{ name, plan, policy, owner, trigger string }{
-		{"production", ".github/nvkr-run-nvke-gpu-site/plan.json", "nvke-gpu-site-qualification.yaml", ".github/nvkr-qualification-nvke-gpu-site/manifest.json", "nvkr-project-nvke-gpu-site"},
-		{"floating candidate", ".github/nvkr-run-nvke-nightly-gpu-site/plan.json", "nvke-nightly-gpu-site-qualification.yaml", ".github/nvkr-qualification-nvke-nightly-gpu-site/manifest.json", "nvkr-project-nvke-nightly-gpu-site"},
+		{"production", ".github/nvkr-run-nvke/plan.json", "nvke-gpu-site-qualification.yaml", ".github/nvkr-qualification-nvke/manifest.json", "nvkr-project-nvke"},
+		{"floating candidate", ".github/nvkr-run-nvke-nightly/plan.json", "nvke-nightly-gpu-site-qualification.yaml", ".github/nvkr-qualification-nvke-nightly/manifest.json", "nvkr-project-nvke-nightly"},
 		{"development", ".github/nvkr-dev/plan.json", "nvke-gpu-site-development-qualification.yaml", DevelopmentQualificationManifestPath, "workflow_dispatch"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -20,7 +20,7 @@ func indexRunFixture(t *testing.T) (*Run, Artifact) {
 	logical := []ir.ImageIndexBuildChild{}
 	results := []string{}
 	for i, platform := range required.RequiredPlatforms {
-		target := "cwe/" + platform
+		target := "nvke-controller/" + platform
 		build := "sha256:" + repeat(string(rune('a'+i)), 64)
 		required.Children = append(required.Children, factory.ImageIndexChildPlan{Platform: platform, BuildTarget: target, BuildDigest: build, Component: "controller", ArtifactID: "artifact/" + target + "/controller", ResultArtifactID: "result/" + target + "/controller", SBOMArtifactID: "sbom/" + target})
 		observed.Children = append(observed.Children, delivery.ImageIndexChildBinding{Platform: platform, BuildDigest: build, Component: "controller", ManifestDigest: "sha256:" + repeat(string(rune('c'+i)), 64), Size: 500, BuildSubject: "sha256:" + repeat(string(rune('e'+i)), 64)})
@@ -31,8 +31,8 @@ func indexRunFixture(t *testing.T) (*Run, Artifact) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	run.Expected = []requiredOutput{{Name: "cwe", Kind: OutputOCI, ArtifactID: "package/cwe", MemberArtifactID: "package/cwe", BuildDigest: digest, Components: []string{"controller"}, ComponentResults: results, ImageIndex: required}}
-	return run, Artifact{Name: "cwe", Kind: OutputOCI, Digest: "sha256:" + repeat("9", 64), BuildDigest: digest, Components: []string{"controller"}, ImageIndex: observed}
+	run.Expected = []requiredOutput{{Name: "nvke-controller", Kind: OutputOCI, ArtifactID: "package/nvke-controller", MemberArtifactID: "package/nvke-controller", BuildDigest: digest, Components: []string{"controller"}, ComponentResults: results, ImageIndex: required}}
+	return run, Artifact{Name: "nvke-controller", Kind: OutputOCI, Digest: "sha256:" + repeat("9", 64), BuildDigest: digest, Components: []string{"controller"}, ImageIndex: observed}
 }
 
 func TestImageIndexRunCompletenessAndDefensiveCopies(t *testing.T) {
@@ -85,7 +85,7 @@ func TestImageIndexRunRejectsMissingAndSiblingBindings(t *testing.T) {
 
 func TestPrepareRunFreezesExplicitNativeImageUses(t *testing.T) {
 	// Preparation consumes the validated frozen plan and does not need source credentials.
-	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestPrepareRunFreezesExplicitNativeImageUses(t *testing.T) {
 	}
 	index := -1
 	for i, slot := range run.Expected {
-		if slot.Name == "cwe" {
+		if slot.Name == "nvke-controller" {
 			index = i
 		}
 	}
@@ -121,7 +121,7 @@ func TestPrepareExactInputsFreezesImageIndexRequirements(t *testing.T) {
 		{"required platform", func(p *factory.ImageIndexPlan) { p.RequiredPlatforms[0] = "changed" }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+			plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -156,7 +156,7 @@ func TestPrepareExactInputsFreezesImageIndexRequirements(t *testing.T) {
 			check()
 			// A second expectation from the untouched prepared inputs must not
 			// share either nested slice with the first expectation.
-			fresh, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+			fresh, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 			if err != nil {
 				t.Fatal(err)
 			}

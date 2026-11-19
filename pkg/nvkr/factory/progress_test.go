@@ -121,7 +121,7 @@ func TestLocalProgressPreservesSchedulerResult(t *testing.T) {
 }
 
 func BenchmarkProgressCheckedInPlan(b *testing.B) {
-	plan, err := LoadPlanContext(b.Context(), "../../../.github/nvkr-run/plan.json")
+	plan, err := LoadPlanContext(b.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		b.Fatal(err)
 	}

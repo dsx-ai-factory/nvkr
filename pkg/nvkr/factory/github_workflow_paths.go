@@ -77,7 +77,7 @@ func generatedMemberInNamespace(bundle *GeneratedBundle, member string) bool {
 		return member == tektonResourcePath || member == tektonPlanPath
 	}
 	owner, sibling := legacyGitHubChildWorkflowOwner(member)
-	return member == bundle.WorkflowPath || strings.HasPrefix(member, path.Dir(bundle.ManifestPath)+"/") ||
+	return isPlanStorePath(member) || member == bundle.WorkflowPath || strings.HasPrefix(member, path.Dir(bundle.ManifestPath)+"/") ||
 		(sibling && owner == bundle.WorkflowPath && githubPartitionWorkflowSuffix.MatchString(member))
 }
 

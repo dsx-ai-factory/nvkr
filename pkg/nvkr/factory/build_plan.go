@@ -244,6 +244,9 @@ func (plan *Plan) catalogPinSetRepositories() map[string]bool {
 		}
 	}
 	collect(plan.CatalogSnapshot)
+	for _, candidate := range plan.CatalogCandidates {
+		collect(candidate.CatalogSnapshot)
+	}
 	for _, build := range plan.Builds {
 		collect(build.CatalogSnapshot)
 	}

@@ -24,7 +24,8 @@ make ci-check      # every merge-gate check that runs locally
   **`make test-race`** adds race detection and coverage; **`make test-full`** also
   enables expensive capacity and full-product integration fixtures. Direct
   `go test ./...` uses the fast default too.
-- Local development Runs use `run local` with an explicit Definition and Environment. Container
+- Local development Runs use `run local` with an explicit Definition and either an explicit Environment
+  or the recorded built-in build-only local policy. Container
   producers need **Docker + git** and network for their fetch step; native producers have their own
   capability admission. Local execution does not establish qualified reproduction.
 - **Lint** uses `golangci-lint` (config in [`.golangci.yml`](.golangci.yml)) and warning-or-higher

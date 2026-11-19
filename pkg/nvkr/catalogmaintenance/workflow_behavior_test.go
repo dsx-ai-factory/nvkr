@@ -283,7 +283,7 @@ func TestDefinitionNameStepRefusesNamesThatCouldReachAPathOrARef(t *testing.T) {
 		ok               bool
 	}{
 		{"plain", "alpha", true},
-		{"digits and hyphen", "nvke-m2", true},
+		{"digits and hyphen", "nvke", true},
 		{"empty", "", false},
 		{"traversal", "../x", false},
 		{"leading hyphen", "-alpha", false},

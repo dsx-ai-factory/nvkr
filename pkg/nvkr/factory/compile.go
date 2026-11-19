@@ -70,9 +70,20 @@ func compileDocumentsFor(ctx context.Context, definitionPath string, definition 
 	if err != nil {
 		return nil, err
 	}
+	candidates, err := loadCatalogCandidates(ctx, definition.Catalogs, loadStack)
+	if err != nil {
+		return nil, err
+	}
 	targetStacks := make(map[string]*catalog.Stack)
 	for _, target := range definition.Outputs {
 		if target.Catalog == nil {
+			if len(candidates) != 0 {
+				selected, err := selectCatalogCandidate(target, candidates)
+				if err != nil {
+					return nil, err
+				}
+				targetStacks[target.Name] = selected.stack()
+			}
 			continue
 		}
 		targetStack, err := loadStack(ctx, *target.Catalog)
@@ -83,6 +94,13 @@ func compileDocumentsFor(ctx context.Context, definitionPath string, definition 
 	}
 	for _, tool := range definition.InternalTools {
 		if tool.Catalog == nil {
+			if len(candidates) != 0 {
+				selected, err := selectCatalogCandidate(internalToolSelection(tool), candidates)
+				if err != nil {
+					return nil, err
+				}
+				targetStacks[internalToolSelection(tool).Name] = selected.stack()
+			}
 			continue
 		}
 		selected, err := loadStack(ctx, *tool.Catalog)
@@ -92,7 +110,7 @@ func compileDocumentsFor(ctx context.Context, definitionPath string, definition 
 		targetStacks[internalToolSelection(tool).Name] = selected
 	}
 	return compileWithTargetStacksFor(ctx, definition, delivery, stack, targetStacks, generatorVersion,
-		filepath.ToSlash(filepath.Clean(definitionPath)), filepath.ToSlash(filepath.Clean(environmentPath)), record, runtimeSourceCommit...)
+		filepath.ToSlash(filepath.Clean(definitionPath)), filepath.ToSlash(filepath.Clean(environmentPath)), record, candidates, runtimeSourceCommit...)
 
 }
 
@@ -127,6 +145,9 @@ func loadFactoryCatalogStack(ctx context.Context, definitionPath string, catalog
 // Compile derives the complete Run plan from admitted inputs and a resolved catalog.
 // Catalog overrides require CompileDocuments so each path has an explicit base.
 func Compile(ctx context.Context, definition authored.Definition, delivery authored.Environment, stack *catalog.Stack, generatorVersion string) (*Plan, error) {
+	if len(definition.Catalogs) != 0 {
+		return nil, e.New(e.CodeUsage, "catalog lists require CompileDocuments")
+	}
 	for _, target := range definition.Outputs {
 		if target.Catalog != nil {
 			return nil, e.New(e.CodeUsage,
@@ -143,11 +164,11 @@ func Compile(ctx context.Context, definition authored.Definition, delivery autho
 
 func compileWithTargetStacks(ctx context.Context, definition authored.Definition, delivery authored.Environment, stack *catalog.Stack,
 	targetStacks map[string]*catalog.Stack, generatorVersion, definitionPath, environmentPath string, runtimeSourceCommit ...string) (*Plan, error) {
-	return compileWithTargetStacksFor(ctx, definition, delivery, stack, targetStacks, generatorVersion, definitionPath, environmentPath, nil, runtimeSourceCommit...)
+	return compileWithTargetStacksFor(ctx, definition, delivery, stack, targetStacks, generatorVersion, definitionPath, environmentPath, nil, nil, runtimeSourceCommit...)
 }
 
 func compileWithTargetStacksFor(ctx context.Context, definition authored.Definition, delivery authored.Environment, stack *catalog.Stack,
-	targetStacks map[string]*catalog.Stack, generatorVersion, definitionPath, environmentPath string, record *CompositionRecord,
+	targetStacks map[string]*catalog.Stack, generatorVersion, definitionPath, environmentPath string, record *CompositionRecord, candidates []CatalogCandidate,
 	runtimeSourceCommit ...string) (*Plan, error) {
 	if ctx == nil {
 		return nil, e.New(e.CodeUsage, "factory compilation requires a context")
@@ -164,6 +185,9 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 	if err := admitDefinitionForm(delivery, record); err != nil {
 		return nil, err
 	}
+	if len(candidates) != len(definition.Catalogs) {
+		return nil, e.New(e.CodeUsage, "factory compilation requires every declared catalog candidate")
+	}
 	// Hold independent authored input values so callers cannot change executable identity.
 	definition = definition.Clone()
 	delivery = delivery.Clone()
@@ -179,7 +203,18 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 	if err != nil {
 		return nil, err
 	}
-	plan := &Plan{Actions: cloneActionPins(stack.Catalog.Actions), SchemaVersion: PlanSchemaVersion, Name: definition.Metadata.Name,
+	ownedCandidates := make([]CatalogCandidate, len(candidates))
+	for i, candidate := range candidates {
+		owned, err := catalog.ApplyStack(candidate.CatalogSnapshot)
+		if err != nil {
+			return nil, err
+		}
+		candidate.CatalogSnapshot = owned.Catalog
+		candidate.Selection.Overlays = append([]string(nil), candidate.Selection.Overlays...)
+		candidate.AppliedOverlays = append([]catalog.AppliedOverlay(nil), candidate.AppliedOverlays...)
+		ownedCandidates[i] = candidate
+	}
+	plan := &Plan{CatalogCandidates: ownedCandidates, Actions: cloneActionPins(stack.Catalog.Actions), SchemaVersion: PlanSchemaVersion, Name: definition.Metadata.Name,
 		GeneratorVersion: generatorVersion, Qualification: planTier(delivery.Signing),
 		DefinitionDigest: definitionDigest, EnvironmentDigest: environmentDigest, Definition: definition, Environment: delivery,
 		DefinitionPath: definitionPath, EnvironmentPath: environmentPath,
@@ -226,6 +261,15 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 		}
 	}
 	plan.Builds = append(plan.Builds, internalBuilds...)
+	selections, err := plan.selectedCatalogs()
+	if err != nil {
+		return nil, err
+	}
+	for i := range plan.Builds {
+		if spec, ok := selections[plan.Builds[i].Name]; ok {
+			plan.Builds[i].SelectedCatalog = &spec
+		}
+	}
 	tools, err := selectedTools(definition, delivery, plan.CatalogSnapshot, plan.Builds)
 	if err != nil {
 		return nil, err
@@ -250,6 +294,10 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 		return nil, err
 	}
 	plan.Targets, plan.Routes = targets, routes
+	plan.BootPublication, err = deriveBootPublicationPlan(plan)
+	if err != nil {
+		return nil, err
+	}
 	plan.Graph, err = compileArtifactGraph(*plan, tools, packageSpecs)
 	if err != nil {
 		return nil, err
@@ -260,6 +308,7 @@ func compileWithTargetStacksFor(ctx context.Context, definition authored.Definit
 		}
 		plan.SchemaVersion, plan.Composition = CompositePlanSchemaVersion, record.Clone()
 	}
+	plan.SchemaVersion = planSchemaFor(*plan)
 	if err := plan.Validate(); err != nil {
 		return nil, err
 	}

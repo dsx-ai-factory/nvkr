@@ -137,7 +137,7 @@ func TestGitHubDevelopmentPublicationAdmission(t *testing.T) {
 		{"anonymous", func(env *Environment) { env.Publication.Anonymous = true }, false},
 		{"plain HTTP", func(env *Environment) { env.Publication.PlainHTTP = true }, false},
 		{"image tags", func(env *Environment) { env.Publication.ImageTags = map[string]string{"image": "latest"} }, false},
-		{"production namespace", func(env *Environment) { env.Publication.RepositoryPrefix = "ghcr.io/example/nvkr/m2-candidate" }, false},
+		{"production namespace", func(env *Environment) { env.Publication.RepositoryPrefix = "ghcr.io/example/nvkr/candidate" }, false},
 		{"namespace child", func(env *Environment) { env.Publication.RepositoryPrefix += "/branch" }, false},
 		{"other repository namespace", func(env *Environment) { env.Publication.RepositoryPrefix = "ghcr.io/other/nvkr/development" }, false},
 		{"broad identity", func(env *Environment) { env.Signing.Identity = ".*" }, false},

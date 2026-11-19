@@ -23,8 +23,10 @@ import (
 const (
 	GeneratedManifestPath   = ".github/nvkr-run/manifest.json"
 	generatedManifestSchema = "nvkr.dev/generated-run/v1"
-	maxGeneratedFileBytes   = int64(32 << 20)
-	maxGeneratedDirEntries  = 4096
+	// MaxGeneratedFileBytes bounds one generated storage member, including a Plan root.
+	MaxGeneratedFileBytes  = int64(32 << 20)
+	maxGeneratedFileBytes  = MaxGeneratedFileBytes
+	maxGeneratedDirEntries = 4096
 )
 
 type GeneratedManifest struct {
@@ -65,8 +67,29 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 	if len(names) > maxGeneratedDirEntries {
 		return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run has too many members")
 	}
-	members := make([]GeneratedMember, 0, len(names))
+	// The reader's entry bound includes directories, the manifest and its lease.
+	// Admit that same inventory before creating a tree with many target folders.
+	privateRoot := filepath.ToSlash(filepath.Dir(bundle.ManifestPath))
+	entries := map[string]bool{bundle.ManifestPath: true, bundle.ManifestPath + ".lease": true}
 	for _, name := range names {
+		if !strings.HasPrefix(name, privateRoot+"/") {
+			continue
+		}
+		entries[name] = true
+		for parent := filepath.ToSlash(filepath.Dir(name)); parent != privateRoot; parent = filepath.ToSlash(filepath.Dir(parent)) {
+			entries[parent] = true
+		}
+		if len(entries) > maxGeneratedDirEntries {
+			return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run directory has too many entries")
+		}
+	}
+	members := make([]GeneratedMember, 0, len(names))
+	total := 0
+	for _, name := range names {
+		total += len(bundle.Files[name])
+		if bundle.Engine == EngineGitHub && total > maxPlanTreeBytes {
+			return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated GitHub bundle exceeds aggregate size bound")
+		}
 		if !safeGeneratedPath(name) || int64(len(bundle.Files[name])) > maxGeneratedFileBytes {
 			return GeneratedManifest{}, nil, e.New(e.CodeInvalidCatalog, "generated Run member %q is unsafe or oversized", name)
 		}
@@ -74,6 +97,9 @@ func ManifestFor(bundle *GeneratedBundle) (GeneratedManifest, []byte, error) {
 			if err := validateGitHubWorkflowSize(bundle.Files[name]); err != nil {
 				return GeneratedManifest{}, nil, err
 			}
+		}
+		if isPlanStorePath(name) && !planStoreMatches(name, bundle.Files[name]) {
+			return GeneratedManifest{}, nil, e.New(e.CodePipelineDrift, "shared Plan member differs from its content address")
 		}
 		members = append(members, GeneratedMember{Path: name, SHA256: pipeline.FileDigest(bundle.Files[name]), Mode: 0o644})
 	}
@@ -142,6 +168,13 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	if err := ensureGeneratedDirectory(root, filepath.ToSlash(filepath.Dir(bundle.ManifestPath))); err != nil {
 		return err
 	}
+	if bundle.Engine == EngineGitHub {
+		unlock, err := acquireBundleLock(ctx, filepath.Join(root, PlanStoreDirectory+".lease"))
+		if err != nil {
+			return err
+		}
+		defer unlock()
+	}
 	release, err := acquireBundleLock(ctx, filepath.Join(root, bundle.ManifestPath+".lease"))
 	if err != nil {
 		return err
@@ -154,8 +187,24 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	if err != nil {
 		return err
 	}
+	garbage, err := inspectPlanStore(ctx, root, bundle, true)
+	if err != nil {
+		return err
+	}
+	var storeIndex []byte
+	if bundle.Engine == EngineGitHub {
+		// Admit and compute the complete index before publication, while the
+		// store lock fixes the owner set. Commit those bytes after the manifest.
+		storeIndex, err = planStoreIndex(ctx, root, bundle)
+		if err != nil {
+			return err
+		}
+	}
 
-	type staged struct{ destination, temporary string }
+	type staged struct {
+		destination, temporary string
+		shared                 bool
+	}
 	names := sortedFileNames(bundle.Files)
 	stagedFiles := make([]staged, 0, len(names)+1)
 	cleanup := func() {
@@ -181,7 +230,7 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		if err != nil {
 			return e.Wrap(e.CodeInternal, err, "staging generated member %s", relative)
 		}
-		entry := staged{destination: destination, temporary: tmp.Name()}
+		entry := staged{destination: destination, temporary: tmp.Name(), shared: isPlanStorePath(relative)}
 		stagedFiles = append(stagedFiles, entry)
 		// Name the logical member; %w keeps the os.PathError and any owner code.
 		fail := func(err error) error {
@@ -203,6 +252,11 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		return nil
 	}
 	for _, name := range names {
+		if isPlanStorePath(name) {
+			if _, err := os.Lstat(filepath.Join(root, name)); err == nil {
+				continue
+			}
+		}
 		if err := stage(name, bundle.Files[name]); err != nil {
 			return err
 		}
@@ -225,13 +279,42 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 			}
 		}
 		entry := &stagedFiles[index]
-		if err := os.Rename(entry.temporary, entry.destination); err != nil {
+		publish := os.Rename
+		if entry.shared {
+			publish = func(old, new string) error {
+				if err := os.Link(old, new); err != nil {
+					return err
+				}
+				return os.Remove(old)
+			}
+		}
+		if err := publish(entry.temporary, entry.destination); err != nil {
 			return e.Wrap(e.CodeInternal, err, "publishing generated member %s", entry.destination)
 		}
 		entry.temporary = ""
 	}
+	// A crash before this sweep leaves only unreferenced objects. The next
+	// generation can reclaim them even when its inputs differ from this attempt.
+	if err := removeRetiredGeneratedMembers(context.WithoutCancel(ctx), root, bundle, garbage); err != nil {
+		return err
+	}
+	for _, member := range garbage {
+		names = append(names, member.Path)
+	}
+	if bundle.Engine == EngineGitHub {
+		if err := writePlanStoreIndex(context.WithoutCancel(ctx), root, storeIndex); err != nil {
+			return err
+		}
+		if err := prunePlanStoreDirectories(context.WithoutCancel(ctx), root); err != nil {
+			return err
+		}
+		names = append(names, PlanStoreIndexPath)
+	}
 	for _, directory := range generatedDirectories(root, append(names, bundle.ManifestPath)) {
 		opened, err := os.Open(directory)
+		if errors.Is(err, os.ErrNotExist) && strings.HasPrefix(directory, filepath.Join(root, PlanStoreDirectory)+string(filepath.Separator)) {
+			continue // The sweep removed this empty store directory; sync its surviving parents.
+		}
 		if err != nil {
 			return err
 		}
@@ -258,6 +341,9 @@ func CheckGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	}
 	manifest, manifestBytes, err := ManifestFor(bundle)
 	if err != nil {
+		return err
+	}
+	if err := checkPlanStore(ctx, root, bundle); err != nil {
 		return err
 	}
 	if err := checkGeneratedDirectoryContents(ctx, root, bundle); err != nil {
@@ -342,6 +428,14 @@ func checkGeneratedDirectoryContents(ctx context.Context, root string, bundle *G
 		return err
 	}
 
+	if err := checkGeneratedInventory(ctx, directory, allowedFiles, allowedDirectories); err != nil {
+		return err
+	}
+	return checkGeneratedWorkflowContents(ctx, root, bundle)
+}
+
+// Inspect a bounded directory inventory without interpreting member contents.
+func checkGeneratedInventory(ctx context.Context, directory string, allowedFiles, allowedDirectories map[string]bool) error {
 	seen := 0
 	var inspect func(string, string) error
 	inspect = func(path, relative string) error {
@@ -350,16 +444,16 @@ func checkGeneratedDirectoryContents(ctx context.Context, root string, bundle *G
 		}
 		before, err := os.Lstat(path)
 		if err != nil || !before.IsDir() || before.Mode()&os.ModeSymlink != 0 {
-			return e.New(e.CodePipelineDrift, "generated Run directory %s is missing or unsafe", path)
+			return e.New(e.CodePipelineDrift, "generated Run directory %q is missing or unsafe", path)
 		}
 		opened, err := os.Open(path)
 		if err != nil {
-			return e.Wrap(e.CodePipelineDrift, err, "opening generated Run directory %s", path)
+			return e.Wrap(e.CodePipelineDrift, err, "opening generated Run directory %q", path)
 		}
 		defer func() { _ = opened.Close() }()
 		openedInfo, err := opened.Stat()
 		if err != nil || !openedInfo.IsDir() || !os.SameFile(before, openedInfo) {
-			return e.New(e.CodePipelineDrift, "generated Run directory %s changed while opening", path)
+			return e.New(e.CodePipelineDrift, "generated Run directory %q changed while opening", path)
 		}
 		for {
 			entries, readErr := opened.ReadDir(128)
@@ -378,11 +472,11 @@ func checkGeneratedDirectoryContents(ctx context.Context, root string, bundle *G
 				childPath := filepath.Join(path, entry.Name())
 				info, statErr := os.Lstat(childPath)
 				if statErr != nil || info.Mode()&os.ModeSymlink != 0 {
-					return e.New(e.CodePipelineDrift, "generated Run member %s is missing or unsafe", childRelative)
+					return e.New(e.CodePipelineDrift, "generated Run member %q is missing or unsafe", childRelative)
 				}
 				if info.IsDir() {
 					if !allowedDirectories[childRelative] {
-						return e.New(e.CodePipelineDrift, "unexpected generated Run directory %s", childRelative)
+						return e.New(e.CodePipelineDrift, "unexpected generated Run directory %q", childRelative)
 					}
 					if err := inspect(childPath, childRelative); err != nil {
 						return err
@@ -390,33 +484,33 @@ func checkGeneratedDirectoryContents(ctx context.Context, root string, bundle *G
 					continue
 				}
 				if !info.Mode().IsRegular() || !allowedFiles[childRelative] {
-					return e.New(e.CodePipelineDrift, "unexpected generated Run member %s", childRelative)
+					return e.New(e.CodePipelineDrift, "unexpected generated Run member %q", childRelative)
 				}
 			}
 			if errors.Is(readErr, io.EOF) {
 				break
 			}
 			if readErr != nil {
-				return e.Wrap(e.CodePipelineDrift, readErr, "listing generated Run directory %s", path)
+				return e.Wrap(e.CodePipelineDrift, readErr, "listing generated Run directory %q", path)
 			}
 		}
 		after, err := os.Lstat(path)
 		if err != nil || !after.IsDir() || after.Mode()&os.ModeSymlink != 0 || !os.SameFile(before, after) {
-			return e.New(e.CodePipelineDrift, "generated Run directory %s changed during inspection", path)
+			return e.New(e.CodePipelineDrift, "generated Run directory %q changed during inspection", path)
 		}
 		return nil
 	}
 	if err := inspect(directory, "."); err != nil {
 		return err
 	}
-	return checkGeneratedWorkflowContents(ctx, root, bundle)
+	return nil
 }
 
 func validateGeneratedDirectoryChain(root, relative string) error {
 	current := filepath.Clean(root)
 	info, err := os.Lstat(current)
 	if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-		return e.New(e.CodeImmutableViolation, "generated Run root %s is not a real directory", current)
+		return e.New(e.CodeImmutableViolation, "generated Run root %q is not a real directory", current)
 	}
 	for _, component := range strings.Split(filepath.ToSlash(relative), "/") {
 		if component == "." || component == "" {
@@ -425,7 +519,7 @@ func validateGeneratedDirectoryChain(root, relative string) error {
 		current = filepath.Join(current, component)
 		info, err = os.Lstat(current)
 		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-			return e.New(e.CodeImmutableViolation, "generated Run directory %s is not a real directory", current)
+			return e.New(e.CodeImmutableViolation, "generated Run directory %q is not a real directory", current)
 		}
 	}
 	return nil
@@ -470,7 +564,7 @@ func ensureGeneratedDirectory(root, relative string) error {
 	current := filepath.Clean(root)
 	rootInfo, err := os.Lstat(current)
 	if err != nil || !rootInfo.IsDir() || rootInfo.Mode()&os.ModeSymlink != 0 {
-		return e.New(e.CodeImmutableViolation, "generated Run root %s is not a real directory", current)
+		return e.New(e.CodeImmutableViolation, "generated Run root %q is not a real directory", current)
 	}
 	for _, component := range strings.Split(filepath.ToSlash(relative), "/") {
 		if component == "." || component == "" {
@@ -479,13 +573,16 @@ func ensureGeneratedDirectory(root, relative string) error {
 		current = filepath.Join(current, component)
 		info, err := os.Lstat(current)
 		if errors.Is(err, os.ErrNotExist) {
-			if err := os.Mkdir(current, 0o755); err != nil {
+			if err := os.Mkdir(current, 0o755); err != nil && !errors.Is(err, os.ErrExist) {
 				return e.Wrap(e.CodeImmutableViolation, err, "creating generated Run directory %s", current)
 			}
+			// Another bundle may create a shared ancestor before either writer
+			// acquires its lock. Admit the resulting directory through the same
+			// no-symlink check as an ancestor that already existed.
 			info, err = os.Lstat(current)
 		}
 		if err != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
-			return e.New(e.CodeImmutableViolation, "generated Run directory %s is not a real directory", current)
+			return e.New(e.CodeImmutableViolation, "generated Run directory %q is not a real directory", current)
 		}
 	}
 	return nil
@@ -494,7 +591,9 @@ func ensureGeneratedDirectory(root, relative string) error {
 func generatedDirectories(root string, members []string) []string {
 	set := map[string]bool{filepath.Clean(root): true}
 	for _, member := range members {
-		set[filepath.Join(root, filepath.Dir(filepath.FromSlash(member)))] = true
+		for parent := filepath.Dir(filepath.FromSlash(member)); parent != "."; parent = filepath.Dir(parent) {
+			set[filepath.Join(root, parent)] = true
+		}
 	}
 	directories := sortedKeys(set)
 	sort.Slice(directories, func(i, j int) bool {

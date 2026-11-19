@@ -175,7 +175,7 @@ func TestNVKEPinSetRejectsInvalidBetaLocalChartMetadata(t *testing.T) {
 		{"artifact mapping empty", controller, "artifact: controller-chart", "artifact: \"\""},
 		{"artifact mapping null", controller, "artifact: controller-chart", "artifact: null"},
 		{"artifact mapping numeric", controller, "artifact: controller-chart", "artifact: 1"},
-		{"image mapping whitespace", controller, "imageArtifact: cwe", "imageArtifact: \"cwe image\""},
+		{"image mapping whitespace", controller, "imageArtifact: cwe", "imageArtifact: \"nvke-controller image\""},
 		{"profiles mapping reference", controller, "profilesArtifact: controller-profiles", "profilesArtifact: registry.example/profiles"},
 		{"external artifact mapping", "deploy/nico/spire/release.yaml", "chart:\n", "chart:\n  artifact: spire\n"},
 	} {
@@ -342,7 +342,7 @@ func TestNVKEPinSetLocalChartOwnsOptionalReleaseVersion(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			reg, tree := nvkePinFixture(t)
 			replaceNVKEFixture(t, tree, release, "  version: \"0.0.0\"\n", "")
-			replaceNVKEFixture(t, tree, release, "chart:\n", "chart:\n  artifact: controller-chart\n  imageArtifact: cwe\n  profilesArtifact: controller-profiles\n")
+			replaceNVKEFixture(t, tree, release, "chart:\n", "chart:\n  artifact: controller-chart\n  imageArtifact: nvke-controller\n  profilesArtifact: controller-profiles\n")
 			tc.edit(t, tree)
 			versions, err := deriveNVKEPinSet(t.Context(), tree, reg, "nvke")
 			if tc.want != "" {
@@ -440,7 +440,7 @@ func TestNVKEPinSetLocalChartMetadata(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			reg, tree := nvkePinFixture(t)
 			replaceNVKEFixture(t, tree, releaseFile, "  version: \"0.0.0\"\n", "")
-			replaceNVKEFixture(t, tree, releaseFile, "chart:\n", "chart:\n  artifact: controller-chart\n  imageArtifact: cwe\n  profilesArtifact: controller-profiles\n")
+			replaceNVKEFixture(t, tree, releaseFile, "chart:\n", "chart:\n  artifact: controller-chart\n  imageArtifact: nvke-controller\n  profilesArtifact: controller-profiles\n")
 			tree.files[chartFile] = []byte("name: " + tc.chartName + "\nversion: \"" + tc.version + "\"\n")
 			item := reg.Sources["nvke"].PinSet.Accounted["controller"]
 			item.ChartName = tc.reviewedName

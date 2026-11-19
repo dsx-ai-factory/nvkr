@@ -94,8 +94,8 @@ ADR-26 §9 additionally admits, for composite Definitions only, a named signed d
 `development-<name>` namespace with a signer bound to that workflow; it never shares the fixed layout.
 The default production layout remains `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/`. Both use the same
 compiler, renderer, exact validation and writer. The admitted Environment selects these paths; callers
-cannot relocate one bundle into the other layout. Each manifest owns only its own payloads and lock, so
-regeneration or retirement of one leaves the other intact. Helper commands and container launches bind the
+cannot relocate one bundle into the other layout. Each manifest owns its private payloads and lock, and references shared frozen Plan objects under the storage contract below.
+Regeneration preserves objects still referenced by another bundle. Helper commands and container launches bind the
 Plan at that layout and recheck its digest. Development mode changes Environment/Plan identity, not
 transport-independent logical Build identity. Its execution and retention policy is owned by ADR-18.
 Signed development also binds the disposable namespace and signer policy in this immutable Plan. Actual
@@ -111,6 +111,62 @@ Unnamed development and named production remain separate supported selections.
 Execution identity and transaction identity are separate. The Plan binds authored inputs and every executable
 operation; the workflow has its own exact-byte digest. The commit manifest lists each owned file's safe relative path, mode and exact whole-file digest,
 plus plan and workflow identities. It is written last and never lists itself. No self-referential identity is permitted.
+
+GitHub stores that same Plan as a generated file tree.
+Each bundle's small `plan.json` index carries the `storage: nvkr-plan-tree-v1` discriminator, outside the executable Plan schema.
+Frozen JSON records and raw scripts live in one repository store, `.github/nvkr-plan-store/`.
+Paths identify kind and logical name, followed by `@` and the first 12 hex characters of the exact-byte
+SHA-256, then `.json` or `.sh`. The store has three directories: `scripts/`, `steps/` and `plan/`.
+Examples are `plan/catalog-<name>@<digest>.json`, `steps/<target>/<platform>@<digest>.json`
+and `scripts/<component>/build@<digest>.sh`. Platform filename labels use `linux-arm64` form;
+when an aggregate target already ends in that platform, the path includes it only once.
+The frozen record retains the exact full target name and platform.
+Every object has a suffix, including a name with only one variant. A path depends only on that object's
+kind, logical name and bytes; adding, removing or reordering neighboring bundles cannot change it.
+Full digests in each owning manifest authenticate bytes. A short-suffix collision with different full
+bytes fails closed; the suffix is a locator, not a new logical identity.
+The generated `index.json` groups object variants by logical name, with each object's path, full digest
+and sorted bundle users. Its job entries link workflow jobs and execution steps to frozen producer records
+and exact scripts. Identical job descriptions share one entry with their workflow and bundle users.
+Job comments point to this one index; no per-bundle script index is emitted. Generation reconstructs
+navigation from each published manifest's current records and workflows without rendering workflows
+or resolving catalogs; retirement-only workflows are excluded. A bundle drift check validates the global
+object inventory and its own job mapping without reading neighboring private Plans or workflows.
+Checking all maintained bundles covers the entire navigation index. Plan loads do not consult the
+descriptive index or neighboring bundles.
+Runtime pin refresh retains the existing target/script-binding and exact workflow/action checks; the
+shared index is rebuilt when generation publishes changed records. Navigation does not change executable identity.
+Each bundle's `plan.json` retains scalar metadata, ordered build names and references, and a `catalogSnapshots` map keyed by the existing `catalogDigest`.
+Every distinct snapshot is stored once; identical snapshots across bundles share the same object under `plan/`.
+Snapshots keep component and source configuration inline. Each step record keeps its resolved component
+configuration inline beside the unchanged target name, platform, Build Digest, component selection,
+overlays and execution graph, whose source operations carry their exact source commits. There are no
+separate component, source or resolved-component pointer records. Loading never resolves them again.
+Structured top-level fields, including the complete graph with its nodes and artifacts, are shared records too.
+Byte-identical graphs share one object across bundles; differing graphs retain distinct objects without changing graph or Plan identity.
+Full target names remain unchanged, including aggregate targets such as `output/linux/arm64`.
+
+JSON objects use the canonical codec's bytes indented with two spaces and one final LF.
+Every multiline command operand in a snapshot, resolved component or execution step references the same exact script bytes through a single-key `{ "file": "<store path>" }` operand.
+Other operands remain strings.
+Raw script bytes gain no header, shebang or newline.
+References admit only safe named objects beneath the fixed store; arbitrary paths and symlinks fail closed.
+
+Loading admits the manifest's root and shared objects, their bounded inventory, regular-file modes, hashes and Plan digest.
+It reconstructs and validates the complete existing Plan and compares the exact regenerated tree without rendering or reading workflows and actions, fetching catalogs, or resolving inputs again.
+Duplicate or unknown fields, alternate encodings, missing, extra, symlinked, edited or mixed-generation members fail admission.
+The union of producer manifests describes ownership of the shared store; a manifest does not grant executable authority over another bundle.
+A load verifies only the objects listed by its own manifest. A malformed neighboring manifest,
+an unreferenced object, a stale generated index or an interrupted neighboring write cannot prevent that load.
+Generation and drift checks validate the union's store inventory and byte addresses; drift checks
+report unreferenced objects without changing files, and generation sweeps them under the store lock.
+Complete workflow/action closure checks remain with generation and runtime bootstrap, so read-only inspection does not depend on the binary's workflow renderer.
+Execution uses the captured Plan without reopening command files.
+The object store has a 64 MiB aggregate bound and 4,096-entry inventory bound, including directories.
+The generated index has the existing 32 MiB member bound; reconstructed Plans retain their 8 MiB bound.
+Diagnostic `planSha256` denotes the reconstructed packed bytes.
+The tree adds no Plan schema, digest family, Build identity or execution authority.
+Packed canonical bytes remain the wire and non-GitHub storage form, including Tekton.
 
 Owned payloads are generated provider/configuration files and canonical graph/plan records. Catalogs, profiles,
 vectors, roots and credentials remain external inputs whose exact references/policies are recorded, not copied
@@ -167,13 +223,23 @@ defines the full boundary. Ordinary bundles require complete regeneration and th
 check after every input update. Named production Environments may explicitly select
 `githubRuntimePlan: true`: the first bootstrap admits the committed baseline, freezes a fresh Plan from
 current pinned inputs and distributes its exact data through same-Run helper artifacts. Only the Plan
-and derived manifest may change; every workflow/action byte, member path,
+and derived manifest may change; every workflow/action byte and path, script body and consumer binding,
 Environment digest and authored input path stays fixed. Source-version updates within that contract need
 no regeneration commit. `--runtime --check` validates that contract without writes; ordinary `--check`
-still compares the complete current bundle. Secondary bootstraps restore the two runtime JSON files (Plan and manifest) into
-a fresh staging directory, then admit their exact rendered bytes and current authored selection against
-the complete committed baseline. The generation owner installs the admitted bundle using its existing
+still compares the complete current bundle. The two-file carrier contains the packed canonical Plan
+and the manifest of the rendered tree. Secondary bootstraps and
+helper consumers restore these two runtime JSON files into a fresh staging directory, then admit
+their exact bytes and current authored selection. Bootstraps render and check the complete committed
+baseline. Stage jobs load and validate that baseline Plan, render only the delivered candidate, match its
+packed bytes and manifest, and compare every fixed member's path, mode and bytes with the checkout.
+The stage path preserves the same Environment, authored selection, target and script-consumer bindings
+without rendering the baseline workflow again. A secondary bootstrap's runtime-input check also stages
+the two-file carrier, avoiding a duplicate check/render for export.
+The generation owner installs the admitted bundle using its existing
 lock, per-file atomic replacement and manifest-last semantics; this is not an atomic directory transaction.
+The root and content-addressed JSON objects are refreshable Plan data; new pins may change their object paths.
+Target membership, script bytes and the scripts' logical consumer cohorts remain fixed.
+A source pin that splits or merges a shared fetch cohort requires reviewed regeneration even if both cohorts use identical script bytes.
 Private transport never overwrites checked-out files. ADR-18 owns bootstrap ordering and transport. Neither an
 unchanged workflow nor runtime compilation establishes execution or publication acceptance.
 
@@ -360,8 +426,8 @@ compiled Plan. Impossible policy scope fails before any workflow write. The work
 selected executable platform set, while the final signer remains AMD64 with its independent executable pin.
 `run generate --qualification-policy` admits and renders this pair before writes, then composes it with
 the normal producer generation. The worker is a generated reusable GitHub Actions workflow, not an additional
-handwritten integration. The maintained candidate uses `inputs/policies/nvke-qualification.yaml` to emit
-`.github/workflows/nvkr-qualify.yml` and `.github/workflows/nvkr-smoke.yml` alongside its producer bundle.
+handwritten integration. The maintained candidate uses `inputs/policies/nvke-gpu-site-qualification.yaml` to emit
+`.github/workflows/nvkr-qualify-nvke.yml` and `.github/workflows/nvkr-smoke-nvke.yml` alongside its producer bundle.
 Its separate manifest owns exactly the two workflows. A persistent kernel lock serializes writes; bounded
 stages are synced and the manifest is committed last. Replacement or
 retirement requires prior ownership and exact bytes. Recovery may accept only prior-owned bytes or the
@@ -421,8 +487,15 @@ The legacy `--toolchain` spelling cannot alter component producer pins.
 ### 6. Serialized local writes and exact retirement of generated members
 
 Catalog lock writes use original-byte compare-and-swap, a persistent kernel lock inode, same-filesystem
-staging, fsync and atomic replacement (ADR-22). Generated Run writes acquire their per-bundle kernel lock,
-stage complete files and fsync them, publish payloads, retire obsolete members, and replace the manifest last.
+staging, fsync and atomic replacement (ADR-22).
+GitHub generation acquires the repository Plan-store kernel lock before its per-bundle kernel lock.
+Writers stage and fsync complete files, publish new shared objects with no-replace semantics, replace
+private payloads and retire obsolete private members, then replace the manifest. Only after publication
+do they sweep objects unreferenced by the new manifest and every other producer manifest.
+Existing shared objects must match their name suffix and each owner's full digest and are reused without
+replacement. Generation migrates former flat SHA-256 paths through the prior manifests and sweep;
+it does not preserve a second committed layout. After sweeping, generation publishes the derived index
+and removes empty generated store directories. A stale index after interruption is repaired by regeneration.
 Each named namespace owns its distinct manifest and lock. Write and check reject mixed
 namespace paths or members before output work; retirement cannot claim another bundle's
 workflow or generated directory. Default and multiple named bundles may coexist. Changing
@@ -432,11 +505,32 @@ conflict for two separately compiled bundles.
 
 Retirement reads the previous generated-run/v1 manifest as a bounded ownership description. It validates
 its schema, engine, workflow path, sorted member paths, digests and modes. A member may be retired only
-inside the generator-owned directory or the exact owner's reserved legacy child workflow namespace, and
-only when it is a regular file whose current bytes and mode still match that manifest. Missing obsolete
-members are tolerated for retry after an interrupted retirement.
+inside the generator-owned directory or the exact owner's reserved legacy child workflow namespace,
+and only when it is a regular file whose current bytes and mode still match that manifest.
+Missing obsolete private members are tolerated for retry after an interrupted retirement.
+
+The shared store has separate sweep authority over valid content-addressed objects and regular files
+with the reserved `.nvkr-run-stage-` prefix. The bounded inventory checks all addresses, modes and
+remaining owners before payload publication. A referenced object survives while any producer manifest
+lists it, including a script removed from another bundle. Unreferenced objects and abandoned staging
+files are rechecked against the inspected bytes and modes immediately before removal. Staging files
+may have the writer's initial 0600 mode or final 0644 mode; symlinks, directories, arbitrary names,
+altered addressed objects and malformed ownership manifests fail generation without being swept.
+The store lock covers ownership inspection, manifest publication and sweeping.
+
+To remove a whole bundle, remove its generated private directory and workflow closure together;
+then regenerate a retained bundle from its Definition and Environment without `--check`. Renaming
+also requires removing the old owner: generating a new name alone keeps both owners. Regeneration
+sweeps only objects no remaining manifest lists. The same sweep recovers objects published before an
+interruption, even if the retry has different inputs, and abandoned store staging files. Loads of
+unaffected bundles continue to work while the drift check reports the incomplete repository inventory.
+A malformed ownership manifest blocks generation and repository-wide drift checks. Restore that manifest
+from version control, or remove that bundle's generated private directory and workflow closure together,
+then regenerate. Regenerating over the damaged manifest cannot recover its ownership information.
+Drift checks are read-only and take no store lock. Do not overlap them with generation in the same checkout:
+they can observe staging files or an unfinished sweep and report transient drift. Rerun after generation finishes.
 Symlinks, changed obsolete members and unlisted directory members fail closed before payload publication.
-A missing prior manifest grants no ownership over unexpected files. Empty directories made obsolete by
+Outside the shared store, a missing prior manifest grants no ownership over unexpected files. Empty directories made obsolete by
 retired members are removed nonrecursively; unknown files are never swept by a recursive cleanup.
 
 New bundles cannot introduce child destinations; unsupported members fail before filesystem work.
@@ -450,14 +544,17 @@ before removal, writes the new manifest last, and fsyncs generated directories. 
 mixed payloads or incomplete retirement that fails the byte-exact check; regeneration is the recovery path
 when the prior ownership record remains available. The writer does not claim a crash-wide transaction or
 protection from an arbitrary same-user editor outside its kernel lock. If an older generator already replaced
-the ownership manifest while leaving old files behind, recover the authentic prior manifest from version
-control before regeneration; the current writer does not guess which unlisted files it may delete.
+the ownership manifest while leaving old private files behind, recover the authentic prior manifest
+from version control before regeneration; private files have no content-addressed sweep authority.
 
 The persistent owner-only lock inode is opened without following symlinks and is never removed. Process death
 releases kernel ownership automatically. Acquisition uses nonblocking attempts with context-aware retries;
 unsupported lock platforms fail closed. Staging honors cancellation; after publication begins the small
 commit finishes without voluntary cancellation. No daemon or distributed lock is required. Separate branches
-and worktrees retain Git's ordinary review and merge-conflict behavior.
+and worktrees retain Git's ordinary review and merge-conflict behavior. A textual merge can remove an
+object another branch newly references without a Git conflict. The repository-wide drift check on the
+merged tree, including `main`, detects that missing reference; regenerate from the merged inputs before
+accepting the tree. Per-bundle loads are not a replacement for that gate.
 
 ### 7. Single-owner rule for "the CI files"
 

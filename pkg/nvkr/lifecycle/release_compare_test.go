@@ -294,7 +294,7 @@ func TestCompareReleasesLocalLayoutsReportEachKindOfChange(t *testing.T) {
 		both, bothDigest := indexPublicationLayout(t, "amd64", "arm64")
 		one, oneDigest := indexPublicationLayout(t, "amd64")
 		comparison := compare(t, ref("registry.example.test", bothDigest), both, ref("registry.example.test", oneDigest), one)
-		changed(t, comparison, "cwe", "imageIndex", false)
+		changed(t, comparison, "nvke-controller", "imageIndex", false)
 		if before, after := comparison.Changed[0].Before.ImageIndex, comparison.Changed[0].After.ImageIndex; before == nil || after == nil ||
 			len(before.Children) != 2 || len(after.Children) != 1 || len(after.RequiredPlatforms) != 1 {
 			t.Fatalf("image index change lost its children: %+v", comparison.Changed[0])

@@ -68,7 +68,7 @@ var allowedBuildEnv = map[string]bool{
 	"NICO_VERSION": true,
 	"NICO_COMMIT":  true,
 	"NICO_DATE":    true,
-	// Upstream CWE Dockerfile build arguments, rendered from the source lock.
+	// Upstream nvke-controller Dockerfile build arguments, rendered from the source lock.
 	"BUILD_VERSION": true,
 	"GIT_VERSION":   true,
 }

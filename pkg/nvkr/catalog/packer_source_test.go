@@ -12,11 +12,11 @@ import (
 
 func TestMaintainedPackerSourcesKeepAgentVendoringSeparate(t *testing.T) {
 	root := "../../../inputs/catalogs/node-images"
-	base, err := LoadContext(t.Context(), Dir(filepath.Join(root, "release")))
+	base, err := LoadContext(t.Context(), Dir(root))
 	if err != nil {
 		t.Fatal(err)
 	}
-	lock, err := LoadLockContext(t.Context(), filepath.Join(root, "release"))
+	lock, err := LoadLockContext(t.Context(), root)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -174,7 +174,7 @@ aggregate or the Release lane. A content-validated rebuild proves neither exact-
 construction. Qualified promotion under §1–§4 remains all-or-nothing for its exact required release members;
 there is no mixed-evidence shortcut around a missing reproduction receipt.
 
-The current M3 MVP is a build/evidence qualification gate over the exact complete M2 publication. It authenticates every named
+The current M3 MVP is a build/evidence qualification gate over the exact complete NVKE publication. It authenticates every named
 output against its producing Run, original attempt identities, commit, Definition and relevant input identities. Strict input and
 evidence schemas, exact output membership, applicable pins/digests and source consistency, and cryptographically
 verified build signatures and provenance are mandatory. Missing, duplicate, extra, substituted or mismatched
@@ -382,7 +382,7 @@ issuer. A missing, failed, incomplete, wrong-signer or mismatched member refuses
 output's surviving attachment cannot stand in for a later failed or canceled one. Only then does it attest the
 canonical manifest (ADR-01) to the publication root under the qualification identity and verify the exact
 attached bytes again. The receipt is rechecked and cancellation is observed between every step. Issuance uses
-M2's existing bytes and never rebuilds, repacks or relabels a member.
+NVKE's existing bytes and never rebuilds, repacks or relabels a member.
 
 The production adapter derives that independent manifest policy from the one loaded qualification-policy
 snapshot: its repository, qualification workflow and default branch select the exact expected certificate

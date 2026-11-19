@@ -381,7 +381,7 @@ func githubNeedsWorkflowFixture(t *testing.T, projection *githubNeedsProjection)
 }
 
 func TestGitHubNeedsLoweringPreservesBodiesAliasesAndExactCollectors(t *testing.T) {
-	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
