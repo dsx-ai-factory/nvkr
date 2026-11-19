@@ -132,7 +132,7 @@ func recoverGitHubArtifacts(ctx context.Context, plan *Plan, providerResults str
 	}
 	var upstreamFailure string
 	if PerOutputPublication(plan) {
-		status := githubProviderClosureStatus(jobs, results)
+		status := githubProviderClosureStatus(jobs, results, projection.Full)
 		if err := writeGitHubRestoreOutcome(ctx, "all-provider-jobs", status); err != nil {
 			return err
 		}

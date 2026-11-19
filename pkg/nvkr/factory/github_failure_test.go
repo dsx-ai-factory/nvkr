@@ -29,11 +29,50 @@ func TestGitHubProviderClosurePrioritizesActualFailure(t *testing.T) {
 		{"unknown result", map[string]string{"a": "success", "z": "unknown"}, "job-failed"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := githubProviderClosureStatus([]string{"z", "a"}, tc.results); got != tc.want {
+			if got := githubProviderClosureStatus([]string{"z", "a"}, tc.results, nil); got != tc.want {
 				t.Fatalf("closure status = %q, want %q", got, tc.want)
 			}
 		})
 	}
+}
+
+func TestGitHubProviderClosurePrefersFailedAncestor(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		needs map[string][]string
+	}{
+		{"direct dependency", map[string][]string{"a-verify": {"z-build"}}},
+		{"successful intermediate", map[string][]string{"a-verify": {"middle"}, "middle": {"z-build"}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			results := map[string]string{"a-verify": "failure", "middle": "success", "z-build": "failure"}
+			if got := githubProviderClosureStatus([]string{"a-verify", "middle", "z-build"}, results, tc.needs); got != "job-failed:failure:z-build" {
+				t.Fatalf("consequential failure hid the failed producer: %s", got)
+			}
+		})
+	}
+}
+
+func TestGitHubProviderFailureBootstrapOmitsDuplicateLabel(t *testing.T) {
+	plan := referenceTestPlan(t)
+	_, nodeJobs, err := githubStages(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs, err := githubFinalizerJobs(plan, nodeJobs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, job := range jobs {
+		if strings.HasPrefix(job, "build-runner-") {
+			message := githubProviderFailureMessage(plan, "job-failed:failure:"+job)
+			if strings.Count(message, job) != 1 || strings.Contains(message, "(") {
+				t.Fatalf("bootstrap diagnostic repeats the ID: %s", message)
+			}
+			return
+		}
+	}
+	t.Fatal("fixture needs a bootstrap job")
 }
 
 func TestGitHubRecoveryPreservesUpstreamFailureForFinalizer(t *testing.T) {

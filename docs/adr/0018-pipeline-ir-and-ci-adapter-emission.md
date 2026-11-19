@@ -1813,9 +1813,11 @@ Finalizers are scheduled unconditionally and fail on failed/missing producers, f
 artifacts, malformed or substituted observations/SBOMs, and wrong production predicates. The platform may prevent
 the finalizer itself from starting; inspect provider status when no Run record exists (ADR-17).
 For GitHub per-output publication, recovery retains one original unsuccessful provider job in the failed
-closure description. Actual failure takes precedence over cancellation and skipped dependents; ties use
-job-ID order because the provider result schema carries no timestamps. Recovery logs and the finalizer's
-existing `provenance-missing` failure name that admitted job and its Plan-derived display label, directing
+closure description. Actual failure takes precedence over cancellation and skipped dependents. Within
+each outcome, ancestors with that outcome precede their dependents, including through successful
+intermediate jobs; independent roots use job-ID order because the provider result schema carries no
+timestamps. Recovery logs and the finalizer's existing `provenance-missing` failure name that admitted job
+and, for execution stages, its Plan-derived display label, directing
 operators to its log for the original error. These descriptions cannot select an upstream error code or
 authorize completion. Missing, legacy, malformed or foreign diagnostics retain the generic completeness
 error; successful closure still requires every original job and exact restored evidence.

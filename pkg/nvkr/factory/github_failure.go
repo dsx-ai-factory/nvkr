@@ -11,13 +11,31 @@ import (
 
 // Results have already passed exact original-job accounting, including collector
 // expansion. Prefer a real failure over canceled or skipped dependents. The
-// provider result schema has no timestamps: ties use job ID, not inferred time.
-func githubProviderClosureStatus(jobs []string, results map[string]string) string {
+// admitted dependency DAG puts an upstream failure before consequential failures;
+// independent roots use job ID, not inferred time.
+func githubProviderClosureStatus(jobs []string, results map[string]string, needs map[string][]string) string {
 	ordered := slices.Clone(jobs)
 	slices.Sort(ordered)
 	for _, outcome := range []string{"failure", "cancelled", "skipped"} { //nolint:misspell // GitHub enum.
+		// Walk through successful intermediates too: completion-scheduled jobs
+		// can succeed despite an unsuccessful ancestor. The DAG is validated.
+		ancestors := map[string]bool{}
+		var hasAncestor func(string) bool
+		hasAncestor = func(job string) bool {
+			if found, known := ancestors[job]; known {
+				return found
+			}
+			for _, dependency := range needs[job] {
+				if results[dependency] == outcome || hasAncestor(dependency) {
+					ancestors[job] = true
+					return true
+				}
+			}
+			ancestors[job] = false
+			return false
+		}
 		for _, job := range ordered {
-			if results[job] == outcome {
+			if results[job] == outcome && !hasAncestor(job) {
 				return "job-failed:" + outcome + ":" + job
 			}
 		}
@@ -51,12 +69,12 @@ func githubProviderFailureMessage(plan *Plan, status string) string {
 	if err != nil || !slices.Contains(jobs, job) {
 		return ""
 	}
-	label := job
+	label := ""
 	for _, stage := range stages {
 		if stage.ID == job {
-			label = stage.Name
+			label = fmt.Sprintf(" (%q)", stage.Name)
 			break
 		}
 	}
-	return fmt.Sprintf("upstream provider job %q (%q) reported %s; inspect its log for the original error", job, label, outcome)
+	return fmt.Sprintf("upstream provider job %q%s reported %s; inspect its log for the original error", job, label, outcome)
 }
