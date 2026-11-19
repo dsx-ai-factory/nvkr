@@ -27,6 +27,9 @@ func (plan Plan) Validate() error {
 	if err != nil {
 		return err
 	}
+	if err := plan.validateCatalogCandidates(); err != nil {
+		return err
+	}
 	if err := plan.validatePlanBuilds(); err != nil {
 		return err
 	}

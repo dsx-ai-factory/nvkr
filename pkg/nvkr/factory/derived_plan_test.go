@@ -74,6 +74,52 @@ func TestDerivedInventoryPlan(t *testing.T) {
 	}
 }
 
+func TestDerivedInventoryCatalogCandidates(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		candidates []authored.Catalog
+		explicit   bool
+	}{
+		{"selected sibling", []authored.Catalog{{Base: "candidate"}}, false},
+		{"explicit sibling among identical candidates", []authored.Catalog{{Base: "first"}, {Base: "second"}}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			definition, environment, stack := derivedTestInputs(t)
+			baseline, err := Compile(t.Context(), definition, environment, stack, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			definition.Catalogs = tc.candidates
+			if tc.explicit {
+				definition.Outputs[0].Catalog = &definition.Catalog
+			}
+			plan, err := compileDocumentsWithLoader(t.Context(), "definition.yaml", definition, "environment.yaml", environment, "test",
+				func(context.Context, authored.Catalog) (*catalog.Stack, error) { return stack, nil })
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(plan.Builds) != 1 || len(plan.LifecycleOutputs) != 2 || len(plan.CatalogCandidates) != len(tc.candidates) {
+				t.Fatal("catalog candidates changed derived or producer membership")
+			}
+			if plan.Builds[0].BuildDigest != baseline.Builds[0].BuildDigest || plan.LifecycleOutputs[1].BuildDigest != baseline.LifecycleOutputs[1].BuildDigest {
+				t.Fatal("catalog selection changed unchanged payload or derived Build identity")
+			}
+			selections, err := plan.selectedCatalogs()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, selected := selections["inventory"]; selected || len(selections) != 1 {
+				t.Fatal("source-less inventory acquired a producer catalog")
+			}
+			if err := plan.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			plan.Builds[0].SelectedCatalog = nil
+			assertFactoryErrorCode(t, plan.Validate(), e.CodeUnverifiedRef)
+		})
+	}
+}
+
 func TestDerivedInventoryAdmission(t *testing.T) {
 	for _, tc := range []struct {
 		name   string

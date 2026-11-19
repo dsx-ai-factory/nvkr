@@ -27,7 +27,7 @@ At launch, the four-family NVKE pilot (#211) split the then 69-output combined c
 (28), telemetry (17) and disks (4) Definitions. Each family has its own owner, Environment, generated bundle, Run and Release, and
 the [partitioning strategy](../definition-partitioning-strategy.md) records why. The combined
 `inputs/definitions/nvke/definition.yaml` remains a hand-maintained second copy of the families' shared
-output declarations, currently 69, so every family change must be repeated there. Consumers that want one product Release must
+output declarations, plus a release-derived inventory, currently 70 outputs, so every family change must be repeated there. Consumers that want one product Release must
 otherwise associate four family Releases themselves.
 
 Execution partitioning (ADR-18 §8, PR #264) already runs one complete Plan as bounded same-commit worker
@@ -111,7 +111,8 @@ consumes unchanged. The derivation is a pure, deterministic function of the comp
 | Input | Rule | Conflict |
 |---|---|---|
 | Named outputs | Disjoint union. Each output declaration is copied unchanged except for catalog path rebasing below. Output names are preserved; there is no prefixing, renaming or namespacing. The union is sorted by name. | The same output name in two members is an error, even if the declarations are identical. There is no deduplication. |
-| Per-output catalog | Every output receives an explicit catalog stack. An output without an override inherits its own member's top-level `catalog`. Base and overlay locators are rebased from the member's directory to the composite's directory. Member locators must be relative; absolute locators are rejected, not rebased, matching compile-input capture. | An absolute base or overlay locator, or a rebased locator outside the admitted input root, is an error. |
+| Per-output catalog | Without a catalog list, every ordinary output receives an explicit stack inherited from its member unless overridden. With a list, an omitted ordinary output override stays omitted and selects from the shared effective list under ADR-11. Release-derived outputs retain no catalog stack. Base and overlay locators are rebased from the member's directory to the composite's directory. Member locators must be relative; absolute locators are rejected, not rebased, matching compile-input capture. | An absolute base or overlay locator, or a rebased locator outside the admitted input root, is an error. |
+| Top-level `catalogs` | Every member's optional ordered candidate list, after rebasing, must be identical. It becomes the effective Definition's list; order never breaks a producer collision. | Any difference, including an omitted list in only some members, is an error. |
 | Top-level `catalog` | Every member's top-level catalog stack, after rebasing, must be identical. It becomes the effective Definition's top-level stack. | Any difference is an error. |
 | `sbomTool` | Every member that selects one must select the same value; it becomes the effective `sbomTool`. A member that omits it inherits that shared value, so its outputs get SBOMs inside the composite while its standalone Runs stay unchanged. | Two different selected values are an error. |
 | `cosignTool` | Every member must select the same value (including omission). | Any difference is an error. |

@@ -29,23 +29,37 @@ func compositeMemberFixture(name string, outputs ...string) Definition {
 }
 
 func TestCompositeDerivedInventoryMember(t *testing.T) {
-	root, composite := compositeFixture(t)
-	member := compositeMemberFixture("alpha", "alpha-image")
-	member.Outputs[0].Format = OutputOCI
-	member.Outputs = append(member.Outputs, DefinitionOutput{Name: "inventory", Platform: "linux/amd64", Format: OutputBundle, Derived: &derivedoutput.Selection{Encoding: derivedoutput.InventoryV1, Outputs: []string{"alpha-image"}}})
-	writeCompositeFile(t, filepath.Join(root, "defs", "alpha.yaml"), member)
-	composite.Members[0] = memberPin(t, "alpha", "alpha.yaml", member)
-	writeCompositeFile(t, filepath.Join(root, "defs", "composite.yaml"), composite)
-	admitted, err := LoadComposite(t.Context(), root, "defs/composite.yaml")
-	if err != nil {
-		t.Fatal(err)
-	}
-	effective := admitted.Effective()
-	if err := effective.Validate(); err != nil {
-		t.Fatal(err)
-	}
-	if effective.Outputs[2].Derived == nil || effective.Outputs[2].Catalog != nil {
-		t.Fatal("composition changed the source-less derivation")
+	for _, candidates := range []bool{false, true} {
+		t.Run(fmt.Sprintf("catalog candidates %t", candidates), func(t *testing.T) {
+			root, composite := compositeFixture(t)
+			member := compositeMemberFixture("alpha", "alpha-image")
+			member.Outputs[0].Format = OutputOCI
+			member.Outputs = append(member.Outputs, DefinitionOutput{Name: "inventory", Platform: "linux/amd64", Format: OutputBundle, Derived: &derivedoutput.Selection{Encoding: derivedoutput.InventoryV1, Outputs: []string{"alpha-image"}}})
+			if candidates {
+				member.Catalogs = []Catalog{member.Catalog}
+				beta := compositeMemberFixture("beta", "beta-cli")
+				beta.Catalogs = []Catalog{beta.Catalog}
+				writeCompositeFile(t, filepath.Join(root, "defs", "beta.yaml"), beta)
+				composite.Members[1] = memberPin(t, "beta", "beta.yaml", beta)
+			}
+			writeCompositeFile(t, filepath.Join(root, "defs", "alpha.yaml"), member)
+			composite.Members[0] = memberPin(t, "alpha", "alpha.yaml", member)
+			writeCompositeFile(t, filepath.Join(root, "defs", "composite.yaml"), composite)
+			admitted, err := LoadComposite(t.Context(), root, "defs/composite.yaml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			effective := admitted.Effective()
+			if err := effective.Validate(); err != nil {
+				t.Fatal(err)
+			}
+			if effective.Outputs[2].Derived == nil || effective.Outputs[2].Catalog != nil {
+				t.Fatal("composition changed the source-less derivation")
+			}
+			if (effective.Outputs[0].Catalog == nil) != candidates {
+				t.Fatal("composition changed ordinary catalog inheritance")
+			}
+		})
 	}
 }
 

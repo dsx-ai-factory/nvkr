@@ -257,7 +257,7 @@ func TestMaintainedM2DeploymentImageMembership(t *testing.T) {
 	seen := map[string]map[string]bool{}
 	selections := 0
 	for _, output := range authored.Outputs {
-		if output.Catalog == nil || output.Catalog.Base != "../../catalogs/runtime-dependencies" {
+		if len(output.Components) != 1 || expected[output.Components[0]] == "" {
 			continue
 		}
 		if output.Format != definition.OutputOCI || len(output.Components) != 1 {
