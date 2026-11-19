@@ -119,7 +119,7 @@ func TestGitLabNativeCheckoutModePolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	variables, ok := document["variables"].(map[string]any)
-	if !ok || len(variables) != 2 || variables["FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR"] != "true" || variables["GIT_STRATEGY"] != "clone" {
+	if !ok || len(variables) != 3 || variables["FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR"] != "true" || variables["GIT_STRATEGY"] != "clone" || variables["FF_GIT_URLS_WITHOUT_TOKENS"] != "true" {
 		t.Fatal("exact intrinsic pre-checkout Runner mode policy missing")
 	}
 	names, err := GitLabJobNames(t.Context(), plan)
@@ -146,6 +146,8 @@ func TestGitLabNativeCheckoutModePolicy(t *testing.T) {
 		{"disabled umask switch", "FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR", "false", false},
 		{"missing fresh checkout", "GIT_STRATEGY", "", true},
 		{"reused checkout", "GIT_STRATEGY", "fetch", false},
+		{"missing token-free URLs", "FF_GIT_URLS_WITHOUT_TOKENS", "", true},
+		{"credential-bearing URLs", "FF_GIT_URLS_WITHOUT_TOKENS", "false", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			candidate := *bundle

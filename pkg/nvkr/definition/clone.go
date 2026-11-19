@@ -59,6 +59,8 @@ func (input Environment) Clone() Environment {
 	}
 	if input.GitLab != nil {
 		value := *input.GitLab
+		value.AdditionalRefs = slices.Clone(value.AdditionalRefs)
+		value.PipelineSources = slices.Clone(value.PipelineSources)
 		value.Runners = maps.Clone(value.Runners)
 		for platform, runner := range value.Runners {
 			runner.Tags = slices.Clone(runner.Tags)

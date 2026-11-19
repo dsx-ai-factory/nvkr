@@ -6,6 +6,7 @@ package delivery
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,7 +27,7 @@ func TestIsolatedRegistryTransportRejectsPlainHTTP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if response, err := registryTransport(RegistryOptions{IsolatedTransport: true}).RoundTrip(request); err == nil {
+	if response, err := registryTransport(t.Context(), RegistryOptions{IsolatedTransport: true}).RoundTrip(request); err == nil {
 		if response != nil {
 			response.Body.Close()
 		}
@@ -39,9 +40,48 @@ func TestIsolatedRegistryTransportRejectsPlainHTTP(t *testing.T) {
 }
 
 func TestRegistryDefaultTransportRemainsUnchanged(t *testing.T) {
-	if got := registryTransport(RegistryOptions{}); got != remote.DefaultTransport {
+	t.Setenv("SSL_CERT_FILE", "/untrusted/ambient-root")
+	t.Setenv("HTTPS_PROXY", "http://proxy.example.invalid")
+	if got := registryTransport(t.Context(), RegistryOptions{}); got != remote.DefaultTransport {
 		t.Fatal("ordinary registry caller no longer uses the upstream default")
 	}
+}
+
+func TestIsolatedRegistryTransportUsesSelectedTrustWithoutProxy(t *testing.T) {
+	var proxyHits atomic.Int32
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		proxyHits.Add(1)
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	t.Cleanup(proxy.Close)
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNoContent) }))
+	t.Cleanup(server.Close)
+	t.Setenv("HTTPS_PROXY", proxy.URL)
+	t.Setenv("SSL_CERT_FILE", "/untrusted/ambient-root")
+	options := RegistryOptions{Anonymous: true, IsolatedTransport: true, CertificateAuthority: string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw}))}
+	if err := options.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	transport := registryTransport(t.Context(), options)
+	client := &http.Client{Transport: transport}
+	request, err := http.NewRequestWithContext(t.Context(), http.MethodGet, server.URL+"/v2/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := client.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := response.Body.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusNoContent || proxyHits.Load() != 0 {
+		t.Fatal("isolated registry did not preserve its selected direct TLS route")
+	}
+	// The default transport path remains unchanged, but an isolated route may
+	// not acquire job-variable certificate authority before layout/network work.
+	_, err = PushWithOptions(t.Context(), "absent-layout", "registry.example.test/release", PushOptions{Registry: RegistryOptions{Anonymous: true, IsolatedTransport: true}})
+	assertRegistryCode(t, err, e.CodeTrustPolicyMissing)
 }
 
 type registryAuthorityProbe struct{ calls int }

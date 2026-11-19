@@ -284,7 +284,7 @@ func CheckRegistry(ctx context.Context, repository string, options RegistryOptio
 		return report, e.Wrap(e.CodeUsage, err, "parsing registry check endpoint")
 	}
 	registry.PlainHTTP = options.PlainHTTP
-	registry.Client = &orasauth.Client{Client: &http.Client{Transport: observer.transport(registryTransport(options))},
+	registry.Client = &orasauth.Client{Client: &http.Client{Transport: observer.transport(registryTransport(ctx, options))},
 		Credential: func(ctx context.Context, host string) (orasauth.Credential, error) {
 			if host != repo.RegistryStr() || options.Anonymous {
 				return orasauth.EmptyCredential, nil

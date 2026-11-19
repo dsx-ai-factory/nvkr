@@ -377,6 +377,16 @@ Repeat generation with the same inputs, generator identity and `--check` to chec
 The GitHub walkthrough's Environment is not a GitLab configuration. Keep authored inputs and generation
 under review before committing or invoking the pipeline.
 
+By default, only the project's authenticated default branch and `push` or `web` pipelines are admitted.
+Explicitly list any additional branch in `gitlab.additionalRefs` and any other source, such as `api`,
+`merge_request_event` or `parent_pipeline`, in `gitlab.pipelineSources`. These are exact selectors, not
+patterns. Tags and debug modes are refused. When merge-request events are selected, an open merge
+request suppresses the duplicate push pipeline. If publication is configured, the branch must also be
+protected: generated rules check the native flag and runtime verifies protection through the provider API.
+Changing a pipeline variable cannot substitute for that authenticated branch check.
+Supported source names are `api`, `merge_request_event`, `parent_pipeline`, `pipeline`, `push`,
+`schedule`, `trigger`, `web` and `webide`; other source names fail admission.
+
 The Environment supplies these provider settings; values are public configuration and credential references,
 never credential contents:
 
@@ -384,6 +394,9 @@ never credential contents:
 |---|---|
 | `gitlab.apiURL` | Exact HTTPS provider API base ending in `/api/v4`, without credentials, query or fragment |
 | `gitlab.projectID` | Exact positive native project ID |
+| `gitlab.certificateAuthority` | Optional explicit PEM CA, at most 64 KiB; replaces system roots and is bound into the Plan |
+| `gitlab.additionalRefs` | Optional sorted unique exact branch names in addition to the provider-authenticated default branch; no patterns |
+| `gitlab.pipelineSources` | Optional sorted unique supported native source names; omission admits only `push` and `web` |
 | `gitlab.apiReadCredentialRef` | `gitlab:VARIABLE_NAME` naming the separately provisioned API reader |
 | `gitlab.apiReadCredentialKind` | Explicit `private-token` or `job-token` authentication mechanism |
 | `gitlab.runners` | Explicit native `linux/amd64` and/or `linux/arm64` routes covering every resolved operation and the utility platform |
@@ -393,8 +406,14 @@ Provide the exact Go release selected by the generator's bootstrap, a matching n
 selected container runtime. Bootstrap checks Go and host architecture before source compilation with
 `GOTOOLCHAIN=local`. The runner comes from checkout source or the generator's own exact module version
 and checksum contract. Declared producer/vendor/utility images require anonymous immutable access.
-Runner tags select placement; they prove neither capacity nor runtime compatibility. GitHub labels and
+GitLab has no hosted-runner default: operators provision runners matching the authored tags. These tags
+select placement; they prove neither capacity nor runtime compatibility. GitHub labels and
 `GITHUB_*` invocation variables cannot substitute for native GitLab context.
+
+Declare the provider CA explicitly for private PKI. An explicit `certificateAuthority` replaces system
+roots for API, carriers and isolated GitLab registry traffic. Without it, NVKR permits system roots only
+when `SSL_CERT_FILE` and `SSL_CERT_DIR` are unset. These routes connect directly and ignore ambient proxy
+settings. This leaves ordinary non-isolated registry behavior unchanged.
 
 Generation owns only `.gitlab/nvkr-run/pipeline.yml`, `.gitlab/nvkr-run/plan.json` and
 `.gitlab/nvkr-run/manifest.json`. Keep the root `.gitlab-ci.yml` operator-owned, containing only one local
@@ -404,19 +423,27 @@ commit the root and complete generated bundle together; never hand-edit generate
 uses native GitLab pipeline invocation and adds no cron or trigger API. Debug tracing and service debugging
 must be off. The bounded projection permits at most 256 operations and 50 needs per job.
 
-Reserve `GIT_STRATEGY=clone` and `FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR=true` for the generated
-checkout policy. [GitLab variable precedence](https://docs.gitlab.com/ci/variables/#ci-cd-variable-precedence)
+Reserve `GIT_STRATEGY=clone`, `FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR=true` and
+`FF_GIT_URLS_WITHOUT_TOKENS=true` for the generated checkout policy. [GitLab variable precedence](https://docs.gitlab.com/ci/variables/#ci-cd-variable-precedence)
 allows project, group and pipeline variables to override YAML defaults, including job-level defaults.
 Before submitting the pipeline, remove conflicting keys from **Settings > CI/CD > Variables** at the
 project and inherited group levels, and from schedules, triggers, API/run-pipeline variables and any
-applicable policy. Do not override either key through Runner configuration. An override such as
+applicable policy. Do not override these keys through Runner configuration. An override such as
 `GIT_STRATEGY=empty` prevents checkout; disabling the umask switch can change generated-file modes.
 `run generate --check` verifies committed bytes, not these external settings, and cannot establish
-the prerequisite. Remove the override and start a fresh pipeline; never repair its checkout with chmod.
+the prerequisite. Runtime additionally requires the token-free URL flag to remain `true` and checks
+the raw root Git config and effective local/include config for the actual job and API-reader token bytes
+before provider or build work. This is a bounded credential check, not a repository-wide secret audit.
+Remove the override and start a fresh pipeline; never repair its checkout with chmod.
 
 Use the provider-supplied current job's `CI_JOB_TOKEN` for current-job authentication. Separately provision
-the API reader named by the Environment for project/pipeline metadata, current job enumeration and original-job artifact downloads.
-Selecting a credential kind does not grant endpoint permissions. Keep API access and masking/protection
+the API reader named by the Environment for project metadata including `default_branch`, pipeline
+metadata, current job enumeration and original-job artifact downloads. Publication additionally requires
+read access to `repository/branches/<exact-ref>` for authenticated branch protection.
+Selecting a credential kind does not grant endpoint permissions. NVKR does not introspect token grants
+or verify least-privilege scopes. Provision a project-limited read-only private-token reader (such as
+`read_api`), without write or broader account grants; an overprivileged token is not refused solely for
+its scopes. Keep API access and masking/protection
 policy scoped to the intended project and permitted pipeline sources; never put tokens in authored inputs,
 generated Plans or logs. The optional API-reader job-token route has instance-specific permission requirements;
 consult the [credential-access ledger](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile)
@@ -430,11 +457,14 @@ The provider authenticates the exact current job and pipeline, then consumers fe
 outcomes and digest-bound carriers. They retain original job IDs across retries and reject substituted,
 failed, skipped, missing or corrupt members. The always-scheduled finalizer rechecks the complete closure,
 recompiles the exact authored inputs and writes the shared immutable Run record. A missing final Run
-record proves neither success nor absence of remote effects.
+record proves neither success nor absence of remote effects. The recorded complete or failed Run includes
+the authenticated GitLab API, project, pipeline, finalizer job, commit, ref and source as descriptive metadata;
+it grants no provider or publication authority when reloaded.
 
 This profile stays unsigned and `static-unqualified`. Optional publication selects HTTPS OCI transport,
 either anonymous or the exact `publication.credentialRef: gitlab:CI_JOB_TOKEN` with anonymous access off.
-That publication token is separate from API-reader provisioning. The authenticated route confines all
+That publication token is separate from API-reader provisioning. Every publication selection requires a
+provider-authenticated protected branch. The authenticated route confines all
 repositories to the provider-reported current project registry and independently reads back the complete
 published closure. It supplies byte integrity, not signer or qualification acceptance.
 Signing, stronger evidence lanes, disk outputs, private-source and private execution-image routes,

@@ -9,13 +9,13 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,6 +24,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/internal/sourcegit"
 	"github.com/dsx-ai-factory/nvkr/internal/transportarchive"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	provider "github.com/dsx-ai-factory/nvkr/pkg/nvkr/gitlab"
@@ -35,7 +36,7 @@ import (
 // GitLabJobContext describes the caller. Only the provider owner authenticates it.
 type GitLabJobContext struct {
 	ProjectID, PipelineID, JobID uint64
-	Commit                       string
+	Commit, Ref, Source          string
 }
 type GitLabNodeOptions struct {
 	Root           string
@@ -51,20 +52,23 @@ type GitLabFinalizer struct{ state *gitlabAdmission }
 // The operation and finalizer paths hold it across their state helper calls;
 // Close cancels the lifetime before waiting for that lock.
 type gitlabAdmission struct {
-	mu         sync.Mutex
-	closed     bool
-	lifetime   context.Context
-	cancel     context.CancelFunc
-	client     *provider.Client
-	identity   provider.Identity
-	names      []string
-	digest     string
-	config     provider.Config
-	receipt    *provider.Receipt
-	registry   provider.ProjectRegistry
-	acquired   map[string]provider.Job
-	transport  *http.Transport
-	httpClient *http.Client
+	mu              sync.Mutex
+	closed          bool
+	lifetime        context.Context
+	cancel          context.CancelFunc
+	client          *provider.Client
+	identity        provider.Identity
+	names           []string
+	digest          string
+	config          provider.Config
+	receipt         *provider.Receipt
+	registry        provider.ProjectRegistry
+	defaultBranch   string
+	additionalRefs  []string
+	pipelineSources []string
+	acquired        map[string]provider.Job
+	transport       *http.Transport
+	httpClient      *http.Client
 }
 
 func (owner *GitLabFinalizer) Close() error {
@@ -132,6 +136,8 @@ type gitlabInput struct {
 }
 
 type gitlabOutcome struct {
+	Ref        string          `json:"ref"`
+	Source     string          `json:"source"`
 	Schema     string          `json:"schema"`
 	APIURL     string          `json:"apiURL"`
 	ProjectID  uint64          `json:"projectID"`
@@ -152,6 +158,12 @@ func admitGitLabJob(ctx context.Context, plan *Plan, job GitLabJobContext, role 
 	}
 	if _, err := GitLabAttempt(job); err != nil {
 		return nil, err
+	}
+	if job.Ref == "" || job.Source == "" || strings.ContainsAny(job.Ref+job.Source, "\r\n\x00") {
+		return nil, e.New(e.CodeUsage, "GitLab execution requires native ref and pipeline source")
+	}
+	if os.Getenv("FF_GIT_URLS_WITHOUT_TOKENS") != "true" {
+		return nil, e.New(e.CodeEngineCapability, "GitLab execution requires native token-free checkout URLs")
 	}
 	if err := CheckGenerated(ctx, plan, EngineGitLab, "."); err != nil {
 		return nil, err
@@ -174,7 +186,14 @@ func admitGitLabJob(ctx context.Context, plan *Plan, job GitLabJobContext, role 
 	if err := gitlabCheckout(ctx, job.Commit, []string{".gitlab-ci.yml", GitLabPlanPath, GitLabManifestPath, GitLabWorkflowPath}); err != nil {
 		return nil, err
 	}
-	config := provider.Config{APIURL: policy.APIURL, ProjectID: policy.ProjectID, JobToken: os.Getenv("CI_JOB_TOKEN"), ReadCredential: os.Getenv(strings.TrimPrefix(policy.APIReadCredentialRef, "gitlab:")), ReadCredentialKind: policy.APIReadCredentialKind}
+	config := provider.Config{APIURL: policy.APIURL, ProjectID: policy.ProjectID, JobToken: os.Getenv("CI_JOB_TOKEN"), ReadCredential: os.Getenv(strings.TrimPrefix(policy.APIReadCredentialRef, "gitlab:")), ReadCredentialKind: policy.APIReadCredentialKind, CertificateAuthority: policy.CertificateAuthority, RequireProtectedBranch: plan.Environment.Publication != nil}
+	root, err := filepath.Abs(".")
+	if err != nil {
+		return nil, e.Wrap(e.CodeProvenanceMissing, err, "resolving GitLab credential guard checkout")
+	}
+	if err := sourcegit.CheckCheckoutCredentials(ctx, []string{"PATH=" + os.Getenv("PATH")}, root, config.JobToken, config.ReadCredential); err != nil {
+		return nil, err
+	}
 	client, err := provider.New(ctx, config)
 	if err != nil {
 		return nil, err
@@ -185,9 +204,12 @@ func admitGitLabJob(ctx context.Context, plan *Plan, job GitLabJobContext, role 
 			_ = client.Close()
 		}
 	}()
-	identity := provider.Identity{APIURL: policy.APIURL, ProjectID: job.ProjectID, PipelineID: job.PipelineID, JobID: job.JobID, Commit: job.Commit}
+	identity := provider.Identity{APIURL: policy.APIURL, ProjectID: job.ProjectID, PipelineID: job.PipelineID, JobID: job.JobID, Commit: job.Commit, Ref: job.Ref, Source: job.Source}
 	receipt, err := client.Current(ctx, identity, names)
 	if err != nil {
+		return nil, err
+	}
+	if err := admitGitLabInvocation(receipt.CurrentIdentity(), receipt.DefaultBranch(), policy.AdditionalRefs, policy.AdmittedPipelineSources()); err != nil {
 		return nil, err
 	}
 	actual, ok := receipt.Job(role)
@@ -207,7 +229,7 @@ func admitGitLabJob(ctx context.Context, plan *Plan, job GitLabJobContext, role 
 	}
 	lifetime, cancel := context.WithCancel(ctx)
 	accepted = true
-	return &GitLabFinalizer{state: &gitlabAdmission{lifetime: lifetime, cancel: cancel, client: client, identity: receipt.CurrentIdentity(), names: names, digest: digest, config: config, receipt: receipt, registry: registry, acquired: map[string]provider.Job{role: actual}}}, nil
+	return &GitLabFinalizer{state: &gitlabAdmission{lifetime: lifetime, cancel: cancel, client: client, identity: receipt.CurrentIdentity(), names: names, digest: digest, config: config, receipt: receipt, registry: registry, defaultBranch: receipt.DefaultBranch(), additionalRefs: slices.Clone(policy.AdditionalRefs), pipelineSources: policy.AdmittedPipelineSources(), acquired: map[string]provider.Job{role: actual}}}, nil
 }
 func AdmitGitLabFinalizer(ctx context.Context, plan *Plan, job GitLabJobContext) (*GitLabFinalizer, error) {
 	return admitGitLabJob(ctx, plan, job, gitlabFinalizerJob)
@@ -222,11 +244,39 @@ func (state *gitlabAdmission) current(ctx context.Context) (*provider.Receipt, e
 	if err != nil {
 		return nil, err
 	}
+	if receipt.DefaultBranch() != state.defaultBranch {
+		return nil, e.New(e.CodeProvenanceMissing, "GitLab default branch changed during the operation")
+	}
+	if err := admitGitLabInvocation(receipt.CurrentIdentity(), state.defaultBranch, state.additionalRefs, state.pipelineSources); err != nil {
+		return nil, err
+	}
 	if state.registry.Present && receipt.ProjectRegistry() != state.registry {
 		return nil, e.New(e.CodeProvenanceMissing, "GitLab project registry metadata changed during the operation")
 	}
 	state.receipt = receipt
 	return receipt, nil
+}
+
+// Invocation returns only the live owner's authenticated descriptive identity.
+// The copy grants no provider, publication or retry authority.
+func (owner *GitLabFinalizer) Invocation() (provider.Identity, error) {
+	if owner == nil || owner.state == nil {
+		return provider.Identity{}, e.New(e.CodeProvenanceMissing, "GitLab invocation requires its live native admission")
+	}
+	state := owner.state
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.closed || state.client == nil || state.receipt == nil || state.lifetime == nil || state.lifetime.Err() != nil {
+		return provider.Identity{}, e.New(e.CodeProvenanceMissing, "GitLab invocation admission is closed or canceled")
+	}
+	return state.identity, nil
+}
+
+func admitGitLabInvocation(identity provider.Identity, defaultBranch string, additionalRefs, sources []string) error {
+	if !definition.GitLabBranchNameAdmitted(defaultBranch) || !definition.GitLabBranchNameAdmitted(identity.Ref) || (identity.Ref != defaultBranch && !slices.Contains(additionalRefs, identity.Ref)) || !slices.Contains(sources, identity.Source) {
+		return e.New(e.CodeProvenanceMissing, "GitLab invocation is outside the authored ref and pipeline-source policy")
+	}
+	return nil
 }
 
 func gitlabJobTokenPublication(plan *Plan) bool {
@@ -313,11 +363,7 @@ func RunGitLabNode(ctx context.Context, plan *Plan, nodeID string, options GitLa
 	if digest != owner.state.digest {
 		return e.New(e.CodePipelineDrift, "GitLab operation differs from exact authored Plan")
 	}
-	paths := make([]string, 0, len(snapshot.Files))
-	for _, file := range snapshot.Files {
-		paths = append(paths, file.Path)
-	}
-	if err := gitlabCheckout(ctx, options.Job.Commit, paths); err != nil {
+	if err := VerifyGitLabCompileSnapshot(ctx, options.Job.Commit, snapshot); err != nil {
 		return err
 	}
 	owner.state.mu.Lock()
@@ -371,7 +417,7 @@ func RunGitLabNode(ctx context.Context, plan *Plan, nodeID string, options GitLa
 	// Completion shares the native job deadline; it cannot consume the
 	// producer time reserved above or run beyond the generated allowance.
 	ctx = jobCtx
-	outcome := gitlabOutcome{Schema: "nvkr.dev/gitlab-operation/v1", APIURL: owner.state.identity.APIURL, ProjectID: options.Job.ProjectID, PipelineID: options.Job.PipelineID, JobID: options.Job.JobID, Commit: options.Job.Commit, Plan: owner.state.digest, Node: nodeID, Status: "failed", ExitCode: e.ExitCode(runErr), Carriers: []gitlabCarrier{}}
+	outcome := gitlabOutcome{Ref: owner.state.identity.Ref, Source: owner.state.identity.Source, Schema: "nvkr.dev/gitlab-operation/v1", APIURL: owner.state.identity.APIURL, ProjectID: options.Job.ProjectID, PipelineID: options.Job.PipelineID, JobID: options.Job.JobID, Commit: options.Job.Commit, Plan: owner.state.digest, Node: nodeID, Status: "failed", ExitCode: e.ExitCode(runErr), Carriers: []gitlabCarrier{}}
 	outcome.Inputs = make([]gitlabInput, 0, len(node.Inputs))
 	for _, id := range node.Inputs {
 		source := owner.state.acquired[gitlabNodeJob(artifacts[id].Producer)]
@@ -440,6 +486,9 @@ func executeGitLabPublication(ctx context.Context, plan *Plan, node Node, artifa
 	if node.ID != "publish/release" || node.Target != "release" || len(node.Inputs) != 1 || len(node.Outputs) != 1 {
 		return e.New(e.CodePipelineDrift, "GitLab publication has unexpected graph bindings")
 	}
+	if plan == nil || plan.Environment.GitLab == nil {
+		return e.New(e.CodeEngineCapability, "GitLab publication requires its explicit provider policy")
+	}
 	target, err := runtimeTarget(plan, node.Target)
 	if err != nil {
 		return err
@@ -449,7 +498,7 @@ func executeGitLabPublication(ctx context.Context, plan *Plan, node Node, artifa
 	if err != nil || repo.Name() != target.Ref || repo.Scheme() != "https" || target.Kind != TargetOCI || (!authenticated && (!target.Anonymous || target.CredentialRef != "")) || target.PlainHTTP || len(target.ImageTags) != 0 {
 		return e.New(e.CodeEngineCapability, "GitLab publication target is not an admitted HTTPS release")
 	}
-	options := delivery.RegistryOptions{Anonymous: true, IsolatedTransport: true}
+	options := delivery.RegistryOptions{Anonymous: true, IsolatedTransport: true, CertificateAuthority: plan.Environment.GitLab.CertificateAuthority}
 	if authenticated {
 		if admission == nil || admission.closed || admission.receipt == nil || admission.config.JobToken == "" || admission.registry != admission.receipt.ProjectRegistry() {
 			return e.New(e.CodeProvenanceMissing, "GitLab publication requires its live current-job admission")
@@ -461,7 +510,7 @@ func executeGitLabPublication(ctx context.Context, plan *Plan, node Node, artifa
 		if err != nil || issuer.Scheme != "https" || issuer.Host == "" || issuer.Path != "/api/v4" || issuer.User != nil || issuer.RawQuery != "" || issuer.Fragment != "" {
 			return e.New(e.CodeProvenanceMissing, "GitLab publication issuer is invalid")
 		}
-		options = delivery.RegistryOptions{Username: "gitlab-ci-token", Password: admission.config.JobToken, IsolatedTransport: true, Authority: &delivery.RegistryAuthority{RegistryHost: repo.RegistryStr(), TokenEndpoint: (&url.URL{Scheme: "https", Host: issuer.Host, Path: "/jwt/auth"}).String()}}
+		options = delivery.RegistryOptions{Username: "gitlab-ci-token", Password: admission.config.JobToken, IsolatedTransport: true, CertificateAuthority: plan.Environment.GitLab.CertificateAuthority, Authority: &delivery.RegistryAuthority{RegistryHost: repo.RegistryStr(), TokenEndpoint: (&url.URL{Scheme: "https", Host: issuer.Host, Path: "/jwt/auth"}).String()}}
 	}
 	input, ok := artifacts[node.Inputs[0]]
 	if !ok {
@@ -739,7 +788,10 @@ func (state *gitlabAdmission) request(ctx context.Context, job uint64, path stri
 		request.Header.Set("PRIVATE-TOKEN", state.config.ReadCredential)
 	}
 	if state.httpClient == nil {
-		state.transport = &http.Transport{Proxy: http.ProxyFromEnvironment, DialContext: (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext, ForceAttemptHTTP2: true, MaxIdleConns: 100, IdleConnTimeout: 90 * time.Second, TLSHandshakeTimeout: 10 * time.Second, ExpectContinueTimeout: time.Second}
+		state.transport, err = provider.NewTransport(ctx, state.config.CertificateAuthority)
+		if err != nil {
+			return nil, err
+		}
 		state.httpClient = &http.Client{Transport: state.transport, Timeout: 30 * time.Minute, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	}
 	client := state.httpClient
@@ -810,6 +862,22 @@ func (state *gitlabAdmission) download(ctx context.Context, job uint64, path str
 
 // Git owns revision/index/path syntax. The existing isolated source command
 // owner excludes callbacks and credential helpers; no new Git parser is used.
+// VerifyGitLabCompileSnapshot compares the complete captured input closure with
+// the selected runner clone through the existing Git checkout owner.
+func VerifyGitLabCompileSnapshot(ctx context.Context, commit string, snapshot InputSnapshot) error {
+	if err := executionContext(ctx); err != nil {
+		return err
+	}
+	if err := validateInputSnapshot(snapshot); err != nil {
+		return err
+	}
+	paths := make([]string, 0, len(snapshot.Files))
+	for _, file := range snapshot.Files {
+		paths = append(paths, file.Path)
+	}
+	return gitlabCheckout(ctx, commit, paths)
+}
+
 func gitlabCheckout(ctx context.Context, commit string, paths []string) error {
 	root, err := filepath.Abs(".")
 	if err != nil {
@@ -823,7 +891,7 @@ func validateGitLabProducerOutcome(raw []byte, identity provider.Identity, diges
 	if err := canonical.UnmarshalExact(raw, &outcome); err != nil {
 		return nil, e.New(e.CodeProvenanceMissing, "GitLab operation outcome is malformed")
 	}
-	if outcome.Schema != "nvkr.dev/gitlab-operation/v1" || outcome.APIURL != identity.APIURL || outcome.ProjectID != identity.ProjectID || outcome.PipelineID != identity.PipelineID || outcome.JobID != jobID || outcome.Commit != identity.Commit || outcome.Plan != digest || outcome.Node != producer || outcome.Status != "success" || outcome.ExitCode != 0 {
+	if outcome.Schema != "nvkr.dev/gitlab-operation/v1" || outcome.APIURL != identity.APIURL || outcome.ProjectID != identity.ProjectID || outcome.PipelineID != identity.PipelineID || outcome.JobID != jobID || outcome.Commit != identity.Commit || outcome.Ref != identity.Ref || outcome.Source != identity.Source || outcome.Plan != digest || outcome.Node != producer || outcome.Status != "success" || outcome.ExitCode != 0 {
 		return nil, e.New(e.CodeProvenanceMissing, "GitLab outcome does not bind its exact current producer")
 	}
 	node, ok := nodes[producer]

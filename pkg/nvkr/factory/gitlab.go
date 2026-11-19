@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -180,13 +182,11 @@ func renderGitLab(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 	document["variables"] = map[string]string{
 		"FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR": "true",
 		"GIT_STRATEGY":                         "clone",
+		"FF_GIT_URLS_WITHOUT_TOKENS":           "true",
 	}
 	// Native rules run before Runner startup. Shell set+x is defense in depth,
 	// not permission to expose scoped API credentials through debug traces.
-	document["workflow"] = map[string]any{"rules": []map[string]any{
-		{"if": `($CI_DEBUG_TRACE != null && $CI_DEBUG_TRACE != "false") || ($CI_DEBUG_SERVICES != null && $CI_DEBUG_SERVICES != "false")`, "when": "never"},
-		{"when": "always"},
-	}}
+	document["workflow"] = map[string]any{"rules": gitlabWorkflowRules(plan)}
 
 	release, err := githubRunnerReleaseForGenerator()
 	if err != nil {
@@ -260,6 +260,34 @@ func renderGitLab(ctx context.Context, plan *Plan, validate bool) (*GeneratedBun
 		}
 	}
 	return bundle, nil
+}
+
+// The authored policy is validated before interpolation. Literal ref/source
+// selectors use the standard quoted-string encoder, never a pattern or shell.
+func gitlabWorkflowRules(plan *Plan) []map[string]any {
+	policy := plan.Environment.GitLab
+	rules := []map[string]any{
+		{"if": `($CI_DEBUG_TRACE != null && $CI_DEBUG_TRACE != "false") || ($CI_DEBUG_SERVICES != null && $CI_DEBUG_SERVICES != "false")`, "when": "never"},
+		{"if": `$CI_COMMIT_TAG`, "when": "never"},
+	}
+	if plan.Environment.Publication != nil {
+		rules = append(rules, map[string]any{"if": `$CI_COMMIT_REF_PROTECTED != "true"`, "when": "never"})
+	}
+	sources := policy.AdmittedPipelineSources()
+	if slices.Contains(sources, "merge_request_event") {
+		rules = append(rules, map[string]any{"if": `$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS`, "when": "never"})
+	}
+	refs := []string{`$CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH`}
+	for _, ref := range policy.AdditionalRefs {
+		refs = append(refs, "$CI_COMMIT_REF_NAME == "+strconv.Quote(ref))
+	}
+	allowedSources := make([]string, 0, len(sources))
+	for _, source := range sources {
+		allowedSources = append(allowedSources, "$CI_PIPELINE_SOURCE == "+strconv.Quote(source))
+	}
+	condition := "(" + strings.Join(refs, " || ") + ") && (" + strings.Join(allowedSources, " || ") + ")"
+	rules = append(rules, map[string]any{"if": condition, "when": "always"}, map[string]any{"when": "never"})
+	return rules
 }
 
 func gitlabRunnerCheck(runner string) string {

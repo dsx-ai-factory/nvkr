@@ -46,14 +46,14 @@ func TestGitLabEarlierProducerRetryDuringLaterAcquisition(t *testing.T) {
 					if projectReads.Add(1) > 2 && mode == "retry-after-restore" {
 						changed.Store(true)
 					}
-					_, _ = w.Write([]byte(`{"id":123,"ci_config_path":null}`))
+					_, _ = w.Write([]byte(`{"id":123,"ci_config_path":null,"default_branch":"main"}`))
 					return
 				case "/api/v4/projects/123/pipelines/2":
 					_, _ = w.Write([]byte(`{"id":2,"project_id":123,"sha":"` + strings.Repeat("a", 40) + `","ref":"main","source":"push"}`))
 					return
 				}
 				jobJSON := func(job provider.Job) map[string]any {
-					return map[string]any{"id": job.ID, "name": job.Name, "status": job.Status, "ref": "main", "commit": map[string]any{"id": strings.Repeat("a", 40)}, "pipeline": map[string]any{"id": 2, "project_id": 123, "sha": strings.Repeat("a", 40), "ref": "main", "source": "push"}}
+					return map[string]any{"id": job.ID, "name": job.Name, "status": job.Status, "tag": false, "ref": "main", "commit": map[string]any{"id": strings.Repeat("a", 40)}, "pipeline": map[string]any{"id": 2, "project_id": 123, "sha": strings.Repeat("a", 40), "ref": "main", "source": "push"}}
 				}
 				if r.URL.Path == "/api/v4/job" {
 					_ = json.NewEncoder(w).Encode(jobJSON(jobs[gitlabFinalizerJob]))
@@ -172,7 +172,7 @@ func TestGitLabEarlierProducerRetryDuringLaterAcquisition(t *testing.T) {
 			for _, nodeID := range sortedKeys(closure) {
 				node := closure[nodeID]
 				job := jobs[gitlabNodeJob(node.ID)]
-				outcome := gitlabOutcome{Schema: "nvkr.dev/gitlab-operation/v1", APIURL: server.URL + "/api/v4", ProjectID: 123, PipelineID: 2, JobID: job.ID, Commit: strings.Repeat("a", 40), Plan: digest, Node: node.ID, Status: "success", Inputs: []gitlabInput{}, Carriers: []gitlabCarrier{}}
+				outcome := gitlabOutcome{Ref: "main", Source: "push", Schema: "nvkr.dev/gitlab-operation/v1", APIURL: server.URL + "/api/v4", ProjectID: 123, PipelineID: 2, JobID: job.ID, Commit: strings.Repeat("a", 40), Plan: digest, Node: node.ID, Status: "success", Inputs: []gitlabInput{}, Carriers: []gitlabCarrier{}}
 				for _, id := range node.Inputs {
 					outcome.Inputs = append(outcome.Inputs, gitlabInput{Artifact: id, ProducerJobID: jobs[gitlabNodeJob(artifacts[id].Producer)].ID})
 				}
@@ -287,7 +287,7 @@ func TestGitLabEarlierProducerRetryChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	config := provider.Config{APIURL: os.Getenv("NVKR_GITLAB_TEST_API"), ProjectID: 123, JobToken: "synthetic-job", ReadCredential: "synthetic-read", ReadCredentialKind: "private-token"}
+	config := provider.Config{APIURL: os.Getenv("NVKR_GITLAB_TEST_API"), ProjectID: 123, JobToken: "synthetic-job", ReadCredential: "synthetic-read", ReadCredentialKind: "private-token", CertificateAuthority: string(raw)}
 	client, err := provider.New(t.Context(), config)
 	if err != nil {
 		t.Fatal(err)
@@ -296,7 +296,7 @@ func TestGitLabEarlierProducerRetryChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := &gitlabAdmission{lifetime: t.Context(), client: client, config: config, identity: provider.Identity{APIURL: config.APIURL, ProjectID: 123, PipelineID: 2, JobID: 3, Commit: strings.Repeat("a", 40)}, names: names, digest: digest, acquired: map[string]provider.Job{gitlabFinalizerJob: {ID: 3, Name: gitlabFinalizerJob, Status: "running"}}}
+	state := &gitlabAdmission{defaultBranch: "main", pipelineSources: []string{"push", "web"}, lifetime: t.Context(), client: client, config: config, identity: provider.Identity{APIURL: config.APIURL, ProjectID: 123, PipelineID: 2, JobID: 3, Commit: strings.Repeat("a", 40), Ref: "main", Source: "push"}, names: names, digest: digest, acquired: map[string]provider.Job{gitlabFinalizerJob: {ID: 3, Name: gitlabFinalizerJob, Status: "running"}}}
 	selection, err := os.ReadFile("selected.json")
 	if err != nil {
 		t.Fatal(err)
@@ -368,7 +368,7 @@ func TestGitLabSubstitutedEndpointRefusesBeforeCredentialTransport(t *testing.T)
 		t.Fatal(err)
 	}
 	child := exec.CommandContext(t.Context(), executable, "-test.run=^TestGitLabSubstitutedEndpointChild$", "-test.count=1")
-	child.Env = append(os.Environ(), "NVKR_GITLAB_ORIGIN_CHILD=1", "NVKR_GITLAB_TEST_ROOT="+root, "NVKR_GITLAB_ORIGIN_COMMIT="+commit, "GODEBUG=x509usefallbackroots=1", "CI_JOB_TOKEN=synthetic-job", "NVKR_API_READ=synthetic-read")
+	child.Env = append(os.Environ(), "NVKR_GITLAB_ORIGIN_CHILD=1", "NVKR_GITLAB_TEST_ROOT="+root, "NVKR_GITLAB_ORIGIN_COMMIT="+commit, "GODEBUG=x509usefallbackroots=1", "FF_GIT_URLS_WITHOUT_TOKENS=true", "CI_JOB_TOKEN=synthetic-job", "NVKR_API_READ=synthetic-read")
 	output, err := child.CombinedOutput()
 	if err != nil {
 		t.Fatalf("native source-origin fixture: %v\n%s", err, output)
@@ -396,7 +396,7 @@ func TestGitLabSubstitutedEndpointChild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	owner, err := AdmitGitLabFinalizer(t.Context(), plan, GitLabJobContext{ProjectID: 123, PipelineID: 2, JobID: 3, Commit: os.Getenv("NVKR_GITLAB_ORIGIN_COMMIT")})
+	owner, err := AdmitGitLabFinalizer(t.Context(), plan, GitLabJobContext{ProjectID: 123, PipelineID: 2, JobID: 3, Commit: os.Getenv("NVKR_GITLAB_ORIGIN_COMMIT"), Ref: "main", Source: "push"})
 	if owner != nil {
 		_ = owner.Close()
 		t.Fatal("dirty native source created an admission")

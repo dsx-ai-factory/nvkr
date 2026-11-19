@@ -83,6 +83,16 @@ This GitLab extension remains proposed for maintainer review. The provider runs 
 exact recorded source snapshots; they do not establish acceptance for the integration with upstream
 `12e0badb` (shared Plan storage and catalog consolidation) or later source changes.
 
+The current implementation admits the authenticated project default branch plus exact authored
+`additionalRefs`, with `push`/`web` defaults or explicit `pipelineSources`. It denies tags, requires
+authenticated branch protection for every publication, and binds ref/source into operation outcomes and
+recorded complete or failed Runs. Refreshes retain the original invocation and default branch. API, carriers
+and isolated GitLab registry access share direct TLS trust: authored bounded PEM CA replaces system
+roots; omitted CA refuses ambient certificate overrides, and proxies are not taken from the environment.
+The token-free checkout flag is required; a bounded raw/effective local Git-config check refuses the actual
+job/reader credential bytes before provider/build work. These later changes are outside the historical
+real-server snapshots below and require fresh affected acceptance.
+
 The bounded adapter implements native runner/bootstrap policy, complete-Plan projection,
 provider-authenticated current jobs, original-job outcomes/carriers and shared lifecycle finalization.
 Producer placement and budgets use the executable producer view. Generated jobs select the native
@@ -108,8 +118,11 @@ failures or skips. It covers production-client publication/refusal and finalizat
 fixtures, separately from the real server/Runner acceptance above. It does not establish a live project-registry push.
 
 The real exercise used a scoped project `read_api` private-token reader, separate from native current-job
-authentication and registry-write authority. The optional job-token API-reader route remains unverified,
-especially project metadata and job-list permissions. See GitLab's
+authentication and registry-write authority. This describes the fixture's provisioning, not scope enforcement:
+NVKR checks the credential kind and endpoint access but does not introspect token grants. Least-privilege
+reader provisioning remains the operator's responsibility. The optional job-token API-reader route remains unverified,
+especially project metadata, job-list permissions and the branch-read permission needed by the later
+protected-publication check. No job-token access proof is inferred for that added endpoint. See GitLab's
 [job-token access table](https://docs.gitlab.com/ci/jobs/ci_job_token/#job-token-access) and
 [fine-grained permissions](https://docs.gitlab.com/ci/jobs/fine_grained_permissions/).
 Native AMD64 execution, module-installed bootstrap, live registry publication and actual retry/cancellation
@@ -127,7 +140,9 @@ Each consumer authenticates every ancestor outcome against one provider snapshot
 attempt bindings; only selected payload carriers are downloaded. Publication revalidates that acquired
 closure after inspection and before the first write, then again on completion. The finalizer uses the last
 stage as its completion barrier and downloads only its utility bootstrap. Raw checkout input bytes are
-compared with the authenticated commit's blobs without Git worktree conversion.
+compared without Git worktree conversion against the runner clone's blobs for the provider-authenticated
+commit identifier. This establishes consistency with that clone, whose object database is trusted; it does
+not independently rehash the commit/tree/blob closure or protect against a compromised runner.
 
 A fresh native Linux ARM64 server/Runner exercise passed on the complete 3,067-entry source archive
 `ce0a8f34a90e99b659d0871bf528f56a1385cab796bf899f295faa740ced0f2c`, based on `1f156647` plus these

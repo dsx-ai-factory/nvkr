@@ -7,7 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -18,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/httptrust"
 	"github.com/dsx-ai-factory/nvkr/internal/readbudget"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -39,6 +39,9 @@ type RegistryOptions struct {
 	// IsolatedTransport selects a fresh standard TLS transport rather than the
 	// process-mutable upstream default. It does not alter registry credentials.
 	IsolatedTransport bool
+	// CertificateAuthority optionally selects exact PEM trust for the isolated
+	// route. Default, non-isolated registry behavior is unchanged.
+	CertificateAuthority string
 	// Authority restricts authenticated traffic to the selected registry and
 	// its token endpoint. It is descriptive and grants no provider authority.
 	Authority *RegistryAuthority
@@ -460,7 +463,7 @@ func helmTagPublishError(err error, tag name.Tag, chart string) error {
 func registryOptions(ctx context.Context, options RegistryOptions) []remote.Option {
 	remoteOptions := []remote.Option{remote.WithContext(ctx), remote.WithUserAgent("nvkr/delivery")}
 	progress, _ := ctx.Value(registryPublicationProgressKey{}).(*registryPublicationProgress)
-	base := readbudget.Transport(ctx, registryTransportWithProgress(options, progress))
+	base := readbudget.Transport(ctx, registryTransportWithProgress(ctx, options, progress))
 	if observer, ok := ctx.Value(registryObserverKey{}).(*registryObserver); ok {
 		base = observer.transport(base)
 	}
@@ -499,20 +502,20 @@ func registryWriteAttempted(ctx context.Context) bool {
 	return ok && progress.writeAttempted.Load()
 }
 
-func registryTransport(options RegistryOptions) http.RoundTripper {
-	return registryTransportWithProgress(options, nil)
+func registryTransport(ctx context.Context, options RegistryOptions) http.RoundTripper {
+	return registryTransportWithProgress(ctx, options, nil)
 }
 
-func registryTransportWithProgress(options RegistryOptions, progress *registryPublicationProgress) http.RoundTripper {
+func registryTransportWithProgress(ctx context.Context, options RegistryOptions, progress *registryPublicationProgress) http.RoundTripper {
 	base := remote.DefaultTransport
 	if options.IsolatedTransport {
-		base = &http.Transport{
-			Proxy:             http.ProxyFromEnvironment,
-			DialContext:       (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-			ForceAttemptHTTP2: true, DisableKeepAlives: true, MaxIdleConns: 100, MaxIdleConnsPerHost: 50,
-			IdleConnTimeout: 90 * time.Second, TLSHandshakeTimeout: 10 * time.Second,
-			ExpectContinueTimeout: time.Second,
+		isolated, err := httptrust.NewTransport(ctx, options.CertificateAuthority)
+		if err != nil {
+			return httpsRegistryTransport{admissionErr: err}
 		}
+		isolated.DisableKeepAlives = true
+		isolated.MaxIdleConnsPerHost = 50
+		base = isolated
 	}
 	if progress != nil {
 		// Observe only a request admitted to the network transport. Wrapping
@@ -705,6 +708,17 @@ func (options RegistryOptions) AmbientKeychain() authn.Keychain {
 func (options RegistryOptions) Validate() error {
 	if options.IsolatedTransport && options.PlainHTTP {
 		return e.New(e.CodeUsage, "isolated registry transport requires HTTPS")
+	}
+	if options.CertificateAuthority != "" && !options.IsolatedTransport {
+		return e.New(e.CodeUsage, "explicit registry certificate authority requires isolated transport")
+	}
+	if options.IsolatedTransport {
+		if err := httptrust.ValidateCertificateAuthority(options.CertificateAuthority); err != nil {
+			return err
+		}
+		if options.CertificateAuthority == "" && (os.Getenv("SSL_CERT_FILE") != "" || os.Getenv("SSL_CERT_DIR") != "") {
+			return e.New(e.CodeTrustPolicyMissing, "isolated registry certificate overrides require an explicit certificate authority")
+		}
 	}
 	if options.Authority.enabled() {
 		registry, registryErr := name.NewRegistry(options.Authority.RegistryHost, name.StrictValidation)

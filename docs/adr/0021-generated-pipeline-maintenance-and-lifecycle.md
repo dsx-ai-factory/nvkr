@@ -1,6 +1,6 @@
 # ADR-21 — Generated-pipeline maintenance & lifecycle
 
-- **Decision status:** Accepted (2026-11-14)
+- **Decision status:** Accepted (2026-11-14); GitLab extension below proposed for maintainer review.
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
@@ -47,8 +47,9 @@ operator-owned and is never generated, adopted or retired by that writer. Execut
 contain only one local include naming `.gitlab/nvkr-run/pipeline.yml`; extra root jobs, variables, includes
 and replacement policy are not customization seams. The provider project must select its default root CI
 configuration. Generated GitLab namespace paths are not authored and cannot be replaced with GitHub layouts.
-The generated include's intrinsic Docker-helper umask switch and fresh-clone strategy apply before every
-job's source checkout (ADR-18). Fresh job-owned source checkout avoids incompatible regular-file modes
+The generated include's intrinsic Docker-helper umask switch, fresh-clone strategy and token-free Git URL
+flag apply before every job's source checkout (ADR-18). Its workflow rules mirror the authored ref/source
+selection and protected-publication requirement; they end with refusal, not a catch-all allow rule. Fresh job-owned source checkout avoids incompatible regular-file modes
 retained by fetch in reused Runner storage; the switch prevents the standard helper from widening them.
 Committed generated payloads still require their exact manifest modes, including `0644` regular files.
 No checkout chmod or mode-tolerant drift exception is admitted.

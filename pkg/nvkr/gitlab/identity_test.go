@@ -87,6 +87,8 @@ func TestPublicClientIgnoresMutableDefaultTransport(t *testing.T) {
 
 func fixtureJob(id uint64, name, status string) apiJob {
 	var j apiJob
+	branch := false
+	j.Tag = &branch
 	j.ID = id
 	j.Name = name
 	j.Status = status

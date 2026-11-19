@@ -1,6 +1,6 @@
 # ADR-18 — Pipeline IR & CI-adapter emission (hermetic execution)
 
-- **Decision status:** Accepted (2026-11-14)
+- **Decision status:** Accepted (2026-11-14); GitLab extension below proposed for maintainer review.
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
@@ -14,7 +14,8 @@
 
 - **Scope:** Sections 1–7 define shared execution requirements and the deferred qualified provider protocol.
   Qualified CI renderers and their TransportPlan implementation are removed; shared local authority primitives
-  remain. Section 1 also defines the bounded ordinary unsigned GitLab profile. Section 8 defines the GitHub Run emitter and event policy.
+  remain. Section 1 also proposes the bounded ordinary unsigned GitLab profile, outside the existing
+  acceptance. Section 8 defines the GitHub Run emitter and event policy.
 
 ## Context
 
@@ -29,7 +30,7 @@ implementation of rendered strings that must be kept in sync.
 
 ### 1. One IR, many adapters — topology/transport only
 
-The GitHub adapter, local runner and bounded ordinary unsigned GitLab adapter use the same producer IR.
+The GitHub adapter, local runner and proposed bounded ordinary unsigned GitLab adapter use the same producer IR.
 Argo generation is unavailable. Separate qualified GitHub/GitLab renderers remain retired.
 Tekton's cluster execution and independent key policy are specified below. Generation admits only that
 explicit contract; reconciliation records implementation checks and external acceptance separately.
@@ -86,22 +87,37 @@ storage extensions and unsupported producer execution requirements fail capabili
 Arbitrary setup hooks, job variables, services and legacy runtime/helper image overrides are not admitted.
 Neither authenticated provider metadata nor successful publication upgrades this evidence lane.
 
+The project's provider-authenticated default branch is always admitted. Optional `additionalRefs` adds
+a sorted, unique list of at most 32 exact branch names from the existing bounded dispatch-branch subset,
+not patterns. Optional `pipelineSources` selects a sorted, unique list of at most 16 supported native
+sources; omission admits only `push` and `web`. Other sources, including API, merge-request and parent
+pipelines, require explicit selection. Generated rules deny debug modes and tags, apply the exact ref/source
+selection and end with refusal. When merge-request events are selected, an open merge request suppresses
+the duplicate push pipeline. Any publication selection additionally requires a protected ref, both in the
+generated rule and through an authenticated exact-branch lookup; a job variable is not protected-branch proof.
+
 Environment's `gitlab` policy selects an exact HTTPS `/api/v4` endpoint, positive native project ID, API-reader
 credential reference and kind, and one or two native `linux/amd64` / `linux/arm64` runner routes. Each route
 declares sorted unique literal tags and a digest-pinned bootstrap image. There are no inferred organization
-tags or GitHub runner-label substitutions. Selected execution images require declared anonymous access.
+tags or GitHub runner-label substitutions and no hosted-runner default. The operator provisions runners
+matching these authored tags. Selected execution images require declared anonymous access.
 The operator supplies the native host, matching Go installation and container runtime. Placement and time
 budgets resolve through the Plan's executable producer view; an empty scheduler reference cannot substitute
 the utility platform or hide source-owned requirements. Actual host mismatch fails before execution.
 The source-built runner follows the generator's checkout or exact module-version bootstrap contract above;
 bootstrap checks the selected Go release and native host before compiling with automatic toolchain download disabled.
-The generated include selects native `FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR=true` and
-`GIT_STRATEGY=clone` before checkout for bootstrap, operation and finalizer jobs. The first removes the
+The generated include selects native `FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR=true`,
+`GIT_STRATEGY=clone` and `FF_GIT_URLS_WITHOUT_TOKENS=true` before checkout for bootstrap, operation
+and finalizer jobs. Runtime admission requires the token-free URL flag to remain enabled. The first removes the
 Docker helper's default `umask 0000` override; the second creates a fresh source checkout in the job-owned
 CI workspace, including when Runner storage was previously used. Git fetch and forced checkout do not
 normalize unchanged files' non-executable permission bits. Native Runner owns this workspace lifecycle;
 NVKR does not change file permissions after checkout or relax the exact generated-file mode contract.
-These intrinsic provider settings do not admit authored job variables or arbitrary Git configuration.
+Before provider or build work, the existing Git owner checks the raw root `.git/config` and effective
+local configuration, including includes, for the actual current-job and selected reader credential bytes.
+A match is refused without exposing those bytes. This bounded check is not a general repository secret
+scan or protection against a compromised runner. These intrinsic provider settings do not admit authored
+job variables or arbitrary Git configuration.
 Non-root build images must supply working `id -u` / `id -g` for Runner's native ownership handling.
 The switch does not itself force a particular umask: a nonstandard helper or repository policy still fails
 the exact mode check. Source acquisition and artifacts continue through their existing owning boundaries.
@@ -116,11 +132,27 @@ The finalizer is scheduled with `when: always`; cancellation or provider loss ca
 Caller-supplied project, pipeline, job and commit values describe a selection. Before operation work, the
 provider owner authenticates the current running generated job using its own `CI_JOB_TOKEN`, checks project
 configuration and exact pipeline identity, and enumerates the complete current non-retried generated job map.
-The separately configured API reader must cover project metadata, pipeline metadata, job enumeration and
-original-job artifact downloads. Its `private-token` and `job-token` kinds describe authentication mechanisms,
+The separately configured API reader must cover project metadata (including `default_branch`), pipeline
+metadata, job enumeration and original-job artifact downloads. Any publication selection also requires
+read access to the exact `repository/branches/<ref>` endpoint for the protected-branch check. Its `private-token` and `job-token` kinds describe authentication mechanisms,
 not a grant of API permissions; the operator must establish the selected instance's endpoint access.
+NVKR does not introspect token grants or enforce least-privilege scopes. For a `private-token` reader,
+the operator must provision project-limited read access (such as `read_api`), without write or broader
+account grants; a more privileged token is not rejected solely for its scopes.
 The current-job token is not interchangeable with that API reader. Provider clients have bounded I/O and a
 caller-derived lifetime; closing an owner cancels and joins its work.
+
+Optional `certificateAuthority` contains at most 64 KiB of explicit PEM CA material bound into the Plan;
+it replaces system roots. Omission admits system roots only when `SSL_CERT_FILE` and `SSL_CERT_DIR`
+are absent. API metadata, artifact carriers and isolated GitLab registry transport share the direct TLS
+owner and do not select proxies from the job environment. This does not change the default, non-isolated
+registry transport. Provider redirects remain refused; carrier storage follows its separately bounded
+credential-free delegation contract.
+
+The provider authenticates the commit identifier, but checkout comparison establishes consistency only
+with the runner's clone. The runner's object database is trusted; NVKR does not independently rehash the
+commit/tree/blob closure. Comparing raw committed blobs with worktree bytes excludes worktree conversion
+from that comparison, not a malicious object database or a compromised runner.
 
 Provider-client reuse is subject to the repository's linked-dependency license and security admission.
 The official GitLab Go SDK remains a candidate for API plumbing and generated test facilities when its pinned
@@ -131,13 +163,20 @@ external acceptance fixture through an owned, bounded subprocess with explicit c
 replace runtime provider authentication or create a linked SDK dependency. The
 [SDK assessment ledger](reconciliation/adr-18.md#gitlab-sdk-reuse-assessment) records the current constraint and open recommendation.
 
-Each outcome binds its exact Plan operation, project, pipeline, commit, original job ID, inputs and carrier
+Runtime compares the caller's ref and source with authenticated provider metadata, then checks that
+invocation against the authored selection. Every refresh retains the original default branch and invocation;
+a changed default branch, ref or source is refused. Each outcome binds its exact Plan operation, project,
+pipeline, commit, authenticated ref and source, original job ID, inputs and carrier
 digests/sizes. Consumers authenticate the original provider job and bounded carrier bytes before restoration;
 workspace files and digest strings confer no authority. A retried producer replacing an acquired original job,
 foreign or ambiguous membership, missing outcomes and failed/skipped jobs fail closed. Original bindings are
 revalidated before acceptance. The finalizer authenticates its role before recompilation, compares the exact
 authored-input Plan, validates the complete job/outcome closure and delegates observation, named-output
-binding and immutable Run writing to the shared lifecycle. No alternative public lifecycle object is added.
+binding and immutable Run writing to the shared lifecycle. Both complete and failed Runs recorded after
+admission carry optional descriptive GitLab invocation metadata (API, project, pipeline, finalizer job,
+commit, ref and source); loading this metadata cannot restore a provider receipt. Finalization compares
+the complete captured authored-input closure with the runner clone before accepting its recompilation.
+No alternative public lifecycle object is added.
 Provider acceptance requires a real GitLab server and GitLab Runner in Docker executing the generated
 multi-job pipeline, with native job authentication, artifact transfer and finalization. Record exact server,
 runner and source identities and the resulting job/Run outcomes, including failure and transport refusals.
@@ -1236,8 +1275,9 @@ requires separate runtime evidence. An opt-in native smoke test requires an expl
 and already-local exact native image ID; absence of those inputs skips it, not proves the backend works.
 No generated disk executor or stronger evidence lane is implied.
 
-Maintained lifecycle targets are local, GitHub, the explicit native Tekton cluster contract and the bounded
-ordinary unsigned GitLab contract above. Argo selection returns `CodeEngineCapability` before reading authored inputs or producing output.
+Maintained lifecycle targets are local, GitHub and the explicit native Tekton cluster contract. The bounded
+ordinary unsigned GitLab implementation follows the proposed contract above; it is outside the ADR's existing
+acceptance. Argo selection returns `CodeEngineCapability` before reading authored inputs or producing output.
 No fallback renderer exists.
 
 | Event | Admitted work and credentials |

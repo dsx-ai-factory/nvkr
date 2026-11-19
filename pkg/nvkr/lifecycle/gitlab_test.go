@@ -15,7 +15,7 @@ import (
 )
 
 func TestFinalizeGitLabRejectsMissingContextAndPathsBeforeInputs(t *testing.T) {
-	job := factory.GitLabJobContext{ProjectID: 7, PipelineID: 23, JobID: 31, Commit: strings.Repeat("a", 40)}
+	job := factory.GitLabJobContext{ProjectID: 7, PipelineID: 23, JobID: 31, Commit: strings.Repeat("a", 40), Ref: "main", Source: "push"}
 	canceled, cancel := context.WithCancel(t.Context())
 	cancel()
 	for _, test := range []struct {
@@ -44,7 +44,7 @@ func TestFinalizeGitLabRejectsMissingContextAndPathsBeforeInputs(t *testing.T) {
 }
 
 func TestFinalizeGitLabAdmitsAuthoredDefinitionBeforeGeneratedPlan(t *testing.T) {
-	job := factory.GitLabJobContext{ProjectID: 7, PipelineID: 23, JobID: 31, Commit: strings.Repeat("a", 40)}
+	job := factory.GitLabJobContext{ProjectID: 7, PipelineID: 23, JobID: 31, Commit: strings.Repeat("a", 40), Ref: "main", Source: "push"}
 	out := filepath.Join(t.TempDir(), "must-not-exist.json")
 	run, err := FinalizeGitLab(t.Context(), "missing-definition.yaml", "missing-environment.yaml", "missing-plan.json", "test", ".nvkr/factory", out, job)
 	assertCode(t, err, e.CodeInvalidCatalog)

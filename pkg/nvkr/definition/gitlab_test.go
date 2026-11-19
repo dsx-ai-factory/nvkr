@@ -30,6 +30,17 @@ func TestGitLabEnvironmentAdmission(t *testing.T) {
 		{name: "omitted unchanged", change: func(e *Environment) { e.GitLab = nil }},
 		{name: "empty map", change: func(e *Environment) { e.GitLab.Runners = nil }, code: e.CodeInvalidCatalog},
 		{name: "missing project", change: func(e *Environment) { e.GitLab.ProjectID = 0 }, code: e.CodeInvalidCatalog},
+		{name: "explicit sources", change: func(e *Environment) { e.GitLab.PipelineSources = []string{"api", "push"} }},
+		{name: "unknown source", change: func(e *Environment) { e.GitLab.PipelineSources = []string{"future-event"} }, code: e.CodeEngineCapability},
+		{name: "duplicate source", change: func(e *Environment) { e.GitLab.PipelineSources = []string{"push", "push"} }, code: e.CodeEngineCapability},
+		{name: "unsorted sources", change: func(e *Environment) { e.GitLab.PipelineSources = []string{"web", "push"} }, code: e.CodeEngineCapability},
+		{name: "explicit branch", change: func(e *Environment) { e.GitLab.AdditionalRefs = []string{"release/0.23"} }},
+		{name: "glob branch", change: func(e *Environment) { e.GitLab.AdditionalRefs = []string{"release/*"} }, code: e.CodeInvalidCatalog},
+		{name: "duplicate branch", change: func(e *Environment) { e.GitLab.AdditionalRefs = []string{"main", "main"} }, code: e.CodeInvalidCatalog},
+		{name: "variable branch", change: func(e *Environment) { e.GitLab.AdditionalRefs = []string{"$CI_DEFAULT_BRANCH"} }, code: e.CodeInvalidCatalog},
+		{name: "lock branch", change: func(e *Environment) { e.GitLab.AdditionalRefs = []string{"release.lock"} }, code: e.CodeInvalidCatalog},
+		{name: "invalid certificate", change: func(e *Environment) { e.GitLab.CertificateAuthority = "not a PEM certificate" }, code: e.CodeTrustPolicyMissing},
+		{name: "oversized certificate", change: func(e *Environment) { e.GitLab.CertificateAuthority = strings.Repeat("x", (64<<10)+1) }, code: e.CodeTrustPolicyMissing},
 		{name: "insecure api", change: func(e *Environment) { e.GitLab.APIURL = "http://gitlab.example.com/api/v4" }, code: e.CodeInvalidCatalog},
 		{name: "hostname missing", change: func(e *Environment) { e.GitLab.APIURL = "https://:443/api/v4" }, code: e.CodeInvalidCatalog},
 		{name: "explicit port", change: func(e *Environment) { e.GitLab.APIURL = "https://gitlab.example.com:8443/api/v4" }},
@@ -161,11 +172,18 @@ func TestGitLabEnvironmentAdmission(t *testing.T) {
 
 func TestGitLabEnvironmentCloneAndIdentity(t *testing.T) {
 	input := gitlabTestEnvironment()
+	input.GitLab.AdditionalRefs = []string{"release/0.23"}
+	input.GitLab.PipelineSources = []string{"api", "web"}
 	before, err := input.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
 	copied := input.Clone()
+	copied.GitLab.AdditionalRefs[0] = "release/0.24"
+	copied.GitLab.PipelineSources[0] = "push"
+	if input.GitLab.AdditionalRefs[0] != "release/0.23" || input.GitLab.PipelineSources[0] != "api" {
+		t.Fatal("clone shares mutable pipeline admission policy")
+	}
 	runner := copied.GitLab.Runners["linux/amd64"]
 	runner.Tags[0] = "other-amd64"
 	copied.GitLab.Runners["linux/amd64"] = runner
@@ -179,5 +197,29 @@ func TestGitLabEnvironmentCloneAndIdentity(t *testing.T) {
 	delete(copied.GitLab.Runners, "linux/amd64")
 	if len(input.GitLab.Runners) != 1 {
 		t.Fatal("clone shares mutable routes")
+	}
+}
+
+func TestGitLabPipelinePolicyDefaultsAndCertificateIdentity(t *testing.T) {
+	input := gitlabTestEnvironment()
+	defaults := input.GitLab.AdmittedPipelineSources()
+	if strings.Join(defaults, ",") != "push,web" {
+		t.Fatal("ordinary invocation defaults changed")
+	}
+	defaults[0] = "api"
+	if input.GitLab.AdmittedPipelineSources()[0] != "push" {
+		t.Fatal("caller mutated default policy")
+	}
+	before, err := input.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	input.GitLab.CertificateAuthority = tektonEnvironmentFixture(t).Tekton.CertificateAuthority
+	if err := input.Validate(); err != nil {
+		t.Fatal(err)
+	}
+	after, err := input.Digest()
+	if err != nil || before == after {
+		t.Fatalf("CA must bind Environment identity: %v", err)
 	}
 }

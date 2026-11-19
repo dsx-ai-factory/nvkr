@@ -62,8 +62,11 @@ func FinalizeGitLab(ctx context.Context, definitionPath, environmentPath, planPa
 		return nil, err
 	}
 	defer func() { _ = finalizer.Close() }()
-	expectedPlan, err := CompileFiles(ctx, definitionPath, environmentPath, generatorVersion)
+	expectedPlan, snapshot, err := factory.CaptureCompileFiles(ctx, ".", definitionPath, environmentPath, generatorVersion)
 	if err != nil {
+		return nil, err
+	}
+	if err := factory.VerifyGitLabCompileSnapshot(ctx, job.Commit, snapshot); err != nil {
 		return nil, err
 	}
 	want, err := expectedPlan.Digest()
@@ -81,6 +84,11 @@ func FinalizeGitLab(ctx context.Context, definitionPath, environmentPath, planPa
 	if err != nil {
 		return nil, err
 	}
+	invocation, err := finalizer.Invocation()
+	if err != nil {
+		return nil, err
+	}
+	run.GitLab = &GitLabInvocation{APIURL: invocation.APIURL, ProjectID: invocation.ProjectID, PipelineID: invocation.PipelineID, JobID: invocation.JobID, Commit: invocation.Commit, Ref: invocation.Ref, Source: invocation.Source}
 	// Failed or skipped provider jobs may leave no restored artifact directory.
 	// Prepare the confined output parent before failure accounting, through the
 	// existing no-follow owner; the immutable Run writer still refuses replacement.

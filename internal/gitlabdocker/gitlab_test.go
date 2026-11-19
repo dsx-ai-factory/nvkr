@@ -19,6 +19,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/parser"
@@ -59,6 +60,7 @@ type lab struct {
 	containers, volumes                                            []string
 	project, pipeline                                              int
 	pipelineTerminal                                               bool
+	credentialsChecked                                             map[int]bool
 	cleanupRun                                                     func(context.Context, ...string) ([]byte, error)
 }
 type job struct {
@@ -251,6 +253,7 @@ func TestGitLabNVKE(t *testing.T) {
 	for {
 		l.api(ctx, "GET", fmt.Sprintf("projects/%d/pipelines/%d", l.project, p.ID), nil, &p)
 		l.api(ctx, "GET", fmt.Sprintf("projects/%d/pipelines/%d/jobs?include_retried=true&per_page=100", l.project, p.ID), nil, &jobs)
+		l.observeCheckoutCredentials(ctx, jobs)
 		l.evidenceJSON("status.json", map[string]any{"pipeline": p, "jobs": jobs, "platform": "linux/" + l.arch, "images": l.pins, "bootstrapImage": bootstrap})
 		if p.Status != lastStatus {
 			t.Logf("pipeline %d status %s", p.ID, p.Status)
@@ -308,6 +311,9 @@ func TestGitLabNVKE(t *testing.T) {
 			}
 		}
 		bootstrapIdentities = append(bootstrapIdentities, identity)
+	}
+	if p.Status == "success" && len(l.credentialsChecked) == 0 {
+		t.Error("no running native operation checkout was observed free of its live credentials")
 	}
 	bootstrapStatus := "observed"
 	if len(bootstrapIdentities) == 0 {
@@ -425,7 +431,7 @@ func (l *lab) authorAndGenerate(ctx context.Context, repo, bootstrap string) {
 	must(l.t, err)
 	env.Signing = nil
 	env.Publication = nil
-	env.GitLab = &definition.GitLab{APIURL: "https://gitlab.test/api/v4", ProjectID: uint64(l.project), APIReadCredentialRef: "gitlab:NVKR_API_READ", APIReadCredentialKind: "private-token", Runners: map[string]definition.GitLabRunner{"linux/" + l.arch: {Tags: []string{l.name}, BootstrapImage: bootstrap}}}
+	env.GitLab = &definition.GitLab{APIURL: "https://gitlab.test/api/v4", ProjectID: uint64(l.project), APIReadCredentialRef: "gitlab:NVKR_API_READ", APIReadCredentialKind: "private-token", CertificateAuthority: string(read(l.t, filepath.Join(l.work, "secrets", "gitlab.test.crt"))), PipelineSources: []string{"api"}, Runners: map[string]definition.GitLabRunner{"linux/" + l.arch: {Tags: []string{l.name}, BootstrapImage: bootstrap}}}
 	writeJSON(l.t, filepath.Join(repo, envPath), env)
 	write(l.t, filepath.Join(repo, ".gitlab-ci.yml"), []byte("include:\n  - local: .gitlab/nvkr-run/pipeline.yml\n"), 0600)
 	binary := filepath.Join(l.work, "nvkr")
@@ -579,6 +585,61 @@ func (l *lab) checkArtifacts(ctx context.Context, plan *factory.Plan, p pipeline
 	must(l.t, err)
 	if run.Attempt != attempt || run.PlanDigest != want || run.DefinitionDigest != plan.DefinitionDigest || run.EnvironmentDigest != plan.EnvironmentDigest || p.SHA != l.fixtureCommit {
 		l.t.Fatal("Run did not bind generated inputs and provider commit")
+	}
+	if run.GitLab == nil || run.GitLab.Ref != "main" || run.GitLab.Source != "api" || run.GitLab.ProjectID != uint64(l.project) || run.GitLab.PipelineID != uint64(l.pipeline) || run.GitLab.JobID != finalizerID || run.GitLab.Commit != l.fixtureCommit {
+		l.t.Fatal("Run omitted or substituted its authenticated GitLab ref/source invocation")
+	}
+}
+
+// Observe the real Runner checkout while its native job is live. Official
+// Runner 19.4 labels bind each selected Docker container to this fixture's
+// project/pipeline/job; no ambient or unrelated container is inspected.
+func (l *lab) observeCheckoutCredentials(ctx context.Context, jobs []job) {
+	for _, job := range jobs {
+		if job.Status != "running" || !strings.HasPrefix(job.Name, "nvkr:op:") || l.credentialsChecked[job.ID] {
+			continue
+		}
+		ids := l.command(ctx, l.root, nil, "docker", "ps", "--quiet", "--filter", "network="+l.name,
+			"--filter", fmt.Sprintf("label=com.gitlab.gitlab-runner.project.id=%d", l.project),
+			"--filter", fmt.Sprintf("label=com.gitlab.gitlab-runner.pipeline.id=%d", l.pipeline),
+			"--filter", fmt.Sprintf("label=com.gitlab.gitlab-runner.job.id=%d", job.ID),
+			"--filter", "label=com.gitlab.gitlab-runner.type=build")
+		for _, id := range strings.Fields(string(ids)) {
+			// Literal shell only checks the test-owned checkout; secrets remain
+			// inside the live job, never argv expanded by the host or output.
+			const check = `set -eu
+set +x
+test -n "${CI_PROJECT_DIR:-}" && test -n "${CI_JOB_TOKEN:-}" || exit 80
+cd "$CI_PROJECT_DIR"
+test -f .git/config || exit 80
+test "${FF_GIT_URLS_WITHOUT_TOKENS:-}" = true || exit 88
+absent() {
+  if grep -Fq -- "$1" .git/config; then exit 88
+  else status=$?; test "$status" -eq 1 || exit 80
+  fi
+}
+absent "$CI_JOB_TOKEN"
+if test -n "${NVKR_API_READ:-}"; then absent "$NVKR_API_READ"; fi
+printf '%s\n' nvkr-checkout-credentials-absent
+`
+			probe, cancel := context.WithTimeout(ctx, 10*time.Second)
+			out, err := l.invoke(probe, l.root, nil, "docker", "exec", id, "/bin/sh", "-c", check)
+			cancel()
+			var exit *exec.ExitError
+			if errors.As(err, &exit) && exit.ExitCode() == 88 {
+				l.t.Fatal("real native checkout exposed credentials or disabled token-free checkout")
+			}
+			// A job may finish between enumeration and exec. Do not infer a
+			// successful observation from a removed/not-ready container.
+			if err != nil || string(out) != "nvkr-checkout-credentials-absent\n" {
+				continue
+			}
+			if l.credentialsChecked == nil {
+				l.credentialsChecked = map[int]bool{}
+			}
+			l.credentialsChecked[job.ID] = true
+			l.evidenceJSON("checkout-credentials.json", map[string]any{"observedNativeOperationJobs": len(l.credentialsChecked), "liveCredentialsAbsentFromGitConfig": true})
+		}
 	}
 }
 

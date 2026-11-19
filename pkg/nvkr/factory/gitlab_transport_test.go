@@ -35,12 +35,12 @@ func TestGitLabProducerOutcomeExactCurrentMembership(t *testing.T) {
 			break
 		}
 	}
-	identity := provider.Identity{APIURL: plan.Environment.GitLab.APIURL, ProjectID: 123, PipelineID: 2, JobID: 3, Commit: strings.Repeat("a", 40)}
+	identity := provider.Identity{APIURL: plan.Environment.GitLab.APIURL, ProjectID: 123, PipelineID: 2, JobID: 3, Commit: strings.Repeat("a", 40), Ref: "main", Source: "push"}
 	digest, err := plan.Digest()
 	if err != nil {
 		t.Fatal(err)
 	}
-	good := gitlabOutcome{Schema: "nvkr.dev/gitlab-operation/v1", APIURL: identity.APIURL, ProjectID: 123, PipelineID: 2, JobID: 9, Commit: identity.Commit, Plan: digest, Node: node.ID, Status: "success", Carriers: []gitlabCarrier{}}
+	good := gitlabOutcome{Ref: "main", Source: "push", Schema: "nvkr.dev/gitlab-operation/v1", APIURL: identity.APIURL, ProjectID: 123, PipelineID: 2, JobID: 9, Commit: identity.Commit, Plan: digest, Node: node.ID, Status: "success", Carriers: []gitlabCarrier{}}
 	for _, id := range node.Outputs {
 		good.Carriers = append(good.Carriers, gitlabCarrier{Artifact: id, Digest: "sha256:" + strings.Repeat("b", 64), Bytes: 1024})
 	}
@@ -66,6 +66,9 @@ func TestGitLabProducerOutcomeExactCurrentMembership(t *testing.T) {
 		{"foreign project", func(o *gitlabOutcome) { o.ProjectID++ }, false},
 		{"foreign pipeline", func(o *gitlabOutcome) { o.PipelineID++ }, false},
 		{"previous retry job", func(o *gitlabOutcome) { o.JobID-- }, false},
+		{"wrong ref", func(o *gitlabOutcome) { o.Ref = "feature" }, false},
+		{"wrong pipeline source", func(o *gitlabOutcome) { o.Source = "api" }, false},
+		{"missing invocation", func(o *gitlabOutcome) { o.Ref = ""; o.Source = "" }, false},
 		{"wrong source", func(o *gitlabOutcome) { o.Commit = strings.Repeat("c", 40) }, false},
 		{"wrong Plan", func(o *gitlabOutcome) { o.Plan = "sha256:" + strings.Repeat("d", 64) }, false},
 		{"wrong node", func(o *gitlabOutcome) { o.Node = "other" }, false},
@@ -211,7 +214,7 @@ func TestGitLabNativeArtifactTransportChild(t *testing.T) {
 	}
 	x509.SetFallbackRoots(pool)
 	t.Chdir(os.Getenv("NVKR_GITLAB_TEST_ROOT"))
-	state := &gitlabAdmission{config: provider.Config{APIURL: os.Getenv("NVKR_GITLAB_TEST_API"), ProjectID: 123, ReadCredentialKind: "private-token", ReadCredential: "synthetic-read"}}
+	state := &gitlabAdmission{defaultBranch: "main", pipelineSources: []string{"push", "web"}, config: provider.Config{APIURL: os.Getenv("NVKR_GITLAB_TEST_API"), ProjectID: 123, ReadCredentialKind: "private-token", ReadCredential: "synthetic-read", CertificateAuthority: string(raw)}}
 	payload := []byte("original native carrier bytes")
 	digest := sha256.Sum256(payload)
 	item := gitlabCarrier{Artifact: "source", Digest: "sha256:" + hex.EncodeToString(digest[:]), Bytes: int64(len(payload))}

@@ -1,6 +1,6 @@
 # ADR-20 — Artifact publication & target-registry configuration
 
-- **Decision status:** Accepted (2026-11-14); selective boot-asset extension below proposed for review in issue #514.
+- **Decision status:** Accepted (2026-11-14); selective boot-asset extension below proposed for review in issue #514; GitLab extension below proposed for maintainer review.
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
@@ -73,15 +73,22 @@ This proposed GitLab extension requires maintainer review; the existing ADR acce
 The ordinary GitLab profile may explicitly select unsigned HTTPS OCI publication without changing signed
 GitHub, Tekton or consumer-policy contracts. It accepts anonymous transport or the exact credential reference
 `gitlab:CI_JOB_TOKEN`, with no signing configuration. The job token is publication authentication, separate
-from the configured API reader. Authenticated publication requires provider-reported enabled registry metadata
+from the configured API reader. Every selected publication, including anonymous transport, requires an
+authenticated protected branch under ADR-18's exact invocation policy. Authenticated publication requires provider-reported enabled registry metadata
 for the authenticated current project and a destination inside that exact project's registry namespace.
 Every derived output and evidence repository must remain inside it; a lexical sibling is not a child.
 The native registry username is `gitlab-ci-token`. An isolated TLS transport confines authenticated requests
 to the selected registry, admitted repositories and the selected provider's exact `/jwt/auth` token endpoint,
-with only the admitted repository scopes. Digest-addressed blob reads may follow one HTTPS redirect from
-an admitted repository to object storage. Storage requests carry no registry or API credentials; manifests
-and token requests gain no cross-origin authority. Readback still verifies each exact blob and its size.
-No ambient registry keychain supplies publication credentials.
+with only the admitted repository scopes. On this authenticated route, digest-addressed blob reads may
+follow one HTTPS redirect from an admitted repository to object storage. Storage requests carry no registry
+or API credentials; manifests and token requests gain no cross-origin authority. Anonymous publication
+enforces HTTPS on every request and may follow the HTTP client's ordinary redirect policy; it does not
+use the authenticated route's one-hop or same-project authority limits and sends no publication credentials.
+Both routes still verify each exact blob and its size during readback.
+No ambient registry keychain supplies publication credentials. Both isolated GitLab routes use the same
+direct TLS owner as API and carrier access: optional Plan-bound `gitlab.certificateAuthority` replaces
+system roots, omitted CA refuses ambient certificate-file/directory overrides, and ambient proxy settings
+are ignored. The default, non-isolated registry transport is unchanged.
 
 Only the compiled `publish/release` route is admitted. The publisher validates the complete local closure,
 writes its existing digest-addressed representation,

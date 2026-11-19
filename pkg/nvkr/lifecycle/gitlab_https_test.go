@@ -30,7 +30,7 @@ import (
 // bytes. They exercise the public production HTTPS adapter, native archive
 // owner and complete finalizer; they are not evidence of a live GitLab run.
 func TestFinalizeGitLabNativeHTTPSClosure(t *testing.T) {
-	for _, mode := range []string{"complete", "failed", "skipped", "missing-outcome", "corrupt-outcome", "wrong-producer-job", "corrupt-carrier", "wrong-role", "foreign-output-parent", "existing-run", "foreign-definition", "foreign-environment", "producer-retried-after-dependent", "producer-retried-before-commit"} {
+	for _, mode := range []string{"complete", "failed", "skipped", "missing-outcome", "corrupt-outcome", "wrong-producer-job", "corrupt-carrier", "wrong-role", "foreign-output-parent", "existing-run", "foreign-definition", "foreign-environment", "dirty-authored-input", "producer-retried-after-dependent", "producer-retried-before-commit"} {
 		t.Run(mode, func(t *testing.T) {
 			root := t.TempDir()
 			t.Chdir(root)
@@ -58,9 +58,9 @@ func TestFinalizeGitLabNativeHTTPSClosure(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				switch r.URL.Path {
 				case "/api/v4/projects/7":
-					_ = json.NewEncoder(w).Encode(map[string]any{"id": 7, "ci_config_path": nil})
+					_ = json.NewEncoder(w).Encode(map[string]any{"id": 7, "ci_config_path": nil, "default_branch": "main"})
 				case "/api/v4/projects/7/pipelines/23":
-					_ = json.NewEncoder(w).Encode(map[string]any{"id": 23, "project_id": 7, "sha": commit, "ref": "main", "source": "api"})
+					_ = json.NewEncoder(w).Encode(map[string]any{"id": 23, "project_id": 7, "sha": commit, "ref": "main", "source": "push"})
 				case "/api/v4/job":
 					_ = json.NewEncoder(w).Encode(self)
 				case "/api/v4/projects/7/pipelines/23/jobs":
@@ -96,7 +96,7 @@ func TestFinalizeGitLabNativeHTTPSClosure(t *testing.T) {
 				}
 			}))
 			defer server.Close()
-			plan := prepareGitLabFinalizerPayloads(t, root, server.URL+"/api/v4")
+			plan := prepareGitLabFinalizerPayloads(t, root, server.URL+"/api/v4", string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})))
 			names, err := factory.GitLabJobNames(t.Context(), plan)
 			if err != nil {
 				t.Fatal(err)
@@ -163,7 +163,7 @@ func TestFinalizeGitLabNativeHTTPSClosure(t *testing.T) {
 					members[gitLabMemberURL(jobID, factory.GitLabCarrierPath(node.ID, id))] = raw
 				}
 				outcome := map[string]any{"schema": "nvkr.dev/gitlab-operation/v1", "apiURL": server.URL + "/api/v4", "projectID": 7,
-					"pipelineID": 23, "jobID": jobID, "commit": "filled-after-native-git-commit", "plan": digest, "node": node.ID,
+					"pipelineID": 23, "jobID": jobID, "commit": "filled-after-native-git-commit", "ref": "main", "source": "push", "plan": digest, "node": node.ID,
 					"status": "success", "exitCode": 0, "inputs": inputs, "carriers": carriers}
 				// Commit is filled below; the original member descriptions are
 				// generated only after the actual fixture checkout exists.
@@ -173,6 +173,17 @@ func TestFinalizeGitLabNativeHTTPSClosure(t *testing.T) {
 				t.Fatal(err)
 			}
 			commit = gitLabCommitFixture(t, root)
+			if mode == "dirty-authored-input" {
+				raw, err := os.ReadFile("environment.json")
+				if err != nil {
+					t.Fatal(err)
+				}
+				// The parsed Environment and Plan identities stay the same. The finalizer
+				// must still compare the actual captured file bytes with the runner clone.
+				if err := os.WriteFile("environment.json", append(raw, '\n'), 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
 			if mode == "foreign-definition" || mode == "foreign-environment" {
 				name := strings.TrimPrefix(mode, "foreign-") + ".json"
 				raw, err := os.ReadFile(name)
@@ -237,8 +248,8 @@ func TestFinalizeGitLabNativeHTTPSClosure(t *testing.T) {
 				} else if name == operationNames["package/cli"] && (mode == "failed" || mode == "skipped") {
 					status = mode
 				}
-				job := map[string]any{"id": jobIDs[name], "name": name, "status": status, "ref": "main", "commit": map[string]any{"id": commit},
-					"pipeline": map[string]any{"id": 23, "project_id": 7, "sha": commit, "ref": "main", "source": "api"}}
+				job := map[string]any{"id": jobIDs[name], "name": name, "status": status, "tag": false, "ref": "main", "commit": map[string]any{"id": commit},
+					"pipeline": map[string]any{"id": 23, "project_id": 7, "sha": commit, "ref": "main", "source": "push"}}
 				jobs = append(jobs, job)
 				if jobIDs[name] == 31 {
 					self = job
@@ -256,7 +267,7 @@ func TestFinalizeGitLabNativeHTTPSClosure(t *testing.T) {
 			child.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + t.TempDir(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
 				"GODEBUG=x509usefallbackroots=1", "NVKR_GITLAB_FINALIZE_MODE=" + mode, "NVKR_GITLAB_FINALIZE_ROOT=" + root,
 				"NVKR_GITLAB_FINALIZE_CA=" + ca, "NVKR_GITLAB_FINALIZE_COMMIT=" + commit,
-				"CI_JOB_TOKEN=synthetic-job-token", "NVKR_API_READ=synthetic-read-token"}
+				"FF_GIT_URLS_WITHOUT_TOKENS=true", "CI_JOB_TOKEN=synthetic-job-token", "NVKR_API_READ=synthetic-read-token"}
 			// Inherit the parent's temporary directory so bounded scratch storage
 			// stays with the attempt on hosts where the default location is full.
 			if tmpdir := os.Getenv("TMPDIR"); tmpdir != "" {
@@ -268,7 +279,7 @@ func TestFinalizeGitLabNativeHTTPSClosure(t *testing.T) {
 			if mode == "producer-retried-before-commit" && mapReads.Load() != 6 {
 				t.Fatalf("did not reach final confirmation: %d", mapReads.Load())
 			}
-			if mode == "wrong-role" && artifactReads.Load() != 0 {
+			if (mode == "wrong-role" || mode == "dirty-authored-input") && artifactReads.Load() != 0 {
 				t.Fatal("foreign role performed artifact IO")
 			}
 			if (mode == "foreign-definition" || mode == "foreign-environment") && apiReads.Load() != 0 {
@@ -293,7 +304,7 @@ func TestFinalizeGitLabNativeHTTPSChild(t *testing.T) {
 	}
 	x509.SetFallbackRoots(pool)
 	t.Chdir(os.Getenv("NVKR_GITLAB_FINALIZE_ROOT"))
-	job := factory.GitLabJobContext{ProjectID: 7, PipelineID: 23, JobID: 31, Commit: os.Getenv("NVKR_GITLAB_FINALIZE_COMMIT")}
+	job := factory.GitLabJobContext{ProjectID: 7, PipelineID: 23, JobID: 31, Commit: os.Getenv("NVKR_GITLAB_FINALIZE_COMMIT"), Ref: "main", Source: "push"}
 	definitionPath, environmentPath := "definition.json", "environment.json"
 	if mode == "foreign-definition" {
 		definitionPath = "foreign-definition.json"
@@ -322,7 +333,7 @@ func TestFinalizeGitLabNativeHTTPSChild(t *testing.T) {
 		}
 		return
 	}
-	if mode == "wrong-role" {
+	if mode == "wrong-role" || mode == "dirty-authored-input" {
 		assertCode(t, err, e.CodeProvenanceMissing)
 		if run != nil {
 			t.Fatal("wrong role returned a Run")
@@ -334,6 +345,9 @@ func TestFinalizeGitLabNativeHTTPSChild(t *testing.T) {
 	}
 	if run == nil || len(run.Expected) != 1 || run.Lane != LaneUnqualified || run.Attempt != "gitlab-7-23-31" {
 		t.Fatalf("frozen requirement/attempt/lane lost: %+v, %v", run, err)
+	}
+	if run.GitLab == nil || run.GitLab.Ref != "main" || run.GitLab.Source != "push" || run.GitLab.Commit != job.Commit || run.GitLab.ProjectID != 7 || run.GitLab.PipelineID != 23 || run.GitLab.JobID != 31 {
+		t.Fatalf("terminal Run omitted its authenticated invocation: %+v", run.GitLab)
 	}
 	if mode == "complete" {
 		if err != nil || run.Status != RunComplete || len(run.Observed) != 1 || run.Observed[0].Digest == "" {
@@ -355,7 +369,7 @@ func TestFinalizeGitLabNativeHTTPSChild(t *testing.T) {
 	}
 }
 
-func prepareGitLabFinalizerPayloads(t *testing.T, root, api string) *factory.Plan {
+func prepareGitLabFinalizerPayloads(t *testing.T, root, api, certificateAuthority string) *factory.Plan {
 	t.Helper()
 	definition, environment := testDefinition(t), testEnvironment()
 	if err := os.CopyFS(filepath.Join(root, "catalog"), os.DirFS(definition.Catalog.Base)); err != nil {
@@ -363,7 +377,7 @@ func prepareGitLabFinalizerPayloads(t *testing.T, root, api string) *factory.Pla
 	}
 	definition.Catalog.Base = "catalog"
 	environment.Publication = nil
-	environment.GitLab = &authored.GitLab{APIURL: api, ProjectID: 7, APIReadCredentialRef: "gitlab:NVKR_API_READ", APIReadCredentialKind: "private-token",
+	environment.GitLab = &authored.GitLab{APIURL: api, CertificateAuthority: certificateAuthority, ProjectID: 7, APIReadCredentialRef: "gitlab:NVKR_API_READ", APIReadCredentialKind: "private-token",
 		Runners: map[string]authored.GitLabRunner{"linux/amd64": {Tags: []string{"synthetic-native-runner"}, BootstrapImage: "registry.example.test/go@sha256:" + strings.Repeat("a", 64)}}}
 	writeCanonicalTestFile(t, "definition.json", definition)
 	writeCanonicalTestFile(t, "environment.json", environment)

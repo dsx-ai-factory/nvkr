@@ -56,14 +56,14 @@ func TestGitLabGenerateRefusesGitHubOptionsBeforePluginOrInputWork(t *testing.T)
 }
 
 func TestGitLabNativeContextUsesOnlyCanonicalNativeDescriptions(t *testing.T) {
-	base := map[string]string{"CI_PROJECT_ID": "7", "CI_PIPELINE_ID": "23", "CI_JOB_ID": "31", "CI_COMMIT_SHA": strings.Repeat("a", 40)}
+	base := map[string]string{"CI_PROJECT_ID": "7", "CI_PIPELINE_ID": "23", "CI_JOB_ID": "31", "CI_COMMIT_SHA": strings.Repeat("a", 40), "CI_COMMIT_REF_NAME": "main", "CI_PIPELINE_SOURCE": "push"}
 	job, err := gitLabJobFromEnvironment(func(key string) string {
 		if strings.HasPrefix(key, "GITHUB_") || strings.Contains(key, "TOKEN") {
 			t.Fatalf("native context parser read unrelated identity or credential %s", key)
 		}
 		return base[key]
 	})
-	want := factory.GitLabJobContext{ProjectID: 7, PipelineID: 23, JobID: 31, Commit: strings.Repeat("a", 40)}
+	want := factory.GitLabJobContext{ProjectID: 7, PipelineID: 23, JobID: 31, Commit: strings.Repeat("a", 40), Ref: "main", Source: "push"}
 	if err != nil || !reflect.DeepEqual(job, want) {
 		t.Fatalf("native context = %+v, error %v", job, err)
 	}
@@ -87,6 +87,23 @@ func TestGitLabNativeContextUsesOnlyCanonicalNativeDescriptions(t *testing.T) {
 			})
 		}
 	}
+	for _, key := range []string{"CI_COMMIT_REF_NAME", "CI_PIPELINE_SOURCE"} {
+		for _, value := range []string{"", " main", "main ", "main\n", "ma\x00in"} {
+			t.Run(key+"/"+strconv.Quote(value), func(t *testing.T) {
+				got, err := gitLabJobFromEnvironment(func(name string) string {
+					if name == key {
+						return value
+					}
+					return base[name]
+				})
+				assertLifecycleCommandCode(t, err, e.CodeUsage)
+				if got != (factory.GitLabJobContext{}) {
+					t.Fatal("refused ref/source returned a partial native context")
+				}
+			})
+		}
+	}
+
 }
 
 func TestGitLabCommandsDoNotFallbackToGitHubContext(t *testing.T) {

@@ -118,7 +118,9 @@ shared generated-file owner. Its Plan retains packed canonical bytes; the shared
 GitHub-only. Root `.gitlab-ci.yml` remains operator-owned; runtime admission requires its
 single exact local include and the project's default root CI configuration.
 The exact generated transport includes the native Docker-helper switch suppressing Runner's default
-`umask 0000` and the native fresh-clone strategy before all job checkouts. Contract tests cover all-job
+`umask 0000`, the native fresh-clone strategy and the token-free Git URL flag before all job checkouts.
+Current workflow rules mirror the exact ref/source policy, require protected refs for publication and
+end with refusal. These later policy changes do not inherit the earlier provider-run evidence below. Contract tests cover all-job
 inheritance and coherent missing/disabled/substituted policy refusal. Shared manifest `0644` mode checks
 remain unchanged. Fresh job-owned source checkout avoids the reproduced unchanged-file mode retention in
 reused Runner storage. The historical [real server/Runner runs](adr-18.md#gitlab-ordinary-unsigned-profile)

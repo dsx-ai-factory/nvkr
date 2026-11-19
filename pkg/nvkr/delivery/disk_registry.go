@@ -32,6 +32,9 @@ func PushDiskArtifact(ctx context.Context, artifact *DiskArtifact, repository, s
 // production always supplies the filesystem owner above.
 func pushDiskArtifactWithCleanup(ctx context.Context, artifact *DiskArtifact, repository, scratch string, options RegistryOptions, remove func(string) error) (reference string, err error) {
 	ctx, observer := observeRegistry(ctx)
+	if ctx != nil {
+		ctx = context.WithValue(ctx, registryPublicationProgressKey{}, &registryPublicationProgress{})
+	}
 	defer func(observedCtx context.Context) {
 		err = observer.explain(observedCtx, err)
 		// Classify using the original caller lifetime, not the deadline we

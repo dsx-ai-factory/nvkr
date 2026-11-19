@@ -129,7 +129,7 @@ func cmdRun() *cli.Command {
 type localLifecycleExecutor func(context.Context, *lifecycle.PreparedRun, lifecycle.LocalOptions) (*lifecycle.Run, error)
 
 func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
-	generationFlags := append(append(lifecycleInputFlags(), commandPresentationFlags()...), &cli.StringFlag{Name: "engine", Value: factory.EngineGitHub, Usage: "CI adapter: github, gitlab, or tekton"})
+	generationFlags := append(append(lifecycleInputFlags(), commandPresentationFlags()...), &cli.StringFlag{Name: "engine", Value: factory.EngineGitHub, Usage: "CI adapter: github, tekton, or gitlab (proposed; maintainer review pending)"})
 	return &cli.Command{Name: "run", Usage: "plan, generate, and execute Definition runs", Subcommands: []*cli.Command{
 		cmdRunFinalizeGitLab(),
 		{Name: "finalize", Hidden: true, Usage: "finalize one generated hosted Run from restored carriers", Flags: append(lifecycleInputFlags(),

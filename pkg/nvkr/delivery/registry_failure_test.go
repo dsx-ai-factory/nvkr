@@ -640,13 +640,86 @@ func TestRegistryPrewriteCancellationDoesNotClaimPartialUploads(t *testing.T) {
 	}
 }
 
+func TestDocumentAndDiskCancellationPreservesPublicationPhase(t *testing.T) {
+	for _, kind := range []string{"document", "disk"} {
+		for _, afterWrite := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/after-write=%t", kind, afterWrite), func(t *testing.T) {
+				var artifact *DiskArtifact
+				if kind == "disk" {
+					root, payload, manifest := diskFixture(t, "linux/arm64")
+					var err error
+					artifact, err = OpenDiskArtifact(t.Context(), root, manifest, "linux/arm64", int64(len(payload)))
+					if err != nil {
+						t.Fatal(err)
+					}
+					defer artifact.Close()
+				}
+				ctx, cancel := context.WithCancel(t.Context())
+				defer cancel()
+				var posts, manifests, canceled atomic.Int64
+				base := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
+				server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.Method == http.MethodPost {
+						posts.Add(1)
+					}
+					manifest := r.Method == http.MethodPut && strings.Contains(r.URL.Path, "/manifests/")
+					if manifest {
+						manifests.Add(1)
+					}
+					if afterWrite && manifest || !afterWrite && r.Method == http.MethodGet && r.URL.Path == "/v2/" {
+						if _, err := io.Copy(io.Discard, r.Body); err != nil {
+							t.Errorf("reading controlled registry request: %v", err)
+							return
+						}
+						canceled.Add(1)
+						cancel()
+						timer := time.NewTimer(5 * time.Second)
+						defer timer.Stop()
+						select {
+						case <-r.Context().Done():
+						case <-timer.C:
+							t.Error("registry request did not observe caller cancellation")
+						}
+						return
+					}
+					base.ServeHTTP(w, r)
+				}))
+				defer func() {
+					cancel()
+					server.CloseClientConnections()
+					server.Close()
+				}()
+				repo := strings.TrimPrefix(server.URL, "http://") + "/cancellation"
+				options := RegistryOptions{PlainHTTP: true, Anonymous: true}
+				var original error
+				if kind == "document" {
+					_, original = PushDocumentArtifact(ctx, repo, "application/vnd.nvkr.test-document.v1+json", []byte(`{"fixture":"exact bytes"}`), options)
+				} else {
+					_, original = PushDiskArtifact(ctx, artifact, repo, t.TempDir(), options)
+				}
+				assertRegistryCode(t, original, e.CodeTimeout)
+				var failure *RegistryFailure
+				if !errors.Is(original, context.Canceled) || !errors.As(original, &failure) || canceled.Load() != 1 {
+					t.Fatalf("cancellation lost its cause or registry observation: %v", original)
+				}
+				if (posts.Load() > 0) != afterWrite || (manifests.Load() == 1) != afterWrite {
+					t.Fatalf("cancellation occurred in the wrong phase: posts=%d manifests=%d", posts.Load(), manifests.Load())
+				}
+				if strings.Contains(failure.Action, "reconcile partial uploads") != afterWrite || strings.Contains(original.Error(), "partial uploads") != afterWrite {
+					t.Fatalf("timeout advice lost the actual publication phase: %v", original)
+				}
+			})
+		}
+	}
+}
+
 func TestRegistryLocallyRefusedWriteIsNotUploadProgress(t *testing.T) {
 	progress := &registryPublicationProgress{}
 	request, err := http.NewRequestWithContext(t.Context(), http.MethodPost, "http://registry.invalid/v2/release/blobs/uploads/", strings.NewReader("synthetic body"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	response, err := registryTransportWithProgress(RegistryOptions{IsolatedTransport: true}, progress).RoundTrip(request)
+	response, err := registryTransportWithProgress(t.Context(), RegistryOptions{IsolatedTransport: true}, progress).RoundTrip(request)
 	if response != nil {
 		_ = response.Body.Close()
 	}

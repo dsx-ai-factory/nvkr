@@ -54,12 +54,12 @@ func TestGitLabPublicationRevalidatesBeforeRegistryWrite(t *testing.T) {
 			reg := registry.New(registry.Logger(log.New(io.Discard, "", 0)))
 			server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				job := func(id uint64, name, status string) map[string]any {
-					return map[string]any{"id": id, "name": name, "status": status, "ref": "main", "commit": map[string]any{"id": strings.Repeat("a", 40)}, "pipeline": map[string]any{"id": 2, "project_id": 123, "sha": strings.Repeat("a", 40), "ref": "main", "source": "push"}}
+					return map[string]any{"id": id, "name": name, "status": status, "tag": false, "ref": "main", "commit": map[string]any{"id": strings.Repeat("a", 40)}, "pipeline": map[string]any{"id": 2, "project_id": 123, "sha": strings.Repeat("a", 40), "ref": "main", "source": "push"}}
 				}
 				switch r.URL.Path {
 				case "/api/v4/projects/123":
 					refreshes.Add(1)
-					_, _ = w.Write([]byte(`{"id":123,"ci_config_path":null}`))
+					_, _ = w.Write([]byte(`{"id":123,"ci_config_path":null,"default_branch":"main"}`))
 				case "/api/v4/projects/123/pipelines/2":
 					_, _ = w.Write([]byte(`{"id":2,"project_id":123,"sha":"` + strings.Repeat("a", 40) + `","ref":"main","source":"push"}`))
 				case "/api/v4/job":
@@ -158,13 +158,13 @@ func TestGitLabPublicationClosureChild(t *testing.T) {
 	}
 	x509.SetFallbackRoots(pool)
 	origin := os.Getenv("NVKR_GITLAB_TEST_ORIGIN")
-	config := provider.Config{APIURL: origin + "/api/v4", ProjectID: 123, JobToken: "synthetic-job", ReadCredential: "synthetic-read", ReadCredentialKind: "private-token"}
+	config := provider.Config{APIURL: origin + "/api/v4", ProjectID: 123, JobToken: "synthetic-job", ReadCredential: "synthetic-read", ReadCredentialKind: "private-token", CertificateAuthority: string(raw)}
 	client, err := provider.New(t.Context(), config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	state := &gitlabAdmission{client: client, names: []string{gitlabFinalizerJob, "nvkr:original"}, identity: provider.Identity{APIURL: config.APIURL, ProjectID: 123, PipelineID: 2, JobID: 3, Commit: strings.Repeat("a", 40)}, acquired: map[string]provider.Job{"nvkr:original": {ID: 9, Name: "nvkr:original", Status: "success"}}}
+	state := &gitlabAdmission{defaultBranch: "main", pipelineSources: []string{"push", "web"}, client: client, names: []string{gitlabFinalizerJob, "nvkr:original"}, identity: provider.Identity{APIURL: config.APIURL, ProjectID: 123, PipelineID: 2, JobID: 3, Commit: strings.Repeat("a", 40), Ref: "main", Source: "push"}, acquired: map[string]provider.Job{"nvkr:original": {ID: 9, Name: "nvkr:original", Status: "success"}}}
 	plan, artifacts := gitlabCompiledPublicationFixture(t, strings.TrimPrefix(origin, "https://")+"/fixture")
 	node := planNode(plan, "publish/release")
 	inspection, err := delivery.Inspect(t.Context(), artifacts[node.Inputs[0]].Path)

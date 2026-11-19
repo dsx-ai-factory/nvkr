@@ -40,7 +40,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func prepareGitLabPublishedClosure(t *testing.T, root, api, prefix string, authenticated bool) *factory.Plan {
+func prepareGitLabPublishedClosure(t *testing.T, root, api, prefix, certificateAuthority string, authenticated bool) *factory.Plan {
 	t.Helper()
 	def, env := testDefinition(t), testEnvironment()
 	if err := os.CopyFS(filepath.Join(root, "catalog"), os.DirFS(def.Catalog.Base)); err != nil {
@@ -89,7 +89,7 @@ func prepareGitLabPublishedClosure(t *testing.T, root, api, prefix string, authe
 	for _, arch := range []string{"amd64", "arm64"} {
 		runners["linux/"+arch] = authored.GitLabRunner{Tags: []string{"fixture"}, BootstrapImage: "registry.example.test/go@sha256:" + strings.Repeat("a", 64)}
 	}
-	env.GitLab = &authored.GitLab{APIURL: api, ProjectID: 7, APIReadCredentialRef: "gitlab:NVKR_API_READ", APIReadCredentialKind: "private-token", Runners: runners}
+	env.GitLab = &authored.GitLab{APIURL: api, CertificateAuthority: certificateAuthority, ProjectID: 7, APIReadCredentialRef: "gitlab:NVKR_API_READ", APIReadCredentialKind: "private-token", Runners: runners}
 	writeCanonicalTestFile(t, "definition.json", def)
 	writeCanonicalTestFile(t, "environment.json", env)
 	plan, err := CompileFiles(t.Context(), "definition.json", "environment.json", "test (deadbeef)")
@@ -202,7 +202,7 @@ func TestGitLabCompiledPublishedClosureCurrentJobs(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("requires a native Linux GitLab utility runner")
 	}
-	for _, mode := range []string{"anonymous", "job-token", "missing-registry", "disabled-registry", "foreign-namespace", "changed-registry", "change-after-push", "bad-job-token", "foreign-realm", "foreign-scope", "token-redirect", "token-denied"} {
+	for _, mode := range []string{"anonymous", "job-token", "missing-registry", "disabled-registry", "foreign-namespace", "changed-registry", "change-after-push", "bad-job-token", "unprotected-branch", "foreign-realm", "foreign-scope", "token-redirect", "token-denied"} {
 		t.Run(mode, func(t *testing.T) { testGitLabCompiledPublishedClosureCurrentJobs(t, mode) })
 	}
 }
@@ -315,12 +315,12 @@ func testGitLabCompiledPublishedClosureCurrentJobs(t *testing.T, mode string) {
 					id = 42
 				}
 			}
-			return map[string]any{"id": id, "name": name, "status": status, "started_at": startedAt, "ref": "main", "commit": map[string]any{"id": commit}, "pipeline": map[string]any{"id": 23, "project_id": 7, "sha": commit, "ref": "main", "source": "api"}}
+			return map[string]any{"id": id, "name": name, "status": status, "tag": false, "started_at": startedAt, "ref": "main", "commit": map[string]any{"id": commit}, "pipeline": map[string]any{"id": 23, "project_id": 7, "sha": commit, "ref": "main", "source": "push"}}
 		}
 		switch r.URL.Path {
 		case "/api/v4/projects/7":
 			count := projectReads.Add(1)
-			project := map[string]any{"id": 7, "ci_config_path": nil, "container_registry_enabled": true, "container_registry_image_prefix": r.Host + "/fixture"}
+			project := map[string]any{"id": 7, "ci_config_path": nil, "default_branch": "main", "container_registry_enabled": true, "container_registry_image_prefix": r.Host + "/fixture"}
 			if mode == "missing-registry" {
 				delete(project, "container_registry_image_prefix")
 			}
@@ -331,8 +331,10 @@ func testGitLabCompiledPublishedClosureCurrentJobs(t *testing.T, mode string) {
 				project["container_registry_image_prefix"] = r.Host + "/fixture-other"
 			}
 			_ = json.NewEncoder(w).Encode(project)
+		case "/api/v4/projects/7/repository/branches/main":
+			_ = json.NewEncoder(w).Encode(map[string]any{"name": "main", "protected": mode != "unprotected-branch"})
 		case "/api/v4/projects/7/pipelines/23":
-			_ = json.NewEncoder(w).Encode(map[string]any{"id": 23, "project_id": 7, "sha": commit, "ref": "main", "source": "api"})
+			_ = json.NewEncoder(w).Encode(map[string]any{"id": 23, "project_id": 7, "sha": commit, "ref": "main", "source": "push"})
 		case "/api/v4/job":
 			name := publishName
 			if strings.HasPrefix(phase, "finalizer") {
@@ -379,7 +381,7 @@ func testGitLabCompiledPublishedClosureCurrentJobs(t *testing.T, mode string) {
 	if mode == "foreign-namespace" {
 		prefix = "127.0.0.2:" + port + "/fixture-other"
 	}
-	plan := prepareGitLabPublishedClosure(t, root, server.URL+"/api/v4", prefix, authenticated)
+	plan := prepareGitLabPublishedClosure(t, root, server.URL+"/api/v4", prefix, string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})), authenticated)
 	names, err = factory.GitLabJobNames(t.Context(), plan)
 	if err != nil {
 		t.Fatal(err)
@@ -420,7 +422,7 @@ func testGitLabCompiledPublishedClosureCurrentJobs(t *testing.T, mode string) {
 			carriers = append(carriers, map[string]any{"artifact": id, "digest": pipeline.FileDigest(body), "bytes": len(body)})
 			members[gitLabMemberURL(jobID, factory.GitLabCarrierPath(node.ID, id))] = body
 		}
-		outcome := map[string]any{"schema": "nvkr.dev/gitlab-operation/v1", "apiURL": server.URL + "/api/v4", "projectID": 7, "pipelineID": 23, "jobID": jobID, "commit": "pending", "plan": planDigest, "node": node.ID, "status": "success", "exitCode": 0, "inputs": inputs, "carriers": carriers}
+		outcome := map[string]any{"schema": "nvkr.dev/gitlab-operation/v1", "apiURL": server.URL + "/api/v4", "projectID": 7, "pipelineID": 23, "jobID": jobID, "commit": "pending", "ref": "main", "source": "push", "plan": planDigest, "node": node.ID, "status": "success", "exitCode": 0, "inputs": inputs, "carriers": carriers}
 		members[gitLabMemberURL(jobID, factory.GitLabOutcomePath(node.ID))] = gitLabJSON(t, outcome)
 	}
 	if err := os.RemoveAll(".nvkr"); err != nil {
@@ -452,7 +454,7 @@ func testGitLabCompiledPublishedClosureCurrentJobs(t *testing.T, mode string) {
 	runChild := func(which string) {
 		t.Helper()
 		child := exec.CommandContext(t.Context(), exe, "-test.run=^TestGitLabCompiledPublishedClosureChild$", "-test.count=1")
-		child.Env = []string{"PATH=" + bin + ":" + os.Getenv("PATH"), "HOME=" + t.TempDir(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GODEBUG=x509usefallbackroots=1", "NO_PROXY=127.0.0.2", "no_proxy=127.0.0.2", "CI_JOB_TOKEN=synthetic-job-token", "NVKR_API_READ=synthetic-read-token", "NVKR_GITLAB_CLOSURE_MODE=" + which, "NVKR_GITLAB_CLOSURE_ROOT=" + root, "NVKR_GITLAB_CLOSURE_CA=" + ca, "NVKR_GITLAB_CLOSURE_COMMIT=" + commit}
+		child.Env = []string{"PATH=" + bin + ":" + os.Getenv("PATH"), "HOME=" + t.TempDir(), "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GODEBUG=x509usefallbackroots=1", "NO_PROXY=127.0.0.2", "no_proxy=127.0.0.2", "FF_GIT_URLS_WITHOUT_TOKENS=true", "CI_JOB_TOKEN=synthetic-job-token", "NVKR_API_READ=synthetic-read-token", "NVKR_GITLAB_CLOSURE_MODE=" + which, "NVKR_GITLAB_CLOSURE_ROOT=" + root, "NVKR_GITLAB_CLOSURE_CA=" + ca, "NVKR_GITLAB_CLOSURE_COMMIT=" + commit}
 		// Inherit the parent's temporary directory so bounded scratch storage
 		// stays with the attempt on hosts where the default location is full.
 		if tmpdir := os.Getenv("TMPDIR"); tmpdir != "" {
@@ -509,7 +511,7 @@ func testGitLabCompiledPublishedClosureCurrentJobs(t *testing.T, mode string) {
 			which = "publisher-revalidated-refusal"
 		}
 		runChild(which)
-		if (mode == "missing-registry" || mode == "disabled-registry" || mode == "foreign-namespace" || mode == "changed-registry" || mode == "bad-job-token") && registryRequests.Load() != 0 {
+		if (mode == "missing-registry" || mode == "disabled-registry" || mode == "foreign-namespace" || mode == "changed-registry" || mode == "bad-job-token" || mode == "unprotected-branch") && registryRequests.Load() != 0 {
 			t.Fatal("invalid project registry reached registry I/O")
 		}
 		if mode == "change-after-push" && !rootPublished.Load() {
@@ -582,7 +584,7 @@ func TestGitLabCompiledPublishedClosureChild(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		job := factory.GitLabJobContext{ProjectID: 7, PipelineID: 23, JobID: 41, Commit: commit}
+		job := factory.GitLabJobContext{ProjectID: 7, PipelineID: 23, JobID: 41, Commit: commit, Ref: "main", Source: "push"}
 		err = factory.RunGitLabNode(t.Context(), plan, "publish/release", factory.GitLabNodeOptions{Root: ".", Job: job, Stdout: io.Discard, Stderr: io.Discard})
 		if mode == "publisher-refused" || mode == "publisher-revalidated-refusal" || mode == "publisher-close-probe" {
 			if err == nil {
@@ -632,7 +634,7 @@ func TestGitLabCompiledPublishedClosureChild(t *testing.T) {
 		return
 	}
 	if strings.HasPrefix(mode, "finalizer") {
-		job := factory.GitLabJobContext{ProjectID: 7, PipelineID: 23, JobID: 31, Commit: commit}
+		job := factory.GitLabJobContext{ProjectID: 7, PipelineID: 23, JobID: 31, Commit: commit, Ref: "main", Source: "push"}
 		run, err := FinalizeGitLab(t.Context(), "definition.json", "environment.json", factory.GitLabPlanPath, "test (deadbeef)", ".nvkr/factory", ".nvkr/gitlab/run.json", job)
 		if mode == "finalizer-retry" {
 			assertCode(t, err, e.CodeProvenanceMissing)

@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"io"
 	"maps"
-	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -34,11 +33,13 @@ var commitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 
 // Config names one explicitly selected GitLab API and scoped credentials.
 type Config struct {
-	APIURL             string
-	ProjectID          uint64
-	JobToken           string
-	ReadCredential     string
-	ReadCredentialKind string
+	APIURL                 string
+	ProjectID              uint64
+	JobToken               string
+	ReadCredential         string
+	ReadCredentialKind     string
+	CertificateAuthority   string
+	RequireProtectedBranch bool
 }
 
 // Identity describes the provider invocation; Ref and Source are authenticated metadata.
@@ -64,6 +65,7 @@ type Client struct {
 	mu                                 sync.Mutex
 	wg                                 sync.WaitGroup
 	closed                             bool
+	requireProtectedBranch             bool
 	lifetime                           context.Context
 	cancel                             context.CancelFunc
 	base                               *url.URL
@@ -76,10 +78,20 @@ type Client struct {
 // Receipt holds authenticated observations, not a server-atomic snapshot or
 // durable retry authority.
 type Receipt struct {
-	identity  Identity
-	jobs      map[string]Job
-	registry  ProjectRegistry
-	startedAt time.Time
+	identity      Identity
+	jobs          map[string]Job
+	registry      ProjectRegistry
+	startedAt     time.Time
+	defaultBranch string
+}
+
+// DefaultBranch is metadata returned for the authenticated project. It is not
+// inferred from a job variable, local branch or caller-provided description.
+func (r *Receipt) DefaultBranch() string {
+	if r == nil {
+		return ""
+	}
+	return r.defaultBranch
 }
 
 // StartedAt returns the authenticated current job's provider-reported start.
@@ -147,12 +159,11 @@ func newWithHTTPClient(ctx context.Context, c Config, testClient *http.Client) (
 	}
 	// Do not inherit http.DefaultTransport: it is a mutable package global and
 	// cannot serve as an authority boundary for provider responses.
-	h := &http.Client{Transport: &http.Transport{
-		Proxy:             http.ProxyFromEnvironment,
-		DialContext:       (&net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		ForceAttemptHTTP2: true, MaxIdleConns: 100, IdleConnTimeout: 90 * time.Second,
-		TLSHandshakeTimeout: 10 * time.Second, ExpectContinueTimeout: time.Second,
-	}}
+	transport, err := NewTransport(ctx, c.CertificateAuthority)
+	if err != nil {
+		return nil, err
+	}
+	h := &http.Client{Transport: transport}
 	if testClient != nil {
 		*h = *testClient
 	}
@@ -162,7 +173,7 @@ func newWithHTTPClient(ctx context.Context, c Config, testClient *http.Client) (
 		h.Timeout = 30 * time.Second
 	}
 	lifetime, cancel := context.WithCancel(ctx)
-	return &Client{base: u, project: c.ProjectID, jobToken: c.JobToken, readCredential: c.ReadCredential, readKind: c.ReadCredentialKind, http: h, lifetime: lifetime, cancel: cancel}, nil
+	return &Client{base: u, project: c.ProjectID, jobToken: c.JobToken, readCredential: c.ReadCredential, readKind: c.ReadCredentialKind, requireProtectedBranch: c.RequireProtectedBranch, http: h, lifetime: lifetime, cancel: cancel}, nil
 }
 
 // Close revokes the client, cancels and joins active lookups, and closes its
@@ -195,6 +206,7 @@ type apiJob struct {
 	Status    string     `json:"status"`
 	StartedAt *time.Time `json:"started_at"`
 	Ref       string     `json:"ref"`
+	Tag       *bool      `json:"tag"`
 	Commit    struct {
 		ID string `json:"id"`
 	} `json:"commit"`
@@ -218,7 +230,14 @@ func (c *Client) getQuery(ctx context.Context, endpoint, query, kind, credential
 		return e.New(e.CodeTimeout, "GitLab lookup canceled")
 	}
 	u := *c.base
-	u.Path += endpoint
+	// The standard URL codec retains an escaped branch as one path operand
+	// (feature/x -> feature%2Fx), rather than double-escaping the percent sign.
+	u.RawPath = c.base.EscapedPath() + endpoint
+	path, err := url.PathUnescape(u.RawPath)
+	if err != nil {
+		return e.New(e.CodeUsage, "GitLab lookup path is invalid")
+	}
+	u.Path = path
 	u.RawQuery = query
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
@@ -314,6 +333,7 @@ func (c *Client) Current(ctx context.Context, id Identity, expectedJobNames []st
 	}
 	var project struct {
 		ID              uint64          `json:"id"`
+		DefaultBranch   string          `json:"default_branch"`
 		CIConfigPath    json.RawMessage `json:"ci_config_path"`
 		RegistryEnabled *bool           `json:"container_registry_enabled"`
 		RegistryPrefix  *string         `json:"container_registry_image_prefix"`
@@ -353,6 +373,21 @@ func (c *Client) Current(ctx context.Context, id Identity, expectedJobNames []st
 	if !validJob(self, id) || self.ID != id.JobID || !expected[self.Name] || self.Status != "running" {
 		return nil, e.New(e.CodeVerifyFailed, "GitLab current job identity does not match")
 	}
+	if self.Tag == nil || *self.Tag {
+		return nil, e.New(e.CodeVerifyFailed, "GitLab tag pipelines are not admitted")
+	}
+	if c.requireProtectedBranch {
+		var branch struct {
+			Name      string `json:"name"`
+			Protected *bool  `json:"protected"`
+		}
+		if err := c.get(ctx, projectPath+"/repository/branches/"+url.PathEscape(id.Ref), c.readKind, c.readCredential, &branch); err != nil {
+			return nil, err
+		}
+		if branch.Name != id.Ref || branch.Protected == nil || !*branch.Protected {
+			return nil, e.New(e.CodeVerifyFailed, "GitLab publication requires an authenticated protected branch")
+		}
+	}
 	found, pages, err := c.currentJobs(ctx, id, self, expected)
 	if err != nil {
 		return nil, err
@@ -378,7 +413,7 @@ func (c *Client) Current(ctx context.Context, id Identity, expectedJobNames []st
 	if self.StartedAt != nil {
 		startedAt = self.StartedAt.UTC()
 	}
-	return &Receipt{identity: id, jobs: found, registry: registry, startedAt: startedAt}, nil
+	return &Receipt{identity: id, jobs: found, registry: registry, startedAt: startedAt, defaultBranch: project.DefaultBranch}, nil
 }
 
 func (c *Client) currentJobs(ctx context.Context, id Identity, self apiJob, expected map[string]bool) (map[string]Job, int, error) {

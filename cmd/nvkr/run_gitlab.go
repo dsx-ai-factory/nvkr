@@ -67,6 +67,15 @@ func gitLabJobFromEnvironment(getenv func(string) string) (factory.GitLabJobCont
 	if err != nil || len(decoded) != 20 || hex.EncodeToString(decoded) != job.Commit {
 		return factory.GitLabJobContext{}, e.New(e.CodeUsage, "GitLab execution requires canonical CI_COMMIT_SHA")
 	}
+	job.Ref = getenv("CI_COMMIT_REF_NAME")
+	job.Source = getenv("CI_PIPELINE_SOURCE")
+	for _, selection := range []struct{ name, value string }{
+		{"CI_COMMIT_REF_NAME", job.Ref}, {"CI_PIPELINE_SOURCE", job.Source},
+	} {
+		if selection.value == "" || strings.TrimSpace(selection.value) != selection.value || strings.ContainsAny(selection.value, "\r\n\x00") {
+			return factory.GitLabJobContext{}, e.New(e.CodeUsage, "GitLab execution requires canonical %s", selection.name)
+		}
+	}
 	return job, nil
 }
 
