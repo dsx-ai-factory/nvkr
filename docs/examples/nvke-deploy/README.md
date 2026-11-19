@@ -18,7 +18,7 @@ selected by NVKE `v0.23.0`. It remains available for local execution. The commit
 
 ## Source and package membership
 
-The [shared controller catalog](../../../inputs/catalogs/nvke/release/registry.yaml) pins the umbrella NVKE tag
+The [shared controller catalog](../../../inputs/catalogs/nvke/registry.yaml) pins the umbrella NVKE tag
 `v0.23.0`. Its machine-managed lock authenticates the source commit/tree and acquired chart bytes.
 The source-owned `deploy/nico/nvke-deploy.yaml` supplies the four external chart versions;
 every other deploy member is explicitly accounted for. Re-pinning fails on unreviewed membership,

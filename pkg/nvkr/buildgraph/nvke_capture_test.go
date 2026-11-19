@@ -20,9 +20,9 @@ import (
 // These maintained-catalog checks preserve exact pinned upstream filenames.
 // They are not framework requirements for customer catalogs or component names.
 func TestNVKEControllerPinnedChartFilename(t *testing.T) {
-	for _, tc := range []struct{ catalog, source string }{
-		{"../../../inputs/catalogs/nvke/release", "nvke-helm"},
-		{"../../../inputs/catalogs/nvke/local-site-arm64", "nvke-controller-helm"},
+	for _, tc := range []struct{ catalog, source, component string }{
+		{"../../../inputs/catalogs/nvke", "nvke-helm", "nvke-controller-chart"},
+		{"../../../inputs/catalogs/nvke", "nvke-controller-helm", "nvke-controller-chart-local-site"},
 	} {
 		t.Run(tc.catalog, func(t *testing.T) {
 			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(tc.catalog))
@@ -46,13 +46,13 @@ func TestNVKEControllerPinnedChartFilename(t *testing.T) {
 			if err := yaml.Unmarshal(raw, &declarations); err != nil {
 				t.Fatal(err)
 			}
-			component, ok := declarations.Components["nvke-controller-chart"]
+			component, ok := declarations.Components[tc.component]
 			version := catalog.NormalizeVersion(pin.Tag)
 			artifact := "charts/nvke-controller-" + version + ".tgz"
 			if !ok || component.Source != tc.source || component.ArtifactPath != artifact {
 				t.Fatalf("controller chart must use source %q and pinned upstream artifact %q, got %+v", tc.source, artifact, component)
 			}
-			command := strings.Join(cat.Components["nvke-controller-chart"].BuildCommand, " ")
+			command := strings.Join(cat.Components[tc.component].BuildCommand, " ")
 			for _, required := range []string{"controller/deploy/charts/controller", "--version=" + version, "--app-version=" + catalog.StripTagPrefix(pin.Tag), "--destination=charts/"} {
 				if !slices.Contains(strings.Fields(command), required) {
 					t.Fatalf("controller chart packaging must retain %q, got %q", required, command)
@@ -88,7 +88,7 @@ func TestMaintainedNVKENativeCaptureGraph(t *testing.T) {
 		}
 		seen[output.Name] = true
 		t.Run(output.Name, func(t *testing.T) {
-			index := slices.IndexFunc(authored.Catalogs, func(spec definition.Catalog) bool { return spec.Base == "../../catalogs/node-images/release" })
+			index := slices.IndexFunc(authored.Catalogs, func(spec definition.Catalog) bool { return spec.Base == "../../catalogs/node-images" })
 			if index < 0 || output.Catalog != nil {
 				t.Fatal("disk catalog must be declared once in the shared list")
 			}

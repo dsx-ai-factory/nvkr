@@ -3,7 +3,7 @@
 
 apiVersion: nvkr.dev/definition/v5
 catalog:
-  base: ../../../inputs/catalogs/nvke/release
+  base: ../../../inputs/catalogs/nvke
 cosignTool: cosign
 kind: Definition
 metadata:

@@ -102,11 +102,11 @@ shellcheck: ## Check executable shell surfaces for warning-or-higher defects.
 	@# same context without adding headers or changing identity-bearing file bytes.
 	@set -e; for spec in \
 	 bash:inputs/catalogs/aicr/scripts/build-nvke-bundle.sh.tmpl \
-	 bash:inputs/catalogs/node-images/release/scripts/build-nvke-cni-ovn.sh.tmpl \
-	 bash:inputs/catalogs/ovn-nvidia/scripts/build-nvke-cni-ovn.sh.tmpl \
-	 bash:inputs/catalogs/ovn-upstream/scripts/build-nvke-cni-ovn.sh.tmpl \
+	 bash:inputs/catalogs/node-images/scripts/build-nvke-cni-ovn.sh.tmpl \
+	 bash:inputs/catalogs/ovn/nvidia/scripts/build-nvke-cni-ovn.sh.tmpl \
+	 bash:inputs/catalogs/ovn/upstream/scripts/build-nvke-cni-ovn.sh.tmpl \
 	 sh:inputs/catalogs/nvsentinel/scripts/build-go-image.sh.tmpl \
-	 sh:inputs/catalogs/nvke/native-site/scripts/vendor-nktp-helm.sh.tmpl; do \
+	 sh:inputs/catalogs/nvke/scripts/vendor-nktp-helm.sh.tmpl; do \
 	 script=$${spec#*:}; dialect=$${spec%%:*}; \
 	 for arch in amd64 arm64; do \
 	   body=$$(sed 's/{{\.Arch}}/'"$$arch"'/g' "$$script"); \

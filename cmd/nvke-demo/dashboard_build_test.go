@@ -383,7 +383,7 @@ func TestDashboardGraphDisplayBounds(t *testing.T) {
 // source-selector rename must update the display deliberately, rather than
 // silently losing the fixed, privacy-safe Packer reports.
 func TestDashboardGuestReportsFollowMaintainedPackerSelectors(t *testing.T) {
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../inputs/catalogs/node-images/release"))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../inputs/catalogs/node-images"))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -171,11 +171,11 @@ func TestLaptopSiteArtifactContract(t *testing.T) {
 			if err := plan.Validate(); err != nil {
 				t.Fatal(err)
 			}
-			installerPin, err := plan.CatalogSnapshot.SourcePin("nvke-cli")
+			installerPin, err := plan.CatalogSnapshot.SourcePin("nvke-cli-local-site")
 			if err != nil {
 				t.Fatal(err)
 			}
-			installerSource := plan.CatalogSnapshot.Sources["nvke-cli"]
+			installerSource := plan.CatalogSnapshot.Sources["nvke-cli-local-site"]
 			// NKTP is released from its own repository, so its chart has its own source.
 			nktpPin, err := plan.CatalogSnapshot.SourcePin("nvke-nktp-helm")
 			if err != nil {

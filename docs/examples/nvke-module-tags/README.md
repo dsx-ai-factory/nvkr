@@ -23,8 +23,8 @@ a hosted run of these updated inputs. See the [implementation and evidence recor
 | `environment-local.yaml` | Local Docker execution, optional registry destination and dry-run signing settings. |
 | `environment-github.yaml` | Hosted GitHub destination and signing settings. |
 | `environment-github-dev.yaml` | Build-only branch dispatch with one-day output retention and no signing or publication. |
-| `../../../inputs/catalogs/nvke/module-tags/registry.yaml` | Catalog-owned NVKE components, platforms, and source declarations. |
-| `../../../inputs/catalogs/nvke/module-tags/pins.lock.yaml` | Machine-managed exact source pins. |
+| `../../../inputs/catalogs/nvke/registry.yaml` | Catalog-owned NVKE components, platforms, and source declarations. |
+| `../../../inputs/catalogs/nvke/pins.lock.yaml` | Machine-managed exact source pins. |
 
 ## Inspect and run
 
@@ -89,7 +89,7 @@ because full-tree copies can exhaust hosted-runner disk space.
 
 ## Dependency SBOMs
 
-The Definition enables dependency inspection with `sbomTool: syft`; the catalog lock supplies exact archive
+The Definition enables dependency inspection with `sbomTool: syft-module-tags`; the catalog lock supplies exact archive
 and executable digests shared by both Environments. The CLI and image SBOMs inventory packages discovered in their produced bytes. The Helm SBOM inventories
 bundled chart metadata and external chart references. See [dependency SBOMs](../../dependency-sboms.md) for
 scope, limits and offline checks on actual artifacts. These populated documents supersede the source-metadata-only
@@ -147,14 +147,14 @@ bin/nvkr run generate \
 
 Generated CI recompiles these repository-relative inputs, executes the internal graph, and finalizes an immutable Run record from exact restored outcomes. Static generation and contract tests do not establish that GitHub, a registry, OIDC, or cosign ran.
 
-The CLI source `nvke` and the shared controller/chart source `nvke-controller` are pinned to
+The CLI source `nvke` and the shared controller/chart source `nvke-controller-module-tags` are pinned to
 `v0.23.0` (`2cfd00081b468d85a4894ec17e9deac13c9d8169`). The controller pin supplies the
 source chart's existing digest support. Each source role has its own lock entry;
 update both for a shared NVKE release:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v0.23.0 nvke
-bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v0.23.0 nvke-controller
+bin/nvkr catalog pin --dir inputs/catalogs/nvke --tag v0.23.0 nvke
+bin/nvkr catalog pin --dir inputs/catalogs/nvke --tag v0.23.0 nvke-controller-module-tags
 ```
 
 Repin only through `nvkr catalog pin`; never hand-edit the lock. Regenerate CI after changing pins.
@@ -176,12 +176,12 @@ use the existing command-scoped mirror override described above.
 
 ## Catalog tools and publication
 
-`sbomTool: syft` and `cosignTool: cosign` select catalog sources. Their release declarations live in
-`../../../inputs/catalogs/nvke/module-tags/registry.yaml`; `../../../inputs/catalogs/nvke/module-tags/pins.lock.yaml` binds source and executable bytes. Update through:
+`sbomTool: syft-module-tags` and `cosignTool: cosign-module-tags` select catalog sources. Their release declarations live in
+`../../../inputs/catalogs/nvke/registry.yaml`; `../../../inputs/catalogs/nvke/pins.lock.yaml` binds source and executable bytes. Update through:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/nvke/module-tags --tag v1.51.1 syft
-bin/nvkr catalog bump --dir inputs/catalogs/nvke/module-tags syft cosign
+bin/nvkr catalog pin --dir inputs/catalogs/nvke --tag v1.51.1 syft-module-tags
+bin/nvkr catalog bump --dir inputs/catalogs/nvke syft-module-tags cosign-module-tags
 ```
 
 Regenerate the workflow after changing the lock. Each Environment configures one
@@ -194,8 +194,8 @@ Workflow dependencies are catalog sources with `kind: github-action`. Their cons
 release lines; their exact commits are in the same lock as NVKE and tool pins.
 
 ```sh
-bin/nvkr catalog bump --dir inputs/catalogs/nvke/module-tags --check checkout download-artifact setup-go upload-artifact
-bin/nvkr catalog bump --dir inputs/catalogs/nvke/module-tags checkout download-artifact setup-go upload-artifact
+bin/nvkr catalog bump --dir inputs/catalogs/nvke --check checkout download-artifact setup-go upload-artifact
+bin/nvkr catalog bump --dir inputs/catalogs/nvke checkout download-artifact setup-go upload-artifact
 ```
 
 Regenerate the Run workflow after applying an update. No generator rebuild is needed. The adapter rejects

@@ -1,17 +1,17 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
   "catalog": {
-    "base": "../../../catalogs/nvke/local-site-arm64"
+    "base": "../../../catalogs/nvke"
   },
   "kind": "Definition",
   "metadata": {
-    "name": "nvke-local-site-artifacts-arm64",
-    "description": "Five source-aligned staged-installer artifacts including the native diagnostic profiles image. Build-only candidate; no OS, complete dependency mirror, deployment or signing claim."
+    "description": "Five source-aligned staged-installer artifacts including the native diagnostic profiles image. Build-only candidate; no OS, complete dependency mirror, deployment or signing claim.",
+    "name": "nvke-local-site-artifacts-arm64"
   },
   "outputs": [
     {
       "components": [
-        "nvke-controller-chart"
+        "nvke-controller-chart-local-site"
       ],
       "format": "helm-oci",
       "helm": {
@@ -24,10 +24,10 @@
     },
     {
       "catalog": {
-        "base": "../../../catalogs/controller-profiles/nvidia-arm64"
+        "base": "../../../catalogs/nvke"
       },
       "components": [
-        "nvke-local-profiles"
+        "nvke-local-profiles-nvidia"
       ],
       "format": "oci",
       "name": "controller-profiles",
@@ -43,7 +43,7 @@
     },
     {
       "components": [
-        "nvke-controller"
+        "nvke-controller-local-site"
       ],
       "format": "oci",
       "name": "nvke-controller",
@@ -51,7 +51,7 @@
     },
     {
       "components": [
-        "nvkectl"
+        "nvkectl-local-site"
       ],
       "format": "executable",
       "name": "nvkectl",

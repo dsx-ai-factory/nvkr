@@ -67,10 +67,14 @@ func cliTestPlan(t *testing.T, arch, mode string, outputs int) *Plan {
 	case "image":
 		component.OutputType = "oci-image"
 	}
-	base.Components["nvkectl"] = component
+	name := "nvkectl"
+	if selected, ok := strings.CutPrefix(mode, "component:"); ok {
+		name = selected
+	}
+	base.Components[name] = component
 	definition, environment := fixtureInputs("cli-test", "renamed-cli", DefaultRunsOn)
 	environment.ToolchainAccess.PublicRoots = append(environment.ToolchainAccess.PublicRoots, "mirror.example/tools", "source.example/cli")
-	definition.Outputs[0].Components = []string{"nvkectl"}
+	definition.Outputs[0].Components = []string{name}
 	definition.Outputs[0].Platform = "linux/" + arch
 	if mode == "image" {
 		definition.Outputs[0].Format = authored.OutputOCI
@@ -230,5 +234,24 @@ func TestCLIArtifactTestValidatesUnselectedOutput(t *testing.T) {
 	assertFactoryErrorCode(t, err, e.CodeUnverifiedRef)
 	if inputs != nil {
 		t.Fatal("invalid unselected output emitted inputs")
+	}
+}
+
+func TestCLIArtifactTestCatalogVariants(t *testing.T) {
+	for _, name := range []string{"nvkectl", "nvkectl-module-tags", "nvkectl-local-site", "nvkectl-native-site", "nvkectl-unknown"} {
+		t.Run(name, func(t *testing.T) {
+			plan := cliTestPlan(t, "amd64", "component:"+name, 1)
+			inputs, err := LoadCLIArtifactTestInputs(t.Context(), writeCLIPlan(t, plan), "renamed-cli")
+			if name == "nvkectl-unknown" {
+				assertFactoryErrorCode(t, err, e.CodeUsage)
+				if inputs != nil {
+					t.Fatal("unknown recipe emitted diagnostic inputs")
+				}
+				return
+			}
+			if err != nil || inputs.Output != "renamed-cli" || inputs.ExpectedVersion != "v1" || inputs.Commit != plan.Builds[0].CatalogSnapshot.Components[name].Commit {
+				t.Fatalf("variant diagnostic inputs: %+v, %v", inputs, err)
+			}
+		})
 	}
 }

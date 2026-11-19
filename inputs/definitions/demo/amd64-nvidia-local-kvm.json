@@ -1,20 +1,17 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
   "catalog": {
-    "base": "../../catalogs/tools/native",
-    "overlays": [
-      "../../catalogs/tools/variants/nightly-go.json"
-    ]
+    "base": "../../catalogs/tools"
   },
   "kind": "Definition",
   "metadata": {
-    "name": "nvke-local-dev-amd64-kvm",
-    "description": "Native AMD64 KVM site bootstrap inputs using the shared NVKE, native tools and NVIDIA OVN producers. Local diagnostic build and deployment; no publication or signing."
+    "description": "Native AMD64 KVM site bootstrap inputs using the shared NVKE, native tools and NVIDIA OVN producers. Local diagnostic build and deployment; no publication or signing.",
+    "name": "nvke-local-dev-amd64-kvm"
   },
   "outputs": [
     {
       "catalog": {
-        "base": "../../catalogs/tools/native",
+        "base": "../../catalogs/tools",
         "overlays": [
           "../../catalogs/tools/variants/nightly-go.json"
         ]
@@ -28,7 +25,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/native",
+        "base": "../../catalogs/tools",
         "overlays": [
           "../../catalogs/tools/variants/nightly-go.json"
         ]
@@ -42,7 +39,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/capnico/local"
+        "base": "../../catalogs/capnico"
       },
       "components": [
         "capnico-controller"
@@ -53,13 +50,13 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site",
+        "base": "../../catalogs/nvke",
         "overlays": [
           "../../catalogs/nvke/variants/nightly-go.json"
         ]
       },
       "components": [
-        "cluster-api-provider-provisioned"
+        "cluster-api-provider-provisioned-native-site"
       ],
       "format": "oci",
       "name": "cluster-api-provider-provisioned-amd64",
@@ -67,13 +64,13 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site",
+        "base": "../../catalogs/nvke",
         "overlays": [
           "../../catalogs/nvke/variants/nightly-go.json"
         ]
       },
       "components": [
-        "nvke-controller-chart"
+        "nvke-controller-chart-native-site"
       ],
       "format": "helm-oci",
       "helm": {
@@ -86,7 +83,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/controller-profiles/native-nvidia"
+        "base": "../../catalogs/nvke"
       },
       "components": [
         "nvke-local-profiles"
@@ -108,17 +105,17 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/native",
+        "base": "../../catalogs/tools",
         "overlays": [
           "../../catalogs/tools/variants/nightly-go.json"
         ]
       },
       "components": [
-        "clusterctl-linux-amd64",
-        "helm-linux-amd64",
-        "kind-linux-amd64",
-        "kubectl-linux-amd64",
-        "oras-linux-amd64"
+        "clusterctl",
+        "helm",
+        "kind",
+        "kubectl",
+        "oras"
       ],
       "format": "executable",
       "name": "installer-tools-amd64",
@@ -126,22 +123,22 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/native",
+        "base": "../../catalogs/tools",
         "overlays": [
           "../../catalogs/tools/variants/nightly-go.json"
         ]
       },
       "components": [
-        "clusterctl-linux-amd64",
-        "helm-linux-amd64",
-        "kind-linux-amd64",
-        "kubectl-linux-amd64",
+        "clusterctl",
+        "helm",
+        "kind",
+        "kubectl",
         "nerdctl",
         "nico-sim",
         "nico-simctl",
         "nvke-installer-sources",
         "nvkectl",
-        "oras-linux-amd64"
+        "oras"
       ],
       "format": "executable",
       "name": "native-tools-linux-amd64",
@@ -149,7 +146,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/native",
+        "base": "../../catalogs/tools",
         "overlays": [
           "../../catalogs/tools/variants/nightly-go.json"
         ]
@@ -165,13 +162,13 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site",
+        "base": "../../catalogs/nvke",
         "overlays": [
           "../../catalogs/nvke/variants/nightly-go.json"
         ]
       },
       "components": [
-        "nktp-chart"
+        "nktp-chart-native-site"
       ],
       "format": "helm-oci",
       "name": "nktp",
@@ -179,13 +176,13 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site",
+        "base": "../../catalogs/nvke",
         "overlays": [
           "../../catalogs/nvke/variants/nightly-go.json"
         ]
       },
       "components": [
-        "nvke-controller"
+        "nvke-controller-native-site"
       ],
       "format": "oci",
       "name": "nvke-controller",
@@ -193,7 +190,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/node-images/release",
+        "base": "../../catalogs/node-images",
         "overlays": [
           "../../catalogs/node-images/variants/native-nvidia.json",
           "../../catalogs/node-images/variants/nvidia-amd64-kvm.json"
@@ -219,13 +216,13 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site",
+        "base": "../../catalogs/nvke",
         "overlays": [
           "../../catalogs/nvke/variants/nightly-go.json"
         ]
       },
       "components": [
-        "nvkectl"
+        "nvkectl-native-site"
       ],
       "format": "executable",
       "name": "nvkectl",
@@ -233,11 +230,11 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/operator-amd64"
+        "base": "../../catalogs/tools"
       },
       "components": [
-        "helm",
-        "kubectl"
+        "helm-operator",
+        "kubectl-operator"
       ],
       "format": "executable",
       "name": "operator-tools",
@@ -245,7 +242,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/ovn-nvidia"
+        "base": "../../catalogs/ovn/nvidia"
       },
       "components": [
         "ovn-kubernetes-chart"
@@ -266,7 +263,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/ovn-nvidia"
+        "base": "../../catalogs/ovn/nvidia"
       },
       "components": [
         "ovn-kube-ubuntu"
@@ -277,13 +274,13 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site",
+        "base": "../../catalogs/nvke",
         "overlays": [
           "../../catalogs/nvke/variants/nightly-go.json"
         ]
       },
       "components": [
-        "postgresql-chart"
+        "postgresql-chart-native-site"
       ],
       "format": "helm-oci",
       "name": "postgresql",
@@ -302,7 +299,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/native",
+        "base": "../../catalogs/tools",
         "overlays": [
           "../../catalogs/tools/variants/nightly-go.json"
         ]
@@ -328,13 +325,13 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site",
+        "base": "../../catalogs/nvke",
         "overlays": [
           "../../catalogs/nvke/variants/nightly-go.json"
         ]
       },
       "components": [
-        "spire-chart"
+        "spire-chart-native-site"
       ],
       "format": "helm-oci",
       "name": "spire",
@@ -375,13 +372,13 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site",
+        "base": "../../catalogs/nvke",
         "overlays": [
           "../../catalogs/nvke/variants/nightly-go.json"
         ]
       },
       "components": [
-        "spire-crds-chart"
+        "spire-crds-chart-native-site"
       ],
       "format": "helm-oci",
       "name": "spire-crds",
@@ -422,13 +419,13 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/nvke/native-site",
+        "base": "../../catalogs/nvke",
         "overlays": [
           "../../catalogs/nvke/variants/nightly-go.json"
         ]
       },
       "components": [
-        "temporal-chart"
+        "temporal-chart-native-site"
       ],
       "format": "helm-oci",
       "name": "temporal",
@@ -469,7 +466,7 @@
     },
     {
       "catalog": {
-        "base": "../../catalogs/tools/native",
+        "base": "../../catalogs/tools",
         "overlays": [
           "../../catalogs/tools/variants/nightly-go.json"
         ]

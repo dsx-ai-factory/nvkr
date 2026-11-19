@@ -13,7 +13,7 @@ import (
 // nvkeV1CatalogDir is the shipped production catalog for the NVKE CLI. It is loaded here,
 // rather than restated as a fixture, because the property under test is exactly that the
 // document we ship stamps what upstream stamps.
-const nvkeV1CatalogDir = "../../../inputs/catalogs/nvke/module-tags"
+const nvkeV1CatalogDir = "../../../inputs/catalogs/nvke"
 
 // The nvkectl binary this catalog builds must report the SAME version string as a binary
 // built by NVKE's own cli/Makefile, including the leading v. The retained v1
@@ -28,12 +28,12 @@ func TestNVKEV1CatalogStampsUpstreamModuleTag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loading the shipped nvke-v1 catalog: %v", err)
 	}
-	component, ok := cat.Components["nvkectl"]
+	component, ok := cat.Components["nvkectl-module-tags"]
 	if !ok {
 		t.Fatalf("nvke-v1 catalog has no nvkectl component; components: %v", componentNames(cat))
 	}
 
-	pin, err := cat.SourcePin("nvke")
+	pin, err := cat.SourcePin("nvke-cli")
 	if err != nil {
 		t.Fatal(err)
 	}

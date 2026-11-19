@@ -31,7 +31,7 @@ import (
 // these package-shaped fixtures do not claim a completed upstream source build.
 func nightlyRuntimeCompiledFixture(t *testing.T, profile NightlyProfile, build NightlyBuild, commit string, sourcePolicy ...bool) (*factory.Plan, lifecycle.Run) {
 	t.Helper()
-	root, err := filepath.Abs("../../inputs/catalogs/nvke/module-tags")
+	root, err := filepath.Abs("../../inputs/catalogs/nvke")
 	if err != nil {
 		t.Fatal(err)
 	}

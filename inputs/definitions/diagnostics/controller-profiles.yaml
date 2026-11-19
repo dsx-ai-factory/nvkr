@@ -2,14 +2,18 @@
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: nvkr.dev/definition/v5
+catalog:
+  base: ../../catalogs/nvke
 kind: Definition
 metadata:
+  description: Runnable controller fixture profiles for both Linux architectures;
+    source fixture URLs and deployment settings are not fleet configuration.
   name: nvke-controller-profiles
-  description: Runnable controller fixture profiles for both Linux architectures; source fixture URLs and deployment settings are not fleet configuration.
-catalog:
-  base: ../../catalogs/nvke/release
 outputs:
-  - name: controller-profiles-image
-    components: [nvke-controller-profiles-image]
-    format: oci
-    platforms: [linux/amd64, linux/arm64]
+- components:
+  - nvke-controller-profiles-image
+  format: oci
+  name: controller-profiles-image
+  platforms:
+  - linux/amd64
+  - linux/arm64

@@ -2,28 +2,28 @@
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: nvkr.dev/definition/v5
+catalog:
+  base: ../../catalogs/nvke
 kind: Definition
 metadata:
-  name: nvke-controller-arm64
   description: NVKE controller containers and helm chart.
-catalog:
-  base: ../../catalogs/nvke/release
+  name: nvke-controller-arm64
 outputs:
-- name: cluster-api-provider-provisioned-arm64
-  components:
+- components:
   - cluster-api-provider-provisioned
   format: oci
+  name: cluster-api-provider-provisioned-arm64
   platform: linux/arm64
-- name: nvke-controller-arm64
-  components:
+- components:
   - nvke-controller
   format: oci
+  name: nvke-controller-arm64
   platform: linux/arm64
-- name: nvke-controller-chart-arm64
-  components:
+- components:
   - nvke-controller-chart
   format: helm-oci
   helm:
     images:
       controller: nvke-controller-arm64
+  name: nvke-controller-chart-arm64
   platform: linux/arm64

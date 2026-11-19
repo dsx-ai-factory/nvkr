@@ -54,8 +54,8 @@ so the saved Definition has the same bytes when the checkout moves:
 
 ```sh
 bin/nvkr definition init --name my-tools --destination definition.yaml \
-  --catalog inputs/catalogs/tools/operator-arm64 \
-  --platform linux/arm64 --component helm --component kubectl > definition.yaml
+  --catalog inputs/catalogs/tools \
+  --platform linux/arm64 --component helm-operator --component kubectl-operator > definition.yaml
 bin/nvkr definition validate --definition definition.yaml
 bin/nvkr run local --definition definition.yaml --attempt my-tools-1
 ```
@@ -266,7 +266,7 @@ presentation flags.
 ```sh
 bin/nvkr definition inspect --definition docs/examples/nvke-module-tags/definition.yaml --ui=tui
 bin/nvkr run graph --plan .github/nvkr-run-nvke/plan.json --ui=tui
-bin/nvkr catalog list --data inputs/catalogs/nvke/module-tags --ui=tui
+bin/nvkr catalog list --data inputs/catalogs/nvke --ui=tui
 ```
 
 Graph and release browsers start with an output overview when their supplied

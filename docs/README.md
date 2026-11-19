@@ -56,7 +56,7 @@ public-bootstrap FDE disk diagnostics; the sibling Ubuntu 24.04 disks family sel
 The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
 
 Experimental [public OS source producers](../inputs/experiments/public-os-sources/README.md) and the
-[OVN source-build option](../inputs/catalogs/ovn-nvidia/README.md) are separate candidates, not full OS
+[OVN source-build option](../inputs/catalogs/ovn/nvidia/notes/ovn-nvidia-README.md) are separate candidates, not full OS
 migration or maintained NVKE membership. The [v0.21.0 dependency inventory](nvke-v0.21.0-os-dependency-inventory.md)
 records source availability and remaining gaps.
 
@@ -127,7 +127,8 @@ owns execution evidence, unsupported capabilities and remaining hosted and consu
 [ADR-28: Multi-platform executables](adr/0028-multi-platform-executable-indexes.md) designs one tool
 source for every platform of a release, where the platforms share a format, companions and admitted URL
 spellings, and executable outputs published as standard OCI image indexes. The AICR CLI is the first
-migration, and the ADR inventories existing executables to retrofit. It is design only.
+index migration. Multi-platform tool declarations, complete locks and exact native selection are implemented
+under ADR-22; executable-index publication and the output retrofits remain design only.
 
 [ADR-29: Cluster observation and artifact attribution](adr/0029-cluster-observation-and-artifact-attribution.md)
 and its [feature design](cluster-observation-and-artifact-attribution.md) describe gathering cluster facts
