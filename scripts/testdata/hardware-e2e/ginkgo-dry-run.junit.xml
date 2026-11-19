@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Ginkgo dry run of NVKE controller/test/e2e at c044392984cdd74149d00110cbb68adfd1075024 with
+     -ginkgo.label-filter='site-controller && !nico-dsx' -e2e.environment=forge -e2e.site-stage=full.
+     Trimmed to the 82 non-skipped cases and two filtered-out ones; the suite has 532. Local
+     paths and timings removed. Test data only: nothing here is evidence about hardware. -->
+<testsuites tests="84" disabled="450" errors="0" failures="0" time="0" skipped="2">
+  <testsuite name="NVKE E2E Suite" package="" tests="84" disabled="0" skipped="2" errors="0" failures="0" time="0" timestamp="0">
+    <properties>
+      <property name="SuiteSucceeded" value="true" />
+      <property name="SuiteHasProgrammaticFocus" value="false" />
+      <property name="SpecialSuiteFailureReason" value="" />
+      <property name="SuiteLabels" value="[]" />
+      <property name="SuiteSemVerConstraints" value="[]" />
+      <property name="SuiteComponentSemVerConstraints" value="[]" />
+      <property name="RandomSeed" value="1794988842" />
+      <property name="RandomizeAllSpecs" value="false" />
+      <property name="LabelFilter" value="site-controller &amp;&amp; !nico-dsx" />
+      <property name="SemVerFilter" value="" />
+      <property name="FocusStrings" value="" />
+      <property name="SkipStrings" value="" />
+      <property name="FocusFiles" value="" />
+      <property name="SkipFiles" value="" />
+      <property name="FailOnPending" value="false" />
+      <property name="FailOnEmpty" value="false" />
+      <property name="FailFast" value="false" />
+      <property name="FlakeAttempts" value="0" />
+      <property name="DryRun" value="true" />
+      <property name="ParallelTotal" value="1" />
+      <property name="OutputInterceptorMode" value="" />
+    </properties>
+    <testcase name="[It] NVKE API authentication with a SPIRE JWT-SVID admits an attested workload's JWT-SVID and rejects one minted for the wrong audience [authn, authn-spire]" classname="NVKE E2E Suite" status="skipped" time="0">
+      <skipped message="skipped" />
+    </testcase>
+    <testcase name="[It] NVKE e2e qualification provisions a node [site-controller, needs:cpu=2, needs:gpu=1]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification reaches what bootstrap and the deploy path pull from [site-controller, needs:cpu=2, needs:gpu=1]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification bootstraps the site controller [site-controller, needs:cpu=2, needs:gpu=1]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification reaches its API server [site-controller, needs:cpu=2, needs:gpu=1]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification deploys the stack [site-controller, needs:cpu=2, needs:gpu=1]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification reports its controller version [site-controller, needs:cpu=2, needs:gpu=1]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification has every node Ready and schedulable [site-controller, needs:cpu=2, needs:gpu=1, readiness, site-software]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs every workload the platform and the deploy path install [site-controller, needs:cpu=2, needs:gpu=1, readiness, site-software]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification has no pod failing in any namespace [site-controller, needs:cpu=2, needs:gpu=1, readiness, site-software]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification has issued every cert-manager certificate [site-controller, needs:cpu=2, needs:gpu=1, readiness, site-software]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification lists clusters through the controller API [site-controller, needs:cpu=2, needs:gpu=1, readiness, site-software]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification passes every API server readiness and liveness check, etcd included [site-controller, needs:cpu=2, needs:gpu=1, readiness, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs the scheduler and controller-manager on every control-plane node [site-controller, needs:cpu=2, needs:gpu=1, readiness, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs CoreDNS [site-controller, needs:cpu=2, needs:gpu=1, readiness, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs the Kubernetes version it was built with [site-controller, needs:cpu=2, needs:gpu=1, readiness, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification resolves cluster DNS from a pod [site-controller, needs:cpu=2, needs:gpu=1, readiness, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs Argo CD [site-controller, needs:cpu=2, needs:gpu=1, site-software, component]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification has every Argo CD Application Synced and Healthy [site-controller, needs:cpu=2, needs:gpu=1, site-software, component]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs the CloudNativePG operator with every database cluster healthy [site-controller, needs:cpu=2, needs:gpu=1, site-software, component]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs the Teleport agent [site-controller, needs:cpu=2, needs:gpu=1, site-software, component]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs cert-manager [site-controller, needs:cpu=2, needs:gpu=1, site-software, component]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs kube-vip on every control-plane node [site-controller, needs:cpu=2, needs:gpu=1, site-software, component]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs every workload the run requires [site-controller, needs:cpu=2, needs:gpu=1, site-software]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs the workload versions the run expects [site-controller, needs:cpu=2, needs:gpu=1, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs every API server with the flags kubeadm and the run set [site-controller, needs:cpu=2, needs:gpu=1, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs every API server with an encryption provider config [site-controller, needs:cpu=2, needs:gpu=1, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification runs etcd with the quota kubeadm sets [site-controller, needs:cpu=2, needs:gpu=1, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification reserves the memory the run expects on every node [site-controller, needs:cpu=2, needs:gpu=1, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification has every StorageClass the run expects [site-controller, needs:cpu=2, needs:gpu=1, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification refuses anonymous access and holds the validation identity to read access [site-controller, needs:cpu=2, needs:gpu=1, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification has a ready endpoint behind every admission webhook [site-controller, needs:cpu=2, needs:gpu=1, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification reaches the API server at the control-plane endpoint from a pod [site-controller, needs:cpu=2, needs:gpu=1, site-distro, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification carries traffic between pods and through a Service, across nodes where there are two [site-controller, needs:cpu=2, needs:gpu=1, site-distro, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification enforces a NetworkPolicy [site-controller, needs:cpu=2, needs:gpu=1, site-distro, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification resolves and reaches a StatefulSet pod by its headless Service name [site-controller, needs:cpu=2, needs:gpu=1, site-distro, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification binds a PersistentVolumeClaim and mounts it in a pod [site-controller, needs:cpu=2, needs:gpu=1, site-distro, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification issues a certificate from a new cert-manager Issuer [site-controller, needs:cpu=2, needs:gpu=1, site-software, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification delivers the site's telemetry through NKTP [site-controller, needs:cpu=2, needs:gpu=1]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge creates the cluster [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, lifecycle]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation brings every desired node to Ready [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, readiness]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation attests every node's SPIRE agent by its TPM [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, readiness, tpm-attestation]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation has every node Ready and schedulable [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, readiness, site-software]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs every workload the platform and the deploy path install [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, readiness, site-software]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation has no pod failing in any namespace [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, readiness, site-software]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation has issued every cert-manager certificate [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, readiness, site-software]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation lists clusters through the controller API [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, readiness, site-software]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation passes every API server readiness and liveness check, etcd included [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, readiness, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs the scheduler and controller-manager on every control-plane node [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, readiness, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs CoreDNS [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, readiness, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs the Kubernetes version it was built with [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, readiness, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation resolves cluster DNS from a pod [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, readiness, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs Argo CD [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-software, component]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation has every Argo CD Application Synced and Healthy [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-software, component]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs the CloudNativePG operator with every database cluster healthy [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-software, component]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs the Teleport agent [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-software, component]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs cert-manager [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-software, component]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs kube-vip on every control-plane node [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-software, component]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs every workload the run requires [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-software]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs the workload versions the run expects [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs every API server with the flags kubeadm and the run set [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs every API server with an encryption provider config [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs etcd with the quota kubeadm sets [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation reserves the memory the run expects on every node [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation has every StorageClass the run expects [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation refuses anonymous access and holds the validation identity to read access [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation has a ready endpoint behind every admission webhook [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation reaches the API server at the control-plane endpoint from a pod [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation carries traffic between pods and through a Service, across nodes where there are two [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation enforces a NetworkPolicy [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation resolves and reaches a StatefulSet pod by its headless Service name [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation binds a PersistentVolumeClaim and mounts it in a pod [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-distro, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation issues a certificate from a new cert-manager Issuer [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, site-software, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation has the nodes the controller records for it, each joined, Ready and running the node agent [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, tenant, readiness]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation carries each node pool's labels and taints on its nodes [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, tenant]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation reserves each node pool's memory on its nodes [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, tenant]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs NodeLocal DNS on every Ready node [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, tenant, readiness]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation has as many nodes advertising GPUs as the run expects [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, tenant, gpu]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster creation runs a GPU workload to completion [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, tenant, gpu, creates]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge deletes the cluster [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, lifecycle]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-forge after cluster deletion garbage-collects the tenant-access admin kubeconfig secret [site-controller, needs:cpu=2, needs:gpu=1, nico-forge, lifecycle, tenant-access, cleanup]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[It] NVKE e2e qualification tenant on the built site nico-dsx creates the cluster [site-controller, needs:cpu=2, needs:gpu=1, nico-dsx, lifecycle]" classname="NVKE E2E Suite" status="skipped" time="0">
+      <skipped message="skipped" />
+    </testcase>
+    <testcase name="[AfterSuite]" classname="NVKE E2E Suite" status="passed" time="0" />
+    <testcase name="[ReportAfterSuite] JUnit report of the selected specs" classname="NVKE E2E Suite" status="passed" time="1.3208e-05">
+              </testcase>
+  </testsuite>
+</testsuites>
