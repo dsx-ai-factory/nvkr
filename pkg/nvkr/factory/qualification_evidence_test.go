@@ -57,7 +57,7 @@ func qualificationEvidenceFixture(t *testing.T, perOutput bool) (*Plan, string, 
 	routes := []string{"release"}
 	saved := map[string][]byte{}
 	for index, route := range routes {
-		// Model valid M2 reuse: transport must retain every original invocation,
+		// Model valid NVKE reuse: transport must retain every original invocation,
 		// leaving exact-attempt qualification refusal to the consuming gate.
 		t.Setenv("GITHUB_RUN_ATTEMPT", fmt.Sprint(index+1))
 		digest := "sha256:" + strings.Repeat(fmt.Sprintf("%x", index+1), 64)

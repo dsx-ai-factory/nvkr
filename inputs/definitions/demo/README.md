@@ -31,7 +31,7 @@ The full demo uses one NVKR/demo bootstrap and a measured
 Packer/Go/GCC toolchain across its selected output scopes; that image also includes
 digest-checked Helm 4.2.4 and ORAS 1.3.3. There is no separate Helm-wrapper image.
 The combined selection creates one immutable Run. Catalog
-overlays remain bound to each exact predecessor digest. `../../catalogs/node-images/variants/nvidia-tcg.json` depends on the NVKE release
+overlays remain bound to each exact predecessor digest. `../../catalogs/node-images/variants/nvidia-tcg.json` depends on the NVKE
 OS catalog's digest: repinning that catalog requires regenerating and reviewing this binding.
 The upstream selection stacks `../../catalogs/node-images/variants/upstream-tcg.json` after `../../catalogs/node-images/variants/nvidia-tcg.json`;
 its `requiresCatalogDigest` binds that exact predecessor, not the base catalog
@@ -91,7 +91,7 @@ compiles the installer's five Linux binaries from pinned Git. The separate older
 acquired `operator-tools` selection remains in the combined artifact membership.
 
 The local OS replaces the upstream OVN producers with PR #113's
-[NVKE/NVIDIA fork producers](../../catalogs/ovn-nvidia/README.md). Its chart/image Debian
+[NVKE/NVIDIA fork producers](../../catalogs/ovn/nvidia/notes/ovn-nvidia-README.md). Its chart/image Debian
 packages and demo tenant select stream `2.4.0`. Packer still consumes staged
 materials; it does not fetch the fork or compile OVN. A fresh bake and tenant
 acceptance are separate gates from compiling this selection.

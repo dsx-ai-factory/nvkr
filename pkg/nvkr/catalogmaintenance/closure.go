@@ -204,6 +204,7 @@ func (members *closure) plans() []string {
 
 // paths returns the exact, sorted directories and files a candidate patch may touch.
 func (members *closure) paths() (directories, files []string) {
+	directories = append(directories, factory.PlanStoreDirectory)
 	add := func(bundle *factory.GeneratedBundle) {
 		directories = append(directories, path.Dir(bundle.ManifestPath))
 		files = append(files, bundle.WorkflowPath)
@@ -274,12 +275,12 @@ func admitPlanStamp(ctx context.Context, plan, generatorVersion string) error {
 	if err := admitPath(plan); err != nil {
 		return e.Wrap(e.CodePipelineDrift, err, "admitting committed Plan %q", plan)
 	}
-	held, err := heldfile.OpenContext(ctx, plan, heldfile.Options{Label: "committed-plan", MaxBytes: factory.MaxPlanBytes})
+	held, err := heldfile.OpenContext(ctx, plan, heldfile.Options{Label: "committed-plan", MaxBytes: factory.MaxGeneratedFileBytes})
 	if err != nil {
 		return contextError(ctx, e.Wrap(e.CodePipelineDrift, err, "reading committed Plan %q", plan))
 	}
 	defer func() { _ = held.Close() }()
-	raw, err := held.ReadAllContext(ctx, factory.MaxPlanBytes)
+	raw, err := held.ReadAllContext(ctx, factory.MaxGeneratedFileBytes)
 	if err != nil {
 		return contextError(ctx, e.Wrap(e.CodePipelineDrift, err, "reading committed Plan %q", plan))
 	}

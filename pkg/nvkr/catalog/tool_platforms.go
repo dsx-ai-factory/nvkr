@@ -216,3 +216,55 @@ func (cat *Catalog) validatePlatformTools() error {
 	}
 	return nil
 }
+
+// ForPlatform resolves a release executable's exact platform before graph lowering.
+// Existing single-platform component values are returned unchanged.
+func (c Component) ForPlatform(platform string) (Component, error) {
+	if c.Prebuilt == nil || c.Prebuilt.Executables == nil {
+		return c, nil
+	}
+	for _, pin := range c.Prebuilt.Executables {
+		if pin.Platform != platform {
+			continue
+		}
+		tool := pin.clone()
+		prebuilt := *c.Prebuilt
+		prebuilt.Executables, prebuilt.Executable = nil, &tool
+		prebuilt.URL = tool.URL
+		prebuilt.Digests = map[string]string{target.ExecutableArch(platform): tool.ExecutableDigest}
+		c.Prebuilt = &prebuilt
+		c.Platforms = []string{platform}
+		return c, nil
+	}
+	return Component{}, e.New(e.CodeEngineCapability, "release executable has no pin for platform %s", platform)
+}
+
+func toolSupportsPlatforms(source *ToolSource, platforms []string) bool {
+	if source == nil || len(platforms) == 0 {
+		return false
+	}
+	for _, platform := range platforms {
+		if !source.supportsPlatform(platform) {
+			return false
+		}
+	}
+	return true
+}
+
+func validateToolPins(tools []ToolPin) error {
+	seen := map[string]bool{}
+	for i, tool := range tools {
+		if i > 0 && tools[i-1].Platform >= tool.Platform {
+			return e.New(e.CodeInvalidCatalog, "tool pins must be sorted by unique platform")
+		}
+		if err := validateToolPin(tool); err != nil {
+			return err
+		}
+		key := tool.URL + "\x00" + tool.ExecutablePath
+		if seen[key] {
+			return e.New(e.CodeInvalidCatalog, "tool platforms must pin distinct assets")
+		}
+		seen[key] = true
+	}
+	return nil
+}

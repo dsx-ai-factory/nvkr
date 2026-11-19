@@ -2,32 +2,36 @@
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: nvkr.dev/definition/v5
+catalog:
+  base: ../../../inputs/catalogs/tools
 kind: Definition
 metadata:
+  description: Build the Linux arm64 NVKE CLI, controller image and image-bound controller
+    chart from pinned source.
   name: nvke-tutorial-arm64
-  description: Build the Linux arm64 NVKE CLI, controller image and image-bound controller chart from pinned source.
-catalog:
-  base: ../../../inputs/catalogs/tools/sbom-arm64
-sbomTool: syft
 outputs:
-  - name: nvke-controller
-    catalog:
-      base: ../../../inputs/catalogs/nvke/release
-    platform: linux/arm64
-    format: oci
-    components: [nvke-controller]
-  - name: nvke-controller-chart
-    catalog:
-      base: ../../../inputs/catalogs/nvke/release
-    platform: linux/arm64
-    format: helm-oci
-    components: [nvke-controller-chart]
-    helm:
-      images:
-        controller: nvke-controller
-  - name: nvkectl
-    catalog:
-      base: ../../../inputs/catalogs/nvke/release
-    platform: linux/arm64
-    format: executable
-    components: [nvkectl]
+- catalog:
+    base: ../../../inputs/catalogs/nvke
+  components:
+  - nvke-controller
+  format: oci
+  name: nvke-controller
+  platform: linux/arm64
+- catalog:
+    base: ../../../inputs/catalogs/nvke
+  components:
+  - nvke-controller-chart
+  format: helm-oci
+  helm:
+    images:
+      controller: nvke-controller
+  name: nvke-controller-chart
+  platform: linux/arm64
+- catalog:
+    base: ../../../inputs/catalogs/nvke
+  components:
+  - nvkectl
+  format: executable
+  name: nvkectl
+  platform: linux/arm64
+sbomTool: syft

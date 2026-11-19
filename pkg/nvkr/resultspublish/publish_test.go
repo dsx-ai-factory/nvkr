@@ -27,7 +27,7 @@ import (
 
 const (
 	group      = "nvke"
-	definition = "nvke-m2"
+	definition = "nvke"
 )
 
 var subject = "sha256:" + strings.Repeat("e", 64)
@@ -162,10 +162,10 @@ func TestResultsPublishLayout(t *testing.T) {
 			t.Fatal(err)
 		}
 		want := []string{
-			"results/nvke/nvke-m2/101-1/202-2/outcome.json",
-			"groups/nvkr/nvke/nvke-m2/1793615400000000000-101-1-202-2/started.json",
-			"groups/nvkr/nvke/nvke-m2/1793615400000000000-101-1-202-2/artifacts/junit.xml",
-			"groups/nvkr/nvke/nvke-m2/1793615400000000000-101-1-202-2/finished.json",
+			"results/nvke/nvke/101-1/202-2/outcome.json",
+			"groups/nvkr/nvke/nvke/1793615400000000000-101-1-202-2/started.json",
+			"groups/nvkr/nvke/nvke/1793615400000000000-101-1-202-2/artifacts/junit.xml",
+			"groups/nvkr/nvke/nvke/1793615400000000000-101-1-202-2/finished.json",
 		}
 		if !slices.Equal(store.calls, prefixed("create ", want)) {
 			t.Fatalf("calls %q, want %q", store.calls, want)
@@ -203,7 +203,7 @@ func TestResultsPublishLayout(t *testing.T) {
 		{"an empty group", "", definition, passed, e.CodeUsage},
 		{"a nested group", "nvke/x", definition, passed, e.CodeUsage},
 		{"a parent segment", "..", definition, passed, e.CodeUsage},
-		{"a Definition with a space", group, "nvke m2", passed, e.CodeUsage},
+		{"a Definition with a space", group, "nvke candidate", passed, e.CodeUsage},
 		{"a Definition ending in a hyphen", group, "nvke-", passed, e.CodeUsage},
 		{"a Definition ending in a dot", group, "nvke.", passed, e.CodeUsage},
 		{"a Definition of 129 characters", group, strings.Repeat("d", 129), passed, e.CodeUsage},
@@ -285,7 +285,7 @@ func TestResultsPublishMetadata(t *testing.T) {
 			}
 			want := map[string]any{"sha": strings.Repeat("a", 40), "source_run": "101-1", "qualifier_run": "202-2", "lane": "pipeline-attested",
 				"run_url": tc.runURL, "status": string(tc.outcome.Status), "repository": "example/nvkr", "group": group, "definition": definition,
-				"outcome": "results/nvke/nvke-m2/101-1/202-2/outcome.json"}
+				"outcome": "results/nvke/nvke/101-1/202-2/outcome.json"}
 			if tc.digests {
 				want["evidence_digest"] = tc.outcome.EvidenceDigest
 			}

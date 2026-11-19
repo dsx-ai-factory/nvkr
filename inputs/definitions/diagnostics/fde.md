@@ -1,10 +1,10 @@
 # FDE-only branch build
 
 This Definition selects one native AMD64 QCOW2 and its complete eleven-component material closure.
-The maintained [NVKE release candidate pipeline](../nvke/README.md) includes both native FDE outputs with build-provenance
+The maintained [NVKE pipeline](../nvke/README.md) includes both native FDE outputs with build-provenance
 publication; this separate selection retains the smaller build-only diagnostic route.
-It reuses the NVKE release candidate OS catalog and native toolchain pins, selecting the separate `nvke-node-fde-amd64`
-producer. Other NVKE release candidate outputs and the plain disk are absent. Material producers still run because their
+It reuses the NVKE OS catalog and native toolchain pins, selecting the separate `nvke-node-fde-amd64`
+producer. Other NVKE outputs and the plain disk are absent. Material producers still run because their
 bytes are required by the FDE image; this does not introduce cross-Run cache reuse.
 
 The Environment selects Docker/KVM on `arc-amd64-kvm` and admits manual dispatch on
@@ -21,7 +21,7 @@ production acceptance or byte-reproducibility evidence.
 Build-only generation admits one disk output. Finalization uses a fresh job on the same selected ARC
 pool, with a matching helper, read-only repository access and a two-hour bound for transfer and observation.
 It restores the complete source/material/disk closure. The comparable AMD64 carriers from
-[M2 Run 37533806963](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963) totaled
+[NVKE Run 37533806963](https://github.com/dsx-ai-factory/nvkr/actions/runs/37533806963) totaled
 15,362,463,697 bytes (14.31 GiB) compressed, already beyond the generic hosted runner's
 [documented 14 GB allocation](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
 That measurement motivates ARC finalization; it does not establish the FDE image's size or sufficient
@@ -57,7 +57,7 @@ GOTOOLCHAIN=local go run ./cmd/nvkr run generate \
 ```
 
 This writes a scratch workflow, Plan and manifest for the standalone selection. It does not authorize
-registry publication. The maintained repository bundle and tests select the combined NVKE release candidate pipeline;
+registry publication. The maintained repository bundles select the NVKE composite;
 `make workflows-check` verifies that committed selection. Do not hand-edit rendered files or replace
 the maintained bundle with this alternate selection in a PR to main.
 

@@ -82,7 +82,7 @@ func TestLaptopARM64DefinitionMembership(t *testing.T) {
 							}
 							continue
 						}
-						if tc.file != "inputs/definitions/diagnostics/demo-arm64/site.json" || (output.Name != "cwe" && output.Name != "controller-chart" && output.Name != "nvkectl") {
+						if tc.file != "inputs/definitions/diagnostics/demo-arm64/site.json" || (output.Name != "nvke-controller" && output.Name != "controller-chart" && output.Name != "nvkectl") {
 							t.Fatalf("unexpected duplicate split output %s", output.Name)
 						}
 						replaced[output.Name] = true

@@ -58,7 +58,7 @@ func TestDeliverableSigningAndVerification(t *testing.T) {
 	inspection := delivery.Inspection{RootDigest: digest, Root: delivery.PublicationRoot{
 		SchemaVersion: delivery.PublicationRootSchema, Qualification: delivery.QualificationDiagnostic}}
 	var expected []sign.Subject
-	for i, name := range []string{"cwe", "nvke-helm", "nvkectl"} {
+	for i, name := range []string{"nvke-controller", "nvke-helm", "nvkectl"} {
 		d := "sha256:" + strings.Repeat(string(rune('b'+i)), 64)
 		inspection.Root.Objects = append(inspection.Root.Objects, delivery.PublishedObject{Name: name, Kind: "artifact",
 			ArtifactType: delivery.MediaOCIManifest, DescriptorDigest: d, SemanticDigest: d, BlobDigest: d,

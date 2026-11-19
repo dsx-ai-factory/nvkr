@@ -1,35 +1,27 @@
 ## Maintained input and schema boundaries
 
-The NVKE product-family split adds independent core (21 outputs), services (34), telemetry (17), disks (4)
-and disks-ubuntu24 (4)
-Definitions under `inputs/definitions/nvke/`, with corresponding `github-nvke-<family>` Environments and
-named production bundles. Their selected output union is the combined candidate's 69 outputs, except `nico-reference-profiles-fixture`, plus 12
-family-only outputs (two core, six services and four Ubuntu 24.04 disks), retaining
-aggregate native children, bound chart/image relationships and complete disk material selections. They
-reuse shared catalog/pin owners and publish into separate family prefixes beneath the existing candidate
-namespace. `make nvke-split-generate` and `make nvke-split-check` own the family subset; the repository-wide
-workflow targets include it. These are authored-input and generation changes, not a new lifecycle or
-cross-Run assembly contract. Actions history retrieved on November 14, 2026 contains one successful standalone
+The maintained inventory contains three producer bundles: `nvkr-run-nvke`, `nvkr-dev` and
+`nvkr-run-nvke-nightly`. All select the existing six-member, 83-output GPU-site composite.
+The 2026-11-17 maintainer decision retires the combined production/qualification bundle, the five
+standalone family bundles and the two legacy ARM64 nightly producers. The family Definitions remain
+pinned composite members; the former combined input and family Environments remain comparison fixtures.
+The two legacy ARM64 nightly Definition files and their profile entries are removed. The active AMD64
+local E2E nightly remains separate and unchanged.
+
+Production and floating-source nightly use their exact renamed workflow signers and qualifier/smoke
+pairs. Their registry prefixes stay unchanged. Member Definition and producer Build identities are
+preserved; Environment, Plan, qualification-policy and workflow identities change with namespace selection.
+Development keeps its existing bytes and identity. ADR-26 U10 records the explicit override of the
+former retirement prerequisites without claiming consumer verification, current-candidate execution
+or qualification. The [historical publication](adr-26.md#hosted-gpu-site-publication) retains its original
+workflow, root and acceptance scope. Independent consumer verification and Ubuntu24 guest boots remain
+outstanding. The remaining paragraphs retain their dated scope; standalone-family references describe
+the retired pilot, not current maintained workflows.
+
+Actions history retrieved on November 14, 2026 recorded one successful standalone
 [core Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/40641309939), with older membership, and no Runs
-for services, telemetry or either disk family. These workflows are dispatch-only; the absence of Runs does
-not establish a build failure. Current standalone family publication and independent consumer acceptance
-remain unrecorded. The combined production and qualification paths remain until consumer and qualification
-cutover; the GPU site composite below owns the fixed development bundle. Named producer qualification remains unsupported, and so does named development for these plain family Definitions; a composite may have a named development bundle (ADR-26). The pilot
-emits no automatic association file or parent Release. Consumers independently verify exact family
-references and own any required association or compatibility decision. See the
-[pilot inputs](../../../inputs/definitions/nvke/README.md#product-families) and
-[partitioning strategy](../../definition-partitioning-strategy.md) for scope and historical measurements.
-[ADR-26](../0026-definition-composition.md) designs a composite of these families as one Release;
-units U1–U8 are implemented and contract-tested, with historical publication evidence below. The authored
-[GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite) pins the five families
-and the GB200 AICR Definition, which inherits their `sbomTool`, declares the eight components the Ubuntu 24.04 overlay replaces as variants of the two disk families, and has
-a generated named production bundle and the fixed development bundle, both enrolled in `make workflows-check`
-and catalog maintenance. The [historical 83-output hosted publication](adr-26.md#hosted-gpu-site-publication)
-records one complete composite Run; current-candidate execution and independent consumer verification remain
-unrecorded. The six-member finalizer fits
-ADR-18's 16 result-collector buckets.
-The `disks-ubuntu24` selection is described in
-[Ubuntu 24 node-image inputs](ubuntu-24-node-image-inputs.md#ubuntu-24-node-image-inputs).
+for services, telemetry or either disk family. That historical pilot evidence retains its scope after
+retirement; it does not establish current composite execution or independent consumer acceptance.
 
 The [GPU system matrix](../../../inputs/definitions/nvke/README.md#gpu-system-matrix) maps GB200, GB300, VR200
 and the site controller to family outputs in documentation only. It adds no Definition axis, input or
@@ -60,7 +52,7 @@ build records and 69 output records against the updated combined Plan. The exten
 contract passed in 4.05 seconds and the complete focused family/credential suite in 32.747 seconds on
 2026-10-20, with Go 1.27.2 on Darwin ARM64 and recorded staged tree
 `e9187e1e6ce5e5fda6d26e04b912d10622f559c0`. The
-[current measurements](../../definition-partitioning-strategy.md#current-local-validation) record each family.
+[current measurements](../../definition-partitioning-strategy.md#historical-local-validation) record each family.
 The full local gate passed at 21:54:35 UTC on 2026-10-20 on staged tree
 `2ff2a400055ae9cfe429b5c0bcfeb55bfaaedb41`, with Go 1.27.2 on Darwin ARM64 and golangci-lint 2.14.0:
 `make check GO_TEST_FLAGS='-count=1 -json -p=1'`, `make build` and both diff checks. All 58 default Go
@@ -118,7 +110,7 @@ named-runtime helpers. No hosted family execution of this boundary is recorded.
 [bootstrap dispatch tests](../../../pkg/nvkr/factory/github_bootstrap_dispatch_test.go) cover refusal.
 
 All five family Environments retain the maintained production `NVKR_REGISTRY_WRITE` publication policy.
-The exact `m2-candidate/disks` and `m2-candidate/disks-ubuntu24` prefixes also admit the existing pinned NVKE release toolchains for separate preparation
+The exact `candidate/disks` and `candidate/disks-ubuntu24` prefixes also admit the existing pinned NVKE toolchains for separate preparation
 with the fixed independent registry reader. Focused contracts reproduce and fix the previously omitted
 preparation, require it before each family's four disk producers and source-vendor execution, and reject lookalike,
 child, other-family and foreign-owner exceptions. Credential projection and cleanup contracts pass; they
@@ -158,7 +150,7 @@ family matrix passed in 34.227 seconds, including the 73/69 identity comparison 
 disks-family credential regression in 0.83 seconds. These are local
 contracts, not evidence of private registry access, hosted family execution or consumer acceptance.
 
-The [NVKE release Definition instructions](../../../inputs/definitions/nvke/README.md) own example-specific selection and input
+The [NVKE Definition instructions](../../../inputs/definitions/nvke/README.md) own example-specific selection and input
 preparation. The candidate requires 69 named outputs. It retains the previous 37 and adds source-built
 CAPNICo and explicitly named reference-profile fixtures, the existing provisioned infrastructure provider, source-packaged NVKE telemetry pipelines,
 and fourteen acquired runtime-image components delivered separately for both native architectures.

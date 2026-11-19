@@ -44,19 +44,19 @@ func TestOSFrozenInputProjectionPreservesSelection(t *testing.T) {
 		{
 			name:       "26.04/amd64",
 			definition: "os-amd64.yaml",
-			catalog:    "../../catalogs/node-images/diagnostic",
+			catalog:    "../../catalogs/node-images",
 			overlays:   []string{},
 		},
 		{
 			name:       "26.04/arm64",
 			definition: "os-arm64.yaml",
-			catalog:    "../../catalogs/node-images/diagnostic",
+			catalog:    "../../catalogs/node-images",
 			overlays:   []string{"../../catalogs/node-images/variants/diagnostic-arm64-kvm.yaml"},
 		},
 		{
 			name:       "24.04/amd64",
 			definition: "ubuntu24/definition-amd64.yaml",
-			catalog:    "../../../catalogs/node-images/release",
+			catalog:    "../../../catalogs/node-images",
 			overlays: []string{
 				"../../../catalogs/node-images/variants/native-toolchains.yaml",
 				"../../../catalogs/node-images/variants/ubuntu24.json",
@@ -65,7 +65,7 @@ func TestOSFrozenInputProjectionPreservesSelection(t *testing.T) {
 		{
 			name:       "24.04/arm64",
 			definition: "ubuntu24/definition-arm64.yaml",
-			catalog:    "../../../catalogs/node-images/release",
+			catalog:    "../../../catalogs/node-images",
 			overlays: []string{
 				"../../../catalogs/node-images/variants/native-toolchains.yaml",
 				"../../../catalogs/node-images/variants/ubuntu24.json",

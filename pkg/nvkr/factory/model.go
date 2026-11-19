@@ -25,7 +25,9 @@ import (
 )
 
 const (
-	MaxPlanBytes        = int64(4 << 20)
+	// MaxPlanBytes bounds complete captured domain catalogs; maintained composite
+	// Plans require more than 4 MiB after catalog consolidation.
+	MaxPlanBytes        = int64(8 << 20)
 	PlanSchemaVersion   = "nvkr.dev/run-plan/v5"
 	ArtifactGraphSchema = "nvkr.dev/artifact-graph/v5"
 	// DefaultRunsOn is the runner an unset Environment.runsOn falls back to. ADR-18 §8
@@ -128,6 +130,7 @@ type Route struct {
 }
 
 type Plan struct {
+	CatalogCandidates   []CatalogCandidate           `json:"catalogCandidates,omitempty"`
 	Actions             map[string]catalog.ActionPin `json:"actions,omitempty"`
 	SchemaVersion       string                       `json:"schemaVersion"`
 	Name                string                       `json:"name"`
@@ -187,6 +190,7 @@ type LifecycleOutputPlan struct {
 type LifecycleBoundOutput = delivery.Output
 
 type BuildPlan struct {
+	SelectedCatalog *definition.Catalog      `json:"selectedCatalog,omitempty"`
 	Name            string                   `json:"name"`
 	CatalogDigest   string                   `json:"catalogDigest"`
 	AppliedOverlays []catalog.AppliedOverlay `json:"appliedOverlays,omitempty"`

@@ -31,7 +31,7 @@ freezes fresh bytes through an attempt overlay.
 The AMD64 graph is authored, but neither Docker architecture has a stable maintained image ID in
 `toolchains/nvkr-packer/toolchain.lock.json`. The catalog's AMD64 ID is a substitution-only baseline, not a
 maintained pin or a claim that a subsequent build will reproduce it. The ARM64 baseline retains the historical
-NVKE release candidate Docker candidate publication; it does not prove reproduction of the current Dockerfile or bootstrap compiler.
+NVKE Docker candidate publication; it does not prove reproduction of the current Dockerfile or bootstrap compiler.
 For a local Docker attempt, the wrapper builds the
 source-locked toolchain and freezes its observed exact ID into an attempt-local catalog overlay before compiling the
 executable Plan. The runtime re-checks that the loaded image equals that frozen ID, a bind rather than provenance
@@ -71,7 +71,7 @@ This remains `unqualified-local-execution`. The [ARC build evidence](https://git
 records successful committed-code ARM64 and AMD64 Docker/KVM builds, boot smoke and QCOW2 uploads, alongside the
 earlier ARM64 Podman/TCG bake.
 The standalone Docker/KVM validation workflow is an unqualified integration path. It does not publish or sign
-these disks. [NVKE release candidate](../nvke/README.md) separately selects ADR-18's admitted native ARC generated route and
+these disks. [NVKE](../nvke/README.md) separately selects ADR-18's admitted native ARC generated route and
 build-provenance publication scope. Neither route establishes FDE support or qualified reproduction.
 The local image-ID check binds loaded bytes to the attempt's Plan; it does not authenticate toolchain provenance.
 

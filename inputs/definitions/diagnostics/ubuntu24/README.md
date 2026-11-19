@@ -2,7 +2,7 @@
 
 These opt-in inputs select Ubuntu **24.04.5** installers for single native AMD64 and ARM64 NVKE
 QCOW2 builds. The maintained [`disks-ubuntu24` family](../../nvke/disks-ubuntu24.yaml) selects the same
-four disks and overlay stack for signed publication; see [the NVKE inputs](../../nvke/README.md#product-families).
+four disks and overlay stack for signed publication; see [the NVKE inputs](../../nvke/README.md#gpu-site-composite).
 No publication is recorded yet. The release catalog pins NVKE
 `v0.23.0` at `2cfd00081b468d85a4894ec17e9deac13c9d8169`, which contains upstream's
 [Ubuntu 24 support](https://github.com/dsx-ai-factory/nvke/commit/96ccc50cb7f8ed8bb08f7cf8655906982774f809).
@@ -18,7 +18,7 @@ The installer material and required `ubuntu_series=24.04` Packer variable select
 | GitHub FDE ARM64 | `definition-github-fde-arm64.yaml` | `nvke-node-fde-ubuntu24-arm64` |
 
 Each selects the complete twelve-producer closure. The ordered stack is the shared
-[release node-image catalog](../../../catalogs/node-images/release/registry.yaml), its
+[release node-image catalog](../../../catalogs/node-images/registry.yaml), its
 [native-toolchain overlay](../../../catalogs/node-images/variants/native-toolchains.yaml), then
 [Ubuntu 24 overlay](../../../catalogs/node-images/variants/ubuntu24.json). The last overlay
 replaces the two installer suppliers, the agent, DOCA OVS and four disk producers as complete declarations, bound

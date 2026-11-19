@@ -1,15 +1,15 @@
 # NVKE module-tags example
 
 The separate `definition.yaml` is retained for existing demos and scratch hosted generation.
-Its output names are `nvkectl`, `cwe` and `nvke-helm`. The instructions below describe that selection.
+Its output names are `nvkectl`, `nvke-controller` and `nvke-helm`. The instructions below describe that selection.
 Use the [native tutorial](../nvke-tutorial/README.md) for the quickstart.
 
-This retained example builds `nvkectl`, the NVKE controller image (output identifier `cwe`), and the
+This retained example builds `nvkectl`, the NVKE controller image (output identifier `nvke-controller`), and the
 source controller Helm chart from NVKE `v0.23.0`. The chart depends on the exact built controller image. Producer
 instructions live in the catalog; the Definition selects and packages outputs; the Environment selects
 runtime, destination and signing.
 
-The committed production workflow uses the [NVKE release candidate](../../../inputs/definitions/nvke/README.md).
+The committed production workflow uses the [NVKE candidate](../../../inputs/definitions/nvke/README.md).
 The development workflow runs the 83-output GPU site composite, five NVKE family Definitions and the GB200 AICR bundle.
 This three-output Definition retains a smaller unsigned development example for scratch generation.
 Its [historical hosted run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md)
@@ -23,8 +23,8 @@ a hosted run of these updated inputs. See the [implementation and evidence recor
 | `environment-local.yaml` | Local Docker execution, optional registry destination and dry-run signing settings. |
 | `environment-github.yaml` | Hosted GitHub destination and signing settings. |
 | `environment-github-dev.yaml` | Build-only branch dispatch with one-day output retention and no signing or publication. |
-| `../../../inputs/catalogs/nvke/module-tags/registry.yaml` | Catalog-owned NVKE components, platforms, and source declarations. |
-| `../../../inputs/catalogs/nvke/module-tags/pins.lock.yaml` | Machine-managed exact source pins. |
+| `../../../inputs/catalogs/nvke/registry.yaml` | Catalog-owned NVKE components, platforms, and source declarations. |
+| `../../../inputs/catalogs/nvke/pins.lock.yaml` | Machine-managed exact source pins. |
 
 ## Inspect and run
 
@@ -89,7 +89,7 @@ because full-tree copies can exhaust hosted-runner disk space.
 
 ## Dependency SBOMs
 
-The Definition enables dependency inspection with `sbomTool: syft`; the catalog lock supplies exact archive
+The Definition enables dependency inspection with `sbomTool: syft-module-tags`; the catalog lock supplies exact archive
 and executable digests shared by both Environments. The CLI and image SBOMs inventory packages discovered in their produced bytes. The Helm SBOM inventories
 bundled chart metadata and external chart references. See [dependency SBOMs](../../dependency-sboms.md) for
 scope, limits and offline checks on actual artifacts. These populated documents supersede the source-metadata-only
@@ -98,7 +98,7 @@ SBOMs emitted by earlier runs; existing signed publications are not modified.
 ## Helm image binding
 
 The producer packages `controller/deploy/charts/controller` from the pinned controller source. The Definition
-binds its `controller` image slot to `cwe`; the catalog maps that slot to `image.digest`. Packaging writes the
+binds its `controller` image slot to `nvke-controller`; the catalog maps that slot to `image.digest`. Packaging writes the
 verified native image manifest digest into `values.yaml`. Root charts preserve upstream checksum files;
 nested wrappers refresh binder-owned checksums outside the chart. Templates and other values remain
 unchanged. This chart must already support digest-based image selection.
@@ -107,7 +107,7 @@ After verifying and extracting the Release, supply the repository containing its
 
 ```sh
 helm template controller ./controller \
-  --set-string image.repository=ghcr.io/dsx-ai-factory/nvkr/cwe
+  --set-string image.repository=ghcr.io/dsx-ai-factory/nvkr/nvke-controller
 ```
 
 Registry selection does not change the packaged chart bytes. Normal Helm values overrides still apply;
@@ -125,11 +125,11 @@ of the production paths below. Generate this smaller unsigned example only into 
 See [pipeline development](../../../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) for one-time
 registration, source access, development signing/publication, downloads and cleanup.
 
-The repository commits the [NVKE release candidate](../../../inputs/definitions/nvke/README.md), selected by `make workflows-check`.
+The repository commits the [NVKE candidate](../../../inputs/definitions/nvke/README.md), selected by `make workflows-check`.
 This checked-in configuration is not a ratified canonical-product decision.
 
 Generate this alternative into a scratch directory. Generating it into the repository root would
-replace the maintained NVKE release bundle and fail `make workflows-check`. Pinned-tree access may be
+replace the maintained NVKE bundle and fail `make workflows-check`. Pinned-tree access may be
 needed during catalog loading; configure your existing Git credentials or the transport override above.
 
 ```sh
@@ -147,23 +147,23 @@ bin/nvkr run generate \
 
 Generated CI recompiles these repository-relative inputs, executes the internal graph, and finalizes an immutable Run record from exact restored outcomes. Static generation and contract tests do not establish that GitHub, a registry, OIDC, or cosign ran.
 
-The CLI source `nvke` and the shared controller/chart source `nvke-controller` are pinned to
+The CLI source `nvke-cli` and the shared controller/chart source `nvke-controller-module-tags` are pinned to
 `v0.23.0` (`2cfd00081b468d85a4894ec17e9deac13c9d8169`). The controller pin supplies the
 source chart's existing digest support. Each source role has its own lock entry;
 update both for a shared NVKE release:
 
 ```sh
-bin/nvkr catalog pin --catalog inputs/catalogs/nvke/module-tags --tag v0.23.0 nvke
-bin/nvkr catalog pin --catalog inputs/catalogs/nvke/module-tags --tag v0.23.0 nvke-controller
+bin/nvkr catalog pin --catalog inputs/catalogs/nvke --tag v0.23.0 nvke-cli
+bin/nvkr catalog pin --catalog inputs/catalogs/nvke --tag v0.23.0 nvke-controller-module-tags
 ```
 
 Repin only through `nvkr catalog pin`; never hand-edit the lock. Regenerate CI after changing pins.
 
-The generated workflow path is `.github/workflows/nvkr-run.yml`, with exact inputs under
-`.github/nvkr-run/`. Its current repository selection is the NVKE release candidate, not this three-output alternative; use
+The maintained NVKE workflow path is `.github/workflows/nvkr-run-nvke.yml`, with exact inputs under
+`.github/nvkr-run-nvke/`. Its current repository selection is the NVKE composite, not this three-output alternative; use
 `make workflows-check` for that maintained selection. Dispatch runs whichever reviewed bundle is committed
 at the selected ref and does not choose a different Definition. This alternative's GitHub Environment targets
-the `nvkectl`, `cwe` and `nvke-helm` repositories under `ghcr.io/dsx-ai-factory/nvkr` and uses the
+the `nvkectl`, `nvke-controller` and `nvke-helm` repositories under `ghcr.io/dsx-ai-factory/nvkr` and uses the
 exact pinned cosign executable for keyless signing and provenance attestation. Configure the GitHub deployment
 environment `nvkr-release` with a deployment branch policy admitting only `main`. Registry access and NVKE source
 access must be available to the hosted runner. Real operational acceptance is recorded separately in the
@@ -176,12 +176,12 @@ use the existing command-scoped mirror override described above.
 
 ## Catalog tools and publication
 
-`sbomTool: syft` and `cosignTool: cosign` select catalog sources. Their release declarations live in
-`../../../inputs/catalogs/nvke/module-tags/registry.yaml`; `../../../inputs/catalogs/nvke/module-tags/pins.lock.yaml` binds source and executable bytes. Update through:
+`sbomTool: syft-module-tags` and `cosignTool: cosign-module-tags` select catalog sources. Their release declarations live in
+`../../../inputs/catalogs/nvke/registry.yaml`; `../../../inputs/catalogs/nvke/pins.lock.yaml` binds source and executable bytes. Update through:
 
 ```sh
-bin/nvkr catalog pin --catalog inputs/catalogs/nvke/module-tags --tag v1.51.1 syft
-bin/nvkr catalog bump --catalog inputs/catalogs/nvke/module-tags syft cosign
+bin/nvkr catalog pin --catalog inputs/catalogs/nvke --tag v1.51.1 syft-module-tags
+bin/nvkr catalog bump --catalog inputs/catalogs/nvke syft-module-tags cosign-module-tags
 ```
 
 Regenerate the workflow after changing the lock. Each Environment configures one
@@ -194,8 +194,8 @@ Workflow dependencies are catalog sources with `kind: github-action`. Their cons
 release lines; their exact commits are in the same lock as NVKE and tool pins.
 
 ```sh
-bin/nvkr catalog bump --catalog inputs/catalogs/nvke/module-tags --check checkout download-artifact setup-go upload-artifact
-bin/nvkr catalog bump --catalog inputs/catalogs/nvke/module-tags checkout download-artifact setup-go upload-artifact
+bin/nvkr catalog bump --catalog inputs/catalogs/nvke --check checkout download-artifact setup-go upload-artifact
+bin/nvkr catalog bump --catalog inputs/catalogs/nvke checkout download-artifact setup-go upload-artifact
 ```
 
 Regenerate the Run workflow after applying an update. No generator rebuild is needed. The adapter rejects

@@ -103,7 +103,7 @@ func TestPrivateImagePullRejectsCredentialAndCancellationBeforeWork(t *testing.T
 
 func TestPrivateToolchainPublicationBoundary(t *testing.T) {
 	plan := arcTestPlan(t, "linux/amd64")
-	for _, publication := range []string{"ghcr.io/dsx-ai-factory/nvkr/m2-candidate", "ghcr.io/other/arbitrary-output"} {
+	for _, publication := range []string{"ghcr.io/dsx-ai-factory/nvkr/candidate", "ghcr.io/other/arbitrary-output"} {
 		plan.Environment.Publication.RepositoryPrefix = publication
 		for _, test := range []struct {
 			name, repository string
@@ -114,7 +114,7 @@ func TestPrivateToolchainPublicationBoundary(t *testing.T) {
 			{"owner lookalike", "ghcr.io/dsx-ai-factory-mirror/nvkr/m2-candidate/toolchains/packer", false},
 			{"repository lookalike", "ghcr.io/dsx-ai-factory/nvkr-mirror/m2-candidate/toolchains/packer", false},
 			{"root lookalike", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains-mirror/packer", false},
-			{"undeclared sibling", "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/other/packer", false},
+			{"undeclared sibling", "ghcr.io/dsx-ai-factory/nvkr/candidate/other/packer", false},
 		} {
 			t.Run(publication+"/"+test.name, func(t *testing.T) {
 				image := test.repository + "@sha256:" + strings.Repeat("a", 64)
@@ -172,12 +172,10 @@ func assertNoPrivateToolchainPreparation(t *testing.T, bundle *GeneratedBundle) 
 func TestMaintainedNamedPrivateImageCredentialBoundary(t *testing.T) {
 	// The combined and nightly bundles share their assertions with
 	// TestMaintainedGitHubBundles. Keep both disk-family namespaces covered too.
-	for _, bundleName := range []string{"nvkr-run-nvke-disks", "nvkr-run-nvke-disks-ubuntu24"} {
+	nvkeSplitRepository(t)
+	for _, bundleName := range []string{"disks", "disks-ubuntu24"} {
 		t.Run(bundleName, func(t *testing.T) {
-			plan, err := LoadPlanContext(t.Context(), "../../../.github/"+bundleName+"/plan.json")
-			if err != nil {
-				t.Fatal(err)
-			}
+			plan := nvkeFamilyPlan(t, bundleName)
 			bundle, err := RenderGitHub(t.Context(), plan)
 			if err != nil {
 				t.Fatal(err)

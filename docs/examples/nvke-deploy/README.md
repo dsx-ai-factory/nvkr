@@ -1,15 +1,15 @@
 # NVKE deploy example
 
-This nine-output Definition builds the NVKE container image (`cwe`), a runnable fixture profiles image, and its controller chart and acquires the four external charts
+This nine-output Definition builds nvke-controller, a runnable fixture profiles image, and its controller chart and acquires the four external charts
 selected by NVKE `v0.23.0`. It remains available for local execution. The committed GitHub workflow uses
-[the combined NVKE release candidate Definition](../../../inputs/definitions/nvke/README.md), which has its own output selection and additional artifacts.
+[the NVKE composite](../../../inputs/definitions/nvke/README.md), which has its own output selection and additional artifacts.
 
 | Output | Selected input |
 |---|---|
 | `nvkectl-linux-amd64` | Native AMD64 CLI binary bundle |
 | `nvkectl-linux-arm64` | Native ARM64 CLI binary bundle |
-| `cwe` | Source-built controller image |
-| `controller-chart` | Source controller chart, with its `controller` slot bound to the exact `cwe` image |
+| `nvke-controller` | Source-built controller image |
+| `controller-chart` | Source controller chart, with its `controller` slot bound to the exact `nvke-controller` image |
 | `controller-profiles-image` | Runnable source fixture profiles with a pinned Alpine base; one OCI index with AMD64 and ARM64 members |
 | `postgresql` | Acquired chart `18.5.15` |
 | `spire` | Acquired chart `0.30.1` |
@@ -18,7 +18,7 @@ selected by NVKE `v0.23.0`. It remains available for local execution. The commit
 
 ## Source and package membership
 
-The [shared controller catalog](../../../inputs/catalogs/nvke/release/registry.yaml) pins the umbrella NVKE tag
+The [shared controller catalog](../../../inputs/catalogs/nvke/registry.yaml) pins the umbrella NVKE tag
 `v0.23.0`. Its machine-managed lock authenticates the source commit/tree and acquired chart bytes.
 The source-owned `deploy/nico/nvke-deploy.yaml` supplies the four external chart versions;
 every other deploy member is explicitly accounted for. Re-pinning fails on unreviewed membership,
@@ -70,13 +70,13 @@ go run ./cmd/nvkr run local \
 ```
 
 The executed record is `.nvkr/runs/nvke-deploy-001/lifecycle.json`. Local execution has no publication or
-signing. The NVKE container image uses upstream Dockerfile network dependencies; it is a wrapped, unqualified build.
+signing. nvke-controller uses upstream Dockerfile network dependencies; it is a wrapped, unqualified build.
 
 ## Hosted workflow ownership
 
-Use [the NVKE release candidate README](../../../inputs/definitions/nvke/README.md#generate-and-check-the-maintained-workflow) for the maintained bundle
+Use [the NVKE README](../../../inputs/definitions/nvke/README.md#generate-and-check-the-maintained-workflow) for the maintained bundle
 and its source, runner, registry and signing requirements. Generating this deploy example into the repository
-root would replace that bundle and fail the NVKE release candidate drift check. A dispatch of the committed `nvkr-run.yml` executes NVKE release candidate; dispatch does not select a different Definition.
+root would introduce an unenrolled default bundle and fail maintained-closure checks. A dispatch of the committed `nvkr-run-nvke.yml` executes the NVKE composite; dispatch does not select a different Definition.
 This is the checked-in candidate configuration, not a ratified canonical-product/path or namespace decision.
 No parallel generated deploy workflow is maintained at that fixed path.
 
@@ -85,7 +85,7 @@ repository gate, workflow lint and dry-runs. Those dry-runs observed zero artifa
 `static-unqualified`; no complete six-output build or hosted publication was exercised at that revision.
 The current nine-output Definition has separate native-route and profiles producer contract coverage;
 those checks do not extend the historical record or establish a complete nine-output build.
-Current NVKE release candidate publication is separate evidence with its own exact inputs and limits.
+Current NVKE candidate publication is separate evidence with its own exact inputs and limits.
 
 This example does not package an installer/deploy bundle, build NKTP or the provider image, mirror all
 runtime images, or establish release qualification.

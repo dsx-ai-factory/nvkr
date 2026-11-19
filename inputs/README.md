@@ -2,10 +2,9 @@
 
 This directory owns the repository's NVKE, NVSentinel and AICR build and release inputs. Definitions select named outputs
 from pinned catalog producers; Environments select execution and publication policy. The maintained
-release candidate starts at [the NVKE Definition](definitions/nvke/definition.yaml).
-The [product families](definitions/nvke/README.md#product-families) supply independent core, services,
-telemetry and disk Definitions alongside that combined candidate, and the
-[GPU site composite](definitions/nvke/README.md#gpu-site-composite) releases the five families and the GB200 AICR bundle together.
+release candidate starts at [the NVKE composite](definitions/nvke/gpu-site.composite.yaml).
+The [composite](definitions/nvke/README.md#gpu-site-composite) pins the five NVKE families and GB200
+AICR member. Three maintained bundles cover production, development and floating-source nightly.
 
 ```text
 inputs/
@@ -30,19 +29,12 @@ the move preserves each file's existing format.
 
 | Definition | Environment | Scope |
 |---|---|---|
-| [`definitions/nvke/definition.yaml`](definitions/nvke/definition.yaml) | [`environments/github-release.yaml`](environments/github-release.yaml) | Maintained 69-output release candidate; existing main-only signed publication |
-| [`definitions/nvke/core.yaml`](definitions/nvke/core.yaml) | [`environments/github-nvke-core.yaml`](environments/github-nvke-core.yaml) | 21-output core pilot with its own named production bundle and publication namespace |
-| [`definitions/nvke/services.yaml`](definitions/nvke/services.yaml) | [`environments/github-nvke-services.yaml`](environments/github-nvke-services.yaml) | 34-output supporting-services pilot |
-| [`definitions/nvke/telemetry.yaml`](definitions/nvke/telemetry.yaml) | [`environments/github-nvke-telemetry.yaml`](environments/github-nvke-telemetry.yaml) | 17-output telemetry pilot |
-| [`definitions/nvke/disks.yaml`](definitions/nvke/disks.yaml) | [`environments/github-nvke-disks.yaml`](environments/github-nvke-disks.yaml) | Four-output native Ubuntu 26.04 plain/public-bootstrap FDE disk pilot |
-| [`definitions/nvke/disks-ubuntu24.yaml`](definitions/nvke/disks-ubuntu24.yaml) | [`environments/github-nvke-disks-ubuntu24.yaml`](environments/github-nvke-disks-ubuntu24.yaml) | Four-output native Ubuntu 24.04 plain/public-bootstrap FDE disk pilot |
 | [`definitions/nvke/gpu-site.composite.yaml`](definitions/nvke/gpu-site.composite.yaml) | [`environments/github-nvke-gpu-site.yaml`](environments/github-nvke-gpu-site.yaml) | 83-output [GPU site composite](definitions/nvke/README.md#gpu-site-composite) of the five families and the GB200 AICR bundle; one Run and one Release |
 | Same GPU site composite | [`environments/github-development.yaml`](environments/github-development.yaml) | The repository's fixed signed development bundle (`nvkr-dev.yml`) and disposable publication namespace |
+| Same GPU site composite | [`environments/github-nvke-nightly-gpu-site.yaml`](environments/github-nvke-nightly-gpu-site.yaml) | Floating-source signed NVKE candidate (`nvkr-run-nvke-nightly.yml`), manual dispatch |
 | [`definitions/demo/arm64-nvidia-tcg.json`](definitions/demo/arm64-nvidia-tcg.json) | [`environments/local-arm64-tcg.json`](environments/local-arm64-tcg.json) | Local 32-output NVIDIA OVN demo |
 | [`definitions/demo/arm64-upstream-tcg.json`](definitions/demo/arm64-upstream-tcg.json) | Same local TCG Environment | Local 32-output upstream OVN diagnostic demo |
-| [`definitions/demo/arm64-nvidia-kvm.json`](definitions/demo/arm64-nvidia-kvm.json) | [`environments/github-nightly-nvidia.json`](environments/github-nightly-nvidia.json) | Named NVIDIA nightly producer; current content differences remain explicit |
 | [`definitions/demo/amd64-nvidia-local-kvm.json`](definitions/demo/amd64-nvidia-local-kvm.json) | [`environments/local-amd64-kvm.json`](environments/local-amd64-kvm.json) | Native AMD64 local build and Go site-bootstrap smoke inputs; build and runtime acceptance require a completed Run |
-| [`definitions/demo/arm64-upstream-kvm.json`](definitions/demo/arm64-upstream-kvm.json) | [`environments/github-nightly-upstream.json`](environments/github-nightly-upstream.json) | Separately signed upstream nightly producer |
 | [`definitions/diagnostics/os-amd64.yaml`](definitions/diagnostics/os-amd64.yaml) | [`environments/local-linux-amd64-kvm.yaml`](environments/local-linux-amd64-kvm.yaml) | Native AMD64 plain-disk diagnostic |
 | [`definitions/diagnostics/os-arm64.yaml`](definitions/diagnostics/os-arm64.yaml) | [`environments/local-linux-arm64-kvm.yaml`](environments/local-linux-arm64-kvm.yaml) | Native ARM64 plain-disk diagnostic |
 | [`definitions/diagnostics/fde-amd64.yaml`](definitions/diagnostics/fde-amd64.yaml) | [`environments/github-diagnostics.yaml`](environments/github-diagnostics.yaml) | Build-only public-bootstrap FDE diagnostic; existing branch allowlist |
@@ -56,7 +48,7 @@ producer inputs as well as runtime admission, so the explicit demo Definitions r
 
 The additional [Mac](definitions/demo/native-mac/README.md) and
 [Linux](definitions/demo/native-linux/README.md) selections use one
-[shared native tool catalog](catalogs/tools/native/README.md). Their local policies
+[shared native tool catalog](catalogs/tools/notes/tools-native-README.md). Their local policies
 are `environments/local-native-mac.json` and the matching `environments/local-<arch>-kvm.json`.
 Host tool Definitions live in `definitions/demo/tools/<os>-<arch>.json`.
 QCOW builds use NVKR's existing disk-image Definitions listed above.
@@ -101,16 +93,12 @@ together. Maintain pins through `catalog pin`/`catalog bump`; use
 [catalog maintenance](../docs/catalog-maintenance.md) for the complete workflow. Definition reuse is
 explicit producer selection, without inheritance or execution-time output filtering.
 
-`make workflows-generate` regenerates the maintained release, product-family, development, nightly and qualification
-bundles. `make workflows-check` checks their exact recorded inputs. The product-family targets are
-`make nvke-split-generate` and `make nvke-split-check`. Generated bundles remain under
-`.github/`; Run records and release artifacts remain with their execution/publication owners.
+`make workflows-generate` and `make workflows-check` own exactly three maintained composite bundles:
+`nvkr-dev`, `nvkr-run-nvke` and `nvkr-run-nvke-nightly`. `make nvke-generate` and `make nvke-check`
+select production only. Family files remain pinned members; their standalone Environments and the old
+combined input are comparison fixtures, not maintained releases.
 
-The pilot retains the combined production and qualification paths pending consumer and
-qualification cutover. Its family Releases require separate digest-pinned verification and downstream-owned
-association; no parent Release, automatic association file or hosted acceptance is supplied by the split.
-
-The [qualification policy](policies/nvke-qualification.yaml) and
+The [qualification policy](policies/nvke-gpu-site-qualification.yaml) and
 [nightly build/test workflow](../.github/workflows/nvkr-nightly.yml) have independent owners and scopes.
 [Reconciliation](../docs/adr/reconciliation/README.md) remains the evidence ledger for implementation and
 external acceptance.

@@ -23,7 +23,7 @@ func TestRunLocalDefaultEnvironmentAndExplicitOverride(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := t.TempDir()
-	for _, name := range []string{"inputs/catalogs/tools/operator-arm64", "inputs/catalogs/shared"} {
+	for _, name := range []string{"inputs/catalogs/tools", "inputs/catalogs/shared"} {
 		if err := os.CopyFS(filepath.Join(root, name), os.DirFS(filepath.Join(repository, name))); err != nil {
 			t.Fatal(err)
 		}
@@ -37,7 +37,7 @@ func TestRunLocalDefaultEnvironmentAndExplicitOverride(t *testing.T) {
 	}
 	t.Chdir(root)
 	destination := filepath.Join(root, "definition.yaml")
-	authored, err := lifecycle.InitDefinition(t.Context(), lifecycle.DefinitionInit{Root: root, Destination: destination, Name: "starter", Catalog: "inputs/catalogs/tools/operator-arm64", Platform: "linux/arm64", Components: []string{"helm", "kubectl"}})
+	authored, err := lifecycle.InitDefinition(t.Context(), lifecycle.DefinitionInit{Root: root, Destination: destination, Name: "starter", Catalog: "inputs/catalogs/tools", Platform: "linux/arm64", Components: []string{"helm-operator", "kubectl-operator"}})
 	if err != nil {
 		t.Fatal(err)
 	}

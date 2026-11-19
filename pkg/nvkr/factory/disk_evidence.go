@@ -404,12 +404,36 @@ func requireProductionDiskScratch(profile definition.DiskInspectionProfile) erro
 // Whether raw material bytes are a supported ISO is still checked by guestfish;
 // output kind alone grants no filesystem or installed-content proof.
 func admitDiskEvidenceBuild(plan *Plan, expected LifecycleOutputPlan) (BuildPlan, error) {
-	if plan == nil {
-		return BuildPlan{}, e.New(e.CodeUsage, "disk evidence requires its frozen Plan")
-	}
-	if err := plan.Validate(); err != nil {
+	builds, err := admitDiskEvidenceBuilds(plan, []LifecycleOutputPlan{expected})
+	if err != nil {
 		return BuildPlan{}, err
 	}
+	return builds[0], nil
+}
+
+// Admit a group against one complete Plan validation. Rendering checks all disk
+// outputs together; repeating whole-Plan validation per output makes that work
+// grow with both the output count and the size of the Plan. No admission survives
+// this call, and an invalid member returns no partially admitted group.
+func admitDiskEvidenceBuilds(plan *Plan, expected []LifecycleOutputPlan) ([]BuildPlan, error) {
+	if plan == nil {
+		return nil, e.New(e.CodeUsage, "disk evidence requires its frozen Plan")
+	}
+	if err := plan.Validate(); err != nil {
+		return nil, err
+	}
+	builds := make([]BuildPlan, 0, len(expected))
+	for _, output := range expected {
+		build, err := diskEvidenceBuildForValidatedPlan(plan, output)
+		if err != nil {
+			return nil, err
+		}
+		builds = append(builds, build)
+	}
+	return builds, nil
+}
+
+func diskEvidenceBuildForValidatedPlan(plan *Plan, expected LifecycleOutputPlan) (BuildPlan, error) {
 	for _, build := range plan.Builds {
 		if build.Name != expected.Name || build.BuildDigest != expected.BuildDigest {
 			continue

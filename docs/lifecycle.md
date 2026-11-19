@@ -16,8 +16,8 @@ The Build Digest identifies that generated graph's logical content. Output label
 execution settings remain in their owning records. Two outputs can share a Build Digest while requiring
 separate producer jobs, observations and evidence; one successful output cannot satisfy a missing sibling.
 
-The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-module-tags/definition.yaml) directly selects `nvkectl`, `cwe`, and `nvke-helm`
-for three outputs. The Helm output explicitly depends on the NVKE management-plane image output (`cwe`). No reusable membership group,
+The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-module-tags/definition.yaml) directly selects `nvkectl`, `nvke-controller`, and `nvke-helm`
+for three outputs. The Helm output explicitly depends on the NVKE management-plane image output (`nvke-controller`). No reusable membership group,
 criteria query, inheritance chain, or mixin sits between an output and its producers.
 
 Deployment topology and placement are owned by the system that consumes the artifacts;
@@ -54,8 +54,8 @@ so the saved Definition has the same bytes when the checkout moves:
 
 ```sh
 bin/nvkr definition init --name my-tools --destination definition.yaml \
-  --catalog inputs/catalogs/tools/operator-arm64 \
-  --platform linux/arm64 --component helm --component kubectl > definition.yaml
+  --catalog inputs/catalogs/tools \
+  --platform linux/arm64 --component helm-operator --component kubectl-operator > definition.yaml
 bin/nvkr definition validate --definition definition.yaml
 bin/nvkr run local --definition definition.yaml --attempt my-tools-1
 ```
@@ -265,8 +265,8 @@ presentation flags.
 
 ```sh
 bin/nvkr definition inspect --definition docs/examples/nvke-module-tags/definition.yaml --ui=tui
-bin/nvkr run graph --plan .github/nvkr-run/plan.json --ui=tui
-bin/nvkr catalog list --catalog inputs/catalogs/nvke/module-tags --ui=tui
+bin/nvkr run graph --plan .github/nvkr-run-nvke/plan.json --ui=tui
+bin/nvkr catalog list --catalog inputs/catalogs/nvke --ui=tui
 ```
 
 Graph and release browsers start with an output overview when their supplied
@@ -716,8 +716,8 @@ publishes outcomes to the results index of ADR-31, but no generated job runs it 
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
 Actions workflow; the operator does not write or maintain a separate worker implementation. The maintained
-candidate supplies `inputs/policies/nvke-qualification.yaml` and emits `.github/workflows/nvkr-qualify.yml`
-and `.github/workflows/nvkr-smoke.yml`. The same invocation with `--check` compares
+candidate supplies `inputs/policies/nvke-gpu-site-qualification.yaml` and emits `.github/workflows/nvkr-qualify-nvke.yml`
+and `.github/workflows/nvkr-smoke-nvke.yml`. The same invocation with `--check` compares
 all owned bytes without writing. The separately owned qualification manifest records both workflow files;
 hand edits and unowned files are not silently overwritten. The worker is a fixed same-repository reusable
 workflow at the caller's exact commit. It is generated plumbing, not another operator command to configure
@@ -737,7 +737,7 @@ The independent policy extends the artifact-check policy with these decisions:
 | `smoke.nonToolMembers` | Exact output/member pairs for non-executable runtime-assets archives in mixed executable bundles |
 | `outsideMVPSuites` / `requiredSuites` | Unevaluated external suites, or a requirement that currently blocks qualification |
 
-The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-qualification.yaml)
+The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-gpu-site-qualification.yaml)
 contains concrete verifier/native-image pins and exact output scope. Review those independent trust selections
 with the generated workflows before merge. Other Definitions need their own matching scope and native pins;
 the candidate policy is not a wildcard approval. The trust policy belongs to the operator, not the producing

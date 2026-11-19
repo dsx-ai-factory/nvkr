@@ -39,18 +39,14 @@ both `resolve` and `catalog bump`.
   maintained producer copies and Run bundles; the registry's source-derived bindings stay unchanged.
 
 Maintained catalog metadata uses the slash-separated directory identity relative to `inputs/catalogs/`,
-for example `nvke/release`. This is descriptive naming, not a schema or producer-key rename.
+for example `ovn/nvidia`. This is descriptive naming, not a schema or producer-key rename.
 Existing catalog names remain accepted. Renaming metadata changes the catalog snapshot digest;
 rebind authored overlay predecessors through the snapshot/stack owner and regenerate generated copies
 and dependent Plans through their owners. Update explicit name-keyed local toolchain binding selectors in the same migration. Lock bytes and selected producer Build Digests remain unchanged
 when only names change. Previously captured Plans retain their original bytes and identities.
-The maintained Definition name migrates from `nvke-m2` to `nvke-release`. Its generated workflow display
-names become `nvkr-run-nvke-release`, `nvkr-qualify-nvke-release` and `nvkr-smoke-nvke-release`, including
-the owning workflow-run trigger. Definition-keyed result paths for new Runs use the new name;
-historical results are not moved. The required repository check remains `gate`. External dashboards
-or consumers filtering the old display name or result prefix must select the new name for future Runs.
-Registry namespaces containing `m2-candidate`, existing Environment/overlay names and the maintenance
-policy's own `nvke-m2` name remain compatibility identifiers; they do not rename with the Definition.
+The maintained Definition retains the `nvke` name and the composite generation inventory owns workflow
+names and result paths. Historical results and registry namespaces containing `m2-candidate` remain
+compatibility identifiers; catalog metadata migration does not rewrite them.
 
 
 Both files carry explicit `apiVersion` and `kind`. Readers dispatch to an exact versioned schema, reject unknown
@@ -541,7 +537,7 @@ on supported filesystems and publication of a separately versioned catalog-data 
 
 ## Tool release assets
 
-A source may declare `tool` with `format` (`raw` or `tar-gzip`), a version-rendered HTTPS `url`,
+A source may declare `tool` with `format` (`raw`, `tar-gzip` or `zip`), a version-rendered HTTPS `url`,
 `platform` (`linux/amd64` or `linux/arm64`), `executablePath`, and optional `companions`. Tool names are source names; they do not
 include release versions. The same source constraint and tag-prefix selection used by other sources governs
 `catalog pin` and `catalog bump`. A tool may instead declare nonempty sorted unique `platforms`,
@@ -567,7 +563,9 @@ The original `tools` single-pin map remains unchanged for legacy catalogs. Missi
 or ambiguous declarations fail before execution. Regenerate the Run bundle after any tool bump.
 
 An acquired `host-package` producer may set `prebuilt.releaseExecutable: true`
-with one matching-platform source tool declaration. The source tool lock owns
+with a source tool declaration covering every component platform. Graph resolution selects the exact native
+record before lowering; the resulting native graph has the same identity as its single-platform declaration.
+The source tool lock owns
 both transport and selected executable pins; a second component artifact lock,
 authored URL/image/chart or resolved executable record is rejected. Raw assets
 retain their bytes. A tar-gzip asset uses the standard-library codecs to select

@@ -168,7 +168,10 @@ if [ "$EXECUTION_RUNTIME" = docker ]; then
     for input_path in "$DEFINITION" "$ENVIRONMENT" "$PLAN"; do
       [ -f "$input_path" ] && [ ! -L "$input_path" ] || demo_die "exact inputs must be regular files"
     done
-    docker_args+=(-v "$DEFINITION:/inputs/definition.yaml:ro" -v "$ENVIRONMENT:/inputs/environment.yaml:ro" -v "$PLAN:/inputs/plan.json:ro")
+    # Admit the Plan tree on the host, then transport canonical wire bytes.
+    demo_prepare_nvkr
+    "$NVKR" run plan --plan "$PLAN" --json > "$WORK/plan.json"
+    docker_args+=(-v "$DEFINITION:/inputs/definition.yaml:ro" -v "$ENVIRONMENT:/inputs/environment.yaml:ro" -v "$PWD/$WORK/plan.json:/inputs/plan.json:ro")
     args+=(--definition /inputs/definition.yaml --environment /inputs/environment.yaml --plan /inputs/plan.json)
   fi
   docker "${docker_args[@]}" "$LINUX_IMAGE" /nvkr "${args[@]}"

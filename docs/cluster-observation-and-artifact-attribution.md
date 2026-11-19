@@ -270,7 +270,7 @@ placeholders stand for complete values and the digest domains remain explicit:
 
 ```yaml
 selected:
-  output: cwe
+  output: nvke-controller
   platform: linux/arm64
   imageIndex: <index-I>
   nativeManifest: <native-A>

@@ -196,7 +196,7 @@ mutation. Preview is the default. The separate hourly cleanup workflow executes 
 with a cleanup-only credential; it never loads branch executables or downloaded artifacts. Production and
 older unscoped packages remain outside this protocol.
 
-Definition/factory contracts cover admission, identity, complete M2 graph retention, exact rendering,
+Definition/factory contracts cover admission, identity, complete NVKE graph retention, exact rendering,
 credential/environment scope, retention, runtime namespace projection and same-run retry admission.
 Cleanup API fixtures cover internal visibility, rejection of private/public/missing/empty/unknown visibility at inventory
 and deletion recheck, eligibility, authentication errors, pagination, races and mutation failures;
