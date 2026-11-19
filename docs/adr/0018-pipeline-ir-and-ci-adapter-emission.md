@@ -288,7 +288,8 @@ proxy/checksum-database networking disabled. Only PATH, HOME and optional TMPDIR
 runner environment; Go's toolchain, environment-file and workspace settings are fixed. No producer,
 signing, verification or publication operation is retried by this bootstrap policy. Coreutils bounds the
 process group. The step shell forwards INT/TERM to timeout and re-waits before cleanup, returning the
-coded timeout error for cancellation. Both Go commands receive closed input via `/dev/null`; a compiler's
+coded timeout error for cancellation, including cancellation during cache cleanup. The joined child PID
+is cleared and cleanup completes before the final status is selected. Both Go commands receive closed input via `/dev/null`; a compiler's
 nonzero exit is a build failure even when its status resembles a timeout. This does not add supervision
 of arbitrary detached descendants after a successful Go exit. Cleanup removes only the invocation's disposable caches before private downloads. The installed Go
 toolchain and produced helper remain available; ambient runner caches are not cleanup targets. Missing

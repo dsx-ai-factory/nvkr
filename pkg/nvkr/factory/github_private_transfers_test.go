@@ -14,7 +14,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -23,6 +22,7 @@ import (
 )
 
 func TestGitHubPrivateBootstrapOwnsAndDiscardsItsCaches(t *testing.T) {
+	requireGitHubBootstrapTimeout(t)
 	python, err := exec.LookPath("python3")
 	if err != nil {
 		t.Skip("Python 3 is required to exercise the hosted bootstrap owner")
@@ -40,6 +40,8 @@ func TestGitHubPrivateBootstrapOwnsAndDiscardsItsCaches(t *testing.T) {
 		{name: "cancellation", code: e.CodeTimeout},
 		{name: "download cancellation", code: e.CodeTimeout},
 		{name: "interrupt", code: e.CodeTimeout},
+		{name: "cleanup cancellation", code: e.CodeTimeout},
+		{name: "cleanup failure", code: e.CodeBuildFailed},
 		{name: "missing runner temporary directory", code: e.CodeEngineCapability},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -91,6 +93,16 @@ PY
 			if err := os.WriteFile(filepath.Join(root, "go"), []byte(fakeGo), 0o700); err != nil {
 				t.Fatal(err)
 			}
+			if test.name == "cleanup cancellation" {
+				chmod, err := exec.LookPath("chmod")
+				if err != nil {
+					t.Fatal(err)
+				}
+				fixture := "#!/bin/sh\nif [ \"$1\" = -R ]; then kill -INT \"$(cat step.pid)\"; fi\nexec " + shellQuote(chmod) + " \"$@\"\n"
+				if err := os.WriteFile(filepath.Join(root, "chmod"), []byte(fixture), 0700); err != nil {
+					t.Fatal(err)
+				}
+			}
 			selectedTemp := runnerTemp
 			if test.code == e.CodeEngineCapability {
 				selectedTemp = ""
@@ -98,6 +110,9 @@ PY
 			ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
 			defer cancel()
 			script := githubCIBootstrapBuildCommand("-X main.version=fixture", githubRunnerRelease{})
+			if test.name == "cleanup failure" {
+				script = strings.Replace(script, "rm -rf -- \"$cache\";", "rm -rf -- \"$cache\"; return 1;", 1)
+			}
 			script = "printf '%s' \"$$\" > step.pid\n" + strings.ReplaceAll(strings.Replace(script, "900s", "60s", 1), "--kill-after=5s", "--kill-after=0.2s")
 			command := exec.CommandContext(ctx, bash, "--noprofile", "--norc", "-e", "-o", "pipefail", "-c", script)
 			command.Dir = root
@@ -165,13 +180,7 @@ PY
 			if filepath.Dir(observed.Cache) != runnerTemp || !strings.HasPrefix(filepath.Base(observed.Cache), "nvkr-ci-bootstrap-") || strings.Join(observed.Args, "|") != wantArgs {
 				t.Fatal("bootstrap escaped its owned caches or fixed build arguments")
 			}
-			process, err := os.FindProcess(observed.PID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := process.Signal(syscall.Signal(0)); err == nil {
-				t.Fatal("bootstrap compiler survived cache cleanup")
-			}
+			assertGitHubBootstrapProcessStopped(ctx, t, observed.PID)
 			if test.name == "download cancellation" {
 				if _, err := os.Stat(filepath.Join(root, ".nvkr/ci-bootstrap/nvkr-exec")); !os.IsNotExist(err) {
 					t.Fatal("canceled download reached compiler")
@@ -186,6 +195,7 @@ PY
 }
 
 func TestGitHubPrivateBootstrapRetriesDownloads(t *testing.T) {
+	requireGitHubBootstrapTimeout(t)
 	for _, test := range []struct {
 		name             string
 		failures, builds int
@@ -369,6 +379,7 @@ func TestGitHubPrivateBootstrapCapabilities(t *testing.T) {
 }
 
 func TestGitHubPrivateBootstrapRejectsInvalidManifests(t *testing.T) {
+	requireGitHubBootstrapTimeout(t)
 	for _, name := range []string{"go.mod", "go.sum"} {
 		for _, kind := range []string{"symlink", "directory", "oversized"} {
 			t.Run(name+"/"+kind, func(t *testing.T) {
@@ -833,6 +844,7 @@ var testRunnerRelease = githubRunnerRelease{Version: "v1.2.3", Sum: "h1:" + stri
 // builds it from a private copy, and leaves the module cache and the checkout's
 // own files untouched. Any other module, version or checksum is refused.
 func TestGitHubPrivateBootstrapBuildsPinnedPublishedRelease(t *testing.T) {
+	requireGitHubBootstrapTimeout(t)
 	python, err := exec.LookPath("python3")
 	if err != nil {
 		t.Skip("Python 3 is required to exercise the hosted bootstrap owner")
@@ -911,5 +923,33 @@ PY
 				t.Fatalf("bootstrap left disposable caches behind: %v / %v", entries, err)
 			}
 		})
+	}
+}
+
+// requireGitHubBootstrapTimeout leaves deliberate missing-capability tests unskipped.
+func requireGitHubBootstrapTimeout(t *testing.T) {
+	t.Helper()
+	if _, err := exec.LookPath("timeout"); err != nil {
+		t.Skip("GNU timeout required for bootstrap fixture")
+	}
+}
+
+func assertGitHubBootstrapProcessStopped(ctx context.Context, t *testing.T, pid int) {
+	t.Helper()
+	// SIGKILL delivery can precede the scheduler's final process-state update.
+	for deadline := time.Now().Add(2 * time.Second); ; {
+		state, err := exec.CommandContext(ctx, "ps", "-o", "stat=", "-p", strconv.Itoa(pid)).CombinedOutput()
+		var exit *exec.ExitError
+		if err != nil && (!errors.As(err, &exit) || exit.ExitCode() != 1 || len(bytes.TrimSpace(state)) != 0) {
+			t.Fatalf("process-state probe failed: %v %s", err, state)
+		}
+		value := strings.TrimSpace(string(state))
+		if value == "" || strings.HasPrefix(value, "Z") {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("bootstrap process %d still executing: %s", pid, state)
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

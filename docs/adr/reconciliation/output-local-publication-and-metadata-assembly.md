@@ -493,9 +493,9 @@ compiler exit statuses are normalized to build failures. The 900-second deadline
 4 MiB captured-output bound and successful-exit descendant supervision are not retained. Focused shell
 contracts cover retries, credentials, cache cleanup, module pins and deadline escalation. All three
 maintained bundles were regenerated from their authored inventory and checked byte-for-byte. Their
-identical 62-line bootstrap scripts pass ShellCheck and YAML lint; the three workflows pass Actionlint.
+identical 65-line bootstrap scripts pass ShellCheck and YAML lint; the three workflows pass Actionlint.
 The bootstrap contracts passed three race-instrumented repetitions on macOS, including step-shell
-INT/TERM cancellation, stdin-consuming children, signal-killed compilation, simultaneous source/private
+INT/TERM cancellation (including during cleanup), cleanup failure, stdin-consuming children, signal-killed compilation, simultaneous source/private
 manifest changes, non-regular/symlink/oversized manifests and missing tool capabilities. The deadline
 fixture delivers coreutils' timer signal only after descendant readiness, removing host startup contention
 from its assertion; its leader and descendant loops have a separate 120-second fallback bound.

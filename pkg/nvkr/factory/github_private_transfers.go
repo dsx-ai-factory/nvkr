@@ -282,6 +282,9 @@ while :; do
   # A trap interrupts wait; retain caches and wait again until timeout exits.
   if [ "$canceled" -eq 0 ] || ! kill -0 "$child" 2>/dev/null; then break; fi
 done
+child=''
+if ! cleanup; then result=1; fi
+trap - EXIT
 if [ "$canceled" -eq 1 ]; then result=143; fi
 case "$result" in
   0) ;;

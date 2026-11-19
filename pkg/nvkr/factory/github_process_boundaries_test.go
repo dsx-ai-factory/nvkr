@@ -21,6 +21,7 @@ import (
 )
 
 func TestGitHubBootstrapDeadlineStopsDescendants(t *testing.T) {
+	requireGitHubBootstrapTimeout(t)
 	python, err := exec.LookPath("python3")
 	if err != nil {
 		t.Skip("Python 3 required for fixture")
@@ -79,22 +80,7 @@ PY
 			if !errors.As(runErr, &exit) || exit.ExitCode() != e.ExitCode(e.New(e.CodeTimeout, "")) || !bytes.Contains(output, []byte(e.CodeTimeout)) {
 				t.Fatalf("lost timeout: %v %s", runErr, output)
 			}
-			// SIGKILL delivery can precede the scheduler's final process-state update.
-			for deadline := time.Now().Add(2 * time.Second); ; {
-				probe := exec.CommandContext(ctx, "ps", "-o", "stat=", "-p", string(pidBytes))
-				state, probeErr := probe.Output()
-				if probeErr != nil && (!errors.As(probeErr, &exit) || exit.ExitCode() != 1) {
-					t.Fatal(probeErr)
-				}
-				value := strings.TrimSpace(string(state))
-				if value == "" || strings.HasPrefix(value, "Z") {
-					break
-				}
-				if time.Now().After(deadline) {
-					t.Fatalf("descendant still executing: %s", state)
-				}
-				time.Sleep(10 * time.Millisecond)
-			}
+			assertGitHubBootstrapProcessStopped(ctx, t, pid)
 			if entries, err := os.ReadDir(cache); err != nil || len(entries) != 0 {
 				t.Fatalf("cache leaked: %v %v", entries, err)
 			}
