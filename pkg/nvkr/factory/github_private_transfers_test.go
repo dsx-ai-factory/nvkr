@@ -41,6 +41,7 @@ func TestGitHubPrivateBootstrapOwnsAndDiscardsItsCaches(t *testing.T) {
 		{name: "download cancellation", code: e.CodeTimeout},
 		{name: "interrupt", code: e.CodeTimeout},
 		{name: "cleanup cancellation", code: e.CodeTimeout},
+		{name: "interrupted cleanup", code: e.CodeTimeout},
 		{name: "cleanup failure", code: e.CodeBuildFailed},
 		{name: "missing runner temporary directory", code: e.CodeEngineCapability},
 	} {
@@ -93,12 +94,15 @@ PY
 			if err := os.WriteFile(filepath.Join(root, "go"), []byte(fakeGo), 0o700); err != nil {
 				t.Fatal(err)
 			}
-			if test.name == "cleanup cancellation" {
+			if test.name == "cleanup cancellation" || test.name == "interrupted cleanup" {
 				chmod, err := exec.LookPath("chmod")
 				if err != nil {
 					t.Fatal(err)
 				}
 				fixture := "#!/bin/sh\nif [ \"$1\" = -R ]; then kill -INT \"$(cat step.pid)\"; fi\nexec " + shellQuote(chmod) + " \"$@\"\n"
+				if test.name == "interrupted cleanup" {
+					fixture = "#!/bin/sh\nif [ \"$1\" = -R ] && [ ! -f cleanup-interrupted ]; then touch cleanup-interrupted; kill -INT \"$(cat step.pid)\"; exit 130; fi\nexec " + shellQuote(chmod) + " \"$@\"\n"
+				}
 				if err := os.WriteFile(filepath.Join(root, "chmod"), []byte(fixture), 0700); err != nil {
 					t.Fatal(err)
 				}
