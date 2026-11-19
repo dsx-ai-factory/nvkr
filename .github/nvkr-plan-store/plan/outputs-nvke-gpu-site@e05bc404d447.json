@@ -1,7 +1,7 @@
 [
   {
     "artifactId": "package/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
-    "buildDigest": "sha256:a026cd498411a94703b3657421e21db317e9b17cf151f9ece77a1a6e05a3a473",
+    "buildDigest": "sha256:2b5bccc736d21dc33fa769d973f2fcd21c56319927b640c80f62e67e958b3e84",
     "components": [
       "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
     ],
@@ -10,7 +10,7 @@
   },
   {
     "artifactId": "package/aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
-    "buildDigest": "sha256:f0c97e98f3ed2bba9c2151eb6f403430c2e79f1813c51bf726bd5c918e030eff",
+    "buildDigest": "sha256:35a3fcc52d4ce3c0267ac4583cffc849e26606dcf738dffb784219c2f0653fdf",
     "components": [
       "aicr-nvke-gb200-ubuntu-training-kubeflow-flux"
     ],
@@ -19,7 +19,7 @@
   },
   {
     "artifactId": "package/aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
-    "buildDigest": "sha256:c17fa987ed3ebeea010524487de41b6d4740bcb09ded952e2258ed1eaf2ea71d",
+    "buildDigest": "sha256:e93076b706533036020127e8e6e9e0883837853c68b7b6b6f82801f4311f34fa",
     "components": [
       "aicr-nvke-gb200-ubuntu-training-kubeflow-helm"
     ],

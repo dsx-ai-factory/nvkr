@@ -44,7 +44,7 @@
         "pipefail",
         "-c",
         {
-          "file": ".github/nvkr-plan-store/scripts/aicr-gb300-generic-training-argocd/build@79b429bf61c7.sh"
+          "file": ".github/nvkr-plan-store/scripts/aicr-gb300-generic-training-argocd/build@9d706a08ad2b.sh"
         },
         "nvkr-aicr-bundle",
         "generic",
@@ -52,7 +52,7 @@
         "argocd"
       ],
       "builderType": "oci-hermetic",
-      "commit": "935e0746dc54da890a23c1ecca998244b3a25de7",
+      "commit": "d3493485869ca0a3f49f1058b3985d6ed536b6b2",
       "fromSource": true,
       "outputType": "tarball",
       "platforms": [
@@ -60,10 +60,10 @@
         "linux/arm64"
       ],
       "repo": "https://github.com/NVIDIA/aicr",
-      "sourceDateEpoch": 1793648938,
-      "tag": "v1.2.0",
+      "sourceDateEpoch": 1794869656,
+      "tag": "v1.3.0",
       "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
-      "treeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+      "treeHash": "a593245facd939ea9f569e1aa9fdf7497d378e43",
       "vendorCommand": [
         "bash",
         "-euo",
@@ -74,8 +74,8 @@
         }
       ],
       "versionStamp": {
-        "BUILD_VERSION": "1.2.0",
-        "GIT_VERSION": "935e0746dc54da890a23c1ecca998244b3a25de7"
+        "BUILD_VERSION": "1.3.0",
+        "GIT_VERSION": "d3493485869ca0a3f49f1058b3985d6ed536b6b2"
       },
       "writeDir": "bin/nvkr-aicr"
     },
@@ -87,7 +87,7 @@
         "pipefail",
         "-c",
         {
-          "file": ".github/nvkr-plan-store/scripts/aicr-gb300-generic-training-argocd-helm/build@79b429bf61c7.sh"
+          "file": ".github/nvkr-plan-store/scripts/aicr-gb300-generic-training-argocd-helm/build@9d706a08ad2b.sh"
         },
         "nvkr-aicr-bundle",
         "generic",
@@ -95,7 +95,7 @@
         "argocd-helm"
       ],
       "builderType": "oci-hermetic",
-      "commit": "935e0746dc54da890a23c1ecca998244b3a25de7",
+      "commit": "d3493485869ca0a3f49f1058b3985d6ed536b6b2",
       "fromSource": true,
       "outputType": "tarball",
       "platforms": [
@@ -103,10 +103,10 @@
         "linux/arm64"
       ],
       "repo": "https://github.com/NVIDIA/aicr",
-      "sourceDateEpoch": 1793648938,
-      "tag": "v1.2.0",
+      "sourceDateEpoch": 1794869656,
+      "tag": "v1.3.0",
       "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
-      "treeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+      "treeHash": "a593245facd939ea9f569e1aa9fdf7497d378e43",
       "vendorCommand": [
         "bash",
         "-euo",
@@ -117,8 +117,8 @@
         }
       ],
       "versionStamp": {
-        "BUILD_VERSION": "1.2.0",
-        "GIT_VERSION": "935e0746dc54da890a23c1ecca998244b3a25de7"
+        "BUILD_VERSION": "1.3.0",
+        "GIT_VERSION": "d3493485869ca0a3f49f1058b3985d6ed536b6b2"
       },
       "writeDir": "bin/nvkr-aicr"
     },
@@ -132,7 +132,7 @@
       "platforms": [
         "linux/arm64"
       ],
-      "tag": "v1.2.0",
+      "tag": "v1.3.0",
       "tool": "aicr-tool-arm64",
       "toolArgs": [
         "bundle",
@@ -144,12 +144,12 @@
         "oci-layout:{{.Output}}"
       ],
       "toolExecutable": {
-        "archiveDigest": "sha256:26824146cd0743229239899cb75d3b68e0bc262bcdb357fccc98eca0a5b75976",
-        "executableDigest": "sha256:16e5ac98250cdcdb0ecf18e6a9a05b041b3b3cc83aa3181f755aa0e5c5e0fe24",
+        "archiveDigest": "sha256:15c50d4c356a33bfcbf86ec45f391c4e8e098dc88aaea4fd9d6176cd543e5c35",
+        "executableDigest": "sha256:76d92901efa44bfa5a424c91c26c76ef83446e46350f6ed6a8f44d3ec556657d",
         "executablePath": "aicr",
         "format": "tar-gzip",
         "platform": "linux/arm64",
-        "url": "https://github.com/NVIDIA/aicr/releases/download/v1.2.0/aicr_1.2.0_linux_arm64.tar.gz"
+        "url": "https://github.com/NVIDIA/aicr/releases/download/v1.3.0/aicr_1.3.0_linux_arm64.tar.gz"
       },
       "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c"
     },
@@ -161,7 +161,7 @@
         "pipefail",
         "-c",
         {
-          "file": ".github/nvkr-plan-store/scripts/aicr-gb300-generic-training-helm/build@79b429bf61c7.sh"
+          "file": ".github/nvkr-plan-store/scripts/aicr-gb300-generic-training-helm/build@9d706a08ad2b.sh"
         },
         "nvkr-aicr-bundle",
         "generic",
@@ -169,7 +169,7 @@
         "helm"
       ],
       "builderType": "oci-hermetic",
-      "commit": "935e0746dc54da890a23c1ecca998244b3a25de7",
+      "commit": "d3493485869ca0a3f49f1058b3985d6ed536b6b2",
       "fromSource": true,
       "outputType": "tarball",
       "platforms": [
@@ -177,10 +177,10 @@
         "linux/arm64"
       ],
       "repo": "https://github.com/NVIDIA/aicr",
-      "sourceDateEpoch": 1793648938,
-      "tag": "v1.2.0",
+      "sourceDateEpoch": 1794869656,
+      "tag": "v1.3.0",
       "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
-      "treeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+      "treeHash": "a593245facd939ea9f569e1aa9fdf7497d378e43",
       "vendorCommand": [
         "bash",
         "-euo",
@@ -191,8 +191,8 @@
         }
       ],
       "versionStamp": {
-        "BUILD_VERSION": "1.2.0",
-        "GIT_VERSION": "935e0746dc54da890a23c1ecca998244b3a25de7"
+        "BUILD_VERSION": "1.3.0",
+        "GIT_VERSION": "d3493485869ca0a3f49f1058b3985d6ed536b6b2"
       },
       "writeDir": "bin/nvkr-aicr"
     },
@@ -204,7 +204,7 @@
         "pipefail",
         "-c",
         {
-          "file": ".github/nvkr-plan-store/scripts/aicr-gb300-generic-training-helmfile/build@79b429bf61c7.sh"
+          "file": ".github/nvkr-plan-store/scripts/aicr-gb300-generic-training-helmfile/build@9d706a08ad2b.sh"
         },
         "nvkr-aicr-bundle",
         "generic",
@@ -212,7 +212,7 @@
         "helmfile"
       ],
       "builderType": "oci-hermetic",
-      "commit": "935e0746dc54da890a23c1ecca998244b3a25de7",
+      "commit": "d3493485869ca0a3f49f1058b3985d6ed536b6b2",
       "fromSource": true,
       "outputType": "tarball",
       "platforms": [
@@ -220,10 +220,10 @@
         "linux/arm64"
       ],
       "repo": "https://github.com/NVIDIA/aicr",
-      "sourceDateEpoch": 1793648938,
-      "tag": "v1.2.0",
+      "sourceDateEpoch": 1794869656,
+      "tag": "v1.3.0",
       "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
-      "treeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+      "treeHash": "a593245facd939ea9f569e1aa9fdf7497d378e43",
       "vendorCommand": [
         "bash",
         "-euo",
@@ -234,8 +234,8 @@
         }
       ],
       "versionStamp": {
-        "BUILD_VERSION": "1.2.0",
-        "GIT_VERSION": "935e0746dc54da890a23c1ecca998244b3a25de7"
+        "BUILD_VERSION": "1.3.0",
+        "GIT_VERSION": "d3493485869ca0a3f49f1058b3985d6ed536b6b2"
       },
       "writeDir": "bin/nvkr-aicr"
     },
@@ -247,7 +247,7 @@
       "platforms": [
         "linux/arm64"
       ],
-      "tag": "v1.2.0",
+      "tag": "v1.3.0",
       "tool": "aicr-tool-arm64",
       "toolArgs": [
         "recipe",
@@ -263,12 +263,12 @@
         "{{.Output}}/recipe.yaml"
       ],
       "toolExecutable": {
-        "archiveDigest": "sha256:26824146cd0743229239899cb75d3b68e0bc262bcdb357fccc98eca0a5b75976",
-        "executableDigest": "sha256:16e5ac98250cdcdb0ecf18e6a9a05b041b3b3cc83aa3181f755aa0e5c5e0fe24",
+        "archiveDigest": "sha256:15c50d4c356a33bfcbf86ec45f391c4e8e098dc88aaea4fd9d6176cd543e5c35",
+        "executableDigest": "sha256:76d92901efa44bfa5a424c91c26c76ef83446e46350f6ed6a8f44d3ec556657d",
         "executablePath": "aicr",
         "format": "tar-gzip",
         "platform": "linux/arm64",
-        "url": "https://github.com/NVIDIA/aicr/releases/download/v1.2.0/aicr_1.2.0_linux_arm64.tar.gz"
+        "url": "https://github.com/NVIDIA/aicr/releases/download/v1.3.0/aicr_1.3.0_linux_arm64.tar.gz"
       },
       "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c"
     },
@@ -280,7 +280,7 @@
         "pipefail",
         "-c",
         {
-          "file": ".github/nvkr-plan-store/scripts/aicr-gb300-generic-training-terraform/build@79b429bf61c7.sh"
+          "file": ".github/nvkr-plan-store/scripts/aicr-gb300-generic-training-terraform/build@9d706a08ad2b.sh"
         },
         "nvkr-aicr-bundle",
         "generic",
@@ -288,7 +288,7 @@
         "terraform"
       ],
       "builderType": "oci-hermetic",
-      "commit": "935e0746dc54da890a23c1ecca998244b3a25de7",
+      "commit": "d3493485869ca0a3f49f1058b3985d6ed536b6b2",
       "fromSource": true,
       "outputType": "tarball",
       "platforms": [
@@ -296,10 +296,10 @@
         "linux/arm64"
       ],
       "repo": "https://github.com/NVIDIA/aicr",
-      "sourceDateEpoch": 1793648938,
-      "tag": "v1.2.0",
+      "sourceDateEpoch": 1794869656,
+      "tag": "v1.3.0",
       "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
-      "treeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+      "treeHash": "a593245facd939ea9f569e1aa9fdf7497d378e43",
       "vendorCommand": [
         "bash",
         "-euo",
@@ -310,8 +310,8 @@
         }
       ],
       "versionStamp": {
-        "BUILD_VERSION": "1.2.0",
-        "GIT_VERSION": "935e0746dc54da890a23c1ecca998244b3a25de7"
+        "BUILD_VERSION": "1.3.0",
+        "GIT_VERSION": "d3493485869ca0a3f49f1058b3985d6ed536b6b2"
       },
       "writeDir": "bin/nvkr-aicr"
     },
@@ -323,7 +323,7 @@
         "pipefail",
         "-c",
         {
-          "file": ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build@569ec037bb57.sh"
+          "file": ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build@85641776609c.sh"
         },
         "nvkr-aicr-bundle",
         "nvke",
@@ -332,7 +332,7 @@
         "argocd-helm"
       ],
       "builderType": "oci-hermetic",
-      "commit": "935e0746dc54da890a23c1ecca998244b3a25de7",
+      "commit": "d3493485869ca0a3f49f1058b3985d6ed536b6b2",
       "fromSource": true,
       "outputType": "tarball",
       "platforms": [
@@ -340,10 +340,10 @@
         "linux/arm64"
       ],
       "repo": "https://github.com/NVIDIA/aicr",
-      "sourceDateEpoch": 1793648938,
-      "tag": "v1.2.0",
+      "sourceDateEpoch": 1794869656,
+      "tag": "v1.3.0",
       "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
-      "treeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+      "treeHash": "a593245facd939ea9f569e1aa9fdf7497d378e43",
       "vendorCommand": [
         "bash",
         "-euo",
@@ -354,8 +354,8 @@
         }
       ],
       "versionStamp": {
-        "BUILD_VERSION": "1.2.0",
-        "GIT_VERSION": "935e0746dc54da890a23c1ecca998244b3a25de7"
+        "BUILD_VERSION": "1.3.0",
+        "GIT_VERSION": "d3493485869ca0a3f49f1058b3985d6ed536b6b2"
       },
       "writeDir": "bin/nvkr-aicr"
     },
@@ -367,7 +367,7 @@
         "pipefail",
         "-c",
         {
-          "file": ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/build@569ec037bb57.sh"
+          "file": ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/build@85641776609c.sh"
         },
         "nvkr-aicr-bundle",
         "nvke",
@@ -376,7 +376,7 @@
         "flux"
       ],
       "builderType": "oci-hermetic",
-      "commit": "935e0746dc54da890a23c1ecca998244b3a25de7",
+      "commit": "d3493485869ca0a3f49f1058b3985d6ed536b6b2",
       "fromSource": true,
       "outputType": "tarball",
       "platforms": [
@@ -384,10 +384,10 @@
         "linux/arm64"
       ],
       "repo": "https://github.com/NVIDIA/aicr",
-      "sourceDateEpoch": 1793648938,
-      "tag": "v1.2.0",
+      "sourceDateEpoch": 1794869656,
+      "tag": "v1.3.0",
       "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
-      "treeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+      "treeHash": "a593245facd939ea9f569e1aa9fdf7497d378e43",
       "vendorCommand": [
         "bash",
         "-euo",
@@ -398,8 +398,8 @@
         }
       ],
       "versionStamp": {
-        "BUILD_VERSION": "1.2.0",
-        "GIT_VERSION": "935e0746dc54da890a23c1ecca998244b3a25de7"
+        "BUILD_VERSION": "1.3.0",
+        "GIT_VERSION": "d3493485869ca0a3f49f1058b3985d6ed536b6b2"
       },
       "writeDir": "bin/nvkr-aicr"
     },
@@ -411,7 +411,7 @@
         "pipefail",
         "-c",
         {
-          "file": ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/build@569ec037bb57.sh"
+          "file": ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/build@85641776609c.sh"
         },
         "nvkr-aicr-bundle",
         "nvke",
@@ -420,7 +420,7 @@
         "helm"
       ],
       "builderType": "oci-hermetic",
-      "commit": "935e0746dc54da890a23c1ecca998244b3a25de7",
+      "commit": "d3493485869ca0a3f49f1058b3985d6ed536b6b2",
       "fromSource": true,
       "outputType": "tarball",
       "platforms": [
@@ -428,10 +428,10 @@
         "linux/arm64"
       ],
       "repo": "https://github.com/NVIDIA/aicr",
-      "sourceDateEpoch": 1793648938,
-      "tag": "v1.2.0",
+      "sourceDateEpoch": 1794869656,
+      "tag": "v1.3.0",
       "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
-      "treeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+      "treeHash": "a593245facd939ea9f569e1aa9fdf7497d378e43",
       "vendorCommand": [
         "bash",
         "-euo",
@@ -442,8 +442,8 @@
         }
       ],
       "versionStamp": {
-        "BUILD_VERSION": "1.2.0",
-        "GIT_VERSION": "935e0746dc54da890a23c1ecca998244b3a25de7"
+        "BUILD_VERSION": "1.3.0",
+        "GIT_VERSION": "d3493485869ca0a3f49f1058b3985d6ed536b6b2"
       },
       "writeDir": "bin/nvkr-aicr"
     }
@@ -481,7 +481,7 @@
       }
     },
     "aicr-tool-arm64": {
-      "constraint": "1.2.0",
+      "constraint": "1.3.0",
       "repo": "https://github.com/NVIDIA/aicr",
       "tool": {
         "executablePath": "aicr",
@@ -507,12 +507,12 @@
       "url": "https://github.com/NVIDIA/aicr/releases/download/v1.1.2/aicr_1.1.2_linux_arm64.tar.gz"
     },
     "aicr-tool-arm64": {
-      "archiveDigest": "sha256:26824146cd0743229239899cb75d3b68e0bc262bcdb357fccc98eca0a5b75976",
-      "executableDigest": "sha256:16e5ac98250cdcdb0ecf18e6a9a05b041b3b3cc83aa3181f755aa0e5c5e0fe24",
+      "archiveDigest": "sha256:15c50d4c356a33bfcbf86ec45f391c4e8e098dc88aaea4fd9d6176cd543e5c35",
+      "executableDigest": "sha256:76d92901efa44bfa5a424c91c26c76ef83446e46350f6ed6a8f44d3ec556657d",
       "executablePath": "aicr",
       "format": "tar-gzip",
       "platform": "linux/arm64",
-      "url": "https://github.com/NVIDIA/aicr/releases/download/v1.2.0/aicr_1.2.0_linux_arm64.tar.gz"
+      "url": "https://github.com/NVIDIA/aicr/releases/download/v1.3.0/aicr_1.3.0_linux_arm64.tar.gz"
     }
   }
 }

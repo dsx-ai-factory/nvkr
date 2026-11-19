@@ -268,10 +268,63 @@ func TestLeafAdmissionLines(t *testing.T) {
 	}
 }
 
+func TestAICRBuildIdentityAdmission(t *testing.T) {
+	aicrInputTestRoot(t)
+	const expected = "aicr version 1.3.0 (commit: d3493485869ca0a3f49f1058b3985d6ed536b6b2, date: 2026-11-16T22:54:16Z)"
+	for _, file := range []string{"definition.yaml", "nvke-gb200.yaml"} {
+		plan := compileAICRInput(t, file, "aicr-local-arm64.yaml")
+		for _, build := range plan.Builds {
+			for _, node := range build.Graph.Nodes {
+				if node.Kind != ir.KindBuild || node.BuilderType == ir.BuilderPinnedTool {
+					continue
+				}
+				script := node.Command[4]
+				start := strings.Index(script, "version_report=")
+				end := strings.Index(script, `timeout --kill-after=10s 120s "$out/aicr" recipe`)
+				if start < 0 || end <= start || !strings.Contains(script[:start], `-o "$out/aicr" ./cmd/aicr`) {
+					t.Fatal("build identity assertion must follow compilation and precede rendering")
+				}
+				for _, tc := range []struct {
+					name, report  string
+					failed, admit bool
+				}{
+					{"matching", expected, false, true},
+					{"version", strings.Replace(expected, "1.3.0", "dev", 1), false, false},
+					{"commit", strings.Replace(expected, "d3493485869ca0a3f49f1058b3985d6ed536b6b2", "unknown", 1), false, false},
+					{"date", strings.Replace(expected, "2026-11-16T22:54:16Z", "unknown", 1), false, false},
+					{"empty", "", false, false},
+					{"failed command", expected, true, false},
+				} {
+					t.Run(build.Name+"/"+tc.name, func(t *testing.T) {
+						out := t.TempDir()
+						stub := "#!/bin/sh\n[ \"$#\" -eq 1 ] && [ \"$1\" = --version ] || exit 2\nprintf '%s\\n' \"$NVKR_TEST_REPORT\"\n[ \"$NVKR_TEST_FAIL\" = false ]\n"
+						if err := os.WriteFile(filepath.Join(out, "aicr"), []byte(stub), 0o700); err != nil {
+							t.Fatal(err)
+						}
+						// Exercise the compiled shell assertion while checking its timeout operands.
+						prefix := "out=\"$NVKR_TEST_OUT\"\ntimeout() { [ \"$1\" = --kill-after=10s ] && [ \"$2\" = 30s ] || return 2; shift 2; \"$@\"; }\n"
+						run := exec.CommandContext(t.Context(), "bash", "-euo", "pipefail", "-c", prefix+script[start:end])
+						failed := "false"
+						if tc.failed {
+							failed = "true"
+						}
+						run.Env = append(os.Environ(), "NVKR_TEST_OUT="+out, "NVKR_TEST_REPORT="+tc.report, "NVKR_TEST_FAIL="+failed,
+							"BUILD_VERSION=1.3.0", "GIT_VERSION=d3493485869ca0a3f49f1058b3985d6ed536b6b2", "build_date=2026-11-16T22:54:16Z")
+						output, err := run.CombinedOutput()
+						if (err == nil) != tc.admit {
+							t.Fatalf("admission = %v, want %v: %v\n%s", err == nil, tc.admit, err, output)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
 func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node, contract []string) {
 	t.Helper()
-	const commit = "935e0746dc54da890a23c1ecca998244b3a25de7"
-	const tree = "1d4bfa6d824159dbb4c8077303fe8de154946405"
+	const commit = "d3493485869ca0a3f49f1058b3985d6ed536b6b2"
+	const tree = "a593245facd939ea9f569e1aa9fdf7497d378e43"
 	const image = "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c"
 	if fetch.Repo != "https://github.com/NVIDIA/aicr" || fetch.Commit != commit || fetch.TreeHash != tree ||
 		fetch.VendorImage != image || fetch.VendorSpecDigest == "" || fetch.Network != ir.NetworkDefault {
@@ -286,7 +339,7 @@ func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node, contract []
 	for _, value := range producer.Env {
 		environment[value.Name] = value.Value
 	}
-	if environment["GIT_VERSION"] != commit || environment["BUILD_VERSION"] != "1.2.0" || environment["SOURCE_DATE_EPOCH"] != "1793648938" {
+	if environment["GIT_VERSION"] != commit || environment["BUILD_VERSION"] != "1.3.0" || environment["SOURCE_DATE_EPOCH"] != "1794869656" {
 		t.Fatalf("AICR build stamps do not bind the frozen source: %+v", environment)
 	}
 	for _, required := range []string{"go mod download", "go mod verify", "go mod vendor", "sha256sum -c -"} {
@@ -294,7 +347,7 @@ func assertAICRSourceProducer(t *testing.T, producer, fetch ir.Node, contract []
 			t.Fatalf("AICR dependency fetch omits %q", required)
 		}
 	}
-	for _, required := range append([]string{"-mod=vendor", "GOPROXY=off", `--output "oci-layout:$out/layout"`, `"$out/aicr" verify`, `cp "$layer" "$out/bundle.tar.gz"`}, contract...) {
+	for _, required := range append([]string{"-mod=vendor", "GOPROXY=off", "-X aicr.run/pkg/cli.version=$BUILD_VERSION", "-X aicr.run/pkg/cli.commit=$GIT_VERSION", "-X aicr.run/pkg/cli.date=$build_date", `--output "oci-layout:$out/layout"`, `"$out/aicr" verify`, `cp "$layer" "$out/bundle.tar.gz"`}, contract...) {
 		if !strings.Contains(strings.Join(producer.Command, "\n"), required) {
 			t.Fatalf("AICR build omits its offline rendering/layer contract %q", required)
 		}
@@ -340,7 +393,7 @@ func assertAICRPinnedFlux(t *testing.T, build BuildPlan) {
 			t.Fatalf("pinned Flux gained source or acquired artifact node: %+v", n)
 		}
 		producers[n.Component] = n
-		if n.BuilderType != ir.BuilderPinnedTool || n.Platform != "linux/arm64" || n.Digest != "sha256:16e5ac98250cdcdb0ecf18e6a9a05b041b3b3cc83aa3181f755aa0e5c5e0fe24" || n.ExecutableArchive == nil || n.ExecutableArchive.Digest != "sha256:26824146cd0743229239899cb75d3b68e0bc262bcdb357fccc98eca0a5b75976" || n.Network != ir.NetworkNone {
+		if n.BuilderType != ir.BuilderPinnedTool || n.Platform != "linux/arm64" || n.Digest != "sha256:76d92901efa44bfa5a424c91c26c76ef83446e46350f6ed6a8f44d3ec556657d" || n.ExecutableArchive == nil || n.ExecutableArchive.Digest != "sha256:15c50d4c356a33bfcbf86ec45f391c4e8e098dc88aaea4fd9d6176cd543e5c35" || n.Network != ir.NetworkNone {
 			t.Fatalf("Flux lost released ARM64 tool identity: %+v", n)
 		}
 	}

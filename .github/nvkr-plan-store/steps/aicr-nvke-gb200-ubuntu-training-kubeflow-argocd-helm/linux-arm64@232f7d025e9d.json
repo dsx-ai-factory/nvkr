@@ -1,8 +1,8 @@
 {
-  "buildDigest": "sha256:c17fa987ed3ebeea010524487de41b6d4740bcb09ded952e2258ed1eaf2ea71d",
-  "catalogDigest": "sha256:9b4f94bf46bb8ddb7dd3c33791dea5698505b7d8cd035fef4df74d0858f21e35",
+  "buildDigest": "sha256:2b5bccc736d21dc33fa769d973f2fcd21c56319927b640c80f62e67e958b3e84",
+  "catalogDigest": "sha256:89be7d16270fba4550ba69b239af96a04351889196f3c7508cff9dd3270b3d29",
   "components": [
-    "aicr-nvke-gb200-ubuntu-training-kubeflow-helm"
+    "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
   ],
   "executionGraph": {
     "nodes": [
@@ -15,19 +15,19 @@
           "pipefail",
           "-c",
           {
-            "file": ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/build@569ec037bb57.sh"
+            "file": ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build@85641776609c.sh"
           },
           "nvkr-aicr-bundle",
           "nvke",
           "gb200",
           "kubeflow",
-          "helm"
+          "argocd-helm"
         ],
-        "component": "aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
+        "component": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
         "env": [
           {
             "name": "BUILD_VERSION",
-            "value": "1.2.0"
+            "value": "1.3.0"
           },
           {
             "name": "CGO_ENABLED",
@@ -35,7 +35,7 @@
           },
           {
             "name": "GIT_VERSION",
-            "value": "935e0746dc54da890a23c1ecca998244b3a25de7"
+            "value": "d3493485869ca0a3f49f1058b3985d6ed536b6b2"
           },
           {
             "name": "GOARCH",
@@ -63,39 +63,39 @@
           },
           {
             "name": "SOURCE_DATE_EPOCH",
-            "value": "1793648938"
+            "value": "1794869656"
           },
           {
             "name": "TZ",
             "value": "UTC"
           }
         ],
-        "id": "build-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
+        "id": "build-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
         "kind": "build",
         "needs": [
-          "fetch-source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f"
+          "fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70"
         ],
         "network": "none",
         "outputType": "tarball",
         "platform": "linux/arm64",
-        "sourceCommit": "935e0746dc54da890a23c1ecca998244b3a25de7",
-        "sourceDest": "source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f",
+        "sourceCommit": "d3493485869ca0a3f49f1058b3985d6ed536b6b2",
+        "sourceDest": "source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
         "sourceReadOnly": true,
-        "sourceTreeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+        "sourceTreeHash": "a593245facd939ea9f569e1aa9fdf7497d378e43",
         "toolchain": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
         "vendorSpecDigest": "sha256:39683736c0edf5aea987963a51d570008b7f492c8daa8895f119aa0a445737e1",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "workdir": "/src",
         "writeDir": "bin/nvkr-aicr"
       },
       {
-        "commit": "935e0746dc54da890a23c1ecca998244b3a25de7",
-        "dest": "source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f",
-        "id": "fetch-source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f",
+        "commit": "d3493485869ca0a3f49f1058b3985d6ed536b6b2",
+        "dest": "source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+        "id": "fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
         "kind": "fetch",
         "network": "default",
         "repo": "https://github.com/NVIDIA/aicr",
-        "treeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+        "treeHash": "a593245facd939ea9f569e1aa9fdf7497d378e43",
         "vendorCmd": [
           "bash",
           "-euo",
@@ -112,18 +112,18 @@
         "id": "verify",
         "kind": "verify",
         "needs": [
-          "build-aicr-nvke-gb200-ubuntu-training-kubeflow-helm"
+          "build-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
         ]
       }
     ],
     "platform": "linux/arm64",
     "schemaVersion": "nvkr.dev/ir/v4"
   },
-  "name": "aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
+  "name": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
   "platform": "linux/arm64",
   "resolvedComponents": [
     {
-      "Name": "aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
+      "Name": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "artifactPath": "bin/nvkr-aicr/bundle.tar.gz",
       "buildCommand": [
         "bash",
@@ -131,16 +131,16 @@
         "pipefail",
         "-c",
         {
-          "file": ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/build@569ec037bb57.sh"
+          "file": ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build@85641776609c.sh"
         },
         "nvkr-aicr-bundle",
         "nvke",
         "gb200",
         "kubeflow",
-        "helm"
+        "argocd-helm"
       ],
       "builderType": "oci-hermetic",
-      "commit": "935e0746dc54da890a23c1ecca998244b3a25de7",
+      "commit": "d3493485869ca0a3f49f1058b3985d6ed536b6b2",
       "fromSource": true,
       "outputType": "tarball",
       "platforms": [
@@ -148,10 +148,10 @@
         "linux/arm64"
       ],
       "repo": "https://github.com/NVIDIA/aicr",
-      "sourceDateEpoch": 1793648938,
-      "tag": "v1.2.0",
+      "sourceDateEpoch": 1794869656,
+      "tag": "v1.3.0",
       "toolchainImage": "golang@sha256:5bc7f572bbaa98885a3a1fd9c0aa76b59e3e14e8628bfc316bbfd0c701e4818c",
-      "treeHash": "1d4bfa6d824159dbb4c8077303fe8de154946405",
+      "treeHash": "a593245facd939ea9f569e1aa9fdf7497d378e43",
       "vendorCommand": [
         "bash",
         "-euo",
@@ -162,8 +162,8 @@
         }
       ],
       "versionStamp": {
-        "BUILD_VERSION": "1.2.0",
-        "GIT_VERSION": "935e0746dc54da890a23c1ecca998244b3a25de7"
+        "BUILD_VERSION": "1.3.0",
+        "GIT_VERSION": "d3493485869ca0a3f49f1058b3985d6ed536b6b2"
       },
       "writeDir": "bin/nvkr-aicr"
     }
