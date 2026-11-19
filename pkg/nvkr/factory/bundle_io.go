@@ -182,6 +182,9 @@ func writeGeneratedBundles(ctx context.Context, root string, bundles []*Generate
 		}
 		for name, raw := range bundle.Files {
 			if previous, exists := files[name]; exists && (!isPlanStorePath(name) || !bytes.Equal(previous, raw)) {
+				if isPlanStoreRecord(name) && !strings.Contains(filepath.Base(name), "@") {
+					return e.New(e.CodeEngineCapability, "selected bundles require incompatible contents at stable Plan record %s; align shared inputs, or use distinct Definition names for different graph structures", name)
+				}
 				return e.New(e.CodePipelineDrift, "coordinated bundles disagree on member %s", name)
 			}
 			files[name] = raw
@@ -341,8 +344,9 @@ func writeGeneratedBundles(ctx context.Context, root string, bundles []*Generate
 		}
 		entry.temporary = ""
 	}
-	// A crash before this sweep leaves only unreferenced objects. The next
-	// generation can reclaim them even when its inputs differ from this attempt.
+	// After every manifest is published, a crash before this sweep leaves only
+	// unreferenced objects. Earlier interruption of stable-record replacement
+	// requires the same coordinated inputs, or restoration of committed records.
 	if err := removeRetiredGeneratedMembers(context.WithoutCancel(ctx), root, bundles[0], garbage); err != nil {
 		return err
 	}

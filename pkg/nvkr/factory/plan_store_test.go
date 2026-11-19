@@ -20,7 +20,7 @@ import (
 
 func sharedPlanStoreFixtures(t *testing.T) ([]*Plan, []*GeneratedBundle) {
 	t.Helper()
-	first := githubRuntimePlanFixture(t)
+	first := namedGitHubTestPlan(t, "static-project")
 	second := recompileGitHubStabilityPlan(t, first, func(in *githubStabilityInputs) {
 		in.environment.GitHubBundle = "other-project"
 	})

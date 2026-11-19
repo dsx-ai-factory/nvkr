@@ -369,9 +369,11 @@ catalog-refresh-generate: workflow-generator ## Regenerate the installed catalog
 	 bin/nvkr-exec catalog update-ci > "$$rendered" && \
 	 chmod 0644 "$$rendered" && mv "$$rendered" .github/workflows/catalog-refresh.yaml
 
-.PHONY: workflows-generate
-workflows-generate: workflow-generator ## Regenerate all maintained bundles from the authored generation inventory.
-	python3 scripts/generate-maintained.py
+.PHONY: maintained-bundles-generate workflows-generate
+maintained-bundles-generate: workflow-generator ## Regenerate all maintained producer and qualifier owners together.
+	bin/nvkr-exec run generate-set --inventory inputs/policies/maintained-generation.json --root .
+
+workflows-generate: maintained-bundles-generate ## Regenerate all maintained bundles and the catalog-refresh workflow.
 	$(MAKE) catalog-refresh-generate
 
 # Composite member pin admission is independent of bundle inventory admission.
@@ -379,8 +381,7 @@ NVKE_GPU_SITE := inputs/definitions/nvke/gpu-site.composite.yaml
 NVKE_RELEASE := inputs/definitions/nvke/gpu-site-release.composite.yaml
 
 .PHONY: nvke-generate nvke-check
-nvke-generate: workflow-generator ## Regenerate the NVKE production bundle.
-	python3 scripts/generate-maintained.py --group main
+nvke-generate: maintained-bundles-generate ## Regenerate all maintained owners for an NVKE production change.
 
 nvke-check: workflow-generator ## Check NVKE member pins and generation.
 	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
@@ -388,8 +389,7 @@ nvke-check: workflow-generator ## Check NVKE member pins and generation.
 	python3 scripts/generate-maintained.py --group main --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-generate pipeline-dev-check
-pipeline-dev-generate: workflow-generator ## Regenerate the development bundle.
-	python3 scripts/generate-maintained.py --group development
+pipeline-dev-generate: maintained-bundles-generate ## Regenerate all maintained owners for a development change.
 
 pipeline-dev-check: workflow-generator ## Check development workflow generation.
 	python3 scripts/generate-maintained.py --group development --check $(PROJECTION_PILOT_FLAG)

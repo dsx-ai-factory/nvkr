@@ -1527,8 +1527,8 @@ That bootstrap publishes the frozen data once as `nvkr-runtime-inputs`. Other na
 depend on it and restore its two JSON files into a fresh staging directory. The carrier retains
 packed canonical Plan bytes; ADR-21's GitHub tree is reconstructed locally from that Plan. The v2 tree uses stable Plan-record filenames,
 with environment-specific node and inventory bindings in its per-bundle targets record. Full manifest
-hashes authenticate those files. A refresh that changes a stable record still owned by another bundle
-requires coordinated generation of all owners; single-bundle runtime installation fails closed in that case.
+hashes authenticate those files. Runtime-plan Environments scope all stable records by bundle, so
+nightly dispatch refresh and carrier installation preserve production records in the same checkout.
 Catalog/script variants retain their content suffixes. This storage projection restores the original
 canonical bytes and does not change the Plan, graph or Build identity.
 The generation owner admits

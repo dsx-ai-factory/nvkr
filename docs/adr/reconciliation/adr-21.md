@@ -86,7 +86,9 @@ The Plan schema and digest contracts are unchanged.
 The v2 storage projection gives Plan and step records stable names, keeps script and catalog variants
 content-addressed, and moves runner placement, execution bindings, utility platform/container,
 publication prefix and the publication-bound inventory Build Digest into each bundle's targets record.
-Production and nightly selections share graph and output records. The original canonical Plan and
+Static Environments share graph and output records when only their bindings differ. Runtime-plan
+Environments scope every stable record by bundle to preserve independent dispatch refresh and carrier
+installation; maintained production and nightly therefore keep separate graph and output records. The original canonical Plan and
 all identities are reconstructed before admission; the descriptive index retains full file hashes,
 while each loader authenticates every loaded object against its own manifest.
 `TestPlanTreeEnvironmentProjectionPreservesIdentity` covers exact canonical and identity round trips
@@ -96,16 +98,23 @@ covers stable paths and limits a prefix edit to the root, Environment and target
 Coordinated writer contracts cover omitted-owner refusal, concurrent access and interrupted publication;
 `TestPlanStoreCoordinatedInterruptedPublication` proves mixed-state rejection and same-batch recovery.
 The maintained inventory driver and catalog-maintenance closure compile all selected owners before calling the coordinated writer.
-Catalog-refresh contracts retain runtime admission, qualification ownership conflicts and coded failures.
-A shared-record change must include all owners; a single-bundle runtime refresh obeys the same rule.
+Catalog-refresh contracts retain runtime-source freezing, unpinned-source and selected-projection refusals,
+qualifier/producer overlap checks, qualification ownership conflicts and coded failures.
+`TestPlanStoreStructuralEnvironmentConflict` covers the distinct capability refusal for incompatible
+same-Definition static graph structures; selecting every owner cannot repair that incompatibility.
+The production and development regeneration Make targets include all maintained owners, while their
+check targets retain their group scope. Generation calls the coordinated CLI directly.
+A shared-record change must include all owners. `TestRuntimePlanRefreshBesideProduction` covers
+independent runtime dispatch refresh and both carrier installers with unchanged production bytes.
 The v1 tree reader remains available for migration. Hosted execution of the v2 layout remains unrecorded.
 
 Local regeneration on 2026-11-19 from main `61eb0ca7205fb23f277a9b74a3d9e9d3d83a7574`
 preserved the exact canonical bytes of the three maintained Plans (261 named builds and 251 outputs).
 The recursive store inventory, including its shared index and excluding sibling leases, changed from
-224 files / 135,124 lines / 5,519,266 bytes to 309 files / 134,054 lines / 5,270,763 bytes.
-Stable selection-scoped step records increase file count while sharing the production/nightly graph
-reduces bytes. Replaying only the production publication prefix from `candidate/gpu-site` to
+224 files / 135,124 lines / 5,519,266 bytes to 402 files / 188,707 lines / 7,433,254 bytes.
+Stable selection-scoped step records and independent nightly records increase the store by 1,913,988
+bytes (34.7%). Nightly gives up graph/output/step sharing to preserve independent runtime refresh;
+the benefit is localized subsequent edits, not a smaller initial store. Replaying only the production publication prefix from `candidate/gpu-site` to
 `nightly/gpu-site` changed five store lines (two index hashes, one Environment value and two targets
 values), plus one line each in the private Plan, producer manifest and qualification manifest.
 No workflow, graph, output, step or script bytes changed in that replay. The authored prefix was restored

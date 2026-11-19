@@ -6,6 +6,8 @@ package factory
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -84,6 +86,34 @@ func TestPlanTreeEnvironmentProjectionPreservesIdentity(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestPlanStoreStructuralEnvironmentConflict(t *testing.T) {
+	first := signedTestPlan(t, cosignSigningProfile(), ghcrTarget())
+	second := recompileGitHubStabilityPlan(t, first, func(in *githubStabilityInputs) {
+		in.environment.GitHubBundle = "unsigned"
+		in.environment.Signing = nil
+	})
+	if bytes.Equal(mustCanonical(t, first.Graph), mustCanonical(t, second.Graph)) {
+		t.Fatal("fixture did not change graph structure")
+	}
+	var bundles []*GeneratedBundle
+	for _, plan := range []*Plan{first, second} {
+		bundle, err := RenderGitHub(t.Context(), plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bundles = append(bundles, bundle)
+	}
+	root := filepath.Join(t.TempDir(), "untouched")
+	err := WriteGeneratedBundles(t.Context(), root, bundles)
+	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+	if !strings.Contains(err.Error(), "distinct Definition names") {
+		t.Fatal("structural conflict suggested an impossible retry", err)
+	}
+	if _, err := os.Stat(root); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("incompatible selection created output", err)
 	}
 }
 
@@ -228,6 +258,66 @@ func TestPlanStoreCoordinatedInterruptedPublication(t *testing.T) {
 			}
 			for _, bundle := range fresh {
 				if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
+func TestRuntimePlanRefreshBesideProduction(t *testing.T) {
+	production := namedGitHubTestPlan(t, "production")
+	nightly := recompileGitHubStabilityPlan(t, production, func(in *githubStabilityInputs) {
+		in.environment.GitHubBundle = "nightly"
+		in.environment.GitHubRuntimePlan = true
+	})
+	var baseline []*GeneratedBundle
+	for _, plan := range []*Plan{production, nightly} {
+		bundle, err := RenderGitHub(t.Context(), plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		baseline = append(baseline, bundle)
+	}
+	fresh := freshGitHubRuntimePins(t, nightly)
+	updated, err := RenderGitHub(t.Context(), fresh)
+	if err != nil || updated.PlanDigest == baseline[1].PlanDigest {
+		t.Fatal("fixture did not refresh nightly", err)
+	}
+	for _, mode := range []string{"dispatch", "bootstrap", "stage"} {
+		t.Run(mode, func(t *testing.T) {
+			root := t.TempDir()
+			writeRuntimeTrustedInput(t, root, nightly.DefinitionPath, nightly.Definition)
+			writeRuntimeTrustedInput(t, root, nightly.EnvironmentPath, nightly.Environment)
+			if err := WriteGeneratedBundles(t.Context(), root, baseline); err != nil {
+				t.Fatal(err)
+			}
+			_, productionManifest, err := ManifestFor(baseline[0])
+			if err != nil {
+				t.Fatal(err)
+			}
+			switch mode {
+			case "dispatch":
+				err = PrepareGitHubRuntimeBundle(t.Context(), fresh, root, false)
+			case "bootstrap":
+				stageGitHubRuntimeInputs(t, root, fresh)
+				err = InstallGitHubRuntimeInputs(t.Context(), nightly, root)
+			case "stage":
+				stageGitHubRuntimeInputs(t, root, fresh)
+				err = InstallGitHubStageRuntimeInputs(t.Context(), nightly, root)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := os.ReadFile(filepath.Join(root, baseline[0].ManifestPath))
+			if err != nil || !bytes.Equal(raw, productionManifest) {
+				t.Fatal("runtime refresh changed production manifest", err)
+			}
+			for _, bundle := range []*GeneratedBundle{baseline[0], updated} {
+				if err := CheckGeneratedBundle(t.Context(), root, bundle); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := LoadPlanContext(t.Context(), filepath.Join(root, bundle.PlanPath)); err != nil {
 					t.Fatal(err)
 				}
 			}

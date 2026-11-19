@@ -120,6 +120,10 @@ The store has three directories: `scripts/`, `steps/` and `plan/`.
 Plan records use stable logical filenames, such as `plan/graph-<selection>.json`,
 `plan/outputs-<selection>.json` and `steps/<selection>/<target>/<platform>.json`.
 Environment, targets and runtime-input records additionally include the owning bundle name.
+For `githubRuntimePlan` Environments, every stable Plan and step record includes that bundle name,
+so dispatch-time source freezing and carrier installation can refresh one bundle independently.
+Runtime bundles therefore give up graph, output and step sharing with other bundles; catalog snapshots
+and scripts remain shared by exact content.
 Platform filename labels use `linux-arm64` form; an aggregate target includes its platform only once.
 Catalog snapshots and scripts can have multiple simultaneous variants within one Plan. They retain
 `plan/catalog-<name>@<digest>.json` and `scripts/<component>/build@<digest>.sh`, with the first
@@ -130,7 +134,14 @@ A filename is a locator, never an identity or evidence of integrity.
 Changing a shared stable record requires coordinated regeneration of all owners. A single-bundle update
 that conflicts with another owner's full digest fails before payload publication. Independent selections
 have separate step records; differing source pins for the same selection cannot coexist at one stable name.
+Likewise, static Environments for one Definition must have the same graph structure after environment bindings
+are projected out. A signed and an unsigned topology, for example, need distinct Definition names.
+If the selected owners themselves disagree on stable contents, coordinated generation returns
+`NVKR-E-ENGINE-CAPABILITY` and directs the author to separate the selections; rerunning the same batch
+cannot repair that structural incompatibility. This differs from an omitted-owner drift refusal.
 The maintained generation driver renders the selected producer set before calling the coordinated writer.
+`workflows-generate`, `nvke-generate` and `pipeline-dev-generate` regenerate every maintained producer
+and qualifier owner together; group-specific check targets remain read-only and scoped to their group.
 It holds the store lock and selected bundle locks, admits the complete prospective union, stages all
 payloads and manifests, publishes payloads before manifests, then sweeps unreferenced files and rebuilds
 the descriptive index. An interrupted write is not an atomic repository snapshot: affected readers fail
@@ -161,8 +172,9 @@ record. That record also retains the derived output's publication-bound Build Di
 from the shared outputs record, beside the ordinary publication destinations and credentials.
 This is a storage projection only: joining restores every original field before canonical Plan and graph
 validation. The inventory Build Digest still covers the publication prefix; no Build, Plan or published
-identity is recomputed under a different contract. Production and nightly share the same graph and
-outputs record when their only differences are these environment bindings.
+identity is recomputed under a different contract. Static Environments share the same graph and
+outputs record when their only differences are these environment bindings. The maintained nightly
+Environment opts into runtime Plans and keeps its own stable records for independent refresh.
 Full target names remain unchanged, including aggregate targets such as `output/linux/arm64`.
 
 JSON objects use the canonical codec's bytes indented with two spaces and one final LF.
@@ -257,8 +269,8 @@ the two-file carrier, avoiding a duplicate check/render for export.
 The generation owner installs the admitted bundle using its existing
 lock, per-file atomic replacement and manifest-last semantics; this is not an atomic directory transaction.
 The root and stored JSON objects are refreshable Plan data. Plan and step paths stay stable; catalog
-variants retain content addresses. A runtime write that changes a stable object shared with an omitted
-owner fails closed; normal coordinated generation must update every owner of that object.
+variants retain content addresses. Runtime Plan records are bundle-scoped, allowing a nightly refresh
+beside an unchanged production bundle. Static shared records still require coordinated owner updates.
 Target membership, script bytes and the scripts' logical consumer cohorts remain fixed.
 A source pin that splits or merges a shared fetch cohort requires reviewed regeneration even if both cohorts use identical script bytes.
 Private transport never overwrites checked-out files. ADR-18 owns bootstrap ordering and transport. Neither an
@@ -541,6 +553,10 @@ files are rechecked against the inspected bytes and modes immediately before rem
 may have the writer's initial 0600 mode or final 0644 mode; symlinks, directories, arbitrary names,
 altered content-addressed objects, stable objects that disagree with their prior owner, and malformed
 ownership manifests fail generation without being swept.
+The reserved `plan/` and `steps/` directories are entirely generator-owned. An unmanifested regular
+file with an admitted stable `.json` name is unreferenced garbage and is swept even without a content
+suffix. Keep authored notes outside the store. This changes the old hashed-only layout's refusal of
+such names; it does not permit arbitrary filenames or changed manifest-owned bytes to be swept.
 The store lock covers ownership inspection, manifest publication and sweeping.
 
 To remove a whole bundle, remove its generated private directory and workflow closure together;

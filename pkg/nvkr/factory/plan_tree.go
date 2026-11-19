@@ -147,7 +147,11 @@ func renderPlanTreeFormat(ctx context.Context, plan *Plan, planPath string, lega
 		// record. Aggregate targets already end in that platform.
 		logical := strings.TrimSuffix(name, "/"+platform) + "/" + strings.ReplaceAll(platform, "/", "-")
 		if !legacy {
-			logical = plan.Definition.Metadata.Name + "/" + logical
+			selection := plan.Definition.Metadata.Name
+			if plan.Environment.GitHubRuntimePlan {
+				selection += "-" + path.Base(path.Dir(planPath))
+			}
+			logical = selection + "/" + logical
 		}
 		stepPath, err := namedPlanStorePath("steps/"+logical, step, ".json")
 		if err != nil {
@@ -187,7 +191,7 @@ func renderPlanTreeFormat(ctx context.Context, plan *Plan, planPath string, lega
 			if field == "actions" {
 				logical = "github"
 			}
-			if !legacy && (field == "environment" || field == "targets" || field == "runtimeInputs") {
+			if !legacy && (plan.Environment.GitHubRuntimePlan || field == "environment" || field == "targets" || field == "runtimeInputs") {
 				logical += "-" + path.Base(path.Dir(planPath))
 			}
 			if logical == "" {

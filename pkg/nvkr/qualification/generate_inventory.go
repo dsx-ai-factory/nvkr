@@ -104,7 +104,13 @@ func GenerateSelections(ctx context.Context, inputs []GenerationInput, generator
 	var qualifiers []*GeneratedWorkflows
 	var digests []string
 	for _, selection := range inputs {
-		plan, err := lifecycle.CompileFiles(ctx, selection.Definition, selection.Environment, generatorVersion)
+		var plan *factory.Plan
+		var err error
+		if selection.Runtime {
+			plan, err = lifecycle.CompileRuntimeGeneration(ctx, selection.Definition, selection.Environment, generatorVersion, root, check)
+		} else {
+			plan, err = lifecycle.CompileFiles(ctx, selection.Definition, selection.Environment, generatorVersion)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -138,6 +144,13 @@ func GenerateSelections(ctx context.Context, inputs []GenerationInput, generator
 			return nil, err
 		}
 		qualifiers = append(qualifiers, qualifier)
+	}
+	for _, producer := range producers {
+		for _, qualifier := range qualifiers {
+			if err := checkProducerQualificationOverlap(producer, qualifier); err != nil {
+				return nil, err
+			}
+		}
 	}
 	for _, qualifier := range qualifiers {
 		if check {
