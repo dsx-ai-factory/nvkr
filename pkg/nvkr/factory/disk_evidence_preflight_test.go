@@ -136,7 +136,10 @@ func TestDiskEvidenceRejectsHostileCompletePlanBeforeRuntimeWork(t *testing.T) {
 }
 
 func TestDiskEvidenceGroupAdmitsEveryNamedOutput(t *testing.T) {
-	for _, condition := range []string{"valid", "wrong second name", "wrong second digest", "mutated Plan after admission"} {
+	for _, condition := range []string{
+		"valid", "wrong second name", "wrong second digest", "mutated Plan after admission",
+		"empty valid Plan", "empty invalid Plan",
+	} {
 		t.Run(condition, func(t *testing.T) {
 			base, _ := diskMaterialTraceFixtureWithCapture(t, false, false, "linux/amd64", "none", "acquisitions.tar")
 			definition := base.Definition.Clone()
@@ -160,18 +163,27 @@ func TestDiskEvidenceGroupAdmitsEveryNamedOutput(t *testing.T) {
 			switch condition {
 			case "valid":
 				return
+			case "empty valid Plan":
+				builds, err = admitDiskEvidenceBuilds(plan, nil)
+				if err != nil || len(builds) != 0 {
+					t.Fatalf("empty group returned %d builds and error %v", len(builds), err)
+				}
+				return
 			case "wrong second name":
 				expected[1].Name = "not-planned"
 			case "wrong second digest":
 				expected[1].BuildDigest = "sha256:" + strings.Repeat("9", 64)
-			case "mutated Plan after admission":
+			case "mutated Plan after admission", "empty invalid Plan":
+				if condition == "empty invalid Plan" {
+					expected = nil
+				}
 				plan.Builds[1].Platform = "linux/riscv64"
 				plan.Builds[1].Graph.Platform = "linux/riscv64"
 				want = e.CodeInvalidCatalog
 			}
 			builds, err = admitDiskEvidenceBuilds(plan, expected)
 			assertFactoryErrorCode(t, err, want)
-			if builds != nil {
+			if len(builds) != 0 {
 				t.Fatal("rejected group returned partially admitted builds")
 			}
 		})
