@@ -69,8 +69,10 @@ The bootstrap stages them separately from the committed Plan tree;
 the helper invokes the installer to admit and regenerate that tree. Bootstrap installation renders
 the baseline and candidate once each. Stage installation verifies the saved baseline Plan and fixed
 checkout members, then renders only the candidate. Secondary multi-source bootstraps combine the
-runtime-input check and carrier staging in one render. Frozen JSON record addresses may change during a source-pin refresh,
-while target membership, script bytes, consumer cohorts and non-Plan members remain fixed.
+runtime-input check and carrier staging in one render. Frozen Plan and step record addresses remain stable during a source-pin refresh; catalog variants
+retain content addresses. Target membership, script bytes, consumer cohorts and non-Plan members remain fixed.
+A runtime refresh that would replace a shared stable record without its other owning bundles is refused;
+coordinated normal generation must update those owners together.
 A vendor cohort split requires normal regeneration even when its script bytes and addresses are unchanged.
 Packed-carrier and cohort-split refusal fixtures exercise these boundaries locally. The retained
 `nvke-nightly` selection passes synthetic source-pin refresh with unchanged scripts and exact reconstructed

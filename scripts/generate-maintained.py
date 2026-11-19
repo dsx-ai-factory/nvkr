@@ -49,6 +49,15 @@ def main():
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
     inventory = load_inventory(root)
+    if not args.check:
+        if args.projection_pilot:
+            raise ValueError("projection pilot is supported only for checks")
+        command = [str(root / "bin/nvkr-exec"), "run", "generate-set",
+                   "--inventory", "inputs/policies/maintained-generation.json", "--root", "."]
+        if args.group:
+            command += ["--group", args.group]
+        subprocess.run(command, cwd=root, check=True, timeout=2700)
+        return
     for entry in inventory:
         if args.group and args.group != entry["group"]:
             continue

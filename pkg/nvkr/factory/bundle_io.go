@@ -140,7 +140,14 @@ func validateBundleNamespace(bundle *GeneratedBundle) error {
 // gate; this is not an atomic replacement of the entire directory. Every failure
 // carries a stable code; raw staging, sync and publication I/O is internal.
 func WriteGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBundle) error {
-	err := writeGeneratedBundle(ctx, root, bundle)
+	return WriteGeneratedBundles(ctx, root, []*GeneratedBundle{bundle})
+}
+
+// WriteGeneratedBundles admits all selected owners before publishing shared stable
+// records. Conflicting or omitted owners fail closed. The store lock covers the
+// complete update; readers verify their own manifests throughout publication.
+func WriteGeneratedBundles(ctx context.Context, root string, bundles []*GeneratedBundle) error {
+	err := writeGeneratedBundles(ctx, root, bundles)
 	var coded *e.Error
 	if err == nil || errors.As(err, &coded) {
 		return err
@@ -154,48 +161,71 @@ var syncGeneratedDirectory = (*os.File).Sync
 // syncStagedMember is the staged-member fsync. Tests inject a raw failure.
 var syncStagedMember = (*os.File).Sync
 
-func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBundle) error {
-	if ctx == nil {
-		return e.New(e.CodeUsage, "generated Run write requires a context")
+func writeGeneratedBundles(ctx context.Context, root string, bundles []*GeneratedBundle) error {
+	if ctx == nil || strings.TrimSpace(root) == "" || len(bundles) == 0 || len(bundles) > 64 {
+		return e.New(e.CodeUsage, "generated Run write requires context, repository root and 1–64 bundles")
 	}
-	if strings.TrimSpace(root) == "" {
-		return e.New(e.CodeUsage, "generated Run write requires a repository root")
+	bundles = append([]*GeneratedBundle(nil), bundles...)
+	manifests := map[string][]byte{}
+	files := map[string][]byte{}
+	for _, bundle := range bundles {
+		_, raw, err := ManifestFor(bundle)
+		if err != nil {
+			return err
+		}
+		if _, exists := manifests[bundle.ManifestPath]; exists {
+			return e.New(e.CodeUsage, "duplicate generated bundle")
+		}
+		manifests[bundle.ManifestPath] = raw
+		if len(bundles) > 1 && bundle.Engine != EngineGitHub {
+			return e.New(e.CodeEngineCapability, "coordinated generation requires GitHub bundles")
+		}
+		for name, raw := range bundle.Files {
+			if previous, exists := files[name]; exists && (!isPlanStorePath(name) || !bytes.Equal(previous, raw)) {
+				return e.New(e.CodePipelineDrift, "coordinated bundles disagree on member %s", name)
+			}
+			files[name] = raw
+		}
 	}
-	_, manifestBytes, err := ManifestFor(bundle)
-	if err != nil {
-		return err
+	sort.Slice(bundles, func(i, j int) bool { return bundles[i].ManifestPath < bundles[j].ManifestPath })
+	for _, bundle := range bundles {
+		if err := ensureGeneratedDirectory(root, filepath.ToSlash(filepath.Dir(bundle.ManifestPath))); err != nil {
+			return err
+		}
 	}
-	if err := ensureGeneratedDirectory(root, filepath.ToSlash(filepath.Dir(bundle.ManifestPath))); err != nil {
-		return err
-	}
-	if bundle.Engine == EngineGitHub {
+	github := bundles[0].Engine == EngineGitHub
+	if github {
 		unlock, err := acquireBundleLock(ctx, filepath.Join(root, PlanStoreDirectory+".lease"))
 		if err != nil {
 			return err
 		}
 		defer unlock()
 	}
-	release, err := acquireBundleLock(ctx, filepath.Join(root, bundle.ManifestPath+".lease"))
-	if err != nil {
-		return err
+	for _, bundle := range bundles {
+		release, err := acquireBundleLock(ctx, filepath.Join(root, bundle.ManifestPath+".lease"))
+		if err != nil {
+			return err
+		}
+		defer release()
 	}
-	defer release()
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "generated Run write canceled")
 	}
-	retired, err := retiredGeneratedMembers(ctx, root, bundle)
-	if err != nil {
-		return err
+	retirements := map[string][]GeneratedMember{}
+	for _, bundle := range bundles {
+		retired, err := retiredGeneratedMembers(ctx, root, bundle)
+		if err != nil {
+			return err
+		}
+		retirements[bundle.ManifestPath] = retired
 	}
-	garbage, err := inspectPlanStore(ctx, root, bundle, true)
+	garbage, err := inspectPlanStoreSet(ctx, root, bundles, true)
 	if err != nil {
 		return err
 	}
 	var storeIndex []byte
-	if bundle.Engine == EngineGitHub {
-		// Admit and compute the complete index before publication, while the
-		// store lock fixes the owner set. Commit those bytes after the manifest.
-		storeIndex, err = planStoreIndex(ctx, root, bundle)
+	if github {
+		storeIndex, err = planStoreIndex(ctx, root, bundles...)
 		if err != nil {
 			return err
 		}
@@ -205,8 +235,9 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		destination, temporary string
 		shared                 bool
 	}
-	names := sortedFileNames(bundle.Files)
-	stagedFiles := make([]staged, 0, len(names)+1)
+	names := sortedFileNames(files)
+	var replaced []GeneratedMember
+	stagedFiles := make([]staged, 0, len(names)+len(bundles))
 	cleanup := func() {
 		for _, file := range stagedFiles {
 			if file.temporary != "" {
@@ -230,7 +261,7 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		if err != nil {
 			return e.Wrap(e.CodeInternal, err, "staging generated member %s", relative)
 		}
-		entry := staged{destination: destination, temporary: tmp.Name(), shared: isPlanStorePath(relative)}
+		entry := staged{destination: destination, temporary: tmp.Name(), shared: isPlanStorePath(relative) && (strings.Contains(filepath.Base(relative), "@") || filepath.ToSlash(filepath.Dir(relative)) == PlanStoreDirectory)}
 		stagedFiles = append(stagedFiles, entry)
 		// Name the logical member; %w keeps the os.PathError and any owner code.
 		fail := func(err error) error {
@@ -254,28 +285,45 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	for _, name := range names {
 		if isPlanStorePath(name) {
 			if _, err := os.Lstat(filepath.Join(root, name)); err == nil {
-				continue
+				raw, err := readGeneratedContext(ctx, filepath.Join(root, name))
+				if err != nil {
+					return err
+				}
+				if bytes.Equal(raw, files[name]) {
+					continue
+				}
+				replaced = append(replaced, GeneratedMember{Path: name, SHA256: pipeline.FileDigest(raw), Mode: 0o644})
 			}
 		}
-		if err := stage(name, bundle.Files[name]); err != nil {
+		if err := stage(name, files[name]); err != nil {
 			return err
 		}
 	}
-	if err := stage(bundle.ManifestPath, manifestBytes); err != nil {
-		return err
+	payloadCount := len(stagedFiles)
+	for _, bundle := range bundles {
+		if err := stage(bundle.ManifestPath, manifests[bundle.ManifestPath]); err != nil {
+			return err
+		}
 	}
 	if err := ctx.Err(); err != nil {
 		return e.Wrap(e.CodeTimeout, err, "generated Run write canceled before commit")
 	}
-	if err := checkRetiredGeneratedMembers(ctx, root, retired); err != nil {
+	if err := checkRetiredGeneratedMembers(ctx, root, replaced); err != nil {
 		return err
 	}
-	// The manifest is staged last and committed last. Once payload publication starts,
-	// complete the small commit even if voluntary cancellation arrives.
+	for _, bundle := range bundles {
+		if err := checkRetiredGeneratedMembers(ctx, root, retirements[bundle.ManifestPath]); err != nil {
+			return err
+		}
+	}
+	// Publish all payloads before any manifest. An interrupted batch is detected
+	// by each reader's full digest checks; the same batch can complete the update.
 	for index := range stagedFiles {
-		if index == len(stagedFiles)-1 {
-			if err := removeRetiredGeneratedMembers(context.WithoutCancel(ctx), root, bundle, retired); err != nil {
-				return err
+		if index == payloadCount {
+			for _, bundle := range bundles {
+				if err := removeRetiredGeneratedMembers(context.WithoutCancel(ctx), root, bundle, retirements[bundle.ManifestPath]); err != nil {
+					return err
+				}
 			}
 		}
 		entry := &stagedFiles[index]
@@ -295,13 +343,13 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 	}
 	// A crash before this sweep leaves only unreferenced objects. The next
 	// generation can reclaim them even when its inputs differ from this attempt.
-	if err := removeRetiredGeneratedMembers(context.WithoutCancel(ctx), root, bundle, garbage); err != nil {
+	if err := removeRetiredGeneratedMembers(context.WithoutCancel(ctx), root, bundles[0], garbage); err != nil {
 		return err
 	}
 	for _, member := range garbage {
 		names = append(names, member.Path)
 	}
-	if bundle.Engine == EngineGitHub {
+	if github {
 		if err := writePlanStoreIndex(context.WithoutCancel(ctx), root, storeIndex); err != nil {
 			return err
 		}
@@ -310,7 +358,10 @@ func writeGeneratedBundle(ctx context.Context, root string, bundle *GeneratedBun
 		}
 		names = append(names, PlanStoreIndexPath)
 	}
-	for _, directory := range generatedDirectories(root, append(names, bundle.ManifestPath)) {
+	for _, bundle := range bundles {
+		names = append(names, bundle.ManifestPath)
+	}
+	for _, directory := range generatedDirectories(root, names) {
 		opened, err := os.Open(directory)
 		if errors.Is(err, os.ErrNotExist) && strings.HasPrefix(directory, filepath.Join(root, PlanStoreDirectory)+string(filepath.Separator)) {
 			continue // The sweep removed this empty store directory; sync its surviving parents.

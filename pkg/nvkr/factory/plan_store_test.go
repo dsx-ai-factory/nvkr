@@ -148,18 +148,15 @@ func TestPlanStoreRetirementPreservesOtherOwners(t *testing.T) {
 			t.Fatal("rejected retirement changed bundle payloads")
 		}
 	})
-	if err := WriteGeneratedBundle(t.Context(), root, fresh[0]); err != nil {
-		t.Fatal(err)
+	before := mustCanonical(t, githubRuntimeTree(t, root))
+	assertFactoryErrorCode(t, WriteGeneratedBundle(t.Context(), root, fresh[0]), e.CodePipelineDrift)
+	if !bytes.Equal(before, mustCanonical(t, githubRuntimeTree(t, root))) {
+		t.Fatal("single-owner refusal changed files")
 	}
 	if err := CheckGeneratedBundle(t.Context(), root, bundles[1]); err != nil {
-		t.Fatal("first refresh damaged the other bundle", err)
+		t.Fatal(err)
 	}
-	for _, name := range retired {
-		if _, err := os.Stat(filepath.Join(root, name)); err != nil {
-			t.Fatal("shared object retired before its last owner", err)
-		}
-	}
-	if err := WriteGeneratedBundle(t.Context(), root, fresh[1]); err != nil {
+	if err := WriteGeneratedBundles(t.Context(), root, fresh); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range retired {
@@ -321,7 +318,8 @@ func TestPlanStoreRecoversRemovedAndRenamedBundles(t *testing.T) {
 
 func TestPlanStoreRecoversInterruptedWrites(t *testing.T) {
 	plans, bundles := sharedPlanStoreFixtures(t)
-	freshPlan := recompileGitHubStabilityPlan(t, freshGitHubRuntimePins(t, plans[0]), func(in *githubStabilityInputs) {
+	freshPlan := recompileGitHubStabilityPlan(t, plans[0], func(in *githubStabilityInputs) {
+		in.environment.Metadata.Name = "changed-recovery"
 		in.environment.Metadata.Description = "changed recovery fixture"
 	})
 	fresh, err := RenderGitHub(t.Context(), freshPlan)
@@ -395,7 +393,7 @@ func TestPlanStoreReaderDuringOtherOwnerWrite(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	fresh, err := RenderGitHub(t.Context(), freshGitHubRuntimePins(t, plans[0]))
+	fresh, err := RenderGitHub(t.Context(), recompileGitHubStabilityPlan(t, plans[0], func(in *githubStabilityInputs) { in.environment.Metadata.Description = "own environment update" }))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -466,6 +464,7 @@ func TestPlanStoreAggregateBoundBeforePublication(t *testing.T) {
 
 func TestPlanStoreScriptSurvivesUntilLastOwner(t *testing.T) {
 	plans, _ := sharedPlanStoreFixtures(t)
+	plans[1] = recompileGitHubStabilityPlan(t, plans[1], func(in *githubStabilityInputs) { in.definition.Metadata.Name = "other-selection" })
 	root := t.TempDir()
 	const oldBody = "printf shared\nprintf old\n"
 	const newBody = "printf shared\nprintf new\n"
@@ -574,7 +573,8 @@ func testNamedStorePath(t *testing.T, logical string, raw []byte, extension stri
 
 func TestPlanStoreNamesAndIndexDoNotDependOnGenerationOrder(t *testing.T) {
 	plans, bundles := sharedPlanStoreFixtures(t)
-	// These bundles deliberately contain different variants of the same targets.
+	// Distinct selections may retain different pins and share catalog/script variants.
+	plans[1] = recompileGitHubStabilityPlan(t, plans[1], func(in *githubStabilityInputs) { in.definition.Metadata.Name = "other-selection" })
 	var err error
 	bundles[1], err = RenderGitHub(t.Context(), freshGitHubRuntimePins(t, plans[1]))
 	if err != nil {
@@ -634,17 +634,17 @@ func TestPlanStoreNamesAndIndexDoNotDependOnGenerationOrder(t *testing.T) {
 	}
 	diverged := false
 	for logical, variants := range index.Objects {
-		if strings.HasPrefix(logical, "steps/") && len(variants) > 1 {
+		if strings.HasPrefix(logical, "plan/catalog-") && len(variants) > 1 {
 			diverged = true
 		}
 		for _, variant := range variants {
-			if len(variant.Bundles) == 0 || !strings.Contains(variant.File, "@") || !strings.HasPrefix(variant.SHA256, "sha256:") {
+			if len(variant.Bundles) == 0 || !strings.HasPrefix(variant.SHA256, "sha256:") {
 				t.Fatal("index omits a variant's name, full digest or users", variant)
 			}
 		}
 	}
 	if !diverged {
-		t.Fatal("index did not group divergent target variants")
+		t.Fatal("index did not group divergent catalog variants")
 	}
 	for _, name := range []string{filepath.Dir(bundles[1].ManifestPath), bundles[1].WorkflowPath} {
 		if err := os.RemoveAll(filepath.Join(roots[0], name)); err != nil {
@@ -748,7 +748,9 @@ func TestPlanStoreNamedPathGrammar(t *testing.T) {
 		{"steps/output/linux/arm64/build@abcdef012345.json", true},
 		{"scripts/Uppercase/nested/build@abcdef012345.sh", true},
 		{"unknown/name@abcdef012345.json", false},
-		{"steps/name.json", false},
+		{"steps/name.json", true},
+		{"plan/graph-selection.json", true},
+		{"scripts/name.sh", false},
 		{"steps/name@abcdef0123456.json", false},
 		{"steps/name@ABCDEF012345.json", false},
 		{"steps/a/../name@abcdef012345.json", false},
@@ -786,7 +788,7 @@ func TestPlanStoreFullDigestDisagreementDoesNotPublish(t *testing.T) {
 			incoming := &GeneratedBundle{Engine: EngineGitHub, ManifestPath: ".github/nvkr-run-incoming/manifest.json", Files: map[string][]byte{name: []byte(body)}}
 			_, err := inspectPlanStore(t.Context(), root, incoming, true)
 			assertFactoryErrorCode(t, err, e.CodePipelineDrift)
-			want := "short Plan address collision"
+			want := "conflicting Plan record"
 			if betweenOwners {
 				want = "owners disagree on full digest"
 			}

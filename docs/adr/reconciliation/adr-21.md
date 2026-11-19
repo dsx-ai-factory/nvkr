@@ -83,17 +83,33 @@ Local contracts cover exact canonical round trips, malformed references, missing
 The loader does not render workflows or actions; complete closure checks remain with generation and runtime bootstrap.
 Packed inputs, CLI JSON and Tekton retain the canonical representation.
 The Plan schema and digest contracts are unchanged.
-The 2026-11-17 three-folder simplification preserves the exact reconstructed canonical bytes, three Plan Digests and 261 named Build Digests of the retained development, NVKE and nightly NVKE bundles at `b5109e62dbf95de245669fafd3e76968bd90ac9a`.
-The store contains 22 Plan records, 87 step records with inline component configurations and source pins,
-62 byte-identical scripts and one shared navigation index. Its only object folders are `plan`, `steps` and `scripts`.
-Across the store and three private bundle directories, the change reduces files from 441 to 236,
-nested directories from 218 to 187 and bytes from 3,460,553 to 2,977,305 (excluding workflows and local locks).
-The store itself grows from 2,166,150 to 2,668,669 bytes because configurations are inline;
-removing duplicated per-bundle indexes and reducing manifest membership saves 985,767 bytes elsewhere.
-Named object paths remain unchanged when neighboring bundles are added, removed or reordered;
-the shared index groups variants and records their full hashes and bundle users.
-One graph object contains the unchanged 941 nodes and 1,537 artifacts shared by all three bundles.
-Hosted execution of the simplified layout remains unrecorded.
+The v2 storage projection gives Plan and step records stable names, keeps script and catalog variants
+content-addressed, and moves runner placement, execution bindings, utility platform/container,
+publication prefix and the publication-bound inventory Build Digest into each bundle's targets record.
+Production and nightly selections share graph and output records. The original canonical Plan and
+all identities are reconstructed before admission; the descriptive index retains full file hashes,
+while each loader authenticates every loaded object against its own manifest.
+`TestPlanTreeEnvironmentProjectionPreservesIdentity` covers exact canonical and identity round trips
+across prefix, runner and utility-container differences. `TestPlanTreePrefixUpdateTouchesOnlyEnvironmentRecords`
+covers stable paths and limits a prefix edit to the root, Environment and targets records.
+`TestPlanStoreStableTamperAndSweep` covers altered/swapped stable objects and unreferenced-object sweeping.
+Coordinated writer contracts cover omitted-owner refusal, concurrent access and interrupted publication;
+`TestPlanStoreCoordinatedInterruptedPublication` proves mixed-state rejection and same-batch recovery.
+The maintained inventory driver and catalog-maintenance closure compile all selected owners before calling the coordinated writer.
+Catalog-refresh contracts retain runtime admission, qualification ownership conflicts and coded failures.
+A shared-record change must include all owners; a single-bundle runtime refresh obeys the same rule.
+The v1 tree reader remains available for migration. Hosted execution of the v2 layout remains unrecorded.
+
+Local regeneration on 2026-11-19 from main `61eb0ca7205fb23f277a9b74a3d9e9d3d83a7574`
+preserved the exact canonical bytes of the three maintained Plans (261 named builds and 251 outputs).
+The recursive store inventory, including its shared index and excluding sibling leases, changed from
+224 files / 135,124 lines / 5,519,266 bytes to 309 files / 134,054 lines / 5,270,763 bytes.
+Stable selection-scoped step records increase file count while sharing the production/nightly graph
+reduces bytes. Replaying only the production publication prefix from `candidate/gpu-site` to
+`nightly/gpu-site` changed five store lines (two index hashes, one Environment value and two targets
+values), plus one line each in the private Plan, producer manifest and qualification manifest.
+No workflow, graph, output, step or script bytes changed in that replay. The authored prefix was restored
+and the maintained bundles regenerated; this is local storage evidence, not hosted execution evidence.
 
 Invocation data is regenerated from the Plan and is not a bundle member;
 `TestGitHubActionDataIsTransientAndRetired` covers omission, prior-owned retirement and refusal of
@@ -106,7 +122,7 @@ exact command operands remain in the step record. Plan loads do not consult this
 shared job and bundle-user lookup, and separate object/navigation drift without adding a Plan-loader dependency.
 Bundle independence contracts cover damaged neighboring private Plans and workflows; each bundle checks its own job mapping.
 The maintained all-bundle check covers the complete navigation index. Legacy workflow retirement retains its owning manifest without admitting retired workflows into navigation.
-Runtime pin-refresh contracts retain exact executable programs while regenerating descriptive record links.
+Runtime pin-refresh contracts retain exact executable programs while regenerating descriptive record links; shared-record changes require all owning bundles in the write.
 `TestPlanStoreNamedPathGrammar` and `TestPlanStoreFullDigestDisagreementDoesNotPublish` directly cover the
 named-path predicate and both conflicting-full-digest refusal branches. These are local contracts;
 hosted execution of the navigation layout remains unrecorded.

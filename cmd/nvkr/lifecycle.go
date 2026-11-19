@@ -148,6 +148,16 @@ func cmdRunWithLocalExecutor(executeLocal localLifecycleExecutor) *cli.Command {
 			fmt.Printf("hosted Run %s: %s (%d observed outputs)\n", run.Attempt, run.Status, len(run.Observed))
 			return nil
 		}},
+		{Name: "generate-set", Hidden: true, Usage: "regenerate a coordinated maintained bundle inventory", Flags: []cli.Flag{
+			&cli.StringFlag{Name: "inventory", Required: true},
+			&cli.StringFlag{Name: "group"},
+			&cli.StringFlag{Name: "root", Value: "."},
+		}, Action: func(c *cli.Context) error {
+			if err := rejectUnusedArguments(c, "inventory"); err != nil {
+				return err
+			}
+			return qualification.GenerateInventory(c.Context, c.String("inventory"), c.String("group"), factoryGeneratorVersion(), c.String("root"))
+		}},
 		cmdRunPlan(),
 		cmdArtifactTestInputs(),
 		cmdRunGraph(),

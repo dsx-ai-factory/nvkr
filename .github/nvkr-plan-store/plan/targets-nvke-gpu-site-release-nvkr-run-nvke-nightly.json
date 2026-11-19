@@ -1,0 +1,3179 @@
+{
+  "nodes": {
+    "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "aicr-nvke-gb200-ubuntu-training-kubeflow-flux/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "aicr-nvke-gb200-ubuntu-training-kubeflow-flux/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "aicr-nvke-gb200-ubuntu-training-kubeflow-helm/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "aicr-nvke-gb200-ubuntu-training-kubeflow-helm/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-aicr-inventory": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-capi-controller-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-capi-controller-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-capi-kubeadm-bootstrap-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-capi-kubeadm-bootstrap-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-capi-kubeadm-control-plane-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-capi-kubeadm-control-plane-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-capnico-controller": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-cert-manager-cainjector-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-cert-manager-cainjector-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-cert-manager-controller-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-cert-manager-controller-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-cert-manager-webhook-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-cert-manager-webhook-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-cluster-api-provider-provisioned": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-controller-chart": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-controller-profiles": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-csi-node-driver-registrar-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-csi-node-driver-registrar-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-local-path-helper-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-local-path-helper-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-local-path-provisioner": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-local-path-provisioner-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-local-path-provisioner-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-local-path-provisioner-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-collector-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-collector-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-kube-state-metrics-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-kube-state-metrics-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-kubectl-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-kubectl-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-lgtm-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-lgtm-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-metrics-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-metrics-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-node-exporter-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-node-exporter-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-operator-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-operator-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-target-allocator-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nktp-target-allocator-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nvke-controller": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nvke-node-fde-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nvke-node-fde-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nvke-node-fde-ubuntu24-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nvke-node-fde-ubuntu24-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nvke-node-image-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nvke-node-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nvke-node-image-ubuntu24-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nvke-node-image-ubuntu24-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nvkectl": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-nvkectl-linux-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-operator-tools": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-operator-tools-linux-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-postgresql": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-postgresql-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-postgresql-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spiffe-csi-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spiffe-csi-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-agent-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-agent-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-bash-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-bash-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-controller-manager-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-controller-manager-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-crds": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-oidc-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-oidc-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-tpm-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-spire-tpm-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-temporal": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-temporal-admin-tools-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-temporal-admin-tools-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-temporal-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-temporal-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-temporal-ui-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "attest-sboms/output-temporal-ui-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "capi-controller-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capi-controller-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capi-controller-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capi-controller-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capi-kubeadm-bootstrap-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capi-kubeadm-bootstrap-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capi-kubeadm-bootstrap-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capi-kubeadm-bootstrap-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capi-kubeadm-control-plane-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capi-kubeadm-control-plane-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capi-kubeadm-control-plane-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capi-kubeadm-control-plane-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capnico-controller/linux/amd64/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capnico-controller/linux/amd64/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capnico-controller/linux/arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "capnico-controller/linux/arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cert-manager-cainjector-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cert-manager-cainjector-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cert-manager-cainjector-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cert-manager-cainjector-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cert-manager-controller-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cert-manager-controller-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cert-manager-controller-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cert-manager-controller-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cert-manager-webhook-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cert-manager-webhook-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cert-manager-webhook-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cert-manager-webhook-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cluster-api-provider-provisioned/linux/amd64/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cluster-api-provider-provisioned/linux/amd64/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cluster-api-provider-provisioned/linux/arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "cluster-api-provider-provisioned/linux/arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "controller-chart/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "controller-chart/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "controller-profiles/linux/amd64/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "controller-profiles/linux/amd64/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "controller-profiles/linux/arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "controller-profiles/linux/arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "csi-node-driver-registrar-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "csi-node-driver-registrar-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "csi-node-driver-registrar-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "csi-node-driver-registrar-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "local-path-helper-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "local-path-helper-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "local-path-helper-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "local-path-helper-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "local-path-provisioner-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "local-path-provisioner-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "local-path-provisioner-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "local-path-provisioner-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "local-path-provisioner-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "local-path-provisioner-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "local-path-provisioner/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "local-path-provisioner/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-collector-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-collector-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-collector-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-collector-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-kube-state-metrics-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-kube-state-metrics-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-kube-state-metrics-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-kube-state-metrics-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-kubectl-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-kubectl-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-kubectl-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-kubectl-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-lgtm-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-lgtm-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-lgtm-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-lgtm-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-metrics-server-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-metrics-server-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-metrics-server-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-metrics-server-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-node-exporter-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-node-exporter-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-node-exporter-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-node-exporter-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-operator-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-operator-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-operator-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-operator-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-target-allocator-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-target-allocator-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-target-allocator-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp-target-allocator-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nktp/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-controller/linux/amd64/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-controller/linux/amd64/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-controller/linux/arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-controller/linux/arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-fde-amd64/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-fde-amd64/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-fde-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-fde-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-fde-ubuntu24-amd64/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-fde-ubuntu24-amd64/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-fde-ubuntu24-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-fde-ubuntu24-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-image-amd64/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-image-amd64/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-image-ubuntu24-amd64/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-image-ubuntu24-amd64/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-image-ubuntu24-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvke-node-image-ubuntu24-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvkectl-linux-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvkectl-linux-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvkectl/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "nvkectl/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "operator-tools-linux-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "operator-tools-linux-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "operator-tools/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "operator-tools/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/aicr-inventory": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/aicr-nvke-gb200-ubuntu-training-kubeflow-flux": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/aicr-nvke-gb200-ubuntu-training-kubeflow-helm": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/capi-controller-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/capi-controller-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/capi-kubeadm-bootstrap-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/capi-kubeadm-bootstrap-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/capi-kubeadm-control-plane-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/capi-kubeadm-control-plane-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/capnico-controller": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/cert-manager-cainjector-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/cert-manager-cainjector-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/cert-manager-controller-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/cert-manager-controller-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/cert-manager-webhook-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/cert-manager-webhook-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/cluster-api-provider-provisioned": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/controller-chart": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/controller-profiles": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/csi-node-driver-registrar-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/csi-node-driver-registrar-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/local-path-helper-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/local-path-helper-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/local-path-provisioner": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/local-path-provisioner-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/local-path-provisioner-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/local-path-provisioner-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-collector-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-collector-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-kube-state-metrics-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-kube-state-metrics-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-kubectl-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-kubectl-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-lgtm-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-lgtm-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-metrics-server-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-metrics-server-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-node-exporter-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-node-exporter-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-operator-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-operator-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-target-allocator-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nktp-target-allocator-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nvke-controller": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nvke-node-fde-amd64": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nvke-node-fde-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nvke-node-fde-ubuntu24-amd64": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nvke-node-fde-ubuntu24-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nvke-node-image-amd64": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nvke-node-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nvke-node-image-ubuntu24-amd64": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nvke-node-image-ubuntu24-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nvkectl": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/nvkectl-linux-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/operator-tools": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/operator-tools-linux-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/postgresql": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/postgresql-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/postgresql-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-aicr-inventory": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-aicr-nvke-gb200-ubuntu-training-kubeflow-flux": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-aicr-nvke-gb200-ubuntu-training-kubeflow-helm": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-capi-controller-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-capi-controller-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-capi-kubeadm-bootstrap-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-capi-kubeadm-bootstrap-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-capi-kubeadm-control-plane-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-capi-kubeadm-control-plane-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-capnico-controller": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-cert-manager-cainjector-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-cert-manager-cainjector-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-cert-manager-controller-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-cert-manager-controller-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-cert-manager-webhook-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-cert-manager-webhook-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-cluster-api-provider-provisioned": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-controller-chart": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-controller-profiles": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-csi-node-driver-registrar-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-csi-node-driver-registrar-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-local-path-helper-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-local-path-helper-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-local-path-provisioner": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-local-path-provisioner-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-local-path-provisioner-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-local-path-provisioner-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-collector-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-collector-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-kube-state-metrics-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-kube-state-metrics-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-kubectl-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-kubectl-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-lgtm-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-lgtm-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-metrics-server-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-metrics-server-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-node-exporter-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-node-exporter-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-operator-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-operator-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-target-allocator-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nktp-target-allocator-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nvke-controller": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nvke-node-fde-amd64": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nvke-node-fde-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nvke-node-fde-ubuntu24-amd64": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nvke-node-fde-ubuntu24-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nvke-node-image-amd64": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nvke-node-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nvke-node-image-ubuntu24-amd64": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nvke-node-image-ubuntu24-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nvkectl": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-nvkectl-linux-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-operator-tools": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-operator-tools-linux-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-postgresql": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-postgresql-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-postgresql-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spiffe-csi-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spiffe-csi-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-agent-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-agent-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-bash-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-bash-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-controller-manager-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-controller-manager-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-crds": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-oidc-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-oidc-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-server-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-server-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-tpm-server-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-spire-tpm-server-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-temporal": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-temporal-admin-tools-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-temporal-admin-tools-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-temporal-server-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-temporal-server-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-temporal-ui-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/publication-temporal-ui-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/release": {
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spiffe-csi-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spiffe-csi-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-agent-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-agent-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-bash-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-bash-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-controller-manager-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-controller-manager-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-crds": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-oidc-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-oidc-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-server-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-server-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-tpm-server-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/spire-tpm-server-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/temporal": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/temporal-admin-tools-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/temporal-admin-tools-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/temporal-server-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/temporal-server-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/temporal-ui-image": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "package/temporal-ui-image-arm64": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "postgresql-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "postgresql-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "postgresql-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "postgresql-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "postgresql/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "postgresql/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-aicr-inventory": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-capi-controller-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-capi-controller-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-capi-kubeadm-bootstrap-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-capi-kubeadm-bootstrap-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-capi-kubeadm-control-plane-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-capi-kubeadm-control-plane-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-capnico-controller": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-cert-manager-cainjector-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-cert-manager-cainjector-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-cert-manager-controller-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-cert-manager-controller-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-cert-manager-webhook-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-cert-manager-webhook-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-cluster-api-provider-provisioned": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-controller-chart": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-controller-profiles": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-csi-node-driver-registrar-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-csi-node-driver-registrar-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-local-path-helper-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-local-path-helper-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-local-path-provisioner": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-local-path-provisioner-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-local-path-provisioner-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-local-path-provisioner-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-collector-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-collector-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-kube-state-metrics-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-kube-state-metrics-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-kubectl-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-kubectl-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-lgtm-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-lgtm-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-metrics-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-metrics-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-node-exporter-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-node-exporter-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-operator-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-operator-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-target-allocator-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nktp-target-allocator-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nvke-controller": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nvke-node-fde-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nvke-node-fde-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nvke-node-fde-ubuntu24-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nvke-node-fde-ubuntu24-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nvke-node-image-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nvke-node-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nvke-node-image-ubuntu24-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nvke-node-image-ubuntu24-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nvkectl": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-nvkectl-linux-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-operator-tools": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-operator-tools-linux-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-postgresql": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-postgresql-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-postgresql-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spiffe-csi-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spiffe-csi-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-agent-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-agent-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-bash-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-bash-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-controller-manager-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-controller-manager-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-crds": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-oidc-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-oidc-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-tpm-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-spire-tpm-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-temporal": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-temporal-admin-tools-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-temporal-admin-tools-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-temporal-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-temporal-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-temporal-ui-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/output-temporal-ui-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "publish/release": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-aicr-inventory": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-capi-controller-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-capi-controller-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-capi-kubeadm-bootstrap-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-capi-kubeadm-bootstrap-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-capi-kubeadm-control-plane-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-capi-kubeadm-control-plane-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-capnico-controller": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-cert-manager-cainjector-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-cert-manager-cainjector-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-cert-manager-controller-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-cert-manager-controller-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-cert-manager-webhook-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-cert-manager-webhook-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-cluster-api-provider-provisioned": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-controller-chart": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-controller-profiles": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-csi-node-driver-registrar-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-csi-node-driver-registrar-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-local-path-helper-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-local-path-helper-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-local-path-provisioner": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-local-path-provisioner-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-local-path-provisioner-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-local-path-provisioner-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-collector-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-collector-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-kube-state-metrics-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-kube-state-metrics-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-kubectl-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-kubectl-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-lgtm-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-lgtm-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-metrics-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-metrics-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-node-exporter-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-node-exporter-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-operator-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-operator-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-target-allocator-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nktp-target-allocator-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nvke-controller": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nvke-node-fde-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nvke-node-fde-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nvke-node-fde-ubuntu24-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nvke-node-fde-ubuntu24-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nvke-node-image-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nvke-node-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nvke-node-image-ubuntu24-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nvke-node-image-ubuntu24-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nvkectl": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-nvkectl-linux-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-operator-tools": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-operator-tools-linux-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-postgresql": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-postgresql-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-postgresql-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spiffe-csi-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spiffe-csi-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-agent-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-agent-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-bash-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-bash-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-controller-manager-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-controller-manager-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-crds": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-oidc-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-oidc-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-tpm-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-spire-tpm-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-temporal": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-temporal-admin-tools-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-temporal-admin-tools-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-temporal-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-temporal-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-temporal-ui-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/output-temporal-ui-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "sign/release": {
+      "runsOn": "ubuntu-latest"
+    },
+    "spiffe-csi-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spiffe-csi-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spiffe-csi-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spiffe-csi-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-agent-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-agent-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-agent-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-agent-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-bash-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-bash-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-bash-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-bash-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-controller-manager-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-controller-manager-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-controller-manager-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-controller-manager-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-crds/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-crds/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-oidc-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-oidc-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-oidc-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-oidc-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-server-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-server-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-server-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-server-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-tpm-server-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-tpm-server-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-tpm-server-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire-tpm-server-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "spire/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal-admin-tools-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal-admin-tools-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal-admin-tools-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal-admin-tools-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal-server-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal-server-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal-server-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal-server-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal-ui-image-arm64/sbom": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal-ui-image-arm64/terminal-observe": {
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal-ui-image/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal-ui-image/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal/sbom": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "temporal/terminal-observe": {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "tool/cosign-module-tags": {
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "tool/syft-module-tags": {
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    "tool/syft-module-tags/linux/arm64": {
+      "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-aicr-inventory": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-capi-controller-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-capi-controller-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-capi-kubeadm-bootstrap-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-capi-kubeadm-bootstrap-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-capi-kubeadm-control-plane-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-capi-kubeadm-control-plane-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-capnico-controller": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-cert-manager-cainjector-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-cert-manager-cainjector-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-cert-manager-controller-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-cert-manager-controller-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-cert-manager-webhook-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-cert-manager-webhook-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-cluster-api-provider-provisioned": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-controller-chart": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-controller-profiles": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-csi-node-driver-registrar-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-csi-node-driver-registrar-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-local-path-helper-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-local-path-helper-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-local-path-provisioner": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-local-path-provisioner-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-local-path-provisioner-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-local-path-provisioner-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-collector-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-collector-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-kube-state-metrics-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-kube-state-metrics-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-kubectl-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-kubectl-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-lgtm-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-lgtm-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-metrics-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-metrics-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-node-exporter-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-node-exporter-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-operator-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-operator-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-target-allocator-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nktp-target-allocator-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nvke-controller": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nvke-node-fde-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nvke-node-fde-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nvke-node-fde-ubuntu24-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nvke-node-fde-ubuntu24-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nvke-node-image-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nvke-node-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nvke-node-image-ubuntu24-amd64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nvke-node-image-ubuntu24-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nvkectl": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-nvkectl-linux-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-operator-tools": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-operator-tools-linux-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-postgresql": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-postgresql-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-postgresql-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spiffe-csi-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spiffe-csi-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-agent-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-agent-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-bash-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-bash-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-controller-manager-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-controller-manager-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-crds": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-oidc-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-oidc-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-tpm-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-spire-tpm-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-temporal": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-temporal-admin-tools-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-temporal-admin-tools-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-temporal-server-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-temporal-server-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-temporal-ui-image": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/output-temporal-ui-image-arm64": {
+      "runsOn": "ubuntu-latest"
+    },
+    "verify-publication/release": {
+      "runsOn": "ubuntu-latest"
+    }
+  },
+  "outputs": {
+    "aicr-inventory": {
+      "buildDigest": "sha256:85830e79660a0bd4e1a2a1e824378ef6bb2ba163707b4ae84002b347741bb65a"
+    }
+  },
+  "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site",
+  "targets": {
+    "output-aicr-inventory": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-aicr-inventory"
+    },
+    "output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
+    },
+    "output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-aicr-nvke-gb200-ubuntu-training-kubeflow-flux"
+    },
+    "output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-aicr-nvke-gb200-ubuntu-training-kubeflow-helm"
+    },
+    "output-capi-controller-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-capi-controller-image"
+    },
+    "output-capi-controller-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-capi-controller-image-arm64"
+    },
+    "output-capi-kubeadm-bootstrap-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-capi-kubeadm-bootstrap-image"
+    },
+    "output-capi-kubeadm-bootstrap-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-capi-kubeadm-bootstrap-image-arm64"
+    },
+    "output-capi-kubeadm-control-plane-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-capi-kubeadm-control-plane-image"
+    },
+    "output-capi-kubeadm-control-plane-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-capi-kubeadm-control-plane-image-arm64"
+    },
+    "output-capnico-controller": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-capnico-controller"
+    },
+    "output-cert-manager-cainjector-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-cert-manager-cainjector-image"
+    },
+    "output-cert-manager-cainjector-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-cert-manager-cainjector-image-arm64"
+    },
+    "output-cert-manager-controller-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-cert-manager-controller-image"
+    },
+    "output-cert-manager-controller-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-cert-manager-controller-image-arm64"
+    },
+    "output-cert-manager-webhook-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-cert-manager-webhook-image"
+    },
+    "output-cert-manager-webhook-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-cert-manager-webhook-image-arm64"
+    },
+    "output-cluster-api-provider-provisioned": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-cluster-api-provider-provisioned"
+    },
+    "output-controller-chart": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-controller-chart"
+    },
+    "output-controller-profiles": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-controller-profiles"
+    },
+    "output-csi-node-driver-registrar-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-csi-node-driver-registrar-image"
+    },
+    "output-csi-node-driver-registrar-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-csi-node-driver-registrar-image-arm64"
+    },
+    "output-local-path-helper-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-local-path-helper-image"
+    },
+    "output-local-path-helper-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-local-path-helper-image-arm64"
+    },
+    "output-local-path-provisioner": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-local-path-provisioner"
+    },
+    "output-local-path-provisioner-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-local-path-provisioner-arm64"
+    },
+    "output-local-path-provisioner-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-local-path-provisioner-image"
+    },
+    "output-local-path-provisioner-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-local-path-provisioner-image-arm64"
+    },
+    "output-nktp": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp"
+    },
+    "output-nktp-collector-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-collector-image"
+    },
+    "output-nktp-collector-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-collector-image-arm64"
+    },
+    "output-nktp-kube-state-metrics-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-kube-state-metrics-image"
+    },
+    "output-nktp-kube-state-metrics-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-kube-state-metrics-image-arm64"
+    },
+    "output-nktp-kubectl-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-kubectl-image"
+    },
+    "output-nktp-kubectl-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-kubectl-image-arm64"
+    },
+    "output-nktp-lgtm-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-lgtm-image"
+    },
+    "output-nktp-lgtm-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-lgtm-image-arm64"
+    },
+    "output-nktp-metrics-server-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-metrics-server-image"
+    },
+    "output-nktp-metrics-server-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-metrics-server-image-arm64"
+    },
+    "output-nktp-node-exporter-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-node-exporter-image"
+    },
+    "output-nktp-node-exporter-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-node-exporter-image-arm64"
+    },
+    "output-nktp-operator-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-operator-image"
+    },
+    "output-nktp-operator-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-operator-image-arm64"
+    },
+    "output-nktp-target-allocator-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-target-allocator-image"
+    },
+    "output-nktp-target-allocator-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nktp-target-allocator-image-arm64"
+    },
+    "output-nvke-controller": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nvke-controller"
+    },
+    "output-nvke-node-fde-amd64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nvke-node-fde-amd64"
+    },
+    "output-nvke-node-fde-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nvke-node-fde-arm64"
+    },
+    "output-nvke-node-fde-ubuntu24-amd64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nvke-node-fde-ubuntu24-amd64"
+    },
+    "output-nvke-node-fde-ubuntu24-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nvke-node-fde-ubuntu24-arm64"
+    },
+    "output-nvke-node-image-amd64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nvke-node-image-amd64"
+    },
+    "output-nvke-node-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nvke-node-image-arm64"
+    },
+    "output-nvke-node-image-ubuntu24-amd64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nvke-node-image-ubuntu24-amd64"
+    },
+    "output-nvke-node-image-ubuntu24-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nvke-node-image-ubuntu24-arm64"
+    },
+    "output-nvkectl": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nvkectl"
+    },
+    "output-nvkectl-linux-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-nvkectl-linux-arm64"
+    },
+    "output-operator-tools": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-operator-tools"
+    },
+    "output-operator-tools-linux-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-operator-tools-linux-arm64"
+    },
+    "output-postgresql": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-postgresql"
+    },
+    "output-postgresql-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-postgresql-image"
+    },
+    "output-postgresql-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-postgresql-image-arm64"
+    },
+    "output-spiffe-csi-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spiffe-csi-image"
+    },
+    "output-spiffe-csi-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spiffe-csi-image-arm64"
+    },
+    "output-spire": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire"
+    },
+    "output-spire-agent-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-agent-image"
+    },
+    "output-spire-agent-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-agent-image-arm64"
+    },
+    "output-spire-bash-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-bash-image"
+    },
+    "output-spire-bash-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-bash-image-arm64"
+    },
+    "output-spire-controller-manager-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-controller-manager-image"
+    },
+    "output-spire-controller-manager-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-controller-manager-image-arm64"
+    },
+    "output-spire-crds": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-crds"
+    },
+    "output-spire-oidc-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-oidc-image"
+    },
+    "output-spire-oidc-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-oidc-image-arm64"
+    },
+    "output-spire-server-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-server-image"
+    },
+    "output-spire-server-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-server-image-arm64"
+    },
+    "output-spire-tpm-server-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-tpm-server-image"
+    },
+    "output-spire-tpm-server-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-spire-tpm-server-image-arm64"
+    },
+    "output-temporal": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-temporal"
+    },
+    "output-temporal-admin-tools-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-temporal-admin-tools-image"
+    },
+    "output-temporal-admin-tools-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-temporal-admin-tools-image-arm64"
+    },
+    "output-temporal-server-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-temporal-server-image"
+    },
+    "output-temporal-server-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-temporal-server-image-arm64"
+    },
+    "output-temporal-ui-image": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-temporal-ui-image"
+    },
+    "output-temporal-ui-image-arm64": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases-temporal-ui-image-arm64"
+    },
+    "release": {
+      "credentialRef": "github:NVKR_REGISTRY_WRITE",
+      "kind": "oci",
+      "repositorySuffix": "releases"
+    }
+  }
+}

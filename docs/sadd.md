@@ -791,7 +791,7 @@ within one complete Plan, finalizer, Run and Release.
 GitHub stores the complete Plan as a per-bundle index into shared frozen records and byte-exact
 command files. [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold)
 owns storage and admission. Loading reconstructs the same canonical Plan before execution;
-Plan and Build identity are unchanged. Runtime carriers and Tekton retain the packed canonical
+Plan and Build identity are unchanged. Stable Plan-record names bind exact bytes through each owning manifest; environment bindings are stored separately in each bundle's targets record. Shared-record updates require coordinated regeneration of all owners. Runtime carriers and Tekton retain the packed canonical
 form; helper consumers stage that form and let the generation owner reconstruct the GitHub bundle.
 [ADR-18 §8](adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
 owns the grouping, the jobs that stay in the entry workflow, result forwarding and the proposed signer

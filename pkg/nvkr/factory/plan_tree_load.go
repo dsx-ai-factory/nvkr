@@ -26,7 +26,8 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 	if err := decodeTreeJSON(files[planPath], &root); err != nil {
 		return nil, nil, err
 	}
-	if string(root["storage"]) != `"`+planTreeStorage+`"` {
+	legacy := string(root["storage"]) == `"`+legacyPlanTreeStorage+`"`
+	if !legacy && string(root["storage"]) != `"`+planTreeStorage+`"` {
 		return nil, nil, e.New(e.CodePipelineDrift, "unknown Plan storage format")
 	}
 	delete(root, "storage")
@@ -59,6 +60,11 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 				return nil, nil, e.New(e.CodePipelineDrift, "Plan fields exceed decoded size bound")
 			}
 			root[field] = value
+		}
+	}
+	if !legacy {
+		if err := joinTreeEnvironment(root); err != nil {
+			return nil, nil, err
 		}
 	}
 	restoreCatalog := func(record planFields) error {
@@ -164,7 +170,7 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 	if err := plan.Validate(); err != nil {
 		return nil, nil, err
 	}
-	want, err := renderPlanTree(ctx, &plan, planPath)
+	want, err := renderPlanTreeFormat(ctx, &plan, planPath, legacy)
 	if err != nil {
 		return nil, nil, err
 	}
