@@ -60,6 +60,7 @@ func TestMaintainedGeneration(t *testing.T) {
 		want         string
 	}{
 		{"generate", "", nil, 0, "--root\n.\n"},
+		{"stdin-reading generator", "stdin", []string{"--check"}, 0, "--check\n"},
 		{"check runtime", "runtime", []string{"--check", "--projection-pilot", "in-process"}, 0, "--check\n--runtime\n"},
 		{"pilot", "", []string{"--check", "--projection-pilot", "in-process"}, 0, "--check\n--projection-pilot\nin-process\n"},
 		{"policy", "policy", nil, 0, "--qualification-policy\npolicy.yaml\n"},
@@ -90,6 +91,10 @@ func TestMaintainedGeneration(t *testing.T) {
 			entry := map[string]any{"bundle": "nvkr-run", "group": "main", "definition": "definition.yaml", "environment": "environment.yaml"}
 			entries := []map[string]any{entry}
 			switch tc.change {
+			case "stdin":
+				for _, bundle := range []string{"nvkr-two", "nvkr-z"} {
+					entries = append(entries, map[string]any{"bundle": bundle, "group": "main", "definition": "definition.yaml", "environment": "environment.yaml"})
+				}
 			case "runtime":
 				entry["runtime"] = true
 			case "bundle newline":
@@ -134,6 +139,9 @@ func TestMaintainedGeneration(t *testing.T) {
 				swapWrite(t, filepath.Join(root, p), "fixture")
 			}
 			stub := "#!/bin/sh\nprintf '%s\\n' \"$@\" >> calls\n"
+			if tc.change == "stdin" {
+				stub += "cat >/dev/null\n"
+			}
 			if tc.change == "child error" {
 				stub += "exit 17\n"
 			}
@@ -147,6 +155,9 @@ func TestMaintainedGeneration(t *testing.T) {
 				t.Fatalf("missing coded error: %s", out)
 			}
 			calls, _ := os.ReadFile(filepath.Join(root, "calls"))
+			if tc.change == "stdin" && strings.Count(string(calls), "--check\n") != 3 {
+				t.Fatalf("stdin-reading child skipped bundles: %s", calls)
+			}
 			if tc.want == "" && len(calls) != 0 {
 				t.Fatalf("unexpected generator call: %s", calls)
 			}
