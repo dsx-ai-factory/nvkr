@@ -75,7 +75,7 @@ provisioning network or retention policy is configured here.
 
 The MachineImage formatting candidate belongs to the NVKE catalog under
 `inputs/catalogs/nvke/machineimage/`, not NVKR Go. A small script and maintained template consume generic
-boot descriptions and proposed disk metadata, read the CRD from an exact supplied NVKE Git commit, and
+boot descriptions and proposed disk metadata, read the CRD from the catalog's locked `nvke-controller` Git commit, and
 validate all rendered documents against its served OpenAPI schema before output. No CRD is vendored.
 Standalone Python contracts exercise both architectures, complete pair ordering, schema rejection,
 selection/metadata checks, literal URLs and no partial output. They require pinned NVKE source and the

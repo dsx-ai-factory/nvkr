@@ -46,7 +46,9 @@ class RendererTests(unittest.TestCase):
                                 template if template is not None else self.template)
 
     def test_both_architectures_and_downstream_placeholders(self):
-        documents = list(yaml.safe_load_all(self.render()))
+        rendered = self.render()
+        self.assertIn("{{ .DiskSelectionStrategy }}", rendered)
+        documents = list(yaml.safe_load_all(rendered))
         self.assertEqual(len(documents), 2)
         for document in documents:
             arch = document["spec"]["architecture"]
@@ -111,10 +113,10 @@ class RendererTests(unittest.TestCase):
         self.assertEqual(candidate.literal_url("https://[2001:db8::1]/image"), "https://[2001:db8::1]/image")
 
     def test_exact_source_pin_required(self):
-        with self.assertRaises(ValueError):
-            candidate.load_crd(SOURCE, "main")
-        with self.assertRaises(subprocess.CalledProcessError):
-            candidate.load_crd(SOURCE, "0" * 40)
+        candidate.load_crd(SOURCE)
+        for pin in ("main", "0" * 40, "28b9e338c1d08a4a0427b7c6d79c8174358ad991"):
+            with self.subTest(pin=pin), self.assertRaisesRegex(candidate.CandidateError, "differs from the catalog"):
+                candidate.load_crd(SOURCE, pin)
 
     def test_changed_exact_bytes_change_candidate_name(self):
         baseline = list(yaml.safe_load_all(self.render()))[0]["metadata"]["name"]
@@ -137,6 +139,14 @@ class RendererTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertEqual(result.stdout, b"")
             self.assertIn(b"verify-failed", result.stderr)
+            publication["assets"].pop()
+            (root / "publication.json").write_text(json.dumps(publication))
+            result = subprocess.run([sys.executable, str(candidate.HERE / "render_candidate.py"),
+                                     "--nvke-source", str(SOURCE), "--publication", str(root / "publication.json"),
+                                     "--metadata", str(root / "metadata.json")], capture_output=True, timeout=30)
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(result.stdout, b"")
+            self.assertIn(b"missing selected asset", result.stderr)
 
 
 if __name__ == "__main__":

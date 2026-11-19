@@ -1,7 +1,7 @@
 # NVKE MachineImage catalog candidate
 
 `render_candidate.py` renders the maintained `machineimage.yaml.tmpl` and checks each
-result against the MachineImage CRD from an explicitly pinned NVKE source commit.
+result against the MachineImage CRD from the catalog's pinned NVKE controller source commit.
 This is an offline catalog experiment, not an NVKR Go capability or a registered
 producer. No Definition or generated workflow invokes it. Production rendering,
 signing, import and registration remain disabled/unimplemented.
@@ -15,17 +15,18 @@ python3 -m venv "$candidate_venv"
 "$candidate_venv/bin/python" -m pip install -r requirements.txt
 "$candidate_venv/bin/python" render_candidate.py \
   --nvke-source /path/to/nvke-git-repository \
-  --nvke-commit 28b9e338c1d08a4a0427b7c6d79c8174358ad991 \
+  --nvke-commit 2cfd00081b468d85a4894ec17e9deac13c9d8169 \
   --publication /path/to/primary-boot-description.json \
   --metadata /path/to/proposed-disk-metadata.json > candidate.yaml
 ```
 
-The source can be a normal or bare Git repository containing that commit. The script
-reads `controller/deploy/charts/nvke-crds/bases/internal.nvke.nvidia.com_machineimages.yaml`
-using `git show <commit>:<path>`; it never uses a dirty working-tree copy, fetches a
-revision or vendors the CRD. Select the exact NVKE source pin independently of the
-publication input. The example is a known CRD-bearing commit, not a change to the
-catalog's maintained controller pin. A source pin without the CRD fails closed.
+The source can be a normal or bare Git repository containing the `nvke-controller`
+commit in the adjacent `../pins.lock.yaml` (currently NVKE v0.23.0 at `2cfd0008`).
+The script always reads that catalog pin; optional `--nvke-commit` must match it.
+It reads `management-engine/config/crd/bases/internal.nvke.nvidia.com_machineimages.yaml`
+using `git --no-replace-objects cat-file blob '<pin>^{commit}:<path>'`, which requires
+an actual commit and ignores replacement objects. It never uses a dirty working-tree
+copy, fetches a revision or vendors the CRD. A missing commit or CRD fails closed.
 
 Repeat `--publication` for each destination. Each input is the JSON description from
 the generic `PreparedBootAssets.Description` or `SelectedBootReceipt.Description`
@@ -67,9 +68,12 @@ Run the focused contracts against that same source without a vendored schema:
 ```sh
 PYTHONDONTWRITEBYTECODE=1 "$candidate_venv/bin/python" test_render_candidate.py \
   --nvke-source /path/to/nvke-git-repository \
-  --nvke-commit 28b9e338c1d08a4a0427b7c6d79c8174358ad991
+  --nvke-commit 2cfd00081b468d85a4894ec17e9deac13c9d8169
 ```
 
 These standalone tests require the supplied source and Python dependencies; the
 repository's default Go suite does not run them. This directory is not referenced
 by a producer, so changing it does not change existing Plan or Build Digests.
+
+Dependency follow-up: lock transitive Python dependencies and distribution hashes before
+producer/toolchain admission. `requirements.txt` currently pins only the direct packages.

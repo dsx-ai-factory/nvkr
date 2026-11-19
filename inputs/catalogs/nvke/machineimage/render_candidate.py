@@ -18,15 +18,19 @@ from jsonschema import Draft4Validator, FormatChecker
 
 
 HERE = Path(__file__).resolve().parent
-CRD_PATH = "controller/deploy/charts/nvke-crds/bases/internal.nvke.nvidia.com_machineimages.yaml"
+CRD_PATH = "management-engine/config/crd/bases/internal.nvke.nvidia.com_machineimages.yaml"
 DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 NAME = re.compile(r"[a-z0-9](?:[-a-z0-9]*[a-z0-9])?\Z")
 LIMIT = 4 * 1024 * 1024
 
 
+class CandidateError(ValueError):
+    """A fixed diagnostic that contains no caller-provided values."""
+
+
 def require(condition, message):
     if not condition:
-        raise ValueError(message)
+        raise CandidateError(message)
 
 
 def read(path):
@@ -48,11 +52,13 @@ def read_json(path):
     return json.loads(read(path), object_pairs_hook=unique_object)
 
 
-def load_crd(source, pin):
+def load_crd(source, pin=None):
     """Read the committed blob, never a dirty working-tree CRD or network URL."""
-    require(isinstance(pin, str) and re.fullmatch(r"[0-9a-f]{40}", pin), "NVKE source must be commit-pinned")
+    catalog_pin = yaml.safe_load(read(HERE.parent / "pins.lock.yaml"))["pins"]["nvke-controller"]["commit"]
+    require(isinstance(catalog_pin, str) and re.fullmatch(r"[0-9a-f]{40}", catalog_pin), "catalog NVKE source must be commit-pinned")
+    require(pin is None or pin == catalog_pin, "NVKE commit differs from the catalog controller pin")
     result = subprocess.run(
-        ["git", "-C", str(source), "show", f"{pin}:{CRD_PATH}"],
+        ["git", "--no-replace-objects", "-C", str(source), "cat-file", "blob", f"{catalog_pin}^{{commit}}:{CRD_PATH}"],
         capture_output=True, check=True, timeout=30,
     )
     require(len(result.stdout) <= LIMIT, "CRD exceeds 4 MiB")
@@ -161,7 +167,7 @@ def render(publications, metadata, validator, template):
             require(script.startswith("#!ipxe\n") and script.count("{{") == script.count("}}") and
                     len(script.splitlines()) > 1, "invalid iPXE template")
             # Exact byte fingerprint for a candidate name, not a Build/Release identity.
-            raw = yaml.safe_dump(document, sort_keys=True).encode()
+            raw = yaml.safe_dump(document, sort_keys=True, width=float("inf")).encode()
             name = "mi-" + base64.b32encode(hashlib.sha256(raw).digest()).decode().lower().rstrip("=")
             document["metadata"]["name"] = name
             validator.validate(document)
@@ -170,13 +176,13 @@ def render(publications, metadata, validator, template):
             names.add(name)
             documents[pair] = document
     require(used == meta.keys(), "unused disk metadata")
-    return yaml.safe_dump_all([documents[k] for k in sorted(documents)], sort_keys=True)
+    return yaml.safe_dump_all([documents[k] for k in sorted(documents)], sort_keys=True, width=float("inf"))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--nvke-source", required=True, type=Path, help="local NVKE Git object repository; no fetch is performed")
-    parser.add_argument("--nvke-commit", required=True, help="independently chosen exact NVKE source commit (40 lowercase hex digits)")
+    parser.add_argument("--nvke-commit", help="optional assertion; must equal pins.lock.yaml's nvke-controller commit")
     parser.add_argument("--publication", action="append", required=True, type=Path, help="generic PreparedBootDescription/SelectedBootDescription JSON, one per destination")
     parser.add_argument("--metadata", required=True, type=Path, help="proposed disk metadata JSON array; not authenticated")
     args = parser.parse_args()
@@ -184,6 +190,9 @@ def main():
         validator = load_crd(args.nvke_source, args.nvke_commit)
         output = render([read_json(p) for p in args.publication], read_json(args.metadata), validator,
                         read(HERE / "machineimage.yaml.tmpl"))
+    except CandidateError as exc:
+        print(f"verify-failed: {exc}", file=sys.stderr)
+        return 1
     except (ValueError, KeyError, TypeError, AttributeError, OSError, subprocess.SubprocessError, yaml.YAMLError) as exc:
         print(f"verify-failed: catalog candidate rejected ({type(exc).__name__})", file=sys.stderr)
         return 1

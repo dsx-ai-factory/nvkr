@@ -348,7 +348,7 @@ NVKR Go remains independent of downstream CRDs and rendering conventions. The NV
 its MachineImage candidate as a small script and maintained template under
 `inputs/catalogs/nvke/machineimage/`. It consumes generic preliminary or selected boot descriptions
 (named disk/platform raw digests, imager members/profiles and destination URLs), with separately supplied
-proposed disk metadata. It reads the CRD directly from an independently chosen exact NVKE source commit;
+proposed disk metadata. It reads the CRD directly from the catalog's locked `nvke-controller` source commit;
 no CRD is vendored and no floating or dirty-working-tree schema is used. Rendering validates the complete
 set against that source's served OpenAPI schema before emitting any manifests. Local JSON Schema checks
 are not Kubernetes CEL/admission or boot evidence.
@@ -438,7 +438,9 @@ reservations.
 2. Copy raw QCOW2/EFI to immutable keys; fully hash/size-check pinned S3 readback and declared HTTPS responses.
    Issue a live preliminary receipt bound to output/member, inputs/invocations, policy, bytes, destination pins and mapping.
    It proves bytes and observed availability, never aggregate membership.
-3. In that lifecycle process, render the predeclared artifact from receipts/authenticated metadata using its pinned schema/profile.
+3. Hand generic receipt-bound inputs and authenticated metadata to the predeclared catalog producer.
+   Its script/template renders the artifact using the CRD from its locked NVKE source and admitted profile;
+   lifecycle owns the authority handoff, without interpreting downstream CRD fields.
    Exclude its eventual aggregate root, release-content and inventory digests from bytes and identity inputs. Predicted URLs
    cannot replace receipts. The ordinary output job publishes/signs the prepared artifact through authenticated producer handoff.
 4. Assemble/publish/sign/verify every required OCI member. A separate final selective job reauthenticates aggregate membership
