@@ -152,8 +152,9 @@ The generated `nvkr-run-nvke-nightly.yml` producer uses the complete
 [Environment](../inputs/environments/github-nvke-nightly.yaml). On first dispatch
 it freezes main once for `dsx-ai-factory/nvke`, `dsx-ai-factory/ovn-kubernetes`,
 `dsx-ai-factory/cluster-api-provider-nico` and `NVIDIA/aicr`. Toolchains, acquired
-dependencies and the Rancher source remain pinned. The production GPU-site workflow,
-namespace and pins are separate and unchanged.
+dependencies and the Rancher source remain pinned. Production retains its separate workflow and pins;
+future production releases publish below `ghcr.io/dsx-ai-factory/nvkr/candidate/nvke`. References to any
+releases already published remain unchanged.
 
 After maintainer configuration and merge to main, dispatch the generated producer:
 
