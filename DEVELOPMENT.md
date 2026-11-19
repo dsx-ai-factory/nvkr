@@ -89,6 +89,21 @@ Changes to sign/pipeline authority also need Linux tests. Containerized tests re
 children; Linux signing fixtures build static helpers while retaining race instrumentation in the parent suite.
 Passing these checks proves contracts, not CI, signing-service or registry acceptance.
 
+## NVKE demo module
+
+The VM/site/tenant stack is in `demos/nvke`, with its own `go.mod` and checks.
+Root `go test ./...`, `go vet ./...`, `make build` and `make lint` cover the core module.
+Use `make demo` for the unchanged `bin/nvke-demo` output, `make demo-test-bin`
+for its opt-in E2E test binary, and `make demo-check` for the nested module gate.
+`make ci-check` includes both modules; `make tidy` formats and tidies both. The merge gate selects the demo job on
+demo/input, root-library, module manifest, toolchain, lint configuration and build-wiring
+changes; main pushes and manual dispatches run it unconditionally. While root-library
+imports remain, their PRs still pay for the separate demo compatibility check.
+
+This is a partial extraction: the nested module still imports core packages through
+a local replacement. Shared internal helpers remain in the root module. Moving to
+a binary-only boundary is deferred; no new module release is published by this change.
+
 ## Work with product inputs
 
 The [lifecycle guide](docs/lifecycle.md) covers Definition → Run → Release. Begin with `definition validate`,

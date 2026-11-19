@@ -227,6 +227,18 @@ for the promised period. API checks establish equality at observation time, not 
 Record actual provisioning-network retrieval under [#383](https://github.com/dsx-ai-factory/nvkr/issues/383);
 local fixtures establish no EFI chainload, Secure Boot, imaging, reboot or first-boot acceptance.
 
+MachineImage rendering is unavailable in production. The [NVKE catalog candidate](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/nvke/machineimage/README.md)
+is a standalone script and maintained template, with no NVKR Go renderer or vendored CRD. It reads the
+CRD from the catalog's locked NVKE controller source commit and checks rendered documents against its OpenAPI schema.
+Generic boot descriptions supply named raw digests, platforms and destination URLs; proposed disk metadata
+remains separately supplied and unauthenticated. No producer or workflow invokes the candidate. Local
+schema validation does not establish Kubernetes admission, authenticated import or boot compatibility.
+The strict imager profile/source pin arrives through [#516](https://github.com/dsx-ai-factory/nvkr/issues/516)
+and [NVKE #2365](https://github.com/dsx-ai-factory/nvke/issues/2365). [#517](https://github.com/dsx-ai-factory/nvkr/issues/517)
+also retains authenticated render integration and amd64/arm64 boot acceptance. No MachineImage is
+registered or cluster changed. Signed provenance, served-byte integrity and TLS authentication are distinct
+from iPXE loader authentication and firmware Secure Boot; neither boot-enforcement claim is supported here.
+
 ## Registry graph
 
 Solid arrows are OCI descriptors within a repository. Dashed metadata arrows bind exact sibling locations

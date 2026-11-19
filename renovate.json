@@ -6,7 +6,7 @@
     ":gitSignOff"
   ],
   "enabledManagers": ["gomod", "github-actions"],
-  "includePaths": ["go.mod", "go.sum", ".github/workflows/**"],
+  "includePaths": ["go.mod", "go.sum", "demos/nvke/go.mod", "demos/nvke/go.sum", ".github/workflows/**"],
   "ignorePaths": [
     ".github/nvkr-*/**",
     ".github/workflows/nvkr-run*.yml",
