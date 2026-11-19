@@ -34,7 +34,7 @@ and repositories are **environment configuration**, declared **outside producer 
 because they are transport rather than a build input. This preserves define-once / publish-many and
 cross-environment byte-identity.
 
-The proposed MachineImage renderer consumes serving configuration as content. Its Build includes that configuration,
+A proposed catalog-owned downstream renderer consumes serving configuration as content. Its Build includes that configuration,
 render profile and selected producer Build dependencies. Mapping changes alter its Build, artifact and enclosing identities;
 source QCOW2/EFI bytes and Builds remain unchanged. Copy-only relocation retains the ordinary transport rule.
 Runtime versions, read times and receipts are excluded from render Build identity and YAML.
@@ -344,29 +344,30 @@ Pipeline-attested contract from [#514](https://github.com/dsx-ai-factory/nvkr/is
 [Reconciliation](reconciliation/object-store-publication.md#selective-boot-asset-publication) owns acceptance/implementation. Existing full-mirror schemas, bytes and verification stay unchanged.
 Generated execution, producer integration and rendering remain separate acceptance work; compiling the versioned Plan does not enable those routes.
 
-The contract-first renderer implements only a private deterministic formatting candidate and an
-unconditionally disabled `Consumer.RenderMachineImages` entry point. The candidate pins the MachineImage
-schema to NVKE commit `28b9e338c1d08a4a0427b7c6d79c8174358ad991`. Its canonical candidate record
-includes the exact spec, named raw dependencies, serving description and proposed imager profile/source pin,
-and excludes eventual aggregate/content/inventory identities. The existing material owner constructs and
-validates a native material manifest referencing that record's exact bytes and derives its typed digest
-under `nvkr.build-material-manifest/v1`. Names encode the full material digest in lowercase base32 under `mi-` (55 characters);
-duplicate pairs and name collisions fail. A separate canonical record binds those materials to the raw
-SHA-256 of the exact YAML. This material digest is neither a compiled Build Digest nor an authenticated
-metadata binding. Existing source Build and Plan identities are unchanged. Candidate names and request shapes are provisional;
-production admission will establish the render Build contract. The private fixture formatter caps supplied
-sets at 256 pairs; that is not an admitted Plan or destination limit.
+NVKR Go remains independent of downstream CRDs and rendering conventions. The NVKE catalog owns
+its MachineImage candidate as a small script and maintained template under
+`inputs/catalogs/nvke/machineimage/`. It consumes generic preliminary or selected boot descriptions
+(named disk/platform raw digests, imager members/profiles and destination URLs), with separately supplied
+proposed disk metadata. It reads the CRD directly from an independently chosen exact NVKE source commit;
+no CRD is vendored and no floating or dirty-working-tree schema is used. Rendering validates the complete
+set against that source's served OpenAPI schema before emitting any manifests. Local JSON Schema checks
+are not Kubernetes CEL/admission or boot evidence.
 
-Private fixtures exercise the proposed raw `image_sha`, `disk_strategy` and EFI-chain arguments with
-architecture-specific console/kernel settings. They admit only an importer-verification/TLS candidate
-trust description, without loader or firmware enforcement. This is not a production imager profile.
-Production admission requires the strict profile/source pin from the mkosi EFI producer in
-[#516](https://github.com/dsx-ai-factory/nvkr/issues/516) after step 3 and the argument contract in
-[NVKE #2365](https://github.com/dsx-ai-factory/nvke/issues/2365), plus recorded amd64/arm64 boot evidence.
-Before enabling the entry point, implement the declared Plan/render Build, authorized metadata and live
-receipt joins, signed artifact handoff, final dependency authentication and independent import described
-below. No configuration flag enables the candidate. [#517](https://github.com/dsx-ai-factory/nvkr/issues/517)
-remains open for those joins and acceptance.
+This catalog experiment is not a declared producer, generated execution route or NVKR lifecycle API.
+Production rendering remains unavailable. Candidate descriptions authenticate nothing; metadata bindings,
+ordinary producer/material integration, signed artifact handoff and trusted import remain unimplemented.
+The candidate names fingerprint exact pre-name YAML bytes, not a typed Build or Release identity. Its
+annotations distinguish output/destination pairs and record the imager raw digest. No eventual aggregate,
+content or inventory identity enters the rendered bytes. Existing source Build and Plan identities are
+unchanged by this unregistered candidate. Future producer admission must bind the script, template,
+source CRD, exact raw dependencies and authorized metadata through the existing material/Build owners.
+
+NVKE owns CRD compatibility, iPXE/template conventions and downstream registration. Strict imager
+profile/source admission remains with [#516](https://github.com/dsx-ai-factory/nvkr/issues/516) after mkosi
+step 3 and [NVKE #2365](https://github.com/dsx-ai-factory/nvke/issues/2365), followed by recorded amd64/arm64
+boot evidence. [#517](https://github.com/dsx-ai-factory/nvkr/issues/517) remains open for those integrations.
+The remaining render ordering and binding requirements below describe future admitted catalog producers,
+not an NVKE-specific renderer or general templating engine in NVKR Go.
 
 **Admission.** `selective-boot-v1` requires a new Environment/Plan version and explicit destination modes.
 The new schema has no mode default; old schemas keep full mirror on omission and reject selective fields. Select sorted, nonempty QCOW2 outputs, one
@@ -402,7 +403,8 @@ bind member name/hash/size/architecture; otherwise reject or extend its original
 raw payloads and required proofs. No unselected layers, bundle fallback, truncated documents, reference-only proofs,
 copier signatures or unsigned subset assertions.
 Delivery owns raw-member inspection/transport, `sign` proof authentication, `lifecycle` policy/input/membership joins and
-opaque receipts, factory dependencies/finalization, CLI/SDK adaptation. Structured records use canonical typed identities;
+opaque receipts, factory dependencies/finalization, CLI/SDK adaptation. Catalog producers own downstream schema/template rendering;
+NVKR consumes their ordinary artifacts without CRD-specific Go types or logic. Structured records use canonical typed identities;
 raw SHA-256 is blob integrity only.
 
 **Limits.** Preparation/rendering and final publication each admit a fresh store/session and operation/cleanup deadlines

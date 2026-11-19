@@ -73,16 +73,19 @@ fixtures cover authentic updates, rollback-cache isolation, tampered targets, ca
 Live Linux cosign/TUF service acceptance remains unexercised. No new signing trust, IAM, bucket, credential,
 provisioning network or retention policy is configured here.
 
-The MachineImage renderer is contract-first and disabled in production. `Consumer.RenderMachineImages`
-returns `CodeEngineCapability` with no manifests before inspecting receipts or doing I/O. Private candidate
-tests cover deterministic exact YAML/material records, full-digest immutable names, complete supplied-pair
-ordering, duplicate rejection, metadata bounds and URL/template grammar for both architectures. They check
-field constraints against the unchanged CRD from NVKE commit `28b9e338c1d08a4a0427b7c6d79c8174358ad991`
-and script invariants separately; this is not API-server/CEL admission or an EFI execution test.
-Candidate descriptions authenticate nothing. Declared Plan/render Build integration, authorized metadata,
-live receipt joins, signed packaging, final render verification and independent import remain unimplemented.
-The admitted imager profile/source pin is owned by #516's mkosi EFI lane after step 3 and NVKE #2365;
-production rendering also requires recorded amd64/arm64 boot evidence. No flag bypasses this boundary.
+The MachineImage formatting candidate belongs to the NVKE catalog under
+`inputs/catalogs/nvke/machineimage/`, not NVKR Go. A small script and maintained template consume generic
+boot descriptions and proposed disk metadata, read the CRD from an exact supplied NVKE Git commit, and
+validate all rendered documents against its served OpenAPI schema before output. No CRD is vendored.
+Standalone Python contracts exercise both architectures, complete pair ordering, schema rejection,
+selection/metadata checks, literal URLs and no partial output. They require pinned NVKE source and the
+catalog's Python dependencies; they are not part of the default Go suite. JSON Schema validation and
+script checks do not establish Kubernetes CEL/API-server admission or EFI execution.
+No producer or workflow invokes the candidate, and no production rendering API is added. Descriptions
+remain unauthenticated; authorized metadata, declared producer/material integration, signed packaging,
+trusted import and external boot acceptance remain unimplemented. The admitted imager profile/source pin
+is owned by #516's mkosi EFI lane after step 3 and NVKE #2365. NVKE owns CRD/script conventions and
+registration; generic NVKR delivery, signature and lifecycle owners retain their existing boundaries.
 
 Generated selective execution remains rejected before effects pending its configuration/generation owner;
 static Plan compilation and lifecycle APIs do not establish hosted Run completion. No selective provider,
@@ -92,7 +95,7 @@ Existing full-mirror evidence is unchanged. See the [operator boundary](../../pu
 | Owner | Outstanding scope |
 |---|---|
 | [#515](https://github.com/dsx-ai-factory/nvkr/issues/515) | Core selection, raw-member proofs, limited receipts, serving, recovery and S3-only verification are contract-tested; external acceptance remains with the owners below. |
-| [#517](https://github.com/dsx-ai-factory/nvkr/issues/517) | Private formatting candidate and unconditional production refusal are contract-tested. Predeclared render, admitted imager profile, authority/dependency joins, signed packaging, trusted import and chainload/imaging/first-boot evidence remain. |
+| [#517](https://github.com/dsx-ai-factory/nvkr/issues/517) | Catalog script/template candidate uses the CRD from pinned NVKE source; NVKR Go remains agnostic. Production integration, admitted imager profile, authority/dependency joins, signed packaging, trusted import and chainload/imaging/first-boot evidence remain. |
 | [#516](https://github.com/dsx-ai-factory/nvkr/issues/516) | Signed EFI member/platform/profile binding; separate mkosi producer lane. |
 | [#384](https://github.com/dsx-ai-factory/nvkr/issues/384) | Selective configuration, regeneration and required finalization, preserving full-mirror defaults. |
 | [#383](https://github.com/dsx-ai-factory/nvkr/issues/383) | Provider/Run selected-only inventory, original proofs, pinned-read/fault evidence and independent S3-only client access. |
