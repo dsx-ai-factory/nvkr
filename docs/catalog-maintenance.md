@@ -107,7 +107,7 @@ The migration retains existing output membership. Its remaining copies have expl
 | `node-images/variants/native-nvidia.json` | Generated from the three OVN producers in `node-images/release`; the release catalog owns their maintained `nvke-*` package contract and source pins. |
 | `node-images/variants/upstream-kvm.json` | Retains its explicit upstream 1.4.0 snapshot; not enrolled. |
 | `node-images/variants/nvidia-kvm.json` | Retains the known mismatch: commit `26cc199de8e814a7fe6d899a770fc04df0bbc2f9`, stream 1.5.18, versus the candidate NVIDIA 2.4.2 stream. It is not silently upgraded. |
-| `node-images/diagnostic` | Retains its separate source-owned package producers and upstream pin. |
+| `node-images` | Retains its separate source-owned package producers and upstream pin. |
 | Controller profile package streams and deployment requests | Remain downstream-owned selections. Integration checks require the selected profile stream to match its producer; coordinate a stream change explicitly. |
 
 These paths are under `inputs/catalogs/`. No build, deployment compatibility or qualification is established
