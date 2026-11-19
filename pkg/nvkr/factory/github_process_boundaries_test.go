@@ -44,7 +44,8 @@ if os.fork() == 0:
     # expiry. Deliver it only after readiness, so startup is outside the test's
     # deadline assertion; the real timeout still owns TERM/KILL escalation.
     os.kill(os.getpgrp(), signal.SIGALRM)
-while True: time.sleep(0.01)
+deadline = time.monotonic() + 120
+while time.monotonic() < deadline: time.sleep(0.01)
 PY
 `
 			if err := os.WriteFile(filepath.Join(root, "go"), []byte(script), 0700); err != nil {

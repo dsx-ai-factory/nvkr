@@ -64,30 +64,51 @@ runs:
         }
         cleanup() { chmod -R u+w "$cache" && rm -rf -- "$cache"; }
         trap 'cleanup || { printf "%s\n" "NVKR-E-BUILD-FAILED: private bootstrap acquisition, compilation or cache cleanup failed" >&2; exit 21; }' EXIT
-        result=0
+        canceled=0 child=''
+        cancel() { canceled=1; if [ -n "$child" ]; then kill -TERM "$child" 2>/dev/null || :; fi; }
+        trap cancel INT TERM
         env -i PATH="$PATH" HOME="${HOME:-}" ${TMPDIR+TMPDIR="$TMPDIR"} ${GOROOT+GOROOT="$GOROOT"} \
           CGO_ENABLED=0 GOTOOLCHAIN=local GOENV=off GOWORK=off GOCACHE="$cache/build" GOMODCACHE="$cache/modules" \
-          timeout --kill-after=5s 900s bash -eu -s -- "$cache" "$PWD/.nvkr/ci-bootstrap/nvkr-exec" '-X main.version=dev -X main.commit=unknown' <<'SH' || result=$?
+          timeout --kill-after=5s 900s bash -eu -s -- "$cache" "$PWD/.nvkr/ci-bootstrap/nvkr-exec" '-X main.version=dev -X main.commit=unknown' <<'SH' &
         cache=$1 output=$2 linker=$3
         # Keep the group leader alive until timeout escalates, even if Go exits on TERM.
         trap 'sleep 10' INT TERM
         download() {
           for attempt in 1 2 3; do
-            if go mod download "$@" > "$cache/download.json"; then cat "$cache/download.json"; return 0; fi
+            if go mod download "$@" </dev/null > "$cache/download.json"; then cat "$cache/download.json"; return 0; fi
           done
           return 1
         }
-        mkdir "$cache/inputs"
-        cp go.mod go.sum "$cache/inputs/"
+        regular_manifest() { [ ! -L "$1" ] && [ -f "$1" ] && [ "$(wc -c < "$1")" -le 4194304 ]; }
+        mkdir "$cache/inputs" "$cache/original"
+        for name in go.mod go.sum; do
+          regular_manifest "$name"
+          cp "$name" "$cache/original/$name"
+          chmod 400 "$cache/original/$name"
+          cp "$name" "$cache/inputs/$name"
+        done
+        check_manifests() {
+          for name in go.mod go.sum; do
+            regular_manifest "$name" && regular_manifest "$cache/inputs/$name" || return 1
+            cmp "$cache/original/$name" "$name" && cmp "$cache/original/$name" "$cache/inputs/$name" || return 1
+          done
+        }
         modfile="-modfile=$cache/inputs/go.mod"
         download "$modfile"
-        cmp go.mod "$cache/inputs/go.mod"
-        cmp go.sum "$cache/inputs/go.sum"
+        check_manifests
         mkdir -p "${output%/*}"
-        GOPROXY=off GOSUMDB=off go build -mod=readonly "$modfile" -trimpath -ldflags "$linker" -o "$output" ./cmd/nvkr
-        cmp go.mod "$cache/inputs/go.mod"
-        cmp go.sum "$cache/inputs/go.sum"
+        GOPROXY=off GOSUMDB=off go build -mod=readonly "$modfile" -trimpath -ldflags "$linker" -o "$output" ./cmd/nvkr </dev/null || exit 1
+        check_manifests
         SH
+        child=$!
+        if [ "$canceled" -eq 1 ]; then cancel; fi
+        result=0
+        while :; do
+          wait "$child" && { result=0; break; } || result=$?
+          # A trap interrupts wait; retain caches and wait again until timeout exits.
+          if [ "$canceled" -eq 0 ] || ! kill -0 "$child" 2>/dev/null; then break; fi
+        done
+        if [ "$canceled" -eq 1 ]; then result=143; fi
         case "$result" in
           0) ;;
           124|137|143|130) printf 'NVKR-E-TIMEOUT: private bootstrap acquisition or compilation canceled or timed out\n' >&2; exit 31 ;;

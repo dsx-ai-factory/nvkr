@@ -483,15 +483,22 @@ passed; the vulnerability scan found no vulnerabilities. Entry workflows and job
 Unit/race/Python suites remain skipped; hosted acceptance of this bootstrap change remains open.
 
 The current generator replaces that Python supervisor with a shell retry loop and coreutils timeout.
-It permits three dependency-download attempts for any failure, then one offline read-only build. Private
-manifest copies, byte comparisons and the environment allow-list remain; published-module identity is
-still checked before compilation. The 900-second deadline has five seconds of kill escalation. The former
+It permits three immediate dependency-download attempts for any failure, then one offline read-only
+build. Go download diagnostics are now emitted without JSON error filtering or backoff. The environment
+allow-list and published-module pin checks remain. Regular/non-symlink manifest pathname checks and a
+4 MiB per-file bound precede pristine snapshots; source and private Go inputs must match those snapshots.
+Pathname checks do not preserve the former atomic no-follow open against a concurrent same-user writer.
+Step-shell INT/TERM is forwarded to timeout and joined before cache cleanup; Go stdin is `/dev/null`, and
+compiler exit statuses are normalized to build failures. The 900-second deadline has five seconds of kill escalation. The former
 4 MiB captured-output bound and successful-exit descendant supervision are not retained. Focused shell
 contracts cover retries, credentials, cache cleanup, module pins and deadline escalation. All three
 maintained bundles were regenerated from their authored inventory and checked byte-for-byte. Their
-identical 41-line bootstrap scripts pass ShellCheck and YAML lint; the three workflows pass Actionlint.
-The deadline fixture delivers coreutils' timer signal only after descendant readiness, removing host
-startup contention from its assertion; both phases passed three race-instrumented repetitions on macOS.
+identical 62-line bootstrap scripts pass ShellCheck and YAML lint; the three workflows pass Actionlint.
+The bootstrap contracts passed three race-instrumented repetitions on macOS, including step-shell
+INT/TERM cancellation, stdin-consuming children, signal-killed compilation, simultaneous source/private
+manifest changes, non-regular/symlink/oversized manifests and missing tool capabilities. The deadline
+fixture delivers coreutils' timer signal only after descendant readiness, removing host startup contention
+from its assertion; its leader and descendant loops have a separate 120-second fallback bound.
 The broader local merge gate was not run because validation was limited to focused checks. No hosted
 acceptance or reduction in per-job compilation time is claimed.
 
