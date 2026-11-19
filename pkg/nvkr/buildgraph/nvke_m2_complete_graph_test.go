@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
@@ -27,6 +28,17 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	if len(authored.Outputs) != 69 {
 		t.Fatal("required output membership changed")
 	}
+	runtimeCatalog, err := catalog.LoadContext(t.Context(), catalog.Dir("inputs/catalogs/runtime-dependencies"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	isRuntime := func(output definition.DefinitionOutput) bool {
+		if len(output.Components) != 1 {
+			return false
+		}
+		_, ok := runtimeCatalog.Components[output.Components[0]]
+		return ok
+	}
 	declaredImages := 0
 	disks := map[string]string{
 		"nvke-node-fde-amd64": "linux/amd64", "nvke-node-fde-arm64": "linux/arm64",
@@ -34,7 +46,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 	}
 	declaredDisks := 0
 	for _, output := range authored.Outputs {
-		if output.Catalog != nil && output.Catalog.Base == "../../catalogs/runtime-dependencies" {
+		if isRuntime(output) {
 			declaredImages++
 		}
 		if output.Format == definition.OutputDiskImage {
@@ -103,7 +115,7 @@ func TestMaintainedM2AllOutputGraphs(t *testing.T) {
 				t.Fatal(err)
 			}
 			graphs++
-			if output.Catalog != nil && output.Catalog.Base == "../../catalogs/runtime-dependencies" {
+			if isRuntime(output) {
 				pulls := 0
 				for _, node := range build.Graph.Nodes {
 					if node.Kind == ir.KindPull && node.OutputType == "oci-image" {
