@@ -39,6 +39,9 @@ const crdPath = "management-engine/config/crd/bases/internal.nvke.nvidia.com_mac
 const limit = 4 * 1024 * 1024
 
 var namePattern = regexp.MustCompile(`^[a-z0-9](?:[-a-z0-9]*[a-z0-9])?$`)
+
+// Match Definition BootSelection output names; destinations keep DNS-label syntax.
+var outputNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 var digestPattern = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
 var commitPattern = regexp.MustCompile(`^[0-9a-f]{40}$`)
 var urlPattern = regexp.MustCompile(`^[A-Za-z0-9._~:/\[\]-]+$`)
@@ -134,6 +137,9 @@ func decodeYAML(raw []byte) (any, error) {
 	if err := decoder.Decode(&document); err != nil {
 		return nil, reject("invalid YAML")
 	}
+	if err := checkYAMLKeys(document, 0); err != nil {
+		return nil, err
+	}
 	if err := decoder.Decode(&document); err != io.EOF {
 		return nil, reject("expected one YAML document")
 	}
@@ -142,6 +148,31 @@ func decodeYAML(raw []byte) (any, error) {
 		return nil, reject("invalid YAML")
 	}
 	return decodeJSON(b)
+}
+
+// YAML permits non-string keys that JSON conversion would stringify and merge.
+func checkYAMLKeys(value any, depth int) error {
+	if depth > 64 {
+		return reject("input nesting exceeds limit")
+	}
+	switch node := value.(type) {
+	case map[any]any:
+		for key, child := range node {
+			if _, ok := key.(string); !ok {
+				return reject("YAML mapping keys must be strings")
+			}
+			if err := checkYAMLKeys(child, depth+1); err != nil {
+				return err
+			}
+		}
+	case []any:
+		for _, child := range node {
+			if err := checkYAMLKeys(child, depth+1); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func read(ctx context.Context, path string) ([]byte, error) {
@@ -173,18 +204,35 @@ func read(ctx context.Context, path string) ([]byte, error) {
 }
 
 // Cap subprocess buffers while exec.CommandContext owns termination and joining.
-type cappedBuffer struct{ bytes.Buffer }
+// Do not embed bytes.Buffer: its promoted ReadFrom lets io.Copy bypass Write.
+type cappedBuffer struct{ buffer bytes.Buffer }
 
 func (b *cappedBuffer) Write(p []byte) (int, error) {
-	if len(p) > limit-b.Len() {
+	if len(p) > limit-b.buffer.Len() {
 		return 0, reject("Git output exceeds 4 MiB")
 	}
-	return b.Buffer.Write(p)
+	return b.buffer.Write(p)
 }
 func gitBlob(ctx context.Context, source, pin string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "git", "--no-replace-objects", "-C", source, "cat-file", "blob", pin+"^{commit}:"+crdPath)
+	// Older Git silently ignores GIT_NO_LAZY_FETCH. Admit the explicit option
+	// without accessing the source, then retain it on every object operation.
+	if _, err := gitOutput(ctx, "--version"); err != nil {
+		return nil, reject("Git with --no-lazy-fetch support (2.45+) is required")
+	}
+	kind, err := gitOutput(ctx, "-C", source, "cat-file", "-t", pin)
+	if err != nil {
+		return nil, err
+	}
+	if string(kind) != "commit\n" {
+		return nil, reject("catalog NVKE source pin must directly identify a commit object")
+	}
+	return gitOutput(ctx, "-C", source, "cat-file", "blob", pin+"^{commit}:"+crdPath)
+}
+
+func gitOutput(ctx context.Context, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, "git", append([]string{"--no-replace-objects", "--no-lazy-fetch"}, args...)...)
 	cmd.Env = append(os.Environ(), "GIT_NO_LAZY_FETCH=1")
 	cmd.WaitDelay = time.Second
 	var stdout, stderr cappedBuffer
@@ -193,7 +241,7 @@ func gitBlob(ctx context.Context, source, pin string) ([]byte, error) {
 	if err := cmd.Run(); err != nil {
 		return nil, reject("cannot read pinned source CRD")
 	}
-	return stdout.Bytes(), nil
+	return stdout.buffer.Bytes(), nil
 }
 func catalogPin(ctx context.Context, catalog string, asserted string) (string, error) {
 	raw, err := read(ctx, filepath.Join(catalog, "..", "pins.lock.yaml"))
@@ -231,17 +279,17 @@ const delimitersRule = `self.split('{{').size() == self.split('}}').size()`
 const immutableRule = `self == oldSelf`
 
 type celRule struct {
-	path      string
+	path      []string
 	predicate func(string) bool
 }
 
 // Exact text AND schema location are guarded. This program only creates candidates;
 // oldSelf is absent, so the known transition rule is inapplicable on creation.
 var celRules = map[string]celRule{
-	headerRule:     {"spec.nico.ipxeScript", func(s string) bool { return strings.HasPrefix(s, "#!ipxe\n") || strings.HasPrefix(s, "#!ipxe\r\n") }},
-	commandRule:    {"spec.nico.ipxeScript", func(s string) bool { return strings.TrimSpace(strings.ReplaceAll(s, "#!ipxe", "")) != "" }},
-	delimitersRule: {"spec.nico.ipxeScript", func(s string) bool { return strings.Count(s, "{{") == strings.Count(s, "}}") }},
-	immutableRule:  {"spec", nil},
+	headerRule:     {[]string{"spec", "nico", "ipxeScript"}, func(s string) bool { return strings.HasPrefix(s, "#!ipxe\n") || strings.HasPrefix(s, "#!ipxe\r\n") }},
+	commandRule:    {[]string{"spec", "nico", "ipxeScript"}, func(s string) bool { return strings.TrimSpace(strings.ReplaceAll(s, "#!ipxe", "")) != "" }},
+	delimitersRule: {[]string{"spec", "nico", "ipxeScript"}, func(s string) bool { return strings.Count(s, "{{") == strings.Count(s, "}}") }},
+	immutableRule:  {[]string{"spec"}, nil},
 }
 
 type boundRule struct {
@@ -356,7 +404,7 @@ func (v *validator) admitSchema(node object, path []string) error {
 		case "x-kubernetes-validations":
 			for _, item := range array(value) {
 				rule := celRules[str(obj(item)["rule"])]
-				if rule.path != strings.Join(path, ".") {
+				if !slices.Equal(rule.path, path) {
 					return reject("unsupported CEL rule location")
 				}
 				v.rules = append(v.rules, boundRule{slices.Clone(path), rule})
@@ -520,7 +568,7 @@ func selectedAssets(publication object) (map[assetKey]object, error) {
 		if k.platform != "linux/amd64" && k.platform != "linux/arm64" {
 			return nil, reject("unsupported platform")
 		}
-		if !namePattern.MatchString(k.output) || len(k.output) > 128 {
+		if !outputNamePattern.MatchString(k.output) || len(k.output) > 128 {
 			return nil, reject("invalid output name")
 		}
 		n, ok := binding["size"].(json.Number)

@@ -6,7 +6,8 @@ This is an offline catalog experiment in a separate Go module, not an NVKR lifec
 producer. No Definition or generated workflow invokes it. Production rendering,
 signing, import and registration remain disabled/unimplemented.
 
-Use Go 1.27.4 (the repository's `.go-version`) and Git. The separate `go.mod` and
+Use Go 1.27.4 (the repository's `.go-version`) and Git 2.45 or newer with
+`--no-lazy-fetch` support. The separate `go.mod` and
 `go.sum` pin the schema validator and all transitive dependencies; the root module
 does not import this renderer. Acquire the Go modules once before working offline.
 For example, from this directory:
@@ -26,11 +27,13 @@ The program always reads that catalog pin; optional `--nvke-commit` must match i
 When invoking a compiled binary from another directory, set `--catalog-dir` to this
 directory, which owns the template and adjacent catalog pin file.
 It reads `management-engine/config/crd/bases/internal.nvke.nvidia.com_machineimages.yaml`
-using `git --no-replace-objects cat-file blob '<pin>^{commit}:<path>'`, which requires
-an actual commit and ignores replacement objects. It never uses a dirty working-tree
-copy, fetches a revision or vendors the CRD. The child Git process sets
-`GIT_NO_LAZY_FETCH=1`, so missing objects in partial clones cannot trigger retrieval
-from a promisor remote. A missing commit or CRD fails closed.
+using `git --no-replace-objects --no-lazy-fetch cat-file blob '<pin>^{commit}:<path>'`.
+Before reading source objects, it checks support for `--no-lazy-fetch`; older Git
+versions fail closed instead of ignoring an unfamiliar environment variable. It
+checks the unpeeled pin's object type and rejects annotated tag objects. It never
+uses a dirty working-tree copy, fetches a revision or vendors the CRD. Every child
+Git process also sets `GIT_NO_LAZY_FETCH=1`, so missing objects in partial clones
+cannot trigger retrieval from a promisor remote. A missing commit or CRD fails closed.
 
 Repeat `--publication` for each destination. Each input is the JSON description from
 the generic `PreparedBootAssets.Description` or `SelectedBootReceipt.Description`

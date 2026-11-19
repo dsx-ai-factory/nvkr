@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -280,10 +281,14 @@ func git(t *testing.T, repo string, input []byte, args ...string) []byte {
 }
 func sourceFixture(t *testing.T) (source, catalog, pin string) {
 	t.Helper()
+	return sourceFixtureData(t, crdFixture(schemaFixture()))
+}
+func sourceFixtureData(t *testing.T, raw []byte) (source, catalog, pin string) {
+	t.Helper()
 	root := t.TempDir()
 	source = filepath.Join(root, "source.git")
-	git(t, root, nil, "init", "--bare", source)
-	blob := strings.TrimSpace(string(git(t, source, crdFixture(schemaFixture()), "hash-object", "-w", "--stdin")))
+	git(t, root, nil, "init", "--bare", "--object-format=sha1", source)
+	blob := strings.TrimSpace(string(git(t, source, raw, "hash-object", "-w", "--stdin")))
 	tree := strings.TrimSpace(string(git(t, source, []byte("100644 blob "+blob+"\t"+filepath.Base(crdPath)+"\n"), "mktree")))
 	dirs := strings.Split(filepath.Dir(crdPath), "/")
 	for i := len(dirs) - 1; i >= 0; i-- {
@@ -305,6 +310,7 @@ func write(t *testing.T, path string, b []byte) {
 	}
 }
 func TestExactSourcePinRequired(t *testing.T) {
+	t.Setenv("GIT_DEFAULT_HASH", "sha256")
 	source, catalog, pin := sourceFixture(t)
 	for _, asserted := range []string{"", pin} {
 		if _, err := loadCRD(t.Context(), source, catalog, asserted); err != nil {
@@ -334,10 +340,11 @@ func TestChangedExactBytesChangeCandidateName(t *testing.T) {
 	}
 }
 func TestMissingPromisorBlobDoesNotFetch(t *testing.T) {
+	t.Setenv("GIT_DEFAULT_HASH", "sha256")
 	source, catalog, pin := sourceFixture(t)
 	root := t.TempDir()
 	repo := filepath.Join(root, "partial.git")
-	git(t, root, nil, "init", "--bare", repo)
+	git(t, root, nil, "init", "--bare", "--object-format=sha1", repo)
 	objects := [][2]string{{"commit", pin}, {"tree", pin + "^{tree}"}}
 	dirs := strings.Split(filepath.Dir(crdPath), "/")
 	for i := range dirs {
@@ -440,6 +447,9 @@ func TestCELAndSchemaAdmission(t *testing.T) {
 	}{
 		{"unknown rule", func(s object) { s["x-kubernetes-validations"] = []object{{"rule": "self != oldSelf"}} }},
 		{"wrong location", func(s object) { s["x-kubernetes-validations"] = []object{{"rule": headerRule}} }},
+		{"dotted property location", func(s object) {
+			obj(s["properties"])["spec.nico.ipxeScript"] = object{"type": "string", "x-kubernetes-validations": []object{{"rule": headerRule}}}
+		}},
 		{"optional old self", func(s object) {
 			obj(obj(s["properties"])["spec"])["x-kubernetes-validations"] = []object{{"rule": immutableRule, "optionalOldSelf": true}}
 		}},
@@ -520,5 +530,118 @@ func TestSchemaPanicFailsClosed(t *testing.T) {
 	out, err := render([]any{p}, m, v, templateFixture(t))
 	if err == nil || out != "" {
 		t.Fatalf("out=%q err=%v", out, err)
+	}
+}
+
+func TestYAMLStringKeys(t *testing.T) {
+	for _, tc := range []struct {
+		name, raw string
+		valid     bool
+	}{
+		{"ambiguous integer", "1: first\n\"1\": second\n", false},
+		{"nested boolean", "annotations:\n  true: first\n  \"true\": second\n", false},
+		{"sequence map", "items:\n- 1: value\n", false},
+		{"quoted keys", "\"1\": first\n\"true\": second\n", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			value, err := decodeYAML([]byte(tc.raw))
+			if (err == nil) != tc.valid {
+				t.Fatalf("value=%v err=%v", value, err)
+			}
+			if tc.valid && (obj(value)["1"] != "first" || obj(value)["true"] != "second") {
+				t.Fatal("quoted keys changed")
+			}
+		})
+	}
+}
+
+func TestGitBlobOutputLimit(t *testing.T) {
+	for _, size := range []int{limit, limit + 1} {
+		t.Run(strconv.Itoa(size), func(t *testing.T) {
+			source, _, pin := sourceFixtureData(t, bytes.Repeat([]byte{'x'}, size))
+			raw, err := gitBlob(t.Context(), source, pin)
+			if size <= limit {
+				if err != nil || len(raw) != size {
+					t.Fatalf("bytes=%d err=%v", len(raw), err)
+				}
+			} else if err == nil || len(raw) != 0 {
+				t.Fatalf("oversize bytes=%d err=%v", len(raw), err)
+			}
+		})
+	}
+}
+
+func TestPinnedTagObjectRejected(t *testing.T) {
+	source, catalog, pin := sourceFixture(t)
+	tag := []byte("object " + pin + "\ntype commit\ntag synthetic\ntagger Synthetic Fixture <fixture@example.invalid> 0 +0000\n\nannotated fixture\n")
+	tagID := strings.TrimSpace(string(git(t, source, tag, "hash-object", "-w", "-t", "tag", "--stdin")))
+	write(t, filepath.Join(catalog, "..", "pins.lock.yaml"), []byte("pins:\n  nvke-controller:\n    commit: "+tagID+"\n"))
+	if _, err := loadCRD(t.Context(), source, catalog, tagID); err == nil {
+		t.Fatal("accepted annotated tag object as commit pin")
+	}
+}
+
+func TestGitOfflineCapabilityRequired(t *testing.T) {
+	root := t.TempDir()
+	trace := filepath.Join(root, "trace")
+	stub := filepath.Join(root, "git")
+	write(t, stub, []byte("#!/bin/sh\nprintf '%s\\n' \"$*\" > \"$GIT_CAPABILITY_TRACE\"\nexit 129\n"))
+	if err := os.Chmod(stub, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", root+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("GIT_CAPABILITY_TRACE", trace)
+	raw, err := gitBlob(t.Context(), "must-not-read-source", strings.Repeat("a", 40))
+	if err == nil || len(raw) != 0 || !strings.Contains(err.Error(), "--no-lazy-fetch") {
+		t.Fatalf("bytes=%d err=%v", len(raw), err)
+	}
+	invoked, err := os.ReadFile(trace)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(invoked), "cat-file") || !strings.Contains(string(invoked), "--no-lazy-fetch --version") {
+		t.Fatalf("source operation before capability admission: %s", invoked)
+	}
+}
+
+func TestOutputNamesMatchBootSelection(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		valid bool
+	}{
+		{"disk.debug", true}, {"disk_debug", true}, {"disk..debug", true}, {"disk-1", true}, {strings.Repeat("a", 128), true},
+		{".disk", false}, {"disk.", false}, {"disk/part", false}, {"Disk", false}, {strings.Repeat("a", 129), false},
+	} {
+		for _, kind := range []string{"disk", "imager"} {
+			t.Run(kind+"/"+tc.name, func(t *testing.T) {
+				p, m := fixture()
+				original := kind + "-amd64"
+				for _, field := range []string{"disks", "imagers"} {
+					for _, item := range array(obj(p["selection"])[field]) {
+						if obj(item)["output"] == original {
+							obj(item)["output"] = tc.name
+						}
+					}
+				}
+				for _, item := range array(p["assets"]) {
+					binding := obj(obj(item)["binding"])
+					if binding["output"] == original {
+						binding["output"] = tc.name
+					}
+				}
+				for _, item := range m {
+					if obj(item)["output"] == original {
+						obj(item)["output"] = tc.name
+					}
+				}
+				out, err := render([]any{p}, m, testValidator(t), templateFixture(t))
+				if (err == nil) != tc.valid {
+					t.Fatalf("err=%v", err)
+				}
+				if !tc.valid && out != "" {
+					t.Fatal("partial output")
+				}
+			})
+		}
 	}
 }
