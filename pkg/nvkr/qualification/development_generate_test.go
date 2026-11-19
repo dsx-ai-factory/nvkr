@@ -16,7 +16,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 )
 
-// developmentGenerationFixture loads a recorded Plan of the combined Definition
+// developmentGenerationFixture loads a historical Plan of the combined Definition
 // under the development Environment, so the test needs no source access. The
 // committed fixed development bundle belongs to the GPU site composite, covered
 // separately by TestGPUCompositeQualificationPairs. Regenerate this fixture with

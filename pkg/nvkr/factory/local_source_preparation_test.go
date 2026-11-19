@@ -16,6 +16,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -99,6 +100,18 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 	if err := os.WriteFile(overlayPath, rawOverlay, 0600); err != nil {
 		t.Fatal(err)
 	}
+	// Exercise an implicit candidate from a stack different from the shared tools.
+	definition, err := authored.LoadDefinition(t.Context(), definitionPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range definition.Outputs {
+		if definition.Outputs[i].Name == "cwe" {
+			definition.Catalogs = []authored.Catalog{*definition.Outputs[i].Catalog}
+			definition.Outputs[i].Catalog = nil
+		}
+	}
+	writeSnapshotFixtureDocument(t, root, definitionPath, definition)
 	original, err := os.ReadFile(definitionPath)
 	if err != nil {
 		t.Fatal(err)
