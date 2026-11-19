@@ -15,15 +15,25 @@ import (
 )
 
 func TestPrepareLocalInputsCaptureCompileReplay(t *testing.T) {
-	for _, absolute := range []bool{false, true} {
+	for _, mode := range []int{0, 1, 2} {
+		absolute := mode == 1
 		name := "relative inputs"
 		if absolute {
 			name = "absolute inputs inside repository"
+		}
+		if mode == 2 {
+			name = "catalog list relocation"
 		}
 		t.Run(name, func(t *testing.T) {
 			root, definition, environment := snapshotFixture(t)
 			t.Chdir(root)
 			definitionPath, environmentPath := snapshotDefinition, snapshotEnvironment
+			if mode == 2 {
+				definition.Catalogs = []authored.Catalog{definition.Catalog}
+				// The singular stack deliberately has different toolchain bytes.
+				definition.Catalog = authored.Catalog{Base: "../override"}
+				writeSnapshotFixtureDocument(t, root, snapshotDefinition, definition)
+			}
 			if absolute {
 				definitionPath, environmentPath = filepath.Join(root, definitionPath), filepath.Join(root, environmentPath)
 				definition.Catalog.Base = filepath.Join(root, "catalog")
