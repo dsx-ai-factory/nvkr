@@ -1,0 +1,186 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+---
+name: NVKR NVKE node image publication
+
+# Copies the node images NVKR built to the HTTPS location the hardware site's imager reads, so the
+# hardware E2E workflow (nvkr-nvke-hardware-e2e.yml, ADR-18) can boot them. The imager cannot
+# present a token, and the registry that holds NVKR's publication needs one.
+#
+# This is a stand-in until NVKR's own boot-asset publication (ADR-20) serves that imager. That route
+# has core lifecycle APIs and no live exercise, and this workflow does not use it. This workflow
+# publishes nothing signed: each image is pulled by exact digest, checked to be a plain qcow2, copied
+# under a key that contains its sha256, read back from the object store with credentials and hashed.
+# The record it leaves is a description, carries qualificationAuthority "none", and is what an outputs
+# manifest for the hardware E2E workflow cites. It does not show that the hardware site can fetch the
+# URL or boot the image; a machine booting it does.
+#
+# A re-run is safe: the key holds the digest, so a second publication rewrites identical bytes and a
+# different image can never replace this one. That is why, unlike the hardware E2E workflow, a later attempt
+# is allowed.
+
+'on':
+  workflow_dispatch:
+    inputs:
+      release:
+        description: The NVKR release's publication root, oci://REPOSITORY@sha256:DIGEST. Pinned by digest, never by tag.
+        type: string
+        required: true
+      amd64-output:
+        description: The exact name of the release's amd64 node image disk output.
+        type: string
+        required: true
+      arm64-output:
+        description: The exact name of the release's arm64 node image disk output.
+        type: string
+        required: true
+      nvke-version:
+        description: The NVKE version both images were built at, such as v0.24.0-beta.12. The outputs manifest records it and the hardware lane compares it with the plan's.
+        type: string
+        required: true
+      dry-run:
+        description: Pull and check each image and name where it would go, without credentials, an upload or a record.
+        type: boolean
+        default: false
+
+permissions: {}
+
+concurrency:
+  group: nvkr-nvke-node-image-publish-${{ github.ref }}-${{ inputs.dry-run && 'dry-run' || 'run' }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: ${{ matrix.slot }}${{ inputs.dry-run && ' (dry run)' || '' }}
+    if: github.repository == 'dsx-ai-factory/nvkr'
+    runs-on: ubuntu-24.04
+    # The variables and the role live in this environment, outside the repository.
+    environment: s3-publish
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - slot: os-image-amd64
+            output: ${{ inputs.amd64-output }}
+          - slot: os-image-arm64
+            output: ${{ inputs.arm64-output }}
+    steps:
+      # The role trusts the main branch's environment, so a real run from anywhere else would fail at the
+      # credential step. Say so before a checkout instead.
+      - name: Admit the dispatch
+        env:
+          DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          if [ "$DRY_RUN" != true ] && [ "$REF" != refs/heads/main ]; then
+            echo "::error::a real publication starts from refs/heads/main, not $REF"
+            exit 1
+          fi
+
+      - name: Check the publication is configured
+        env:
+          DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
+          S3_URI: ${{ vars.S3_PUBLISH_S3_URI }}
+          ROLE_ARN: ${{ vars.S3_PUBLISH_AWS_ROLE_ARN }}
+          REGION: ${{ vars.S3_PUBLISH_AWS_REGION }}
+          CDN_DOMAIN: ${{ vars.S3_PUBLISH_CLOUDFRONT_DOMAIN }}
+        run: |
+          set -euo pipefail
+          required=(S3_URI REGION CDN_DOMAIN)
+          if [ "$DRY_RUN" != true ]; then required+=(ROLE_ARN); fi
+          missing=()
+          for name in "${required[@]}"; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error::the s3-publish environment lacks: ${missing[*]} (S3_PUBLISH_S3_URI, S3_PUBLISH_AWS_ROLE_ARN, S3_PUBLISH_AWS_REGION and S3_PUBLISH_CLOUDFRONT_DOMAIN)"
+            exit 1
+          fi
+
+      - name: Check out NVKR
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+
+      # Only release pull is used, so nothing here builds, signs or verifies anything.
+      - name: Build nvkr
+        env:
+          GOTOOLCHAIN: local
+          CGO_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          go build -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' -o "$RUNNER_TEMP/bin/nvkr" ./cmd/nvkr
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # A dry run takes no credentials: it pulls and checks, and names where the image would go.
+      - name: Configure AWS credentials
+        if: ${{ !inputs.dry-run }}
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.S3_PUBLISH_AWS_ROLE_ARN }}
+          aws-region: ${{ vars.S3_PUBLISH_AWS_REGION }}
+
+      - name: Publish the image and read it back
+        env:
+          SLOT: ${{ matrix.slot }}
+          OUTPUT: ${{ matrix.output }}
+          RELEASE: ${{ inputs.release }}
+          NVKE_VERSION: ${{ inputs.nvke-version }}
+          DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
+          S3_URI: ${{ vars.S3_PUBLISH_S3_URI }}
+          REGION: ${{ vars.S3_PUBLISH_AWS_REGION }}
+          CDN_DOMAIN: ${{ vars.S3_PUBLISH_CLOUDFRONT_DOMAIN }}
+          PREFIX: nvkr/os-image
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          flags=()
+          if [ "$DRY_RUN" = true ]; then flags+=(--dry-run); fi
+          df -h "$RUNNER_TEMP"
+          python3 scripts/hardware-e2e-publish-node-image.py ${flags[@]+"${flags[@]}"} \
+            --slot "$SLOT" --reference "$RELEASE" --output "$OUTPUT" --version "$NVKE_VERSION" \
+            --s3-uri "$S3_URI" --prefix "$PREFIX" --cdn-domain "$CDN_DOMAIN" --region "$REGION" \
+            --run-url "$RUN_URL" --nvkr "$RUNNER_TEMP/bin/nvkr" \
+            --work-dir "$RUNNER_TEMP/pull" --out "$RUNNER_TEMP/record"
+
+      # The entry to paste into the outputs manifest, with the run that checked it.
+      - name: Show the outputs manifest entry
+        if: ${{ !inputs.dry-run }}
+        env:
+          SLOT: ${{ matrix.slot }}
+        run: |
+          set -euo pipefail
+          {
+            echo "### $SLOT"
+            echo '```json'
+            jq .manifestEntry "$RUNNER_TEMP/record/$SLOT.json"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the publication record
+        if: ${{ !inputs.dry-run }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: nvkr-hardware-e2e-node-image-publication-${{ matrix.slot }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/record
+          if-no-files-found: error
+          retention-days: 90
