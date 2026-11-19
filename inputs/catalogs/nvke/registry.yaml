@@ -118,15 +118,15 @@ components:
     versionStamp:
       BUILD_VERSION: git-{{.Commit}}
     writeDir: bin
-  cwe:
-    artifactPath: bin/cwe.oci.tar
+  nvke-controller-module-tags:
+    artifactPath: bin/nvke-controller.oci.tar
     buildCommand:
     - sh
     - -ec
     - buildctl-daemonless.sh build --frontend dockerfile.v0 --local context=/src --local
       dockerfile=/src/controller --opt platform=linux/amd64 --opt "build-arg:BUILD_VERSION=$BUILD_VERSION"
       --opt "build-arg:GIT_VERSION=$GIT_VERSION" --opt "build-arg:SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH"
-      --output type=oci,dest=/src/bin/cwe.oci.tar,oci-mediatypes=true
+      --output type=oci,dest=/src/bin/nvke-controller.oci.tar,oci-mediatypes=true
     builderType: buildkit-rootless
     fromSource: true
     outputType: oci-image
@@ -181,7 +181,7 @@ components:
     - linux/arm64
     source: nvke-nktp-helm-nightly-site
     writeDir: charts
-  nktp-chart-release-components:
+  nktp-chart-release:
     artifactPath: charts/nktp-0.1.0.tgz
     buildCommand:
     - sh

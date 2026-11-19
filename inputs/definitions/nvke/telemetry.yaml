@@ -14,7 +14,7 @@ outputs:
 - catalog:
     base: ../../catalogs/nvke
   components:
-  - nktp-chart-release-components
+  - nktp-chart-release
   format: helm-oci
   name: nktp
   platform: linux/amd64

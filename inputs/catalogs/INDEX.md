@@ -68,11 +68,10 @@ Recorded declarations only; no producer selection or upstream pin-set verificati
 | <code>"nvke"</code> | <code>"cert-manager-webhook-image"</code> | <code>"acquisition"</code> |
 | <code>"nvke"</code> | <code>"cluster-api-provider-provisioned"</code> | <code>"source"</code> |
 | <code>"nvke"</code> | <code>"cluster-api-provider-provisioned-native-site"</code> | <code>"source"</code> |
-| <code>"nvke"</code> | <code>"cwe"</code> | <code>"source"</code> |
 | <code>"nvke"</code> | <code>"nktp-chart"</code> | <code>"source"</code> |
 | <code>"nvke"</code> | <code>"nktp-chart-native-site"</code> | <code>"source"</code> |
 | <code>"nvke"</code> | <code>"nktp-chart-nightly-site"</code> | <code>"source"</code> |
-| <code>"nvke"</code> | <code>"nktp-chart-release-components"</code> | <code>"source"</code> |
+| <code>"nvke"</code> | <code>"nktp-chart-release"</code> | <code>"source"</code> |
 | <code>"nvke"</code> | <code>"nktp-collector-image"</code> | <code>"acquisition"</code> |
 | <code>"nvke"</code> | <code>"nktp-kube-state-metrics-image"</code> | <code>"acquisition"</code> |
 | <code>"nvke"</code> | <code>"nktp-kubectl-image"</code> | <code>"acquisition"</code> |
@@ -87,6 +86,7 @@ Recorded declarations only; no producer selection or upstream pin-set verificati
 | <code>"nvke"</code> | <code>"nvke-controller-chart-native-site"</code> | <code>"source"</code> |
 | <code>"nvke"</code> | <code>"nvke-controller-chart-nightly-site"</code> | <code>"source"</code> |
 | <code>"nvke"</code> | <code>"nvke-controller-local-site"</code> | <code>"source"</code> |
+| <code>"nvke"</code> | <code>"nvke-controller-module-tags"</code> | <code>"source"</code> |
 | <code>"nvke"</code> | <code>"nvke-controller-native-site"</code> | <code>"source"</code> |
 | <code>"nvke"</code> | <code>"nvke-controller-profiles-image"</code> | <code>"source"</code> |
 | <code>"nvke"</code> | <code>"nvke-helm"</code> | <code>"source"</code> |

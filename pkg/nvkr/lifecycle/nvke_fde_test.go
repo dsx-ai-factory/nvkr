@@ -74,7 +74,7 @@ func TestNVKEFDEOnlyGeneratedSelection(t *testing.T) {
 	}
 }
 
-func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
+func TestNVKEIncludesBothNativeFDEImages(t *testing.T) {
 	repo, err := filepath.Abs("../../..")
 	if err != nil {
 		t.Fatal(err)
@@ -98,13 +98,13 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		cert-manager-controller-image cert-manager-controller-image-arm64
 		cert-manager-webhook-image cert-manager-webhook-image-arm64
 		cluster-api-provider-provisioned controller-chart
-		csi-node-driver-registrar-image csi-node-driver-registrar-image-arm64 cwe
+		csi-node-driver-registrar-image csi-node-driver-registrar-image-arm64
 		nico-reference-profiles-fixture nktp nktp-collector-image nktp-collector-image-arm64
 		nktp-kube-state-metrics-image nktp-kube-state-metrics-image-arm64
 		nktp-kubectl-image nktp-kubectl-image-arm64 nktp-lgtm-image nktp-lgtm-image-arm64
 		nktp-metrics-server-image nktp-metrics-server-image-arm64 nktp-node-exporter-image nktp-node-exporter-image-arm64
 		nktp-operator-image nktp-operator-image-arm64 nktp-target-allocator-image nktp-target-allocator-image-arm64
-		nvke-node-fde-amd64 nvke-node-fde-arm64 nvke-node-image-amd64 nvke-node-image-arm64
+		nvke-controller nvke-node-fde-amd64 nvke-node-fde-arm64 nvke-node-image-amd64 nvke-node-image-arm64
 		nvkectl nvkectl-linux-arm64 operator-tools postgresql postgresql-image postgresql-image-arm64
 		spiffe-csi-image spiffe-csi-image-arm64 spire spire-agent-image spire-agent-image-arm64
 		spire-bash-image spire-bash-image-arm64 spire-controller-manager-image spire-controller-manager-image-arm64
@@ -120,7 +120,7 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 		}
 	}
 	if !slices.Equal(names, wantNames) || len(diskOutputs) != 4 {
-		t.Fatalf("maintained M2 must retain all 69 outputs and four native disks: names=%v, disks=%d", names, len(diskOutputs))
+		t.Fatalf("maintained NVKE must retain all 69 outputs and four native disks: names=%v, disks=%d", names, len(diskOutputs))
 	}
 	// This contract concerns the four native disk closures. Compiling unrelated
 	// controllers and charts adds no FDE signal and requires a synthetic Git source.
@@ -138,7 +138,7 @@ func TestNVKEM2IncludesBothNativeFDEImages(t *testing.T) {
 	}
 	if plan.Qualification != factory.TierPipelineAttested || !factory.PerOutputPublication(plan) ||
 		plan.Environment.Signing == nil || plan.Environment.DiskEvidence != "build-provenance-v1" {
-		t.Fatal("maintained M2 lost its publication and evidence policy")
+		t.Fatal("maintained NVKE lost its publication and evidence policy")
 	}
 	for _, tc := range []struct {
 		arch, installer, patched, plain, toolchain, firmwareCode, firmwareVars, memory string

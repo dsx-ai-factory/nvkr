@@ -70,11 +70,12 @@ func TestCIRestrictsAutomaticSelectionOnly(t *testing.T) {
 
 // These fixed bytes were captured with the pre-dashboard base executable at
 // 3558650e986cd7600558e4e38b77da5b89d780f0, not regenerated from this implementation.
-// Only input-dependent identities, relocated catalog paths and renamed producer/tool
+// Input-dependent identities, relocated catalog paths and renamed producer/tool
 // selectors are adapted below.
+// The Definition inspection fixture was regenerated after its input names changed.
 func TestDefaultLeafBytesMatchPreDashboardFixtures(t *testing.T) {
 	lifecycleCommandRepo(t)
-	const maintainedPlan = ".github/nvkr-run/plan.json"
+	const maintainedPlan = ".github/nvkr-run-nvke/plan.json"
 	for _, test := range []struct {
 		name, fixture string
 		args          []string
@@ -103,15 +104,18 @@ func TestDefaultLeafBytesMatchPreDashboardFixtures(t *testing.T) {
 						t.Fatal(err)
 					}
 					want = bytes.ReplaceAll(want, []byte(capturedDigest), []byte(digest))
+					want = bytes.ReplaceAll(want, []byte("definition: nvke-v1\n"), []byte("definition: nvke-module-tags\n"))
 				} else {
-					const capturedCatalog = `"base":"./catalog"`
+					const capturedCatalog = `"base":"../../../inputs/catalogs/nvke/module-tags"`
 					if bytes.Count(want, []byte(capturedCatalog)) != 1 {
 						t.Fatal("Definition fixture lost its captured catalog path")
 					}
 					want = bytes.ReplaceAll(want, []byte(capturedCatalog), []byte(fmt.Sprintf(`"base":%q`, definition.Catalog.Base)))
 					want = []byte(strings.NewReplacer(`"cosignTool":"cosign"`, `"cosignTool":"cosign-module-tags"`,
 						`"sbomTool":"syft"`, `"sbomTool":"syft-module-tags"`,
-						`"components":["nvkectl"]`, `"components":["nvkectl-module-tags"]`).Replace(string(want)))
+						`"components":["nvkectl"]`, `"components":["nvkectl-module-tags"]`,
+						`"components":["nvke-controller"]`, `"components":["nvke-controller-module-tags"]`,
+						`"name":"nvke-v1"`, `"name":"nvke-module-tags"`).Replace(string(want)))
 				}
 			}
 			if test.fixture == "identical-plans.txt" {

@@ -20,7 +20,7 @@ func TestReleaseNKTPRetainsHelmForPackaging(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	component := cat.Components["nktp-chart-release-components"]
+	component := cat.Components["nktp-chart-release"]
 	realCopy, err := exec.LookPath("cp")
 	if err != nil {
 		t.Fatal(err)

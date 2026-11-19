@@ -1,50 +1,9 @@
-# ARM64 nightly producer with upstream OVN
+# Retired ARM64 upstream OVN nightly producer
 
-This is the explicit upstream OVN v1.4.0 alternative to `arm64-nvidia-kvm.json`. It retains all 29
-selected components, platforms and Helm image bindings from
-`arm64-upstream-tcg.json`. The root `../../catalogs/nvke` supplies only
-the existing pinned GitHub Actions, Syft and cosign tools. It does not replace selected output producers.
-The profiles image uses the public output name `controller-profiles` required by the native NVKE
-deployment renderer; it selects the same upstream OVN profiles catalog and component. The former local
-output name `controller-profiles-upstream-ovn` is not an additional output or a fallback.
+The signed ARM64 upstream OVN producer, its Definition and generated workflow are retired.
+The old build/publish/consume coordinator had already been replaced by the
+[AMD64 local E2E nightly](../../../docs/nvke-nightly.md). That nightly does not establish ARM64 coverage.
 
-The CLI, controller image, controller chart and NKTP chart share the profile-owned
-[nightly site catalog](../../catalogs/nvke/notes/nvke-nightly-site-arm64-README.md). `installer-tools-arm64` shares the
-separate [nightly installer-tools catalog](../../catalogs/tools/notes/tools-installer-hosted-arm64-README.md);
-other output catalog selections remain explicit. Four tools
-remain source-built with executable `host-package` output types; clusterctl selects 1.13.6 to
-match the beta installer, while kind, kubectl and ORAS retain their existing pins.
-Helm 4.2.4 is acquired by exact archive/executable digest because its diagnostic source preparation
-is unsupported by hosted fetching. Its recorded binary security scan has findings; this is an
-exception disclosure, not a security-pass or complete-source-build claim.
-
-The disk first applies `../../catalogs/node-images/variants/nvidia-kvm.json`, selecting the base catalog's required-KVM
-ARM64 producer while retaining the explicit NVIDIA OVN replacements. `../../catalogs/node-images/variants/upstream-kvm.json` then
-replaces the same three OVN producers with the original upstream producer definitions. Its reviewed
-predecessor digest is recomputed by the catalog owner for that KVM stack. The standalone image/chart,
-disk CNI packages and controller profiles remain one explicit matched selection. No NVIDIA fallback
-or compatibility, FIPS/STIG or qualification claim is implied.
-
-`../../environments/github-nightly-upstream.json` uses the existing native ARC ARM64 resource contract, `build-provenance-v1`
-disk evidence and `per-output-v1` signed publication. The workflow namespace is
-`nvke-nightly-upstream-ovn-arm64`; the Environment declares its exact main-branch signing identity and
-`ghcr.io/dsx-ai-factory/nvkr/nightly/nvke-nightly-upstream-ovn-arm64` publication prefix.
-These candidate settings do not establish live runner, source, registry or protected-environment access.
-
-```sh
-bin/nvkr definition validate --definition inputs/definitions/demo/arm64-upstream-kvm.json
-bin/nvkr run generate \
-  --definition inputs/definitions/demo/arm64-upstream-kvm.json \
-  --environment inputs/environments/github-nightly-upstream.json
-```
-
-The Environment selects `githubRuntimePlan: true`. Each dispatch freezes current catalog pins within
-the reviewed workflow/action and Environment contract, so routine source-version updates need no
-regeneration commit. CI checks that contract with `run generate --runtime --check`; changes to the
-execution contract still require normal regeneration and review.
-
-This generated workflow remains a manually dispatched publication diagnostic.
-The scheduled [nightly Go test](../../../docs/nvke-nightly.md) builds and tests
-locally on public hosted AMD64. No maintained nightly dispatches this producer
-or consumes its published artifacts. Definition validation and
-generation do not establish a successful build, VM runtime or hardware acceptance.
+Use the maintained [NVKE composite](../nvke/README.md) for signed product publication, or the retained
+local TCG diagnostic inputs for platform-specific development. The composite is not a byte-equivalent
+replacement for the former manual ARM64 diagnostic selection. Historical Runs retain their original scope.

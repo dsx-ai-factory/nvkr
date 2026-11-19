@@ -85,7 +85,7 @@
       "format": "helm-oci",
       "helm": {
         "images": {
-          "controller": "cwe"
+          "controller": "nvke-controller"
         }
       },
       "name": "controller-chart",
@@ -111,17 +111,6 @@
       ],
       "format": "oci",
       "name": "csi-node-driver-registrar-image-arm64",
-      "platform": "linux/arm64"
-    },
-    {
-      "catalog": {
-        "base": "../../catalogs/nvke"
-      },
-      "components": [
-        "nvke-controller-native-site"
-      ],
-      "format": "oci",
-      "name": "cwe",
       "platform": "linux/arm64"
     },
     {
@@ -205,6 +194,17 @@
       ],
       "format": "helm-oci",
       "name": "nktp",
+      "platform": "linux/arm64"
+    },
+    {
+      "catalog": {
+        "base": "../../catalogs/nvke"
+      },
+      "components": [
+        "nvke-controller-native-site"
+      ],
+      "format": "oci",
+      "name": "nvke-controller",
       "platform": "linux/arm64"
     },
     {

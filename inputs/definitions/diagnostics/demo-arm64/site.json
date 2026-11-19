@@ -16,7 +16,7 @@
       "format": "helm-oci",
       "helm": {
         "images": {
-          "controller": "cwe"
+          "controller": "nvke-controller"
         }
       },
       "name": "controller-chart",
@@ -35,18 +35,18 @@
     },
     {
       "components": [
-        "nvke-controller-local-site"
-      ],
-      "format": "oci",
-      "name": "cwe",
-      "platform": "linux/arm64"
-    },
-    {
-      "components": [
         "nktp-chart"
       ],
       "format": "helm-oci",
       "name": "nktp",
+      "platform": "linux/arm64"
+    },
+    {
+      "components": [
+        "nvke-controller-local-site"
+      ],
+      "format": "oci",
+      "name": "nvke-controller",
       "platform": "linux/arm64"
     },
     {

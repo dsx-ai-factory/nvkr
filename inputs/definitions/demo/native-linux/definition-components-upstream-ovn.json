@@ -50,7 +50,7 @@
         "nvke-controller-local-site"
       ],
       "format": "oci",
-      "name": "cwe",
+      "name": "nvke-controller",
       "platform": "linux/arm64"
     }
   ]

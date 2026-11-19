@@ -121,7 +121,7 @@ outputs:
   format: helm-oci
   helm:
     images:
-      controller: cwe
+      controller: nvke-controller
   name: controller-chart
   platform: linux/amd64
 - catalog:
@@ -138,7 +138,7 @@ outputs:
   components:
   - nvke-controller
   format: oci
-  name: cwe
+  name: nvke-controller
   platforms:
   - linux/amd64
   - linux/arm64

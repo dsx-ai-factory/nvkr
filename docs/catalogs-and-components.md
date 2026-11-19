@@ -12,6 +12,11 @@ and dependency graphs; actual builds and output checks validate the declared pro
 The example packages two application tools: `app-cli` for users and `config-cli` for administrators.
 The `client-bundle` contains `app-cli`; the `admin-bundle` contains both tools.
 
+GitHub tree generation uses `metadata.name` in a readable frozen-record path. Catalog validation alone
+need not reject a name that storage cannot represent: generation refuses parent segments, control/format
+characters and other unsafe path spellings with `NVKR-E-PIPELINE-DRIFT`. It does not normalize names.
+Uppercase letters and safe nested names are permitted. See the [tree layout](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/generated-plan-tree.md).
+
 ## Author declarations; generate pins
 
 The catalog has two files:
@@ -119,13 +124,14 @@ the same ordered list after rebasing paths.
 records `builds[].selectedCatalog` and the complete `catalogCandidates` snapshots. Validation rechecks
 the whole output's choice, including every native child of a platform set.
 
-The maintained NVKE Definition uses four stacks: `nvke`, `runtime-dependencies`, `node-images`
+The retained combined NVKE comparison fixture uses four stacks: `nvke`, `runtime-dependencies`, `node-images`
 with its native-toolchain overlay, and `tools`. Two explicit `nvkectl` overrides retain the
 module-tag producer selection within the consolidated `nvke` catalog. Its 69 output names and all
 73 native producer selections stay unchanged. Source-built image outputs already use platform sets. Acquired
 image pairs remain separate: aggregate packaging currently requires built OCI exports. Disk outputs
 remain native, and executable-index migration belongs to issues #297, #296 and #376 with their
-qualification prerequisites. No output rename or consumer mapping changes in this migration.
+qualification prerequisites. Catalog-list selection alone does not rename outputs or change consumer mappings.
+Maintained generation still uses the composite built from family files.
 
 ## Find components
 

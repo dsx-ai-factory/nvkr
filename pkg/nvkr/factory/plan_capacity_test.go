@@ -8,11 +8,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func TestMaintainedDomainCatalogPlansFitReadBound(t *testing.T) {
-	for _, bundle := range []string{"nvkr-run", "nvkr-dev", "nvkr-run-nvke-gpu-site", "nvkr-run-nvke-nightly-gpu-site"} {
+	for _, bundle := range []string{"nvkr-dev", "nvkr-run-nvke", "nvkr-run-nvke-nightly"} {
 		t.Run(bundle, func(t *testing.T) {
 			path := filepath.Join("../../..", ".github", bundle, "plan.json")
 			info, err := os.Stat(path)
@@ -22,8 +23,16 @@ func TestMaintainedDomainCatalogPlansFitReadBound(t *testing.T) {
 			if info.Size() > MaxPlanBytes {
 				t.Fatalf("maintained Plan is %d bytes, limit %d", info.Size(), MaxPlanBytes)
 			}
-			if _, err := LoadPlanContext(t.Context(), path); err != nil {
+			plan, err := LoadPlanContext(t.Context(), path)
+			if err != nil {
 				t.Fatal(err)
+			}
+			raw, err := canonical.Marshal(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if int64(len(raw)) > MaxPlanBytes {
+				t.Fatalf("joined maintained Plan is %d bytes, limit %d", len(raw), MaxPlanBytes)
 			}
 		})
 	}

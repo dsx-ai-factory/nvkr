@@ -111,7 +111,7 @@ func TestPrepareLocalNVKESourceFreezesCapturedAMD64Graph(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := range definition.Outputs {
-		if definition.Outputs[i].Name == "cwe" {
+		if definition.Outputs[i].Name == "nvke-controller" {
 			definition.Catalogs = []authored.Catalog{*definition.Outputs[i].Catalog}
 			definition.Outputs[i].Catalog = nil
 		}

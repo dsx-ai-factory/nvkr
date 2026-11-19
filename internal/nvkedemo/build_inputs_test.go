@@ -37,7 +37,7 @@ func TestLocalKVMInputsPreserveSelectedOutputsAndSources(t *testing.T) {
 				"cluster-api-provider-provisioned-arm64": {Base: "../../catalogs/nvke"},
 				"controller-chart":                       {Base: "../../catalogs/nvke"},
 				"controller-profiles":                    {Base: "../../catalogs/nvke"},
-				"cwe":                                    {Base: "../../catalogs/nvke"},
+				"nvke-controller":                        {Base: "../../catalogs/nvke"},
 				"nktp":                                   {Base: "../../catalogs/nvke"},
 				"nvkectl":                                {Base: "../../catalogs/nvke"},
 				"nvke-node-image-arm64":                  {Base: "../../catalogs/node-images", Overlays: []string{"../../catalogs/node-images/variants/native-nvidia.json", "../../catalogs/node-images/variants/native-local-kvm.json"}},

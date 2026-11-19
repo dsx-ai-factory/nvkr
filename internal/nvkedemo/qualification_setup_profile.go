@@ -62,7 +62,7 @@ func bindDemoQualificationScope(p *lifecycle.LocalQualificationPolicy, plan *fac
 		"capi-exec-init-image-arm64": "native-capi-exec-init-image", "capi-exec-plugin-image-arm64": "native-capi-exec-plugin-image",
 		"workload-image-arm64": "native-workload-image",
 		"controller-profiles":  "nvke-local-profiles", "csi-node-driver-registrar-image-arm64": "csi-node-driver-registrar-image",
-		"cwe": "nvke-controller-native-site", "ovn-image-arm64": "ovn-kube-ubuntu", "postgresql-image-arm64": "postgresql-image",
+		"nvke-controller": "nvke-controller-native-site", "ovn-image-arm64": "ovn-kube-ubuntu", "postgresql-image-arm64": "postgresql-image",
 		"spiffe-csi-image-arm64": "spiffe-csi-image", "spire-agent-image-arm64": "spire-agent-image", "spire-bash-image-arm64": "spire-bash-image",
 		"spire-controller-manager-image-arm64": "spire-controller-manager-image", "spire-oidc-image-arm64": "spire-oidc-image",
 		"spire-server-image-arm64": "spire-server-image", "spire-tpm-server-image-arm64": "spire-tpm-server-image",
@@ -77,7 +77,7 @@ func bindDemoQualificationScope(p *lifecycle.LocalQualificationPolicy, plan *fac
 		delete(charts, "ovn-chart-arm64")
 		images["controller-profiles-upstream-ovn"] = "nvke-local-profiles-upstream"
 		images["cluster-api-provider-provisioned-arm64"] = "cluster-api-provider-provisioned"
-		images["cwe"] = "nvke-controller-local-site"
+		images["nvke-controller"] = "nvke-controller-local-site"
 		charts["controller-chart"], charts["nktp"] = "nvke-controller-chart-local-site", "nktp-chart"
 		charts["postgresql"], charts["spire"], charts["spire-crds"], charts["temporal"] = "postgresql-chart", "spire-chart", "spire-crds-chart", "temporal-chart"
 		cli = "nvkectl-local-site"

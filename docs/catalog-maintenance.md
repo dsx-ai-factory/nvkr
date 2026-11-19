@@ -253,8 +253,8 @@ applies the patch to `catalog-maintenance/<definition>` and opens or updates the
 closes a stale PR and deletes its branch. The `refresh` job writes the PR body with `jq` from the `catalog
 refresh --json` result, so the body is part of the rendered workflow. Unlike `GITHUB_TOKEN` writes, the App's
 branch updates and PR events start the PR's own workflow runs without a maintainer approving them. Because the
-token can write workflows, a candidate whose closure regenerates a generated workflow file (`nvkr-run.yml` and,
-when named, `nvkr-dev.yml`, `nvkr-qualify.yml`, `nvkr-smoke.yml` or an additional Run's workflow) is published
+token can write workflows, a candidate whose closure regenerates a generated workflow file (`nvkr-run-nvke.yml` and,
+when named, `nvkr-dev.yml`, `nvkr-qualify-nvke.yml`, `nvkr-smoke-nvke.yml` or an additional Run's workflow) is published
 like any other generated file; patch admission still refuses every other workflow path. An ordinary source or
 artifact pin change leaves every generated workflow byte-identical (it updates the lock, Plans and manifests);
 the pin-only fixtures assert this for the production, development and qualification workflows. A topology,
@@ -317,7 +317,7 @@ interruption between the two converges on the next run. The one file matching
 prefix `<d>` only names the review branch `catalog-maintenance/<d>`. Adding or removing such a file is a reviewed
 change. Exactly one policy can be enrolled until each Definition owns a generated bundle root, because
 `catalog refresh` always checks the bundle at the repository root; rendering and the `discover` job both fail on
-a second policy. Today only `nvke` is enrolled, for the `nvke-m2` Definition. Its policy selects the NVKE
+a second policy. Today only `nvke` is enrolled, for the `nvke` Definition. Its policy selects the NVKE
 umbrella and `nvke-helm`, so the NVKE release and its derived chart pins move together within the registry
 constraints. It cannot widen them.
 
@@ -377,7 +377,7 @@ constraints. It cannot widen them.
   `pull_request` runs, and the required checks are a merge precondition; they are repository settings and are
   not enforced by this workflow. The maintained
   Run stays manual and default-branch-only, so candidate execution and qualification are separate runs that
-  nothing here performs or claims. A `static` policy such as `nvke-m2` is validated by the PR checks only;
+  nothing here performs or claims. A `static` policy such as `nvke` is validated by the PR checks only;
   `local-run` cannot execute its Environment.
 - **Repository settings the workflow does not enforce.** These are hard prerequisites. The release owner or a
   repository administrator must validate them before anyone relies on scheduled writes; this repository does
@@ -422,7 +422,7 @@ catalog-refresh-check`: it renders `catalog update-ci` with the canonical genera
 difference from `.github/workflows/catalog-refresh.yaml`. The merge gate's regeneration job runs it, and a
 change to the installed file triggers that job. The policy file is a CODEOWNERS trust root, because it decides
 which pins move and which bundles are regenerated. A changed shared lock is tested against the production and
-development bundles with real local Git fixtures, and a pin-only change is asserted to leave `nvkr-run.yml`
+development bundles with real local Git fixtures, and a pin-only change is asserted to leave the fixture workflow
 byte-identical. A runtime-Plan member whose committed Plan lags the lock passes the closure check through its
 own owner, an edited workflow byte in it is still refused before pin work, and its regeneration moves the Plan
 but not the workflow. An additional Run's colliding pin-set root is refused before compilation fetches it. A
@@ -442,7 +442,8 @@ moves only the `nvke` and `nvke-helm` pins and regenerates the bundles, so it ch
 Today the exact `v0.23.0` constraints keep refreshes a no-op. Before a constraint allows the NVKE release to
 move, review and update together, in one authored change: the selection source pin, the image references and
 their native digest locks, the Definition's image outputs, the qualification policy's `nonToolOutputs`, and the
-expected images in `pkg/nvkr/buildgraph/nvke_m2_images_test.go`. That test fails, naming this section, when the
+expected images in `TestMaintainedNVKEDeploymentImageMembership` in `pkg/nvkr/buildgraph/nvke_images_test.go`.
+That test names its source file and this section when the
 selection commit and the controller's NVKE commit diverge. Maintenance does not perform or check this
 coordination; it is a documented limit, not a capability.
 

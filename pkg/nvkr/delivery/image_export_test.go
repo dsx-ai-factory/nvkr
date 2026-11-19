@@ -207,9 +207,9 @@ func TestExportPublishedImagePreservesNativeBytes(t *testing.T) {
 					child = candidate
 				}
 			}
-			reference := "registry.example.test/qualification/cwe@" + child.ManifestDigest
+			reference := "registry.example.test/qualification/nvke-controller@" + child.ManifestDigest
 			archive := filepath.Join(t.TempDir(), "image.tar")
-			result, err := ExportPublishedImage(t.Context(), root, "cwe", reference, platform, archive)
+			result, err := ExportPublishedImage(t.Context(), root, "nvke-controller", reference, platform, archive)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -265,7 +265,7 @@ func TestExportPublishedImagePreservesNativeBytes(t *testing.T) {
 			if digestBytes(archiveBytes) != result.ArchiveDigest || int64(len(archiveBytes)) != result.Size {
 				t.Fatal("archive observation mismatch")
 			}
-			_, err = ExportPublishedImage(t.Context(), root, "cwe", reference, platform, archive)
+			_, err = ExportPublishedImage(t.Context(), root, "nvke-controller", reference, platform, archive)
 			assertRegistryCode(t, err, e.CodeImmutableViolation)
 		})
 	}
@@ -275,14 +275,14 @@ func TestExportPublishedImageRejectsSubstitutionBeforeOutput(t *testing.T) {
 	for _, scenario := range []string{"wrong digest", "tag", "missing platform", "unsupported platform", "wrong object", "canceled"} {
 		t.Run(scenario, func(t *testing.T) {
 			root, _, index := registryImageIndexFixture(t)
-			reference, platform, object := "registry.example.test/cwe@"+index.Children[0].ManifestDigest, index.Children[0].Platform, "cwe"
+			reference, platform, object := "registry.example.test/nvke-controller@"+index.Children[0].ManifestDigest, index.Children[0].Platform, "nvke-controller"
 			ctx := t.Context()
 			code := e.CodeVerifyFailed
 			switch scenario {
 			case "wrong digest":
-				reference = "registry.example.test/cwe@sha256:" + strings.Repeat("a", 64)
+				reference = "registry.example.test/nvke-controller@sha256:" + strings.Repeat("a", 64)
 			case "tag":
-				reference = "registry.example.test/cwe:latest"
+				reference = "registry.example.test/nvke-controller:latest"
 				code = e.CodeUsage
 			case "missing platform":
 				platform = ""
@@ -321,8 +321,8 @@ func TestExportPublishedImageRejectsTrailingDestinationSeparatorBeforeSourceAcce
 					t.Fatal(err)
 				}
 			}
-			_, err := ExportPublishedImage(t.Context(), "/missing-publication", "cwe",
-				"registry.example.test/cwe@sha256:"+strings.Repeat("a", 64), "linux/amd64", out+string(filepath.Separator))
+			_, err := ExportPublishedImage(t.Context(), "/missing-publication", "nvke-controller",
+				"registry.example.test/nvke-controller@sha256:"+strings.Repeat("a", 64), "linux/amd64", out+string(filepath.Separator))
 			assertRegistryCode(t, err, e.CodeUsage)
 			if existing {
 				entries, err := os.ReadDir(out)
@@ -349,7 +349,7 @@ func TestExportPublishedImageRejectsDuplicateNameAcrossKindsBeforeOutput(t *test
 				// Preserve this distinct SBOM descriptor and its different Kind so
 				// the rejection exercises release-name membership, not duplicate
 				// descriptors or an identical name/Kind pair.
-				object.Name = "cwe"
+				object.Name = "nvke-controller"
 				sortObjects(publication.Objects)
 				return
 			}
@@ -358,8 +358,8 @@ func TestExportPublishedImageRejectsDuplicateNameAcrossKindsBeforeOutput(t *test
 	})
 	directory := t.TempDir()
 	child := index.Children[0]
-	result, err := ExportPublishedImage(t.Context(), root, "cwe",
-		"registry.example.test/cwe@"+child.ManifestDigest, child.Platform,
+	result, err := ExportPublishedImage(t.Context(), root, "nvke-controller",
+		"registry.example.test/nvke-controller@"+child.ManifestDigest, child.Platform,
 		filepath.Join(directory, "image.tar"))
 	assertRegistryCode(t, err, e.CodeVerifyFailed)
 	if !strings.Contains(err.Error(), "duplicate release object name") {

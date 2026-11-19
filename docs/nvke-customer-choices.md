@@ -1,17 +1,20 @@
 # NVKE inputs and customer choices
 
-The [maintained NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/definition.yaml) selects 69 named outputs, including independent
+The [maintained NVKE composite](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/gpu-site.composite.yaml) selects 83 named outputs, including independent
 `linux/amd64` and `linux/arm64` plain and public-bootstrap FDE disks. FDE publication carries build provenance
 without inspected-content or deployed-confidentiality claims; see the [candidate's FDE scope](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md#native-execution-and-publication).
 The catalog owns producer commands, material edges and
 component-exposed Packer variables. The Environment owns runner, runtime, registry and signing choices.
 There is no generic Definition `overrides` field or arbitrary Packer/HCL rewriting.
 
+The NVKE tests below retain the former combined Definition as a comparison fixture; they do not exercise
+the complete maintained composite. Its current membership is owned by the pinned family Definitions.
+
 ## Input evidence map
 
 | Field or choice | Owning source | Required check |
 |---|---|---|
-| Each disk's exact root and complete material set | M2 Definition and `inputs/catalogs/node-images/registry.yaml` | Resolve the explicitly selected closure for its native platform. |
+| Each disk's exact root and complete material set | NVKE Definition and `inputs/catalogs/node-images/registry.yaml` | Resolve the explicitly selected closure for its native platform. |
 | OS, Calico and kubeadm source | `inputs/catalogs/node-images/pins.lock.yaml`, NVKE `v0.23.0` at `2cfd00081b468d85a4894ec17e9deac13c9d8169` | Exact commit/tree/epoch; each producer retains its own source binding. |
 | SPIRE packaging selection | The same v0.23.0 lock selects `nvke-spire-agent-source` | Source-owned SPIRE 1.14.1 and TPM plugin 1.9.0, Debian revision 4; this release package omits DSX IMDS. |
 | DOCA OVS packages | The same v0.23.0 lock selects `nvke-doca-ovs-source` | NVIDIA's DOCA OVS 3.5.0 debs for the image's Ubuntu series, each checked against NVKE's committed lock; binary-only, with no published source. |
@@ -50,7 +53,7 @@ Definitions, supplier overlays, per-output stacks and retained before/after Plan
 building `nvkr`; its supplier is explicitly a fixture, not a production NVKE package. It avoids inventing
 an unverified package URL or digest in this guide.
 
-The maintained-Definition test `TestMaintainedM2CustomerMaterialReplacement` applies catalog stacks and compiles both
+The maintained-Definition test `TestMaintainedNVKECustomerMaterialReplacement` applies catalog stacks and compiles both
 native disk graphs with fixture source and acquired Calico suppliers. It checks changed Build identity
 and exact material dependency edges. Its negative cases check Resolve selection errors for a missing
 material, an unknown component and a platform mismatch; they do not test supplier downloads, missing
@@ -62,9 +65,9 @@ contracts, not container or image-build tests.
 With authorized access to the exact private source objects:
 
 ```sh
-NVKR_TEST_M2_ALL_OUTPUT_GRAPHS=1 go test ./pkg/nvkr/buildgraph \
-  -run '^TestMaintainedM2AllOutputGraphs$' -count=1
-go test ./pkg/nvkr/buildgraph -run '^TestMaintainedM2CustomerMaterialReplacement$' -count=1
+NVKR_TEST_NVKE_ALL_OUTPUT_GRAPHS=1 go test ./pkg/nvkr/buildgraph \
+  -run '^TestMaintainedNVKEAllOutputGraphs$' -count=1
+go test ./pkg/nvkr/buildgraph -run '^TestMaintainedNVKECustomerMaterialReplacement$' -count=1
 ```
 
 The complete test invokes public `factory.CompileDocuments`, including production's ordered overlay

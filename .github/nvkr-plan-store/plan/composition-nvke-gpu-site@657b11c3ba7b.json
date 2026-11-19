@@ -1,0 +1,426 @@
+{
+  "effectiveDefinitionDigest": "sha256:4ddb789b8fc92e32570358827dcf82a7365778a447da1a7d42380fefe7c3b109",
+  "kind": "CompositeDefinition",
+  "members": [
+    {
+      "digest": "sha256:06013783f5647a30e988f297adfd3c83941b0d5d4e9973b72372810b0d90eae2",
+      "name": "aicr-nvke-gb200"
+    },
+    {
+      "digest": "sha256:2e5fe8538411eb9504238011100499d8dfd0ed889616d687641b6f5c5184f7fe",
+      "name": "nvke-core"
+    },
+    {
+      "digest": "sha256:6d0770da5060e5a17620ee6678f16218172234b76f65a95fa37dd1c53fdec7b5",
+      "name": "nvke-disks"
+    },
+    {
+      "digest": "sha256:4590053e9d1e607e9b37faf697a72d93237cebe3ba7139527b106da6715c61cf",
+      "name": "nvke-disks-ubuntu24"
+    },
+    {
+      "digest": "sha256:3a3f5c2ac3ef6edaf6fdf2edf577e65dbcabccac3370e9647996202e57aaf8a0",
+      "name": "nvke-services"
+    },
+    {
+      "digest": "sha256:70fd73fd73541e434538163de5a4518fcf7082702f48e52e0abbef24a6a0cace",
+      "name": "nvke-telemetry"
+    }
+  ],
+  "metadata": {
+    "description": "Build and publish an NVKE GPU site as one Release from the five NVKE family Definitions and the GB200 AICR bundles.",
+    "name": "nvke-gpu-site"
+  },
+  "outputs": [
+    {
+      "member": "aicr-nvke-gb200",
+      "output": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
+    },
+    {
+      "member": "aicr-nvke-gb200",
+      "output": "aicr-nvke-gb200-ubuntu-training-kubeflow-flux"
+    },
+    {
+      "member": "aicr-nvke-gb200",
+      "output": "aicr-nvke-gb200-ubuntu-training-kubeflow-helm"
+    },
+    {
+      "member": "nvke-core",
+      "output": "capi-controller-image"
+    },
+    {
+      "member": "nvke-core",
+      "output": "capi-controller-image-arm64"
+    },
+    {
+      "member": "nvke-core",
+      "output": "capi-kubeadm-bootstrap-image"
+    },
+    {
+      "member": "nvke-core",
+      "output": "capi-kubeadm-bootstrap-image-arm64"
+    },
+    {
+      "member": "nvke-core",
+      "output": "capi-kubeadm-control-plane-image"
+    },
+    {
+      "member": "nvke-core",
+      "output": "capi-kubeadm-control-plane-image-arm64"
+    },
+    {
+      "member": "nvke-core",
+      "output": "capnico-controller"
+    },
+    {
+      "member": "nvke-core",
+      "output": "cert-manager-cainjector-image"
+    },
+    {
+      "member": "nvke-core",
+      "output": "cert-manager-cainjector-image-arm64"
+    },
+    {
+      "member": "nvke-core",
+      "output": "cert-manager-controller-image"
+    },
+    {
+      "member": "nvke-core",
+      "output": "cert-manager-controller-image-arm64"
+    },
+    {
+      "member": "nvke-core",
+      "output": "cert-manager-webhook-image"
+    },
+    {
+      "member": "nvke-core",
+      "output": "cert-manager-webhook-image-arm64"
+    },
+    {
+      "member": "nvke-core",
+      "output": "cluster-api-provider-provisioned"
+    },
+    {
+      "member": "nvke-core",
+      "output": "controller-chart"
+    },
+    {
+      "member": "nvke-core",
+      "output": "controller-profiles"
+    },
+    {
+      "member": "nvke-services",
+      "output": "csi-node-driver-registrar-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "csi-node-driver-registrar-image-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "local-path-helper-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "local-path-helper-image-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "local-path-provisioner"
+    },
+    {
+      "member": "nvke-services",
+      "output": "local-path-provisioner-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "local-path-provisioner-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "local-path-provisioner-image-arm64"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-collector-image"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-collector-image-arm64"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-kube-state-metrics-image"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-kube-state-metrics-image-arm64"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-kubectl-image"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-kubectl-image-arm64"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-lgtm-image"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-lgtm-image-arm64"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-metrics-server-image"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-metrics-server-image-arm64"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-node-exporter-image"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-node-exporter-image-arm64"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-operator-image"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-operator-image-arm64"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-target-allocator-image"
+    },
+    {
+      "member": "nvke-telemetry",
+      "output": "nktp-target-allocator-image-arm64"
+    },
+    {
+      "member": "nvke-core",
+      "output": "nvke-controller"
+    },
+    {
+      "member": "nvke-disks",
+      "output": "nvke-node-fde-amd64"
+    },
+    {
+      "member": "nvke-disks",
+      "output": "nvke-node-fde-arm64"
+    },
+    {
+      "member": "nvke-disks-ubuntu24",
+      "output": "nvke-node-fde-ubuntu24-amd64"
+    },
+    {
+      "member": "nvke-disks-ubuntu24",
+      "output": "nvke-node-fde-ubuntu24-arm64"
+    },
+    {
+      "member": "nvke-disks",
+      "output": "nvke-node-image-amd64"
+    },
+    {
+      "member": "nvke-disks",
+      "output": "nvke-node-image-arm64"
+    },
+    {
+      "member": "nvke-disks-ubuntu24",
+      "output": "nvke-node-image-ubuntu24-amd64"
+    },
+    {
+      "member": "nvke-disks-ubuntu24",
+      "output": "nvke-node-image-ubuntu24-arm64"
+    },
+    {
+      "member": "nvke-core",
+      "output": "nvkectl"
+    },
+    {
+      "member": "nvke-core",
+      "output": "nvkectl-linux-arm64"
+    },
+    {
+      "member": "nvke-core",
+      "output": "operator-tools"
+    },
+    {
+      "member": "nvke-core",
+      "output": "operator-tools-linux-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "postgresql"
+    },
+    {
+      "member": "nvke-services",
+      "output": "postgresql-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "postgresql-image-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spiffe-csi-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spiffe-csi-image-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-agent-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-agent-image-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-bash-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-bash-image-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-controller-manager-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-controller-manager-image-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-crds"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-oidc-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-oidc-image-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-server-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-server-image-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-tpm-server-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "spire-tpm-server-image-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "temporal"
+    },
+    {
+      "member": "nvke-services",
+      "output": "temporal-admin-tools-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "temporal-admin-tools-image-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "temporal-server-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "temporal-server-image-arm64"
+    },
+    {
+      "member": "nvke-services",
+      "output": "temporal-ui-image"
+    },
+    {
+      "member": "nvke-services",
+      "output": "temporal-ui-image-arm64"
+    }
+  ],
+  "variants": [
+    {
+      "component": "nvke-agent",
+      "members": [
+        "nvke-disks",
+        "nvke-disks-ubuntu24"
+      ]
+    },
+    {
+      "component": "nvke-doca-ovs",
+      "members": [
+        "nvke-disks",
+        "nvke-disks-ubuntu24"
+      ]
+    },
+    {
+      "component": "nvke-node-fde-amd64",
+      "members": [
+        "nvke-disks",
+        "nvke-disks-ubuntu24"
+      ]
+    },
+    {
+      "component": "nvke-node-fde-arm64",
+      "members": [
+        "nvke-disks",
+        "nvke-disks-ubuntu24"
+      ]
+    },
+    {
+      "component": "nvke-node-image",
+      "members": [
+        "nvke-disks",
+        "nvke-disks-ubuntu24"
+      ]
+    },
+    {
+      "component": "nvke-node-image-amd64",
+      "members": [
+        "nvke-disks",
+        "nvke-disks-ubuntu24"
+      ]
+    },
+    {
+      "component": "ubuntu-installer-iso",
+      "members": [
+        "nvke-disks",
+        "nvke-disks-ubuntu24"
+      ]
+    },
+    {
+      "component": "ubuntu-installer-iso-amd64",
+      "members": [
+        "nvke-disks",
+        "nvke-disks-ubuntu24"
+      ]
+    }
+  ]
+}

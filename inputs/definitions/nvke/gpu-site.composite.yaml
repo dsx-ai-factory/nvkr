@@ -13,7 +13,7 @@ members:
     digest: sha256:06013783f5647a30e988f297adfd3c83941b0d5d4e9973b72372810b0d90eae2
   - name: nvke-core
     definition: core.yaml
-    digest: sha256:56c258d3796eb6b6a128059df97dee6449d4c329ea16dd4049ba1e954f24069d
+    digest: sha256:2e5fe8538411eb9504238011100499d8dfd0ed889616d687641b6f5c5184f7fe
   - name: nvke-disks
     definition: disks.yaml
     digest: sha256:6d0770da5060e5a17620ee6678f16218172234b76f65a95fa37dd1c53fdec7b5
@@ -25,7 +25,7 @@ members:
     digest: sha256:3a3f5c2ac3ef6edaf6fdf2edf577e65dbcabccac3370e9647996202e57aaf8a0
   - name: nvke-telemetry
     definition: telemetry.yaml
-    digest: sha256:2b4f5c20beb24cf22852c6f9b03806dddff1f588f75cb34f53919a202c5835a9
+    digest: sha256:70fd73fd73541e434538163de5a4518fcf7082702f48e52e0abbef24a6a0cace
 # The Ubuntu 24.04 overlay replaces these components, so the two disk families resolve different producers for them.
 variants:
   - component: nvke-agent

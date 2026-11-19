@@ -146,11 +146,11 @@ jobs:
               - '.golangci.yml'
               # Tests read the committed generated bundle:
               # pkg/nvkr/factory/{sbom_dependencies,github_labels}_test.go load
-              # .github/nvkr-run/plan.json. A PR touching only that bundle must
+              # .github/nvkr-run-nvke/plan.json. A PR touching only that bundle must
               # therefore still run `check`, or the tests guarding bundle
               # integrity silently do not run.
-              - '.github/nvkr-run/**'
-              - '.github/workflows/nvkr-run.yml'
+              - '.github/nvkr-run-nvke/**'
+              - '.github/workflows/nvkr-run-nvke.yml'
               - '.github/workflows/merge-gate.yaml'
               # `make license-header-check` also covers the stamped files here
               # (dependabot, issue templates, the other workflows).
@@ -176,13 +176,12 @@ jobs:
               # define the check itself, so a change to the gate cannot skip the
               # gate it changes.
               - 'inputs/**'
-              - '.github/workflows/nvkr-run.yml'
-              - '.github/nvkr-run/**'
               - '.github/workflows/nvkr-run-*.yml'
               - '.github/nvkr-run-*/**'
-              - '.github/workflows/nvkr-qualify.yml'
-              - '.github/workflows/nvkr-smoke.yml'
-              - '.github/nvkr-qualification/**'
+              - '.github/nvkr-plan-store/**'
+              - '.github/workflows/nvkr-qualify-*.yml'
+              - '.github/workflows/nvkr-smoke-*.yml'
+              - '.github/nvkr-qualification-*/**'
               - '.github/workflows/nvkr-dev.yml'
               - '.github/nvkr-dev/**'
               - '.github/workflows/nvkr-dev-qualify.yml'

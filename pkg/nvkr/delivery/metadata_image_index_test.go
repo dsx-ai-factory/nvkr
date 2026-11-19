@@ -50,7 +50,7 @@ func TestImageIndexMetadataTransportPreservesChildrenWithoutPayloads(t *testing.
 	defer server.Close()
 	prefix := strings.TrimPrefix(server.URL, "http://") + "/candidate"
 	options := RegistryOptions{PlainHTTP: true, Anonymous: true}
-	ref, err := Push(t.Context(), full, prefix+"/releases-cwe", options)
+	ref, err := Push(t.Context(), full, prefix+"/releases-nvke-controller", options)
 	if err != nil {
 		t.Fatal(err)
 	}

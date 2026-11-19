@@ -58,7 +58,7 @@ supported as described below. The compiler can describe disk publication and its
 can inspect that Plan. The ordinary local scheduler rejects disk publication with `engine-capability` before
 runtime, source, subprocess or workspace work until its grouped live inspector/package executor is connected.
 ADR-18 separately admits generated native ARC jobs for unencrypted direct-Packer outputs. The recorded
-M2 candidate exercised that pipeline-attested publication route with `build-provenance-v1`, explicitly
+NVKE candidate exercised that pipeline-attested publication route with `build-provenance-v1`, explicitly
 deferring inspection, under a validation-branch exception. A separate native ARC build-only route omits
 publication and signing, retains exact raw QCOW2 bytes and producer records, and finalizes a static-unqualified
 Run. It admits ADR-10's explicitly public-bootstrap FDE producer as well as plain disks. Native ARC also admits

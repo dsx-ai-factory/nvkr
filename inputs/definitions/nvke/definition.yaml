@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# Retained comparison/authoring fixture; not enrolled in maintained generation.
+
 apiVersion: nvkr.dev/definition/v5
 catalog:
   base: ../../catalogs/nvke
@@ -17,7 +19,7 @@ metadata:
     and native non-FDE and public-bootstrap FDE node images for AMD64 and ARM64, and
     acquire operator tooling plus AMD64 and ARM64 non-test runtime images selected
     for NVKE v0.23.0 in one Run.
-  name: nvke-m2
+  name: nvke
 outputs:
 - components:
   - capi-controller-image
@@ -98,7 +100,7 @@ outputs:
   format: helm-oci
   helm:
     images:
-      controller: cwe
+      controller: nvke-controller
   name: controller-chart
   platform: linux/amd64
 - components:
@@ -112,13 +114,6 @@ outputs:
   name: csi-node-driver-registrar-image-arm64
   platform: linux/arm64
 - components:
-  - nvke-controller
-  format: oci
-  name: cwe
-  platforms:
-  - linux/amd64
-  - linux/arm64
-- components:
   - nvke-nico-reference-profiles
   format: oci
   name: nico-reference-profiles-fixture
@@ -126,7 +121,7 @@ outputs:
   - linux/amd64
   - linux/arm64
 - components:
-  - nktp-chart-release-components
+  - nktp-chart-release
   format: helm-oci
   name: nktp
   platform: linux/amd64
@@ -210,6 +205,13 @@ outputs:
   format: oci
   name: nktp-target-allocator-image-arm64
   platform: linux/arm64
+- components:
+  - nvke-controller
+  format: oci
+  name: nvke-controller
+  platforms:
+  - linux/amd64
+  - linux/arm64
 - components:
   - nvke-agent
   - nvke-cni-calico

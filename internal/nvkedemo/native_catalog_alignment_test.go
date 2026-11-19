@@ -72,7 +72,7 @@ func TestNativeNVIDIADefinitionsAlignRenamedSourceContracts(t *testing.T) {
 				{"nvke-node-image-arm64", "ovn-kubernetes-chart", ovnPins["ovn-kubernetes"]},
 				{"controller-chart", "nvke-controller-chart-native-site", sitePins["nvke-controller-helm-native-site"]},
 				{"controller-profiles", "nvke-local-profiles", profilePins["nvke-profiles"]},
-				{"cwe", "nvke-controller-native-site", sitePins["nvke-controller"]},
+				{"nvke-controller", "nvke-controller-native-site", sitePins["nvke-controller"]},
 				{"nvkectl", "nvkectl-native-site", sitePins["nvke-cli-local-site"]},
 				{"cluster-api-provider-provisioned-arm64", "cluster-api-provider-provisioned-native-site", sitePins["nvke-controller"]},
 				{"ovn-image-arm64", "ovn-kube-ubuntu", ovnPins["ovn-kubernetes"]},
@@ -155,7 +155,7 @@ func TestNativeNVIDIASelectionsAndPinsOffline(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		expected := map[string]string{"nvke-node-image-arm64": "inputs/catalogs/node-images", "cwe": "inputs/catalogs/nvke", "nvkectl": "inputs/catalogs/nvke", "controller-chart": "inputs/catalogs/nvke", "controller-profiles": "inputs/catalogs/nvke"}
+		expected := map[string]string{"nvke-node-image-arm64": "inputs/catalogs/node-images", "nvke-controller": "inputs/catalogs/nvke", "nvkectl": "inputs/catalogs/nvke", "controller-chart": "inputs/catalogs/nvke", "controller-profiles": "inputs/catalogs/nvke"}
 		hostPlatforms := map[string]string{}
 		if conformance {
 			expected["conformance-image-arm64"] = "inputs/catalogs/kubernetes-conformance"

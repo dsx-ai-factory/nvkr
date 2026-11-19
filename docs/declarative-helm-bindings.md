@@ -10,14 +10,14 @@ outputs:
     platform: linux/amd64
     helm:
       images:
-        controller: cwe
-  - name: cwe
-    components: [cwe]
+        controller: nvke-controller
+  - name: nvke-controller
+    components: [nvke-controller]
     format: oci
     platform: linux/amd64
 ```
 
-Read `controller: cwe` as “use the `cwe` output for this chart's `controller` image.”
+Read `controller: nvke-controller` as “use the `nvke-controller` output for this chart's `controller` image.”
 To bind another image, add another slot-to-output entry. NVKR derives the build dependencies.
 
 The [catalog producer](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-controller-bindings/registry.yaml) maps the slot to the existing value:
@@ -48,8 +48,8 @@ uses this mapping for its six enabled image slots.
 The installer supplies the repository holding that image:
 
 ```sh
-helm template controller ./controller --set-string image.repository=registry.operator-a.test/nvke/cwe
-helm template controller ./controller --set-string image.repository=mirror.operator-b.test/platform/cwe
+helm template controller ./controller --set-string image.repository=registry.operator-a.test/nvke/nvke-controller
+helm template controller ./controller --set-string image.repository=mirror.operator-b.test/platform/nvke-controller
 ```
 
 Both use identical chart bytes and the packaged image digest. The operator must make that image available
@@ -63,14 +63,14 @@ Catalog pin sets and chart mappings use the same path reader:
 | Path | Meaning |
 |---|---|
 | `image.digest` | The `digest` field under `image`. |
-| `components[name=cwe].version` | The version of the component named `cwe`. |
+| `components[name=nvke-controller].version` | The version of the component named `nvke-controller`. |
 
 Missing fields and ambiguous matches fail. Pin sets also reject unaccounted list members.
 
 ## Concrete NVKE example
 
 [Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-controller-bindings/definition.yaml) and
-[catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-controller-bindings/registry.yaml) select six outputs: the management-plane image (`cwe`), its source controller chart,
+[catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-controller-bindings/registry.yaml) select six outputs: the management-plane image (`nvke-controller`), its source controller chart,
 SPIRE, SPIRE CRDs, Temporal and PostgreSQL. They share the pinned NVKE controller source; external charts
 remain acquired and byte-preserving. The controller source archive contains only its chart.
 
@@ -88,7 +88,7 @@ go run ./cmd/nvkr run local \
 ```
 
 The example was pinned against real upstream chart repositories and compiled successfully; its six-output
-plan makes `package/controller-chart` depend on `package/cwe`. This is not a recorded full six-output build. No new image build, signed publication,
+plan makes `package/controller-chart` depend on `package/nvke-controller`. This is not a recorded full six-output build. No new image build, signed publication,
 installation or qualification is claimed. Acquired raw-chart dependency scanning remains unsupported.
 
 ## Validation and migration
@@ -99,5 +99,5 @@ multiple images and registry-independent package bytes. Real Helm rendering is o
 [Development](https://github.com/dsx-ai-factory/nvkr/blob/main/DEVELOPMENT.md#opt-in-integration-checks) for prerequisites and commands.
 These tests do not establish a full six-output build, installation or signed publication.
 
-Replace `helm.imageOutput` with `helm.images: {controller: cwe}`. Put the chart location and digest paths
+Replace `helm.imageOutput` with `helm.images: {controller: nvke-controller}`. Put the chart location and digest paths
 under the selected catalog component's `helm` field, then regenerate plans and workflows.

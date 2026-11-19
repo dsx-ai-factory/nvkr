@@ -14,7 +14,7 @@ The producer mappings follow the source-owned contracts at that revision:
 | Output | Source contract |
 | --- | --- |
 | `nvkectl` | `cli/Makefile` builds `cli/bin/nvkectl` and owns `NVKECTL_VERSION`, `NVKECTL_COMMIT`, `NVKECTL_DATE` and `NVKECTL_TREE`; its build target executes the binary's version assertion |
-| `cwe` | `controller/Dockerfile` uses Go 1.27.3 and the existing Alpine digest pin and its source-owned controller Make target |
+| `nvke-controller` | `controller/Dockerfile` uses Go 1.27.3 and the existing Alpine digest pin and its source-owned controller Make target |
 | `controller-chart` | Source `Chart.yaml` version `0.0.0`, packaged as `0.23.0`, no dependencies or `Chart.lock`; the final chart remains bound to the produced controller digest |
 | `nktp` | NKTP's own repository at tag `nktp/v0.1.0`, packaged with its own `Chart.yaml` version; its existing `Chart.lock` selects the three captured dependency-chart archives |
 

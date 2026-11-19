@@ -99,7 +99,7 @@ func TestGitHubPartitionBundleAuthenticatesAllMembers(t *testing.T) {
 
 func TestGitHubPartitionBundleMaintainsDefinitionAndBuildIdentities(t *testing.T) {
 	engageGitHubPartitions(t)
-	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}

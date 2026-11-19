@@ -75,7 +75,7 @@
       "format": "helm-oci",
       "helm": {
         "images": {
-          "controller": "cwe"
+          "controller": "nvke-controller"
         }
       },
       "name": "controller-chart",
@@ -101,20 +101,6 @@
       ],
       "format": "oci",
       "name": "csi-node-driver-registrar-image-amd64",
-      "platform": "linux/amd64"
-    },
-    {
-      "catalog": {
-        "base": "../../catalogs/nvke",
-        "overlays": [
-          "../../catalogs/nvke/variants/nightly-go.json"
-        ]
-      },
-      "components": [
-        "nvke-controller-native-site"
-      ],
-      "format": "oci",
-      "name": "cwe",
       "platform": "linux/amd64"
     },
     {
@@ -186,6 +172,20 @@
       ],
       "format": "helm-oci",
       "name": "nktp",
+      "platform": "linux/amd64"
+    },
+    {
+      "catalog": {
+        "base": "../../catalogs/nvke",
+        "overlays": [
+          "../../catalogs/nvke/variants/nightly-go.json"
+        ]
+      },
+      "components": [
+        "nvke-controller-native-site"
+      ],
+      "format": "oci",
+      "name": "nvke-controller",
       "platform": "linux/amd64"
     },
     {

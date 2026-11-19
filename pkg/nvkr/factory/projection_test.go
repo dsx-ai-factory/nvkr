@@ -120,8 +120,8 @@ func recordProjectionCalls(t *testing.T) *projectionCalls {
 func projectionEquivalencePlans(t *testing.T, repo string) map[string]*Plan {
 	t.Helper()
 	committed, err := filepath.Glob(filepath.Join(repo, ".github", "nvkr*", "plan.json"))
-	if err != nil || len(committed) != 11 {
-		t.Fatalf("committed maintained Plans = %v, %v; want the eleven .github/nvkr*/plan.json", committed, err)
+	if err != nil || len(committed) != 3 {
+		t.Fatalf("committed maintained Plans = %v, %v; want the three .github/nvkr*/plan.json", committed, err)
 	}
 	plans := map[string]*Plan{}
 	for _, path := range committed {
@@ -151,12 +151,12 @@ func TestProjectionTransportsMatchInBinaryGenerator(t *testing.T) {
 	for _, name := range names {
 		plan := plans[name]
 		t.Run(name, func(t *testing.T) {
-			if name == "committed/nvkr-run-nvke-gpu-site" {
+			if name == "committed/nvkr-run-nvke" {
 				t.Skip("covered by TestMaintainedGPUProjectionTransports in the default suite")
 			}
-			// Telemetry remains in the matrix default; the largest Plan has its
-			// own top-level test so CI can shard its full transport comparison.
-			if strings.HasPrefix(name, "committed/") && name != "committed/nvkr-run-nvke-telemetry" {
+			// The maintained product has its own default test; the complete
+			// committed matrix remains an extended integration check.
+			if strings.HasPrefix(name, "committed/") {
 				testutil.RequireExtended(t)
 			}
 			assertProjectionTransportEquivalence(t, repo, name, plan)
@@ -172,11 +172,11 @@ func TestMaintainedGPUProjectionTransports(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan, err := LoadPlanContext(t.Context(), filepath.Join(repo, ".github/nvkr-run-nvke-gpu-site/plan.json"))
+	plan, err := LoadPlanContext(t.Context(), filepath.Join(repo, ".github/nvkr-run-nvke/plan.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertProjectionTransportEquivalence(t, repo, "committed/nvkr-run-nvke-gpu-site", plan)
+	assertProjectionTransportEquivalence(t, repo, "committed/nvkr-run-nvke", plan)
 }
 
 func assertProjectionTransportEquivalence(t *testing.T, repo, name string, plan *Plan) {
