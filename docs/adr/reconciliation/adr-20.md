@@ -1,5 +1,13 @@
 ## Support by owner
 
+Post-seed GHCR privacy confirmation retries only API absence with bounded backoff.
+`TestPrivatePublicationWaitsForSeedConfirmation` covers delayed visibility, success on the last attempt,
+exhaustion with the original trust-policy code, explicit unsafe policy, denied requests and cancellation;
+the whole-set check and no-repeat-seed boundary remain mandatory. These are local API/registry fixtures.
+The triggering [operator publication failure](https://github.com/dsx-ai-factory/nvkr/actions/runs/44577627888/job/135756330227)
+establishes a successful metadata seed followed by API absence; eventual consistency is an inference
+from that sequence. Retry outcomes and a corrected hosted publication remain unverified.
+
 The Tekton route selects the existing per-output OCI publication owner with anonymous transport and explicit
 cluster signing keys. Its complete in-cluster registry exercise remains pending; see [ADR-18](adr-18.md).
 
