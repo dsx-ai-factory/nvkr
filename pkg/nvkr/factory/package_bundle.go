@@ -14,6 +14,9 @@ import (
 // Bundle packaging preserves the exact observed compressed archive. Delivery
 // holds and rechecks those bytes before producing the OCI envelope.
 func executeBundlePackage(ctx context.Context, plan *Plan, node Node, output Artifact, inputs []Artifact, artifacts map[string]Artifact) error {
+	if node.Derived != nil {
+		return executeDerivedInventory(ctx, plan, node, output, artifacts)
+	}
 	if node.PackageKind != PackageBundle {
 		return e.New(e.CodeInvalidCatalog, "invalid bundle package kind")
 	}

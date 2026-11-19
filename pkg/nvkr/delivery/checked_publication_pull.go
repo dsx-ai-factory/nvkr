@@ -18,8 +18,8 @@ import (
 )
 
 // PullCheckedPublication independently checks every output's complete payload
-// closure, one output at a time. Only controls, evidence and executable layers
-// survive issuance. Non-executable downloads and extraction scratch are released
+// closure, one output at a time. Only controls, evidence, executable layers and
+// explicitly marked bounded derived inventories survive issuance. Other downloads and extraction scratch are released
 // before the next output, without a second retained disk snapshot.
 func PullCheckedPublication(ctx context.Context, reference, workspace string, options RegistryOptions) (*CheckedPublication, error) {
 	return (&checkedPublicationPull{}).run(ctx, reference, workspace, options)
@@ -173,6 +173,15 @@ func checkPublicationOutputAttempt(ctx context.Context, layout, stage string, ob
 	if err := deliveryContext(ctx); err != nil {
 		return false, err
 	}
+	if object.Output.Derived != nil {
+		manifest, err := flatManifest(ctx, layout, object)
+		if err != nil {
+			return false, err
+		}
+		if len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest || manifest.Layers[0].Size > maxDerivedInventoryArchiveBytes {
+			return false, e.New(e.CodeVerifyFailed, "derived inventory requires one bounded layer before acquisition")
+		}
+	}
 	extraction, err := os.MkdirTemp(stage, "output-*")
 	if err != nil {
 		return false, e.Wrap(e.CodeImmutableViolation, err, "creating output inspection scratch")
@@ -228,6 +237,20 @@ func checkPublicationOutputAttempt(ctx context.Context, layout, stage string, ob
 		for output, executable := range executables {
 			state.executables[output] = executable
 		}
+	}
+	if object.Output.Derived != nil {
+		manifest, err := flatManifest(ctx, layout, object)
+		if err != nil {
+			return false, err
+		}
+		if len(manifest.Layers) != 1 || manifest.Layers[0].Digest != object.BlobDigest {
+			return false, e.New(e.CodeVerifyFailed, "derived inventory requires its exact single layer")
+		}
+		file, err := holdBlob(ctx, layout, manifest.Layers[0], maxDerivedInventoryArchiveBytes)
+		if err != nil {
+			return false, err
+		}
+		state.files = append(state.files, file)
 	}
 	state.outputs = append(state.outputs, outputs...)
 	return false, deliveryContext(ctx)

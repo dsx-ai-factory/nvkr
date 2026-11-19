@@ -1,4 +1,9 @@
 {
+  "output-aicr-inventory": {
+    "credentialRef": "github:NVKR_REGISTRY_WRITE",
+    "kind": "oci",
+    "ref": "ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site/releases-aicr-inventory"
+  },
   "output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm": {
     "credentialRef": "github:NVKR_REGISTRY_WRITE",
     "kind": "oci",

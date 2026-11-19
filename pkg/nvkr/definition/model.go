@@ -16,6 +16,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/containerruntime"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/development"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
@@ -77,14 +78,15 @@ type Catalog struct {
 // DefinitionOutput is a named artifact slot frozen before a run. Components
 // selects exact outputs of one build; format selects the standard envelope.
 type DefinitionOutput struct {
-	Name       string      `json:"name"`
-	Platform   string      `json:"platform,omitempty"`
-	Platforms  []string    `json:"platforms,omitempty"`
-	Catalog    *Catalog    `json:"catalog,omitempty"`
-	Components []string    `json:"components,omitempty"`
-	Format     string      `json:"format"`
-	APT        *APTOutput  `json:"apt,omitempty"`
-	Helm       *HelmOutput `json:"helm,omitempty"`
+	Derived    *derivedoutput.Selection `json:"derived,omitempty"`
+	Name       string                   `json:"name"`
+	Platform   string                   `json:"platform,omitempty"`
+	Platforms  []string                 `json:"platforms,omitempty"`
+	Catalog    *Catalog                 `json:"catalog,omitempty"`
+	Components []string                 `json:"components,omitempty"`
+	Format     string                   `json:"format"`
+	APT        *APTOutput               `json:"apt,omitempty"`
+	Helm       *HelmOutput              `json:"helm,omitempty"`
 }
 
 // HelmOutput maps chart image slots to named OCI outputs. Repository locations
@@ -265,7 +267,7 @@ func (definition Definition) Validate() error {
 			if len(output.Components) != 1 {
 				return e.New(e.CodeInvalidCatalog, "definition Helm output %q requires exactly one source archive or acquired chart component", output.Name)
 			}
-		} else if len(output.Components) == 0 {
+		} else if len(output.Components) == 0 && output.Derived == nil {
 			return e.New(e.CodeInvalidCatalog, "definition output %q requires components", output.Name)
 		}
 		if output.Format == OutputOCI && len(output.Components) != 1 {
@@ -309,6 +311,9 @@ func (definition Definition) Validate() error {
 		previous = output.Name
 	}
 
+	if err := definition.validateDerivedOutputs(); err != nil {
+		return err
+	}
 	return definition.validateInternalTools()
 }
 

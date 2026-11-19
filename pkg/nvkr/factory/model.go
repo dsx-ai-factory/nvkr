@@ -18,6 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/execution"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
@@ -93,13 +94,14 @@ const (
 // packageSpec describes dataflow, not ordering. Inputs are artifact selectors:
 // target/component, target/*, or package/name.
 type packageSpec struct {
-	ImageIndex   *ImageIndexPlan   `json:"imageIndex,omitempty"`
-	HelmImage    *HelmImageBinding `json:"helmImage,omitempty"`
-	Name         string            `json:"name"`
-	Kind         string            `json:"kind"`
-	Inputs       []string          `json:"inputs"`
-	Distribution string            `json:"distribution,omitempty"`
-	Component    string            `json:"component,omitempty"`
+	Derived      *derivedoutput.Binding `json:"derived,omitempty"`
+	ImageIndex   *ImageIndexPlan        `json:"imageIndex,omitempty"`
+	HelmImage    *HelmImageBinding      `json:"helmImage,omitempty"`
+	Name         string                 `json:"name"`
+	Kind         string                 `json:"kind"`
+	Inputs       []string               `json:"inputs"`
+	Distribution string                 `json:"distribution,omitempty"`
+	Component    string                 `json:"component,omitempty"`
 }
 
 // HelmImage joins one output dependency with its catalog-owned chart mapping.
@@ -179,12 +181,13 @@ type Plan struct {
 }
 
 type LifecycleOutputPlan struct {
-	ImageIndex  *ImageIndexPlan `json:"imageIndex,omitempty"`
-	Name        string          `json:"name"`
-	Kind        string          `json:"kind"`
-	ArtifactID  string          `json:"artifactId"`
-	BuildDigest string          `json:"buildDigest"`
-	Components  []string        `json:"components"`
+	Derived     *derivedoutput.Binding `json:"derived,omitempty"`
+	ImageIndex  *ImageIndexPlan        `json:"imageIndex,omitempty"`
+	Name        string                 `json:"name"`
+	Kind        string                 `json:"kind"`
+	ArtifactID  string                 `json:"artifactId"`
+	BuildDigest string                 `json:"buildDigest"`
+	Components  []string               `json:"components"`
 }
 
 type LifecycleBoundOutput = delivery.Output
@@ -213,28 +216,29 @@ type ArtifactGraph struct {
 }
 
 type Node struct {
-	ImageIndex       *ImageIndexPlan   `json:"imageIndex,omitempty"`
-	HelmImage        *HelmImageBinding `json:"helmImage,omitempty"`
-	ID               string            `json:"id"`
-	Kind             string            `json:"kind"`
-	BuildTarget      string            `json:"buildTarget,omitempty"`
-	IRNode           string            `json:"irNode,omitempty"`
-	PackageKind      string            `json:"packageKind,omitempty"`
-	Distribution     string            `json:"distribution,omitempty"`
-	PackageComponent string            `json:"packageComponent,omitempty"`
-	Target           string            `json:"target,omitempty"`
-	RunsOn           string            `json:"runsOn,omitempty"`
-	Network          string            `json:"network,omitempty"`
-	Container        string            `json:"container,omitempty"`
-	Platform         string            `json:"platform,omitempty"`
-	URL              string            `json:"url,omitempty"`
-	Digest           string            `json:"digest,omitempty"`
-	Executable       string            `json:"executable,omitempty"`
-	ExecutableDigest string            `json:"executableDigest,omitempty"`
-	ToolFormat       string            `json:"toolFormat,omitempty"`
-	Inputs           []string          `json:"inputs,omitempty"`
-	Outputs          []string          `json:"outputs,omitempty"`
-	InternalTools    []string          `json:"internalTools,omitempty"`
+	Derived          *derivedoutput.Binding `json:"derived,omitempty"`
+	ImageIndex       *ImageIndexPlan        `json:"imageIndex,omitempty"`
+	HelmImage        *HelmImageBinding      `json:"helmImage,omitempty"`
+	ID               string                 `json:"id"`
+	Kind             string                 `json:"kind"`
+	BuildTarget      string                 `json:"buildTarget,omitempty"`
+	IRNode           string                 `json:"irNode,omitempty"`
+	PackageKind      string                 `json:"packageKind,omitempty"`
+	Distribution     string                 `json:"distribution,omitempty"`
+	PackageComponent string                 `json:"packageComponent,omitempty"`
+	Target           string                 `json:"target,omitempty"`
+	RunsOn           string                 `json:"runsOn,omitempty"`
+	Network          string                 `json:"network,omitempty"`
+	Container        string                 `json:"container,omitempty"`
+	Platform         string                 `json:"platform,omitempty"`
+	URL              string                 `json:"url,omitempty"`
+	Digest           string                 `json:"digest,omitempty"`
+	Executable       string                 `json:"executable,omitempty"`
+	ExecutableDigest string                 `json:"executableDigest,omitempty"`
+	ToolFormat       string                 `json:"toolFormat,omitempty"`
+	Inputs           []string               `json:"inputs,omitempty"`
+	Outputs          []string               `json:"outputs,omitempty"`
+	InternalTools    []string               `json:"internalTools,omitempty"`
 
 	Requirements     *execution.Requirements `json:"requirements,omitempty"`
 	ExecutionBinding *execution.Binding      `json:"executionBinding,omitempty"`

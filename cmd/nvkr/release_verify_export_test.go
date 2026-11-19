@@ -54,7 +54,7 @@ func TestReleaseExportForwardsExactInvocationAndDestination(t *testing.T) {
 	err := app.RunContext(t.Context(), []string{"nvkr", "release", "verify",
 		"--reference", "example.test/release@sha256:" + strings.Repeat("a", 64),
 		"--lane", "pipeline-attested", "--scope", "artifact-publication", "--identity", "^builder$", "--issuer", "issuer",
-		"--definition", "inputs/definitions/nvke/gpu-site.composite.yaml", "--environment", "inputs/environments/github-nvke-gpu-site.yaml",
+		"--definition", "inputs/definitions/nvke/gpu-site-release.composite.yaml", "--environment", "inputs/environments/github-nvke-gpu-site.yaml",
 		"--plan", ".github/nvkr-run-nvke/plan.json", "--export-layout", "new-layout", "--expected-invocation", invocation})
 	if !called || cliErrorCode(err) != e.CodeVerifyFailed {
 		t.Fatalf("export origin error did not survive command boundary: called=%v err=%v", called, err)

@@ -83,6 +83,9 @@ func toolSmokePlanScope(plan *factory.Plan, smoke QualificationSmokePolicy) ([]p
 			if !exists || rule.Kind != output.Kind || !sameSmokeComponents(rule.Components, output.Components) {
 				return nil, e.New(e.CodeGateUnmet, "output %q has no exact non-tool smoke rule", output.Name)
 			}
+			if (output.Derived != nil) != (rule.Reason == "derived-inventory") {
+				return nil, e.New(e.CodeGateUnmet, "derived inventory smoke rule differs from the compiled producer kind")
+			}
 			delete(exemptions, output.Name)
 		case OutputExecutable:
 			build, err := smokeOutputBuild(plan, output.Name)

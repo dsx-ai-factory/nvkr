@@ -5,8 +5,9 @@ package gitlab
 
 import (
 	"context"
-	"github.com/dsx-ai-factory/nvkr/internal/httptrust"
 	"net/http"
+
+	"github.com/dsx-ai-factory/nvkr/internal/httptrust"
 )
 
 // NewTransport shares direct HTTPS trust admission between the provider API,
