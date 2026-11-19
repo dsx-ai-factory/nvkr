@@ -484,6 +484,15 @@ func TestQualificationProductionRegistryCredentialAdmission(t *testing.T) {
 }
 
 func TestQualificationGenerationAdmission(t *testing.T) {
+	imageRule := func(p *lifecycle.QualificationPolicy) int {
+		for i, scope := range p.Smoke.NonToolOutputs {
+			if scope.Kind == lifecycle.OutputOCI {
+				return i
+			}
+		}
+		t.Fatal("fixture has no deployment image rule")
+		return -1
+	}
 	for _, tc := range []struct {
 		name string
 		edit func(*factory.Plan, *lifecycle.QualificationPolicy, *string)
@@ -502,10 +511,11 @@ func TestQualificationGenerationAdmission(t *testing.T) {
 			p.Smoke.Tools["unselected"] = "helm-version"
 		}, e.CodeReleaseIncomplete},
 		{"missing image exemption", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
-			p.Smoke.NonToolOutputs = p.Smoke.NonToolOutputs[1:]
+			i := imageRule(p)
+			p.Smoke.NonToolOutputs = append(p.Smoke.NonToolOutputs[:i], p.Smoke.NonToolOutputs[i+1:]...)
 		}, e.CodeGateUnmet},
 		{"wrong image membership", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
-			p.Smoke.NonToolOutputs[0].Components = []string{"unselected"}
+			p.Smoke.NonToolOutputs[imageRule(p)].Components = []string{"unselected"}
 		}, e.CodeGateUnmet},
 		{"extra image exemption", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
 			p.Smoke.NonToolOutputs = append(p.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: "unselected", Kind: lifecycle.OutputOCI, Components: []string{"image"}, Reason: "deployment-image"})

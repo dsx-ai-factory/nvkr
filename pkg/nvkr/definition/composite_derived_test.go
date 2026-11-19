@@ -4,6 +4,7 @@
 package definition
 
 import (
+	"fmt"
 	"path/filepath"
 	"testing"
 
@@ -72,22 +73,45 @@ func TestCompositeOwnedInventory(t *testing.T) {
 }
 
 func TestCompositeOwnedInventoryAdmission(t *testing.T) {
+	declarations := func(count int) func(*CompositeDefinition) {
+		return func(c *CompositeDefinition) {
+			output := c.DerivedOutputs[0]
+			c.DerivedOutputs = make([]CompositeDerivedOutput, count)
+			for i := range c.DerivedOutputs {
+				c.DerivedOutputs[i] = output
+				c.DerivedOutputs[i].Name = fmt.Sprintf("inventory-%02d", i)
+			}
+		}
+	}
 	for _, tc := range []struct {
 		name string
 		edit func(*CompositeDefinition)
+		code e.Code
 	}{
-		{"member collision", func(c *CompositeDefinition) { c.DerivedOutputs[0].Name = "alpha-image" }},
-		{"missing material", func(c *CompositeDefinition) { c.DerivedOutputs[0].Derived.Outputs = []string{"absent"} }},
-		{"self material", func(c *CompositeDefinition) { c.DerivedOutputs[0].Derived.Outputs = []string{"inventory"} }},
-		{"unknown encoding", func(c *CompositeDefinition) { c.DerivedOutputs[0].Derived.Encoding = "unknown" }},
-		{"duplicate declaration", func(c *CompositeDefinition) { c.DerivedOutputs = append(c.DerivedOutputs, c.DerivedOutputs[0]) }},
+		{"member collision", func(c *CompositeDefinition) { c.DerivedOutputs[0].Name = "alpha-image" }, e.CodeInvalidCatalog},
+		{"missing material", func(c *CompositeDefinition) { c.DerivedOutputs[0].Derived.Outputs = []string{"absent"} }, e.CodeInvalidCatalog},
+		{"self material", func(c *CompositeDefinition) { c.DerivedOutputs[0].Derived.Outputs = []string{"inventory"} }, e.CodeInvalidCatalog},
+		{"unknown encoding", func(c *CompositeDefinition) { c.DerivedOutputs[0].Derived.Encoding = "unknown" }, e.CodeInvalidCatalog},
+		{"duplicate declaration", func(c *CompositeDefinition) { c.DerivedOutputs = append(c.DerivedOutputs, c.DerivedOutputs[0]) }, e.CodeInvalidCatalog},
+		{"64 sorted declarations", declarations(64), ""},
+		{"65 declarations", declarations(65), e.CodeInvalidCatalog},
+		{"descending distinct declarations", func(c *CompositeDefinition) {
+			declarations(2)(c)
+			c.DerivedOutputs[0], c.DerivedOutputs[1] = c.DerivedOutputs[1], c.DerivedOutputs[0]
+		}, e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root, composite := compositeDerivedFixture(t)
 			tc.edit(&composite)
 			writeCompositeFile(t, filepath.Join(root, "defs", "composite.yaml"), composite)
 			_, err := LoadComposite(t.Context(), root, "defs/composite.yaml")
-			requireCode(t, err, e.CodeInvalidCatalog)
+			if tc.code == "" {
+				if err != nil {
+					t.Fatal(err)
+				}
+				return
+			}
+			requireCode(t, err, tc.code)
 		})
 	}
 }

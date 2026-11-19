@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -358,7 +359,8 @@ func TestDerivedInventoryImageIndexCarriesNativeEvidence(t *testing.T) {
 	if err := executePackage(t.Context(), plan, imageNode, artifacts, io.Discard); err != nil {
 		t.Fatal(err)
 	}
-	plan.Definition.Outputs = append(plan.Definition.Outputs, authored.DefinitionOutput{Name: "inventory", Platform: "linux/amd64", Format: authored.OutputBundle, Derived: &derivedoutput.Selection{Encoding: derivedoutput.InventoryV1, Outputs: []string{"cwe"}}})
+	plan.Definition.Outputs = append(plan.Definition.Outputs, authored.DefinitionOutput{Name: "inventory", Platform: "linux/amd64", Format: authored.OutputBundle, Derived: &derivedoutput.Selection{Encoding: derivedoutput.InventoryV1, Outputs: []string{"nvke-controller"}}})
+	slices.SortFunc(plan.Definition.Outputs, func(a, b authored.DefinitionOutput) int { return strings.Compare(a.Name, b.Name) })
 	plan = compileImageIndexFixture(t, plan, plan.Environment)
 	_, compiled := planIndex(plan)
 	node := planNode(plan, "package/inventory")
@@ -371,7 +373,7 @@ func TestDerivedInventoryImageIndexCarriesNativeEvidence(t *testing.T) {
 		transported[id] = artifact
 	}
 	output := compiled["package/inventory"]
-	output.Path = filepath.Join(filepath.Dir(artifacts["package/cwe"].Path), "inventory")
+	output.Path = filepath.Join(filepath.Dir(artifacts["package/nvke-controller"].Path), "inventory")
 	transported[output.ID] = output
 	if err := executePackage(t.Context(), plan, node, transported, io.Discard); err != nil {
 		t.Fatal(err)
