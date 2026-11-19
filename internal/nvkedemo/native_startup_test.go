@@ -31,7 +31,7 @@ func startupDescription() NativeSiteStartup {
 		OVNImage:        "localhost/nvke/ovn-kubernetes@sha256:" + strings.Repeat("a", 64),
 		ImageImports: map[string]string{
 			"controller": "docker.io/library/nke-controller@sha256:" + strings.Repeat("a", 64),
-			"profiles":   "docker.io/library/cwe-profiles@sha256:" + strings.Repeat("a", 64),
+			"profiles":   "docker.io/library/nvke-controller-profiles@sha256:" + strings.Repeat("a", 64),
 			"capnico":    "ghcr.io/dsx-ai-factory/cluster-api-provider-nico/controller@sha256:" + strings.Repeat("a", 64),
 		},
 	}

@@ -91,6 +91,7 @@ func newApp() *cli.App {
 			return cli.ShowAppHelp(c)
 		},
 		Commands: []*cli.Command{
+			cmdExplain(),
 			cmdDefinition(),
 			cmdRun(),
 			cmdValidate(),

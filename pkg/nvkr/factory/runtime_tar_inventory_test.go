@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -156,7 +157,11 @@ func TestRuntimeTarInventory(t *testing.T) {
 			case "cancel":
 				cancel()
 			}
-			got, err := readRuntimeTarInventory(ctx, bytes.NewReader(raw), fmt.Sprintf("sha256:%x", sha256.Sum256(original)))
+			path := filepath.Join(t.TempDir(), "layer.tar")
+			if err := os.WriteFile(path, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			got, err := runtimeProofTarInventory(ctx, path, fmt.Sprintf("sha256:%x", sha256.Sum256(original)))
 			if tc.change != "" {
 				if err == nil {
 					t.Fatal("accepted changed layer or canceled context")

@@ -248,10 +248,10 @@ func TestSourceOwnedAcquiredChartPreservesDeclaredVersion(t *testing.T) {
 		{"", "v1.2.3"}, {"controller/", "v1.2.3"}, {"controller/v", "1.2.3"},
 	} {
 		t.Run(tc.prefix+tc.version, func(t *testing.T) {
-			fixture := newPinSetIntegrationFixture(t, fmt.Sprintf("dependencies: [{name: cwe, version: %q}]\n", tc.version))
-			src := fixture.registry.Sources["cwe"]
+			fixture := newPinSetIntegrationFixture(t, fmt.Sprintf("dependencies: [{name: nvke-controller, version: %q}]\n", tc.version))
+			src := fixture.registry.Sources["nvke-controller"]
 			src.TagPrefix = tc.prefix
-			fixture.registry.Sources["cwe"] = src
+			fixture.registry.Sources["nvke-controller"] = src
 			tag := src.QualifiedTag(tc.version)
 			fixture.run("tag", "-f", tag)
 			payload := helmFixtureArchive(t, fmt.Sprintf("apiVersion: v2\nname: demo\nversion: %q\n", tc.version))
@@ -270,7 +270,7 @@ func TestSourceOwnedAcquiredChartPreservesDeclaredVersion(t *testing.T) {
 			original := http.DefaultTransport
 			http.DefaultTransport = server.Client().Transport
 			t.Cleanup(func() { http.DefaultTransport = original })
-			fixture.registry.Components["controller"] = rawComponent{Source: "cwe", Platforms: []string{"linux/amd64"}, OutputType: "raw", Prebuilt: &Prebuilt{Chart: &HelmChart{Name: "demo", Repository: server.URL}, Evidence: &ExternalEvidence{None: true}}}
+			fixture.registry.Components["controller"] = rawComponent{Source: "nvke-controller", Platforms: []string{"linux/amd64"}, OutputType: "raw", Prebuilt: &Prebuilt{Chart: &HelmChart{Name: "demo", Repository: server.URL}, Evidence: &ExternalEvidence{None: true}}}
 			fixture.writeRegistry(t)
 			fixture.pin(t, "1.0.0")
 			lock := fixture.lock(t)

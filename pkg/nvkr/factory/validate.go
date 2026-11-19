@@ -27,6 +27,9 @@ func (plan Plan) Validate() error {
 	if err != nil {
 		return err
 	}
+	if err := plan.validateCatalogCandidates(); err != nil {
+		return err
+	}
 	if err := plan.validatePlanBuilds(); err != nil {
 		return err
 	}
@@ -56,6 +59,9 @@ func (plan Plan) Validate() error {
 		return err
 	}
 	if err := plan.validateLifecyclePlans(); err != nil {
+		return err
+	}
+	if err := plan.validateBootPublicationPlan(); err != nil {
 		return err
 	}
 	return plan.validateCompiledGraph(packages)

@@ -38,16 +38,17 @@ type packageSnapshot struct {
 const (
 	// New wire majors preserve the meaning and bytes of Plans without mkosi
 	// snapshots. The frozen nvkr.run-plan digest family remains unchanged.
-	sharedPlanSchemaVersion          = "nvkr.dev/run-plan/v7"
-	sharedCompositePlanSchemaVersion = "nvkr.dev/run-plan/v8"
+	sharedPlanSchemaVersion          = "nvkr.dev/run-plan/v8"
+	sharedCompositePlanSchemaVersion = "nvkr.dev/run-plan/v9"
+	sharedBootPlanSchemaVersion      = "nvkr.dev/run-plan/v10"
 	maxPlanPackageSnapshots          = 64
 	maxPlanPackageReferences         = 1024
-	// Bound expansion independently of the unchanged 4 MiB wire read limit.
+	// Bound expansion independently of the unchanged 8 MiB wire read limit.
 	maxPlanPackageExpansion = 32 << 20
 )
 
 func packageSnapshotPath(digest string) string {
-	return "store/package-inputs-" + strings.TrimPrefix(digest, "sha256:")[:12] + ".json"
+	return "store/package-inputs@" + strings.TrimPrefix(digest, "sha256:")[:12] + ".json"
 }
 
 // MarshalJSON emits the same shared representation for every Plan consumer,
@@ -83,7 +84,7 @@ func (plan Plan) MarshalJSON() ([]byte, error) {
 		return nil, err
 	}
 	value := planValue(copy)
-	shared := value.SchemaVersion == sharedPlanSchemaVersion || value.SchemaVersion == sharedCompositePlanSchemaVersion
+	shared := isSharedPackageSchema(value.SchemaVersion)
 	if shared != (len(snapshots) != 0) {
 		return nil, e.New(e.CodeInvalidCatalog, "Plan package snapshots do not match its schema")
 	}
@@ -95,7 +96,20 @@ func (plan Plan) MarshalJSON() ([]byte, error) {
 // Build and verifies its catalog, platform, graph and evidence membership.
 func (plan *Plan) UnmarshalJSON(raw []byte) error {
 	if int64(len(raw)) > MaxPlanBytes {
-		return e.New(e.CodePipelineDrift, "Plan exceeds its %d-byte read bound", MaxPlanBytes)
+		// Display JSON may exceed the packed limit through indentation alone.
+		// File readers bound external bytes before decoding; UnmarshalExact
+		// separately rejects whitespace-bearing representations as authority.
+		if int64(len(raw)) > maxGeneratedFileBytes {
+			return e.New(e.CodePipelineDrift, "Plan display exceeds its size bound")
+		}
+		var compact bytes.Buffer
+		if err := json.Compact(&compact, raw); err != nil {
+			return e.Wrap(e.CodePipelineDrift, err, "reading Plan display")
+		}
+		if int64(compact.Len()) > MaxPlanBytes {
+			return e.New(e.CodePipelineDrift, "Plan exceeds its %d-byte read bound", MaxPlanBytes)
+		}
+		raw = compact.Bytes()
 	}
 	schema, err := admitPlanDocumentSchema(raw)
 	if err != nil {
@@ -108,7 +122,7 @@ func (plan *Plan) UnmarshalJSON(raw []byte) error {
 	if err := decoder.Decode(&document); err != nil {
 		return e.Wrap(e.CodePipelineDrift, err, "decoding Plan package snapshots")
 	}
-	shared := schema == sharedPlanSchemaVersion || schema == sharedCompositePlanSchemaVersion
+	shared := isSharedPackageSchema(schema)
 	if shared != (len(document.PackageSnapshots) != 0) {
 		return e.New(e.CodePipelineDrift, "Plan package snapshots do not match its schema")
 	}
@@ -173,16 +187,26 @@ func admitPlanDocumentSchema(raw []byte) (string, error) {
 		return "", e.Wrap(e.CodePipelineDrift, err, "reading Plan schema")
 	}
 	switch header.SchemaVersion {
-	case PlanSchemaVersion, CompositePlanSchemaVersion, sharedPlanSchemaVersion, sharedCompositePlanSchemaVersion:
+	case PlanSchemaVersion, CompositePlanSchemaVersion, BootPlanSchemaVersion, sharedPlanSchemaVersion, sharedCompositePlanSchemaVersion, sharedBootPlanSchemaVersion:
 		return header.SchemaVersion, nil
 	default:
 		return "", e.New(e.CodeInvalidCatalog, "unsupported Plan schema %q", header.SchemaVersion)
 	}
 }
 
+func isSharedPackageSchema(schema string) bool {
+	return schema == sharedPlanSchemaVersion || schema == sharedCompositePlanSchemaVersion || schema == sharedBootPlanSchemaVersion
+}
+
 func planSchemaFor(plan Plan) string {
 	hasPackages := false
 	_, _ = mapPlanPackageInputs(plan, func(*mkosi.Root) error { hasPackages = true; return nil })
+	if plan.BootPublication != nil {
+		if hasPackages {
+			return sharedBootPlanSchemaVersion
+		}
+		return BootPlanSchemaVersion
+	}
 	if plan.Composition != nil {
 		if hasPackages {
 			return sharedCompositePlanSchemaVersion
@@ -241,6 +265,13 @@ func mapPlanPackageInputs(plan Plan, visit func(*mkosi.Root) error) (Plan, error
 	plan.CatalogSnapshot, err = catalogCopy(plan.CatalogSnapshot)
 	if err != nil {
 		return Plan{}, err
+	}
+	plan.CatalogCandidates = slices.Clone(plan.CatalogCandidates)
+	for i := range plan.CatalogCandidates {
+		plan.CatalogCandidates[i].CatalogSnapshot, err = catalogCopy(plan.CatalogCandidates[i].CatalogSnapshot)
+		if err != nil {
+			return Plan{}, err
+		}
 	}
 	plan.Builds = slices.Clone(plan.Builds)
 	for i := range plan.Builds {

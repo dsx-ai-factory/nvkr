@@ -31,7 +31,7 @@ The full demo uses one NVKR/demo bootstrap and a measured
 Packer/Go/GCC toolchain across its selected output scopes; that image also includes
 digest-checked Helm 4.2.4 and ORAS 1.3.3. There is no separate Helm-wrapper image.
 The combined selection creates one immutable Run. Catalog
-overlays remain bound to each exact predecessor digest. `../../catalogs/node-images/variants/nvidia-tcg.json` depends on the M2
+overlays remain bound to each exact predecessor digest. `../../catalogs/node-images/variants/nvidia-tcg.json` depends on the NVKE
 OS catalog's digest: repinning that catalog requires regenerating and reviewing this binding.
 The upstream selection stacks `../../catalogs/node-images/variants/upstream-tcg.json` after `../../catalogs/node-images/variants/nvidia-tcg.json`;
 its `requiresCatalogDigest` binds that exact predecessor, not the base catalog
@@ -78,9 +78,10 @@ uncommitted checkout bytes; omit it for canonical remote fetch. Compilation can
 require authenticated Git access because NVKE chart pin sets are checked against
 the pinned tree. Dry-run/preflight are not runtime acceptance.
 
-The site catalog pins CLI, controller and charts to one exact NVKE candidate;
+The site catalog pins CLI, controller and its chart to one exact NVKE candidate;
 the installer and every NVKE source, including SPIRE, select v0.23.0 at
-`2cfd00081b468d85a4894ec17e9deac13c9d8169`. The demo uses its site-spec renderer
+`2cfd00081b468d85a4894ec17e9deac13c9d8169`. Its separate NKTP 0.1.0 pin preserves
+compatibility with that NVKE release's telemetry values. The demo uses its site-spec renderer
 and deployment entrypoint with verified local charts and image digests. Tenant
 setup creates MachineImage, ClusterRelease and NodePoolRelease resources from
 the observed profiles container and selected disk before requesting the tenant.
@@ -90,7 +91,7 @@ compiles the installer's five Linux binaries from pinned Git. The separate older
 acquired `operator-tools` selection remains in the combined artifact membership.
 
 The local OS replaces the upstream OVN producers with PR #113's
-[NVKE/NVIDIA fork producers](../../catalogs/ovn-nvidia/README.md). Its chart/image Debian
+[NVKE/NVIDIA fork producers](../../catalogs/ovn/nvidia/notes/ovn-nvidia-README.md). Its chart/image Debian
 packages and demo tenant select stream `2.4.0`. Packer still consumes staged
 materials; it does not fetch the fork or compile OVN. A fresh bake and tenant
 acceptance are separate gates from compiling this selection.
@@ -126,7 +127,7 @@ See [reconciliation](../../../docs/adr/reconciliation/README.md) for implementat
 test boundaries. Ordinary tests do not execute the full demo; a fresh complete
 build/deploy/cleanup acceptance record remains required.
 
-## AMD64 nightly compiler
+## AMD64 nightly inputs
 
 `amd64-nvidia-local-kvm.json`, used by the scheduled AMD64 E2E, selects the
 [site](../../catalogs/nvke/variants/nightly-go.json) and
@@ -137,3 +138,15 @@ the shared catalogs and release Plans keep their existing pins. Catalog changes 
 overlay's predecessor digest and copied producers together. The AMD64 Go predecessor bindings in
 `toolchains/nvkr-packer/local-bindings.json` track these images for local utility preparation;
 the Packer version and image pins are unchanged.
+
+The installer carries NKTP's in-tree chart when the selected NVKE source has it.
+Extraction requires that chart only when the source installs it by path. Current
+NVKE installs its published chart from NGC, so this installer does not inject
+another chart source. The separately packaged NKTP output keeps its existing
+pin; changing it to 0.2.0 is a separate follow-up under #465.
+
+The scheduled workflow captures NVKE's commit from a shallow checkout, then
+fetches pinned sources from their public repositories. It does not pass that
+checkout through `NVKE_LOCAL_CLONE`: the bare NVKE Git URL rewrite would also
+match `nvke-telemetry-pipeline` and send NKTP's fetch to a nonexistent local path.
+Local launchers still have that limitation when `NVKE_LOCAL_CLONE` is set.

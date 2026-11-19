@@ -130,7 +130,7 @@ changed shapes are:
 | Executable and logical build graph | `nvkr.dev/ir/v4` |
 | Run plan and artifact graph | `nvkr.dev/run-plan/v5`, `nvkr.dev/artifact-graph/v5` |
 | Composite Run plan (ADR-26) | `nvkr.dev/run-plan/v6`, carrying the composition record; plain Plans stay v5 |
-| Run plan with shared package-input documents (ADR-18) | `nvkr.dev/run-plan/v7` (plain), `nvkr.dev/run-plan/v8` (composite); Plans without package recipes retain v5/v6 |
+| Run plan with shared package-input documents (ADR-18) | `nvkr.dev/run-plan/v8` (plain), `nvkr.dev/run-plan/v9` (composite), `nvkr.dev/run-plan/v10` (boot publication); Plans without package recipes retain v5/v6/v7 |
 | Run and Release views | `nvkr.dev/run/v4`, `nvkr.dev/release/v4` |
 | Composite Run record and publication root (ADR-26) | `nvkr.dev/run/v5`, `nvkr.dev/publication-root/v5`, each carrying the composition record; plain records stay v4 and OCI media types are unchanged |
 

@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -39,20 +40,27 @@ func LoadPlanContext(ctx context.Context, path string) (*Plan, error) {
 	return plan, err
 }
 
-// loadPlanDocument retains the exact admitted document's blob integrity separately
-// from producer Build identity. No second read can describe a different Plan.
+// loadPlanDocument retains the admitted packed Plan's blob integrity separately
+// from producer Build identity, reconstructing tree storage before hashing.
 func loadPlanDocument(ctx context.Context, path string) (*Plan, string, error) {
 	if ctx == nil {
 		return nil, "", e.New(e.CodeUsage, "factory plan load requires a context")
 	}
-	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "run-plan", MaxBytes: MaxPlanBytes})
+	held, err := heldfile.OpenContext(ctx, path, heldfile.Options{Label: "run-plan", MaxBytes: maxGeneratedFileBytes})
 	if err != nil {
 		return nil, "", classifyContext(ctx, e.Wrap(e.CodePipelineDrift, err, "opening factory plan"))
 	}
 	defer func() { _ = held.Close() }()
-	raw, err := held.ReadAllContext(ctx, MaxPlanBytes)
+	raw, err := held.ReadAllContext(ctx, maxGeneratedFileBytes)
 	if err != nil {
 		return nil, "", classifyContext(ctx, e.Wrap(e.CodePipelineDrift, err, "reading factory plan"))
+	}
+	var fields planFields
+	if err := json.Unmarshal(raw, &fields); err == nil && fields["storage"] != nil {
+		return loadPlanTree(ctx, path, raw)
+	}
+	if int64(len(raw)) > MaxPlanBytes {
+		return nil, "", e.New(e.CodePipelineDrift, "packed Plan exceeds its size bound")
 	}
 	var plan Plan
 	if _, err := admitPlanDocumentSchema(raw); err != nil {

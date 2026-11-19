@@ -45,12 +45,17 @@ func nativeControllerFixture(t *testing.T, installer, name string) nativeControl
 
 func TestNativeControllerIdentitySourceAdmission(t *testing.T) {
 	for _, name := range []string{"nke-controller", "nvke-controller"} {
-		for _, scenario := range []string{"selected", "source-owned duplicate env", "unknown", "mixed namespace", "mixed fullname", "mixed name", "null override", "base null override", "ambiguous values", "mismatched chart", "moved chart", "renamed chart artifact", "renamed image artifact", "renamed profiles artifact", "missing declaration", "duplicate declaration", "multiple value documents", "multiple release documents", "alias override", "merge override", "changed source", "symlink declaration", "canceled"} {
+		for _, scenario := range []string{"selected", "current image artifact", "source-owned duplicate env", "unknown", "mixed namespace", "mixed fullname", "mixed name", "null override", "base null override", "ambiguous values", "mismatched chart", "moved chart", "renamed chart artifact", "renamed image artifact", "renamed profiles artifact", "missing declaration", "duplicate declaration", "multiple value documents", "multiple release documents", "alias override", "merge override", "changed source", "changed image artifact", "symlink declaration", "canceled"} {
 			t.Run(name+"/"+scenario, func(t *testing.T) {
 				root := privateTestDir(t)
 				selected := nativeControllerFixture(t, root, name)
 				files := nativeControllerFixtureFiles(name)
 				switch scenario {
+				case "current image artifact", "changed image artifact":
+					files[0] = strings.Replace(files[0], "imageArtifact: cwe", "imageArtifact: nvke-controller", 1)
+					if scenario == "current image artifact" {
+						selected.digests[0] = plainSHA([]byte(files[0]))
+					}
 				case "source-owned duplicate env":
 					files[2] += "env: []\nenv: [{name: SOURCE_OWNED, value: actual}]\n"
 				case "unknown":
@@ -118,12 +123,12 @@ func TestNativeControllerIdentitySourceAdmission(t *testing.T) {
 				}
 				var got nativeControllerIdentity
 				var err error
-				if scenario == "changed source" {
+				if scenario == "changed source" || scenario == "changed image artifact" {
 					got, err = nativeControllerForAssets(ctx, NativeAssets{Installer: root, installerSelection: &nativeInstallerSelection{controller: selected}})
 				} else {
 					got, err = selectNativeControllerIdentity(ctx, root)
 				}
-				if scenario == "selected" || scenario == "source-owned duplicate env" {
+				if scenario == "selected" || scenario == "current image artifact" || scenario == "source-owned duplicate env" {
 					if err != nil || got != selected {
 						t.Fatalf("source selection=%+v err=%v", got, err)
 					}

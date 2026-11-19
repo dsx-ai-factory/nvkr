@@ -22,91 +22,91 @@ func TestExtractPinSetVersions(t *testing.T) {
 	}{
 		{
 			name:  "Helm lock versions",
-			raw:   "dependencies:\n  - name: cwe\n    version: 0.9.3\n  - name: spire\n    version: v1.2.3-rc.1+build.2\ngenerated: 2026-09-29T12:00:00Z\n",
-			paths: map[string]string{"controller": "dependencies[name=cwe].version", "agent": "dependencies[name=spire].version"},
+			raw:   "dependencies:\n  - name: nvke-controller\n    version: 0.9.3\n  - name: spire\n    version: v1.2.3-rc.1+build.2\ngenerated: 2026-09-29T12:00:00Z\n",
+			paths: map[string]string{"controller": "dependencies[name=nvke-controller].version", "agent": "dependencies[name=spire].version"},
 			want:  map[string]string{"controller": "0.9.3", "agent": "v1.2.3-rc.1+build.2"},
 		},
 		{
 			name:  "CycloneDX JSON versions",
 			raw:   `{"bomFormat":"CycloneDX","components":[{"bom-ref":"urn:uuid:1234","version":"1.2.3"},{"bom-ref":"spire.agent","version":"2.3.4"}]}`,
-			paths: map[string]string{"cwe": "components[bom-ref=urn:uuid:1234].version", "spire": "components[bom-ref=spire.agent].version"},
-			want:  map[string]string{"cwe": "1.2.3", "spire": "2.3.4"},
+			paths: map[string]string{"nvke-controller": "components[bom-ref=urn:uuid:1234].version", "spire": "components[bom-ref=spire.agent].version"},
+			want:  map[string]string{"nvke-controller": "1.2.3", "spire": "2.3.4"},
 		},
 		{
 			name:  "scalar paths permit unrelated metadata",
 			raw:   "release: {controller: {version: 1.2.3}, metadata: {channel: stable}}\n",
-			paths: map[string]string{"cwe": "release.controller.version"},
-			want:  map[string]string{"cwe": "1.2.3"},
+			paths: map[string]string{"nvke-controller": "release.controller.version"},
+			want:  map[string]string{"nvke-controller": "1.2.3"},
 		},
 		{
 			name:  "nested selectors each account for complete collection",
-			raw:   "groups: [{name: controllers, components: [{name: cwe, version: 1.2.3}, {name: api, version: 2.3.4}]}, {name: nodes, components: [{name: agent, version: 3.4.5}]}]",
-			paths: map[string]string{"cwe": "groups[name=controllers].components[name=cwe].version", "api": "groups[name=controllers].components[name=api].version", "agent": "groups[name=nodes].components[name=agent].version"},
-			want:  map[string]string{"cwe": "1.2.3", "api": "2.3.4", "agent": "3.4.5"},
+			raw:   "groups: [{name: controllers, components: [{name: nvke-controller, version: 1.2.3}, {name: api, version: 2.3.4}]}, {name: nodes, components: [{name: agent, version: 3.4.5}]}]",
+			paths: map[string]string{"nvke-controller": "groups[name=controllers].components[name=nvke-controller].version", "api": "groups[name=controllers].components[name=api].version", "agent": "groups[name=nodes].components[name=agent].version"},
+			want:  map[string]string{"nvke-controller": "1.2.3", "api": "2.3.4", "agent": "3.4.5"},
 		},
 		{
 			name:  "one upstream version may supply multiple declared targets",
-			raw:   "dependencies: [{name: cwe, version: 1.2.3}]",
-			paths: map[string]string{"cwe": "dependencies[name=cwe].version", "other": "dependencies[name=cwe].version"},
-			want:  map[string]string{"cwe": "1.2.3", "other": "1.2.3"},
+			raw:   "dependencies: [{name: nvke-controller, version: 1.2.3}]",
+			paths: map[string]string{"nvke-controller": "dependencies[name=nvke-controller].version", "other": "dependencies[name=nvke-controller].version"},
+			want:  map[string]string{"nvke-controller": "1.2.3", "other": "1.2.3"},
 		},
-		{name: "unknown member", raw: "dependencies: [{name: cwe, version: 1.2.3}, {name: new, version: 2.3.4}]", wantErr: "unaccounted member"},
+		{name: "unknown member", raw: "dependencies: [{name: nvke-controller, version: 1.2.3}, {name: new, version: 2.3.4}]", wantErr: "unaccounted member"},
 		{name: "missing member", raw: "dependencies: [{name: other, version: 1.2.3}]", wantErr: "no member"},
-		{name: "ambiguous member", raw: "dependencies: [{name: cwe, version: 1.2.3}, {name: cwe, version: 2.3.4}]", wantErr: "duplicate name"},
-		{name: "duplicate identity even for unknown members", raw: "dependencies: [{name: cwe, version: 1.2.3}, {name: new, version: 2.3.4}, {name: new, version: 2.3.4}]", wantErr: "duplicate name"},
+		{name: "ambiguous member", raw: "dependencies: [{name: nvke-controller, version: 1.2.3}, {name: nvke-controller, version: 2.3.4}]", wantErr: "duplicate name"},
+		{name: "duplicate identity even for unknown members", raw: "dependencies: [{name: nvke-controller, version: 1.2.3}, {name: new, version: 2.3.4}, {name: new, version: 2.3.4}]", wantErr: "duplicate name"},
 		{name: "missing identity", raw: "dependencies: [{version: 1.2.3}]", wantErr: "identity"},
 		{name: "numeric identity", raw: "dependencies: [{name: 123, version: 1.2.3}]", wantErr: "identity"},
 		{name: "boolean identity", raw: "dependencies: [{name: true, version: 1.2.3}]", wantErr: "identity"},
-		{name: "surrounding whitespace in identity", raw: `dependencies: [{name: " cwe ", version: 1.2.3}]`, wantErr: "identity"},
-		{name: "scalar record", raw: "dependencies: [cwe]", wantErr: "identity"},
-		{name: "missing version", raw: "dependencies: [{name: cwe}]", wantErr: "missing object field"},
-		{name: "integer version", raw: "dependencies: [{name: cwe, version: 1}]", wantErr: "exact string version"},
-		{name: "float version", raw: "dependencies: [{name: cwe, version: 1.2}]", wantErr: "exact string version"},
-		{name: "null version", raw: "dependencies: [{name: cwe, version: null}]", wantErr: "exact string version"},
-		{name: "object version", raw: "dependencies: [{name: cwe, version: {x: 1.2.3}}]", wantErr: "exact string version"},
-		{name: "version range", raw: `dependencies: [{name: cwe, version: "^1.2.3"}]`, wantErr: "exact string version"},
-		{name: "version template", raw: `dependencies: [{name: cwe, version: "{{ .Version }}"}]`, wantErr: "exact string version"},
-		{name: "version whitespace", raw: `dependencies: [{name: cwe, version: "1.2.3 "}]`, wantErr: "exact string version"},
-		{name: "duplicate YAML mapping key", raw: "dependencies: [{name: cwe, version: 1.2.3, version: 2.3.4}]", wantErr: "duplicate key"},
-		{name: "duplicate JSON mapping key", raw: `{"dependencies":[{"name":"cwe","version":"1.2.3","version":"2.3.4"}]}`, wantErr: "duplicate key"},
-		{name: "duplicate unselected metadata key", raw: "dependencies: [{name: cwe, version: 1.2.3}]\nmetadata: {x: 1, x: 2}", wantErr: "duplicate key"},
-		{name: "alias", raw: "item: &item {name: cwe, version: 1.2.3}\ndependencies: [*item]", wantErr: "anchors or aliases"},
-		{name: "anchor alone", raw: "dependencies: [{name: cwe, version: &version 1.2.3}]", wantErr: "anchors or aliases"},
-		{name: "merge key", raw: "dependencies: [{name: cwe, version: 1.2.3, <<: {extra: value}}]", wantErr: "string object keys"},
-		{name: "numeric mapping key", raw: "dependencies: [{name: cwe, version: 1.2.3}]\n1: metadata", wantErr: "string object keys"},
-		{name: "custom scalar tag", raw: "dependencies: [{name: cwe, version: !custom 1.2.3}]", wantErr: "unsupported scalar tag"},
-		{name: "custom mapping tag", raw: "dependencies: [!custom {name: cwe, version: 1.2.3}]", wantErr: "unsupported mapping tag"},
-		{name: "custom sequence tag", raw: "dependencies: !custom [{name: cwe, version: 1.2.3}]", wantErr: "unsupported sequence tag"},
-		{name: "extra document", raw: "dependencies: [{name: cwe, version: 1.2.3}]\n---\nother: value", wantErr: "exactly one"},
-		{name: "extra empty document", raw: "dependencies: [{name: cwe, version: 1.2.3}]\n---\n", wantErr: "exactly one"},
+		{name: "surrounding whitespace in identity", raw: `dependencies: [{name: " nvke-controller ", version: 1.2.3}]`, wantErr: "identity"},
+		{name: "scalar record", raw: "dependencies: [nvke-controller]", wantErr: "identity"},
+		{name: "missing version", raw: "dependencies: [{name: nvke-controller}]", wantErr: "missing object field"},
+		{name: "integer version", raw: "dependencies: [{name: nvke-controller, version: 1}]", wantErr: "exact string version"},
+		{name: "float version", raw: "dependencies: [{name: nvke-controller, version: 1.2}]", wantErr: "exact string version"},
+		{name: "null version", raw: "dependencies: [{name: nvke-controller, version: null}]", wantErr: "exact string version"},
+		{name: "object version", raw: "dependencies: [{name: nvke-controller, version: {x: 1.2.3}}]", wantErr: "exact string version"},
+		{name: "version range", raw: `dependencies: [{name: nvke-controller, version: "^1.2.3"}]`, wantErr: "exact string version"},
+		{name: "version template", raw: `dependencies: [{name: nvke-controller, version: "{{ .Version }}"}]`, wantErr: "exact string version"},
+		{name: "version whitespace", raw: `dependencies: [{name: nvke-controller, version: "1.2.3 "}]`, wantErr: "exact string version"},
+		{name: "duplicate YAML mapping key", raw: "dependencies: [{name: nvke-controller, version: 1.2.3, version: 2.3.4}]", wantErr: "duplicate key"},
+		{name: "duplicate JSON mapping key", raw: `{"dependencies":[{"name":"nvke-controller","version":"1.2.3","version":"2.3.4"}]}`, wantErr: "duplicate key"},
+		{name: "duplicate unselected metadata key", raw: "dependencies: [{name: nvke-controller, version: 1.2.3}]\nmetadata: {x: 1, x: 2}", wantErr: "duplicate key"},
+		{name: "alias", raw: "item: &item {name: nvke-controller, version: 1.2.3}\ndependencies: [*item]", wantErr: "anchors or aliases"},
+		{name: "anchor alone", raw: "dependencies: [{name: nvke-controller, version: &version 1.2.3}]", wantErr: "anchors or aliases"},
+		{name: "merge key", raw: "dependencies: [{name: nvke-controller, version: 1.2.3, <<: {extra: value}}]", wantErr: "string object keys"},
+		{name: "numeric mapping key", raw: "dependencies: [{name: nvke-controller, version: 1.2.3}]\n1: metadata", wantErr: "string object keys"},
+		{name: "custom scalar tag", raw: "dependencies: [{name: nvke-controller, version: !custom 1.2.3}]", wantErr: "unsupported scalar tag"},
+		{name: "custom mapping tag", raw: "dependencies: [!custom {name: nvke-controller, version: 1.2.3}]", wantErr: "unsupported mapping tag"},
+		{name: "custom sequence tag", raw: "dependencies: !custom [{name: nvke-controller, version: 1.2.3}]", wantErr: "unsupported sequence tag"},
+		{name: "extra document", raw: "dependencies: [{name: nvke-controller, version: 1.2.3}]\n---\nother: value", wantErr: "exactly one"},
+		{name: "extra empty document", raw: "dependencies: [{name: nvke-controller, version: 1.2.3}]\n---\n", wantErr: "exactly one"},
 		{name: "malformed YAML", raw: "dependencies: [", wantErr: "parsing"},
 		{name: "empty document", raw: "", wantErr: "must contain"},
 		{name: "sequence root", raw: "[]", wantErr: "must be an object"},
-		{name: "selector on mapping", raw: "dependencies: {cwe: {version: 1.2.3}}", wantErr: "requires a sequence"},
+		{name: "selector on mapping", raw: "dependencies: {nvke-controller: {version: 1.2.3}}", wantErr: "requires a sequence"},
 		{name: "missing collection", raw: "other: value", wantErr: "missing object field"},
 		{
 			name:    "inconsistent collection identity keys",
-			raw:     "dependencies: [{name: cwe, id: cwe, version: 1.2.3}, {name: spire, id: spire, version: 2.3.4}]",
-			paths:   map[string]string{"cwe": "dependencies[name=cwe].version", "spire": "dependencies[id=spire].version"},
+			raw:     "dependencies: [{name: nvke-controller, id: nvke-controller, version: 1.2.3}, {name: spire, id: spire, version: 2.3.4}]",
+			paths:   map[string]string{"nvke-controller": "dependencies[name=nvke-controller].version", "spire": "dependencies[id=spire].version"},
 			wantErr: "inconsistent identity keys",
 		},
 		{
 			name:    "unknown nested member",
-			raw:     "groups: [{name: controllers, components: [{name: cwe, version: 1.2.3}, {name: hidden, version: 2.3.4}]}]",
-			paths:   map[string]string{"cwe": "groups[name=controllers].components[name=cwe].version"},
+			raw:     "groups: [{name: controllers, components: [{name: nvke-controller, version: 1.2.3}, {name: hidden, version: 2.3.4}]}]",
+			paths:   map[string]string{"nvke-controller": "groups[name=controllers].components[name=nvke-controller].version"},
 			wantErr: "unaccounted member",
 		},
 		{
 			name:    "unknown outer member",
-			raw:     "groups: [{name: controllers, components: [{name: cwe, version: 1.2.3}]}, {name: hidden, components: []}]",
-			paths:   map[string]string{"cwe": "groups[name=controllers].components[name=cwe].version"},
+			raw:     "groups: [{name: controllers, components: [{name: nvke-controller, version: 1.2.3}]}, {name: hidden, components: []}]",
+			paths:   map[string]string{"nvke-controller": "groups[name=controllers].components[name=nvke-controller].version"},
 			wantErr: "unaccounted member",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.paths == nil {
-				tt.paths = map[string]string{"cwe": "dependencies[name=cwe].version"}
+				tt.paths = map[string]string{"nvke-controller": "dependencies[name=nvke-controller].version"}
 			}
 			members := make(map[string]PinSetMember, len(tt.paths))
 			for name, path := range tt.paths {
@@ -130,7 +130,7 @@ func TestExtractPinSetVersions(t *testing.T) {
 }
 
 func TestPinSetExtractionResourceBounds(t *testing.T) {
-	base := map[string]PinSetMember{"cwe": {Source: "cwe", Path: "version"}}
+	base := map[string]PinSetMember{"nvke-controller": {Source: "nvke-controller", Path: "version"}}
 	tests := []struct {
 		name    string
 		raw     string
@@ -143,7 +143,7 @@ func TestPinSetExtractionResourceBounds(t *testing.T) {
 	}
 	tooMany := make(map[string]PinSetMember)
 	for index := 0; index <= maxPinSetMembers; index++ {
-		tooMany[fmt.Sprintf("member-%d", index)] = base["cwe"]
+		tooMany[fmt.Sprintf("member-%d", index)] = base["nvke-controller"]
 	}
 	tests = append(tests, struct {
 		name    string
@@ -167,10 +167,10 @@ func TestValidatePinSetValuePath(t *testing.T) {
 	}{
 		{"version", true},
 		{"metadata.release.version", true},
-		{"dependencies[name=cwe].version", true},
+		{"dependencies[name=nvke-controller].version", true},
 		{"components[bom-ref=urn:uuid:1234].version", true},
 		{"components[bom-ref=pkg:helm/spire@1.2.3].version", true},
-		{"groups[name=controller].components[name=cwe].version", true},
+		{"groups[name=controller].components[name=nvke-controller].version", true},
 		{"", false},
 		{".version", false},
 		{"version.", false},

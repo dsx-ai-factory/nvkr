@@ -1,8 +1,8 @@
 # Direct public-source OS builds
 
-Experimental source-producer catalog for NVKE v0.21.0 OS inputs. It uses NVKR's existing catalog, source preparation, graph compiler and local executor. It is not selected by the maintained OS/M2 Definitions and is not yet a replacement for their package graph.
+Experimental source-producer catalog for NVKE v0.21.0 OS inputs. It uses NVKR's existing catalog, source preparation, graph compiler and local executor. It is not selected by the maintained OS/NVKE Definitions and is not yet a replacement for their package graph.
 
-The separately selectable [DSX OVN source-build option](../../catalogs/ovn-nvidia/README.md)
+The separately selectable [DSX OVN source-build option](../../catalogs/ovn/nvidia/notes/ovn-nvidia-README.md)
 adds the fork's source-owned OCI image and offline chart/image Debian packaging.
 It is kept separate because its Git repository is internal; the public-source
 diagnostic does not receive source credentials. Calico and maintained inputs are
@@ -70,7 +70,7 @@ Complete removal of NVKE package-folder use is not implemented by this catalog a
 2. Package authenticated binaries and rebuilt OCI images using pinned packaging tools, preserving package names, paths, dependencies, hooks, units and runtime image references. Eliminate the indirect NVKE-agent packaging dependency on the package folder.
 3. Declare the unavailable-public-source DSX IMDS exception in the executable package catalog and artifact lock, warn during preparation, and acquire the retained bytes successfully. Do not omit it or substitute an older plugin-free SPIRE package.
 4. Resolve Helm held-source preparation admission: both pinned Helm trees are rejected by the production `ExecNode` vendor owner before fixture removal. Local-route green diagnostics do not establish that production path.
-5. Connect the producers to image-inputs and the maintained OS/M2 Definition, regenerate matching overlays and Plans through their owning commands, and execute fresh AMD64 and ARM64 image builds plus package/boot/runtime selection tests.
+5. Connect the producers to image-inputs and the maintained OS/NVKE Definition, regenerate matching overlays and Plans through their owning commands, and execute fresh AMD64 and ARM64 image builds plus package/boot/runtime selection tests.
 
 The [release inventory](../../../docs/nvke-v0.21.0-os-dependency-inventory.md) contains the exact released inputs and remaining source mappings. Ubuntu packages remain the separately captured APT lane; this change does not rebuild Ubuntu itself or claim byte-reproducible QCOW2 images.
 

@@ -87,6 +87,16 @@ func prepareLocalInputsWithScope(ctx context.Context, definitionPath, environmen
 		selection.Base, selection.Overlays = locations[0], locations[1:]
 		return selection, nil
 	}
+	candidates, err := loadCatalogCandidates(ctx, definition.Catalogs, loadStack)
+	if err != nil {
+		return preparedLocalInputs{}, err
+	}
+	for i := range definition.Catalogs {
+		definition.Catalogs[i], err = rebase(definition.Catalogs[i])
+		if err != nil {
+			return preparedLocalInputs{}, err
+		}
+	}
 	baseSelection := definition.Catalog
 	definition.Catalog, err = rebase(baseSelection)
 	if err != nil {
@@ -96,16 +106,26 @@ func prepareLocalInputsWithScope(ctx context.Context, definitionPath, environmen
 	for i := range definition.Outputs {
 		output := &definition.Outputs[i]
 		selection := baseSelection
+		var stack *catalog.Stack
 		if output.Catalog != nil {
 			selection = *output.Catalog
+		} else if len(candidates) != 0 {
+			candidate, err := selectCatalogCandidate(*output, candidates)
+			if err != nil {
+				return preparedLocalInputs{}, err
+			}
+			selection = candidate.Selection
+			stack = candidate.stack()
 		}
 		rebased, err := rebase(selection)
 		if err != nil {
 			return preparedLocalInputs{}, err
 		}
-		stack, err := loadStack(ctx, selection)
-		if err != nil {
-			return preparedLocalInputs{}, err
+		if stack == nil {
+			stack, err = loadStack(ctx, selection)
+			if err != nil {
+				return preparedLocalInputs{}, err
+			}
 		}
 		selection = rebased
 		overlay := catalog.Overlay{APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind, Name: "local-native-" + output.Name, RequiresCatalogDigest: stack.Digest, Components: make(map[string]catalog.ComponentReplacement)}
@@ -152,6 +172,11 @@ func prepareLocalInputsWithScope(ctx context.Context, definitionPath, environmen
 		}
 		if selection.Base == definition.Catalog.Base && slices.Equal(selection.Overlays, definition.Catalog.Overlays) {
 			return loadStack(ctx, baseSelection)
+		}
+		for i, candidate := range candidates {
+			if sameCatalogSelection(selection, definition.Catalogs[i]) {
+				return candidate.stack(), nil
+			}
 		}
 		return loadFactoryCatalogStack(ctx, prepared.Definition, selection)
 	})

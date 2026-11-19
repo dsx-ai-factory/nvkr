@@ -23,7 +23,7 @@ templates that supply their own algorithm prefix; unknown formats fail before
 chart mutation. Ordinary hosted ARM64 producers select `ubuntu-24.04-arm` when
 `runsOn` is unset; explicit selections and VM/ARC routing retain precedence.
 
-These are experimental candidate inputs, not maintained M2 membership or proof of
+These are experimental candidate inputs, not maintained NVKE membership or proof of
 GHCR publication, signed Release acceptance or OS integration. Internal fork access
 requires separate acceptance. Authenticated cross-output image/final-chart handoff
 into OS material composition remains absent ([issue #116](https://github.com/dsx-ai-factory/nvkr/issues/116)).

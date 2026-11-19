@@ -73,7 +73,7 @@ func presentDemoNarration(ctx context.Context, out io.Writer, cfg nvkedemo.Build
 		return err
 	}
 	// An output-specific catalog is a complete stack, not an inherited patch.
-	stacks := []definition.Catalog{authored.Catalog}
+	stacks := append([]definition.Catalog{authored.Catalog}, authored.Catalogs...)
 	for _, output := range authored.Outputs {
 		if output.Catalog != nil {
 			stacks = append(stacks, *output.Catalog)

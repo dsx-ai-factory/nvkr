@@ -22,16 +22,15 @@ import (
 
 func archiveAssetPlan(t *testing.T) *Plan {
 	t.Helper()
-	maintained, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke-nightly-arm64/plan.json")
+	maintained, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
-	var base catalog.Catalog
-	for _, build := range maintained.Builds {
-		if build.Name == "nicosim-tools-arm64" {
-			base = *build.CatalogSnapshot
-		}
+	native, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/tools"))
+	if err != nil {
+		t.Fatal(err)
 	}
+	base := *native
 	scanner, err := maintained.CatalogSnapshot.SelectTool("syft", "linux/amd64")
 	if err != nil {
 		t.Fatal(err)

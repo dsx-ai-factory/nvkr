@@ -52,7 +52,7 @@ func TestPlanSharesRuntimePackageSnapshots(t *testing.T) {
 				if bytes.Count(raw, input) != 1 {
 					t.Fatal("package document is not stored exactly once")
 				}
-				if path != "store/package-inputs-"+strings.TrimPrefix(snapshot.Digest, "sha256:")[:12]+".json" {
+				if path != "store/package-inputs@"+strings.TrimPrefix(snapshot.Digest, "sha256:")[:12]+".json" {
 					t.Fatalf("snapshot path %q", path)
 				}
 				if got := bytes.Count(raw, []byte(`"inputsDigest":"`+snapshot.Digest+`"`)); got != 4*len(outputs) {
@@ -88,6 +88,34 @@ func TestPlanSharesRuntimePackageSnapshots(t *testing.T) {
 			if err != nil || !bytes.Equal(raw, again) {
 				t.Fatal("shared Plan round trip is not byte-identical", err)
 			}
+			files, err := renderPlanTree(t.Context(), plan, "plan.json")
+			if err != nil {
+				t.Fatal(err)
+			}
+			stored := 0
+			for path, data := range files {
+				if strings.HasPrefix(path, PlanStoreDirectory+"/plan/package-inputs@") {
+					stored++
+					if !planStoreMatches(path, data) {
+						t.Fatalf("invalid package store address %q", path)
+					}
+				}
+			}
+			if stored != len(document.PackageSnapshots) {
+				t.Fatalf("stored %d package records, want %d", stored, len(document.PackageSnapshots))
+			}
+			_, joined, err := joinPlanTree(t.Context(), "plan.json", files)
+			if err != nil || !bytes.Equal(raw, joined) {
+				t.Fatal("Plan tree changed packed package snapshots", err)
+			}
+			for path := range files {
+				if strings.HasPrefix(path, PlanStoreDirectory+"/plan/package-inputs@") {
+					delete(files, path)
+					break
+				}
+			}
+			_, _, err = joinPlanTree(t.Context(), "plan.json", files)
+			assertFactoryErrorCode(t, err, e.CodePipelineDrift)
 			// Display decoding remains descriptive; canonical admission must still
 			// reject the same whitespace-bearing bytes.
 			var pretty bytes.Buffer
@@ -102,6 +130,56 @@ func TestPlanSharesRuntimePackageSnapshots(t *testing.T) {
 				t.Fatal("pretty display passed exact-byte admission")
 			}
 			t.Logf("requirements=%d inline=%d shared=%d bound=%d", len(outputs), len(original), len(raw), MaxPlanBytes)
+		})
+	}
+}
+
+func TestPlanPackageSnapshotsCoverCatalogCandidatesAndSchemaVariants(t *testing.T) {
+	base := runtimeConsumersPlanFixture(t, []string{"first", "second"})
+	for _, tc := range []struct {
+		name   string
+		modify func(*Plan)
+		schema string
+	}{
+		{"catalog candidates", func(p *Plan) {
+			for _, build := range p.Builds {
+				if strings.HasPrefix(build.Name, "internal/") {
+					p.CatalogCandidates = []CatalogCandidate{{CatalogSnapshot: build.CatalogSnapshot}}
+					return
+				}
+			}
+		}, sharedPlanSchemaVersion},
+		{"composite", func(p *Plan) { p.Composition = &CompositionRecord{} }, sharedCompositePlanSchemaVersion},
+		{"boot", func(p *Plan) { p.BootPublication = &BootPublicationPlan{} }, sharedBootPlanSchemaVersion},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// This exercises representation only. Synthetic composition/boot
+			// records do not claim to pass full executable Plan admission.
+			plan := *base
+			tc.modify(&plan)
+			plan.SchemaVersion = planSchemaFor(plan)
+			if plan.SchemaVersion != tc.schema {
+				t.Fatal("wrong package snapshot schema", plan.SchemaVersion)
+			}
+			before, err := canonical.Marshal(planValue(plan))
+			if err != nil {
+				t.Fatal(err)
+			}
+			raw, err := canonical.Marshal(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if bytes.Count(raw, []byte(material.PackageInputsSchema)) != 2 {
+				t.Fatal("schema variant inlined or duplicated a package document")
+			}
+			var restored Plan
+			if err := canonical.UnmarshalExact(raw, &restored); err != nil {
+				t.Fatal(err)
+			}
+			after, err := canonical.Marshal(planValue(restored))
+			if err != nil || !bytes.Equal(before, after) {
+				t.Fatal("schema variant changed captured recipes", err)
+			}
 		})
 	}
 }
@@ -224,7 +302,7 @@ func TestGeneratedPlanAdmitsReaderByteBound(t *testing.T) {
 	}{{"exact limit", 0}, {"one byte above", 1}} {
 		t.Run(tc.name, func(t *testing.T) {
 			plan.GeneratorVersion = originalVersion + strings.Repeat("v", int(MaxPlanBytes)-len(raw)+tc.extra)
-			files, _, err := renderStaticInputs(t.Context(), plan, generationLayout{planPath: "plan.json"})
+			files, _, err := renderStaticInputs(t.Context(), plan, generationLayout{planPath: tektonPlanPath})
 			if tc.extra != 0 {
 				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
 				if files != nil {
@@ -248,12 +326,25 @@ func TestGeneratedPlanAdmitsReaderByteBound(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if int64(len(files["plan.json"])) != MaxPlanBytes {
+			if int64(len(files[tektonPlanPath])) != MaxPlanBytes {
 				t.Fatal("wrong exact-bound fixture")
 			}
 			var restored Plan
-			if err := canonical.UnmarshalExact(files["plan.json"], &restored); err != nil {
+			if err := canonical.UnmarshalExact(files[tektonPlanPath], &restored); err != nil {
 				t.Fatal(err)
+			}
+			var pretty bytes.Buffer
+			if err := json.Indent(&pretty, files[tektonPlanPath], "", "  "); err != nil {
+				t.Fatal(err)
+			}
+			if int64(pretty.Len()) <= MaxPlanBytes {
+				t.Fatal("display fixture does not exceed the packed bound")
+			}
+			if err := json.Unmarshal(pretty.Bytes(), &restored); err != nil {
+				t.Fatal("bounded display JSON cannot be decoded", err)
+			}
+			if canonical.UnmarshalExact(pretty.Bytes(), &restored) == nil {
+				t.Fatal("display JSON passed canonical admission")
 			}
 		})
 	}
