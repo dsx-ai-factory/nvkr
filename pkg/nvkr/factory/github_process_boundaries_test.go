@@ -38,6 +38,7 @@ phase=build
 # Both leader and descendant resist TERM, exercising timeout's KILL escalation.
 trap '' TERM
 group=$(ps -o pgid= -p "$$" | tr -d ' ')
+[ -n "$group" ]
 bash -c '
   printf "%s" "$$" > descendant.pid
   # Readiness triggers TERM/KILL escalation in the real timeout.

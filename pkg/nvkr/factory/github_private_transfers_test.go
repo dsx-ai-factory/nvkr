@@ -57,7 +57,10 @@ set -eu
 for key in NVKR_CREDENTIAL NVKR_CI_STORAGE_TOKEN ACTIONS_ID_TOKEN_REQUEST_TOKEN; do
   [ -z "${!key+x}" ]
 done
-[ "$GOTOOLCHAIN" = local ] && [ "$GOENV" = off ] && [ "$CGO_ENABLED" = 0 ] && [ "$GOWORK" = off ]
+[ "$GOTOOLCHAIN" = local ]
+[ "$GOENV" = off ]
+[ "$CGO_ENABLED" = 0 ]
+[ "$GOWORK" = off ]
 cache=${GOCACHE%/*}
 [ "$cache" = "${GOMODCACHE%/*}" ]
 [ "$(LC_ALL=C ls -ld "$cache" | cut -c1-10)" = drwx------ ]
@@ -70,11 +73,13 @@ mode=` + shellQuote(test.name) + `
 phase=build
 if [ "$1" = mod ] && [ "$2" = download ]; then phase=download; fi
 if [ "$phase" = download ] && [ "$mode" != 'download cancellation' ]; then
-  [ -z "${GOPROXY+x}" ] && [ -z "${GOSUMDB+x}" ]
+  [ -z "${GOPROXY+x}" ]
+  [ -z "${GOSUMDB+x}" ]
   exit 0
 fi
 if [ "$phase" = build ]; then
-  [ "$GOPROXY" = off ] && [ "$GOSUMDB" = off ]
+  [ "$GOPROXY" = off ]
+  [ "$GOSUMDB" = off ]
   mkdir -p "$GOCACHE" "$GOMODCACHE/read-only-module"
   for directory in "$GOCACHE" "$GOMODCACHE/read-only-module"; do
     printf disposable > "$directory/cached"
@@ -898,13 +903,18 @@ published=` + shellQuote(published) + `
 workspace=` + shellQuote(root) + `
 cache=${GOCACHE%/*}
 if [ "$1" = mod ] && [ "$2" = download ] && [ "${3:-}" = -json ]; then
-  [ "$#" = 4 ] && [ "$4" = ` + shellQuote(githubRunnerModule+"@"+testRunnerRelease.Version) + ` ]
-  [ -z "${GOPROXY+x}" ] && [ "$(pwd -P)" = "$(cd "$cache" && pwd -P)" ]
+  [ "$#" = 4 ]
+  [ "$4" = ` + shellQuote(githubRunnerModule+"@"+testRunnerRelease.Version) + ` ]
+  [ -z "${GOPROXY+x}" ]
+  [ "$(pwd -P)" = "$(cd "$cache" && pwd -P)" ]
   printf '%s\n' ` + shellQuote(string(moduleJSON)) + `
   exit 0
 fi
 if [ "$1" = run ]; then
-  [ "$2" = module-pin.go ] && [ "$GOPROXY" = off ] && [ "$GOSUMDB" = off ]
+  [ "$2" = module-pin.go ]
+  [ "$GOPROXY" = off ]
+  [ "$GOSUMDB" = off ]
+  cmp module-pin.go ` + shellQuote(filepath.Join(filepath.Dir(parser), "module-pin.go")) + `
   shift 2
   exec ` + shellQuote(parser) + ` "$@"
 fi
@@ -916,9 +926,12 @@ for arg in "$@"; do
   if [ "$previous" = -o ]; then output=$arg; fi
   previous=$arg
 done
-[ "$modfile" = "$cache/inputs/go.mod" ] && [ "$(cat "$modfile")" = 'published go.mod' ]
+[ "$modfile" = "$cache/inputs/go.mod" ]
+[ "$(cat "$modfile")" = 'published go.mod' ]
 if [ "$1" = mod ] && [ "$2" = download ]; then exit 0; fi
-[ "$1" = build ] && [ "$GOPROXY" = off ] && [ "${!#}" = ./cmd/nvkr ]
+[ "$1" = build ]
+[ "$GOPROXY" = off ]
+[ "${!#}" = ./cmd/nvkr ]
 [ "$output" = "$(cd "$workspace" && pwd -P)/.nvkr/ci-bootstrap/nvkr-exec" ]
 printf 'published helper' > "$output"
 `
