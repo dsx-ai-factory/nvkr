@@ -8,12 +8,13 @@ import (
 	"context"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 
-	"github.com/dsx-ai-factory/nvkr/internal/nvkedemo"
 	"github.com/dsx-ai-factory/nvkr/internal/qualificationprogress"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/urfave/cli/v2"
@@ -21,6 +22,10 @@ import (
 )
 
 func TestQualifyLocalCommand(t *testing.T) {
+	want, err := os.ReadFile(filepath.Join("..", "..", "testdata", "contracts", "local-qualification-result.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, mode := range []string{"exact", "missing", "positional", "failure", "progress", "invalid progress"} {
 		t.Run(mode, func(t *testing.T) {
 			calls := 0
@@ -97,8 +102,20 @@ func TestQualifyLocalCommand(t *testing.T) {
 				}
 				return
 			}
-			if err := nvkedemo.ValidateLocalQualificationResult(output.Bytes(), "attempt"); err != nil {
-				t.Fatalf("actual CLI output refused by demo reader: %v", err)
+			// The downstream reader consumes this same golden record. Comparing
+			// the real command output joins both contracts across module boundaries.
+			if !bytes.Equal(output.Bytes(), want) {
+				t.Fatalf("local qualification output differs from shared contract:\n got %q\nwant %q", output.Bytes(), want)
+			}
+			var result lifecycle.LocalQualificationResult
+			if !bytes.HasSuffix(output.Bytes(), []byte{'\n'}) {
+				t.Fatal("local qualification output lacks its single trailing newline")
+			}
+			if err := canonical.UnmarshalExact(bytes.TrimSuffix(output.Bytes(), []byte{'\n'}), &result); err != nil {
+				t.Fatalf("local qualification output is not exactly canonical: %v", err)
+			}
+			if result.SchemaVersion != "nvkr.dev/local-qualification-result/v1" || result.Attempt != "attempt" || result.Status != "passed" {
+				t.Fatalf("local qualification result changed: %+v", result)
 			}
 			if err != nil || !strings.Contains(output.String(), `"lane":"unqualified-local-execution"`) {
 				t.Fatal("local result missing", err)

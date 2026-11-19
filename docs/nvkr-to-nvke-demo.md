@@ -72,11 +72,11 @@ cluster; the separately admitted Kind configuration owns its networking.
 
 It does not rebuild dependencies during deployment, edit the NVKE checkout or
 mint a Release. NVKE's existing deploy-item reader remains authoritative;
-that reader requires Python. Chart tests are adapter contracts, not proof of
-deployment:
+that reader requires Python. The Helm configuration test checks adapter contracts,
+not deployment:
 
 ```sh
-go test ./internal/nvkedemo -run 'TestChart' -count=1
+go -C demos/nvke test ./internal/nvkedemo -run '^TestPrepareSiteHelmPrivateIndependentConfiguration$' -count=1 -v
 ```
 
 ## Registry transport

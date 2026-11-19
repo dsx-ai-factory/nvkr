@@ -27,7 +27,7 @@ type BootPhaseRequest struct {
 }
 
 // BootPhaseMinimumReadBytes reserves conservative mandatory network passes:
-// two complete source acquisitions at the per-object ceiling, three passes of
+// two complete source acquisitions at the delivery source-layer ceiling, three passes of
 // each control/proof pool, both destination reads, inventory readback, and 32 MiB of trust-metadata response headroom.
 // Retry/error responses debit the same counter; callers may declare a larger
 // finite allowance. This calculation is deterministic and performs no I/O.
@@ -44,8 +44,14 @@ func BootPhaseMinimumReadBytes(selection definition.BootSelection, destination d
 	count := uint64(len(selection.Disks) + len(selection.Imagers))
 	limits := destination.EffectiveTransfer()
 	control := (count+1)*uint64(maxMetadataBytes) + uint64(maxMirrorProofBytes)
-	// Source objects are individually bounded at 64 GiB and selection at 1026.
-	fixed := 2*count*limits.MaxObjectBytes + 3*control + uint64(maxMirrorInventoryBytes) + 32<<20
+	// Each admitted output-local disk/executable has one source payload layer,
+	// admitted by OpenPublication at 64 GiB after acquisition. During the pull,
+	// response reads are bounded by the phase counter; this reservation covers
+	// successful sources, not a per-layer preflight size check. An EFI member
+	// can be much smaller than its bundle, so the raw destination ceiling cannot
+	// size this reservation. Invalid multi-output roots are refused by lifecycle.
+	// Metadata/proofs have a separate pool; selection is bounded at 1026.
+	fixed := 2*count*uint64(maxDeliveryFileBytes) + 3*control + uint64(maxMirrorInventoryBytes) + 32<<20
 	if fixed > math.MaxInt64 || limits.MaxTotalBytes > (math.MaxInt64-fixed)/2 {
 		return 0, e.New(e.CodeEngineCapability, "boot phase read reservation exceeds finite accounting range")
 	}

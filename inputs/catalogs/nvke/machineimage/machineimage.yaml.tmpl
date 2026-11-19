@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: internal.nvke.nvidia.com/v1
+kind: MachineImage
+metadata:
+  annotations:
+    nvke.nvidia.com/catalog-output: ${output}
+    nvke.nvidia.com/catalog-destination: ${destination}
+    nvke.nvidia.com/catalog-imager-sha256: ${imager_sha}
+spec:
+  operatingSystem:
+    family: ${family}
+    version: ${version}
+  architecture: ${architecture}
+  variant: ${variant}
+  buildDate: ${buildDate}
+  nico:
+    ipxeScript: |
+      #!ipxe
+      chain ${imager_url} ${console} ${kernel} image_url=${disk_url} image_sha=${disk_sha} disk_strategy={{ .DiskSelectionStrategy }} ds=nocloud-net;s=$${cloudinit-url} update_grub_template=yes update_grub_cfg=yes
+      boot

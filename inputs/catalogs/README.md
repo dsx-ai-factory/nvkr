@@ -56,3 +56,7 @@ registry is the current entrypoint. The generated workflows and Definitions use 
 
 Plan and graph comparisons establish preserved producer inputs and native pins. They do not establish a
 fresh upstream build, exact-byte reproduction of a source build, hosted execution or runtime acceptance.
+
+The [NVKE MachineImage candidate](nvke/machineimage/README.md) is a standalone catalog script and maintained
+template checked against a CRD read from pinned NVKE source. It is not a registered producer and changes
+no maintained output selection, Plan or Build identity. Production integration remains unavailable.

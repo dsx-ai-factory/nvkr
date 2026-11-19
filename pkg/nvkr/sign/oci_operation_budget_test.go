@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dsx-ai-factory/nvkr/internal/readbudget"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 )
 
@@ -23,6 +24,7 @@ func TestRegistryBundleUsesOperationReadBudget(t *testing.T) {
 	if source != nil {
 		source.close()
 	}
+	requireSignCode(t, err, e.CodeEngineCapability)
 	if err == nil || source != nil || budget.Check() == nil || budget.Used() != 64 {
 		t.Fatal("registry proof discovery escaped shared operation allowance", err, budget.Check(), budget.Used())
 	}
@@ -45,6 +47,7 @@ func TestRegistryBundleLoadUsesSameOperationReadBudget(t *testing.T) {
 	defer source.close()
 	before := budget.Used()
 	got, err := source.bundle(ctx, descriptor)
+	requireSignCode(t, err, e.CodeEngineCapability)
 	if err == nil || len(got) != 0 || before == 0 || budget.Used() != 4096 || budget.Check() == nil {
 		t.Fatal("bundle body did not share discovery allowance", err, before, budget.Used())
 	}
