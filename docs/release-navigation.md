@@ -311,7 +311,7 @@ Consumers own catalog bindings and ignore dispositions; NVKR writes no ignore di
 
 A Definition may also require this projection as a signed `bundle-oci` member using
 `derived.encoding: aicr-inventory-v1` and a sorted, explicit `derived.outputs` list. The
-[maintained NVKE inputs](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md#release-derived-inventory) show the selection
+[maintained NVKE inputs](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md#nvke-composite-release-inputs) show the selection
 and publication requirements. That member contains `artifacts/inventory.yaml`; exporting a description remains
 a separate read-only operation. Qualification checks that the signed inventory agrees with final sibling
 metadata. Changing publication namespace requires re-derivation, not a rewrite of the signed file.

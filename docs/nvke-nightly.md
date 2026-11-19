@@ -148,7 +148,7 @@ the legacy published-artifact consumer. The maintained signed candidate is the c
 ## Dispatch a complete floating GPU-site candidate
 
 The generated `nvkr-run-nvke-nightly.yml` producer uses the complete
-[GPU-site composite](../inputs/definitions/nvke/gpu-site.composite.yaml) with its own
+[release composite](../inputs/definitions/nvke/gpu-site-release.composite.yaml), including its derived inventory, with its own
 [Environment](../inputs/environments/github-nvke-nightly-gpu-site.yaml). On first dispatch
 it freezes main once for `dsx-ai-factory/nvke`, `dsx-ai-factory/ovn-kubernetes`,
 `dsx-ai-factory/cluster-api-provider-nico` and `NVIDIA/aicr`. Toolchains, acquired

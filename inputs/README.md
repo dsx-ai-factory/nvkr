@@ -2,9 +2,10 @@
 
 This directory owns the repository's NVKE, NVSentinel and AICR build and release inputs. Definitions select named outputs
 from pinned catalog producers; Environments select execution and publication policy. The maintained
-release candidate starts at [the NVKE composite](definitions/nvke/gpu-site.composite.yaml).
-The [composite](definitions/nvke/README.md#gpu-site-composite) pins the five NVKE families and GB200
-AICR member. Three maintained bundles cover production, development and floating-source nightly.
+production/nightly candidate starts at [the NVKE release composite](definitions/nvke/gpu-site-release.composite.yaml),
+which adds the derived inventory to the five NVKE families and GB200 AICR member. Development uses the same
+pinned members through the [payload-only composite](definitions/nvke/gpu-site.composite.yaml). The
+[three maintained bundles](definitions/nvke/README.md#gpu-site-composite) cover those selections.
 
 ```text
 inputs/
