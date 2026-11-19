@@ -12,9 +12,12 @@ schema results do not transfer to a changed candidate.
 test interfaces in the consolidated set. Implementation and local CLI proof
 are tracked below; organizational approval, CI and broader acceptance remain pending.
 
-[ADR-24](../0024-imported-validator-catalog.md) defines an imported-validator catalog, explicit artifact-role
-bindings and versioned diagnostic profiles in the consolidated set. The provisional CLI catalog implements loading, discovery and frozen local-plan dispatch, with contract tests but no new
-actual upstream catalog execution. `validators` (hidden, in development) is the sole NVKR interface for these suites. Published-profile migration and controller/chart adapters remain deferred.
+[ADR-24](../0024-imported-validator-catalog.md) defines validator registrations discovered by path, ordered
+selection, binding to a completed Run, one TestEnvironment per invocation, the `container-command/v1` executor
+and ValidationResult. Implementation is still the earlier provisional slice: an indexed catalog with loading,
+discovery and frozen local-plan profile dispatch, with contract tests but no new actual upstream catalog
+execution. `validators` (hidden, in development) is the sole NVKR interface for these suites. Migration to the
+registration model, the executor and controller/chart suites remain outstanding.
 
 [ADR-25](../0025-generic-oci-bundles-and-aicr-producers.md) additionally admits generic OCI bundles and
 ordinary pinned AICR producers. Its contract and rendering evidence remain distinct from hosted delivery
