@@ -23,7 +23,7 @@ complete required build graph directly from those producers.
 
 ### 1. Exact producer selection
 
-Each Definition output declares a concrete target platform, or an explicit required platform set for an OCI image index, and a nonempty explicit component selection.
+Each ordinary Definition output declares a concrete target platform, or an explicit required platform set for an OCI image index, and a nonempty explicit component selection.
 An explicit output catalog stack takes precedence. Otherwise, an optional ordered `catalogs` list
 selects from at most 64 distinct stacks. One stack must contain every explicitly selected component
 and support every required platform; selection never unions producers across stacks. Zero matching
@@ -36,6 +36,12 @@ Generated Plans retain all candidate snapshots and their ordered authored locato
 validation rechecks selection against those snapshots and binds each native Build to its selected
 catalog digest. A platform set must select one stack for the whole set, not one per child.
 Composite members must share the same rebased ordered list, just as they share the singular stack.
+
+A release-derived inventory instead declares its encoding and a nonempty explicit selection of named sibling
+outputs, without components or a catalog. It does not participate in catalog candidate selection. Its concrete
+platform schedules packaging work without inventing a native producer. ADR-20 defines its publication-bound
+derivation contract.
+
 Catalog sources, tools and components are reusable. There is no authored Recipe, reusable build
 group, criteria query, wildcard, specificity rule, inheritance chain, mixin, enable/disable merge, or reserved-axis
 activation. Removed fields and reserved legacy `overlays/` and `mixins/` directory layouts fail closed; they
@@ -66,7 +72,10 @@ must be covered by the terminal node, and the full graph is validated before ide
 The generated graph uses `nvkr.dev/ir/v4`; its transport-independent logical projection is identified under
 `nvkr.build` (ADR-01/02). An unrelated catalog producer cannot change the selected graph's identity. Changing
 selected membership, target, pins or output-affecting instructions must change it.
-Output labels, packaging and Environment settings remain outside build identity and inside their owning records.
+For ordinary payloads, output labels, packaging and Environment settings remain outside build identity
+and inside their owning records. ADR-20 separately binds the encoding, prefix and named sibling Build
+identities of a release-derived inventory. Its declared package dependencies are explicit acyclic Plan edges;
+resolution cannot add a sibling or treat an equal-digest sibling as the selected use.
 Deployment categories, node roles and cluster composition are removed rather than transported as unused metadata.
 
 For an image index, the compiler expands the single named output into independent native producer uses

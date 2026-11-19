@@ -43,6 +43,9 @@ func compileImageIndexFixture(t *testing.T, original *Plan, environment authored
 	}
 	targetStacks := make(map[string]*catalog.Stack)
 	for _, output := range original.Definition.Outputs {
+		if output.Derived != nil {
+			continue
+		}
 		if output.Catalog == nil && len(original.CatalogCandidates) == 0 {
 			continue
 		}
