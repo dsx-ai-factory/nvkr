@@ -45,17 +45,33 @@ func freezeSourceHeadWithLimit(ctx context.Context, repository, ref string, file
 	defer cancel()
 	dir, err := os.MkdirTemp("", "nvkr-freeze-source-")
 	if err != nil {
-		return SourceSelection{}, e.Wrap(e.CodeFetchFailed, err, "creating source freeze repository")
+		return SourceSelection{}, e.Wrap(e.CodeFetchFailed, err, "creating source freeze temporary directory")
 	}
 	defer os.RemoveAll(dir)
+	if _, err := pinTreeGit(ctx, dir, 8192, "init", "--bare", "--template=", "-q"); err != nil {
+		return SourceSelection{}, err
+	}
 	// Observe only the ref here; the exact-revision owner below authenticates
 	// the commit and its metadata without this discovery step fetching a tree.
 	raw, err := pinTreeGitWithLimit(ctx, dir, 128, fileLimit, "ls-remote", "--refs", "--", repository, ref)
 	if err != nil {
 		return SourceSelection{}, err
 	}
-	commit, observedRef, ok := strings.Cut(strings.TrimSuffix(string(raw), "\n"), "\t")
-	if !ok || !fullSHA.MatchString(commit) || observedRef != ref {
+	var commit string
+	for _, line := range strings.Split(strings.TrimSuffix(string(raw), "\n"), "\n") {
+		observedCommit, observedRef, ok := strings.Cut(line, "\t")
+		if !ok || !fullSHA.MatchString(observedCommit) || observedRef == "" || strings.ContainsAny(observedRef, "\t\r ") {
+			return SourceSelection{}, e.New(e.CodeFetchFailed, "source freeze received a malformed ref observation for %s in %s", ref, repository)
+		}
+		if observedRef != ref {
+			continue
+		}
+		if commit != "" {
+			return SourceSelection{}, e.New(e.CodeFetchFailed, "source freeze received duplicate observations for %s in %s", ref, repository)
+		}
+		commit = observedCommit
+	}
+	if commit == "" {
 		return SourceSelection{}, e.New(e.CodeFetchFailed, "source freeze requires exactly one full commit for %s in %s", ref, repository)
 	}
 	revision, err := ResolveSourceRevision(ctx, repository, commit)

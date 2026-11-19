@@ -59,6 +59,37 @@ func TestFreezeSourceHeadAdmission(t *testing.T) {
 	}
 }
 
+func TestFreezeSourceHeadUsesExactRefInOwnedRepository(t *testing.T) {
+	for _, tailMatch := range []bool{false, true} {
+		name := "owned repository"
+		if tailMatch {
+			name = "ignore tail match"
+		}
+		t.Run(name, func(t *testing.T) {
+			repo, pin, run := pinTreeFixture(t, map[string][]byte{"file": []byte("fixture")})
+			run("branch", "-M", "main")
+			if tailMatch {
+				run("tag", "refs/heads/main")
+			}
+			const prefix = "https://github.com/example/"
+			repository := prefix + filepath.Base(repo)
+			t.Setenv("GIT_CONFIG_COUNT", "1")
+			t.Setenv("GIT_CONFIG_KEY_0", "url."+filepath.Dir(repo)+"/.insteadOf")
+			t.Setenv("GIT_CONFIG_VALUE_0", prefix)
+			// A longer local rewrite wins if discovery inherits the parent repo.
+			run("config", "url."+filepath.Join(repo, "missing")+".insteadOf", repository)
+			t.Setenv("TMPDIR", repo)
+			selection, err := FreezeSourceHead(t.Context(), repository, "refs/heads/main")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if selection.Commit != pin.Commit || selection.TreeHash != pin.TreeHash {
+				t.Fatalf("selection = %+v, want commit %s and tree %s", selection, pin.Commit, pin.TreeHash)
+			}
+		})
+	}
+}
+
 func TestFreezeSourceHeadRejectsInvalidRefObservation(t *testing.T) {
 	const ref = "refs/heads/main"
 	commit := strings.Repeat("a", 40)
@@ -92,7 +123,7 @@ func TestFreezeSourceHeadRejectsInvalidRefObservation(t *testing.T) {
 				t.Fatal("invalid observation returned a partial selection")
 			}
 			got, err := os.ReadFile(calls)
-			if err != nil || string(got) != "call\n" {
+			if err != nil || string(got) != "call\ncall\n" {
 				t.Fatalf("invalid observation must fail before revision acquisition: calls = %q, err = %v", got, err)
 			}
 		})
