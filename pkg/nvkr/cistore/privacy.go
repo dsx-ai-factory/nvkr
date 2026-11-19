@@ -148,8 +148,6 @@ func (b *backend) ensurePrivatePackage(ctx context.Context, repository name.Repo
 // Retry only absence after the metadata seed; an explicit policy rejection is
 // terminal. No payload is admitted until the exact package passes every check.
 func (b *backend) confirmSeedPrivacy(ctx context.Context, packageName string, source repositoryRecord, opts Options, requireUnlinked bool) error {
-	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
-	defer cancel()
 	wait := b.wait
 	if wait == nil {
 		wait = waitChunkRetry
@@ -161,7 +159,8 @@ func (b *backend) confirmSeedPrivacy(ctx context.Context, packageName string, so
 			return err
 		}
 		if attempt+1 < attempts {
-			// Five waits total 62 seconds; the deadline also bounds API retries.
+			// Five absence waits total 62 seconds. Each get retains its own
+			// bounded rate-limit retries under the caller's operation deadline.
 			if err := wait(ctx, (2*time.Second)<<attempt); err != nil {
 				return safeIOError(ctx, e.CodeTimeout, "private package confirmation wait canceled")
 			}

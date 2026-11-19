@@ -782,7 +782,9 @@ Repeated metadata checks may use ADR-18's bounded operation-local authenticated 
 admission check is skipped, and errors cannot reuse an earlier successful policy response.
 Public, unknown or inaccessible policy fails closed. A missing package can receive only a metadata-only
 seed before admission. After that seed, API absence alone permits up to six confirmation attempts with
-2-, 4-, 8-, 16- and 32-second cancellation-aware waits, within a 90-second confirmation deadline.
+2-, 4-, 8-, 16- and 32-second cancellation-aware waits. Each API check retains its existing bounded
+availability/rate-limit retries under the caller's operation deadline. A 404 can also hide a package
+that the credential cannot access; retrying it never grants access or bypasses the privacy check.
 An explicit unsafe policy or another API error stops confirmation immediately; six absent responses
 retain `trust-policy-missing`, and deadline/cancellation failures retain `timeout`. No payload upload or
 repeat seed occurs during confirmation. The existing metadata inspector derives sibling references without opening product

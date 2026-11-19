@@ -9,6 +9,7 @@ import (
 	"slices"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -34,8 +35,9 @@ func TestPrivatePublicationWaitsForSeedConfirmation(t *testing.T) {
 		{"cancel during wait", 6, 200, "private", true, e.CodeTimeout, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx, cancel := context.WithCancel(t.Context())
+			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Minute)
 			defer cancel()
+			operationDeadline, _ := ctx.Deadline()
 			var reads atomic.Int64
 			f, _ := publicationBackend(t, func(packageName string, count int) (int, any) {
 				reads.Add(1)
@@ -51,8 +53,8 @@ func TestPrivatePublicationWaitsForSeedConfirmation(t *testing.T) {
 			var seedCalls int64
 			f.b.wait = func(waitCtx context.Context, delay time.Duration) error {
 				deadline, ok := waitCtx.Deadline()
-				if !ok || time.Until(deadline) > 90*time.Second {
-					t.Fatal("confirmation has no bounded total deadline")
+				if !ok || !deadline.Equal(operationDeadline) {
+					t.Fatal("absence wait changed the operation deadline")
 				}
 				waits = append(waits, delay)
 				if len(waits) == 1 {
@@ -86,6 +88,47 @@ func TestPrivatePublicationWaitsForSeedConfirmation(t *testing.T) {
 			if len(waits) != 0 && (seedCalls == 0 || f.transport.calls.Load() != seedCalls) {
 				t.Fatal("confirmation repeated registry work")
 			}
+		})
+	}
+}
+
+func TestSeedConfirmationPreservesRateLimitBudget(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		limited    int
+		retryAfter string
+		elapsed    time.Duration
+	}{
+		{"server delay", 1, "120", 122 * time.Second},
+		{"success after two limits", 2, "", 182 * time.Second},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				b := newBackend()
+				calls := 0
+				b.client.Transport = admissionTransportFunc(func(r *http.Request) (*http.Response, error) {
+					calls++
+					status := http.StatusOK
+					if calls == 1 {
+						status = http.StatusNotFound
+					} else if calls <= 1+tc.limited {
+						status = http.StatusTooManyRequests
+					}
+					response := admissionResponseFor(r, status, "", `{"name":"source/releases","package_type":"container","visibility":"private","owner":{"login":"Example"},"repository":null}`)
+					if status == http.StatusTooManyRequests && tc.retryAfter != "" {
+						response.Header.Set("Retry-After", tc.retryAfter)
+					}
+					return response, nil
+				})
+				started := time.Now()
+				source := repositoryRecord{Owner: account{Login: "Example", Type: "Organization"}}
+				if err := b.confirmSeedPrivacy(t.Context(), "source/releases", source, publisherOptions, true); err != nil {
+					t.Fatal(err)
+				}
+				if calls != tc.limited+2 || time.Since(started) != tc.elapsed {
+					t.Fatalf("confirmation calls=%d elapsed=%v; want calls=%d elapsed=%v", calls, time.Since(started), tc.limited+2, tc.elapsed)
+				}
+			})
 		})
 	}
 }

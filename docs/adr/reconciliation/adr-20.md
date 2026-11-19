@@ -3,7 +3,9 @@
 Post-seed GHCR privacy confirmation retries only API absence with bounded backoff.
 `TestPrivatePublicationWaitsForSeedConfirmation` covers delayed visibility, success on the last attempt,
 exhaustion with the original trust-policy code, explicit unsafe policy, denied requests and cancellation;
-the whole-set check and no-repeat-seed boundary remain mandatory. These are local API/registry fixtures.
+the whole-set check and no-repeat-seed boundary remain mandatory. `TestSeedConfirmationPreservesRateLimitBudget`
+uses virtual time to cover a 120-second Retry-After and consecutive 60/120-second rate-limit waits
+after an absent response. These are local API/registry fixtures.
 The triggering [operator publication failure](https://github.com/dsx-ai-factory/nvkr/actions/runs/44577627888/job/135756330227)
 establishes a successful metadata seed followed by API absence; eventual consistency is an inference
 from that sequence. Retry outcomes and a corrected hosted publication remain unverified.
