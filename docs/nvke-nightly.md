@@ -20,9 +20,6 @@ committed catalogs and the NVKE checkout unchanged; other dependency pins retain
 their owners. NVIDIA OVN remains selected. The existing native helper self-pin
 has its separate maintenance owner, including its post-squash canonical-main re-pin.
 
-This nightly boots a local VM. To run NVKE's suite on real Forge machines against NVKR-built artifacts,
-use the separate dispatch-only [Forge hardware end-to-end lane](qualify-e2e.md).
-
 ## Run a workflow branch before merging
 
 The following branch-dispatch instructions concern the unsigned NVKE E2E workflow.

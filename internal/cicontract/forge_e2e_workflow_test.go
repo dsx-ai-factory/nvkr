@@ -19,7 +19,7 @@ import (
 // These contracts read the Forge lane's workflow as text. They prove its authored
 // boundaries (what can start it, what it may hold, what it runs and what makes it
 // fail), not that GitHub accepts it or that Forge, Teleport or a registry answer;
-// docs/qualify-e2e.md states what has been exercised.
+// the ADR-18 reconciliation row states what has been exercised.
 
 const forgeE2EWorkflowFile = ".github/workflows/nvkr-nvke-forge-e2e.yml"
 

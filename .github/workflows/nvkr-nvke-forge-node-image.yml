@@ -4,7 +4,7 @@
 name: NVKR NVKE Forge node image publication
 
 # Copies the node images NVKR built to the HTTPS location Forge's imager reads, so the Forge hardware
-# lane (nvkr-nvke-forge-e2e.yml, docs/qualify-e2e.md) can boot them. Forge cannot present a token, and
+# lane (nvkr-nvke-forge-e2e.yml, ADR-18) can boot them. Forge cannot present a token, and
 # the registry that holds NVKR's publication needs one.
 #
 # This is a stand-in for NVKR's own object-store publication, which has no production adapter yet. It

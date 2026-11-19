@@ -89,7 +89,7 @@ remains supported per the migration map. Other authoring and pin-set teaching fi
 
 ## Forge hardware lane plan
 
-`qualification/` holds the copy of NVKE's `qualify plan` output that the [Forge hardware lane](../docs/qualify-e2e.md)
+`qualification/` holds the copy of NVKE's `qualify plan` output that the Forge hardware lane (`.github/workflows/nvkr-nvke-forge-e2e.yml`)
 runs against, with a provenance record naming the NVKE run, commit, tag, retrieval date and the SHA-256 of both the
 original artifact and the committed bytes. The fixture masks the NGC organization identifier in its `nvcr.io`
 references. It is a description of NVKE's plan, not an authored Definition: the lane substitutes NVKR-built references
@@ -98,7 +98,7 @@ retrieving a newer NVKE plan and updating both files in one reviewed change.
 
 An outputs manifest for the lane's `nvkr-outputs` source also belongs directly under `qualification/`, added in a
 reviewed change after a producer run. Each node image entry names its verification, `http-get` or `s3-readback`
-with the publication run it cites; the [guide](../docs/qualify-e2e.md#run-nvkr-outputs) owns the schema.
+with the publication run it cites; `scripts/forge-e2e-substitute-plan.sh` owns the schema.
 
 ## Maintenance
 

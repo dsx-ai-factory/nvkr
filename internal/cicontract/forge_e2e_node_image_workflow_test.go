@@ -15,8 +15,8 @@ import (
 
 // These contracts read the node image publication workflow as text. They prove its authored
 // boundaries (what can start it, what it may hold, what it runs and what it uploads), not that
-// GitHub accepts it, that the role trusts it or that an object store answers; docs/qualify-e2e.md
-// states what has been exercised.
+// GitHub accepts it, that the role trusts it or that an object store answers; the ADR-18
+// reconciliation row states what has been exercised.
 
 const nodeImageWorkflowFile = ".github/workflows/nvkr-nvke-forge-node-image.yml"
 

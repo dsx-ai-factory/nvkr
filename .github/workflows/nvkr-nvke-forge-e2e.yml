@@ -5,7 +5,7 @@ name: NVKR NVKE Forge end-to-end tests
 
 # Runs NVKE's Forge site-controller suite on real Forge hardware, from an NVKE checkout at a
 # pinned harness commit, against the plan fixture committed under inputs/qualification/
-# (docs/qualify-e2e.md). Nothing here qualifies, gates or releases anything: the run records a
+# (ADR-18). Nothing here qualifies, gates or releases anything: the run records a
 # summary whose qualificationAuthority is "none", and the final job refuses to pass unless that
 # summary meets its contract.
 #

@@ -49,7 +49,7 @@ pull request against the PR's base and head. `make status-restated-check` runs i
 
 ## Forge hardware lane
 
-The [Forge hardware lane](../docs/qualify-e2e.md) workflow calls these scripts; each one runs offline against
+The [Forge hardware lane](../.github/workflows/nvkr-nvke-forge-e2e.yml) workflow calls these scripts; each one runs offline against
 files, so `internal/cicontract` tests cover them without Forge, a registry or an object store.
 
 `forge-e2e-substitute-plan.sh PLAN PROVENANCE OUTPUTS OUT` checks the committed plan fixture's bytes against its

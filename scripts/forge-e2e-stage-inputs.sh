@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Stage what one Forge hardware lane leg's node runs, from the NVKR-built artifacts the
-# substituted plan names (docs/qualify-e2e.md). It replaces the NVKE harness steps
+# substituted plan names (ADR-18). It replaces the NVKE harness steps
 # `controller-image` and `site-inputs`, which pull by tag from the registry NVKE publishes to.
 #
 #   forge-e2e-stage-inputs.sh --arch ARCH --harness DIR --substitutions FILE \

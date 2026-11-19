@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Substitute NVKR-built references into the committed NVKE plan fixture for the
-# Forge hardware lane (docs/qualify-e2e.md). The plan and the outputs manifest are
+# Forge hardware lane (ADR-18). The plan and the outputs manifest are
 # descriptions: this script authenticates only the fixture's blob integrity against
 # its provenance record and refuses any reference that is not content-addressed
 # (OCI) or not plain HTTPS (node image). It issues no authority and the result

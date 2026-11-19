@@ -21,7 +21,7 @@ import (
 
 // These contracts cover the Forge hardware lane's offline pieces: the committed
 // plan fixture and the plan substitution script. They do not exercise Forge, the
-// object store, a registry or a hosted run; docs/qualify-e2e.md states that scope.
+// object store, a registry or a hosted run; the ADR-18 reconciliation row states that scope.
 
 const (
 	forgeE2EPlanFile       = "inputs/qualification/nvke-plan-v0.24.0-beta.12.json"

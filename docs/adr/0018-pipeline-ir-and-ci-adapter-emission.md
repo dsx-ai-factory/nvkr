@@ -705,8 +705,8 @@ Results remain unsigned local diagnostics, outside qualified release acceptance.
 #### Repository NVKE Forge E2E adapter outside generated execution
 
 A second authored workflow, dispatch-only, runs NVKE's Forge site-controller suite on real Forge machines. The
-[operator guide](../qualify-e2e.md) owns commands, inputs and limits. The workflow is not generated, uses only
-generic hosted `ubuntu-24.04` runners, and has no schedule, push or producer-release trigger, so nothing takes a
+workflow is not generated, uses only generic hosted `ubuntu-24.04` runners, and has no schedule, push or
+producer-release trigger, so nothing takes a
 Forge machine except a person's dispatch. It signs, publishes and tags nothing, uploads nothing to TestGrid, and
 cannot gate an NVKR Release. Its run summary states `qualificationAuthority: "none"`, and the final job fails
 the run unless the summary meets that contract.

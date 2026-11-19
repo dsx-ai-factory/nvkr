@@ -5,7 +5,7 @@
 # Record what a Forge hardware lane run covered, and refuse a summary that claims more.
 # The summary is a description of the run, not a verdict on it: it always says
 # qualificationAuthority "none", and `assert` rejects any summary that adds a field
-# or changes that value (docs/qualify-e2e.md).
+# or changes that value (ADR-18).
 #
 #   forge-e2e-summary.sh leg DIR STREAM COMBINATION ARCH
 #       Stamp when a leg started into DIR/leg.json. Set FORGE_E2E_NOW to an RFC 3339

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Build what one Forge hardware lane leg's node runs from the subject commit itself
-# (docs/qualify-e2e.md), for artifact source "build-subject". It replaces the NVKE harness
+# (ADR-18), for artifact source "build-subject". It replaces the NVKE harness
 # steps `controller-image` and `site-inputs`, and it is the other half of
 # forge-e2e-stage-inputs.sh, which stages NVKR-built artifacts instead.
 #
