@@ -322,9 +322,11 @@ and consumer uses must be frozen in the Plan, with authenticated producer bytes 
 Failure of a required internal tool prevents Run completion; success cannot add a Release member.
 Build-time tools bind logical consumer Build identity, while observation-only helpers retain ADR-13's
 separate observation identity. The native hosted disk inspector retains its produced executable and
-evidence in the same owner as the disk, and Run completion requires its exact recorded use. Other
-consumers and cross-job use remain deferred; pinned static tools and the VM runtime must extend this
-mechanism rather than introduce another lifecycle.
+evidence in the same owner as the disk, and Run completion requires its exact recorded use. The amd64 VM
+runtime extends this mechanism with snapshot-pinned packages, source-pinned mkosi assembly and original-owner
+OCI runtime-use receipts. Each disk group produces and evidences its own requirement; equal bytes cannot
+authorize cross-job reuse. Native namespace execution has bounded recorded proofs; maintained disk equivalence
+remains a hosted acceptance gate. Other consumers and cross-job receipt restoration remain deferred.
 
 A proposed composite Definition (ADR-26) would enter this flow before the compiler: admission loads each
 digest-pinned member, rejects drift and structural conflicts, and derives one effective Definition that the same

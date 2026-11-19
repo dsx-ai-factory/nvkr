@@ -37,6 +37,9 @@ func compileComposition(ctx context.Context, composition authored.Composition, e
 	if err != nil {
 		return nil, err
 	}
+	if err := admitCompositeRuntimeMembers(composition, environment, record); err != nil {
+		return nil, err
+	}
 	plan, err := compileDocumentsFor(ctx, composition.Path(), composition.Effective(), environmentPath, environment, generatorVersion, loadStack, record)
 	if err != nil {
 		return nil, err
@@ -79,10 +82,17 @@ func checkCrossMemberProducers(plan Plan, record *CompositionRecord) error {
 		member string
 		bytes  []byte
 	}
+	runtimeMembers, err := compositeRuntimeMembers(plan.Definition, plan.Environment, record)
+	if err != nil {
+		return err
+	}
 	seen := map[string][]producer{}
 	for _, build := range plan.Builds {
-		output, _, _ := strings.Cut(build.Name, "/")
-		member, ok := record.MemberOf(output)
+		member, ok := runtimeMembers[build.Name]
+		if !ok {
+			output, _, _ := strings.Cut(build.Name, "/")
+			member, ok = record.MemberOf(output)
+		}
 		if !ok {
 			return e.New(e.CodeUnverifiedRef, "native build %q has no attributed output", build.Name)
 		}

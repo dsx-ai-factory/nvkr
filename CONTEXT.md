@@ -479,7 +479,9 @@ Release membership. ADR-19 requires its complete Plan dependency graph, authenti
 consumer-bound evidence and successful completion. Build-time tools are logical consumer inputs;
 observation-only tools retain separate observation identity. This is an internal role, not a seventh
 public object or a separate preparation/publication lifecycle. The native hosted disk inspector uses
-this mechanism within one original execution owner; other consumers and cross-job use remain deferred.
+this mechanism within one original execution owner. The amd64 Plan-built VM runtime uses the same membership
+rule with original-owner production, evidence and runtime-use receipts. Separate disk groups retain separate
+requirements even when their runtime bytes match. Other consumers and cross-job receipt restoration remain deferred.
 _Avoid_: Optional helper, delivered output, path as proof, publication exception
 
 **Component catalog overlay**:

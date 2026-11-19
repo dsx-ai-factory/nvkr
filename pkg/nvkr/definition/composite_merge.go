@@ -35,7 +35,7 @@ func mergeComposite(compositePath string, metadata Metadata, admitted []Admitted
 	members := slices.Clone(admitted)
 	sort.Slice(members, func(i, j int) bool { return members[i].Name < members[j].Name })
 	effective := Definition{APIVersion: DefinitionAPIVersion, Kind: DefinitionKind, Metadata: metadata}
-	owners := map[string]string{}
+	owners, toolOwners := map[string]string{}, map[string]string{}
 	// A member that omits sbomTool inherits the one the other members share.
 	shared := ""
 	for _, member := range members {
@@ -46,9 +46,6 @@ func mergeComposite(compositePath string, metadata Metadata, admitted []Admitted
 	}
 	for i, member := range members {
 		source := member.Definition.Clone()
-		if len(source.InternalTools) != 0 {
-			return Definition{}, nil, e.New(e.CodeEngineCapability, "composite internal tools require exact member attribution and completeness integration")
-		}
 		if source.SBOMTool == "" {
 			source.SBOMTool = shared
 		}
@@ -66,6 +63,24 @@ func mergeComposite(compositePath string, metadata Metadata, admitted []Admitted
 				return Definition{}, nil, e.New(e.CodeInvalidCatalog, "composite member %q selects a different sbomTool or cosignTool than the other members", member.Name)
 			}
 		}
+		for _, tool := range source.InternalTools {
+			if tool.Format != OutputOCI {
+				return Definition{}, nil, e.New(e.CodeEngineCapability, "composite internal tool %q requires the admitted OCI runtime consumer binding", tool.Name)
+			}
+			if owner, repeated := toolOwners[tool.Name]; repeated {
+				return Definition{}, nil, e.New(e.CodeInvalidCatalog, "composite internal tool %q is declared by members %q and %q", tool.Name, owner, member.Name)
+			}
+			toolOwners[tool.Name] = member.Name
+			toolStack := stack
+			if tool.Catalog != nil {
+				if toolStack, err = rebaseCatalog(member.Path, compositePath, *tool.Catalog); err != nil {
+					return Definition{}, nil, e.Wrap(e.CodeInvalidCatalog, err, "composite member %q internal tool %q catalog", member.Name, tool.Name)
+				}
+			}
+			tool.Catalog = &toolStack
+			effective.InternalTools = append(effective.InternalTools, tool)
+		}
+
 		for _, output := range source.Outputs {
 			if owner, repeated := owners[output.Name]; repeated {
 				return Definition{}, nil, e.New(e.CodeInvalidCatalog, "composite output %q is declared by members %q and %q", output.Name, owner, member.Name)
@@ -81,6 +96,7 @@ func mergeComposite(compositePath string, metadata Metadata, admitted []Admitted
 			effective.Outputs = append(effective.Outputs, output)
 		}
 	}
+	sort.Slice(effective.InternalTools, func(i, j int) bool { return effective.InternalTools[i].Name < effective.InternalTools[j].Name })
 	sort.Slice(effective.Outputs, func(i, j int) bool { return effective.Outputs[i].Name < effective.Outputs[j].Name })
 	attribution := make([]OutputAttribution, 0, len(effective.Outputs))
 	for _, output := range effective.Outputs {

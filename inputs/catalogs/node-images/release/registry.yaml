@@ -7,6 +7,14 @@ metadata:
   name: nvke-m2-os
   description: Non-FDE and public-bootstrap FDE NVKE node images from explicit authenticated component outputs.
 sources:
+  # Packer installs the authenticated image-inputs agent package. It never
+  # builds agent sources; keep agent vendoring on the separate nvke-os source.
+  nvke-packer-source:
+    repo: https://github.com/dsx-ai-factory/nvke.git
+    constraint: v0.23.0
+    toolchainImagesByArch:
+      amd64: sha256:42c68ca155d26fcc101dc8e863855f287bd9314b0c0417d5520959c616211edd
+      arm64: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140
   ovn-kubernetes:
     repo: https://github.com/dsx-ai-factory/ovn-kubernetes
     constraint: v2.4.2
@@ -202,7 +210,7 @@ components:
   nvke-node-fde-amd64:
     platforms: [linux/amd64]
     fromSource: true
-    source: nvke-os
+    source: nvke-packer-source
     # The pinned NVKE source accepts only Packer 1.15.4 and QEMU plugin 1.1.6.
     # The toolchain images carry 1.16.2 and 1.1.8, so `packer validate` refuses
     # the unpatched project. Drop this patch when the NVKE pin accepts them.
@@ -363,7 +371,7 @@ components:
   nvke-node-image-amd64:
     platforms: [linux/amd64]
     fromSource: true
-    source: nvke-os
+    source: nvke-packer-source
     patches:
       - name: patches/packer-toolchain-version.patch
         sha256: sha256:63343836aa3e1057769c19c1aaa1e63ef3b520174cdcf4b5a6bb5ce614c9c227

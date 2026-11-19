@@ -83,6 +83,9 @@ publication:
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared
+  producedRuntimes:
+    nvke-node-fde-amd64: nvke-node-fde-amd64-runtime
+    nvke-node-image-amd64: nvke-node-image-amd64-runtime
 signing:
   identity: ^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run-nvke-disks\.yml@refs/heads/main$
   issuer: https://token.actions.githubusercontent.com

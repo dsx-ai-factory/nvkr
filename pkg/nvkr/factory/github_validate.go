@@ -791,7 +791,7 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 		}
 		for i, step := range steps {
 			if step.ID == "run-disk" {
-				if executors != 0 || step.Run != githubRunnerCommand(plan, "run-disk", "output", stage.DiskOutput) || step.If != "" || step.Uses != "" || step.ContinueOnError || len(step.Env) != 0 || step.TimeoutMinutes != githubDiskStepTimeoutMinutes(stage) {
+				if executors != 0 || step.Run != githubDiskCommand(plan, stage) || step.If != "" || step.Uses != "" || step.ContinueOnError || len(step.Env) != 0 || step.TimeoutMinutes != githubDiskStepTimeoutMinutes(stage) {
 					return e.New(e.CodeEngineCapability, "disk stage requires its bounded unconditional live executor")
 				}
 				executors++

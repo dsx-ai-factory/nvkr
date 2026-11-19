@@ -2,159 +2,85 @@
 
 Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
 
-The Plan-produced VM runtime extension has manager-neutral package inputs, exact mkosi installed-package
-closure checks, source-closure acquisition, and digest-bound single-layer OCI capture. The layer is
-retained through a read-only descriptor to the original disk-backed OCI tar, without a second retained
-archive. Extraction rejects memory-backed storage and verifies the entire stream before releasing its
-private root; that root is removed after inspection or consumption joins. Focused tests cover original
-inode retention, ownership, read-only descriptors, tampering, tmpfs rejection and cleanup. Cgroup memory
-observation excludes only inactive file pages from usage, preserves host and ancestor limits, and rejects
-missing or malformed statistics. A bounded native BIOS guest build and original runtime use have passed
-with these changes and complete diagnostic evidence export. Independent runs still produced different
-runtime bytes under one Build; archive normalization has focused tests but awaits its native comparison.
-The native namespace
-[VM proof](https://github.com/njhensley/nvkr/actions/runs/44194123590) at
-`0dbb69bb55dc190884ef3ca2b9d673a6c365284d` exercised both assembly and consumer launchers on stock
-Ubuntu 24.04 AMD64 with kernel `7.0.0-1014-aws`. The separately owned executable tmpfs retained its
-inherited mount restrictions. Private proc/root mounts, assembly user-ID mapping, host-file protection,
-consumer capability dropping, private loopback, output projection and cancellation of descendants in
-separate process sessions passed. The test service had one CPU quota, 256 MiB memory, 96 tasks and a
-60-second lifetime limit. Its fixture does not build a VM runtime or launch QEMU, Packer, KVM or libguestfs;
-the revised launcher has no corresponding ARM64 VM proof. The production assembly backend now stages
-the source-pinned module, performs two fresh offline builds, checks original package reports and measured
-files in each packaged layer, and requires identical complete OCI closures before issuing a production
-receipt. Its focused tests cover staging, substitution rejection, closure checking and receipt revocation.
-The [source-pinned production proof](https://github.com/njhensley/nvkr/actions/runs/44220466951) at
-`3a50d00c43abadfff8f959a06439662d6b01d0a9` passed on native AMD64 with kernel `7.0.0-1017-azure`.
-Both fresh assemblies passed exact installed-package closure, embedded original-report/recipe and measured
-file checks, then produced the same complete OCI closure. Mkosi emitted each tar; NVKR wrapped its bytes
-unchanged as one uncompressed layer. Literal backslashes in pinned systemd unit filenames were preserved
-without treating them as separators. The resulting manifest subject was
-`sha256:f6388e80bc29b72a368e8fd1001a6f208ee59b6dc82e9750e291f85866d6e40d`, layer digest
-`sha256:5929cc0ad843c685e250b92ad1ff76d5721f9b161874eb0ba99e2dc2bbc8355a`, and complete layout digest
-`sha256:8be63fb227252b4d15e90e6c170057289b045d412eb1383488077dca37f7c776` (1,942,375,343 layout bytes).
-The test authenticated the concrete ProducedRuntime receipt against its returned result. Namespace
-assertions also passed, including assembly-only `/dev/full` and `/dev/tty`, full-device `ENOSPC` behavior
-and absence of a controlling terminal. The assembly service used a two-CPU quota, 5 GiB memory limit,
-512-task limit and a separately owned 20 GiB scratch filesystem. The workflow retained text diagnostics,
-not the OCI payload. Host bootstrap utilities were recorded but not snapshot-pinned.
+The Plan-produced VM runtime extension has manager-neutral snapshot/package inputs, source-pinned mkosi
+assembly, exact original installed-package report checks, measured projected files and subject-bound SBOMs.
+It produces one uncompressed OCI layer and requires two fresh assemblies to produce the same complete OCI
+closure before issuing a runtime production receipt. Epoch zero fixes generated dates and mtimes. A read-only
+GNU tar adapter fixes traversal, numeric ownership and PAX header names; both the outer Python search path
+and mkosi's nested search path select it. Focused tests include a real Python/GNU tar regression that reproduces
+the adapter bypass when only the nested path is set.
 
-The Run dispatcher can retain and revoke concrete runtime production and join recorded terminal/SBOM
-evidence. Runtime inventory reads original reports from the authenticated layer and projects a subject-bound
-SBOM; focused fixtures cover these boundaries. The compiler resolves the Environment's named amd64
-runtime producer into each selected Packer Build and adds the runtime result, terminal observation and
-SBOM as required consumer inputs. Each disk output selects a separately named runtime requirement;
-four-output fixtures retain equal runtime Build Digests with distinct artifacts and evidence. Native
-group routing keeps each requirement with its own disk owner. Run completion compares independently
-recorded manifest and complete-layout digests and sizes for equal producer selections, requiring each
-requirement's own inventory and producer records. This comparison consumes descriptions from same-Run
-transport, not restorable execution authority. Complete Plan fixtures exercise catalog revalidation, runtime repins,
-removal of the unused image dependency and exact license companion names. These are compiler contracts,
-not executed disk builds. The internal consumer-use receipt now binds the original and relocated Plan,
-exact consumer instruction, runtime production and completed evidence. Contract tests cover single use,
-substitution rejection, revocation and cancellation with joining; the owning Run retains private production
-Plan bindings and revokes all its issued uses before closing runtime resources. Private consumer staging
-requires that receipt, retains the original layer through cleanup, and rejects replay and unowned use.
-Its cancellation and cleanup contracts have race tests. Narrow input/work mount points preserve the
-runtime's plugin and firmware paths; filesystem tests reject symlink parents. Mkosi material observation
-now uses the same authenticated producer-result boundary as other material consumers. Consumer dispatch
-passes the original production and use receipt to the namespace Packer adapter. Version checking,
-SSH-key generation and validation stay offline; the build uses the fixed outbound helper. The factory
-compares the returned runtime-use record with the original receipt's completed binding before retaining
-the disk. Bounded disk/log collection and descriptive binding checks have focused tests. The maintained
-Environment has not switched to this route. A native factory proof has completed runtime production,
-terminal observation, SBOM and a bounded BIOS guest build through the original owner, as scoped below;
-no completed public Run has exercised the consumer route. This proof does not establish maintained
-disk-output equivalence, ARM64 operation or a stronger evidence lane. The earlier isolated amd64
-[assembly Run](https://github.com/njhensley/nvkr/actions/runs/44145459516) built two byte-identical runtime
-archives from fresh roots and the same revalidated snapshot inputs. It used Ubuntu's mkosi package,
-not the source-commit bootstrap now required by the contract. That Run establishes neither production
-Plan integration nor disk-output equivalence, guest boot, ARM64 operation or a stronger evidence lane.
+Runtime production, evidence and use remain with the original Run owner. The use receipt binds the original
+and relocated Plan, exact consumer instruction, produced runtime and completed terminal/SBOM evidence.
+Private consumer staging rejects reconstruction, substitution, replay and unowned use. The owner revokes uses
+before closing runtime resources, with cancellation/join and cleanup covered by focused race tests. The
+original disk-backed layer remains held read-only until cleanup; no second retained tar or memory-backed
+copy is admitted. Cgroup admission excludes only inactive file pages from usage and preserves host/ancestor
+limits. Generated native disk jobs use an unprivileged preflight, a fixed scrubbed sudo coordinator and an
+owned watchdog. Narrow input/work projections preserve plugin and firmware paths. Packer preparation stays
+offline; the build uses the snapshot-pinned, unprivileged `slirp4netns` helper with fixed arguments, numeric
+DNS projection and paired process lifetime. Shell and namespace fixtures cover these boundaries.
 
-The generated produced-runtime disk bootstrap has an unprivileged preflight, a fixed scrubbed sudo
-invocation and a root-owned watchdog. Scratch admission checks the actual protected executable filesystem
-and its capacity. Shell contract tests cover credential removal, exact operation selection and preflight
-failure. The outbound launcher uses the snapshot's `slirp4netns` 1.3.3-1 TAP-descriptor interface, with
-fixed arguments, numeric DNS projection, unprivileged helper execution and paired process lifetime.
-The runtime package closure adds that exact package; all four library dependencies were already pinned.
-The first [consumer proof attempt](https://github.com/njhensley/nvkr/actions/runs/44258176521) at
-`2689862288223c4cc09bd58eab785810a68a1f3f` passed the assembly and consumer namespace tests but failed
-the outbound resolver's protected-file admission before runtime production or disk execution. It does
-not prove the outbound helper, SBOM or consumer path. Resolver admission now also checks the root's
-delegation to protected systemd-resolved service-owned files; Linux ownership fixtures cover accepted
-targets and rejection of foreign inodes, owners, writable parents/files and unlisted targets. The second
-[consumer proof attempt](https://github.com/njhensley/nvkr/actions/runs/44259377400) at
-`ba4c9f333dbcc57292915045e3dfeb470db587e5` passed all three native namespace tests, including outbound
-handoff with its fixture helper. The host resolver file had UID 991, mode 0644 and 945 bytes. The newly
-included ownership fixtures then failed because the service's `/tmp` was read-only, so production and
-disk execution still did not run. Both diagnostic services now direct temporary files into their owned
-scratch directories. The ownership fixtures pass in a bounded Linux container with read-only `/tmp`
-and an explicit writable scratch directory; later native consumer evidence is scoped below.
-The [factory production and SBOM attempt](https://github.com/njhensley/nvkr/actions/runs/44261280531)
-at `5d1012c7bc79b085e28b0da9b8b2f68bee8f22bb` passed initial admission, both fresh mkosi assemblies,
-the exact OCI reproduction gate, terminal observation and SBOM generation through the original owner.
-The repeated consumer admission then failed with 351/4096 MiB memory and 16499/16384 MiB workspace
-available/required inside the unchanged 5 GiB service. Packer and QEMU did not run. The retained log
-records successful production and SBOM operations, but the failed attempt did not export standalone
-OCI subject or SBOM documents. It establishes no completed runtime use, public Run or publication.
-The [disk-retention attempt](https://github.com/njhensley/nvkr/actions/runs/44266926355) at
-`a0e6c3122ca7f346c426478d923baeadde3d52e3` also completed production, terminal observation and SBOM.
-Its consumer admission failed with 3/4096 MiB memory and 14647/16384 MiB workspace available/required.
-The service reported 5057 MiB file cache (5054 MiB inactive), 20 MiB anonymous memory and 45 MiB process
-RSS; the retained layer was a 1852 MiB disk snapshot. No OOM kill or Packer execution occurred. The
-current storage path removes that extra retained snapshot and retains the original OCI tar.
-The [single-copy working-set attempt](https://github.com/njhensley/nvkr/actions/runs/44272566156) at
-`dc7020d7c58f25549ab89d221cf887a04aaced83` completed production, terminal observation and SBOM, then
-passed consumer admission under unchanged budgets. Its diagnostic sample showed a 167 MiB cgroup
-working set, 4953 MiB cgroup headroom and 16500 MiB available workspace. The filesystem used 2447 MiB;
-one root-owned 1852 MiB OCI tar remained, with no unlinked non-memfd descriptor copy. Packer validation
-rejected the fixture's unsupported `filesha256` function before QEMU execution. The fixture now supplies
-a generated checksum file. This failed attempt establishes neither a completed consumer receipt nor a
-disk result, and it exported no standalone OCI subject or SBOM documents.
-The [bounded guest attempt](https://github.com/njhensley/nvkr/actions/runs/44276540278) at
-`0667a25fb8c513ac1badbd84e7178a80fab21e56` passed the original-owner native factory test, including
-production, SBOM, consumer admission, Packer validation, QEMU guest write and ACPI shutdown, consumer
-UID/capability checks, and the exact snapshot download over HTTPS through the produced outbound helper.
-The completed runtime use binds manifest `sha256:7e35e0e6d5cf4131e77c308217e3d9524bd46651981cdbc885d076465f38d276`,
-layout `sha256:8a74cc11eeb4b7b31ec55dcd743be32ae1a09eb3952b68d508094ed16dfb2302` (1,942,467,503 bytes),
-layer `sha256:85855f97a1ae48884e7b57bf8a96248ad04de53d7809bc85536169e808ac8835`, and SBOM set
-`sha256:aba32249a8839126db71498f44c0145f32ca384d4b78727e1af8c4ab887a896c`. The uploaded disk result and
-observation agree on QCOW2 `sha256:890f00ca2521cc18f880f75e9051799a46db8accc533bde052d2aa0243f20cd7`
-(393,216 file bytes, 8 MiB virtual size). The workflow then failed because the diagnostic exporter read
-the SBOM directory as a file. The complete SBOM set and runtime observation were not uploaded. The exporter
-now copies files and directories and checks both source and destination with the factory's existing
-path digest; focused fixtures cover nested contents, modes, tampering, symlinks, cancellation and an
-existing destination. The [complete evidence attempt](https://github.com/njhensley/nvkr/actions/runs/44283064671)
-at `140a7e6758bbf88e4886ad5a3fb29b67f92f8565` passed the same native consumer checks and exported the
-complete three-document SBOM set plus runtime observation, each checked against its completed-use digest.
-The [entry-diagnostic baseline](https://github.com/njhensley/nvkr/actions/runs/44290280188) at
-`fcc540862614091f5a4e4b73c536aed88df9a7f3` also passed and exported metadata/content hashes for all
-39,422 tar entries. All mtimes were zero; cache/log directories had no children. Archive order was not
-lexical, with 17,745 adjacent inversions. Both attempts and the earlier bounded guest attempt share runtime
-Build `sha256:f10ba9797ad27d8edc0e54663570d925fbd15b1d2639f24a89346fe7d963150b` but produced different
-runtime layer, manifest and layout digests, while the tiny QCOW2 bytes matched. Each passed its own pair
-of fresh assemblies; that check alone does not establish equality across runners. An offline GNU tar
-fixture reproduced order-dependent hard-link representations and equal bytes with lexical traversal.
-The [first adapter attempt](https://github.com/njhensley/nvkr/actions/runs/44294801476) at
-`5613f5d18aee0e2272f3fb910afcb4e36e2ed341` passed the native fixture, but its inventory showed that
-Python bypassed the adapter: owner names and unsorted directory entries remained. The snapshot-derived
-epoch also changed installed file hashes beyond configuration evidence. The implementation now restores
-epoch zero and selects the adapter in both outer Python and nested mkosi search paths. The
-[first corrected run](https://github.com/njhensley/nvkr/actions/runs/44303358758) at
-`e575f0bd8879fed7f997987b60debe4dbe73c5d0` passed production, bounded guest execution and complete evidence
-export. All 39,422 entries had zero mtimes and empty owner names, with unchanged numeric owners and no
-unsorted directories. After resolving hard links, installed content, modes, numeric ownership, symlink
-targets and retained extended attributes matched the entry-diagnostic baseline; only the checked
-configuration and its recipe evidence changed. The tiny QCOW2 bytes also matched. Runtime Build
-`sha256:b146cd100a8abb76b2f48e15ef04231a026bb9879e003592f13d23c7d8cda5f7` produced layer
+The four maintained amd64 disk consumers select separately named runtime requirements. Each native group
+retains its own production, observation and SBOM; equal Build Digests do not permit cross-job receipt
+restoration. Run completion requires matching manifest and complete-layout digests and sizes, with every
+requirement's own evidence. These transported descriptions grant no execution authority. The compiler removes
+the unused container-image dependency from selected consumers and binds runtime production into their Builds.
+Composite admission checks the declaring member before catalog work. Each disk publication requires its
+contributing runtime's producer records and complete SBOM, while runtime payloads remain absent from
+Release membership. Aggregate and per-output tests reject missing runtime evidence and check that a
+per-output publication excludes its sibling's runtime evidence.
+Maintained ARM64 disk consumers retain the existing image route.
+
+The amd64 Packer producers use a separate source declaration without agent vendoring, pinned to the same
+NVKE commit `2cfd00081b468d85a4894ec17e9deac13c9d8169` and tree
+`a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53`. Agent producers keep their original vendoring. The pinned
+[Packer project](https://github.com/dsx-ai-factory/nvke/tree/2cfd00081b468d85a4894ec17e9deac13c9d8169/os-image/packer)
+uploads the authenticated image-inputs archive; its guest provisioner installs `nvke-agent.deb` from that
+material. Six source tests passed with Git-blob-verified scripts and no agent source tree. They cover exact
+supplied agent-byte preservation through composition and both variants' staging, deterministic archives,
+missing inputs, digest rejection and the templates' material-only host input path. Package bytes and metadata
+tools were synthetic fixtures; these tests do not prove guest package installation or maintained disk equivalence.
+The catalog contract separately checks all four Packer selections, matching source pins and retained agent
+vendoring. The shared catalog change also changes the legacy combined Definition's amd64 disk Build identities.
+
+Two independent native AMD64 proofs passed:
+[first run](https://github.com/njhensley/nvkr/actions/runs/44303358758) at
+`e575f0bd8879fed7f997987b60debe4dbe73c5d0` and
+[second run](https://github.com/njhensley/nvkr/actions/runs/44305879063) at
+`8e6e9863628becd283296ebdde1d1dab8a757580`. Both exercised namespace/device/resolver checks, original-owner
+production, two fresh assembly closures, terminal observation, SBOM generation, Packer validation, QEMU guest
+write and ACPI shutdown, consumer UID/capability checks, and an exact snapshot download over HTTPS through the
+produced helper. The consumer service used a two-CPU quota, 5 GiB memory limit, 512-task limit and a separately
+owned 20 GiB scratch filesystem. Host bootstrap utilities were recorded but are not snapshot-pinned.
+
+Both runs produced runtime Build
+`sha256:b146cd100a8abb76b2f48e15ef04231a026bb9879e003592f13d23c7d8cda5f7`, layer
 `sha256:50b86b3c794640beeec4dfd90564fa65fceadb48621dae2e895cce6a6951753d`, manifest
-`sha256:bbc6fe52b2697fae5af9b2031051aab1e3dace6b7287fea248beb30cb305eb3b` and layout
+`sha256:bbc6fe52b2697fae5af9b2031051aab1e3dace6b7287fea248beb30cb305eb3b` and complete layout
 `sha256:6d01dd1f479d1031dc1789b99cff8d6b995b14144524f7c5b93aee5d1c483ed1` (1,942,467,503 bytes).
-A second independent corrected run is still required to establish cross-run equality. This BIOS fixture does
-not establish a public Run, maintained NVKE disk equivalence, publication, signing, libguestfs inspection,
-EFI or ARM64 runtime execution.
-The earlier assembly digest above describes the closure before the outbound helper was added and does
-not evidence the changed runtime.
+The retained inventories match all 39,422 entries, including order, metadata, content hashes and exact header
+segment hashes. All mtimes are zero, user/group names are empty, numeric ownership is preserved and directory
+entries are sorted. The complete three-document SBOM set also matches:
+`sha256:2897fe011c1cc7381b1da91ebfa84a992c9291b933e1b514dafd1febd063bb9e`. Each original-owner export checks
+its full evidence set against the completed-use digest. Runtime observations and terminal digests differ
+between executions; they are bound separately and are not runtime payload identity.
+
+The bounded QCOW2 is byte-identical in both runs:
+`sha256:890f00ca2521cc18f880f75e9051799a46db8accc533bde052d2aa0243f20cd7` (393,216 file bytes, 8 MiB virtual
+size).
+
+The runtime layer comparison with the earlier epoch-zero
+[diagnostic baseline](https://github.com/njhensley/nvkr/actions/runs/44290280188) matches resolved hard-link
+payloads, modes, numeric ownership, symlink targets and retained extended attributes;
+only the checked configuration and its recipe evidence change content. Archive ordering, owner-name encoding
+and hard-link representation intentionally change. Secret-file comparison used whole-file hashes only.
+
+These proofs establish independent runtime reproduction and a bounded BIOS guest build, not a completed public
+Run or maintained NVKE old-image/new-runtime disk equivalence. The latter remains a required hosted development
+gate using its existing registry-read boundary. Publication, signing, libguestfs inspection, EFI, ARM64 runtime
+execution and any stronger evidence lane remain unproven by these fixtures. The workflow retains diagnostics
+and complete SBOM documents, not the OCI payload.
 
 The quick machinery E2E [fork Run](https://github.com/njhensley/nvkr/actions/runs/44043009475)
 at `ee807779f8122a0cce1105853a0a82c88dbb4c56` passed on stock Ubuntu in 91 seconds (71 seconds

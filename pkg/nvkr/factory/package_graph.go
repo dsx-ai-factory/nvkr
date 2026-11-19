@@ -166,6 +166,20 @@ func packageProducerResults(inputs []string, nodes map[string]Node, artifacts ma
 			if member.BuildTarget == "" || member.Component == "" || member.Kind == "producer-result" {
 				continue
 			}
+			// Build-time tools contribute their own producer evidence to this
+			// exact output. Read the explicit edge on the original producer;
+			// a later walk of the raw disk must not discover extra evidence
+			// that package construction omitted. Source closures and runtime
+			// payloads remain execution inputs, not publication members.
+			consumer := nodes[member.Producer]
+			for _, tool := range consumer.InternalTools {
+				for _, inputID := range consumer.Inputs {
+					input := artifacts[inputID]
+					if input.Kind == "producer-result" && input.BuildTarget == "internal/"+tool {
+						results = append(results, inputID)
+					}
+				}
+			}
 			for resultID, candidate := range artifacts {
 				if candidate.Kind == "producer-result" && candidate.BuildTarget == member.BuildTarget && candidate.Component == member.Component {
 					results = append(results, resultID)

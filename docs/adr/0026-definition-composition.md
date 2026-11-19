@@ -103,6 +103,11 @@ and overlays, so compilation (U3) checks it after opening them and before it ret
 Both phases are required: a failure in either returns a coded error and produces no Plan, bundle, attempt
 directory or partial output. Context cancellation is checked between members and maps to `timeout`.
 
+With the composite Environment selected, factory also admits each Run-only VM runtime's exact disk
+consumer before loading any catalog. The runtime and consumer must belong to the same admitted member.
+Unknown, unbound, shared, non-disk or cross-platform selections fail. Captured-input replay repeats this
+check against the original admitted member files; flattened attribution alone does not authorize it.
+
 ### 3. Merge rules: exact union, never precedence
 
 Admission derives one **effective Definition**: an ordinary in-memory v5 Definition that the existing compiler
@@ -112,6 +117,7 @@ consumes unchanged. The derivation is a pure, deterministic function of the comp
 |---|---|---|
 | Named outputs | Disjoint union. Each output declaration is copied unchanged except for catalog path rebasing below. Output names are preserved; there is no prefixing, renaming or namespacing. The union is sorted by name. | The same output name in two members is an error, even if the declarations are identical. There is no deduplication. |
 | Per-output catalog | Every output receives an explicit catalog stack. An output without an override inherits its own member's top-level `catalog`. Base and overlay locators are rebased from the member's directory to the composite's directory. Member locators must be relative; absolute locators are rejected, not rebased, matching compile-input capture. | An absolute base or overlay locator, or a rebased locator outside the admitted input root, is an error. |
+| Run-only VM runtimes | Disjoint, name-sorted union of OCI internal-tool declarations. Each receives its own member's default or explicit catalog, rebased by the same rule as outputs. The selected disk consumer must be in the declaring member. | Duplicate names fail even for identical declarations. Other internal-tool execution forms remain gated pending their member/consumer attribution contract. |
 | Top-level `catalog` | Every member's top-level catalog stack, after rebasing, must be identical. It becomes the effective Definition's top-level stack. | Any difference is an error. |
 | `sbomTool` | Every member that selects one must select the same value; it becomes the effective `sbomTool`. A member that omits it inherits that shared value, so its outputs get SBOMs inside the composite while its standalone Runs stay unchanged. | Two different selected values are an error. |
 | `cosignTool` | Every member must select the same value (including omission). | Any difference is an error. |
@@ -167,8 +173,11 @@ declared variant member to select its component, and the §3 cross-member produc
 Plan's resolved producers; a saved Plan cannot drop a declaration it needs. A consumer that needs those checks
 binds the Plan through an exact-input expectation (§10).
 
-Each variant producer is attributed to the member that selected it. Every native build belongs to one named
-output, the record attributes that output to one member, and the Plan records the build's resolved producers.
+Each variant producer is attributed to the member that selected it. Delivered native Builds use the
+record's named-output attribution. Run-only VM runtime Builds use their exact Environment-selected disk
+consumer's member for the same producer comparison. Pre-catalog admission checks that this is also the
+runtime's declaring member. The Plan records every Build's resolved producers; no new Release member or
+independent member authority is derived from the runtime lookup.
 
 The existing `definitionDigest` field binds the composite digest for a composite and the Definition digest for a
 plain Definition. Records carry an explicit definition kind so a verifier always recomputes under the right
@@ -194,6 +203,11 @@ The composite Run freezes the union of required output slots before execution (A
 an independent required use. Equal Build Digests across members do not merge producer jobs, results, terminal
 observations or evidence, and a successful sibling never satisfies another output's slot. A failure in any
 member's output fails the composite Run; there is no partial composite Release and no per-member success.
+
+Run-only runtime requirements retain ADR-19 completeness and ADR-18's original-owner execution contract.
+Each disk group produces and evidences its own named runtime, even when all runtime Build Digests are equal.
+Run completion requires the independent productions to agree on runtime bytes. Runtime requirements never
+enter the delivered output union or Release membership.
 
 Publication is the existing ADR-20 §6 route. The Release is one flat publication root whose membership is exactly
 the union of member outputs, with the composition binding of §4 in its signed metadata. It is not a parent of

@@ -1,8 +1,11 @@
 # Plan-produced VM runtime
 
 This catalog selects an AMD64 runtime assembled by source-pinned mkosi from the Ubuntu snapshot
-`20261109T000000Z`. It is intended as a Run-only internal artifact. Run consumer integration is still
-incomplete; the existing toolchain images continue to serve the maintained disk builds.
+`20261109T000000Z`. The maintained AMD64 disk Definitions select it as a Run-only internal artifact,
+with a separate production and evidence requirement for each consumer. It is never a delivered output
+or Release member. The existing toolchain images remain for ARM64 consumers. Native runtime reproduction
+and a bounded BIOS guest build have passed; maintained old-image/new-runtime disk equivalence remains
+a required hosted development gate, as scoped in the [ADR-18 ledger](../../docs/adr/reconciliation/adr-18.md).
 
 The outer Ubuntu Resolute root contains QEMU, firmware, xorriso and cloud-localds. A separate Ubuntu
 Noble root at `/opt/nvkr/inspection` retains the baseline libguestfs and its kernel. Each package record

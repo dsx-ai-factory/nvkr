@@ -10,6 +10,21 @@ catalog:
   base: ../../catalogs/nvke/module-tags
 sbomTool: syft
 cosignTool: cosign
+internalTools:
+  - name: nvke-node-fde-amd64-runtime
+    platform: linux/amd64
+    format: oci
+    catalog:
+      base: ../../../toolchains/nvkr-vm-runtime
+    components: [packer-amd64, packer-plugin-qemu-amd64, vm-runtime-amd64]
+    result: vm-runtime-amd64
+  - name: nvke-node-image-amd64-runtime
+    platform: linux/amd64
+    format: oci
+    catalog:
+      base: ../../../toolchains/nvkr-vm-runtime
+    components: [packer-amd64, packer-plugin-qemu-amd64, vm-runtime-amd64]
+    result: vm-runtime-amd64
 outputs:
   - name: nvke-node-fde-amd64
     platform: linux/amd64

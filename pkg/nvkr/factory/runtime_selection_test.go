@@ -54,6 +54,16 @@ func runtimeConsumerPlanFixture(t *testing.T) *Plan {
 
 func runtimeConsumersPlanFixture(t *testing.T, outputs []string) *Plan {
 	t.Helper()
+	input, env, stack, stacks := runtimeConsumerInputsFixture(t, outputs)
+	plan, err := compileWithTargetStacks(t.Context(), input, env, stack, stacks, "test", "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return plan
+}
+
+func runtimeConsumerInputsFixture(t *testing.T, outputs []string) (definition.Definition, definition.Environment, *catalog.Stack, map[string]*catalog.Stack) {
+	t.Helper()
 	outputs = slices.Clone(outputs)
 	slices.Sort(outputs)
 	producer := runtimeOwnerPlanFixture(t)
@@ -96,11 +106,7 @@ func runtimeConsumersPlanFixture(t *testing.T, outputs []string) *Plan {
 		env.Runtime.ProducedRuntimes[output] = tool.Name
 		stacks["internal/"+tool.Name] = runtimeStack
 	}
-	plan, err := compileWithTargetStacks(t.Context(), input, env, stack, stacks, "test", "", "")
-	if err != nil {
-		t.Fatal(err)
-	}
-	return plan
+	return input, env, stack, stacks
 }
 
 func TestRuntimeConsumerPlanRequiresProductionAndEvidenceInputs(t *testing.T) {

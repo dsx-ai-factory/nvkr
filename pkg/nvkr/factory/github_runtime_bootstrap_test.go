@@ -4,13 +4,63 @@
 package factory
 
 import (
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"sigs.k8s.io/yaml"
 )
+
+func TestRuntimeDiskStageRequiresExactBootstrap(t *testing.T) {
+	plan := runtimeConsumerPlanFixture(t)
+	plan.Actions = arcTestPlan(t, "linux/amd64").Actions
+	stage := githubStage{DiskOutput: "node-image", diskExecutionBudget: 485 * time.Second,
+		Nodes: []Node{{ID: "node-image/build-image", Platform: "linux/amd64"}}}
+	actions, err := resolveGitHubActions(plan.Actions)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fragment bytes.Buffer
+	writeGitHubPackerDiagnosticStep(&fragment, plan, stage, actions)
+	var diagnostic struct {
+		Steps []githubStep `json:"steps"`
+	}
+	if err := yaml.UnmarshalStrict([]byte("steps:\n"+fragment.String()), &diagnostic); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name   string
+		change func(*githubStep)
+	}{
+		{"canonical bootstrap", nil},
+		{"legacy direct executor", func(step *githubStep) { step.Run = githubRunnerCommand(plan, "run-disk", "output", stage.DiskOutput) }},
+		{"missing preflight", func(step *githubStep) { _, step.Run, _ = strings.Cut(step.Run, " && ") }},
+		{"ambient environment", func(step *githubStep) { step.Run = strings.ReplaceAll(step.Run, "/usr/bin/env -i", "/usr/bin/env") }},
+		{"changed watchdog", func(step *githubStep) { step.Run = strings.ReplaceAll(step.Run, "515s", "516s") }},
+		{"other output", func(step *githubStep) { step.Run = strings.ReplaceAll(step.Run, "node-image", "other-image") }},
+		{"conditional execution", func(step *githubStep) { step.If = "false" }},
+		{"added credential", func(step *githubStep) { step.Env = map[string]string{sourceTokenEnv: "synthetic-token"} }},
+		{"changed step timeout", func(step *githubStep) { step.TimeoutMinutes++ }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			step := githubStep{ID: "run-disk", Run: githubDiskCommand(plan, stage), TimeoutMinutes: githubDiskStepTimeoutMinutes(stage)}
+			if test.change != nil {
+				test.change(&step)
+			}
+			err := validateGitHubStageExecution(plan, stage, []githubStep{step, diagnostic.Steps[0]})
+			if test.change != nil {
+				assertFactoryErrorCode(t, err, e.CodeEngineCapability)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
 
 func TestRuntimeDiskBootstrapScrubsCredentialsAndRequiresPreflight(t *testing.T) {
 	bash, err := exec.LookPath("bash")
