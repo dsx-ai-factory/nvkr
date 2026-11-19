@@ -44,7 +44,9 @@ trap 'rm -f "$linked" "$generated"' EXIT
 # order keeps the file identical under any locale (CI sorts in C).
 for goos in linux darwin; do
   GOOS="$goos" GOARCH=amd64 \
-    go list -deps -f '{{if .Module}}{{.Module.Path}}{{end}}' ./cmd/nvkr ./cmd/nvke-demo ./cmd/nvkr-site-identity-helper ./cmd/nvkr-results-publish
+    go list -deps -f '{{if .Module}}{{.Module.Path}}{{printf "\t"}}{{.Module.Version}}{{printf "\t"}}{{.Module.Dir}}{{end}}' ./cmd/nvkr ./cmd/nvkr-results-publish
+  GOOS="$goos" GOARCH=amd64 \
+    go -C demos/nvke list -deps -f '{{if .Module}}{{.Module.Path}}{{printf "\t"}}{{.Module.Version}}{{printf "\t"}}{{.Module.Dir}}{{end}}' ./cmd/nvke-demo ./cmd/nvkr-site-identity-helper
 done | LC_ALL=C sort -u | grep -v '^$' | grep -v '^github.com/dsx-ai-factory/nvkr' > "$linked"
 
 python3 scripts/gen_notices.py "$linked" > "$generated"

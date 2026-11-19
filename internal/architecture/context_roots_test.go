@@ -47,12 +47,9 @@ const (
 // contextRootExceptions is the exact inventory of allowed root contexts. Entries
 // must match the tree exactly: a new site, a changed count, or a stale entry fails.
 var contextRootExceptions = map[contextRoot]contextRootException{
-	{"cmd/nvke-demo/main.go", "main", "Background"}:                                                                   {1, processRoot},
 	{"cmd/nvkr-disk-inspect/main.go", "main", "Background"}:                                                           {1, processRoot},
 	{"cmd/nvkr-results-publish/main.go", "main", "Background"}:                                                        {1, processRoot},
-	{"cmd/nvkr-site-identity-helper/main.go", "main", "Background"}:                                                   {1, processRoot},
 	{"cmd/nvkr/main.go", "main", "Background"}:                                                                        {1, processRoot},
-	{"internal/nvkedemo/support.go", "(*OwnedProcess).finish", "Background"}:                                          {3, boundedCleanup},
 	{"internal/quicke2e/main.go", "main", "Background"}:                                                               {1, processRoot},
 	{"internal/quicke2e/runner.go", "(*runner).cleanupContainer", "Background"}:                                       {1, boundedCleanup},
 	{"pkg/nvkr/conformance/run.go", "(*Producer).produce", "Background"}:                                              {3, boundedRecovery},

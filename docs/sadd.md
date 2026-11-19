@@ -572,7 +572,7 @@ copies named QCOW2/EFI bytes and proofs while preserving complete OCI membership
 aggregate authentication precedes proof and final inventory publication/readback. [Reconciliation](adr/reconciliation/object-store-publication.md#selective-boot-asset-publication) tracks implementation.
 Environment v3 and Plan v7 describe the opt-in selection and two bounded phases. Core lifecycle APIs issue
 limited selected-artifact receipts after original authentication and cleanup; generated selective execution,
-rendering and external provider/client acceptance remain separate work.
+production rendering and external provider/client acceptance remain separate work. The NVKE catalog owns a standalone script/template candidate checked against the CRD from pinned NVKE source. NVKR Go has no MachineImage renderer; no producer or workflow enables the candidate.
 
 [Reconciliation](adr/reconciliation/README.md) owns the current support matrix. Local immutable attempts,
 Plan/graph inspection, GitHub generation, metadata-only release navigation and the scoped

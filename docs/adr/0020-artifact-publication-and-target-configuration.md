@@ -48,7 +48,7 @@ new locations. Other Environment changes remain bound by Environment and Plan id
 does not change source producer identities, signing policy, credentials or the downstream deployment boundary.
 Catalog and installer derivations are deferred. This member is artifact bytes, not an ADR-31 description.
 
-The proposed MachineImage renderer consumes serving configuration as content. Its Build includes that configuration,
+A proposed catalog-owned downstream renderer consumes serving configuration as content. Its Build includes that configuration,
 render profile and selected producer Build dependencies. Mapping changes alter its Build, artifact and enclosing identities;
 source QCOW2/EFI bytes and Builds remain unchanged. Copy-only relocation retains the ordinary transport rule.
 Runtime versions, read times and receipts are excluded from render Build identity and YAML.
@@ -358,6 +358,31 @@ Pipeline-attested contract from [#514](https://github.com/dsx-ai-factory/nvkr/is
 [Reconciliation](reconciliation/object-store-publication.md#selective-boot-asset-publication) owns acceptance/implementation. Existing full-mirror schemas, bytes and verification stay unchanged.
 Generated execution, producer integration and rendering remain separate acceptance work; compiling the versioned Plan does not enable those routes.
 
+NVKR Go remains independent of downstream CRDs and rendering conventions. The NVKE catalog owns
+its MachineImage candidate as a small script and maintained template under
+`inputs/catalogs/nvke/machineimage/`. It consumes generic preliminary or selected boot descriptions
+(named disk/platform raw digests, imager members/profiles and destination URLs), with separately supplied
+proposed disk metadata. It reads the CRD directly from the catalog's locked `nvke-controller` source commit;
+no CRD is vendored and no floating or dirty-working-tree schema is used. Rendering validates the complete
+set against that source's served OpenAPI schema before emitting any manifests. Local JSON Schema checks
+are not Kubernetes CEL/admission or boot evidence.
+
+This catalog experiment is not a declared producer, generated execution route or NVKR lifecycle API.
+Production rendering remains unavailable. Candidate descriptions authenticate nothing; metadata bindings,
+ordinary producer/material integration, signed artifact handoff and trusted import remain unimplemented.
+The candidate names fingerprint exact pre-name YAML bytes, not a typed Build or Release identity. Its
+annotations distinguish output/destination pairs and record the imager raw digest. No eventual aggregate,
+content or inventory identity enters the rendered bytes. Existing source Build and Plan identities are
+unchanged by this unregistered candidate. Future producer admission must bind the script, template,
+source CRD, exact raw dependencies and authorized metadata through the existing material/Build owners.
+
+NVKE owns CRD compatibility, iPXE/template conventions and downstream registration. Strict imager
+profile/source admission remains with [#516](https://github.com/dsx-ai-factory/nvkr/issues/516) after mkosi
+step 3 and [NVKE #2365](https://github.com/dsx-ai-factory/nvke/issues/2365), followed by recorded amd64/arm64
+boot evidence. [#517](https://github.com/dsx-ai-factory/nvkr/issues/517) remains open for those integrations.
+The remaining render ordering and binding requirements below describe future admitted catalog producers,
+not an NVKE-specific renderer or general templating engine in NVKR Go.
+
 **Admission.** `selective-boot-v1` requires a new Environment/Plan version and explicit destination modes.
 The new schema has no mode default; old schemas keep full mirror on omission and reject selective fields. Select sorted, nonempty QCOW2 outputs, one
 compatible EFI output/regular member/profile per architecture, and named destinations. Require every selected asset
@@ -392,7 +417,8 @@ bind member name/hash/size/architecture; otherwise reject or extend its original
 raw payloads and required proofs. No unselected layers, bundle fallback, truncated documents, reference-only proofs,
 copier signatures or unsigned subset assertions.
 Delivery owns raw-member inspection/transport, `sign` proof authentication, `lifecycle` policy/input/membership joins and
-opaque receipts, factory dependencies/finalization, CLI/SDK adaptation. Structured records use canonical typed identities;
+opaque receipts, factory dependencies/finalization, CLI/SDK adaptation. Catalog producers own downstream schema/template rendering;
+NVKR consumes their ordinary artifacts without CRD-specific Go types or logic. Structured records use canonical typed identities;
 raw SHA-256 is blob integrity only.
 
 **Limits.** Preparation/rendering and final publication each admit a fresh store/session and operation/cleanup deadlines
@@ -407,6 +433,15 @@ deadline/read allowance; restarted phases admit fresh limits. Per destination, r
 | Total/count | Exact payload sizes plus all reservations and Plan-derived maximum control/proof object count. Count shared bytes once; check every use. |
 | Reads | Plan-declared finite allowance per phase covering acquisition, proof verification, pinned/HTTPS reads and retry/failed responses. Reject insufficient mandatory-pass allowance before I/O; debit actual bytes locally. |
 
+The conservative source-read reservation uses the delivery source-layer ceiling (64 GiB per selected
+output-local disk or executable), independently of the destination raw-object ceiling. Preparation acquires
+the whole executable bundle before extracting the selected EFI; unselected bundle members can be larger
+than that EFI. Phase accounting bounds response reads during acquisition; `OpenPublication` enforces
+source-layer admission after staging. The reservation covers successful sources, not a per-layer preflight
+check. Selected destination object/total limits remain unchanged. Both compiled phase allowances retain this conservative source
+reservation. This correction changes opt-in v7 Plan Digests on recompilation when the destination object
+ceiling is below 64 GiB; it changes neither producer Build Digests nor existing full-mirror Plans.
+
 Reject insufficient reservations or oversized documents. Later phases recompute unique bytes/count from the Plan,
 authenticated controls and checked destination objects, never transported counters. Controls must fit owner caps and
 reservations.
@@ -417,7 +452,9 @@ reservations.
 2. Copy raw QCOW2/EFI to immutable keys; fully hash/size-check pinned S3 readback and declared HTTPS responses.
    Issue a live preliminary receipt bound to output/member, inputs/invocations, policy, bytes, destination pins and mapping.
    It proves bytes and observed availability, never aggregate membership.
-3. In that lifecycle process, render the predeclared artifact from receipts/authenticated metadata using its pinned schema/profile.
+3. Hand generic receipt-bound inputs and authenticated metadata to the predeclared catalog producer.
+   Its script/template renders the artifact using the CRD from its locked NVKE source and admitted profile;
+   lifecycle owns the authority handoff, without interpreting downstream CRD fields.
    Exclude its eventual aggregate root, release-content and inventory digests from bytes and identity inputs. Predicted URLs
    cannot replace receipts. The ordinary output job publishes/signs the prepared artifact through authenticated producer handoff.
 4. Assemble/publish/sign/verify every required OCI member. A separate final selective job reauthenticates aggregate membership

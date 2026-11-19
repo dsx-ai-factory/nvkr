@@ -43,6 +43,9 @@ The catalog and OS tours inspect inputs, graphs, and dry-runs without building a
 release tour reads bounded metadata and evidence; payloads, signatures, and consumer policy
 remain unverified. The [facilitator guide](team-guide.md) explains the separate verification step.
 
+The NVKE site/tenant implementation lives in the [nested demo module](nvke/README.md).
+Build it with `make demo`; run its separate checks with `make demo-check`.
+
 ## Execution and focused examples
 
 | Journey | Start here |
