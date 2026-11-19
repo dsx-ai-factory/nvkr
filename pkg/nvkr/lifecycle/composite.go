@@ -27,14 +27,15 @@ func LoadDefinitionInput(ctx context.Context, path string) (DefinitionInput, err
 // CompositeView describes an admitted composite and its derived effective
 // Definition. It is descriptive output, never an authored input.
 type CompositeView struct {
-	Kind                      string                         `json:"kind"`
-	Name                      string                         `json:"name"`
-	Digest                    string                         `json:"digest"`
-	Members                   []CompositeMemberView          `json:"members"`
-	Variants                  []definition.DeclaredVariant   `json:"variants,omitempty"`
-	EffectiveDefinitionDigest string                         `json:"effectiveDefinitionDigest"`
-	EffectiveDefinition       Definition                     `json:"effectiveDefinition"`
-	Outputs                   []definition.OutputAttribution `json:"outputs"`
+	Kind                      string                              `json:"kind"`
+	Name                      string                              `json:"name"`
+	Digest                    string                              `json:"digest"`
+	Members                   []CompositeMemberView               `json:"members"`
+	Variants                  []definition.DeclaredVariant        `json:"variants,omitempty"`
+	DerivedOutputs            []definition.CompositeDerivedOutput `json:"derivedOutputs,omitempty"`
+	EffectiveDefinitionDigest string                              `json:"effectiveDefinitionDigest"`
+	EffectiveDefinition       Definition                          `json:"effectiveDefinition"`
+	Outputs                   []definition.OutputAttribution      `json:"outputs"`
 }
 
 // CompositeMemberView names one member pin and the file it was admitted from.
@@ -55,7 +56,7 @@ func InspectComposite(input DefinitionInput) (CompositeView, error) {
 		return CompositeView{}, err
 	}
 	view := CompositeView{Kind: definition.CompositeKind, Name: effective.Metadata.Name, Digest: input.Composition.Digest(),
-		Variants: input.Composition.Composite().Variants, EffectiveDefinitionDigest: effectiveDigest, EffectiveDefinition: effective,
+		Variants: input.Composition.Composite().Variants, DerivedOutputs: input.Composition.Composite().DerivedOutputs, EffectiveDefinitionDigest: effectiveDigest, EffectiveDefinition: effective,
 		Outputs: input.Composition.Attribution()}
 	for _, member := range input.Composition.Members() {
 		view.Members = append(view.Members, CompositeMemberView{Name: member.Name, Digest: member.Digest, Definition: member.Path})

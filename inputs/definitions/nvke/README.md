@@ -1,9 +1,17 @@
 # NVKE composite release inputs
 
-The [composite Definition](gpu-site.composite.yaml) is the maintained NVKE product entry point.
-It pins five NVKE family files and the [GB200 AICR member](../aicr/nvke-gb200.yaml), producing
-83 named outputs through one Plan, Run and Release. Family files remain authored selection owners;
-there are no maintained standalone family workflows.
+The [release composite](gpu-site-release.composite.yaml) is the maintained production/nightly entry point.
+It pins five NVKE family files and the [GB200 AICR member](../aicr/nvke-gb200.yaml), preserving their
+83 payload outputs and adding the composite-owned `aicr-inventory` as the 84th required output.
+Development keeps the [payload-only composite](gpu-site.composite.yaml) and its 83 outputs.
+Family files remain authored selection owners; there are no maintained standalone family workflows.
+
+The inventory is derived after packaging from `controller-chart`, `nktp`, `nvke-controller`, `postgresql`,
+`spire`, `spire-crds` and `temporal`. It records exact sibling package subjects and known publication
+repositories without reading a registry or Release. It is signed and admitted to the qualifier's manifest;
+qualification re-projects the inventory and compares its canonical document and archive envelope.
+Production and nightly derive independently for their respective namespaces. Development attempt relocation
+remains unsupported for derived outputs. Catalog rendering and seed/site bundles remain follow-up work.
 
 ## Working Definitions for an NVKE GPU site
 
@@ -54,6 +62,7 @@ After editing a member, update its digest pin and regenerate through the owner:
 
 ```sh
 bin/nvkr definition pin --definition inputs/definitions/nvke/gpu-site.composite.yaml
+bin/nvkr definition pin --definition inputs/definitions/nvke/gpu-site-release.composite.yaml
 make nvke-generate
 make nvke-check
 make workflows-generate
@@ -335,7 +344,7 @@ owns historical publication scope and current-candidate guest acceptance.
 
 The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)
 completed a standalone FDE bake and raw artifact retention. It did not exercise FDE publication, an ARM64
-FDE bake, or the maintained 83-output composite. Those operational acceptance checks remain outstanding.
+FDE bake, or the maintained release composite. Those operational acceptance checks remain outstanding.
 
 `../../environments/github-nvke-gpu-site.yaml` admits only ADR-18's `githubARC: native-kvm-v1` route on
 `arc-amd64-kvm` and `arc-arm64-kvm`, with required native KVM. Each execution class requests 8 CPUs,

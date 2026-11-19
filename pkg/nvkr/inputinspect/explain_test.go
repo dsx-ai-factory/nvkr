@@ -23,6 +23,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
@@ -96,6 +97,39 @@ func TestExplainDirectAndReverseDeterministic(t *testing.T) {
 			}
 			if !strings.Contains(got.Scope, "within this root") {
 				t.Fatal("missing scope")
+			}
+		})
+	}
+}
+
+func TestExplainDerivedOutputsDoNotSelectCatalog(t *testing.T) {
+	root := fixture(t)
+	def, err := definition.LoadDefinition(t.Context(), filepath.Join(root, "definition.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	def.Outputs = append(def.Outputs, definition.DefinitionOutput{
+		Name: "release-inventory", Platform: "linux/amd64", Format: definition.OutputBundle,
+		Derived: &derivedoutput.Selection{Encoding: derivedoutput.InventoryV1, Outputs: []string{"pause"}},
+	})
+	writeJSON(t, root, "definition.json", def)
+	for _, tc := range []struct {
+		file            string
+		direct, reverse int
+	}{
+		{"definition.json", 2, 0},
+		{"catalog/registry.yaml", 1, 3},
+	} {
+		t.Run(tc.file, func(t *testing.T) {
+			got, err := Explain(t.Context(), root, filepath.Join(root, tc.file))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got.References) != tc.direct || len(got.Consumers) != tc.reverse {
+				t.Fatalf("source-less output changed catalog references: %+v", got)
+			}
+			if tc.file == "definition.json" && !strings.Contains(got.Summary, "2 named outputs") {
+				t.Fatalf("derived output missing from summary: %s", got.Summary)
 			}
 		})
 	}

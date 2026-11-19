@@ -145,6 +145,9 @@ func ObserveLifecyclePayload(ctx context.Context, plan *Plan, expected Lifecycle
 	if node.ID == "" {
 		return LifecyclePayloadObservation{}, e.New(e.CodeReleaseIncomplete, "lifecycle output %q has no package producer", expected.Name)
 	}
+	if expected.Derived != nil {
+		return observeDerivedInventory(ctx, plan, expected, artifact, artifacts)
+	}
 	if expected.ImageIndex != nil {
 		if artifact.Kind != PackageImage {
 			return LifecyclePayloadObservation{}, e.New(e.CodeVerifyFailed, "image index on non-image output")
@@ -397,7 +400,8 @@ func lifecyclePublicationOutputsForSelection(ctx context.Context, plan *Plan, no
 			return nil, e.New(e.CodeVerifyFailed, "lifecycle output %q payload differs from its exact plan binding", expected.Name)
 		}
 		bound := delivery.Output{Name: expected.Name, Kind: expected.Kind,
-			Digest: payloadDigest, BuildDigest: expected.BuildDigest, ImageIndex: observation.ImageIndex.Clone(), Components: append([]string(nil), components...)}
+			Derived: expected.Derived.Clone(),
+			Digest:  payloadDigest, BuildDigest: expected.BuildDigest, ImageIndex: observation.ImageIndex.Clone(), Components: append([]string(nil), components...)}
 		outputs = append(outputs, bound)
 	}
 	sort.Slice(outputs, func(i, j int) bool { return outputs[i].Name < outputs[j].Name })
@@ -463,7 +467,7 @@ func ValidateLifecycleOutputs(expected []LifecycleOutputPlan, observed []Lifecyc
 	outputs := make(map[string]LifecycleBoundOutput, len(observed))
 	for _, output := range observed {
 		if _, exists := outputs[output.Name]; exists || lifecyclePackageKind(output.Kind) == "" || !canonical.IsDigest(output.Digest) ||
-			!canonical.IsDigest(output.BuildDigest) || (output.Kind != "helm-oci" && len(output.Components) == 0) {
+			!canonical.IsDigest(output.BuildDigest) || (output.Kind != "helm-oci" && output.Derived == nil && len(output.Components) == 0) {
 			return e.New(e.CodeVerifyFailed, "lifecycle outputs are not unique exact payload bindings")
 		}
 		if err := output.Validate(); err != nil {
@@ -496,7 +500,7 @@ func ValidateLifecycleOutputs(expected []LifecycleOutputPlan, observed []Lifecyc
 				}
 			}
 		}
-		if !ok || got.Kind != want.Kind || got.BuildDigest != want.BuildDigest || !equalFactoryStrings(got.Components, want.Components) {
+		if !ok || got.Kind != want.Kind || got.BuildDigest != want.BuildDigest || !equalFactoryStrings(got.Components, want.Components) || !reflect.DeepEqual(got.Derived, want.Derived) {
 			return e.New(e.CodeVerifyFailed, "lifecycle output %q changes its build or component binding", want.Name)
 		}
 	}

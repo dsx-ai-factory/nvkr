@@ -8,7 +8,7 @@ vocabulary preserves the distinctions needed to authenticate them.
 
 **Definition**:
 Authored product intent declaring named outputs, their exact catalog producers, target platforms and packaging
-intent. An output directly selects components. Packaging intent may bind catalog-declared Helm image slots to named image outputs; the resulting digest is content, while its
+intent. An ordinary output directly selects components. Packaging intent may bind catalog-declared Helm image slots to named image outputs; the resulting digest is content, while its
 deployment repository remains transport configuration. Catalog-owned digest representation
 may retain the full OCI digest or supply SHA-256 hex to a template that owns the algorithm prefix;
 this does not change the authenticated image identity or rewrite templates.
@@ -64,6 +64,8 @@ _Avoid_: Producer, expected output, release
 
 **OCI bundle**:
 A generic archive artifact carrying a pinned producer's rendered files, including AICR deployment bundles.
+A release-derived inventory bundle may instead be owned by a composite and describe named member outputs
+after their packaging. Its declaration and composite attribution are identity-bound.
 The OCI manifest identifies the output; the archive and its file inventory retain separate exact byte bindings.
 Rendering and file integrity do not establish deployed dependency closure or hardware compatibility.
 _Avoid_: Native Helm chart, container image, cluster topology, new lifecycle object
@@ -122,6 +124,13 @@ A Definition's declaration of exact selected producers, concrete target platform
 platform set, and the artifact format they must produce. Each named output is an independent required use, even when two outputs share a Build Digest.
 _Avoid_: Observed artifact, delivery route
 
+**Release-derived output**:
+An explicitly selected packaging derivation from authenticated named sibling results. The first admitted
+encoding is an AICR inventory in a bundle. Its logical identity binds the publication prefix, encoding and
+sibling Build identities; runtime package digests enter the payload. It is re-derived for a new destination
+and becomes an ordinary required, signed Release member. Topology and installation remain downstream.
+_Avoid_: Release readback, unsigned description, source producer
+
 **Disk-image output**:
 A named output containing exactly one disk-producing catalog root plus every explicitly selected component in
 that root's material closure. The disk format and encryption metadata describe the delivered bytes independently
@@ -158,7 +167,8 @@ _Avoid_: Authored selection group, artifact, release
 **Build Digest**:
 The typed identity of a generated build graph's transport-independent logical content under `nvkr.build`.
 Output names and execution settings are bound by their
-owning records and excluded from this identity. Equal Build Digests do not merge required output uses or their evidence.
+owning records and excluded from ordinary producer identity. Release-derived outputs use the distinct
+tagged derivation projection under the same typed family (ADR-20), including the publication prefix. Equal Build Digests do not merge required output uses or their evidence.
 `nvkr.recipe` is reserved and never minted. Historical `nkd.recipe` signed bytes are not renamed or converted.
 _Avoid_: Artifact digest, graph-file hash
 

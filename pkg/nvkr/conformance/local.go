@@ -96,6 +96,7 @@ func localView(description lifecycle.LocalDiagnosticDescription, bindings []Loca
 			Name: output.Name, Kind: output.Kind, Subject: output.Digest,
 			BuildDigest: output.BuildDigest, Platform: output.OS + "/" + output.Arch,
 			ImageIndex: output.ImageIndex, BuildSubjects: output.BuildSubjects,
+			Derived: output.Derived.Clone(),
 		})
 	}
 	for _, binding := range bindings {
