@@ -14,11 +14,11 @@ workflows; consumers verify the results with standard tooling and no NVKR softwa
 **Facts the specification rests on.**
 - The NVKE OS image build bakes in Kubernetes (node side and control-plane images), CNI, and node-agent. NVKR wraps
   that build using selected material producers; embedded components need not be separately delivered.
-  M2 and the M3 MVP require exact-subject producer provenance. Full-disk inventory and material reconciliation
+  NVKE and the M3 MVP require exact-subject producer provenance. Full-disk inventory and material reconciliation
   are deferred hardening. Embedded-component declarations are optional; if authored, they must match their
   referenced pinned upstream metadata. Omission is not applicable. The comparison does not establish customized
   or installed composition; the NVKE OS image build team owns embedded software correctness and runtime validation.
-- V1 production acceptance retains its AMD64-only product floor. M2 requires producer provenance; M3 adds
+- V1 production acceptance retains its AMD64-only product floor. NVKE requires producer provenance; M3 adds
   authenticated build/evidence checks while retaining producer-only disk scope. The
   approved initial scope
   defers strict inspection and material reconciliation; scope approval is not organizational ADR ratification.
@@ -42,7 +42,7 @@ workflows; consumers verify the results with standard tooling and no NVKR softwa
   publication plus qualification identity and verdicts, manifest membership and revocation state; the M3/M4
   scope). An unavailable scope fails; it never falls back to the weaker one.
 - Every built artifact has a per-artifact software bill of materials (CycloneDX), bound to the observed digest
-  and published as a signed attestation. M2 disk documents describe exact producer/material subjects and state
+  and published as a signed attestation. NVKE disk documents describe exact producer/material subjects and state
   that disk inspection was not performed; M3 preserves that explicit scope. The signed release
   index binds required evidence membership; Run completion is a separate record. SBOMs verify no upstream signature.
 - Workflows use generic GitHub-hosted runners, with only the narrowly admitted operator-trusted native
@@ -89,17 +89,17 @@ separately delivered artifact is signed and attested; the Release binds exact na
 |---|---|---|
 | GitHub workflow generator | NVKR | Committed workflows / M1 |
 | NVKE CLI | Pinned NVKE source, hermetic build | OCI executable package / M1 |
-| nvke-agent | NVKE OS build | Inside OS image / M2 |
-| CWE controller | Pinned NVKE build; recorded acquisition fallback | OCI image / M2 |
-| NVKE container images | OS-embedded or separately built/acquired, enumerated in Definition | Inside OS image or OCI images / M2 |
-| NVKE OS image | Pinned wrapped NVKE build; recorded prebuilt-image fallback | OCI disk-image artifact / M2 |
-| Kubernetes node and control-plane components | NVKE OS build | Inside OS image / M2 |
-| CNI | NVKE OS build | Inside OS image / M2 |
-| Helm | Digest-pinned acquisition | Operator tooling package / M2 |
-| Spire-agent | Placement decision: embedded or acquired | Inside OS image or OCI artifact / M2 |
-| Third-party container images | Digest-pinned acquisition when outside OS image | OCI images / M2 |
-| NVKE Helm charts | Pinned chart sources | OCI packages / M2 |
-| Operator tooling | Acquired kubectl and Helm | OCI package / M2 |
+| nvke-agent | NVKE OS build | Inside OS image / artifact breadth |
+| nvke-controller | Pinned NVKE build; recorded acquisition fallback | OCI image / artifact breadth |
+| NVKE container images | OS-embedded or separately built/acquired, enumerated in Definition | Inside OS image or OCI images / artifact breadth |
+| NVKE OS image | Pinned wrapped NVKE build; recorded prebuilt-image fallback | OCI disk-image artifact / artifact breadth |
+| Kubernetes node and control-plane components | NVKE OS build | Inside OS image / artifact breadth |
+| CNI | NVKE OS build | Inside OS image / artifact breadth |
+| Helm | Digest-pinned acquisition | Operator tooling package / artifact breadth |
+| Spire-agent | Placement decision: embedded or acquired | Inside OS image or OCI artifact / artifact breadth |
+| Third-party container images | Digest-pinned acquisition when outside OS image | OCI images / artifact breadth |
+| NVKE Helm charts | Pinned chart sources | OCI packages / artifact breadth |
+| Operator tooling | Acquired kubectl and Helm | OCI package / artifact breadth |
 | AICR deployment bundles | Pinned AICR source and explicit recipe selection | OCI bundle or genuine Helm chart / additional selected outputs |
 
 A deferred member stays explicit in authored requirements and planning; the M3 MVP accepts no waivers and
@@ -192,12 +192,12 @@ any CI engine other than GitHub Actions.
 
 ---
 
-## Epic M2 — Breadth
+## Artifact breadth
 
 **Goal.** The in-scope AMD64 artifact set is delivered, including
 the native AMD64 NVKE OS image built from its pinned source and published as a signed disk-image
 artifact with exact-subject producer provenance and authenticated material evidence. The image already contains
-Kubernetes (node side and control-plane images), CNI, and node-agent. Around it: the CWE controller image and the
+Kubernetes (node side and control-plane images), CNI, and node-agent. Around it: the nvke-controller image and the
 NVKE cluster images that are not baked into the OS image (enumerated by name in the Definition by the source owner), the operator tooling package, and chart packages. The Release binds
 these named outputs to the exact delivered artifacts.
 
@@ -214,7 +214,7 @@ these named outputs to the exact delivered artifacts.
 - **The OS image artifact.** One AMD64 disk-image artifact, with provenance naming the NVKE
   commit and tree hash. Pushed as a single-layer artifact if the registry's blob limit permits,
   otherwise chunked, with the whole-image digest in the run record and provenance.
-  M2 binds those bytes to the successful producer and authenticated materials. M3 retains that producer-only
+  NVKE binds those bytes to the successful producer and authenticated materials. M3 retains that producer-only
   scope; installed-content inventory and reconciliation are deferred hardening. NVKE owns the correctness and runtime
   validation of embedded software; NVKR attests production and composition under the admitted evidence contract.
   Matching dependency or inventory evidence never promotes this wrapped disk to a reproduction claim.
@@ -224,7 +224,7 @@ these named outputs to the exact delivered artifacts.
   remain bound to production evidence. An embedded-component metadata declaration is optional. If
   authored, its complete member list, versions and known source pins must match the referenced upstream metadata
   at the pinned commit; omission is not applicable. This comparison does not apply build customizations or
-  establish installed contents. M2 and M3 MVP producer evidence report inspection as not performed. Read-only
+  establish installed contents. NVKE and M3 MVP producer evidence report inspection as not performed. Read-only
   final-disk inspection and material reconciliation remain deferred hardening.
 - **Image and blob publication.** Pushing container-image layouts by digest with the pinned digest preserved,
   and raw blobs (tarballs, images) as OCI artifacts; every push refuses to move an existing tag to a different
@@ -253,7 +253,7 @@ An additional architecture selected by a Definition remains subject to the same 
 **Pre-authorized fallbacks.** Mirror the prebuilt signed QCOW2 by digest (`acquired`) if the OS build cannot run
 on an admitted execution route. The acquired-disk fallback must preserve the exact acquired bytes and carry
 acquisition provenance; M3 preserves the producer-only scope without claiming disk inspection.
-Mirror NVKE-published CWE and NVKE images (`acquired`) instead of building them. Enclose chart
+Mirror NVKE-published nvke-controller and NVKE images (`acquired`) instead of building them. Enclose chart
 tarballs in the signed package instead of publishing CNCF OCI charts. Any approved deferred artifact remains
 explicit in the requirements and planning with its reason and decision. Every selected output must complete
 before the M3 MVP can pass; it accepts no qualification waivers. A missing required output still makes its Run
@@ -261,8 +261,8 @@ incomplete; a build failure cannot create an implicit deferral.
 
 **Acceptance criteria**
 1. The native AMD64 OS image is published as one signed, attested disk-image artifact built from its pinned NVKE commit. Its provenance identifies the source commit, tree hash and wrapped-build scope; exact-subject producer/material evidence and consumer verification succeed. An admitted acquired-disk fallback preserves the pinned bytes and carries acquisition provenance. Inspection is reported honestly and is outside the M3 MVP. Any additional disk selected by the Definition independently satisfies the same delivery and evidence checks.
-2. Every artifact-matrix row assigned to M2 that is not inside the OS image and not deferred by a recorded decision (CWE controller, NVKE container images, Helm, spire-agent if acquired, third-party images, NVKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. Each selected disk's provenance binds its selected source and material inputs; every required inside-image component is accounted for in those production inputs. Missing producer/material evidence or a digest mismatch fails acceptance; producer-only evidence cannot claim an inspected inventory.
-3. CWE controller and NVKE container images are either built (`wrapped-build`, provenance naming the NVKE commit and tree hash) or, under the Sep 10 fallback, mirrored by digest and recorded as `acquired`. For each CWE, NVKE, and third-party image, `docker pull` by digest succeeds and `cosign verify` passes. A second default-branch run with no pin changes skips every already-present image and blob (each skip in the run log) and every pre-existing tag resolves to the same digest afterwards.
+2. Every artifact-matrix row assigned to artifact breadth that is not inside the OS image and not deferred by a recorded decision (nvke-controller, NVKE container images, Helm, spire-agent if acquired, third-party images, NVKE chart packages, operator tooling package) is published under a digest-pinned reference, signed, carries provenance for its source lane, passes the workflow's verification step, and passes consumer verification. Every acquired artifact's lockfile pin equals its published digest; every built artifact's run-record digest equals its published digest. Each selected disk's provenance binds its selected source and material inputs; every required inside-image component is accounted for in those production inputs. Missing producer/material evidence or a digest mismatch fails acceptance; producer-only evidence cannot claim an inspected inventory.
+3. nvke-controller and NVKE container images are either built (`wrapped-build`, provenance naming the NVKE commit and tree hash) or, under the Sep 10 fallback, mirrored by digest and recorded as `acquired`. For each nvke-controller, NVKE, and third-party image, `docker pull` by digest succeeds and `cosign verify` passes. A second default-branch run with no pin changes skips every already-present image and blob (each skip in the run log) and every pre-existing tag resolves to the same digest afterwards.
 4. The operator tooling package is published as one signed, attested OCI artifact and passes consumer verification. The same Run's Release binds every required output to its exact published digest and evidence. Consumer verification rejects any missing, extra or substituted output. An approved deferred artifact remains explicitly recorded in the requirements and qualification evidence; it cannot be reported as a successful output.
 5. Criteria 1-4 are satisfied by a single default-branch run identified by one run URL. Partial retries may retain authenticated successful outputs from earlier attempts of that run, with unchanged inputs and original evidence. Artifacts from different runs cannot be combined to satisfy this criterion.
 
@@ -441,7 +441,7 @@ anti-rollback guarantees on revocation; cluster-scoped qualification.
 
 ## Shared dependencies and limits
 
-M1 precedes M2 artifact delivery; M3 needs their signed artifacts, and M4 needs the qualification gate.
+M1 precedes NVKE artifact delivery; M3 needs their signed artifacts, and M4 needs the qualification gate.
 Independent reviews, decision ratification and scoped evidence are required at every stage.
 
 | Owner | Required decision or evidence |

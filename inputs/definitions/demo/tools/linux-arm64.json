@@ -1,7 +1,7 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
   "catalog": {
-    "base": "../../../catalogs/tools/native"
+    "base": "../../../catalogs/tools"
   },
   "kind": "Definition",
   "metadata": {
@@ -10,16 +10,16 @@
   "outputs": [
     {
       "components": [
-        "clusterctl-linux",
-        "helm-linux",
-        "kind-linux",
-        "kubectl-linux",
+        "clusterctl",
+        "helm",
+        "kind",
+        "kubectl",
         "nerdctl",
         "nico-sim",
         "nico-simctl",
         "nvke-installer-sources",
         "nvkectl",
-        "oras-linux"
+        "oras"
       ],
       "format": "executable",
       "name": "native-tools-linux-arm64",

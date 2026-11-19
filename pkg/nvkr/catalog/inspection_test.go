@@ -38,7 +38,7 @@ func TestDescribeStackMatchesLocalLoader(t *testing.T) {
 
 func TestDescribeStackPinSetsStayOffline(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	got, err := DescribeStackContext(t.Context(), "../../../inputs", "catalogs/nvke/release", nil)
+	got, err := DescribeStackContext(t.Context(), "../../../inputs", "catalogs/nvke", nil)
 	if err != nil {
 		t.Fatal(err)
 	}

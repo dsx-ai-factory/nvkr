@@ -10,7 +10,7 @@ from pathlib import Path
 import subprocess
 import sys
 
-GROUPS = ["main", "nightly", "split", "gpu-site", "development"]
+GROUPS = ["main", "nightly", "development"]
 
 
 def load_inventory(root):

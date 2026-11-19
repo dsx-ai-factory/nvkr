@@ -15,17 +15,19 @@ import (
 // The mirror must reach the source-authored vendor command: the isolated
 // vendoring container does not inherit the outer job's environment.
 func TestNVKECalicoVendorMirror(t *testing.T) {
-	for _, data := range []string{
-		"../../../inputs/catalogs/node-images/release",
-		"../../../inputs/catalogs/node-images/diagnostic",
-		"../../../inputs/experiments/nvsentinel/catalog",
+	for _, tc := range []struct {
+		data, producer string
+	}{
+		{"../../../inputs/catalogs/node-images", "nvke-cni-calico"},
+		{"../../../inputs/catalogs/node-images", "nvke-cni-calico-diagnostic"},
+		{"../../../inputs/experiments/nvsentinel/catalog", "nvke-cni-calico"},
 	} {
-		t.Run(data, func(t *testing.T) {
-			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(data))
+		t.Run(tc.data+"/"+tc.producer, func(t *testing.T) {
+			cat, err := catalog.LoadContext(t.Context(), catalog.Dir(tc.data))
 			if err != nil {
 				t.Fatal(err)
 			}
-			component, ok := cat.Components["nvke-cni-calico"]
+			component, ok := cat.Components[tc.producer]
 			if !ok {
 				t.Fatal("Calico producer is missing")
 			}
@@ -33,7 +35,7 @@ func TestNVKECalicoVendorMirror(t *testing.T) {
 				t.Run(arch, func(t *testing.T) {
 					graph := mustCompile(t, &Resolved{
 						Platform:   "linux/" + arch,
-						Components: []catalog.NamedComponent{{Name: "nvke-cni-calico", Component: component}},
+						Components: []catalog.NamedComponent{{Name: tc.producer, Component: component}},
 					})
 					want := []string{"bash", "-ec", "CNI_DOCKERHUB_MIRROR=mirror.gcr.io make -C os-image/packages/cni-calico bundle nfpm \\\n  ARCH=" + arch + " BIN_DIR=/usr/local/bin NFPM_BIN=/usr/local/bin/nfpm\n"}
 					found := false

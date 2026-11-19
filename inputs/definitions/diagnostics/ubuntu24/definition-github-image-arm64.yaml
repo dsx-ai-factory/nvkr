@@ -2,29 +2,31 @@
 # SPDX-License-Identifier: Apache-2.0
 
 apiVersion: nvkr.dev/definition/v5
+catalog:
+  base: ../../../catalogs/nvke
 kind: Definition
 metadata:
-  name: nvke-os-ubuntu24-image-arm64
   description: Build one Ubuntu 24.04.5 native plain disk; build-only candidate.
-catalog:
-  base: ../../../catalogs/nvke/module-tags
+  name: nvke-os-ubuntu24-image-arm64
 outputs:
-  - name: nvke-node-image-ubuntu24-arm64
-    platform: linux/arm64
-    format: disk-image
-    catalog:
-      base: ../../../catalogs/node-images/release
-      overlays: [../../../catalogs/node-images/variants/native-toolchains.yaml, ../../../catalogs/node-images/variants/ubuntu24.json]
-    components:
-      - nvke-agent
-      - nvke-cni-calico
-      - nvke-cni-ovn
-      - nvke-doca-ovs
-      - nvke-image-inputs
-      - nvke-kubeadm-distro
-      - nvke-node-image
-      - nvke-patched-installer-iso
-      - nvke-spire-agent
-      - ovn-kube-ubuntu
-      - ovn-kubernetes-chart
-      - ubuntu-installer-iso
+- catalog:
+    base: ../../../catalogs/node-images
+    overlays:
+    - ../../../catalogs/node-images/variants/native-toolchains.yaml
+    - ../../../catalogs/node-images/variants/ubuntu24.json
+  components:
+  - nvke-agent
+  - nvke-cni-calico
+  - nvke-cni-ovn
+  - nvke-doca-ovs
+  - nvke-image-inputs
+  - nvke-kubeadm-distro
+  - nvke-node-image
+  - nvke-patched-installer-iso
+  - nvke-spire-agent
+  - ovn-kube-ubuntu
+  - ovn-kubernetes-chart
+  - ubuntu-installer-iso
+  format: disk-image
+  name: nvke-node-image-ubuntu24-arm64
+  platform: linux/arm64

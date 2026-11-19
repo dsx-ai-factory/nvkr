@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# Retained comparison/authoring fixture; not enrolled in maintained generation.
+
 apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
@@ -19,7 +21,7 @@ githubRunners:
 publication:
   mode: per-output-v1
   credentialRef: github:NVKR_REGISTRY_WRITE
-  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate/telemetry
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/candidate/telemetry
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared

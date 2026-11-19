@@ -12,8 +12,8 @@ import (
 
 func TestPublishImageExportRejectsUnboundInputs(t *testing.T) {
 	for _, args := range [][]string{
-		{"publish", "image-export", "--layout", "missing", "--object", "cwe", "--out", "image.tar"},
-		{"publish", "image-export", "--layout", "missing", "--object", "cwe", "--reference", "registry.example.test/cwe:latest", "--out", "image.tar"},
+		{"publish", "image-export", "--layout", "missing", "--object", "nvke-controller", "--out", "image.tar"},
+		{"publish", "image-export", "--layout", "missing", "--object", "nvke-controller", "--reference", "registry.example.test/nvke-controller:latest", "--out", "image.tar"},
 	} {
 		t.Run(args[len(args)-1], func(t *testing.T) {
 			t.Chdir(t.TempDir())

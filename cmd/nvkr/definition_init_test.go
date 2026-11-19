@@ -20,19 +20,19 @@ import (
 
 func initOperatorArgs(t *testing.T, extra ...string) []string {
 	t.Helper()
-	catalog, err := filepath.Abs(filepath.Join("..", "..", "inputs", "catalogs", "tools", "operator-arm64"))
+	catalog, err := filepath.Abs(filepath.Join("..", "..", "inputs", "catalogs", "tools"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	return append([]string{"nvkr", "definition", "init", "--root", filepath.Clean(filepath.Join(catalog, "..", "..", "..", "..")), "--destination", "starter.yaml", "--name", "my-tools", "--catalog", catalog, "--platform", "linux/arm64"}, extra...)
+	return append([]string{"nvkr", "definition", "init", "--root", filepath.Clean(filepath.Join(catalog, "..", "..", "..")), "--destination", "starter.yaml", "--name", "my-tools", "--catalog", catalog, "--platform", "linux/arm64"}, extra...)
 }
 
 func TestDefinitionInitPrintsAValidatableDefinitionAndNothingElse(t *testing.T) {
-	first, err := runCLIWithCapturedStdout(t, newApp(), initOperatorArgs(t, "--component", "kubectl", "--component", "helm")...)
+	first, err := runCLIWithCapturedStdout(t, newApp(), initOperatorArgs(t, "--component", "kubectl-operator", "--component", "helm-operator")...)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := runCLIWithCapturedStdout(t, newApp(), initOperatorArgs(t, "--component", "helm", "--component", "kubectl")...)
+	second, err := runCLIWithCapturedStdout(t, newApp(), initOperatorArgs(t, "--component", "helm-operator", "--component", "kubectl-operator")...)
 	if err != nil || string(first) != string(second) {
 		t.Fatalf("output depends on flag order: %v\n%s\n%s", err, first, second)
 	}
@@ -44,7 +44,7 @@ func TestDefinitionInitPrintsAValidatableDefinitionAndNothingElse(t *testing.T) 
 	if err != nil {
 		t.Fatalf("emitted Definition does not load: %v\n%s", err, first)
 	}
-	if len(loaded.Outputs) != 1 || strings.Join(loaded.Outputs[0].Components, ",") != "helm,kubectl" {
+	if len(loaded.Outputs) != 1 || strings.Join(loaded.Outputs[0].Components, ",") != "helm-operator,kubectl-operator" {
 		t.Fatalf("unexpected output selection: %+v", loaded.Outputs)
 	}
 	validated, err := runCLIWithCapturedStdout(t, newApp(), "nvkr", "definition", "validate", "--definition", path)
@@ -60,11 +60,11 @@ func TestDefinitionInitRefusalsPrintNoYAML(t *testing.T) {
 		code  e.Code
 	}{
 		{"unknown component", []string{"--component", "nope"}, e.CodeInvalidCatalog},
-		{"duplicate component", []string{"--component", "helm", "--component", "helm"}, e.CodeUsage},
-		{"unsupported platform", []string{"--platform", "linux/amd64", "--component", "helm"}, e.CodeEngineCapability},
-		{"unclassified producer image", []string{"--catalog", "../../inputs/catalogs/nicosim", "--component", "nico-sim-runtime-assets"}, e.CodeEngineCapability},
-		{"outside root", []string{"--destination", "../outside.yaml", "--component", "helm"}, e.CodeUsage},
-		{"unexpected argument", []string{"--component", "helm", "extra"}, e.CodeUsage},
+		{"duplicate component", []string{"--component", "helm-operator", "--component", "helm-operator"}, e.CodeUsage},
+		{"unsupported platform", []string{"--platform", "darwin/arm64", "--component", "helm-operator"}, e.CodeEngineCapability},
+		{"unclassified producer image", []string{"--catalog", "../../inputs/catalogs/tools", "--component", "nico-sim-runtime-assets-nicosim"}, e.CodeEngineCapability},
+		{"outside root", []string{"--destination", "../outside.yaml", "--component", "helm-operator"}, e.CodeUsage},
+		{"unexpected argument", []string{"--component", "helm-operator", "extra"}, e.CodeUsage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			output, err := runCLIWithCapturedStdout(t, newApp(), initOperatorArgs(t, tc.extra...)...)
@@ -77,7 +77,7 @@ func TestDefinitionInitRefusalsPrintNoYAML(t *testing.T) {
 }
 
 func TestDefinitionInitMissingFlagIsCodedAndPrintsNothing(t *testing.T) {
-	full := initOperatorArgs(t, "--component", "helm")[3:]
+	full := initOperatorArgs(t, "--component", "helm-operator")[3:]
 	for _, flag := range []string{"--name", "--catalog", "--platform", "--component", "--destination"} {
 		t.Run(flag, func(t *testing.T) {
 			args := []string{"nvkr", "definition", "init"}
@@ -96,7 +96,7 @@ func TestDefinitionInitMissingFlagIsCodedAndPrintsNothing(t *testing.T) {
 }
 
 func TestDefinitionInitTUIPrintsNoYAML(t *testing.T) {
-	output, err := runCLIWithCapturedStdout(t, newApp(), initOperatorArgs(t, "--component", "helm", "--ui=tui")...)
+	output, err := runCLIWithCapturedStdout(t, newApp(), initOperatorArgs(t, "--component", "helm-operator", "--ui=tui")...)
 	assertLifecycleCommandCode(t, err, e.CodeUsage)
 	if len(output) != 0 {
 		t.Fatalf("rejected viewer printed %q", output)
@@ -124,7 +124,7 @@ func TestDefinitionInitTUIShowsTheSelectionAndPrintsNoYAML(t *testing.T) {
 		status    string
 		code      e.Code
 	}{
-		{"admitted", "helm", "complete", ""},
+		{"admitted", "helm-operator", "complete", ""},
 		{"refused", "nope", "failed", e.CodeInvalidCatalog},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -151,7 +151,7 @@ func TestDefinitionInitTUIShowsTheSelectionAndPrintsNoYAML(t *testing.T) {
 				for _, field := range shown.Fields {
 					fields[field.Label] = field.Value
 				}
-				if fields["Name"] != "my-tools" || fields["Platform"] != "linux/arm64" || fields["Components"] != "helm" || filepath.IsAbs(fields["Catalog"]) {
+				if fields["Name"] != "my-tools" || fields["Platform"] != "linux/arm64" || fields["Components"] != "helm-operator" || filepath.IsAbs(fields["Catalog"]) {
 					t.Fatalf("unexpected fields: %+v", shown.Fields)
 				}
 			}

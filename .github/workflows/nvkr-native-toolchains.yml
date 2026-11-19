@@ -110,7 +110,7 @@ jobs:
           --proposal ".nvkr/native-toolchains/$NATIVE_ARCH/proposal.json"
       - name: Retain native measurements
         if: always() && steps.ci-helper.outcome == 'success'
-        uses: ./.github/nvkr-run/actions/ci-upload
+        uses: ./.github/nvkr-run-nvke/actions/ci-upload
         env:
           NVKR_CI_STORAGE_WRITE_USER: ${{ vars.NVKR_CI_STORAGE_WRITE_USER }}
         with:
@@ -139,6 +139,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # 7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e  # 7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Build Plan inspection helper
+        timeout-minutes: 5
+        env:
+          GOTOOLCHAIN: local
+        run: CGO_ENABLED=0 go build -trimpath -o "$RUNNER_TEMP/nvkr-plan-inspect" ./cmd/nvkr
       - name: Select committed image pins
         id: pins
         timeout-minutes: 1
@@ -146,9 +155,14 @@ jobs:
           NATIVE_ARCH: ${{ matrix.arch }}
         run: |
           set -euo pipefail
-          plan=.github/nvkr-run/plan.json
+          "$RUNNER_TEMP/nvkr-plan-inspect" run plan \
+            --plan .github/nvkr-run-nvke/plan.json --json \
+            > "$RUNNER_TEMP/native-toolchain-plan.json"
+          plan="$RUNNER_TEMP/native-toolchain-plan.json"
           platform="linux/$NATIVE_ARCH"
           repository=ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains
+          # jq evaluates variables inside its quoted program.
+          # shellcheck disable=SC2016
           packer=$(jq -er --arg platform "$platform" \
             --arg repository "$repository/packer-native@" '
             [.builds[] | select(.platform == $platform) |
@@ -158,6 +172,10 @@ jobs:
             if length == 1 then .[0]
             else error("expected one selected Packer image") end
           ' "$plan")
+          case "$packer" in
+            "$repository/packer-native@sha256:"*) ;;
+            *) echo 'unexpected Packer repository' >&2; exit 1 ;;
+          esac
           inspector=$(jq -er --arg platform "$platform" \
             '.environment.diskInspectionProfiles[$platform].image' "$plan")
           case "$inspector" in
@@ -238,7 +256,7 @@ jobs:
           GOTOOLCHAIN: local
         run: go build -trimpath -o nvkr-exec ./cmd/nvkr
       - name: Restore exact AMD64 preparation attempt
-        uses: ./.github/nvkr-run/actions/ci-download
+        uses: ./.github/nvkr-run-nvke/actions/ci-download
         env:
           NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
         with:
@@ -248,7 +266,7 @@ jobs:
           run-id: ${{ inputs.approval_run }}
           attempt: ${{ needs.admit.outputs.attempt }}
       - name: Restore exact ARM64 preparation attempt
-        uses: ./.github/nvkr-run/actions/ci-download
+        uses: ./.github/nvkr-run-nvke/actions/ci-download
         env:
           NVKR_CI_STORAGE_READ_USER: ${{ vars.NVKR_CI_STORAGE_READ_USER }}
         with:
