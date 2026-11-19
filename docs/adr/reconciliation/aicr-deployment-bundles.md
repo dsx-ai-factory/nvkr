@@ -2,7 +2,7 @@
 
 ADR-25's `bundle-oci` path is implemented through the existing Definition → Run → Release owners.
 Eight source-built components each supply one gzip tar archive; GB300 generic training Flux instead
-selects a pinned-tool layout root and its explicit recipe-file material. The eight source producers build `v1.2.0`,
+selects a pinned-tool layout root and its explicit recipe-file material. The eight source producers pin `v1.3.0`,
 render with `--output oci-layout:<dir>` and emit the layout's single layer, so the archive is the one AICR
 packaged rather than an NVKR repack. Delivery preserves its exact bytes
 in an OCI artifact; independent output observation reconstructs the wrapper from that output's producer.
@@ -17,14 +17,15 @@ root must hold only the layout entries and exactly one pinned OCI image manifest
 one gzip tar layer, an artifact type on the import allowlist (initially
 `application/vnd.nvidia.aicr.artifact`), and no unreachable blobs. The layer must also pass the bounded
 archive reader, all before output work. Contract tests import a layout copied from AICR v1.1.2's own
-registry push with the same manifest digest, and they refuse each malformed shape with no output. The GB300 generic training Flux output now uses this import with the released AICR v1.2.0 ARM64 executable.
+registry push with the same manifest digest, and they refuse each malformed shape with no output. The GB300 generic training Flux output now selects this import with the released AICR v1.3.0 ARM64 executable.
 Its separate recipe producer supplies a regular-file material. Factory validates the captured layer with fixed
 `aicr verify` arguments through the same pinned tool/image, offline and bounded, before accepting the layout
 producer result. Packaging rechecks both the validation subjects and the material manifest. Publication
 preserves the original manifest digest and retains original index bytes to bind it to its build subject.
 Recipe composition, layout file inventory and final package inventory occupy separate evidence slots.
 The other eight components continue emitting their original layer into NVKR's wrapper. Historical source-built
-runs below do not establish acceptance of the converted pinned-tool path.
+runs below do not establish acceptance of the current v1.3.0 pin. Its source/tool pins and generated
+bundles are refreshed; no v1.3.0 producer execution is recorded here.
 
 The [focused AICR example](../../../inputs/definitions/aicr/README.md) retains one GB300
 selection across six renderer formats and one local build-only Environment. A second Definition

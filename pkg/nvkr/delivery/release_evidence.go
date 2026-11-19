@@ -28,7 +28,7 @@ func verifyReleaseEvidence(ctx context.Context, root string, publication Publica
 }
 
 // sources receives descriptions from the same exact subject documents checked
-// for release membership. Nothing escapes an inspection unless every slot passes.
+// for release membership. This full path checks every slot before returning.
 func verifyReleaseEvidenceSources(ctx context.Context, root string, publication PublicationRoot, sources map[string]PublicationSource) error {
 	return verifySelectedReleaseEvidenceSources(ctx, root, publication, sources, nil)
 }
@@ -36,6 +36,8 @@ func verifyReleaseEvidenceSources(ctx context.Context, root string, publication 
 // A non-nil selection limits physical document checks, never logical membership
 // validation. Shared evidence retains every original named use; an unselected
 // payload or binary config is not required to authenticate a selected use.
+// Unselected evidence receives no source description: omission means unchecked,
+// not a verified statement that the evidence has no source-built subject.
 func verifySelectedReleaseEvidenceSources(ctx context.Context, root string, publication PublicationRoot, sources map[string]PublicationSource, selection metadataSelection) error {
 	if publication.Release == nil {
 		return nil
