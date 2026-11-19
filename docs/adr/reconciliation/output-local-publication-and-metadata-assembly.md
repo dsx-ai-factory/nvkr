@@ -470,8 +470,8 @@ longer possible. The Run ended with 488 successful, 90 canceled and two failed j
 failure was the finalizer's expected rejection of the incomplete provider closure. No aggregate acceptance
 follows from this Run.
 
-The bootstrap now separates credential-free public dependency acquisition from a single offline compiler
-invocation. Only the exact observed module-proxy ZIP error permits up to three acquisition attempts, with
+The historical Python bootstrap separated credential-free public dependency acquisition from a single offline compiler
+invocation. Only the exact observed module-proxy ZIP error permitted up to three acquisition attempts, with
 bounded waits and one shared deadline. Disposable copies of the two small dependency manifests prevent
 checkout normalization and must remain exact. Unknown or integrity failures and compiler failures do not
 retry. This does not replay producer, publication or evidence operations. Focused contract source and
@@ -481,6 +481,26 @@ exact, and the supervisor removed its caches. This did not inject or exercise th
 four-bundle regeneration/drift, Actionlint, YAML, Python syntax, shell, formatting, license and diff checks
 passed; the vulnerability scan found no vulnerabilities. Entry workflows and job counts are unchanged.
 Unit/race/Python suites remain skipped; hosted acceptance of this bootstrap change remains open.
+
+The current generator replaces that Python supervisor with a shell retry loop and coreutils timeout.
+It permits three immediate dependency-download attempts for any failure, then one offline read-only
+build. Go download diagnostics are now emitted without JSON error filtering or backoff. The environment
+allow-list and published-module pin checks remain. Regular/non-symlink manifest pathname checks and a
+4 MiB per-file bound precede pristine snapshots; source and private Go inputs must match those snapshots.
+Pathname checks do not preserve the former atomic no-follow open against a concurrent same-user writer.
+Step-shell INT/TERM is forwarded to timeout and joined before cache cleanup; Go stdin is `/dev/null`, and
+compiler exit statuses are normalized to build failures. The 900-second deadline has five seconds of kill escalation. The former
+4 MiB captured-output bound and successful-exit descendant supervision are not retained. Focused shell
+contracts cover retries, credentials, cache cleanup, module pins and deadline escalation. All three
+maintained bundles were regenerated from their authored inventory and checked byte-for-byte. Their
+identical 65-line bootstrap scripts pass ShellCheck and YAML lint; the three workflows pass Actionlint.
+The bootstrap contracts passed three race-instrumented repetitions on macOS, including step-shell
+INT/TERM cancellation (including interrupted cleanup with one retry), cleanup failure, stdin-consuming children, signal-killed compilation, simultaneous source/private
+manifest changes, non-regular/symlink/oversized manifests and missing tool capabilities. The deadline
+fixture delivers coreutils' timer signal only after descendant readiness, removing host startup contention
+from its assertion; its leader and descendant loops have a separate 120-second fallback bound.
+The broader local merge gate was not run because validation was limited to focused checks. No hosted
+acceptance or reduction in per-job compilation time is claimed.
 
 The current split transport exports the twelve admitted metadata families directly through Actions,
 including metadata-only OCI controls, while binary/source/tool carriers and unknown/mixed contents remain
