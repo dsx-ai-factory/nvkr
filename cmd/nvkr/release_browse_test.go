@@ -158,7 +158,7 @@ func TestReleaseVerifyForwardsCompleteExactInputsToLifecycleUseCase(t *testing.T
 		"--reference", reference,
 		"--lane", "pipeline-attested", "--scope", "artifact-publication",
 		"--identity", "^builder$", "--issuer", "issuer", "--anonymous",
-		"--definition", "inputs/definitions/nvke/nvke.composite.yaml",
+		"--definition", "inputs/definitions/nvke/nvke-release.composite.yaml",
 		"--environment", "inputs/environments/github-nvke.yaml",
 		"--plan", ".github/nvkr-run-nvke/plan.json",
 	}
@@ -198,7 +198,7 @@ func TestReleaseVerifyForwardsDiskEvidencePolicyWithExactInputs(t *testing.T) {
 				"--reference", "registry.example.test/releases@sha256:" + strings.Repeat("a", 64),
 				"--lane", "pipeline-attested", "--scope", "artifact-publication",
 				"--identity", "^builder$", "--issuer", "issuer",
-				"--definition", "inputs/definitions/nvke/nvke.composite.yaml",
+				"--definition", "inputs/definitions/nvke/nvke-release.composite.yaml",
 				"--environment", "inputs/environments/github-nvke.yaml",
 				"--plan", ".github/nvkr-run-nvke/plan.json",
 			}

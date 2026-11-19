@@ -1,7 +1,9 @@
 ## Maintained input and schema boundaries
 
 The maintained inventory contains three producer bundles: `nvkr-run-nvke`, `nvkr-dev` and
-`nvkr-run-nvke-nightly`. All select the existing six-member, 83-output GPU-site composite.
+`nvkr-run-nvke-nightly`. Production and nightly select the release composite with the same six member
+pins and 83 payload outputs plus the composite-owned inventory. Development retains the existing
+83-output GPU-site composite. ADR-26 records this explicit exception to its same-composite rule.
 The 2026-11-17 maintainer decision retires the combined production/qualification bundle, the five
 standalone family bundles and the two legacy ARM64 nightly producers. The family Definitions remain
 pinned composite members; the former combined input and family Environments remain comparison fixtures.

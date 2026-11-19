@@ -1366,6 +1366,38 @@
         ]
       }
     ],
+    "nvkr-process-attest-sboms-output-aicr-inv-a373c6e21c34": [
+      {
+        "operations": [
+          {
+            "node": "attest-sboms/output-aicr-inventory",
+            "step": "nvkr-attest-sboms-output-aicr-inventory"
+          },
+          {
+            "node": "publish/output-aicr-inventory",
+            "step": "nvkr-publish-output-aicr-inventory"
+          },
+          {
+            "node": "sign/output-aicr-inventory",
+            "step": "nvkr-sign-output-aicr-inventory"
+          },
+          {
+            "node": "verify-publication/output-aicr-inventory",
+            "step": "nvkr-verify-publication-output-aicr-inventory"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
     "nvkr-process-attest-sboms-output-aicr-nvk-21253a0aa17b": [
       {
         "operations": [
@@ -7577,6 +7609,30 @@
         ]
       }
     ],
+    "nvkr-process-package-aicr-inventory-packa-652cb36224b6": [
+      {
+        "operations": [
+          {
+            "node": "package/aicr-inventory",
+            "step": "nvkr-package-aicr-inventory"
+          },
+          {
+            "node": "package/publication-aicr-inventory",
+            "step": "nvkr-package-publication-aicr-inventory"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
     "nvkr-process-package-capnico-controller-p-5cbfb2d0ddf9": [
       {
         "operations": [
@@ -9142,23 +9198,39 @@
     "plan/composition-nvke": [
       {
         "bundles": [
-          "nvkr-dev",
-          "nvkr-run-nvke",
-          "nvkr-run-nvke-nightly"
+          "nvkr-dev"
         ],
         "file": "plan/composition-nvke@25e541105cb3.json",
         "sha256": "sha256:25e541105cb305f9d0722d5a8349cf22e50cbac1439bf05faad04b6d7aef4f20"
       }
     ],
-    "plan/definition-nvke": [
+    "plan/composition-nvke-release": [
       {
         "bundles": [
-          "nvkr-dev",
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
+        "file": "plan/composition-nvke-release@e1e914b84a51.json",
+        "sha256": "sha256:e1e914b84a51134aece66d949bbcd8177f4cc2b689290ad2cb4dac1587f94859"
+      }
+    ],
+    "plan/definition-nvke": [
+      {
+        "bundles": [
+          "nvkr-dev"
+        ],
         "file": "plan/definition-nvke@451fd27b8e0c.json",
         "sha256": "sha256:451fd27b8e0c305fcee33bf706489268f6253524b8fcc0cf5d4715dfed936aac"
+      }
+    ],
+    "plan/definition-nvke-release": [
+      {
+        "bundles": [
+          "nvkr-run-nvke",
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "plan/definition-nvke-release@4ffc236e63a5.json",
+        "sha256": "sha256:4ffc236e63a52fee8b3b16e601d665ab61f43f632c4a81ad965aac1fcb1c17b8"
       }
     ],
     "plan/environment-nvke-github": [
@@ -9191,34 +9263,70 @@
     "plan/graph-nvke": [
       {
         "bundles": [
-          "nvkr-dev",
-          "nvkr-run-nvke",
-          "nvkr-run-nvke-nightly"
+          "nvkr-dev"
         ],
         "file": "plan/graph-nvke@0d269eb7654d.json",
         "sha256": "sha256:0d269eb7654df2a4b805e5ad0a8a95f6102ddd55268b67926ea3784665a03c3c"
       }
     ],
+    "plan/graph-nvke-release": [
+      {
+        "bundles": [
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "plan/graph-nvke-release@60e0fff39596.json",
+        "sha256": "sha256:60e0fff395960d17b329eabb9747045b1bf7c88c43b87edee0614148dbf1c355"
+      },
+      {
+        "bundles": [
+          "nvkr-run-nvke"
+        ],
+        "file": "plan/graph-nvke-release@a14655a7712d.json",
+        "sha256": "sha256:a14655a7712dfbd71eaf6b41225ef9fc86b6df768a0ea5444f17824b2493db36"
+      }
+    ],
     "plan/outputs-nvke": [
       {
         "bundles": [
-          "nvkr-dev",
-          "nvkr-run-nvke",
-          "nvkr-run-nvke-nightly"
+          "nvkr-dev"
         ],
         "file": "plan/outputs-nvke@e05bc404d447.json",
         "sha256": "sha256:e05bc404d44719ae851077590e8e59d107269f294b58fb7796ce94d0e6fe18dc"
       }
     ],
+    "plan/outputs-nvke-release": [
+      {
+        "bundles": [
+          "nvkr-run-nvke"
+        ],
+        "file": "plan/outputs-nvke-release@4c45c9095b00.json",
+        "sha256": "sha256:4c45c9095b0022c002547b7b2042fb41f10fb6efaf4d49047b669284d57ac7f1"
+      },
+      {
+        "bundles": [
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "plan/outputs-nvke-release@f0c06a92ec27.json",
+        "sha256": "sha256:f0c06a92ec27641415f88542091e3abb7962b0dda32639627b7bbda95a2ca4fa"
+      }
+    ],
     "plan/routes-nvke": [
       {
         "bundles": [
-          "nvkr-dev",
-          "nvkr-run-nvke",
-          "nvkr-run-nvke-nightly"
+          "nvkr-dev"
         ],
         "file": "plan/routes-nvke@0ad15842cec4.json",
         "sha256": "sha256:0ad15842cec4a702879ee87d6d0b4d068e25738b0ad37466090aaada5d4243fa"
+      }
+    ],
+    "plan/routes-nvke-release": [
+      {
+        "bundles": [
+          "nvkr-run-nvke",
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "plan/routes-nvke-release@88aaff8ab371.json",
+        "sha256": "sha256:88aaff8ab371bbb824333b2797ede95b4c5070996cfedf4a8fe8c759c4e88fab"
       }
     ],
     "plan/targets-nvke": [
@@ -9228,20 +9336,22 @@
         ],
         "file": "plan/targets-nvke@481ca7239d1d.json",
         "sha256": "sha256:481ca7239d1d3ad9f142a72d38c9f6267db95afa3ab76df87ca3507fb6745e3e"
-      },
+      }
+    ],
+    "plan/targets-nvke-release": [
       {
         "bundles": [
           "nvkr-run-nvke"
         ],
-        "file": "plan/targets-nvke@72627e197c63.json",
-        "sha256": "sha256:72627e197c630b91d6b8cec6a6601e29c9084032d67a56c13a586ef1926a7120"
+        "file": "plan/targets-nvke-release@ac1add7b315b.json",
+        "sha256": "sha256:ac1add7b315b9cafc2142aff8b4ad5e89a20f580f062052536d20b4818477a1d"
       },
       {
         "bundles": [
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/targets-nvke@e5b827ed78ef.json",
-        "sha256": "sha256:e5b827ed78ef173fd27e4eae56681106e7e11a9510fd23ded4c81ef7a3177343"
+        "file": "plan/targets-nvke-release@d16202b29318.json",
+        "sha256": "sha256:d16202b2931839d1474ff50cd149f1f2ffd9908ff5227122af85dd281b55d478"
       }
     ],
     "scripts/aicr-gb300-generic-training-argocd-helm/build": [

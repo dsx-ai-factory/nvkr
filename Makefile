@@ -328,6 +328,7 @@ PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION
 .PHONY: workflows-check
 workflows-check: workflow-generator producer-overlays-check catalog-refresh-check catalog-index-check ## Check every maintained producer and qualification bundle from the authored inventory.
 	bin/nvkr-exec definition pin --check --definition $(NVKE_COMPOSITE)
+	bin/nvkr-exec definition pin --check --definition $(NVKE_RELEASE)
 	python3 scripts/generate-maintained.py --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: producer-overlays-check producer-overlays-generate
@@ -375,6 +376,7 @@ workflows-generate: workflow-generator ## Regenerate all maintained bundles from
 
 # Composite member pin admission is independent of bundle inventory admission.
 NVKE_COMPOSITE := inputs/definitions/nvke/nvke.composite.yaml
+NVKE_RELEASE := inputs/definitions/nvke/nvke-release.composite.yaml
 
 .PHONY: nvke-generate nvke-check
 nvke-generate: workflow-generator ## Regenerate the NVKE production bundle.
@@ -382,6 +384,7 @@ nvke-generate: workflow-generator ## Regenerate the NVKE production bundle.
 
 nvke-check: workflow-generator ## Check NVKE member pins and generation.
 	bin/nvkr-exec definition pin --check --definition $(NVKE_COMPOSITE)
+	bin/nvkr-exec definition pin --check --definition $(NVKE_RELEASE)
 	python3 scripts/generate-maintained.py --group main --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-generate pipeline-dev-check

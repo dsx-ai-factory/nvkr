@@ -1,6 +1,6 @@
 # NVKE inputs and customer choices
 
-The [maintained NVKE composite](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/nvke.composite.yaml) selects 83 named outputs, including independent
+The [maintained NVKE composite](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/nvke-release.composite.yaml) selects 84 named outputs, including independent
 `linux/amd64` and `linux/arm64` plain and public-bootstrap FDE disks. FDE publication carries build provenance
 without inspected-content or deployed-confidentiality claims; see the [candidate's FDE scope](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/README.md#native-execution-and-publication).
 The catalog owns producer commands, material edges and

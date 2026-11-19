@@ -30,6 +30,12 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 		return err
 	}
 	for _, output := range definition.Outputs {
+		if output.Derived != nil && environment.Publication == nil {
+			return e.New(e.CodeEngineCapability, "derived output %q requires publication before compilation", output.Name)
+		}
+		if output.Derived != nil && environment.GitHubDevelopment {
+			return e.New(e.CodeEngineCapability, "derived output %q requires a publication namespace fixed at compilation; development attempt relocation is unsupported", output.Name)
+		}
 		for _, target := range nativeOutputSelections(output) {
 			if _, _, err := environment.OutputUtility(target.Platform); err != nil {
 				return err

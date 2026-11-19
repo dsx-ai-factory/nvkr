@@ -112,17 +112,17 @@ resume capabilities. The [demo index](demos/README.md) provides bounded generati
 journeys with their prerequisites.
 
 The bundle records its selected Definition and Environment in `.github/nvkr-run-nvke/plan.json`.
-The maintained release selection is the 83-output [NVKE composite](inputs/definitions/nvke/README.md), including
+The maintained release selection is the 84-output [NVKE release composite](inputs/definitions/nvke/README.md), including
 plain and public-bootstrap FDE disks for both native architectures. The separate
 [FDE diagnostic workflow](inputs/definitions/diagnostics/fde.md) selects one build-only disk for branch iteration.
 Regenerate with the intended selection after changing its inputs or generator code:
 
 ```sh
 go run ./cmd/nvkr run generate \
-  --definition inputs/definitions/nvke/nvke.composite.yaml \
+  --definition inputs/definitions/nvke/nvke-release.composite.yaml \
   --environment inputs/environments/github-nvke.yaml --engine github --root .
 go run ./cmd/nvkr run generate \
-  --definition inputs/definitions/nvke/nvke.composite.yaml \
+  --definition inputs/definitions/nvke/nvke-release.composite.yaml \
   --environment inputs/environments/github-nvke.yaml --engine github --root . --check
 ```
 
@@ -135,8 +135,8 @@ Definition/Environment paths recorded in the committed Plan. A `make build` CLI 
 Use [scratch generation](docs/generate-pipeline.md) for v1, deploy, or other examples; generating them with
 `--root .` would add an unenrolled default bundle, which maintained-closure checks refuse.
 
-The [NVKE family selections](inputs/definitions/nvke/README.md) are pinned members of the one
-maintained composite. `make nvke-generate` and `make nvke-check` select the production bundle;
+The [NVKE family selections](inputs/definitions/nvke/README.md) are pinned members of both maintained
+composites. Production/nightly add the release inventory; development retains the payload-only selection. `make nvke-generate` and `make nvke-check` select the production bundle;
 `workflows-generate` and `workflows-check` include production, development and floating-source nightly.
 Catalog maintenance enrolls those three exact selections. Standalone family and combined-candidate
 bundles are retired under ADR-26 U10; their retained authored fixtures are not supported release paths.

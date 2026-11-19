@@ -377,13 +377,13 @@
     }
   },
   "composition": {
-    "file": ".github/nvkr-plan-store/plan/composition-nvke@25e541105cb3.json"
+    "file": ".github/nvkr-plan-store/plan/composition-nvke-release@e1e914b84a51.json"
   },
   "definition": {
-    "file": ".github/nvkr-plan-store/plan/definition-nvke@451fd27b8e0c.json"
+    "file": ".github/nvkr-plan-store/plan/definition-nvke-release@4ffc236e63a5.json"
   },
-  "definitionDigest": "sha256:d33a37ddc449506de7cbfee154ac8c3ad044dc1926365dbe452cbeb70aae3b02",
-  "definitionPath": "inputs/definitions/nvke/nvke.composite.yaml",
+  "definitionDigest": "sha256:76b46c92cab7649342a122f868d66dfb5cb9aa494a87db4b61219f0a68e07760",
+  "definitionPath": "inputs/definitions/nvke/nvke-release.composite.yaml",
   "environment": {
     "file": ".github/nvkr-plan-store/plan/environment-nvke-github@f7330dc1e9de.json"
   },
@@ -391,19 +391,19 @@
   "environmentPath": "inputs/environments/github-nvke.yaml",
   "generatorVersion": "dev (unknown)",
   "graph": {
-    "file": ".github/nvkr-plan-store/plan/graph-nvke@0d269eb7654d.json"
+    "file": ".github/nvkr-plan-store/plan/graph-nvke-release@a14655a7712d.json"
   },
   "lifecycleOutputs": {
-    "file": ".github/nvkr-plan-store/plan/outputs-nvke@e05bc404d447.json"
+    "file": ".github/nvkr-plan-store/plan/outputs-nvke-release@4c45c9095b00.json"
   },
-  "name": "nvke",
+  "name": "nvke-release",
   "qualification": "pipeline-attested",
   "routes": {
-    "file": ".github/nvkr-plan-store/plan/routes-nvke@0ad15842cec4.json"
+    "file": ".github/nvkr-plan-store/plan/routes-nvke-release@88aaff8ab371.json"
   },
   "schemaVersion": "nvkr.dev/run-plan/v6",
   "storage": "nvkr-plan-tree-v1",
   "targets": {
-    "file": ".github/nvkr-plan-store/plan/targets-nvke@72627e197c63.json"
+    "file": ".github/nvkr-plan-store/plan/targets-nvke-release@ac1add7b315b.json"
   }
 }

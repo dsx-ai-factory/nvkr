@@ -87,11 +87,12 @@ func (smoke Smoke) ValidateExecution() error {
 	}
 	seen := make(map[string]bool, len(smoke.NonToolOutputs))
 	for _, output := range smoke.NonToolOutputs {
-		if !smokeName.MatchString(output.Output) || seen[output.Output] || len(output.Components) == 0 || len(output.Components) > 1024 {
+		derived := output.Kind == "bundle-oci" && output.Reason == "derived-inventory"
+		if !smokeName.MatchString(output.Output) || seen[output.Output] || (!derived && len(output.Components) == 0) || (derived && len(output.Components) != 0) || len(output.Components) > 1024 {
 			return e.New(e.CodeTrustPolicyMissing, "non-tool smoke scope requires unique exact outputs and nonempty bounded component membership")
 		}
 		seen[output.Output] = true
-		if (output.Kind != "oci" || output.Reason != "deployment-image") && (output.Kind != "apt-repository" || output.Reason != "package-repository") && (output.Kind != "bundle-oci" || output.Reason != "bundle-archive") {
+		if !derived && (output.Kind != "oci" || output.Reason != "deployment-image") && (output.Kind != "apt-repository" || output.Reason != "package-repository") && (output.Kind != "bundle-oci" || output.Reason != "bundle-archive") {
 			return e.New(e.CodeTrustPolicyMissing, "non-tool smoke scope requires an explicit deployment-image, package-repository or bundle-archive role")
 		}
 		components := make(map[string]bool, len(output.Components))

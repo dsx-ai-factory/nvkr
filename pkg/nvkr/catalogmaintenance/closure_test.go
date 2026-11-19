@@ -227,7 +227,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 	}
 	wantAdditional := []RunInput{
 		{Definition: "inputs/definitions/nvke/nvke.composite.yaml", Environment: "inputs/environments/github-development.yaml", QualificationPolicy: "inputs/policies/nvke-composite-development-qualification.yaml"},
-		{Definition: "inputs/definitions/nvke/nvke.composite.yaml", Environment: "inputs/environments/github-nvke-nightly.yaml", QualificationPolicy: "inputs/policies/nvke-composite-nightly-qualification.yaml"},
+		{Definition: "inputs/definitions/nvke/nvke-release.composite.yaml", Environment: "inputs/environments/github-nvke-nightly.yaml", QualificationPolicy: "inputs/policies/nvke-composite-nightly-qualification.yaml"},
 	}
 	if len(cfg.AdditionalRuns) != len(wantAdditional) {
 		t.Fatalf("maintained policy selects %d additional Runs, want %d", len(cfg.AdditionalRuns), len(wantAdditional))
