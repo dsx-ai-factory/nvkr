@@ -129,7 +129,9 @@ if [ "$EXECUTION_RUNTIME" = docker ]; then
     [ -f "$REGISTRY_CONFIG/config.json" ] && [ ! -L "$REGISTRY_CONFIG/config.json" ] ||
       demo_die "--registry-config requires a regular config.json file"
     demo_need_command jq
-    jq -e 'def populated: . != null and . != false and . != "" and . != {} and . != [] and . != 0;
+    jq -se 'def populated: . != null and . != false and . != "" and . != {} and . != [] and . != 0;
+      if length == 1 and (.[0] | type == "object") then .[0]
+      else error("demo: container registry config requires one JSON object") end |
       if (.credsStore | populated) or (.credHelpers | populated)
       then error("demo: container registry config requires inline auth, not host credential helpers")
       else true end' "$REGISTRY_CONFIG/config.json" >/dev/null

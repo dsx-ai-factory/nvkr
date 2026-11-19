@@ -62,5 +62,11 @@ while IFS= read -r entry; do
     [ "$runtime" = false ] || args+=(--runtime)
   fi
   if [ -n "$pilot" ] && [ "$runtime" = false ]; then args+=(--projection-pilot "$pilot"); fi
-  (cd "$root" && "$timer" --foreground --kill-after=10s 900 "$root/bin/nvkr-exec" "${args[@]}" </dev/null) || fail 'generator failed or timed out'
+  if (cd "$root" && "$timer" --foreground --kill-after=10s 900 "$root/bin/nvkr-exec" "${args[@]}" </dev/null); then
+    :
+  else
+    status=$?
+    bundle=$(jq -r '.bundle' <<<"$entry")
+    fail "generator failed or timed out: bundle $bundle, exit status $status"
+  fi
 done < <(jq -c --arg group "$group" '.[] | select($group == "" or .group == $group)' <<<"$inventory")

@@ -21,6 +21,8 @@ func swapRun(t *testing.T, input, name string, args ...string) (string, int) {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Stdin = strings.NewReader(input)
+	// Bound pipe draining even if a descendant inherits the output descriptors.
+	cmd.WaitDelay = time.Second
 	out, err := cmd.CombinedOutput()
 	if err == nil {
 		return string(out), 0
@@ -84,6 +86,7 @@ func TestMaintainedGeneration(t *testing.T) {
 		{"validate unselected group", "missing", []string{"--group", "nightly"}, 1, ""},
 		{"later invalid selection", "later missing", nil, 1, ""},
 		{"child error", "child error", nil, 1, "--root\n.\n"},
+		{"timeout", "timeout", nil, 1, ""},
 		{"whitespace path", "whitespace", nil, 0, "--definition\na b\n.yaml\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -146,6 +149,10 @@ func TestMaintainedGeneration(t *testing.T) {
 				stub += "exit 17\n"
 			}
 			swapWrite(t, filepath.Join(root, "bin/nvkr-exec"), stub)
+			if tc.change == "timeout" {
+				swapWrite(t, filepath.Join(root, "bin/timeout"), "#!/bin/sh\nexit 124\n")
+				t.Setenv("PATH", filepath.Join(root, "bin")+string(os.PathListSeparator)+os.Getenv("PATH"))
+			}
 			args := append([]string{filepath.Join(root, "scripts/generate-maintained.sh")}, tc.args...)
 			out, status := swapRun(t, "", "bash", args...)
 			if status != tc.status {
@@ -153,6 +160,9 @@ func TestMaintainedGeneration(t *testing.T) {
 			}
 			if status == 1 && !strings.Contains(out, "NVKR-E-PIPELINE-DRIFT") {
 				t.Fatalf("missing coded error: %s", out)
+			}
+			if tc.change == "timeout" && !strings.Contains(out, "bundle nvkr-run, exit status 124") {
+				t.Fatalf("missing timeout context: %s", out)
 			}
 			calls, _ := os.ReadFile(filepath.Join(root, "calls"))
 			if tc.change == "stdin" && strings.Count(string(calls), "--check\n") != 3 {
@@ -203,6 +213,27 @@ func TestCITestSummary(t *testing.T) {
 }
 
 func TestDemoShellTools(t *testing.T) {
+	t.Run("registry config admission", func(t *testing.T) {
+		body := swapRead(t, "demo-release-consumer.sh")
+		filter := regexp.MustCompile(`(?s)jq -se '(.*?)' "\$REGISTRY_CONFIG/config.json"`).FindStringSubmatch(body)
+		if len(filter) != 2 {
+			t.Fatal("missing registry admission filter")
+		}
+		for _, tc := range []struct {
+			input string
+			valid bool
+		}{
+			{`{}`, true}, {`{"auths":{"registry.invalid":{"auth":"c3ludGhldGljOmZpeHR1cmU="}}}`, true},
+			{`{"credsStore":"","credHelpers":{}}`, true},
+			{`null`, false}, {`{} {}`, false}, {`[]`, false}, {`"config"`, false}, {``, false},
+			{`{"credsStore":"desktop"}`, false}, {`{"credHelpers":{"registry.invalid":"desktop"}}`, false},
+		} {
+			out, status := swapRun(t, tc.input, "jq", "-se", filter[1])
+			if (status == 0) != tc.valid {
+				t.Fatalf("config %s: status %d: %s", tc.input, status, out)
+			}
+		}
+	})
 	t.Run("demo summaries", func(t *testing.T) {
 		fixture := `{"outputs":[{"name":"disk","format":"qcow2","platform":"linux/arm64","kind":"disk-image","os":"linux","arch":"arm64","digest":"sha256:fixture","components":["one"],"disk":{"payloadDigest":"sha256:payload","format":"qcow2","size":1073741824,"evidenceMode":"build-provenance-v1"}}],"totalOutputs":1,"rootDigest":"sha256:root","metadata":{"invocationId":"run"},"builds":[{"executionGraph":{"nodes":[{"component":"disk","outputType":"disk-image","packer":{},"disk":{"format":"qcow2"},"materials":[{"binding":"rootfs","component":"one"}],"requirements":{"resources":{"cpuMillis":4000,"memoryMiB":8192,"ephemeralStorageMiB":16384}}}]}}],"graph":{"nodes":[],"artifacts":[]},"qualification":"static-unqualified"}`
 		pattern := regexp.MustCompile(`(?s)jq(?: -L "\$DEMO_DIR")? -r(?: --arg output "\$OUTPUT")? '(.*?)' "\$OUT/[^\"]+"`)
