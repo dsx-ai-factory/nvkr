@@ -30,6 +30,7 @@ The task and reference indexes below retain the detailed command, schema, mainte
 | Build and run the native Ubuntu ARM64 or Mac demo | [Shared build-and-demo guide and validation limits](local-nvke-demo.md) |
 | Understand native Linux/Mac execution with one QEMU site and two tenant guests | [Shared native topology and validation scope](local-nvke-demo.md#native-linux-and-mac-path) |
 | Inspect my first Plan | [Plan and graph inspection](plan-and-graph-inspection.md) |
+| Trace workflow jobs to frozen scripts or understand the adapter boundary | [Generated Plan tree](generated-plan-tree.md) |
 | Browse public command results | [Command result browser](lifecycle.md#browse-public-command-results) |
 | Watch a local Run or inspect its recorded outcome | [Lifecycle dashboard and read-only inspection](lifecycle.md#choose-local-run-presentation) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
@@ -47,7 +48,7 @@ The task and reference indexes below retain the detailed command, schema, mainte
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](examples/nvke-tutorial/README.md),
-[nine-output deploy example](examples/nvke-deploy/README.md), [69-output M2 candidate and committed workflow](../inputs/definitions/nvke/README.md),
+[nine-output deploy example](examples/nvke-deploy/README.md), [83-output NVKE composite and committed workflow](../inputs/definitions/nvke/README.md),
 and [OS-image routes](../inputs/definitions/diagnostics/README.md). The separate
 [Ubuntu 24 inputs](../inputs/definitions/diagnostics/ubuntu24/README.md) select build-only native plain and
 public-bootstrap FDE disk diagnostics; the sibling Ubuntu 24.04 disks family selects them for publication. The
@@ -55,8 +56,8 @@ public-bootstrap FDE disk diagnostics; the sibling Ubuntu 24.04 disks family sel
 The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
 
 Experimental [public OS source producers](../inputs/experiments/public-os-sources/README.md) and the
-[OVN source-build option](../inputs/catalogs/ovn-nvidia/README.md) are separate candidates, not full OS
-migration or maintained M2 membership. The [v0.21.0 dependency inventory](nvke-v0.21.0-os-dependency-inventory.md)
+[OVN source-build option](../inputs/catalogs/ovn/nvidia/notes/ovn-nvidia-README.md) are separate candidates, not full OS
+migration or maintained NVKE membership. The [v0.21.0 dependency inventory](nvke-v0.21.0-os-dependency-inventory.md)
 records source availability and remaining gaps.
 
 ### Detailed references
@@ -102,8 +103,9 @@ implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to t
 
 [Definition partitioning strategy](definition-partitioning-strategy.md) explains the NVKE family
 pilot, historical graph-capacity measurements, shared catalog ownership and related Release options.
-The [input instructions](../inputs/definitions/nvke/README.md#family-pilot) own generation and checking;
-the combined candidate remains available pending consumer and qualification cutover.
+The [input instructions](../inputs/definitions/nvke/README.md#generate-and-check-the-maintained-workflow) own generation and checking.
+The composite owns all three maintained bundles under the ADR-26 U10 cutover; the former combined input
+remains only a comparison fixture.
 
 [ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
 adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.
@@ -125,7 +127,8 @@ owns execution evidence, unsupported capabilities and remaining hosted and consu
 [ADR-28: Multi-platform executables](adr/0028-multi-platform-executable-indexes.md) designs one tool
 source for every platform of a release, where the platforms share a format, companions and admitted URL
 spellings, and executable outputs published as standard OCI image indexes. The AICR CLI is the first
-migration, and the ADR inventories existing executables to retrofit. It is design only.
+index migration. Multi-platform tool declarations, complete locks and exact native selection are implemented
+under ADR-22; executable-index publication and the output retrofits remain design only.
 
 [ADR-29: Cluster observation and artifact attribution](adr/0029-cluster-observation-and-artifact-attribution.md)
 and its [feature design](cluster-observation-and-artifact-attribution.md) describe gathering cluster facts
@@ -165,4 +168,4 @@ own current user instructions.
 
 [NVKE customer choices](nvke-customer-choices.md) explains supplier replacement and its current validation scope.
 
-[Multiarch CWE delivery](multiarch-cwe-delivery.md) describes aggregate image membership, evidence and current validation limits.
+[Multiarch nvke-controller delivery](multiarch-nvke-controller-delivery.md) describes aggregate image membership, evidence and current validation limits.

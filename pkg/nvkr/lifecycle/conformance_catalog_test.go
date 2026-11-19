@@ -49,7 +49,7 @@ func TestConformanceCatalogInputsCompile(t *testing.T) {
 				if node.Component != "hydrophone" || patch.Name != "patches/bounded-download.patch" {
 					t.Fatalf("unexpected source patch: %s %s", node.Component, patch.Name)
 				}
-				raw, err := os.ReadFile(filepath.Join("inputs/catalogs/kubernetes-conformance/hydrophone", patch.Name))
+				raw, err := os.ReadFile(filepath.Join("inputs/catalogs/kubernetes-conformance", patch.Name))
 				if err != nil {
 					t.Fatal(err)
 				}

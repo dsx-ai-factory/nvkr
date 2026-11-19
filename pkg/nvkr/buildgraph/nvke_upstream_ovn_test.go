@@ -36,7 +36,7 @@ func upstreamOVNPin(t *testing.T) catalog.Pin {
 	return lock.Pins["ovn-kubernetes"]
 }
 
-const upstreamOVNDir = "../../../inputs/catalogs/ovn-upstream"
+const upstreamOVNDir = "../../../inputs/catalogs/ovn/upstream"
 
 func loadUpstreamOVN(t *testing.T) *catalog.Catalog {
 	t.Helper()
@@ -115,7 +115,7 @@ func TestNVKEUpstreamOVNGraphs(t *testing.T) {
 }
 
 func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/node-images/release"))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/node-images"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,15 +172,15 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 				t.Fatal("disk lost explicit ordered override")
 			}
 		case "upstream-ovn-chart-arm64":
-			if output.Catalog.Base != "../../catalogs/ovn-upstream" || len(output.Helm.Images) != 1 || output.Helm.Images["ovn"] != "upstream-ovn-image-arm64" {
+			if output.Catalog.Base != "../../catalogs/ovn/upstream" || len(output.Helm.Images) != 1 || output.Helm.Images["ovn"] != "upstream-ovn-image-arm64" {
 				t.Fatal("upstream chart binds wrong image slot")
 			}
 		case "upstream-ovn-image-arm64":
-			if output.Catalog.Base != "../../catalogs/ovn-upstream" {
+			if output.Catalog.Base != "../../catalogs/ovn/upstream" {
 				t.Fatal("upstream image selects the NVIDIA producer")
 			}
 		case "controller-profiles-upstream-ovn":
-			if output.Catalog.Base != "../../catalogs/controller-profiles/upstream-arm64" {
+			if output.Catalog.Base != "../../catalogs/nvke" {
 				t.Fatal("upstream profile selects NVIDIA install inputs")
 			}
 		default:
@@ -193,15 +193,15 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 	if len(old) != 4 {
 		t.Fatalf("alternative replaces %d baseline slots, want four", len(old))
 	}
-	profile, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/controller-profiles/upstream-arm64"))
+	profile, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/nvke"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	raw, err := os.ReadFile("../../../inputs/catalogs/controller-profiles/upstream-arm64/patches/local-profile.patch")
+	raw, err := os.ReadFile("../../../inputs/catalogs/nvke/patches/controller-profiles-upstream-arm64/local-profile.patch")
 	if err != nil {
 		t.Fatal(err)
 	}
-	component := profile.Components["nvke-local-profiles"]
+	component := profile.Components["nvke-local-profiles-upstream"]
 	if len(component.Patches) != 1 || component.Patches[0].SHA256 != fmt.Sprintf("sha256:%x", sha256.Sum256(raw)) {
 		t.Fatal("profile package inputs lost exact patch binding")
 	}
@@ -219,7 +219,7 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 	if strings.Contains(string(raw), "http://172.30.0.1:18080/nvke-node-image-arm64.qcow2") {
 		t.Fatal("upstream profile retains the NVIDIA disk route")
 	}
-	baselinePatch, err := os.ReadFile("../../../inputs/catalogs/controller-profiles/nvidia-arm64/patches/local-profile.patch")
+	baselinePatch, err := os.ReadFile("../../../inputs/catalogs/nvke/patches/local-profile.patch")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,11 +228,11 @@ func TestNVKEUpstreamOVNDiskSelection(t *testing.T) {
 	if string(raw) != expected {
 		t.Fatal("upstream profile alters unrelated bootstrap behavior")
 	}
-	baselineProfiles, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/controller-profiles/nvidia-arm64"))
+	baselineProfiles, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/nvke"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	baselineComponent := baselineProfiles.Components["nvke-local-profiles"]
+	baselineComponent := baselineProfiles.Components["nvke-local-profiles-nvidia"]
 	if component.Commit != baselineComponent.Commit || component.TreeHash != baselineComponent.TreeHash || component.SourceDate != baselineComponent.SourceDate {
 		t.Fatal("upstream profile changes the approved NVKE source pin")
 	}

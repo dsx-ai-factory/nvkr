@@ -33,7 +33,7 @@ func TestHelmImageDependency(t *testing.T) {
 			charts = node
 		}
 	}
-	if charts.HelmImage == nil || charts.HelmImage.Images["controller"].From != "package/cwe" || !slices.Contains(charts.Inputs, "package/cwe") || !slices.Contains(charts.Inputs, "artifact/nvke-helm/nvke-helm") {
+	if charts.HelmImage == nil || charts.HelmImage.Images["controller"].From != "package/nvke-controller" || !slices.Contains(charts.Inputs, "package/nvke-controller") || !slices.Contains(charts.Inputs, "artifact/nvke-helm/nvke-helm") {
 		t.Fatalf("image dependency: %#v", charts)
 	}
 	definition.Outputs[1].Helm.Images["controller"] = "missing"

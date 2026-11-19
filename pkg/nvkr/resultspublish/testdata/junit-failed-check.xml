@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="nvke-m2" tests="4" failures="1" skipped="2">
+<testsuite name="nvke" tests="4" failures="1" skipped="2">
   <testcase name="tool/build-signature-and-provenance">
     <failure message="signature does not verify">signature does not verify</failure>
   </testcase>

@@ -1,16 +1,22 @@
 {
   "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "../../../catalogs/tools"
+  },
   "kind": "Definition",
   "metadata": {
-    "name": "nvke-local-nicosim-arm64",
-    "description": "Build NICoSim server, CLI and runtime assets from pinned NVKE source for Linux ARM64; separate from local deployment and OS acceptance."
+    "description": "Build NICoSim server, CLI and runtime assets from pinned NVKE source for Linux ARM64; separate from local deployment and OS acceptance.",
+    "name": "nvke-local-nicosim-arm64"
   },
-  "catalog": {"base": "../../../catalogs/tools/native"},
   "outputs": [
     {
-      "name": "nicosim-tools-arm64",
-      "components": ["nico-sim", "nico-sim-runtime-assets", "nico-simctl"],
+      "components": [
+        "nico-sim",
+        "nico-sim-runtime-assets",
+        "nico-simctl"
+      ],
       "format": "executable",
+      "name": "nicosim-tools-arm64",
       "platform": "linux/arm64"
     }
   ]

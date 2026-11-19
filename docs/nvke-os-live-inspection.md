@@ -149,10 +149,10 @@ are not interchangeable acceptance evidence.
 ## Distinguish diagnostic and production evidence
 
 This optional installed-package diagnostic does not perform acquisition reconciliation, full-content
-CycloneDX generation or publication. A separate strict full-content receipt/packaging path is implemented
-and contract-tested; successful complete native NVKE discovery and original live reconciliation remain
-unexercised. M2's explicit `build-provenance-v1` mode authenticates live disk/material subjects while
-signing the deferred-inspection scope. [The M2 README](../inputs/definitions/nvke/README.md) describes its
+CycloneDX generation or publication. The [inspection reconciliation](adr/reconciliation/native-disk-execution-and-inspection.md)
+owns the strict full-content receipt/packaging path and its external validation limits.
+NVKE's explicit `build-provenance-v1` mode authenticates live disk/material subjects while
+signing the deferred-inspection scope. [The NVKE README](../inputs/definitions/nvke/README.md) describes its
 candidate delivery and consumer limits. The M3 MVP retains this producer-only scope; deep inspection and
 reconciliation remain deferred hardening. Neither diagnostic
-metadata nor M2 delivery proves full-disk inventory, FDE support or qualified reproduction.
+metadata nor NVKE delivery proves full-disk inventory, FDE support or qualified reproduction.

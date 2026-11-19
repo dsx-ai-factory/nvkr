@@ -27,9 +27,9 @@ func TestCLIClosedStdoutPreservesCheckedStatus(t *testing.T) {
 	if scenario := os.Getenv("NVKR_TEST_CLOSED_STDOUT"); scenario != "" {
 		switch scenario {
 		case "plan":
-			os.Args = []string{"nvkr", "run", "plan", "--plan", ".github/nvkr-run/plan.json", "--json"}
+			os.Args = []string{"nvkr", "run", "plan", "--plan", ".github/nvkr-run-nvke/plan.json", "--json"}
 		case "plain plan":
-			os.Args = []string{"nvkr", "run", "plan", "--plan", ".github/nvkr-run/plan.json"}
+			os.Args = []string{"nvkr", "run", "plan", "--plan", ".github/nvkr-run-nvke/plan.json"}
 		case "dry-run":
 			os.Args = localPresentationArgs("--dry-run", "--ui=plain")
 		case "JSON dry-run":

@@ -67,12 +67,12 @@ func TestCombinedBuildKitRuntimeAdmission(t *testing.T) {
 				t.Fatal(err)
 			}
 			if plan.Environment.RuntimeBinary() != tc.resolved {
-				t.Fatalf("CWE Plan lost its admitted %s runtime", tc.resolved)
+				t.Fatalf("nvke-controller Plan lost its admitted %s runtime", tc.resolved)
 			}
 			if err := factory.ValidateGitHubBundle(ctx, plan, bundle); err != nil {
 				t.Fatal(err)
 			}
-			assertGitHubSharedNodeInvocation(t, plan, bundle, "cwe/build-cwe")
+			assertGitHubSharedNodeInvocation(t, plan, bundle, "nvke-controller/build-nvke-controller-module-tags")
 		})
 	}
 }
@@ -346,7 +346,7 @@ func TestCompileDerivesImageEnvelope(t *testing.T) {
 			packages[node.ID] = node.PackageKind
 		}
 	}
-	if len(packages) != 2 || packages["package/cwe"] != factory.PackageImage || packages["package/release"] != factory.PackageOCI {
+	if len(packages) != 2 || packages["package/nvke-controller"] != factory.PackageImage || packages["package/release"] != factory.PackageOCI {
 		t.Fatalf("image packages: %#v", packages)
 	}
 	definition.Outputs[0].Components = []string{"first", "second"}
@@ -375,13 +375,13 @@ func TestConsumerImageBinding(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			artifact := Artifact{Name: "cwe", Kind: OutputOCI, Digest: image.ManifestDigest, BuildDigest: "sha256:" + repeat("a", 64), Components: []string{"cwe"}}
+			artifact := Artifact{Name: "nvke-controller", Kind: OutputOCI, Digest: image.ManifestDigest, BuildDigest: "sha256:" + repeat("a", 64), Components: []string{"nvke-controller"}}
 			content, err := delivery.ContentDigest([]Artifact{artifact})
 			if err != nil {
 				t.Fatal(err)
 			}
 			layout := filepath.Join(root, "release")
-			request := testReleaseRequest(t, []Artifact{artifact}, []delivery.ObjectInput{{Name: "cwe", Kind: factory.PackageImage, Path: imagePath, Layout: true, ArtifactType: delivery.MediaOCIManifest, SemanticDigest: image.ManifestDigest, BlobDigest: image.RootDigest, OS: "linux", Arch: tc.arch}}, map[string]string{"cwe": image.RootDigest})
+			request := testReleaseRequest(t, []Artifact{artifact}, []delivery.ObjectInput{{Name: "nvke-controller", Kind: factory.PackageImage, Path: imagePath, Layout: true, ArtifactType: delivery.MediaOCIManifest, SemanticDigest: image.ManifestDigest, BlobDigest: image.RootDigest, OS: "linux", Arch: tc.arch}}, map[string]string{"nvke-controller": image.RootDigest})
 			_, err = delivery.BuildPublicationRoot(ctx, layout, request)
 			if tc.reject {
 				assertCode(t, err, e.CodeVerifyFailed)

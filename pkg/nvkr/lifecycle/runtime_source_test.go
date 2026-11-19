@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
@@ -92,7 +93,11 @@ func TestRuntimeSourceGenerationReplaysFrozenSourceAfterRestore(t *testing.T) {
 	if err := os.MkdirAll(staging, 0755); err != nil {
 		t.Fatal(err)
 	}
-	for name, raw := range map[string][]byte{"plan.json": freshBundle.Files[freshBundle.PlanPath], "manifest.json": manifest} {
+	packed, err := canonical.Marshal(frozen)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, raw := range map[string][]byte{"plan.json": packed, "manifest.json": manifest} {
 		if err := os.WriteFile(filepath.Join(staging, name), raw, 0644); err != nil {
 			t.Fatal(err)
 		}

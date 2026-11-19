@@ -2,7 +2,7 @@
 
 The release index and its metadata live in `<publication.repositoryPrefix>/releases`. Deliverables and their
 SBOM attestations live in sibling repositories named after the Definition outputs. For NVKE these are
-`<publication.repositoryPrefix>/nvkectl`, `…/cwe`, and `…/nvke-helm`.
+`<publication.repositoryPrefix>/nvkectl`, `…/nvke-controller`, and `…/nvke-helm`.
 
 ## Required publication transports
 
@@ -257,7 +257,7 @@ flowchart TB
     CB --> CD["Sigstore bundle: verification material and signed DSSE statement containing CycloneDX; exact binary subject"]
     CS["Artifact signature and SLSA attestation"] -. authenticates .-> C
   end
-  subgraph image["…/cwe"]
+  subgraph image["…/nvke-controller"]
     I["Native image manifest"] --> IC["Native image config"]
     I --> IL["Native image layers"]
     IB["SBOM referrer manifest"] -. "OCI subject" .-> I
@@ -293,7 +293,7 @@ carries its canonical config. That config alone owns output names, sibling repos
 manifest identities, build bindings, and evidence membership. No deliverable or SBOM payload
 is copied into the release repository, and no separate lifecycle-binding object is published.
 
-The CLI retains its file/platform config for extraction. The management-plane image (`cwe`) retains its native manifest, config and layers.
+The CLI retains its file/platform config for extraction. The management-plane image (`nvke-controller`) retains its native manifest, config and layers.
 Helm has one artifact manifest, its real Chart.yaml-derived config, and one chart-archive layer — a
 standards-conformant Helm OCI chart, without a nested publication root.
 
@@ -366,14 +366,15 @@ claim, and none of these checks establishes qualified reproduction, vulnerabilit
 
 Use a trusted cosign installation and an externally selected workflow identity/issuer. Artifact signatures and
 SLSA attestations are standard Sigstore v0.3 bundles under the cosign 3.1.3 contract. Select each required
-predicate explicitly at the deliverable's exact manifest reference:
+predicate explicitly at the deliverable's exact manifest reference. The examples use the current NVKE
+producer identity; historical Releases require their original independently trusted signer identity:
 
 ```sh
 cosign verify-attestation --type https://sigstore.dev/cosign/sign/v1 \
-  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run-nvke.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$ARTIFACT_REF"
 cosign verify-attestation --type slsaprovenance1 \
-  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run-nvke.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$ARTIFACT_REF"
 ```
 
@@ -383,7 +384,7 @@ release. Fetch the single `application/vnd.dev.sigstore.bundle.v0.3+json` layer 
 ```sh
 cosign verify-blob-attestation --bundle sbom.bundle.json --type cyclonedx \
   --digest "$EXPECTED_SUBJECT_SHA256_HEX" --digestAlg sha256 \
-  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-run-nvke.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
 ```
 
@@ -403,7 +404,7 @@ builder identity used above:
 
 ```sh
 cosign verify-attestation --type https://nvkr.dev/qualification-evidence/v2 \
-  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-qualify.yml@refs/heads/main' \
+  --certificate-identity 'https://github.com/dsx-ai-factory/nvkr/.github/workflows/nvkr-qualify-nvke.yml@refs/heads/main' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' "$ARTIFACT_REF"
 ```
 

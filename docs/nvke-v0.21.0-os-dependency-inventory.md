@@ -2,7 +2,7 @@
 
 Reviewed 2026-10-07 against the exact published release asset, not NVKE main.
 This document inventories the release and the remaining source-build migration.
-The experimental [public-source catalog](../inputs/experiments/public-os-sources/README.md) adds 14 binary producers from 13 pinned Git sources, separate from the maintained M2 inputs.
+The experimental [public-source catalog](../inputs/experiments/public-os-sources/README.md) adds 14 binary producers from 13 pinned Git sources, separate from the maintained NVKE inputs.
 The experimental catalog does not establish a complete OS-image migration or release qualification.
 
 ## Authoritative inputs
@@ -65,7 +65,7 @@ Use ADR-22 catalog pinning to record commit, tree and source epoch once producer
 
 ## Current NVKR comparison
 
-Current M2 uses NVKE `v0.23.0` at `2cfd00081b468d85a4894ec17e9deac13c9d8169` for image preparation, including SPIRE.
+Current NVKE uses NVKE `v0.23.0` at `2cfd00081b468d85a4894ec17e9deac13c9d8169` for image preparation, including SPIRE.
 The v0.23.0 SPIRE package omits the DSX plugin.
 Those are not the release source `33fb71b2f4224b470ebc628a9165fc4b92870406`.
 NVKR compiles the NVKE agent and builds the upstream OVN image, but other OS-package producers currently invoke NVKE package preparation or packaging.
@@ -106,7 +106,7 @@ The v0.21.0 SBOM declares these existing payloads, but does not identify their s
 | AMD64 | `https://nke-prod-assets.s3.us-west-2.amazonaws.com/dsx-imds-node-attestor-agent/linux-amd64/dsx-imds-node-attestor-agent` | `fa134f877968550e33f683ed2b1acb05aa64028ce3eaeaf85603e05bbbef1350` |
 | ARM64 | `https://nke-prod-assets.s3.us-west-2.amazonaws.com/dsx-imds-node-attestor-agent/linux-arm64/dsx-imds-node-attestor-agent` | `88226ee3a848e09c620a99aad9c99c64e6c04e7a862836eb206d6e6f9fae2bf5` |
 
-Both URLs returned HTTP 403 to anonymous HEAD requests on 2026-10-07. These are release-declared hashes, not payloads reauthenticated by this analysis. Retaining the exception does not solve access: an accessible existing mirror or held package must supply bytes matching the declared digest before execution can succeed. Do not replace the plugin with an empty file, omit it, or label the older plugin-free M2 SPIRE package as v0.21.0-complete.
+Both URLs returned HTTP 403 to anonymous HEAD requests on 2026-10-07. These are release-declared hashes, not payloads reauthenticated by this analysis. Retaining the exception does not solve access: an accessible existing mirror or held package must supply bytes matching the declared digest before execution can succeed. Do not replace the plugin with an empty file, omit it, or label the older plugin-free NVKE SPIRE package as v0.21.0-complete.
 
 NVKE's development code names a neighboring `dsx-identity` checkout. GitHub search and probes of the two guessed repository locations below did not establish the actual source location or its public availability. Classify this as unresolved public source, not proof that no repository exists. Replace the prebuilt producer with a pinned source producer when the public source becomes established and reviewed.
 

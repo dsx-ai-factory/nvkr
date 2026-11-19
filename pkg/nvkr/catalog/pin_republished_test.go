@@ -67,13 +67,13 @@ func TestMaintenanceRejectsRepublishedAcquiredMemberAtomically(t *testing.T) {
 	original := http.DefaultTransport
 	http.DefaultTransport = server.Client().Transport
 	t.Cleanup(func() { http.DefaultTransport = original })
-	fixture := newPinSetIntegrationFixture(t, "dependencies: [{name: cwe, version: 1.2.3}, {name: tool, version: 2.0.0}]\n")
+	fixture := newPinSetIntegrationFixture(t, "dependencies: [{name: nvke-controller, version: 1.2.3}, {name: tool, version: 2.0.0}]\n")
 	fixture.registry.Sources["umbrella"].PinSet.Members["b-tool"] = PinSetMember{Artifact: "tool", Path: "dependencies[name=tool].version"}
 	fixture.registry.Components["tool"] = rawComponent{Platforms: []string{"linux/amd64", "linux/arm64"}, PinnedBy: "umbrella", OutputType: "raw", Prebuilt: &Prebuilt{URL: server.URL + "/tool/{{.Version}}/{{.Arch}}", Evidence: &ExternalEvidence{None: true}}}
 	fixture.writeRegistry(t)
 	fixture.pin(t, "1.0.0")
 	// The newer umbrella retains the exact source and acquired member versions.
-	fixture.commitManifest(t, "dependencies: [{name: cwe, version: 1.2.3}, {name: tool, version: 2.0.0}]\n# refreshed umbrella\n", "umbrella/v1.1.0")
+	fixture.commitManifest(t, "dependencies: [{name: nvke-controller, version: 1.2.3}, {name: tool, version: 2.0.0}]\n# refreshed umbrella\n", "umbrella/v1.1.0")
 	before := readPinFixtureLock(t, fixture.dir)
 	changed.Store(true)
 	for _, check := range []bool{true, false} {

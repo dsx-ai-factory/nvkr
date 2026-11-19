@@ -134,9 +134,35 @@ class ComparisonTest(unittest.TestCase):
                 with patch.dict(os.environ, {"GITHUB_OUTPUT": str(output)}), patch("sys.argv", [
                     "report-native-toolchains.py", "compare", "--arch", arch,
                     "--plan", str(root / "plan"), "--proposal", str(root / "proposal"),
-                ]):
+                ]), patch.object(MODULE.subprocess, "run", return_value=subprocess.CompletedProcess(
+                    [], 0, stdout=json.dumps(plan), stderr="",
+                )) as run:
                     MODULE.main()
+                    run.assert_called_once_with(
+                        ["./nvkr-exec", "run", "plan", "--plan", str(root / "plan"), "--json"],
+                        text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                        check=True, timeout=60,
+                    )
                 self.assertEqual(output.read_text(), f"changed_{arch}=false\n")
+
+    def test_plan_admission_failure_has_no_raw_json_fallback(self):
+        with tempfile.TemporaryDirectory() as temp:
+            filename = Path(temp) / "plan.json"
+            filename.write_text(json.dumps(subjects("amd64")[0]))
+            with patch.object(MODULE.subprocess, "run", side_effect=subprocess.CalledProcessError(
+                1, ["./nvkr-exec"], stderr="rejected tree",
+            )), patch.object(MODULE.sys, "stderr") as stderr, self.assertRaises(SystemExit) as refused:
+                MODULE.load_plan(filename)
+            self.assertEqual(refused.exception.code, 1)
+            self.assertEqual("".join(call.args[0] for call in stderr.write.call_args_list), "rejected tree")
+
+    def test_plan_inspection_timeout_has_bounded_diagnostic(self):
+        with patch.object(MODULE.subprocess, "run", side_effect=subprocess.TimeoutExpired(
+            ["./nvkr-exec"], 60, stderr=b"partial helper output",
+        )), contextlib.redirect_stderr(io.StringIO()) as stderr, self.assertRaises(SystemExit) as refused:
+            MODULE.load_plan(Path("plan.json"))
+        self.assertEqual(refused.exception.code, 1)
+        self.assertEqual(stderr.getvalue(), "[NVKR-E-GATE-UNMET] Plan inspection timed out after 60 seconds\n")
 
 
 class RoutingTest(unittest.TestCase):

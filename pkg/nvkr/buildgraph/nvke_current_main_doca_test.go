@@ -24,7 +24,6 @@ func TestNightlyDOCAClosurePreservesTaggedInputs(t *testing.T) {
 		file string
 		want int
 	}{
-		{"demo/arm64-nvidia-kvm.json", 1},
 		{"demo/arm64-nvidia-local-kvm.json", 0},
 		{"demo/amd64-nvidia-local-kvm.json", 0},
 		{"demo/arm64-nvidia-local-kvm-conformance.json", 0},
@@ -58,7 +57,7 @@ func TestNightlyDOCAClosurePreservesTaggedInputs(t *testing.T) {
 }
 
 func TestNightlyDOCAAcquisitionFeedsOfflineImageComposition(t *testing.T) {
-	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/node-images/release"))
+	base, err := catalog.LoadContext(t.Context(), catalog.Dir("../../../inputs/catalogs/node-images"))
 	if err != nil {
 		t.Fatal(err)
 	}

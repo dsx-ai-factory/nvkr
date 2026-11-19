@@ -33,7 +33,7 @@ func indexObservationFixture(t *testing.T) (*Plan, Node, map[string]Artifact) {
 	plan := imageIndexTestPlan(t)
 	var selected []authored.DefinitionOutput
 	for _, output := range plan.Definition.Outputs {
-		if output.Name == "cwe" {
+		if output.Name == "nvke-controller" {
 			selected = append(selected, output)
 		}
 	}
@@ -46,7 +46,7 @@ func indexObservationFixture(t *testing.T) (*Plan, Node, map[string]Artifact) {
 		a.Path = filepath.Join(root, a.Path)
 		artifacts[id] = a
 	}
-	node := planNode(plan, "package/cwe")
+	node := planNode(plan, "package/nvke-controller")
 	required := node.ImageIndex
 	for _, child := range required.Children {
 		platform := child.Platform
@@ -209,7 +209,7 @@ func TestImageIndexPackagingObservesEveryExactChild(t *testing.T) {
 	defer func() { _ = held.Close() }()
 	var image delivery.PublishedObject
 	for _, object := range inspection.Root.Objects {
-		if object.Name == "cwe" {
+		if object.Name == "nvke-controller" {
 			image = object
 		}
 	}

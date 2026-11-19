@@ -330,7 +330,7 @@ func TestNativePublicationRequiresCoherentSourceProducts(t *testing.T) {
 				product.Repo = strings.TrimSuffix(product.Repo, ".git")
 				test.edit(&product)
 				in := &nativePublicationInputs{arch: arch, outputs: map[string]lifecycle.Artifact{host.Name: {Name: host.Name, BuildDigest: host.BuildDigest}},
-					plan: &factory.Plan{Builds: []factory.BuildPlan{host, {Name: "cwe", ResolvedComponents: []catalog.NamedComponent{{Name: "controller", Component: product}}}}}}
+					plan: &factory.Plan{Builds: []factory.BuildPlan{host, {Name: "nvke-controller", ResolvedComponents: []catalog.NamedComponent{{Name: "controller", Component: product}}}}}}
 				selected, err := in.installer()
 				if test.accepted {
 					if err != nil || selected.arch != arch || selected.commit != source.Commit {
