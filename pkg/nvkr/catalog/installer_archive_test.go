@@ -24,7 +24,7 @@ func TestInstallerArchivePreservesLocalChartDependencies(t *testing.T) {
 	if _, err := probe.CombinedOutput(); err != nil {
 		t.Skip("installer archive recipe requires make --eval support")
 	}
-	base, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/tools/native"))
+	base, err := LoadContext(t.Context(), Dir("../../../inputs/catalogs/tools"))
 	if err != nil {
 		t.Fatal(err)
 	}

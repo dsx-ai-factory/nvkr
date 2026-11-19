@@ -11,7 +11,7 @@ shared Docker caches were retained. This was not an empty-cache build.
 
 This establishes one unqualified local diagnostic at that exact revision. It
 does not validate NVIDIA OVN, later source revisions, a supported NVKE release
-combination, a complete source-built distribution, M2 or qualification. NVIDIA
+combination, a complete source-built distribution, NVKE or qualification. NVIDIA
 OVN remains the default; there was no implicit Calico fallback. See the
 [execution guide](../local-nvke-demo.md#explicit-upstream-ovn-alternative).
 

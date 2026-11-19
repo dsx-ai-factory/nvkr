@@ -325,7 +325,7 @@ bash scripts/nvke-full-arm64-local.sh first-tools 1 tools
 The bundle contains Linux ARM64 Helm 4.2.4, kubectl 1.36.0, clusterctl 1.13.6,
 ORAS 1.3.3 and Kind 0.32.0, matching
 [NVKE's pinned installer declarations](https://github.com/dsx-ai-factory/nvke/blob/2cfd00081b468d85a4894ec17e9deac13c9d8169/make/tool-versions.mk).
-See [catalog producers](../inputs/catalogs/tools/installer-local-arm64/registry.yaml)
+See [catalog producers](../inputs/catalogs/tools/registry.yaml)
 and generated pins for exact commits, compiler and preparation instructions.
 
 Source preparation verifies module checksums before offline compilation.
@@ -392,9 +392,9 @@ GIT_CONFIG_COUNT=1 \
 GIT_CONFIG_KEY_0="url.$NVKE_DEV_CLONE.insteadOf" \
 GIT_CONFIG_VALUE_0=https://github.com/dsx-ai-factory/nvke \
   bin/nvkr catalog pin \
-  --dir inputs/catalogs/nvke/module-cli-arm64 \
+  --dir inputs/catalogs/nvke \
   --commit "$NVKE_DEV_COMMIT" nvke
-git diff -- inputs/catalogs/nvke/module-cli-arm64
+git diff -- inputs/catalogs/nvke
 NVKE_LOCAL_CLONE="$NVKE_DEV_CLONE" \
   bash scripts/nvke-full-arm64-local.sh cli-change-01 1 components
 ```

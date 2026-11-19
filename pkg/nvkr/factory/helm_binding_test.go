@@ -98,7 +98,7 @@ func TestHelmImageBindingUpdatesChecksums(t *testing.T) {
 		}
 	}
 	digest := "sha256:" + strings.Repeat("a", 64)
-	if err := bindHelmImages(context.Background(), root, *testHelmBinding("package/cwe", "007-controller"), map[string]string{"controller": digest}); err != nil {
+	if err := bindHelmImages(context.Background(), root, *testHelmBinding("package/nvke-controller", "007-controller"), map[string]string{"controller": digest}); err != nil {
 		t.Fatal(err)
 	}
 	checksums, err := os.ReadFile(filepath.Join(root, "checksums.txt"))
@@ -149,7 +149,7 @@ func TestHelmBindingPreservesChartChecksums(t *testing.T) {
 					}
 				}
 				digest := "sha256:" + strings.Repeat("a", 64)
-				if err := bindHelmImages(t.Context(), root, *testHelmBinding("package/cwe", chart), map[string]string{"controller": digest}); err != nil {
+				if err := bindHelmImages(t.Context(), root, *testHelmBinding("package/nvke-controller", chart), map[string]string{"controller": digest}); err != nil {
 					t.Fatal(err)
 				}
 				archive := filepath.Join(stage, "source.tar")

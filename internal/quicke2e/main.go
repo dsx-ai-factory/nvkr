@@ -117,7 +117,7 @@ func run(ctx context.Context) (resultErr error) {
 	// the existing immutable GitHub action pins needed by generation.
 	helloCatalog := input.Catalog
 	input.Outputs[0].Catalog = &helloCatalog
-	input.Catalog.Base = filepath.Join(root, "inputs/catalogs/nvke/module-tags")
+	input.Catalog.Base = filepath.Join(root, "inputs/catalogs/nvke")
 	environment.UtilityPlatform = platform
 	environment.RunsOn = "ubuntu-24.04"
 	if runtime.GOARCH == "arm64" {

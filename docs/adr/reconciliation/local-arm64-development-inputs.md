@@ -267,7 +267,7 @@ their historical scope and do not establish acceptance of the current host workf
 Maintained OS Definitions, catalog execution and Packer toolchain assembly select Docker.
 The older authored Podman Environment and its TCG Definition are removed; generic
 NVKR Podman support remains. The ARM64 catalog baseline retains the already-published
-historical M2 Docker candidate, not a newly measured current toolchain. Local Docker
+historical NVKE Docker candidate, not a newly measured current toolchain. Local Docker
 launchers still freeze their freshly validated image into an attempt overlay.
 Static Plan and wrapper tests cover these selections, not a new native bake.
 
@@ -357,7 +357,7 @@ unchanged zero-retry workload/DNS and natural deletion plus joined owned cleanup
 The [exact-revision evidence](../../evidence/local-upstream-ovn-2026-10-11.md)
 retains the bindings, runtime checks and recording integrity. This is an
 unqualified local diagnostic, not live acceptance of later changes, a supported
-release combination, M2 or qualification. This option neither fixes nor
+release combination, NVKE or qualification. This option neither fixes nor
 validates the NVIDIA fork's open startup issue.
 
 Fresh profiles selections produce a native OCI image through the existing

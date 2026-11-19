@@ -31,7 +31,7 @@ import (
 // these package-shaped fixtures do not claim a completed upstream source build.
 func nightlyRuntimeCompiledFixture(t *testing.T, profile NightlyProfile, build NightlyBuild, commit string, sourcePolicy ...bool) (*factory.Plan, lifecycle.Run) {
 	t.Helper()
-	root, err := filepath.Abs("../../../../inputs/catalogs/nvke/module-tags")
+	root, err := filepath.Abs("../../../../inputs/catalogs/nvke")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func nightlyRuntimeCompiledFixture(t *testing.T, profile NightlyProfile, build N
 		t.Fatal(err)
 	}
 	declared := definition.Definition{APIVersion: definition.DefinitionAPIVersion, Kind: definition.DefinitionKind, Metadata: definition.Metadata{Name: profile.Name}, Catalog: definition.Catalog{Base: root}, SBOMTool: "syft", CosignTool: "cosign"}
-	for _, role := range []struct{ name, component string }{{"controller-chart", "nvke-controller-chart"}, {"cwe", "nvke-controller"}, {"nktp", "nktp-chart"}, {"nvkectl", "nvkectl"}} {
+	for _, role := range []struct{ name, component string }{{"controller-chart", "nvke-controller-chart"}, {"nktp", "nktp-chart"}, {"nvke-controller", "nvke-controller"}, {"nvkectl", "nvkectl"}} {
 		declared.Outputs = append(declared.Outputs, definition.DefinitionOutput{Name: role.name, Platform: "linux/arm64", Format: definition.OutputExecutable, Components: []string{role.component}})
 	}
 	environment, err := definition.LoadEnvironment(t.Context(), "../../../../docs/examples/nvke-module-tags/environment-github.yaml")

@@ -27,7 +27,7 @@ and an in-cluster registry. The [Tekton guide](../docs/generate-pipeline.md#tekt
 lists prerequisites, trust scope and retained evidence. The GitHub acceptance workflow runs this same
 command; it needs no publishing secrets. This explicit integration test fails when prerequisites are absent.
 
-`ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's eleven
+`ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's fifteen
 test jobs. It includes examples and fuzz seed tests, and requires exact completion of the discovered
 selection. New packages and tests need no allowlist update. `make test-shard` reproduces one matrix
 entry; `make test` still runs the full suite. Each child command may retain at most 32 MiB of stdout;
@@ -74,7 +74,7 @@ For repository pipeline changes, `make pipeline-dev-run PIPELINE_DEV_REPO=owner/
 development bundle and calls `pipeline-dev.py`. The helper requires a clean named branch matching the
 remote commit and an active registered `nvkr-dev.yml`, then dispatches that branch explicitly. It performs
 no commit, push, environment-policy update or registry cleanup. `--check` runs only its provider preflight.
-See [pipeline development](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) for full M2 branch
+See [pipeline development](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) for full NVKE branch
 execution, separate development signing/publication credentials, and attempt-scoped registry cleanup.
 Controlled dispatch-adapter tests run with `make test-ci-tools`; registry cleanup is owned by the Go
 development module and the separate default-branch cleanup workflow.
@@ -113,12 +113,12 @@ a [full source-built distribution](../docs/full-nvke-source-build.md).
 nvkr run plan --definition docs/examples/nvke-module-tags/definition.yaml --environment docs/examples/nvke-module-tags/environment-local.yaml
 
 # Local execution; Docker, Go and acquisition/build network access are required.
-# Despite its historical name, the M1 script executes CLI + CWE + Helm.
+# Despite its historical name, the M1 script executes CLI + nvke-controller + Helm.
 NVKE_LOCAL_CLONE=/path/to/nvke scripts/demo-m1-local.sh
 ```
 
 `demo-m1-local.sh` generates and checks its three-output GitHub bundle in a fresh temporary directory,
-whose path it prints for inspection. The repository's committed bundle selects the 34-output M2 candidate.
+whose path it prints for inspection. The repository's committed bundle selects the 34-output NVKE candidate.
 The local walkthrough publishes to its loopback registry using dry-run signing. Local attempts are immutable and
 `unqualified-local-execution`; plans remain `static-unqualified`. See the
 [M1 walkthrough and acceptance limits](../demos/m1-local.md).

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -60,7 +61,7 @@ case "$1:$2" in
   printf 'generate\n' >> "$EVENTS"; printf '{}\n';;
  bootstrap:site)
   test -z "${NVKECTL_BOOTSTRAP_NODE_IMAGE+x}"
-  case " $* " in *" --controller-image "*|*" --cwe-image "*) exit 55;; esac
+  case " $* " in *" --controller-image "*|*" --controller-image="*) exit 55;; esac
   case " $* " in *" --nvke-controller-image $EXPECTED_CONTROLLER_IMAGE "*) ;; *) exit 56;; esac
   case " $* " in *" --provisioned-provider-image docker.io/library/provider:fixture "*) ;; *) exit 57;; esac
   printf 'bootstrap\n' >> "$EVENTS"
@@ -77,6 +78,21 @@ case "$1:$2" in
  *) exit 42;;
 esac
 `), 0700)
+			if tc.name == "site" {
+				for _, legacy := range [][]string{{"--controller-image", "legacy:fixture"}, {"--controller-image=legacy:fixture"}} {
+					t.Run(legacy[0], func(t *testing.T) {
+						ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
+						defer cancel()
+						args := append([]string{"bootstrap", "site", "--nvke-controller-image", "controller:fixture"}, legacy...)
+						command := exec.CommandContext(ctx, cli, args...)
+						command.Env = []string{"EXPECTED_CONTROLLER_IMAGE=controller:fixture"}
+						var exit *exec.ExitError
+						if err := command.Run(); !errors.As(err, &exit) || exit.ExitCode() != 55 {
+							t.Fatalf("legacy controller flag must fail the mock guard: %v", err)
+						}
+					})
+				}
+			}
 			for name, event := range map[string]string{"nerdctl": "nerdctl", "kind": "kind", "clusterctl": "capi", "kubectl": "kubectl"} {
 				writeTenantFixture(t, filepath.Join(tools, name), []byte("#!/bin/sh\nset -eu\nprintf '%s\\n' '"+event+"' >> \"$EVENTS\"\n"), 0700)
 			}

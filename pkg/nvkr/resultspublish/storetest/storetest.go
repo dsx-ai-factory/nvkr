@@ -17,7 +17,7 @@ import (
 // Conformance runs the contract against a fresh store from open for each case.
 func Conformance(t *testing.T, open func(t *testing.T) resultspublish.ObjectStore) {
 	t.Helper()
-	const path = "groups/nvkr/nvke/nvke-m2/0000000000000000001-101-1-202-1/artifacts/junit.xml"
+	const path = "groups/nvkr/nvke/nvke/0000000000000000001-101-1-202-1/artifacts/junit.xml"
 	first, second := []byte("first"), []byte("second")
 	t.Run("a created object reads back", func(t *testing.T) {
 		store := open(t)

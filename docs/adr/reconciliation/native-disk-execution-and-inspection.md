@@ -88,7 +88,7 @@ coordinates and timeout summaries. A separate parsing ceiling rejects excessive 
 draining the child; truncation preserves the last accepted phase. Diagnostics grant no receipt and timing
 does not enter evidence identity. Hosted retention uses one atomically published, no-replace file and an
 optional, failure-tolerant, always-run upload with one-day retention and a separate five-minute allowance.
-Required evidence uploads remain mandatory. M2 build-provenance mode emits neither inspection nor this
+Required evidence uploads remain mandatory. NVKE build-provenance mode emits neither inspection nor this
 upload. Rebuilt-helper deployment, full native inspection and corrected production timeout behavior remain
 unexercised.
 

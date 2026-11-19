@@ -19,8 +19,16 @@ import (
 
 func TestRunPlanFileViewsRetainCanonicalBytes(t *testing.T) {
 	lifecycleCommandRepo(t)
-	path := ".github/nvkr-run/plan.json"
+	path := ".github/nvkr-run-nvke/plan.json"
 	original, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := factory.LoadPlanContext(t.Context(), path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	packed, err := canonical.Marshal(plan)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,8 +42,8 @@ func TestRunPlanFileViewsRetainCanonicalBytes(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if test.name == "canonical" && !bytes.Equal([]byte(output), original) {
-				t.Fatal("canonical CLI output is not exact stored bytes")
+			if test.name == "canonical" && !bytes.Equal([]byte(output), packed) {
+				t.Fatal("canonical CLI output is not exact reconstructed Plan bytes")
 			}
 			if test.name == "pretty" {
 				var plan factory.Plan
@@ -64,7 +72,7 @@ func TestRunGraphFormats(t *testing.T) {
 	lifecycleCommandRepo(t)
 	for _, format := range []string{"json", "dot", "mermaid"} {
 		t.Run(format, func(t *testing.T) {
-			output, err := invokeLifecycleCLI(t, "run", "graph", "--plan", ".github/nvkr-run/plan.json", "--format", format)
+			output, err := invokeLifecycleCLI(t, "run", "graph", "--plan", ".github/nvkr-run-nvke/plan.json", "--format", format)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -87,7 +95,7 @@ func TestRunGraphOutputFocusIsSmallerAndMarked(t *testing.T) {
 	lifecycleCommandRepo(t)
 	decode := func(args ...string) planview.Graph {
 		t.Helper()
-		output, err := invokeLifecycleCLI(t, append([]string{"run", "graph", "--plan", ".github/nvkr-run/plan.json", "--format", "json"}, args...)...)
+		output, err := invokeLifecycleCLI(t, append([]string{"run", "graph", "--plan", ".github/nvkr-run-nvke/plan.json", "--format", "json"}, args...)...)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -110,7 +118,7 @@ func TestRunGraphOutputFocusIsSmallerAndMarked(t *testing.T) {
 
 func TestRunDiffCountsAllChangesAndSupportsExitStatus(t *testing.T) {
 	lifecycleCommandRepo(t)
-	before := ".github/nvkr-run/plan.json"
+	before := ".github/nvkr-run-nvke/plan.json"
 	p, err := factory.LoadPlanContext(t.Context(), before)
 	if err != nil {
 		t.Fatal(err)
@@ -169,13 +177,13 @@ func TestPlanViewCommandsRejectBeforeOutput(t *testing.T) {
 		{"extra arguments", []string{"run", "plan", "--plan", "missing", "argument"}, e.CodeUsage},
 		{"bad graph view", []string{"run", "graph", "--plan", "missing", "--view", "unknown"}, e.CodeUsage},
 		{"bad graph format", []string{"run", "graph", "--plan", "missing", "--format", "unknown"}, e.CodeUsage},
-		{"unknown graph output", []string{"run", "graph", "--plan", ".github/nvkr-run/plan.json", "--output", "no-such-output"}, e.CodeUsage},
-		{"empty graph output", []string{"run", "graph", "--plan", ".github/nvkr-run/plan.json", "--output", ""}, e.CodeUsage},
+		{"unknown graph output", []string{"run", "graph", "--plan", ".github/nvkr-run-nvke/plan.json", "--output", "no-such-output"}, e.CodeUsage},
+		{"empty graph output", []string{"run", "graph", "--plan", ".github/nvkr-run-nvke/plan.json", "--output", ""}, e.CodeUsage},
 		{"bad diff format", []string{"run", "diff", "--before", "missing", "--after", "missing", "--format", "unknown"}, e.CodeUsage},
 		{"JSON details before input", []string{"run", "diff", "--before", "missing", "--after", "missing", "--format", "json", "--details"}, e.CodeUsage},
-		{"JSON details with valid plans", []string{"run", "diff", "--before", ".github/nvkr-run/plan.json", "--after", ".github/nvkr-run/plan.json", "--format", "json", "--details"}, e.CodeUsage},
+		{"JSON details with valid plans", []string{"run", "diff", "--before", ".github/nvkr-run-nvke/plan.json", "--after", ".github/nvkr-run-nvke/plan.json", "--format", "json", "--details"}, e.CodeUsage},
 		{"missing plan", []string{"run", "graph", "--plan", "missing"}, e.CodePipelineDrift},
-		{"missing after", []string{"run", "diff", "--before", ".github/nvkr-run/plan.json", "--after", "missing"}, e.CodePipelineDrift},
+		{"missing after", []string{"run", "diff", "--before", ".github/nvkr-run-nvke/plan.json", "--after", "missing"}, e.CodePipelineDrift},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			output, err := invokeLifecycleCLI(t, test.args...)

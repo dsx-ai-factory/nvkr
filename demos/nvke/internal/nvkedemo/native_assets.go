@@ -124,8 +124,8 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	selections := []nativeImageSelection{
 		{"ovn", cfg.DeploymentRun, ovnOutput, "", lifecycle.Artifact{}, guestPlatform},
 		{"capnico", providersRun, "capnico-controller-" + arch, "", lifecycle.Artifact{}, guestPlatform},
-		{"controller", controllerRun, "cwe", "docker.io/library/nke-controller:latest", lifecycle.Artifact{}, guestPlatform},
-		{"profiles", cfg.DeploymentRun, profilesOutput, "docker.io/library/cwe-profiles:local", lifecycle.Artifact{}, guestPlatform},
+		{"controller", controllerRun, "nvke-controller", "docker.io/library/nke-controller:latest", lifecycle.Artifact{}, guestPlatform},
+		{"profiles", cfg.DeploymentRun, profilesOutput, "docker.io/library/nvke-controller-profiles:local", lifecycle.Artifact{}, guestPlatform},
 		{"provisioned-provider", cfg.BootstrapRun, "cluster-api-provider-provisioned-" + arch, "docker.io/library/cluster-api-provider-provisioned:latest", lifecycle.Artifact{}, guestPlatform},
 	}
 	if cfg.RuntimeRun != "" {

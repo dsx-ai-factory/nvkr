@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # Local combined NVKE walkthrough. The historical M1 name predates the addition
-# of CWE and Helm: the current Definition builds and publishes all three outputs.
-# The CLI build is offline; CWE wraps the upstream network-enabled Dockerfile.
+# of nvke-controller and Helm: the current Definition builds and publishes all three outputs.
+# The CLI build is offline; nvke-controller wraps the upstream network-enabled Dockerfile.
 # This script inspects the CLI SBOM and dry-run signing records, pulls its
 # publication by digest, and runs the recovered binary. It does not independently
 # smoke-test the image or render the charts.
@@ -45,11 +45,11 @@ usage() {
 Usage: scripts/demo-m1-local.sh [options]
 
 Run the combined NVKE local walkthrough (M1 requires the CLI slice only):
-  pinned NVKE sources -> CLI + CWE image + Helm bundle -> per-artifact SBOMs
+  pinned NVKE sources -> CLI + nvke-controller image + Helm bundle -> per-artifact SBOMs
     -> one OCI release index -> loopback registry -> dry-run signing records
     -> pull the release by digest -> check SBOM digest -> run recovered nvkectl
 
-The CLI build is offline; CWE uses network-enabled rootless BuildKit. All three
+The CLI build is offline; nvke-controller uses network-enabled rootless BuildKit. All three
 outputs must complete, but pull-back and version checks cover the CLI only.
 Planning is static-unqualified; executed Runs use unqualified-local-execution.
 Nothing is signed, and this walkthrough does not complete M1 acceptance.
@@ -72,7 +72,7 @@ Environment:
                     the user's own git configuration is never modified.
 
 Requires docker with rootless BuildKit/overlayfs support, git, curl, a Go toolchain,
-and network access for tools, images and CWE build dependencies. Re-running is safe: the registry
+and network access for tools, images and nvke-controller build dependencies. Re-running is safe: the registry
 container is reused; every execution gets a new immutable attempt, and the consume directory is rebuilt.
 EOF
 }
@@ -172,7 +172,7 @@ demo_section "2/8  Validate the pinned producers and plan the Run"
 
 demo_section "3/8  Validate the Definition and generate its hosted Run in scratch space"
 "$NVKR" definition validate --definition "$DEFINITIONS/definition.yaml"
-# The committed workflow selects M2, while this demo selects the three-output v1
+# The committed workflow selects NVKE, while this demo selects the three-output v1
 # Definition. Generate and check that example with the same binary in a fresh root.
 HOSTED_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-m1-hosted.XXXXXX")
 "$NVKR" run generate --definition "$DEFINITIONS/definition.yaml" \
@@ -287,7 +287,7 @@ cat <<EOF
 
 LOCAL NVKE WALKTHROUGH COMPLETE — UNQUALIFIED-LOCAL-EXECUTION, NO SIGNATURES
   definition:          $DEFINITIONS/definition.yaml
-  produced outputs:    nvkectl, cwe, nvke-helm (default Definition)
+  produced outputs:    nvkectl, nvke-controller, nvke-helm (default Definition)
   pull-back check:     nvkectl only
   registry:            http://$REGISTRY_HOSTPORT/v2/ (container $REGISTRY_CONTAINER)
   published reference: $REFERENCE
