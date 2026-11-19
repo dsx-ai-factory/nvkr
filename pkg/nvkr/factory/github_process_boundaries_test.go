@@ -40,16 +40,22 @@ if phase != ` + strconv.Quote(phase) + `: sys.exit(0)
 signal.signal(signal.SIGTERM, signal.SIG_IGN)
 if os.fork() == 0:
     pathlib.Path("descendant.pid").write_text(str(os.getpid()))
+    # Coreutils timeout leads this process group and handles SIGALRM as timer
+    # expiry. Deliver it only after readiness, so startup is outside the test's
+    # deadline assertion; the real timeout still owns TERM/KILL escalation.
+    os.kill(os.getpgrp(), signal.SIGALRM)
 while True: time.sleep(0.01)
 PY
 `
 			if err := os.WriteFile(filepath.Join(root, "go"), []byte(script), 0700); err != nil {
 				t.Fatal(err)
 			}
-			ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+			ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
 			defer cancel()
 			bootstrap := githubCIBootstrapBuildCommand("-X main.version=fixture", githubRunnerRelease{})
-			bootstrap = strings.ReplaceAll(strings.ReplaceAll(bootstrap, "900s", "3s"), "--kill-after=5s", "--kill-after=0.2s")
+			// The generous fallback bounds a broken fixture; readiness above triggers
+			// the deadline under test, without relying on startup elapsed time.
+			bootstrap = strings.ReplaceAll(strings.ReplaceAll(bootstrap, "900s", "60s"), "--kill-after=5s", "--kill-after=0.2s")
 			command := exec.CommandContext(ctx, "bash", "-c", bootstrap)
 			command.Dir = root
 			command.WaitDelay = time.Second
