@@ -716,7 +716,7 @@ publishes outcomes to the results index of ADR-31, but no generated job runs it 
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
 Actions workflow; the operator does not write or maintain a separate worker implementation. The maintained
-candidate supplies `inputs/policies/nvke-gpu-site-qualification.yaml` and emits `.github/workflows/nvkr-qualify-nvke.yml`
+candidate supplies `inputs/policies/nvke-composite-qualification.yaml` and emits `.github/workflows/nvkr-qualify-nvke.yml`
 and `.github/workflows/nvkr-smoke-nvke.yml`. The same invocation with `--check` compares
 all owned bytes without writing. The separately owned qualification manifest records both workflow files;
 hand edits and unowned files are not silently overwritten. The worker is a fixed same-repository reusable
@@ -737,7 +737,7 @@ The independent policy extends the artifact-check policy with these decisions:
 | `smoke.nonToolMembers` | Exact output/member pairs for non-executable runtime-assets archives in mixed executable bundles |
 | `outsideMVPSuites` / `requiredSuites` | Unevaluated external suites, or a requirement that currently blocks qualification |
 
-The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-gpu-site-qualification.yaml)
+The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-composite-qualification.yaml)
 contains concrete verifier/native-image pins and exact output scope. Review those independent trust selections
 with the generated workflows before merge. Other Definitions need their own matching scope and native pins;
 the candidate policy is not a wildcard approval. The trust policy belongs to the operator, not the producing

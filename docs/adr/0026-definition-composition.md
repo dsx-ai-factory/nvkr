@@ -325,7 +325,7 @@ and owning operation carry that detail.
 ## Worked example: the four NVKE families
 
 This historical four-family example is illustrative and is **not** a maintained input. The maintained entry
-point is `inputs/definitions/nvke/gpu-site.composite.yaml`, which selects a larger membership. The digests
+point is `inputs/definitions/nvke/nvke.composite.yaml`, which selects a larger membership. The digests
 below are the actual `nvkr.definition` digests of the family Definitions at commit `75f154fe`, computed with the existing `Definition.Digest` and the Go toolchain in
 `.go-version`. Until `definition pin` exists, a short program against the existing API reproduces them:
 

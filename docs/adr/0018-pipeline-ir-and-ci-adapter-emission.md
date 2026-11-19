@@ -1583,7 +1583,7 @@ Environment identity remain fixed under the runtime-generation check.
 
 The maintained GPU-site floating candidate selects NVKE, OVN Kubernetes, CAPNICO and
 NVIDIA AICR main in this lane, publishes only below
-`ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site`, and has an independent qualifier/smoke
+`ghcr.io/dsx-ai-factory/nvkr/nightly/nvke`, and has an independent qualifier/smoke
 policy. Its production GPU-site sibling retains its existing pins and namespace.
 The generated producer is manual-only; this decision adds no scheduled dispatch.
 Complete artifact qualification remains `pipeline-attested`, not GPU deployment acceptance

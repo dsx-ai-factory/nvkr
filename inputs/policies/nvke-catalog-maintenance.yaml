@@ -10,15 +10,15 @@ sources: [nvke, nvke-helm]
 producerOverlays: inputs/policies/ovn-producer-overlays.json
 sameRelease:
   - [nvke, nvke-helm]
-definition: inputs/definitions/nvke/gpu-site.composite.yaml
-environment: inputs/environments/github-nvke-gpu-site.yaml
-qualificationPolicy: inputs/policies/nvke-gpu-site-qualification.yaml
+definition: inputs/definitions/nvke/nvke.composite.yaml
+environment: inputs/environments/github-nvke.yaml
+qualificationPolicy: inputs/policies/nvke-composite-qualification.yaml
 # The same composite owns production, isolated development and floating-source nightly.
 additionalRuns:
-  - definition: inputs/definitions/nvke/gpu-site.composite.yaml
+  - definition: inputs/definitions/nvke/nvke.composite.yaml
     environment: inputs/environments/github-development.yaml
-    qualificationPolicy: inputs/policies/nvke-gpu-site-development-qualification.yaml
-  - definition: inputs/definitions/nvke/gpu-site.composite.yaml
-    environment: inputs/environments/github-nvke-nightly-gpu-site.yaml
-    qualificationPolicy: inputs/policies/nvke-nightly-gpu-site-qualification.yaml
+    qualificationPolicy: inputs/policies/nvke-composite-development-qualification.yaml
+  - definition: inputs/definitions/nvke/nvke.composite.yaml
+    environment: inputs/environments/github-nvke-nightly.yaml
+    qualificationPolicy: inputs/policies/nvke-composite-nightly-qualification.yaml
 validation: static

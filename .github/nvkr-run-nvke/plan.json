@@ -377,33 +377,33 @@
     }
   },
   "composition": {
-    "file": ".github/nvkr-plan-store/plan/composition-nvke-gpu-site@657b11c3ba7b.json"
+    "file": ".github/nvkr-plan-store/plan/composition-nvke@25e541105cb3.json"
   },
   "definition": {
-    "file": ".github/nvkr-plan-store/plan/definition-nvke-gpu-site@b3a77aa2c9f8.json"
+    "file": ".github/nvkr-plan-store/plan/definition-nvke@451fd27b8e0c.json"
   },
-  "definitionDigest": "sha256:a2aeb671bfb4bc9f212e0c9cdc6e3bd5e831c599ba269803319b7f41cbe74e2f",
-  "definitionPath": "inputs/definitions/nvke/gpu-site.composite.yaml",
+  "definitionDigest": "sha256:d33a37ddc449506de7cbfee154ac8c3ad044dc1926365dbe452cbeb70aae3b02",
+  "definitionPath": "inputs/definitions/nvke/nvke.composite.yaml",
   "environment": {
-    "file": ".github/nvkr-plan-store/plan/environment-nvke-github@05bbd75616a5.json"
+    "file": ".github/nvkr-plan-store/plan/environment-nvke-github@f7330dc1e9de.json"
   },
-  "environmentDigest": "sha256:a3e77adadba297627afbabe934580bc9e00b15ffa47420c505ea0ae7659b76d6",
-  "environmentPath": "inputs/environments/github-nvke-gpu-site.yaml",
+  "environmentDigest": "sha256:1f230bed54f0e370c8e42c4ae989f60f1e20d6c33f346fd4c5e784c9663e99e2",
+  "environmentPath": "inputs/environments/github-nvke.yaml",
   "generatorVersion": "dev (unknown)",
   "graph": {
-    "file": ".github/nvkr-plan-store/plan/graph-nvke-gpu-site@2797310a4527.json"
+    "file": ".github/nvkr-plan-store/plan/graph-nvke@2797310a4527.json"
   },
   "lifecycleOutputs": {
-    "file": ".github/nvkr-plan-store/plan/outputs-nvke-gpu-site@d6307d7bf56f.json"
+    "file": ".github/nvkr-plan-store/plan/outputs-nvke@d6307d7bf56f.json"
   },
-  "name": "nvke-gpu-site",
+  "name": "nvke",
   "qualification": "pipeline-attested",
   "routes": {
-    "file": ".github/nvkr-plan-store/plan/routes-nvke-gpu-site@0ad15842cec4.json"
+    "file": ".github/nvkr-plan-store/plan/routes-nvke@0ad15842cec4.json"
   },
   "schemaVersion": "nvkr.dev/run-plan/v6",
   "storage": "nvkr-plan-tree-v1",
   "targets": {
-    "file": ".github/nvkr-plan-store/plan/targets-nvke-gpu-site@3fadceecf5ff.json"
+    "file": ".github/nvkr-plan-store/plan/targets-nvke@72627e197c63.json"
   }
 }
