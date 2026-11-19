@@ -157,8 +157,8 @@ func (s *CosignOCISigner) verifyOCIType(ctx context.Context, source *ociBundleSo
 		}
 		bundle, err := source.bundle(ctx, descriptor)
 		if err != nil {
-			if ctxErr := contextError(ctx); ctxErr != nil {
-				return "", "", nil, ctxErr
+			if failure := boundedVerificationFailure(ctx); failure != nil {
+				return "", "", nil, failure
 			}
 			if failure := source.failure(); failure != nil {
 				return "", "", nil, failure
@@ -202,10 +202,10 @@ func (s *CosignOCISigner) verifyOCIType(ctx context.Context, source *ociBundleSo
 		if err != nil {
 			return "", "", nil, err
 		}
-		ran = append(ran, argv(s.binary, args))
+		ran = append(ran, argv(s.binary, boundedVerificationRecordedArgs(ctx, args)))
 		if _, err := s.capture(ctx, args, environment); err != nil {
-			if ctxErr := contextError(ctx); ctxErr != nil {
-				return "", "", nil, ctxErr
+			if failure := boundedVerificationCandidateFailure(ctx, err); failure != nil {
+				return "", "", nil, failure
 			}
 			lastErr = err
 			verificationFailed++

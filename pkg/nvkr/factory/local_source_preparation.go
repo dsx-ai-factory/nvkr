@@ -84,7 +84,8 @@ func PrepareLocalNVKESource(ctx context.Context, repository, definitionPath, env
 		stacks = append(stacks, admittedStack{selection: selection, stack: stack})
 		return stack, nil
 	}
-	if _, err := compileDocumentsWithLoader(ctx, definitionPath, definition, environmentPath, environment, "local-source-preparation", loadStack); err != nil {
+	baseline, err := compileDocumentsWithLoader(ctx, definitionPath, definition, environmentPath, environment, "local-source-preparation", loadStack)
+	if err != nil {
 		return NativeBuildPreparation{}, err
 	}
 	revision, err := catalog.ResolveSourceRevisionAtRef(ctx, localNVKERepository, "refs/heads/main", commit)
@@ -96,6 +97,12 @@ func PrepareLocalNVKESource(ctx context.Context, repository, definitionPath, env
 		selection := definition.Catalog
 		if output.Catalog != nil {
 			selection = *output.Catalog
+		} else if len(baseline.CatalogCandidates) != 0 {
+			candidate, err := selectCatalogCandidate(output, baseline.CatalogCandidates)
+			if err != nil {
+				return NativeBuildPreparation{}, err
+			}
+			selection = candidate.Selection
 		}
 		stack, err := loadStack(ctx, selection)
 		if err != nil {

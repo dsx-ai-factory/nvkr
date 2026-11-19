@@ -30,7 +30,7 @@ type pinSetIntegrationFixture struct {
 func newPinSetIntegrationFixture(t *testing.T, manifest string) *pinSetIntegrationFixture {
 	t.Helper()
 	if manifest == "" {
-		manifest = "dependencies: [{name: cwe, version: 1.2.3}]\n"
+		manifest = "dependencies: [{name: nvke-controller, version: 1.2.3}]\n"
 	}
 	repo, _, run := pinTreeFixture(t, map[string][]byte{"Chart.lock": []byte(manifest), "nested.lock": []byte("dependencies: [{name: agent, version: 3.4.5}]\n")})
 	run("tag", "umbrella/v1.0.0")
@@ -45,12 +45,12 @@ func newPinSetIntegrationFixture(t *testing.T, manifest string) *pinSetIntegrati
 			APIVersion: catalogAPIVersion, Kind: catalogKind,
 			Sources: map[string]Source{
 				"umbrella": {Repo: upstream, TagPrefix: "umbrella/v", Constraint: "1.x", PinSet: &PinSet{File: "Chart.lock", Members: map[string]PinSetMember{
-					"a-cwe": {Source: "cwe", Path: "dependencies[name=cwe].version"},
+					"a-nvke-controller": {Source: "nvke-controller", Path: "dependencies[name=nvke-controller].version"},
 				}}},
-				"cwe": {Repo: upstream, TagPrefix: "controller/v", PinnedBy: "umbrella", ToolchainImage: goodImage},
+				"nvke-controller": {Repo: upstream, TagPrefix: "controller/v", PinnedBy: "umbrella", ToolchainImage: goodImage},
 			},
 			Components: map[string]rawComponent{
-				"controller": {Platforms: []string{"linux/amd64"}, Source: "cwe", FromSource: true, OutputType: "host-package", BuildCommand: []string{"make"}, ArtifactPath: "bin/controller"},
+				"controller": {Platforms: []string{"linux/amd64"}, Source: "nvke-controller", FromSource: true, OutputType: "host-package", BuildCommand: []string{"make"}, ArtifactPath: "bin/controller"},
 			},
 		},
 	}
@@ -100,15 +100,15 @@ func (fixture *pinSetIntegrationFixture) lock(t *testing.T) *PinLock {
 func TestPinSetIntegrationSourceRoundTrip(t *testing.T) {
 	fixture := newPinSetIntegrationFixture(t, "")
 	first := fixture.pin(t, "1.0.0")
-	if first.Changed != 2 || len(first.Pins) != 2 || first.Pins[0].Name != "umbrella" || first.Pins[1].Name != "cwe" {
+	if first.Changed != 2 || len(first.Pins) != 2 || first.Pins[0].Name != "umbrella" || first.Pins[1].Name != "nvke-controller" {
 		t.Fatalf("first pin must report whole set in derivation order: %+v", first)
 	}
 	lock := fixture.lock(t)
-	if lock.Pins["umbrella"].Tag != "umbrella/v1.0.0" || lock.Pins["cwe"].Tag != "controller/v1.2.3" || lock.Pins["cwe"].DerivedFrom != "umbrella@"+lock.Pins["umbrella"].Commit {
+	if lock.Pins["umbrella"].Tag != "umbrella/v1.0.0" || lock.Pins["nvke-controller"].Tag != "controller/v1.2.3" || lock.Pins["nvke-controller"].DerivedFrom != "umbrella@"+lock.Pins["umbrella"].Commit {
 		t.Fatalf("unexpected initial pins: %+v", lock.Pins)
 	}
 	cat, err := LoadContext(t.Context(), Dir(fixture.dir))
-	if err != nil || cat.Components["controller"].Commit != lock.Pins["cwe"].Commit {
+	if err != nil || cat.Components["controller"].Commit != lock.Pins["nvke-controller"].Commit {
 		t.Fatalf("pinned source must reach loaded producer: %v, %v", cat, err)
 	}
 	before := readPinFixtureLock(t, fixture.dir)
@@ -116,7 +116,7 @@ func TestPinSetIntegrationSourceRoundTrip(t *testing.T) {
 	if noOp.Changed != 0 || !bytes.Equal(before, readPinFixtureLock(t, fixture.dir)) {
 		t.Fatal("re-pinning same complete set changed lock bytes")
 	}
-	fixture.commitManifest(t, "dependencies: [{name: cwe, version: 1.2.4}]\n", "umbrella/v1.1.0")
+	fixture.commitManifest(t, "dependencies: [{name: nvke-controller, version: 1.2.4}]\n", "umbrella/v1.1.0")
 	fixture.run("tag", "controller/v1.2.4")
 	request := SourcePinRequest{Directory: fixture.dir, Bump: true, All: true, Check: true}
 	checked, err := UpdateSourcePins(t.Context(), request)
@@ -130,7 +130,7 @@ func TestPinSetIntegrationSourceRoundTrip(t *testing.T) {
 		t.Fatalf("check and write candidates differ: check=%+v write=%+v err=%v", checked, written, err)
 	}
 	lock = fixture.lock(t)
-	if lock.Pins["umbrella"].Tag != "umbrella/v1.1.0" || lock.Pins["cwe"].Tag != "controller/v1.2.4" || lock.Pins["cwe"].DerivedFrom != "umbrella@"+lock.Pins["umbrella"].Commit {
+	if lock.Pins["umbrella"].Tag != "umbrella/v1.1.0" || lock.Pins["nvke-controller"].Tag != "controller/v1.2.4" || lock.Pins["nvke-controller"].DerivedFrom != "umbrella@"+lock.Pins["umbrella"].Commit {
 		t.Fatalf("unexpected updated pins: %+v", lock.Pins)
 	}
 	if _, err := LoadContext(t.Context(), Dir(fixture.dir)); err != nil {
@@ -143,9 +143,9 @@ func TestPinSetIntegrationRejectsIndependentMemberUpdates(t *testing.T) {
 	fixture.pin(t, "1.0.0")
 	before := readPinFixtureLock(t, fixture.dir)
 	for _, request := range []SourcePinRequest{
-		{Sources: []string{"cwe"}, Tag: "1.2.4"},
-		{Sources: []string{"cwe"}, Bump: true},
-		{Sources: []string{"umbrella", "cwe"}, Bump: true},
+		{Sources: []string{"nvke-controller"}, Tag: "1.2.4"},
+		{Sources: []string{"nvke-controller"}, Bump: true},
+		{Sources: []string{"umbrella", "nvke-controller"}, Bump: true},
 	} {
 		request.Directory = fixture.dir
 		update, err := UpdateSourcePins(t.Context(), request)
@@ -164,13 +164,21 @@ func TestPinSetIntegrationLoadRederivesInsteadOfTrustingProvenance(t *testing.T)
 		name string
 		edit func(*PinLock)
 	}{
-		{"stale version with correct provenance", func(lock *PinLock) { pin := lock.Pins["cwe"]; pin.Tag = "controller/v1.2.4"; lock.Pins["cwe"] = pin }},
-		{"wrong provenance with correct version", func(lock *PinLock) {
-			pin := lock.Pins["cwe"]
-			pin.DerivedFrom = "umbrella@" + strings.Repeat("f", 40)
-			lock.Pins["cwe"] = pin
+		{"stale version with correct provenance", func(lock *PinLock) {
+			pin := lock.Pins["nvke-controller"]
+			pin.Tag = "controller/v1.2.4"
+			lock.Pins["nvke-controller"] = pin
 		}},
-		{"missing provenance", func(lock *PinLock) { pin := lock.Pins["cwe"]; pin.DerivedFrom = ""; lock.Pins["cwe"] = pin }},
+		{"wrong provenance with correct version", func(lock *PinLock) {
+			pin := lock.Pins["nvke-controller"]
+			pin.DerivedFrom = "umbrella@" + strings.Repeat("f", 40)
+			lock.Pins["nvke-controller"] = pin
+		}},
+		{"missing provenance", func(lock *PinLock) {
+			pin := lock.Pins["nvke-controller"]
+			pin.DerivedFrom = ""
+			lock.Pins["nvke-controller"] = pin
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			lock, err := decodePinLock(before, "test fixture")
@@ -197,7 +205,7 @@ func TestPinSetIntegrationMembershipFailurePreservesLock(t *testing.T) {
 	before := readPinFixtureLock(t, fixture.dir)
 	// Extraction's malformed-content cases live in TestExtractPinSetVersions;
 	// one failed derivation proves the transaction preserves its original lock.
-	fixture.commitManifest(t, "dependencies: [{name: cwe, version: 1.2.3}, {name: extra, version: 1.0.0}]\n", "umbrella/v1.1.0")
+	fixture.commitManifest(t, "dependencies: [{name: nvke-controller, version: 1.2.3}, {name: extra, version: 1.0.0}]\n", "umbrella/v1.1.0")
 	_, err := UpdateSourcePins(t.Context(), SourcePinRequest{Directory: fixture.dir, Sources: []string{"umbrella"}, Tag: "1.1.0"})
 	assertCatalogContractCode(t, err, e.CodePinSetMismatch)
 	if !bytes.Equal(before, readPinFixtureLock(t, fixture.dir)) {
@@ -224,11 +232,11 @@ func TestPinSetIntegrationAcquiredMembersAndRollback(t *testing.T) {
 	original := http.DefaultTransport
 	http.DefaultTransport = server.Client().Transport
 	t.Cleanup(func() { http.DefaultTransport = original })
-	fixture := newPinSetIntegrationFixture(t, "dependencies: [{name: cwe, version: 1.2.3}, {name: tool, version: 2.0.0}, {name: late, version: 3.0.0}]\n")
+	fixture := newPinSetIntegrationFixture(t, "dependencies: [{name: nvke-controller, version: 1.2.3}, {name: tool, version: 2.0.0}, {name: late, version: 3.0.0}]\n")
 	fixture.run("tag", "late/v3.0.0")
 	fixture.registry.Sources["umbrella"].PinSet.Members["b-tool"] = PinSetMember{Artifact: "tool", Path: "dependencies[name=tool].version"}
 	fixture.registry.Sources["umbrella"].PinSet.Members["z-late"] = PinSetMember{Source: "late", Path: "dependencies[name=late].version"}
-	fixture.registry.Sources["late"] = Source{Repo: fixture.registry.Sources["cwe"].Repo, TagPrefix: "late/v", PinnedBy: "umbrella"}
+	fixture.registry.Sources["late"] = Source{Repo: fixture.registry.Sources["nvke-controller"].Repo, TagPrefix: "late/v", PinnedBy: "umbrella"}
 	fixture.registry.Components["tool"] = rawComponent{
 		Platforms: []string{"linux/amd64", "linux/arm64"}, PinnedBy: "umbrella", OutputType: "raw",
 		Prebuilt: &Prebuilt{URL: server.URL + "/tool/{{.Version}}/{{.Arch}}", Evidence: &ExternalEvidence{None: true}},
@@ -259,7 +267,7 @@ func TestPinSetIntegrationAcquiredMembersAndRollback(t *testing.T) {
 			t.Fatal("independent artifact update performed resolution or wrote a lock")
 		}
 	}
-	fixture.commitManifest(t, "dependencies: [{name: cwe, version: 1.2.3}, {name: tool, version: 2.1.0}, {name: late, version: 3.1.0}]\n", "umbrella/v1.1.0")
+	fixture.commitManifest(t, "dependencies: [{name: nvke-controller, version: 1.2.3}, {name: tool, version: 2.1.0}, {name: late, version: 3.1.0}]\n", "umbrella/v1.1.0")
 	beforeRequests := requests.Load()
 	update, err := UpdateSourcePins(t.Context(), SourcePinRequest{Directory: fixture.dir, Sources: []string{"umbrella"}, Tag: "1.1.0"})
 	assertCatalogContractCode(t, err, e.CodeFetchFailed)
@@ -286,14 +294,14 @@ func TestPinSetIntegrationAcquiredMembersAndRollback(t *testing.T) {
 func TestPinSetIntegrationExplicitNestedSets(t *testing.T) {
 	fixture := newPinSetIntegrationFixture(t, "")
 	fixture.run("tag", "agent/v3.4.5")
-	source := fixture.registry.Sources["cwe"]
+	source := fixture.registry.Sources["nvke-controller"]
 	source.PinSet = &PinSet{File: "nested.lock", Members: map[string]PinSetMember{"agent": {Source: "agent", Path: "dependencies[name=agent].version"}}}
-	fixture.registry.Sources["cwe"] = source
-	fixture.registry.Sources["agent"] = Source{Repo: source.Repo, TagPrefix: "agent/v", PinnedBy: "cwe"}
+	fixture.registry.Sources["nvke-controller"] = source
+	fixture.registry.Sources["agent"] = Source{Repo: source.Repo, TagPrefix: "agent/v", PinnedBy: "nvke-controller"}
 	fixture.writeRegistry(t)
 	update := fixture.pin(t, "1.0.0")
 	lock := fixture.lock(t)
-	if update.Changed != 3 || lock.Pins["agent"].Tag != "agent/v3.4.5" || lock.Pins["agent"].DerivedFrom != "cwe@"+lock.Pins["cwe"].Commit {
+	if update.Changed != 3 || lock.Pins["agent"].Tag != "agent/v3.4.5" || lock.Pins["agent"].DerivedFrom != "nvke-controller@"+lock.Pins["nvke-controller"].Commit {
 		t.Fatalf("explicit nested set was not derived from immediate umbrella: %+v", lock.Pins)
 	}
 	if _, err := LoadContext(t.Context(), Dir(fixture.dir)); err != nil {
@@ -301,7 +309,7 @@ func TestPinSetIntegrationExplicitNestedSets(t *testing.T) {
 	}
 	// Closing the declared ownership cycle must fail at registry admission.
 	agent := fixture.registry.Sources["agent"]
-	agent.PinSet = &PinSet{File: "Chart.lock", Members: map[string]PinSetMember{"umbrella": {Source: "umbrella", Path: "dependencies[name=cwe].version"}}}
+	agent.PinSet = &PinSet{File: "Chart.lock", Members: map[string]PinSetMember{"umbrella": {Source: "umbrella", Path: "dependencies[name=nvke-controller].version"}}}
 	fixture.registry.Sources["agent"] = agent
 	umbrella := fixture.registry.Sources["umbrella"]
 	umbrella.PinnedBy = "agent"
@@ -387,11 +395,11 @@ func TestPinSetImageRuntimeSelection(t *testing.T) {
 				Prebuilt: &Prebuilt{Image: "example.invalid/tool:{{.Version}}", Evidence: &ExternalEvidence{None: true}}}
 			version := "1.2.3"
 			if sourceOwned {
-				image.Source = "cwe"
+				image.Source = "nvke-controller"
 			} else {
-				delete(fixture.registry.Sources, "cwe")
+				delete(fixture.registry.Sources, "nvke-controller")
 				delete(fixture.registry.Components, "controller")
-				fixture.registry.Sources["umbrella"].PinSet.Members["a-cwe"] = PinSetMember{Artifact: "image", Path: "dependencies[name=cwe].version"}
+				fixture.registry.Sources["umbrella"].PinSet.Members["a-nvke-controller"] = PinSetMember{Artifact: "image", Path: "dependencies[name=nvke-controller].version"}
 				image.PinnedBy = "umbrella"
 			}
 			fixture.registry.Components["image"] = image

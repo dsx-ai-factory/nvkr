@@ -124,8 +124,8 @@ func PrepareNativeAssets(ctx context.Context, cfg NativeAssetConfig) (assets Nat
 	selections := []nativeImageSelection{
 		{"ovn", cfg.DeploymentRun, ovnOutput, "", lifecycle.Artifact{}, guestPlatform},
 		{"capnico", providersRun, "capnico-controller-" + arch, "", lifecycle.Artifact{}, guestPlatform},
-		{"controller", controllerRun, "cwe", "docker.io/library/nke-controller:latest", lifecycle.Artifact{}, guestPlatform},
-		{"profiles", cfg.DeploymentRun, profilesOutput, "docker.io/library/cwe-profiles:local", lifecycle.Artifact{}, guestPlatform},
+		{"controller", controllerRun, "nvke-controller", "docker.io/library/nke-controller:latest", lifecycle.Artifact{}, guestPlatform},
+		{"profiles", cfg.DeploymentRun, profilesOutput, "docker.io/library/nvke-controller-profiles:local", lifecycle.Artifact{}, guestPlatform},
 		{"provisioned-provider", cfg.BootstrapRun, "cluster-api-provider-provisioned-" + arch, "docker.io/library/cluster-api-provider-provisioned:latest", lifecycle.Artifact{}, guestPlatform},
 	}
 	if cfg.RuntimeRun != "" {
@@ -619,6 +619,48 @@ func cleanNativeImageProjection(ctx context.Context, projection *os.Root) error 
 	return nil
 }
 
+// nativeNKTPReleasePath is the deploy path's NKTP item, which names the chart
+// source: a path in the NVKE tree, or a Helm repository.
+const nativeNKTPReleasePath = "deploy/nico/nktp/release.yaml"
+
+// admitNativeNKTPChart requires the chart a by-path NKTP item installs. NVKE
+// releases before the in-tree chart's removal install it from the bundle; later
+// ones name a repository, so the bundle carries no chart.
+func admitNativeNKTPChart(ctx context.Context, installer string) error {
+	raw, err := readRunFile(ctx, installer, nativeNKTPReleasePath, 64<<10)
+	if err != nil {
+		return err
+	}
+	var release struct {
+		Chart struct {
+			Path       string `yaml:"path"`
+			Repository string `yaml:"repository"`
+		} `yaml:"chart"`
+	}
+	if err := yaml.Unmarshal(raw, &release); err != nil {
+		return fmt.Errorf("native installer NKTP release: %w", err)
+	}
+	if (release.Chart.Path == "") == (release.Chart.Repository == "") {
+		return errors.New("native installer NKTP release must name exactly one chart path or repository")
+	}
+	if release.Chart.Repository != "" {
+		return nil
+	}
+	// nvke-deploy.sh uses an absolute chart path as given, which the installer
+	// cannot carry, and resolves a relative one against the deploy path.
+	if strings.HasPrefix(release.Chart.Path, "/") || filepath.IsAbs(release.Chart.Path) {
+		return errors.New("native installer NKTP chart path must be relative to the deploy path")
+	}
+	chart := filepath.Join("deploy", "nico", filepath.FromSlash(release.Chart.Path), "Chart.yaml")
+	if !filepath.IsLocal(chart) {
+		return errors.New("native installer NKTP chart path leaves the installer")
+	}
+	if _, err := readRunFile(ctx, installer, chart, 64<<10); err != nil {
+		return errors.Join(err, errors.New("native installer omits the NKTP chart its release installs by path"))
+	}
+	return nil
+}
+
 // Admit the source-owned provider selection at extraction time, before image
 // preparation or any later network/VM work. deployFromHost rechecks these bytes
 // at its executable boundary before invoking clusterctl.
@@ -639,8 +681,8 @@ func extractNativeInstaller(ctx context.Context, archive, installer string, sele
 	if err := safeExtractAssets(ctx, archive, installer, []string{
 		"SOURCE_COMMIT", "CAPI_VERSION", nativeSiteSpecPath, "make/tool-versions.mk", "deploy/nvke-deploy.sh", "deploy/lib/nvke-deploy-items.py",
 		"deploy/lib/render-template.py", "deploy/nico/nvke-deploy.yaml",
-		"deploy/nico/capnico/release.yaml",
-		"controller/deploy/charts/controller/Chart.yaml", "nktp/deploy/charts/nktp/Chart.yaml",
+		"deploy/nico/capnico/release.yaml", nativeNKTPReleasePath,
+		"controller/deploy/charts/controller/Chart.yaml",
 		"controller/nico-sim/internal/seed/default-seed.yaml", "controller/nico-sim/ui/index.html",
 		"controller/deploy/k8s/capi-spiffe-exec-auth/capi-controller-manager.yaml",
 		releasePrefix + "machineimage.yaml",
@@ -659,6 +701,9 @@ func extractNativeInstaller(ctx context.Context, archive, installer string, sele
 		return nil, err
 	}
 	selection.siteSpecDigest = plainSHA(spec)
+	if err := admitNativeNKTPChart(ctx, installer); err != nil {
+		return nil, err
+	}
 	selection.controller, err = selectNativeControllerIdentity(ctx, installer)
 	if err != nil {
 		return nil, err

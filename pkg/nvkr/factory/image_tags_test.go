@@ -18,12 +18,12 @@ func TestImageTagsRequireExactAggregateBeforeCatalogIO(t *testing.T) {
 		aggregate            bool
 	}{
 		{"unknown", "missing", authored.OutputOCI, true},
-		{"native image", "cwe", authored.OutputOCI, false},
-		{"binary", "cwe", authored.OutputExecutable, false},
-		{"chart", "cwe", authored.OutputHelm, false},
+		{"native image", "nvke-controller", authored.OutputOCI, false},
+		{"binary", "nvke-controller", authored.OutputExecutable, false},
+		{"chart", "nvke-controller", authored.OutputHelm, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			output := authored.DefinitionOutput{Name: "cwe", Platform: "linux/amd64", Components: []string{"controller"}, Format: tc.format}
+			output := authored.DefinitionOutput{Name: "nvke-controller", Platform: "linux/amd64", Components: []string{"controller"}, Format: tc.format}
 			if tc.aggregate {
 				output.Platform = ""
 				output.Platforms = []string{"linux/amd64", "linux/arm64"}
@@ -42,7 +42,7 @@ func TestImageTagsRequireExactAggregateBeforeCatalogIO(t *testing.T) {
 func TestImageTagsRemainTransportOnlyAndIndependentlyOwned(t *testing.T) {
 	original := imageIndexTestPlan(t)
 	environment := original.Environment.Clone()
-	environment.Publication.ImageTags = map[string]string{"cwe": "candidate-two"}
+	environment.Publication.ImageTags = map[string]string{"nvke-controller": "candidate-two"}
 	changed := compileImageIndexFixture(t, original, environment)
 	if changed.EnvironmentDigest == original.EnvironmentDigest {
 		t.Fatal("image tags absent from transport identity")
@@ -60,16 +60,16 @@ func TestImageTagsRemainTransportOnlyAndIndependentlyOwned(t *testing.T) {
 			t.Fatal("image tags changed output Build identity")
 		}
 	}
-	environment.Publication.ImageTags["cwe"] = "caller-changed"
-	if changed.Environment.Publication.ImageTags["cwe"] != "candidate-two" || changed.Targets[outputPublicationRoute("cwe")].ImageTags["cwe"] != "candidate-two" {
+	environment.Publication.ImageTags["nvke-controller"] = "caller-changed"
+	if changed.Environment.Publication.ImageTags["nvke-controller"] != "candidate-two" || changed.Targets[outputPublicationRoute("nvke-controller")].ImageTags["nvke-controller"] != "candidate-two" {
 		t.Fatal("compiler retained caller map")
 	}
-	changed.Targets[outputPublicationRoute("cwe")].ImageTags["cwe"] = "target-changed"
-	if changed.Environment.Publication.ImageTags["cwe"] != "candidate-two" {
+	changed.Targets[outputPublicationRoute("nvke-controller")].ImageTags["nvke-controller"] = "target-changed"
+	if changed.Environment.Publication.ImageTags["nvke-controller"] != "candidate-two" {
 		t.Fatal("target shares Environment map")
 	}
 	for name, target := range changed.Targets {
-		if name != outputPublicationRoute("cwe") && len(target.ImageTags) != 0 {
+		if name != outputPublicationRoute("nvke-controller") && len(target.ImageTags) != 0 {
 			t.Fatalf("unrelated publication inherited aliases: %s", name)
 		}
 	}

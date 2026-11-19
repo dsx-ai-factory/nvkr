@@ -21,6 +21,14 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 	if err := environment.Validate(); err != nil {
 		return err
 	}
+	if environment.Publication != nil && environment.Publication.BootSelection != nil {
+		if err := environment.Publication.BootSelection.ValidateOutputs(definition.Outputs); err != nil {
+			return err
+		}
+	}
+	if err := admitScannerPlatforms(definition, environment); err != nil {
+		return err
+	}
 	for _, output := range definition.Outputs {
 		for _, target := range nativeOutputSelections(output) {
 			if _, _, err := environment.OutputUtility(target.Platform); err != nil {
@@ -91,6 +99,32 @@ func admitInputs(definition authored.Definition, environment authored.Environmen
 	}
 	if environment.Signing != nil && environment.Signing.Mode == SigningModeCosign && definition.CosignTool == "" {
 		return e.New(e.CodeTrustPolicyMissing, "cosign signing requires Definition.cosignTool")
+	}
+	return nil
+}
+
+// Legacy acquisition names bind one platform each. Detect conflicts from the
+// authored selections before loading catalogs, while retaining distinct names.
+func admitScannerPlatforms(definition authored.Definition, environment authored.Environment) error {
+	if environment.UtilityContainers != nil {
+		return nil
+	}
+	platforms := map[string]string{}
+	if definition.SBOMTool != "" {
+		platforms[definition.SBOMTool] = environment.UtilityPlatform
+	}
+	for _, tool := range definition.InternalTools {
+		scanner := tool.SBOMTool
+		if scanner == "" {
+			scanner = definition.SBOMTool
+		}
+		if scanner == "" {
+			continue
+		}
+		if previous, exists := platforms[scanner]; exists && previous != tool.Platform {
+			return e.New(e.CodeEngineCapability, "scanner %q selects multiple platforms; per-platform utility containers are required", scanner)
+		}
+		platforms[scanner] = tool.Platform
 	}
 	return nil
 }

@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dsx-ai-factory/nvkr/internal/readbudget"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/name"
@@ -407,9 +408,11 @@ func helmTagPublishError(err error, tag name.Tag, chart string) error {
 // push, pull, and resolve paths.
 func registryOptions(ctx context.Context, options RegistryOptions) []remote.Option {
 	remoteOptions := []remote.Option{remote.WithContext(ctx), remote.WithUserAgent("nvkr/delivery")}
+	base := readbudget.Transport(ctx, remote.DefaultTransport)
 	if observer, ok := ctx.Value(registryObserverKey{}).(*registryObserver); ok {
-		remoteOptions = append(remoteOptions, remote.WithTransport(observer.transport(remote.DefaultTransport)))
+		base = observer.transport(base)
 	}
+	remoteOptions = append(remoteOptions, remote.WithTransport(base))
 	switch {
 	case options.Anonymous:
 		return append(remoteOptions, remote.WithAuth(authn.Anonymous))

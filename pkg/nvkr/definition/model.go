@@ -29,6 +29,7 @@ const (
 	DefinitionKind                    = "Definition"
 	EnvironmentAPIVersion             = "nvkr.dev/environment/v1"
 	EnvironmentObjectStoresAPIVersion = "nvkr.dev/environment/v2"
+	EnvironmentBootAPIVersion         = "nvkr.dev/environment/v3"
 	EnvironmentKind                   = "Environment"
 	OutputExecutable                  = "executable"
 	OutputOCI                         = "oci"
@@ -60,6 +61,7 @@ type Definition struct {
 	Kind       string             `json:"kind"`
 	Metadata   Metadata           `json:"metadata"`
 	Catalog    Catalog            `json:"catalog"`
+	Catalogs   []Catalog          `json:"catalogs,omitempty"`
 	SBOMTool   string             `json:"sbomTool,omitempty"`
 	CosignTool string             `json:"cosignTool,omitempty"`
 	Outputs    []DefinitionOutput `json:"outputs"`
@@ -123,7 +125,7 @@ type Environment struct {
 	// GitHubARC explicitly selects the trusted native KVM pool policy. It is
 	// configuration, not provider isolation or runtime-capacity evidence.
 	GitHubARC string `json:"githubARC,omitempty"`
-	// DiskEvidence selects the M2 producer-evidence contract; empty requires deep inspection.
+	// DiskEvidence selects the NVKE producer-evidence contract; empty requires deep inspection.
 	DiskEvidence string `json:"diskEvidence,omitempty"`
 	// GitHubDispatchBranches adds exact branch names to default-branch manual execution.
 	GitHubDispatchBranches []string                         `json:"githubDispatchBranches,omitempty"`
@@ -162,6 +164,7 @@ type Publication struct {
 	// OCIRepresentation is an authored construction choice, never negotiated by push.
 	OCIRepresentation ociformat.Representation `json:"ociRepresentation,omitempty"`
 	ObjectStores      []ObjectStoreDestination `json:"objectStores,omitempty" yaml:"objectStores,omitempty"`
+	BootSelection     *BootSelection           `json:"bootSelection,omitempty" yaml:"bootSelection,omitempty"`
 	// Transports is a sorted, unique selection. Omission preserves the OCI route.
 	// APT is recognized but unavailable until its publication adapter is admitted.
 	Transports []string `json:"transports,omitempty"`
@@ -221,6 +224,19 @@ func (definition Definition) Validate() error {
 	}
 	if !namePattern.MatchString(definition.Metadata.Name) || definition.Catalog.Base == "" || len(definition.Outputs) == 0 {
 		return e.New(e.CodeInvalidCatalog, "definition requires a canonical name, catalog and outputs")
+	}
+	if len(definition.Catalogs) > 64 {
+		return e.New(e.CodeInvalidCatalog, "definition catalogs exceeds 64 stacks")
+	}
+	for i, candidate := range definition.Catalogs {
+		if candidate.Base == "" {
+			return e.New(e.CodeInvalidCatalog, "definition catalogs[%d] has an empty base", i)
+		}
+		for _, earlier := range definition.Catalogs[:i] {
+			if sameCatalog(candidate, earlier) {
+				return e.New(e.CodeInvalidCatalog, "definition repeats catalog stack %q", candidate.Base)
+			}
+		}
 	}
 	for _, tool := range []string{definition.SBOMTool, definition.CosignTool} {
 		if tool != "" && !namePattern.MatchString(tool) {
@@ -301,7 +317,7 @@ func (definition Definition) Digest() (string, error) {
 }
 
 func (environment Environment) Validate() error {
-	if (environment.APIVersion != EnvironmentAPIVersion && environment.APIVersion != EnvironmentObjectStoresAPIVersion) || environment.Kind != EnvironmentKind || !namePattern.MatchString(environment.Metadata.Name) {
+	if (environment.APIVersion != EnvironmentAPIVersion && environment.APIVersion != EnvironmentObjectStoresAPIVersion && environment.APIVersion != EnvironmentBootAPIVersion) || environment.Kind != EnvironmentKind || !namePattern.MatchString(environment.Metadata.Name) {
 		return e.New(e.CodeInvalidCatalog, "environment has unsupported apiVersion/kind or invalid name")
 	}
 	if err := environment.validateObjectStores(); err != nil {

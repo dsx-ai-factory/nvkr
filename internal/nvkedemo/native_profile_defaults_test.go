@@ -11,8 +11,10 @@ import (
 )
 
 func TestNativeSmallProfilePreservesBaselineDefaultBytes(t *testing.T) {
-	// Exact-byte snapshots independently captured from PR base
-	// 334db4d5cfcc53c8dc4316830de1f4fe093944f2 in a separate clean source tree.
+	// Fixed snapshots protect default configuration from small-profile changes.
+	// Startup includes the four NKTP queue directories and the renamed
+	// nvke-controller-profiles image. The other snapshots retain the independently
+	// captured 334db4d5cfcc53c8dc4316830de1f4fe093944f2 bytes.
 	startup, err := SiteStartupUserData(startupTestContext(t), startupDescription())
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +37,7 @@ func TestNativeSmallProfilePreservesBaselineDefaultBytes(t *testing.T) {
 		raw  []byte
 		want string
 	}{
-		{"startup", []byte(startup), "4cdac004fa5ea6a7ff551396cf047993cdb371d53bf3a056674d927b097f8d6b"},
+		{"startup", []byte(startup), "9aa597faff4cab41d371bf4952d89f10a2f4623a391ca4a1d4b764f66d084002"},
 		{"telemetry", telemetry, "724ea863abea959ff0c1ef30a07457f2e94f1f4d13ba8350a908fa53671910b5"},
 		{"NVIDIA OVN", []byte(nvidia), "7502273181c4c11400e4724075443b2bd640f4aac74729a30f8f5dfdc295dac4"},
 		{"upstream OVN", []byte(upstream), "426c3268fec023c938cbf3e638ec182ddc8291455dcd8ce3a7139b0663c15691"},

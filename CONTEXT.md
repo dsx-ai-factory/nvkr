@@ -19,6 +19,8 @@ _Avoid_: Factory, FactoryDefinition, cluster definition
 Separately selected execution settings, required publication transports and namespace, credential references,
 and signing identity policy. Container execution defaults to Docker; local Runs inherit the Environment
 runtime and reject conflicting executable overrides before work. Podman is an explicit alternative.
+Local execution may resolve a versioned build-only default instead of an authored Environment; the exact
+policy bytes and digest are frozen with the Plan and Run. This grants no signing, publication or VM capability.
 Selecting an unavailable transport fails before work; a supported sibling cannot
 substitute for it. An explicit OCI representation selects construction before packaging and signing;
 it changes Environment and Plan identity, not logical Build identity or existing publication bytes.
@@ -98,12 +100,15 @@ releases their named outputs through one Plan, Run and Release.
 units U1–U8, including complete-composite hosted qualification with independent policies, are implemented
 and contract-tested. The [evidence ledger](docs/adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
 owns hosted publication, qualification and independent consumer-acceptance status.
+The composite supplies all maintained NVKE production, development and floating-source nightly bundles.
+The explicit ADR-26 U10 maintainer cutover supersedes the former retirement prerequisites; it does not
+establish independent consumer acceptance or change member Build identities.
 _Avoid_: Recipe, selection group, parent Release, association file, include
 
 **Effective Definition**:
 The derived ordinary Definition that composite admission produces by merging its members, with every output's
-catalog stack made explicit. It is an internal record, recorded by digest in the composite's Plan; it is never
-authored or selected as input.
+catalog locator rebased and its shared ordered catalog candidates preserved. It is an internal record,
+recorded by digest in the composite's Plan; it is never authored or selected as input.
 _Avoid_: Flattened file, combined candidate, authored Definition
 
 **Declared variant**:
@@ -167,7 +172,10 @@ The complete generated closure of admitted Definition and Environment values, in
 packaging, routes and executable dependencies for a Run. Producer operations reference the single executable
 build instruction; observations are recorded separately. There is no authored compiler-handoff document.
 Readable views, linked graph exports and semantic comparisons describe the validated Plan; they do not replace
-its canonical stored bytes or grant execution or evidence authority.
+its canonical identity bytes or grant execution or evidence authority. GitHub bundle storage splits
+the Plan into a per-bundle index and shared frozen records and command files under
+[ADR-21's storage contract](docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold).
+The loader reconstructs the same canonical bytes before execution. Packed canonical bytes remain the wire and Tekton form.
 An opted-in dispatch-frozen Plan records an explicit repository/main allowlist's exact
 commits, trees and source timestamps together with captured authored inputs. Workers,
 retries and qualification reuse that selection; independent dependency and toolchain pins
@@ -267,6 +275,14 @@ and complete verification establish acceptance. It changes neither Build identit
 subject and grants no destination authorization, boot, installation or qualification claim.
 _Avoid_: New signed release, successful upload flag, mutable channel, atomic bucket transaction
 
+**Selective boot-asset publication**:
+Opt-in copy of named QCOW2/EFI bytes and original proofs, with complete OCI Release membership and separate preliminary, completion and selected-artifact receipts. Core APIs are implemented; generated execution and external acceptance remain deferred. [ADR-20](docs/adr/0020-artifact-publication-and-target-configuration.md#selective-boot-asset-publication-and-machineimage-binding) owns the contract.
+_Avoid_: Partial mirror success, new Release, checksum as membership
+
+**MachineImage render artifact**:
+Proposed signed CR artifact for declared disk/architecture/destination pairs. Its own Build includes byte-affecting serving configuration; its eventual aggregate/content/inventory digests are excluded. Downstream NVKE owns deployment; the artifact grants no registration, placement or disk-selection authority.
+_Avoid_: Final Release root, selected-verification receipt, installed machine
+
 ## Evidence and authority
 
 **External test producer**:
@@ -340,7 +356,7 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
-documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. M2 and the M3 MVP
+documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. NVKE and the M3 MVP
 retain producer-only disk evidence. Strict inspection and material reconciliation are deferred hardening.
 Embedded-component declarations are optional: omission is not applicable, while any authored declaration must
 match its referenced pinned upstream metadata. That comparison does not establish effective customized or

@@ -135,6 +135,61 @@ func TestDiskEvidenceRejectsHostileCompletePlanBeforeRuntimeWork(t *testing.T) {
 	}
 }
 
+func TestDiskEvidenceGroupAdmitsEveryNamedOutput(t *testing.T) {
+	for _, condition := range []string{
+		"valid", "wrong second name", "wrong second digest", "mutated Plan after admission",
+		"empty valid Plan", "empty invalid Plan",
+	} {
+		t.Run(condition, func(t *testing.T) {
+			base, _ := diskMaterialTraceFixtureWithCapture(t, false, false, "linux/amd64", "none", "acquisitions.tar")
+			definition := base.Definition.Clone()
+			sibling := definition.Outputs[0]
+			sibling.Name = "zz-sibling"
+			definition.Outputs = append(definition.Outputs, sibling)
+			stack, err := catalog.ApplyStack(base.CatalogSnapshot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan, err := Compile(t.Context(), definition, base.Environment, stack, "test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			expected := append([]LifecycleOutputPlan(nil), plan.LifecycleOutputs...)
+			builds, err := admitDiskEvidenceBuilds(plan, expected)
+			if err != nil || len(builds) != 2 || builds[0].Name == builds[1].Name || builds[0].BuildDigest != builds[1].BuildDigest {
+				t.Fatalf("equal-digest named outputs were not independently admitted: %v", err)
+			}
+			want := e.CodePipelineDrift
+			switch condition {
+			case "valid":
+				return
+			case "empty valid Plan":
+				builds, err = admitDiskEvidenceBuilds(plan, nil)
+				if err != nil || len(builds) != 0 {
+					t.Fatalf("empty group returned %d builds and error %v", len(builds), err)
+				}
+				return
+			case "wrong second name":
+				expected[1].Name = "not-planned"
+			case "wrong second digest":
+				expected[1].BuildDigest = "sha256:" + strings.Repeat("9", 64)
+			case "mutated Plan after admission", "empty invalid Plan":
+				if condition == "empty invalid Plan" {
+					expected = nil
+				}
+				plan.Builds[1].Platform = "linux/riscv64"
+				plan.Builds[1].Graph.Platform = "linux/riscv64"
+				want = e.CodeInvalidCatalog
+			}
+			builds, err = admitDiskEvidenceBuilds(plan, expected)
+			assertFactoryErrorCode(t, err, want)
+			if len(builds) != 0 {
+				t.Fatal("rejected group returned partially admitted builds")
+			}
+		})
+	}
+}
+
 func TestProductionDiskEvidenceRequiresPrivateScratchAtConsumption(t *testing.T) {
 	for _, scratch := range []string{"private-volume", "memory", ""} {
 		t.Run(scratch, func(t *testing.T) {

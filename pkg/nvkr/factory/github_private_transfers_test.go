@@ -583,7 +583,11 @@ func TestGitHubPrivateTransferProjectionRemainsStableAcrossSourcePins(t *testing
 		t.Fatal(err)
 	}
 	for name, raw := range first.Files {
-		if name != first.PlanPath && name != githubActionDataPathFor(before) && !bytes.Equal(raw, second.Files[name]) {
+		if name == first.PlanPath ||
+			isPlanStoreRecord(name) {
+			continue
+		}
+		if !bytes.Equal(raw, second.Files[name]) {
 			t.Fatalf("source pin update changed private transport implementation %s", name)
 		}
 	}

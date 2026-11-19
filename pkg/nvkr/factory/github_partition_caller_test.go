@@ -84,7 +84,7 @@ func TestGitHubPartitionActionlint(t *testing.T) {
 		t.Fatal(err)
 	}
 	engageGitHubPartitions(t)
-	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -226,7 +226,7 @@ func assertGitHubPartitionMembership(t *testing.T, plan *Plan, entry []byte, wor
 }
 
 func TestGitHubPartitionMaintainedCapacity(t *testing.T) {
-	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,7 +272,7 @@ func TestGitHubPartitionMaintainedCapacity(t *testing.T) {
 }
 
 func TestGitHubPartitionDependenciesCrossSigningBoundary(t *testing.T) {
-	plan, err := LoadPlanContext(t.Context(), "../../../"+FactoryPlanPath)
+	plan, err := LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}

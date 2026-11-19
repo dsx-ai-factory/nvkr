@@ -13,7 +13,7 @@ native `helm-oci` chart artifacts, and file inventories do not establish deploym
 
 | Requested change | Authored owner |
 |---|---|
-| Outputs, components, platforms, formats, default and per-output catalog stacks (base + ordered overlays), purpose-selected tools, Helm/APT bindings | Definition |
+| Outputs, components, platforms, formats, shared catalog candidates, default and per-output catalog stacks (base + ordered overlays), purpose-selected tools, Helm/APT bindings | Definition |
 | Runtime, runner/classes, resource ceilings, destination, credential references, signing policy | Environment |
 | Source declarations, version constraints, complete producer commands, materials, output metadata and build toolchains | Catalog `registry.yaml` |
 | Replace a producer or substitute an admitted toolchain for a defined scope | Catalog overlay referenced from a Definition catalog stack |
@@ -21,15 +21,19 @@ native `helm-oci` chart artifacts, and file inventories do not establish deploym
 
 Create a customer-owned input directory or edit the explicitly selected existing inputs. Copy a suitable
 example only after checking its paths and scope; rebase relative references deliberately. For a new single-output
-executable Definition, `definition init` prints a starting file from explicit catalog components; follow the
-[lifecycle guide](../../../../docs/lifecycle.md#start-a-small-executable-definition) to make its absolute catalog
-path relative before committing it. Read the current
+Definition, `definition init --destination <in-checkout-file>` prints a starting file from explicit catalog
+components and a selected format, with catalog references relative to that destination. Follow the
+[lifecycle guide](../../../../docs/lifecycle.md#start-a-small-executable-definition) for the root and Environment
+selection rules. Read the current
 loader/schema and admitted examples rather than inventing fields. Prefer declarations using supported builders
 over new NVKR Go code. Never place real credentials in YAML or generated Plans.
 
 Keep the Definition/Environment boundary intact. Select exact producer keys and required material closure;
 matching names or source URLs do not imply interchangeability. Output-specific catalog stacks are complete and
-overlays bind exact predecessors. Do not silently refresh a stale overlay or independently bump a derived
+overlays bind exact predecessors. An optional top-level `catalogs` list must contain exactly one complete
+match for each output without an override; order never breaks collisions. Use an explicit override for
+ambiguous names, and inspect the selected catalog through `run plan`. The singular `catalog` still owns
+shared utility and action pins. Do not silently refresh a stale overlay or independently bump a derived
 pin-set member.
 
 For GitHub generation or standalone CLI diagnostics, follow [consumer toolchain access](../../../../docs/toolchain-maintenance.md#declare-consumer-access)
@@ -81,7 +85,7 @@ all byte-exact checks to pass. Keep excluded variants and downstream profile str
 lock-derived command values, use the catalog guide's opt-in `sourceMetadata` bindings; commit-only pins
 require explicit, chart-validated stream metadata. Report changed Build Digests when migrating bindings.
 
-Never hand-edit `pins.lock.yaml`, generated `.github/workflows/nvkr-run.yml`, or managed `.github/nvkr-run/`
+Never hand-edit `pins.lock.yaml`, generated `.github/workflows/nvkr-run-nvke.yml`, or managed `.github/nvkr-run-nvke/`
 members. Use the selected inputs and same CLI identity for generation and `--check`. Root generation is
 appropriate only when explicitly updating that root's owned bundle; alternate examples belong in a scratch
 root. Follow the maintained Definition's own instructions when its committed bundle uses a different generator

@@ -94,7 +94,7 @@ func TestNVKECompositeAdmission(t *testing.T) {
 		mutate        func(*authored.CompositeDefinition)
 		code          e.Code
 	}{
-		{name: "combined Definition as extra member", code: e.CodeInvalidCatalog, message: "is declared by members",
+		{name: "combined Definition as extra member", code: e.CodeInvalidCatalog, message: "catalog list differs",
 			extra: authored.CompositeMember{Name: combined.Metadata.Name, Definition: "definition.yaml", Digest: combinedDigest}},
 		{name: "stale family pin", code: e.CodeUnverifiedRef, message: "run definition pin", mutate: func(composite *authored.CompositeDefinition) {
 			composite.Members[3].Digest = combinedDigest
@@ -122,10 +122,7 @@ func TestNVKECompositeAdmission(t *testing.T) {
 func TestNVKECompositeIdentityInvariance(t *testing.T) {
 	testutil.RequireExtended(t)
 	nvkeSplitRepository(t)
-	combined, err := LoadPlanContext(t.Context(), FactoryPlanPath)
-	if err != nil {
-		t.Fatal(err)
-	}
+	combined := nvkeCombinedPlan(t)
 	loadStack := nvkeSplitCatalogLoader(t, combined)
 	composition, err := admitNVKEComposite(t, nvkeComposite(t))
 	if err != nil {
@@ -209,6 +206,8 @@ func TestNVKECompositeIdentityInvariance(t *testing.T) {
 			if _, combinedOnly := nvkeCombinedOnlyOutputs[output]; excluded[output] || combinedOnly {
 				continue
 			}
+			// Locator descriptions do not change producer or Build identity.
+			build.SelectedCatalog = nil
 			if !bytes.Equal(mustCanonical(t, build), builds[build.Name]) {
 				t.Fatalf("composition changed native build %q relative to %s", build.Name, baseline.Name)
 			}

@@ -13,6 +13,10 @@ import (
 // Clone transfers ownership of every mutable authored value to its new owner.
 func (input Definition) Clone() Definition {
 	input.Catalog.Overlays = append([]string(nil), input.Catalog.Overlays...)
+	input.Catalogs = slices.Clone(input.Catalogs)
+	for i := range input.Catalogs {
+		input.Catalogs[i].Overlays = slices.Clone(input.Catalogs[i].Overlays)
+	}
 	input.InternalTools = slices.Clone(input.InternalTools)
 	for i := range input.InternalTools {
 		tool := &input.InternalTools[i]
@@ -84,8 +88,16 @@ func (input Environment) Clone() Environment {
 		value := *input.Publication
 		value.Transports = slices.Clone(value.Transports)
 		value.ImageTags = maps.Clone(value.ImageTags)
+		if value.BootSelection != nil {
+			selection := value.BootSelection.Clone()
+			value.BootSelection = &selection
+		}
 		value.ObjectStores = slices.Clone(value.ObjectStores)
 		for index := range value.ObjectStores {
+			if value.ObjectStores[index].Serving != nil {
+				serving := *value.ObjectStores[index].Serving
+				value.ObjectStores[index].Serving = &serving
+			}
 			if value.ObjectStores[index].S3 != nil {
 				copyS3 := *value.ObjectStores[index].S3
 				value.ObjectStores[index].S3 = &copyS3

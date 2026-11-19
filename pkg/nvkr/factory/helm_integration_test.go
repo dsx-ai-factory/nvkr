@@ -22,9 +22,9 @@ import (
 // This opt-in integration test uses real produced inputs and a local Helm binary.
 // The ordinary contract suite never treats a skipped external test as evidence.
 func TestPinnedNVKEHelmBinding(t *testing.T) {
-	archive, layout := os.Getenv("NVKR_HELM_ARCHIVE"), os.Getenv("NVKR_CWE_IMAGE_LAYOUT")
+	archive, layout := os.Getenv("NVKR_HELM_ARCHIVE"), os.Getenv("NVKR_NVKE_CONTROLLER_IMAGE_LAYOUT")
 	if archive == "" && layout == "" {
-		t.Skip("set NVKR_HELM_ARCHIVE and NVKR_CWE_IMAGE_LAYOUT for real-input Helm validation")
+		t.Skip("set NVKR_HELM_ARCHIVE and NVKR_NVKE_CONTROLLER_IMAGE_LAYOUT for real-input Helm validation")
 	}
 	if archive == "" || layout == "" {
 		t.Fatal("both real input paths are required")
@@ -41,7 +41,7 @@ func TestPinnedNVKEHelmBinding(t *testing.T) {
 	}
 	defer cleanup()
 	tree := filepath.Join(root, relative)
-	binding := testHelmBinding("package/cwe", ".")
+	binding := testHelmBinding("package/nvke-controller", ".")
 	if err := bindHelmImages(ctx, tree, *binding, map[string]string{"controller": image.ManifestDigest}); err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +50,7 @@ func TestPinnedNVKEHelmBinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	chart := tree
-	for _, repository := range []string{"ghcr.io/nvidia/nvkr/cwe", "mirror.example.test/cwe"} {
+	for _, repository := range []string{"ghcr.io/nvidia/nvkr/nvke-controller", "mirror.example.test/nvke-controller"} {
 		raw, err := exec.CommandContext(ctx, helm, "template", "controller", chart, "--set-string", "image.repository="+repository, "--set-string", "nameOverride=nvkr-binding-controller", "--set-string", "nodeAgent.spireAttestationMethod=tpm").CombinedOutput()
 		if err != nil {
 			t.Fatalf("Helm render: %v\n%s", err, raw)
@@ -115,7 +115,7 @@ func verifyRenderedContainerImage(raw []byte, containerName, repository, digest 
 }
 
 func TestRenderedControllerImage(t *testing.T) {
-	repository := "registry.example.test/nvke/cwe"
+	repository := "registry.example.test/nvke/nvke-controller"
 	digest := "sha256:" + strings.Repeat("a", 64)
 	fixture := func(image string) string {
 		return fmt.Sprintf("apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  annotations:\n    expected: '%s@%s'\nspec:\n  template:\n    spec:\n      containers:\n      - name: nvkr-binding-controller\n        image: %s\n", repository, digest, image)
@@ -127,7 +127,7 @@ func TestRenderedControllerImage(t *testing.T) {
 		{"tag and digest", fixture(repository + ":dev@" + digest), true},
 		{"digest only", fixture(repository + "@" + digest), true},
 		{"digest only in annotation", fixture(repository + ":dev"), false},
-		{"wrong repository", fixture("other.example.test/cwe@" + digest), false},
+		{"wrong repository", fixture("other.example.test/nvke-controller@" + digest), false},
 		{"wrong digest", fixture(repository + "@sha256:" + strings.Repeat("b", 64)), false},
 		{"missing controller", strings.ReplaceAll(fixture(repository+"@"+digest), "nvkr-binding-controller", "sidecar"), false},
 		{"ambiguous controller", fixture(repository+"@"+digest) + "---\n" + fixture(repository+"@"+digest), false},
