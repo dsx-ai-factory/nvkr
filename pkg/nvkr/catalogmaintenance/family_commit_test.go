@@ -233,3 +233,83 @@ func TestFamilyCommitPreservesAlreadyOpenWriter(t *testing.T) {
 		t.Fatal("lost displaced inode edit or failed rollback")
 	}
 }
+
+func TestFamilyRetirementRollbackAndConcurrentSave(t *testing.T) {
+	for _, tc := range []struct {
+		name               string
+		fail, cancel, save bool
+	}{
+		{name: "commit"}, {name: "later failure", fail: true},
+		{name: "cancellation", cancel: true}, {name: "concurrent save", save: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			if err := os.Mkdir("inputs", 0700); err != nil {
+				t.Fatal(err)
+			}
+			snapshot := &familySnapshot{roots: []string{"inputs"}, directories: map[string]bool{"inputs": true}, files: map[string]familyFileState{}}
+			changes := []familyChange{}
+			for _, name := range []string{"inputs/old-object", "inputs/index"} {
+				before := []byte("original-" + name)
+				writeFixture(t, name, before)
+				snapshot.files[name] = familyFileState{digest: sha256.Sum256(before), mode: 0600}
+				changes = append(changes, familyChange{path: name, before: before, after: []byte("new index"), exists: true, mode: 0600})
+			}
+			changes[0].retire, changes[0].after = true, nil
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			err := commitFamilyChangesWithRename(ctx, snapshot, changes, nil, func(from, to string) error {
+				if from == "inputs/index" {
+					if tc.cancel {
+						cancel()
+					}
+					if tc.save {
+						writeFixture(t, "inputs/old-object", []byte("external"))
+					}
+					if tc.fail {
+						return fmt.Errorf("injected index failure")
+					}
+				}
+				return os.Rename(from, to)
+			})
+			if !tc.fail && !tc.cancel && !tc.save {
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err := os.Stat("inputs/old-object"); !os.IsNotExist(err) {
+					t.Fatalf("old object survived: %v", err)
+				}
+				if string(readFixture(t, "inputs/index")) != "new index" {
+					t.Fatal("index not published")
+				}
+				return
+			}
+			code := e.CodeInternal
+			if tc.cancel {
+				code = e.CodeTimeout
+			}
+			if tc.save {
+				code = e.CodeWriteConflict
+			}
+			assertCode(t, err, code)
+			want := "original-inputs/old-object"
+			if tc.save {
+				want = "external"
+			}
+			if string(readFixture(t, "inputs/old-object")) != want || string(readFixture(t, "inputs/index")) != "original-inputs/index" {
+				t.Fatal("rollback lost bytes")
+			}
+			backups, err := filepath.Glob("inputs/.nvkr-family-before-*")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.save {
+				if len(backups) != 1 || string(readFixture(t, backups[0])) != "original-inputs/old-object" {
+					t.Fatal("displaced object backup lost")
+				}
+			} else if len(backups) != 0 {
+				t.Fatal("rollback left backups")
+			}
+		})
+	}
+}

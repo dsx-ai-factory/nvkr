@@ -6,6 +6,7 @@ package catalogmaintenance
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"maps"
 	"os"
 	"path/filepath"
@@ -113,7 +114,7 @@ func bumpFamily(ctx context.Context, configPath, familyName, generatorVersion st
 		}
 	}
 	slices.Sort(result.Consumers)
-	guards := []string{".nvkr-catalog-family.lease", producerOverlayGuard, baseline.ManifestPath + ".lease"}
+	guards := []string{factory.PlanStoreDirectory + ".lease", ".nvkr-catalog-family.lease", producerOverlayGuard, baseline.ManifestPath + ".lease"}
 	for _, run := range closure.runs {
 		guards = append(guards, run.bundle.ManifestPath+".lease")
 	}
@@ -259,10 +260,16 @@ func bumpFamily(ctx context.Context, configPath, familyName, generatorVersion st
 	if err := snapshot.checkOriginals(ctx); err != nil {
 		return result, err
 	}
-	if check {
-		return result, e.New(e.CodeDiff, "family %s would change %d pins across its explicitly selected catalogs", familyName, result.Changed)
+	paths := map[string]bool{factory.PlanStoreIndexPath: true}
+	// The validated snapshot contains only manifest-owned shared objects,
+	// including older records retained by an admitted runtime baseline.
+	baselineStore := map[string]bool{}
+	for name := range snapshot.files {
+		if strings.HasPrefix(name, factory.PlanStoreDirectory+"/") && name != factory.PlanStoreIndexPath {
+			baselineStore[name] = true
+		}
 	}
-	paths := map[string]bool{}
+	retired := map[string]bool{}
 	manifests := map[string]bool{}
 	for name := range snapshot.files {
 		if filepath.Base(name) == catalog.RegistryFile {
@@ -291,35 +298,50 @@ func bumpFamily(ctx context.Context, configPath, familyName, generatorVersion st
 			}
 		}
 	}
-	// Family bump updates an existing closure. Retiring files or changing bytes
-	// outside its explicit owner set requires ordinary authored regeneration.
+	// The owner has checked the final manifests and swept unreferenced store
+	// objects in staging. Other retirements still require authored regeneration.
 	for name, original := range snapshot.files {
 		raw, _, err := readFamilyFile(ctx, filepath.Join(snapshot.root, name))
 		if err != nil {
+			if errors.Is(err, os.ErrNotExist) && baselineStore[name] {
+				retired[name], paths[name] = true, true
+				continue
+			}
 			return result, contextError(ctx, e.Wrap(e.CodeEngineCapability, err, "family bump cannot retire input %q", name))
 		}
 		if sha256.Sum256(raw) != original.digest && !paths[name] {
 			return result, e.New(e.CodeEngineCapability, "family preparation changed an unowned input %q", name)
 		}
 	}
+	if err := snapshot.checkPreparedDirectories(ctx, paths); err != nil {
+		return result, err
+	}
+	if check {
+		return result, e.New(e.CodeDiff, "family %s would change %d pins across its explicitly selected catalogs", familyName, result.Changed)
+	}
 	names := make([]string, 0, len(paths))
 	for name := range paths {
 		names = append(names, name)
 	}
 	slices.Sort(names)
-	// Ownership records become visible only after every payload has committed.
-	slices.SortStableFunc(names, func(a, b string) int {
-		if manifests[a] == manifests[b] {
-			return 0
+	// Publish payloads, then ownership records, then retire unreferenced objects.
+	// The descriptive store index follows the final inventory.
+	phase := func(name string) int {
+		if name == factory.PlanStoreIndexPath {
+			return 3
 		}
-		if manifests[a] {
+		if retired[name] {
+			return 2
+		}
+		if manifests[name] {
 			return 1
 		}
-		return -1
-	})
+		return 0
+	}
+	slices.SortStableFunc(names, func(a, b string) int { return phase(a) - phase(b) })
 	var changes []familyChange
 	for _, name := range names {
-		change, changed, err := snapshot.change(ctx, name)
+		change, changed, err := snapshot.change(ctx, name, retired[name])
 		if err != nil {
 			return result, err
 		}

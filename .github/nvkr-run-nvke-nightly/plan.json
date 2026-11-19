@@ -1,0 +1,409 @@
+{
+  "actions": {
+    "file": ".github/nvkr-plan-store/plan/actions-github@a255839cbafe.json"
+  },
+  "builds": [
+    {
+      "file": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64@f4e696ca4fe6.json",
+      "name": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/linux-arm64@635656dc6741.json",
+      "name": "aicr-nvke-gb200-ubuntu-training-kubeflow-flux"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/linux-arm64@eb368740cd6d.json",
+      "name": "aicr-nvke-gb200-ubuntu-training-kubeflow-helm"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/capi-controller-image/linux-amd64@6c2c822b55fd.json",
+      "name": "capi-controller-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/capi-controller-image-arm64/linux-arm64@794fb274b2b1.json",
+      "name": "capi-controller-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/capi-kubeadm-bootstrap-image/linux-amd64@e5ca0029de80.json",
+      "name": "capi-kubeadm-bootstrap-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/capi-kubeadm-bootstrap-image-arm64/linux-arm64@776511fc46bd.json",
+      "name": "capi-kubeadm-bootstrap-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/capi-kubeadm-control-plane-image/linux-amd64@e492c9a95c43.json",
+      "name": "capi-kubeadm-control-plane-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/capi-kubeadm-control-plane-image-arm64/linux-arm64@ebb848d3acae.json",
+      "name": "capi-kubeadm-control-plane-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/capnico-controller/linux-amd64@c4a85c79a9c5.json",
+      "name": "capnico-controller/linux/amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/capnico-controller/linux-arm64@ecc5ab4a95b1.json",
+      "name": "capnico-controller/linux/arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/cert-manager-cainjector-image/linux-amd64@1df81a58ceac.json",
+      "name": "cert-manager-cainjector-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/cert-manager-cainjector-image-arm64/linux-arm64@1371548dc911.json",
+      "name": "cert-manager-cainjector-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/cert-manager-controller-image/linux-amd64@771bdc5a4b9c.json",
+      "name": "cert-manager-controller-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/cert-manager-controller-image-arm64/linux-arm64@b68ed68d70c9.json",
+      "name": "cert-manager-controller-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/cert-manager-webhook-image/linux-amd64@46e0e8ecd5c6.json",
+      "name": "cert-manager-webhook-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/cert-manager-webhook-image-arm64/linux-arm64@3f2051d52411.json",
+      "name": "cert-manager-webhook-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/cluster-api-provider-provisioned/linux-amd64@66baa43f2608.json",
+      "name": "cluster-api-provider-provisioned/linux/amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/cluster-api-provider-provisioned/linux-arm64@62a24a2aebee.json",
+      "name": "cluster-api-provider-provisioned/linux/arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/controller-chart/linux-amd64@0192068bb904.json",
+      "name": "controller-chart"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/controller-profiles/linux-amd64@d5935c9f11f8.json",
+      "name": "controller-profiles/linux/amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/controller-profiles/linux-arm64@7b1c154f024c.json",
+      "name": "controller-profiles/linux/arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/csi-node-driver-registrar-image/linux-amd64@52b076809116.json",
+      "name": "csi-node-driver-registrar-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/csi-node-driver-registrar-image-arm64/linux-arm64@88d3c087ee72.json",
+      "name": "csi-node-driver-registrar-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/local-path-helper-image/linux-amd64@f2d59545c5f3.json",
+      "name": "local-path-helper-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/local-path-helper-image-arm64/linux-arm64@3ec7f2ed21c7.json",
+      "name": "local-path-helper-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/local-path-provisioner/linux-amd64@d09a0eda5b81.json",
+      "name": "local-path-provisioner"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/local-path-provisioner-arm64/linux-arm64@b65afe7554b4.json",
+      "name": "local-path-provisioner-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/local-path-provisioner-image/linux-amd64@a106e92bd5ce.json",
+      "name": "local-path-provisioner-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/local-path-provisioner-image-arm64/linux-arm64@b76c3e63b078.json",
+      "name": "local-path-provisioner-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp/linux-amd64@3f81c2b2c026.json",
+      "name": "nktp"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-collector-image/linux-amd64@52df43025961.json",
+      "name": "nktp-collector-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-collector-image-arm64/linux-arm64@934d8514ebca.json",
+      "name": "nktp-collector-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-kube-state-metrics-image/linux-amd64@4a8e4df918aa.json",
+      "name": "nktp-kube-state-metrics-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-kube-state-metrics-image-arm64/linux-arm64@4c9570c6412c.json",
+      "name": "nktp-kube-state-metrics-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-kubectl-image/linux-amd64@7aaea144279f.json",
+      "name": "nktp-kubectl-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-kubectl-image-arm64/linux-arm64@9b377a66d15f.json",
+      "name": "nktp-kubectl-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-lgtm-image/linux-amd64@b5d57c315bf5.json",
+      "name": "nktp-lgtm-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-lgtm-image-arm64/linux-arm64@71f7a551ed02.json",
+      "name": "nktp-lgtm-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-metrics-server-image/linux-amd64@340bdd80cbb2.json",
+      "name": "nktp-metrics-server-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-metrics-server-image-arm64/linux-arm64@01bb95ef9672.json",
+      "name": "nktp-metrics-server-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-node-exporter-image/linux-amd64@75b7f77c70c8.json",
+      "name": "nktp-node-exporter-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-node-exporter-image-arm64/linux-arm64@027d916c18bc.json",
+      "name": "nktp-node-exporter-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-operator-image/linux-amd64@a485c16f376b.json",
+      "name": "nktp-operator-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-operator-image-arm64/linux-arm64@f89eae1ff638.json",
+      "name": "nktp-operator-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-target-allocator-image/linux-amd64@e59716b07aac.json",
+      "name": "nktp-target-allocator-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nktp-target-allocator-image-arm64/linux-arm64@43d060d1a125.json",
+      "name": "nktp-target-allocator-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-controller/linux-amd64@22b5aadefc13.json",
+      "name": "nvke-controller/linux/amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-controller/linux-arm64@66086be34316.json",
+      "name": "nvke-controller/linux/arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-node-fde-amd64/linux-amd64@6a9cb3ad988e.json",
+      "name": "nvke-node-fde-amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-node-fde-arm64/linux-arm64@fb5bea0d4db1.json",
+      "name": "nvke-node-fde-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-amd64/linux-amd64@0759e6c1fb98.json",
+      "name": "nvke-node-fde-ubuntu24-amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-node-fde-ubuntu24-arm64/linux-arm64@7e3dc9999e38.json",
+      "name": "nvke-node-fde-ubuntu24-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-node-image-amd64/linux-amd64@3a08511f2e5f.json",
+      "name": "nvke-node-image-amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-node-image-arm64/linux-arm64@34af8b7a0ddf.json",
+      "name": "nvke-node-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-amd64/linux-amd64@d8c9e24f4b80.json",
+      "name": "nvke-node-image-ubuntu24-amd64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvke-node-image-ubuntu24-arm64/linux-arm64@5740eb4efd8f.json",
+      "name": "nvke-node-image-ubuntu24-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvkectl/linux-amd64@89cd5659237e.json",
+      "name": "nvkectl"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/nvkectl-linux-arm64/linux-arm64@91098961f1cf.json",
+      "name": "nvkectl-linux-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/operator-tools/linux-amd64@5ac226c238b6.json",
+      "name": "operator-tools"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/operator-tools-linux-arm64/linux-arm64@cff1fefd2cb1.json",
+      "name": "operator-tools-linux-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/postgresql/linux-amd64@c3f192953302.json",
+      "name": "postgresql"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/postgresql-image/linux-amd64@1d35a7be702f.json",
+      "name": "postgresql-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/postgresql-image-arm64/linux-arm64@25bacb628e6b.json",
+      "name": "postgresql-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spiffe-csi-image/linux-amd64@220a31d5a505.json",
+      "name": "spiffe-csi-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spiffe-csi-image-arm64/linux-arm64@0a341b69a27b.json",
+      "name": "spiffe-csi-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire/linux-amd64@3bf36b27fb95.json",
+      "name": "spire"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-agent-image/linux-amd64@caf8496907f8.json",
+      "name": "spire-agent-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-agent-image-arm64/linux-arm64@73237821917a.json",
+      "name": "spire-agent-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-bash-image/linux-amd64@4f2fb4a72873.json",
+      "name": "spire-bash-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-bash-image-arm64/linux-arm64@03133a3850d2.json",
+      "name": "spire-bash-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-controller-manager-image/linux-amd64@ce0b2973fc3c.json",
+      "name": "spire-controller-manager-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-controller-manager-image-arm64/linux-arm64@33bfc6ff0b5e.json",
+      "name": "spire-controller-manager-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-crds/linux-amd64@dd9fb64b40aa.json",
+      "name": "spire-crds"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-oidc-image/linux-amd64@d76f1669d733.json",
+      "name": "spire-oidc-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-oidc-image-arm64/linux-arm64@2b19930cd2c6.json",
+      "name": "spire-oidc-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-server-image/linux-amd64@25af06aeb7cf.json",
+      "name": "spire-server-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-server-image-arm64/linux-arm64@e611aab31304.json",
+      "name": "spire-server-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-tpm-server-image/linux-amd64@eeb04b5c21c1.json",
+      "name": "spire-tpm-server-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/spire-tpm-server-image-arm64/linux-arm64@72d835055ded.json",
+      "name": "spire-tpm-server-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/temporal/linux-amd64@3b63f9572a2d.json",
+      "name": "temporal"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/temporal-admin-tools-image/linux-amd64@8182a582ca6f.json",
+      "name": "temporal-admin-tools-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/temporal-admin-tools-image-arm64/linux-arm64@e8265936779c.json",
+      "name": "temporal-admin-tools-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/temporal-server-image/linux-amd64@2a175daaef8e.json",
+      "name": "temporal-server-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/temporal-server-image-arm64/linux-arm64@b1b15993fc19.json",
+      "name": "temporal-server-image-arm64"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/temporal-ui-image/linux-amd64@93c2010bfe45.json",
+      "name": "temporal-ui-image"
+    },
+    {
+      "file": ".github/nvkr-plan-store/steps/temporal-ui-image-arm64/linux-arm64@1b39ba7092a1.json",
+      "name": "temporal-ui-image-arm64"
+    }
+  ],
+  "catalogDigest": "sha256:abb063dd6200cfdd7324d2dcfc5319857c3c47904efa09f2023123befcdc54ae",
+  "catalogSnapshots": {
+    "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99": {
+      "file": ".github/nvkr-plan-store/plan/catalog-nvke-deployment-images@ad8da4320a73.json"
+    },
+    "sha256:981ee13a811402292ecebadf45629ce01bbca126d58d83a4e535a606a1e33417": {
+      "file": ".github/nvkr-plan-store/plan/catalog-tools@a83ce2fc8db2.json"
+    },
+    "sha256:9b4f94bf46bb8ddb7dd3c33791dea5698505b7d8cd035fef4df74d0858f21e35": {
+      "file": ".github/nvkr-plan-store/plan/catalog-aicr@c43061df9ae6.json"
+    },
+    "sha256:9bc477c5d41d1a66c9cb5aca4e5e5b58d0f09a65ed0939b6a32f37ae971daa9e": {
+      "file": ".github/nvkr-plan-store/plan/catalog-local-path-provisioner@fcddb073c9a6.json"
+    },
+    "sha256:abb063dd6200cfdd7324d2dcfc5319857c3c47904efa09f2023123befcdc54ae": {
+      "file": ".github/nvkr-plan-store/plan/catalog-nvke@71bdc84b6094.json"
+    },
+    "sha256:c6864cb2ccc890ba3238641c1bedb4aafe3866f0aa84a091d986f3168316ab33": {
+      "file": ".github/nvkr-plan-store/plan/catalog-node-images@afa5078c36a1.json"
+    },
+    "sha256:db146195c3ef82e670bd5dfdacd63a91fd643e0ca79daf42b18da65e82d67261": {
+      "file": ".github/nvkr-plan-store/plan/catalog-node-images@e71c0a37ae36.json"
+    }
+  },
+  "composition": {
+    "file": ".github/nvkr-plan-store/plan/composition-nvke-gpu-site@657b11c3ba7b.json"
+  },
+  "definition": {
+    "file": ".github/nvkr-plan-store/plan/definition-nvke-gpu-site@b3a77aa2c9f8.json"
+  },
+  "definitionDigest": "sha256:a2aeb671bfb4bc9f212e0c9cdc6e3bd5e831c599ba269803319b7f41cbe74e2f",
+  "definitionPath": "inputs/definitions/nvke/gpu-site.composite.yaml",
+  "environment": {
+    "file": ".github/nvkr-plan-store/plan/environment-nvke-nightly-github@9f17df7ab4af.json"
+  },
+  "environmentDigest": "sha256:9d3d4c5cfa34b1a41c425b507712ee7edd5d05aae8b1bccec5f5eefb8dc8b844",
+  "environmentPath": "inputs/environments/github-nvke-nightly-gpu-site.yaml",
+  "generatorVersion": "dev (unknown)",
+  "graph": {
+    "file": ".github/nvkr-plan-store/plan/graph-nvke-gpu-site@2797310a4527.json"
+  },
+  "lifecycleOutputs": {
+    "file": ".github/nvkr-plan-store/plan/outputs-nvke-gpu-site@d6307d7bf56f.json"
+  },
+  "name": "nvke-gpu-site",
+  "qualification": "pipeline-attested",
+  "routes": {
+    "file": ".github/nvkr-plan-store/plan/routes-nvke-gpu-site@0ad15842cec4.json"
+  },
+  "schemaVersion": "nvkr.dev/run-plan/v6",
+  "storage": "nvkr-plan-tree-v1",
+  "targets": {
+    "file": ".github/nvkr-plan-store/plan/targets-nvke-gpu-site@980ae1d636e7.json"
+  }
+}

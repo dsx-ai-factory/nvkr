@@ -3,8 +3,8 @@
 
 apiVersion: nvkr.dev/catalog-overlay/v3
 kind: CatalogOverlay
-name: nvke-m2-native-toolchains
-requiresCatalogDigest: sha256:decafe1447981f2371d684912307ec0273eb156ee2eb9975d6c1a085f6869237
+name: nvke-native-toolchains
+requiresCatalogDigest: sha256:4afb4e97f617e3c348fca7b42e9f9cb5fd2d627c58bec8242cff9ea43b77c663
 toolchainSubstitutions:
 - arch: amd64
   components:

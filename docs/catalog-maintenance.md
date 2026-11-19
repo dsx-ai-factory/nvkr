@@ -27,9 +27,9 @@ all sources in that catalog and does not enroll any other catalog. Family mode r
 name and no `--dir`; it uses the policy's explicit roots rather than discovering repositories by URL.
 The scheduled `catalog refresh` workflow retains its existing selected-source behavior.
 
-The maintained NVKE family selects 25 root entries across 11 catalogs used by the maintained Plans.
-`controller-profiles/nvidia-arm64`, `node-images/diagnostic`, `nvke/local-site-arm64` and
-`nvke/module-cli-arm64` remain separate cohorts. All selected roots must have identical repository,
+The maintained NVKE family selects 21 source roles across four domain catalogs used by the maintained Plans.
+Their shared source identities also advance the diagnostic node-image, NVIDIA profile, local-site CLI/controller
+and module CLI consumers. The separately pinned local-site Helm and NKTP sources remain outside this family. All selected roots must have identical repository,
 tag prefix and constraint text and resolve the same release identity. Their module, patch, toolchain,
 vendoring and packaging contracts remain distinct. Shared fragments already consolidate equivalent
 source declarations; equal commits alone do not make source roles interchangeable.
@@ -39,7 +39,9 @@ Family bump is supported only on a checkout the operator exclusively owns, with 
 Family preparation validates the current overlay and generated closure, resolves every selected lock,
 then renders overlays and consumer bundles in a bounded private input copy. Resolution or validation
 failure writes no working files. Applying acquires the owners' writer guards, rechecks original bytes,
-stages replacements and recovery copies, then commits payloads before manifests. It revalidates the
+stages replacements and recovery copies, then commits payloads before manifests. Under the shared Plan-store
+guard, it retires only baseline objects the generator removed in staging and publishes the derived index last.
+Directory changes require ordinary authored regeneration and are refused before commitment. It revalidates the
 captured baseline and checks the expected complete input/output state before success. Replacement retains
 the actual displaced file and publishes without replacing a racing save; paths can briefly be absent,
 so do not use the checkout concurrently for compilation or execution. Ordinary commit errors
@@ -52,7 +54,7 @@ After repairing a failed rollback, remove the reported `.nvkr-family-before-*` a
 running owner checks; qualification directories reject files outside their declared inventory.
 
 The maintained Ubuntu24 overlay's six NVKE producer copies also follow explicit source roles in
-`node-images/release`. Their complete packaging, patch, vendoring and toolchain declarations remain
+`node-images`. Their complete packaging, patch, vendoring and toolchain declarations remain
 authored in the overlay maintenance policy; source pin values come from the named catalog producers.
 The agent package's version uses the selected tag. Native toolchain substitutions and all maintained
 overlay predecessor bindings regenerate through the overlay owner. Previously approved TCG/local-KVM
@@ -129,10 +131,10 @@ producer copies, plus the native NVIDIA overlay copied from the release node-ima
 refresh policy checks these overlays before pin work and regenerates them before Run generation. This does
 not enroll OVN sources in scheduled bumping or change their release constraints.
 For NVIDIA TCG pin updates, follow the commands beside its
-[source catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/ovn-nvidia/README.md).
+[source catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/ovn/nvidia/notes/ovn-nvidia-README.md).
 For the native NVIDIA overlay, update the release node-image catalog instead: review the constraints for
 both `ovn-kubernetes` and `nvke-cni-ovn-source`, then use `catalog pin` with
-`--dir inputs/catalogs/node-images/release` to pin each source to the same reviewed revision. Review the
+`--dir inputs/catalogs/node-images` to pin each source to the same reviewed revision. Review the
 release producers' version and commit constants in that same change; they do not inherit the TCG catalog's
 source-metadata bindings. Keep lock updates machine-managed. Then regenerate the copies:
 
@@ -161,10 +163,10 @@ The migration retains existing output membership. Its remaining copies have expl
 | `node-images/variants/nvidia-tcg.json` | Generated from `ovn-nvidia`; its distinct node-image producer remains explicitly frozen in the maintenance input. |
 | `node-images/variants/upstream-tcg.json` | Generated from `ovn-upstream`, after NVIDIA TCG. A NVIDIA bump updates its predecessor binding while preserving its upstream pin. |
 | `node-images/variants/nvidia-local-kvm.json`, `upstream-local-kvm.json` | Their existing complete node-image replacements stay frozen; only dependent predecessor bindings are regenerated. |
-| `node-images/variants/native-nvidia.json` | Generated from the three OVN producers in `node-images/release`; the release catalog owns their maintained `nvke-*` package contract and source pins. |
+| `node-images/variants/native-nvidia.json` | Generated from the three OVN producers in `node-images`; the release catalog owns their maintained `nvke-*` package contract and source pins. |
 | `node-images/variants/upstream-kvm.json` | Retains its explicit upstream 1.4.0 snapshot; only predecessor bindings regenerate. |
 | `node-images/variants/nvidia-kvm.json` | Retains the known mismatch: commit `26cc199de8e814a7fe6d899a770fc04df0bbc2f9`, stream 1.5.18, versus the candidate NVIDIA 2.4.2 stream. It is not silently upgraded. |
-| `node-images/diagnostic` | Retains its separate source-owned package producers and upstream pin. |
+| Diagnostic node-image producers in `node-images` | Retain distinct packaging contracts while following the shared family source pins. |
 | Controller profile package streams and deployment requests | Remain downstream-owned selections. Integration checks require the selected profile stream to match its producer; coordinate a stream change explicitly. |
 
 These paths are under `inputs/catalogs/`. No build, deployment compatibility or qualification is established
@@ -310,8 +312,8 @@ applies the patch to `catalog-maintenance/<definition>` and opens or updates the
 closes a stale PR and deletes its branch. The `refresh` job writes the PR body with `jq` from the `catalog
 refresh --json` result, so the body is part of the rendered workflow. Unlike `GITHUB_TOKEN` writes, the App's
 branch updates and PR events start the PR's own workflow runs without a maintainer approving them. Because the
-token can write workflows, a candidate whose closure regenerates a generated workflow file (`nvkr-run.yml` and,
-when named, `nvkr-dev.yml`, `nvkr-qualify.yml`, `nvkr-smoke.yml` or an additional Run's workflow) is published
+token can write workflows, a candidate whose closure regenerates a generated workflow file (`nvkr-run-nvke.yml` and,
+when named, `nvkr-dev.yml`, `nvkr-qualify-nvke.yml`, `nvkr-smoke-nvke.yml` or an additional Run's workflow) is published
 like any other generated file; patch admission still refuses every other workflow path. An ordinary source or
 artifact pin change leaves every generated workflow byte-identical (it updates the lock, Plans and manifests);
 the pin-only fixtures assert this for the production, development and qualification workflows. A topology,
@@ -374,7 +376,7 @@ interruption between the two converges on the next run. The one file matching
 prefix `<d>` only names the review branch `catalog-maintenance/<d>`. Adding or removing such a file is a reviewed
 change. Exactly one policy can be enrolled until each Definition owns a generated bundle root, because
 `catalog refresh` always checks the bundle at the repository root; rendering and the `discover` job both fail on
-a second policy. Today only `nvke` is enrolled, for the `nvke-m2` Definition. Its policy selects the NVKE
+a second policy. Today only `nvke` is enrolled, for the `nvke` Definition. Its policy selects the NVKE
 umbrella and `nvke-helm`, so the NVKE release and its derived chart pins move together within the registry
 constraints. It cannot widen them.
 
@@ -434,7 +436,7 @@ constraints. It cannot widen them.
   `pull_request` runs, and the required checks are a merge precondition; they are repository settings and are
   not enforced by this workflow. The maintained
   Run stays manual and default-branch-only, so candidate execution and qualification are separate runs that
-  nothing here performs or claims. A `static` policy such as `nvke-m2` is validated by the PR checks only;
+  nothing here performs or claims. A `static` policy such as `nvke` is validated by the PR checks only;
   `local-run` cannot execute its Environment.
 - **Repository settings the workflow does not enforce.** These are hard prerequisites. The release owner or a
   repository administrator must validate them before anyone relies on scheduled writes; this repository does
@@ -479,7 +481,7 @@ catalog-refresh-check`: it renders `catalog update-ci` with the canonical genera
 difference from `.github/workflows/catalog-refresh.yaml`. The merge gate's regeneration job runs it, and a
 change to the installed file triggers that job. The policy file is a CODEOWNERS trust root, because it decides
 which pins move and which bundles are regenerated. A changed shared lock is tested against the production and
-development bundles with real local Git fixtures, and a pin-only change is asserted to leave `nvkr-run.yml`
+development bundles with real local Git fixtures, and a pin-only change is asserted to leave the fixture workflow
 byte-identical. A runtime-Plan member whose committed Plan lags the lock passes the closure check through its
 own owner, an edited workflow byte in it is still refused before pin work, and its regeneration moves the Plan
 but not the workflow. An additional Run's colliding pin-set root is refused before compilation fetches it. A
@@ -499,7 +501,8 @@ moves only the `nvke` and `nvke-helm` pins and regenerates the bundles, so it ch
 Today the exact `v0.23.0` constraints keep refreshes a no-op. Before a constraint allows the NVKE release to
 move, review and update together, in one authored change: the selection source pin, the image references and
 their native digest locks, the Definition's image outputs, the qualification policy's `nonToolOutputs`, and the
-expected images in `pkg/nvkr/buildgraph/nvke_m2_images_test.go`. That test fails, naming this section, when the
+expected images in `TestMaintainedNVKEDeploymentImageMembership` in `pkg/nvkr/buildgraph/nvke_images_test.go`.
+That test names its source file and this section when the
 selection commit and the controller's NVKE commit diverge. Maintenance does not perform or check this
 coordination; it is a documented limit, not a capability.
 

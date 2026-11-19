@@ -122,3 +122,36 @@ func TestFamilySnapshotExcludesOnlyNamedLeaseGuards(t *testing.T) {
 	writeFixture(t, ".github/policy.lease", []byte("changed"))
 	assertCode(t, snapshot.checkOriginals(t.Context()), e.CodeWriteConflict)
 }
+
+func TestFamilyPreparedDirectoryMembership(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		removed, added bool
+	}{
+		{name: "same directory"}, {name: "retired directory", removed: true}, {name: "new directory", added: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			directory := ".github/nvkr-plan-store/scripts/producer"
+			if err := os.MkdirAll(filepath.Join(root, directory), 0700); err != nil {
+				t.Fatal(err)
+			}
+			snapshot := &familySnapshot{root: root, directories: map[string]bool{directory: true}}
+			output := directory + "/build@0123456789ab.sh"
+			if tc.removed {
+				if err := os.Remove(filepath.Join(root, directory)); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if tc.added {
+				output = ".github/nvkr-plan-store/scripts/new/build@0123456789ab.sh"
+			}
+			err := snapshot.checkPreparedDirectories(t.Context(), map[string]bool{output: true})
+			if tc.removed || tc.added {
+				assertCode(t, err, e.CodeEngineCapability)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

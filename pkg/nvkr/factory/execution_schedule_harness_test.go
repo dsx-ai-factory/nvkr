@@ -79,9 +79,7 @@ func loadHarnessGraphs(t *testing.T) []harnessGraph {
 	var names []string
 	// Committed Plans are the drift-checked compilations of the NVKE Definitions.
 	for _, path := range []string{
-		GitHubDevelopmentPlanPath, FactoryPlanPath,
-		".github/nvkr-run-nvke-core/plan.json", ".github/nvkr-run-nvke-services/plan.json",
-		".github/nvkr-run-nvke-telemetry/plan.json", ".github/nvkr-run-nvke-disks/plan.json",
+		GitHubDevelopmentPlanPath, maintainedNVKEPlanPath, ".github/nvkr-run-nvke-nightly/plan.json",
 	} {
 		plan, err := LoadPlanContext(t.Context(), path)
 		if err != nil {

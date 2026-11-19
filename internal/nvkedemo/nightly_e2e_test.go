@@ -289,5 +289,5 @@ func nightlyControllerOutput(profile NightlyProfile) string {
 	if profile.ControllerOutput != "" {
 		return profile.ControllerOutput
 	}
-	return "cwe"
+	return "nvke-controller"
 }

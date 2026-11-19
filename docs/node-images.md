@@ -17,7 +17,7 @@ metadata:
   name: nvke-os-arm64-kvm
   description: Build the ARM64 non-FDE NVKE node QCOW2 on a native KVM host.
 catalog:
-  base: ../../catalogs/node-images/diagnostic
+  base: ../../catalogs/node-images
   overlays:
     - ../../catalogs/node-images/variants/diagnostic-arm64-kvm.yaml
 outputs:
@@ -45,7 +45,7 @@ are errors. **Selecting only the root does not expand its dependencies.**
 
 ## Connect producers by exact names
 
-The [catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/node-images/diagnostic/registry.yaml) declares these `materials` mappings:
+The [catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/node-images/registry.yaml) declares these `materials` mappings:
 
 | Consuming component | Binding name → supplying component |
 |---|---|

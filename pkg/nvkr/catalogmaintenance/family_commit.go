@@ -22,6 +22,7 @@ type familyChange struct {
 	path          string
 	before, after []byte
 	exists        bool
+	retire        bool
 	mode          os.FileMode
 }
 
@@ -94,7 +95,7 @@ func commitFamilyChangesWithRename(ctx context.Context, snapshot *familySnapshot
 		if err := ctx.Err(); err != nil {
 			return contextError(ctx, err)
 		}
-		if !safeRelative(change.path) {
+		if !safeFamilyPath(change.path) {
 			return e.New(e.CodeUsage, "unsafe family output path")
 		}
 		if err := admitPath(filepath.Dir(change.path)); err != nil {
@@ -128,7 +129,10 @@ func commitFamilyChangesWithRename(ctx context.Context, snapshot *familySnapshot
 				continue
 			}
 			var err error
-			if file.change.exists {
+			if file.change.retire {
+				// Restore without replacing a file created after retirement.
+				err = os.Link(file.before, file.change.path)
+			} else if file.change.exists {
 				keep, replaceErr := replaceFamilyFile(context.WithoutCancel(ctx), file.change.path, file.before, file.after, file.change.after, file.change.mode, os.Rename)
 				err = replaceErr
 				if keep {
@@ -171,7 +175,11 @@ func commitFamilyChangesWithRename(ctx context.Context, snapshot *familySnapshot
 		}
 		var err error
 		if file.change.exists {
-			keep, replaceErr := replaceFamilyFile(ctx, file.change.path, file.after, file.before, file.change.before, file.change.mode, rename)
+			candidate := file.after
+			if file.change.retire {
+				candidate = ""
+			}
+			keep, replaceErr := replaceFamilyFile(ctx, file.change.path, candidate, file.before, file.change.before, file.change.mode, rename)
 			err = replaceErr
 			if keep {
 				retained[file.before] = true
@@ -202,7 +210,11 @@ func commitFamilyChangesWithRename(ctx context.Context, snapshot *familySnapshot
 	expected := maps.Clone(snapshot.files)
 	ignored := map[string]bool{}
 	for _, file := range files {
-		expected[file.change.path] = familyFileState{digest: sha256.Sum256(file.change.after), mode: file.change.mode}
+		if file.change.retire {
+			delete(expected, file.change.path)
+		} else {
+			expected[file.change.path] = familyFileState{digest: sha256.Sum256(file.change.after), mode: file.change.mode}
+		}
 		ignored[file.after] = true
 		if file.change.exists {
 			expected[file.before] = familyFileState{digest: sha256.Sum256(file.change.before), mode: file.change.mode}
@@ -236,6 +248,9 @@ func replaceFamilyFile(ctx context.Context, target, candidate, displaced string,
 	if err != nil || !bytes.Equal(raw, expected) || gotMode != mode {
 		return restore(e.New(e.CodeWriteConflict, "family output %q changed during replacement", target))
 	}
+	if candidate == "" {
+		return false, nil
+	}
 	if err := os.Link(candidate, target); err != nil {
 		return restore(err)
 	}
@@ -267,17 +282,23 @@ func stageFamilyFile(ctx context.Context, target string, raw []byte, mode os.Fil
 	return name, nil
 }
 
-func (snapshot *familySnapshot) change(ctx context.Context, name string) (familyChange, bool, error) {
+func (snapshot *familySnapshot) change(ctx context.Context, name string, retire bool) (familyChange, bool, error) {
 	candidate, _, err := readFamilyFile(ctx, filepath.Join(snapshot.root, name))
-	if err != nil {
+	if err != nil && !(retire && errors.Is(err, os.ErrNotExist)) {
 		return familyChange{}, false, err
+	}
+	if retire && err == nil {
+		return familyChange{}, false, e.New(e.CodeWriteConflict, "retired family member reappeared in staging")
 	}
 	state, exists := snapshot.files[name]
 	mode := os.FileMode(0644)
 	if exists {
 		mode = state.mode
 	}
-	if exists && sha256.Sum256(candidate) == state.digest {
+	if retire && !exists {
+		return familyChange{}, false, e.New(e.CodeWriteConflict, "retirement requires a captured family member")
+	}
+	if !retire && exists && sha256.Sum256(candidate) == state.digest {
 		return familyChange{}, false, nil
 	}
 	var before []byte
@@ -290,5 +311,5 @@ func (snapshot *familySnapshot) change(ctx context.Context, name string) (family
 			return familyChange{}, false, e.New(e.CodeWriteConflict, "family input %q changed during preparation", name)
 		}
 	}
-	return familyChange{path: name, before: before, after: candidate, exists: exists, mode: mode}, true, nil
+	return familyChange{path: name, before: before, after: candidate, exists: exists, retire: retire, mode: mode}, true, nil
 }

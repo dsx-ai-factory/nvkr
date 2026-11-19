@@ -545,7 +545,7 @@ on supported filesystems and publication of a separately versioned catalog-data 
 
 ## Tool release assets
 
-A source may declare `tool` with `format` (`raw` or `tar-gzip`), a version-rendered HTTPS `url`,
+A source may declare `tool` with `format` (`raw`, `tar-gzip` or `zip`), a version-rendered HTTPS `url`,
 `platform` (`linux/amd64` or `linux/arm64`), `executablePath`, and optional `companions`. Tool names are source names; they do not
 include release versions. The same source constraint and tag-prefix selection used by other sources governs
 `catalog pin` and `catalog bump`. A tool may instead declare nonempty sorted unique `platforms`,
@@ -571,7 +571,9 @@ The original `tools` single-pin map remains unchanged for legacy catalogs. Missi
 or ambiguous declarations fail before execution. Regenerate the Run bundle after any tool bump.
 
 An acquired `host-package` producer may set `prebuilt.releaseExecutable: true`
-with one matching-platform source tool declaration. The source tool lock owns
+with a source tool declaration covering every component platform. Graph resolution selects the exact native
+record before lowering; the resulting native graph has the same identity as its single-platform declaration.
+The source tool lock owns
 both transport and selected executable pins; a second component artifact lock,
 authored URL/image/chart or resolved executable record is rejected. Raw assets
 retain their bytes. A tar-gzip asset uses the standard-library codecs to select

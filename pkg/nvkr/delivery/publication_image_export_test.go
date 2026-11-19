@@ -52,13 +52,13 @@ func TestPublicationImageExportUsesHeldClosureAfterSourceReplacement(t *testing.
 				var result Result
 				var index ImageIndexDescription
 				source, result, index = registryImageIndexFixture(t)
-				pin, output = result.RootDigest, "cwe"
+				pin, output = result.RootDigest, "nvke-controller"
 				if scenario == "aggregate arm64" {
 					platform = "linux/arm64"
 				}
 				for _, child := range index.Children {
 					if child.Platform == platform {
-						reference = "registry.example.test/cwe@" + child.ManifestDigest
+						reference = "registry.example.test/nvke-controller@" + child.ManifestDigest
 					}
 				}
 			} else {
@@ -140,15 +140,15 @@ func TestPublicationImageExportRejectsInvalidRequestsWithoutOutput(t *testing.T)
 			defer publication.Close()
 			directory := t.TempDir()
 			out := filepath.Join(directory, "image.tar")
-			ctx, output, platform, reference := t.Context(), "cwe", index.Children[0].Platform, "registry.example.test/cwe@"+index.Children[0].ManifestDigest
+			ctx, output, platform, reference := t.Context(), "nvke-controller", index.Children[0].Platform, "registry.example.test/nvke-controller@"+index.Children[0].ManifestDigest
 			code := e.CodeVerifyFailed
 			switch scenario {
 			case "wrong digest":
-				reference = "registry.example.test/cwe@sha256:" + strings.Repeat("a", 64)
+				reference = "registry.example.test/nvke-controller@sha256:" + strings.Repeat("a", 64)
 			case "other child digest":
-				reference = "registry.example.test/cwe@" + index.Children[1].ManifestDigest
+				reference = "registry.example.test/nvke-controller@" + index.Children[1].ManifestDigest
 			case "tag":
-				reference, code = "registry.example.test/cwe:latest", e.CodeUsage
+				reference, code = "registry.example.test/nvke-controller:latest", e.CodeUsage
 			case "missing platform":
 				platform, code = "", e.CodeUsage
 			case "unsupported platform":
@@ -215,7 +215,7 @@ func TestPublicationImageExportRetainsCompleteAggregateValidation(t *testing.T) 
 		t.Fatal(err)
 	}
 	out := filepath.Join(t.TempDir(), "image.tar")
-	_, err = publication.ExportImage(t.Context(), "cwe", "registry.example.test/cwe@"+index.Children[0].ManifestDigest, index.Children[0].Platform, out)
+	_, err = publication.ExportImage(t.Context(), "nvke-controller", "registry.example.test/nvke-controller@"+index.Children[0].ManifestDigest, index.Children[0].Platform, out)
 	assertRegistryCode(t, err, e.CodeVerifyFailed)
 	if _, err := os.Lstat(out); !os.IsNotExist(err) {
 		t.Fatalf("failed sibling validation exposed output: %v", err)
@@ -269,7 +269,7 @@ func TestPublicationImageExportConcurrentClose(t *testing.T) {
 		out := filepath.Join(t.TempDir(), "image.tar")
 		done := make(chan error, 1)
 		go func() {
-			_, err := exporter.ExportImage(t.Context(), "cwe", "registry.example.test/cwe@"+index.Children[0].ManifestDigest, index.Children[0].Platform, out)
+			_, err := exporter.ExportImage(t.Context(), "nvke-controller", "registry.example.test/nvke-controller@"+index.Children[0].ManifestDigest, index.Children[0].Platform, out)
 			done <- err
 		}()
 		if err := closer.Close(); err != nil {
@@ -298,7 +298,7 @@ func TestPublicationImageExportConcurrentClose(t *testing.T) {
 		}
 		for _, handle := range []*Publication{publication, &copyOf} {
 			directory := t.TempDir()
-			got, err := handle.ExportImage(t.Context(), "cwe", "registry.example.test/cwe@"+index.Children[0].ManifestDigest, index.Children[0].Platform, filepath.Join(directory, "closed.tar"))
+			got, err := handle.ExportImage(t.Context(), "nvke-controller", "registry.example.test/nvke-controller@"+index.Children[0].ManifestDigest, index.Children[0].Platform, filepath.Join(directory, "closed.tar"))
 			assertRegistryCode(t, err, e.CodeGateUnmet)
 			entries, readErr := os.ReadDir(directory)
 			if got != (PublishedImageExport{}) || readErr != nil || len(entries) != 0 {

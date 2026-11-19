@@ -88,10 +88,14 @@ func Resolve(cat *catalog.Catalog, selection Selection) (*Resolved, error) {
 		if selection.OutputFormat == definition.OutputDebianPackage && (!component.FromSource || component.OutputType != "host-package") {
 			return nil, e.New(e.CodeInvalidCatalog, "Debian output requires a from-source host-package producer")
 		}
-		if err := requireComponentRoute(name, component, selection.Platform); err != nil {
+		selected, err := component.ForPlatform(selection.Platform)
+		if err != nil {
 			return nil, err
 		}
-		resolved.Components = append(resolved.Components, catalog.NamedComponent{Name: name, Component: cloneComponent(component)})
+		if err := requireComponentRoute(name, selected, selection.Platform); err != nil {
+			return nil, err
+		}
+		resolved.Components = append(resolved.Components, catalog.NamedComponent{Name: name, Component: cloneComponent(selected)})
 	}
 	if err := catalog.ValidateMaterialSet(resolved.Components); err != nil {
 		return nil, e.Wrap(e.CodeInvalidCatalog, err, "selected output has an incomplete material set")

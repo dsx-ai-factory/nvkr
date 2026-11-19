@@ -125,7 +125,7 @@ func TestFamilyRejectsStaleOverlayPredecessorBeforeResolution(t *testing.T) {
 }
 
 func TestFamilyRegeneratesRuntimeAndQualificationOwners(t *testing.T) {
-	for _, kind := range []string{"runtime", "qualification"} {
+	for _, kind := range []string{"runtime", "lagging runtime", "qualification"} {
 		t.Run(kind, func(t *testing.T) {
 			var cfg Config
 			var promote func(string)
@@ -145,9 +145,23 @@ func TestFamilyRegeneratesRuntimeAndQualificationOwners(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
+			nextRelease := "1.1.0"
+			if kind == "lagging runtime" {
+				promote("1.1.0")
+				if _, err := catalog.UpdateSourcePins(t.Context(), catalog.SourcePinRequest{Directory: cfg.Catalog, Sources: cfg.Sources, SameRelease: cfg.SameRelease, Bump: true}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, cfg.Environment, "test (deadbeef)", "github", ".", false); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, runtimeFixtureEnvironment, "test (deadbeef)", "github", ".", true); err == nil {
+					t.Fatal("runtime baseline must lag pins")
+				}
+				nextRelease = "1.2.0"
+			}
 			cfg.Family = &FamilyPolicy{Name: "fixture", Catalogs: []FamilyCatalog{{Catalog: cfg.Catalog, Sources: cfg.Sources}}}
 			writeJSON(t, "maintenance.yaml", cfg)
-			promote("1.1.0")
+			promote(nextRelease)
 			result, err := BumpFamily(t.Context(), "maintenance.yaml", "fixture", "test (deadbeef)", false)
 			if err != nil || !result.Complete {
 				t.Fatalf("incomplete family owner regeneration: %+v %v", result, err)
@@ -155,7 +169,7 @@ func TestFamilyRegeneratesRuntimeAndQualificationOwners(t *testing.T) {
 			if _, err := generateClosure(t.Context(), cfg, "test (deadbeef)", true, lifecycle.GenerateFiles); err != nil {
 				t.Fatal(err)
 			}
-			if kind == "runtime" {
+			if kind != "qualification" {
 				plan, err := factory.LoadPlanContext(t.Context(), runtimeFixturePlan)
 				if err != nil {
 					t.Fatal(err)

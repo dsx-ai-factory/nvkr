@@ -1,0 +1,60 @@
+{
+  "buildDigest": "sha256:763c348ee65ad4374ae943680de49462ec01ef57a942501b5dfdc10fdbf73091",
+  "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
+  "components": [
+    "temporal-admin-tools-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "temporalio/admin-tools:1.30.3",
+        "component": "temporal-admin-tools-image",
+        "digest": "sha256:f24c619953ba5724f36446cca514ba7dd865c2367873cbad70977caf58a02448",
+        "id": "pull-temporal-admin-tools-image",
+        "imageParentDigest": "sha256:2c2272b008f1af295b3719963e6feeef64f838d1105d895cf6acfcf96dd31741",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-temporal-admin-tools-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "temporal-admin-tools-image",
+  "platform": "linux/amd64",
+  "resolvedComponents": [
+    {
+      "Name": "temporal-admin-tools-image",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:f24c619953ba5724f36446cca514ba7dd865c2367873cbad70977caf58a02448",
+          "arm64": "sha256:2f90b7c95151bb7a3ddf41749681918f70528fd6c90b160a89e05970b678144a"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "temporalio/admin-tools:1.30.3",
+        "imageParentDigest": "sha256:2c2272b008f1af295b3719963e6feeef64f838d1105d895cf6acfcf96dd31741"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0"
+    }
+  ]
+}

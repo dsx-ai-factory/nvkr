@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
 
@@ -87,7 +88,7 @@ func snapshotFamilyInputs(ctx context.Context, config Config, configPath string,
 				return e.Wrap(e.CodeInvalidCatalog, walkErr, "capturing family input %q", filename)
 			}
 			relative := filepath.ToSlash(filename)
-			if !safeRelative(relative) || strings.Count(relative, "/") > 32 || entry.Type()&os.ModeSymlink != 0 {
+			if !safeFamilyPath(relative) || strings.Count(relative, "/") > 32 || entry.Type()&os.ModeSymlink != 0 {
 				return e.New(e.CodeInvalidCatalog, "unsafe family input %q", relative)
 			}
 			destination := filepath.Join(root, filename)
@@ -202,6 +203,32 @@ func (snapshot *familySnapshot) checkState(ctx context.Context, expectedFiles ma
 		expected := expectedFiles[name]
 		if sha256.Sum256(raw) != expected.digest || mode != expected.mode {
 			return e.New(e.CodeWriteConflict, "family input %q changed during preparation", name)
+		}
+	}
+	return nil
+}
+
+// This is path admission for copying, not generated ownership. The factory
+// authenticates store names, digests and manifests before any family mutation.
+func safeFamilyPath(name string) bool {
+	return safeRelative(name) || (strings.HasPrefix(name, factory.PlanStoreDirectory+"/") && safeRelative(strings.ReplaceAll(name, "@", "-")))
+}
+
+// Family pin changes retain the directory layout. Ordinary authored generation
+// owns creation and pruning; refusing here prevents a successful but dirty store.
+func (snapshot *familySnapshot) checkPreparedDirectories(ctx context.Context, paths map[string]bool) error {
+	for name := range snapshot.directories {
+		if err := ctx.Err(); err != nil {
+			return contextError(ctx, err)
+		}
+		info, err := os.Lstat(filepath.Join(snapshot.root, name))
+		if err != nil || !info.IsDir() {
+			return e.New(e.CodeEngineCapability, "family bump changes directory %q; regenerate through the authored bundle owners", name)
+		}
+	}
+	for name := range paths {
+		if !snapshot.directories[filepath.ToSlash(filepath.Dir(name))] {
+			return e.New(e.CodeEngineCapability, "family bump creates a directory for %q; regenerate through the authored bundle owners", name)
 		}
 	}
 	return nil

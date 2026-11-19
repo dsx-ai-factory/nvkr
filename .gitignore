@@ -9,6 +9,7 @@
 # local engine workspace: cloned sources + build artifacts (hundreds of MB)
 /.nvkr/
 # persistent local coordination inodes for generated workflow bundle updates
+/.github/nvkr-plan-store.lease
 /.github/nvkr-run/*.lease
 /.github/nvkr-run-*/*.lease
 /.github/nvkr-qualification/*.lease

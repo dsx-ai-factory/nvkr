@@ -9,6 +9,10 @@ validate edited workflow/policy bytes captured after initial admission. Publicat
 displaced bytes and uses no-replace links; paths may briefly be absent. These contracts do not
 establish cross-file crash atomicity, hosted family maintenance or producer execution. Scheduled refresh
 retains its existing source selection and separate owner transactions.
+Family commitment holds the shared Plan-store guard, publishes manifests before retiring captured
+objects removed by ordinary staged generation, and writes the derived index last. Injected tests cover
+retirement rollback, cancellation and concurrent saves. Directory additions or retirements require
+ordinary authored regeneration and are refused before commitment.
 The family path generates static authored bundles without freezing runtime source heads, then repeats
 owner checks. Runtime-source fixtures retain capture refusal and exact-commit dispatch admission; family
 generation supplies neither a frozen snapshot nor a source commit. Explicit source-bound Ubuntu24 copies
@@ -95,6 +99,35 @@ Stable worker paths are derived from the current Plan without previous-output in
 The rename changes generated workflow bytes and ownership manifests, not Plan or Build identity.
 Hosted execution of the renamed bundles remains unrecorded.
 
+GitHub Plan storage follows [ADR-21's shared-store contract](../0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold).
+Local contracts cover exact canonical round trips, malformed references, missing or altered objects, unowned objects, cross-bundle retirement, whole-bundle removal and rename, interrupted-write recovery, concurrent writers and readers, aggregate bounds and runtime pin refresh.
+The loader does not render workflows or actions; complete closure checks remain with generation and runtime bootstrap.
+Packed inputs, CLI JSON and Tekton retain the canonical representation.
+The Plan schema and digest contracts are unchanged.
+The 2026-11-17 three-folder simplification preserves the exact reconstructed canonical bytes, three Plan Digests and 261 named Build Digests of the retained development, NVKE and nightly NVKE bundles at `b5109e62dbf95de245669fafd3e76968bd90ac9a`.
+The store contains 22 Plan records, 87 step records with inline component configurations and source pins,
+62 byte-identical scripts and one shared navigation index. Its only object folders are `plan`, `steps` and `scripts`.
+Across the store and three private bundle directories, the change reduces files from 441 to 236,
+nested directories from 218 to 187 and bytes from 3,460,553 to 2,977,305 (excluding workflows and local locks).
+The store itself grows from 2,166,150 to 2,668,669 bytes because configurations are inline;
+removing duplicated per-bundle indexes and reducing manifest membership saves 985,767 bytes elsewhere.
+Named object paths remain unchanged when neighboring bundles are added, removed or reordered;
+the shared index groups variants and records their full hashes and bundle users.
+One graph object contains the unchanged 941 nodes and 1,537 artifacts shared by all three bundles.
+Hosted execution of the simplified layout remains unrecorded.
+
 Invocation data is regenerated from the Plan and is not a bundle member;
 `TestGitHubActionDataIsTransientAndRetired` covers omission, prior-owned retirement and refusal of
 modified or unowned copies. Hosted execution of the regenerated bundles remains unrecorded.
+
+The generated shared `index.json` links each GitHub execution job/step to its frozen producer record,
+exact script files and owning bundle workflows. Identical operations share one entry across bundles;
+exact command operands remain in the step record. Plan loads do not consult this descriptive index.
+`TestGitHubScriptIndexConnectsJobsToExactCommands` covers flat/partition routing, byte-exact script references,
+shared job and bundle-user lookup, and separate object/navigation drift without adding a Plan-loader dependency.
+Bundle independence contracts cover damaged neighboring private Plans and workflows; each bundle checks its own job mapping.
+The maintained all-bundle check covers the complete navigation index. Legacy workflow retirement retains its owning manifest without admitting retired workflows into navigation.
+Runtime pin-refresh contracts retain exact executable programs while regenerating descriptive record links.
+`TestPlanStoreNamedPathGrammar` and `TestPlanStoreFullDigestDisagreementDoesNotPublish` directly cover the
+named-path predicate and both conflicting-full-digest refusal branches. These are local contracts;
+hosted execution of the navigation layout remains unrecorded.

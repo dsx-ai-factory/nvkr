@@ -47,18 +47,36 @@ func TestMaintainedFamilyPolicyBoundary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Family == nil || config.Family.Name != "nvke" || len(config.Family.Catalogs) != 11 {
+	if config.Family == nil || config.Family.Name != "nvke" || len(config.Family.Catalogs) != 4 {
 		t.Fatal("maintained family boundary changed")
 	}
-	excluded := map[string]bool{"inputs/catalogs/controller-profiles/nvidia-arm64": true, "inputs/catalogs/node-images/diagnostic": true, "inputs/catalogs/nvke/local-site-arm64": true, "inputs/catalogs/nvke/module-cli-arm64": true}
+	// Consolidated source identities include their diagnostic and local consumers.
+	// Separately pinned local Helm and NKTP sources remain outside this family.
+	selected := map[string]bool{}
 	count := 0
 	for _, member := range config.Family.Catalogs {
-		if excluded[member.Catalog] {
-			t.Fatalf("independent cohort enrolled: %s", member.Catalog)
+		for _, source := range member.Sources {
+			selected[member.Catalog+":"+source] = true
+			count++
 		}
-		count += len(member.Sources)
 	}
-	if count != 25 {
-		t.Fatalf("source roles=%d, want 25", count)
+	if count != 21 {
+		t.Fatalf("source roles=%d, want 21", count)
+	}
+	for _, tc := range []struct {
+		source   string
+		included bool
+	}{
+		{"inputs/catalogs/nvke:nvke-profiles", true},
+		{"inputs/catalogs/nvke:nvke-cli", true},
+		{"inputs/catalogs/nvke:nvke-cli-local-site", true},
+		{"inputs/catalogs/nvke:nvke-controller", true},
+		{"inputs/catalogs/node-images:nvke-os", true},
+		{"inputs/catalogs/nvke:nvke-controller-helm", false},
+		{"inputs/catalogs/nvke:nvke-nktp-helm", false},
+	} {
+		if selected[tc.source] != tc.included {
+			t.Errorf("family membership for %s = %v, want %v", tc.source, selected[tc.source], tc.included)
+		}
 	}
 }

@@ -37,7 +37,7 @@ func TestDirectReadOnlyViewersReplayPrivateDiagnosticsAfterFailure(t *testing.T)
 		name string
 		args []string
 	}{
-		{"plan", []string{"nvkr", "run", "plan", "--plan", ".github/nvkr-run/plan.json", "--ui=tui"}},
+		{"plan", []string{"nvkr", "run", "plan", "--plan", ".github/nvkr-run-nvke/plan.json", "--ui=tui"}},
 		{"inspect", []string{"nvkr", "run", "inspect", "--record", record, "--ui=tui"}},
 	} {
 		for _, fail := range []bool{false, true} {

@@ -151,4 +151,4 @@ printf '\nBuild complete. Artifacts and SBOMs: %s\n' "${outputs}"
 printf '\nExplore this Run next:\n'
 printf '  bin/nvkr run inspect --record .nvkr/runs/%s/lifecycle.json\n' "$attempt"
 printf '  bin/nvkr run graph --definition %s --environment %s --output nvke-controller-chart\n' "$definition" "$environment"
-printf '  bin/nvkr catalog show --data inputs/catalogs/nvke/release nvkectl\n'
+printf '  bin/nvkr catalog show --data inputs/catalogs/nvke nvkectl\n'
