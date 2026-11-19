@@ -1,6 +1,6 @@
 # ADR-24 — Imported validator catalog and artifact bindings
 
-- **Decision status:** Accepted (2026-11-14); registered container-command model below proposed for review.
+- **Decision status:** Accepted (2026-11-14); registered container-command model below proposed for review in #567.
 - **Implementation maturity:** The earlier provisional slice is what `main` implements: an indexed catalog,
   typed `nvke-cli/v1` dispatch and `validators run --profile` local-plan binding. Registration discovery,
   selection, Run binding, the `container-command/v1` executor, TestEnvironments and ValidationResult are
