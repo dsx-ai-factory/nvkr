@@ -31,6 +31,9 @@ func TestPlanTreeMaintainedRuntimeRefresh(t *testing.T) {
 				stacks[build.Name] = repinPlanTreeStack(t, build.CatalogSnapshot, build.AppliedOverlays)
 			}
 			for _, output := range before.Definition.Outputs {
+				if output.Derived != nil {
+					continue // Derived outputs consume sibling packages, not native catalogs.
+				}
 				selections := nativeOutputSelections(output)
 				selected := stacks[selections[0].Name]
 				for _, selection := range selections {

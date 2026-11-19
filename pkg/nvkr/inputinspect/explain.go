@@ -361,6 +361,9 @@ func (s *scan) admit(name string) error {
 			return err
 		}
 		for _, output := range def.Outputs {
+			if output.Derived != nil {
+				continue // Source-less outputs describe siblings, not catalog producers.
+			}
 			spec := def.Catalog
 			if output.Catalog != nil {
 				spec = *output.Catalog

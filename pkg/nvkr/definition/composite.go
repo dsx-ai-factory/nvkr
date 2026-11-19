@@ -29,13 +29,14 @@ const (
 )
 
 // CompositeDefinition joins complete member Definitions pinned by exact
-// nvkr.definition digest. It carries no Definition field of its own (ADR-26 §1).
+// nvkr.definition digest. It may additionally declare source-less derived bundles (ADR-26 §1).
 type CompositeDefinition struct {
-	APIVersion string            `json:"apiVersion"`
-	Kind       string            `json:"kind"`
-	Metadata   Metadata          `json:"metadata"`
-	Members    []CompositeMember `json:"members"`
-	Variants   []DeclaredVariant `json:"variants,omitempty"`
+	APIVersion     string                   `json:"apiVersion"`
+	Kind           string                   `json:"kind"`
+	Metadata       Metadata                 `json:"metadata"`
+	Members        []CompositeMember        `json:"members"`
+	Variants       []DeclaredVariant        `json:"variants,omitempty"`
+	DerivedOutputs []CompositeDerivedOutput `json:"derivedOutputs,omitempty"`
 }
 
 // CompositeMember locates one member document; only Digest is its identity.
@@ -60,9 +61,10 @@ type MemberIdentity struct {
 }
 
 type compositeIdentity struct {
-	Metadata Metadata          `json:"metadata"`
-	Members  []MemberIdentity  `json:"members"`
-	Variants []DeclaredVariant `json:"variants,omitempty"`
+	Metadata       Metadata                 `json:"metadata"`
+	Members        []MemberIdentity         `json:"members"`
+	Variants       []DeclaredVariant        `json:"variants,omitempty"`
+	DerivedOutputs []CompositeDerivedOutput `json:"derivedOutputs,omitempty"`
 }
 
 // InputReader returns one bounded regular file named by a clean root-relative
@@ -76,6 +78,9 @@ func (composite CompositeDefinition) Validate() error {
 		return e.New(e.CodeInvalidCatalog, "composite definition has unsupported apiVersion/kind %q/%q", composite.APIVersion, composite.Kind)
 	}
 	if err := validateCompositeIdentity(composite.Metadata, composite.MemberIdentities(), composite.Variants); err != nil {
+		return err
+	}
+	if err := validateCompositeDerived(composite.DerivedOutputs); err != nil {
 		return err
 	}
 	for _, member := range composite.Members {
@@ -154,7 +159,7 @@ func (composite CompositeDefinition) Digest() (string, error) {
 	if err := composite.Validate(); err != nil {
 		return "", err
 	}
-	return CompositeDigest(composite.Metadata, composite.MemberIdentities(), composite.Variants...)
+	return compositeDigest(composite.Metadata, composite.MemberIdentities(), composite.Variants, composite.DerivedOutputs)
 }
 
 // MemberIdentities returns the sorted identity-bearing member pins.
@@ -167,19 +172,27 @@ func (composite CompositeDefinition) MemberIdentities() []MemberIdentity {
 }
 
 // CompositeDigest recomputes a composite identity from recorded metadata,
-// member pins and declared variants, so records can be verified without
-// member locators. A composite without variants keeps its earlier digest.
+// member pins and declared variants, without composite-derived outputs or
+// member locators. Use CompositionRecord.DefinitionDigest for complete records.
 func CompositeDigest(metadata Metadata, members []MemberIdentity, variants ...DeclaredVariant) (string, error) {
+	return compositeDigest(metadata, members, variants, nil)
+}
+
+func compositeDigest(metadata Metadata, members []MemberIdentity, variants []DeclaredVariant, derived []CompositeDerivedOutput) (string, error) {
 	if err := validateCompositeIdentity(metadata, members, variants); err != nil {
 		return "", err
 	}
-	return canonical.Digest(canonical.KindCompositeDefinition, compositeIdentity{Metadata: metadata, Members: members, Variants: variants})
+	if err := validateCompositeDerived(derived); err != nil {
+		return "", err
+	}
+	return canonical.Digest(canonical.KindCompositeDefinition, compositeIdentity{Metadata: metadata, Members: members, Variants: variants, DerivedOutputs: derived})
 }
 
 // Clone returns an independent composite value.
 func (composite CompositeDefinition) Clone() CompositeDefinition {
 	composite.Members = append([]CompositeMember(nil), composite.Members...)
 	composite.Variants = cloneVariants(composite.Variants)
+	composite.DerivedOutputs = cloneCompositeDerived(composite.DerivedOutputs)
 	return composite
 }
 
@@ -382,6 +395,9 @@ func AdmitComposite(ctx context.Context, compositePath string, raw []byte, read 
 		composition.members = append(composition.members, AdmittedMember{Name: member.Name, Path: paths[i], Digest: memberDigest, Definition: definition})
 	}
 	if composition.effective, composition.attribution, err = mergeComposite(compositePath, composite.Metadata, composition.members); err != nil {
+		return Composition{}, err
+	}
+	if err := appendCompositeDerived(&composition.effective, &composition.attribution, composite.DerivedOutputs); err != nil {
 		return Composition{}, err
 	}
 	if err := checkVariantSelection(composition.effective, composition.attribution, composite.Variants); err != nil {

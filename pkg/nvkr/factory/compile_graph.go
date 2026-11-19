@@ -64,6 +64,9 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		}
 	}
 	for _, output := range definition.Outputs {
+		if output.Derived != nil {
+			continue
+		}
 		for _, target := range nativeOutputSelections(output) {
 			build, ok := builds[target.Name]
 			if !ok || build.Graph == nil {
@@ -195,7 +198,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				inputs = append(inputs, "result/"+input.BuildTarget+"/"+input.Component)
 			}
 		}
-		if spec.Kind == PackageBundle || spec.Kind == PackageDebian {
+		if (spec.Kind == PackageBundle && spec.Derived == nil) || spec.Kind == PackageDebian {
 			for _, id := range append([]string(nil), inputs...) {
 				input := artifacts[id]
 				if nodes[input.Producer].Kind != NodeBuild && !(spec.Kind == PackageBundle && nodes[input.Producer].Kind == NodeAcquire) {
@@ -222,7 +225,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				inputs = append(inputs, child.ResultArtifactID, child.SBOMArtifactID)
 			}
 		}
-		if spec.Kind == PackageOCI {
+		if spec.Kind == PackageOCI || spec.Derived != nil {
 			inputs = append(inputs, packageProducerResults(inputs, nodes, artifacts)...)
 		}
 		if spec.Kind == PackageOCI || spec.Kind == PackageDiskImage {
@@ -236,6 +239,7 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 		nodeID := "package/" + spec.Name
 		artifactID := "package/" + spec.Name
 		nodes[nodeID] = Node{ID: nodeID, Kind: NodePackage, PackageKind: spec.Kind,
+			Derived:      spec.Derived.Clone(),
 			HelmImage:    spec.HelmImage,
 			ImageIndex:   spec.ImageIndex.Clone(),
 			Distribution: spec.Distribution, PackageComponent: spec.Component,
