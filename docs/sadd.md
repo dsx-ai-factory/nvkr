@@ -60,6 +60,9 @@ before guarded commitment, preserving independently selected cohorts (ADR-21/22)
 authored bundles; runtime source freezing and release authorization remain separate owners.
 [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies) owns how generated
 Runs bind action commits from the catalog lock. Definitions declare named deliverable outputs once.
+An optional ordered catalog list supplies complete producer selections for outputs without an override;
+missing or multiple matches fail, and order grants no precedence. The singular catalog still owns shared
+utility/action pins. Plans bind every candidate snapshot and recheck each output's chosen stack (ADR-11).
 NVKR does not operate a registry, provision clusters, or manage fleet lifecycle. External owners provide source
 access, registry retention, runtime acceptance and deployment policy. NVKR offers explicit descriptive local
 diagnostics under ADR-16 §6; these do not qualify a cluster. Downstream systems consume accepted artifact

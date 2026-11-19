@@ -178,7 +178,7 @@ func definitionCatalogs(ctx context.Context, definitionPath string) (map[string]
 	}
 	def := input.Definition
 	catalogs := map[string]bool{}
-	selections := []definition.Catalog{def.Catalog}
+	selections := append([]definition.Catalog{def.Catalog}, def.Catalogs...)
 	for _, output := range def.Outputs {
 		if output.Catalog != nil {
 			selections = append(selections, *output.Catalog)
