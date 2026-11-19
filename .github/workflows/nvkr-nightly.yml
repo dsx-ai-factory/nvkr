@@ -124,9 +124,9 @@ jobs:
           NVKR_NVKE_E2E_CONFIG: demos/nightly-nvke.yaml
         run: |
           set -euo pipefail
-          timeout --kill-after=10s 180s go test ./internal/nvkedemo -list '^TestEndToEnd$' | grep -Fx TestEndToEnd
+          timeout --kill-after=10s 180s go -C demos/nvke test ./internal/nvkedemo -list '^TestEndToEnd$' | grep -Fx TestEndToEnd
           remaining=$(( NVKR_JOB_DEADLINE - $(date +%s) ))
           # TestEndToEnd reserves two hours inside this deadline for owned cleanup.
           (( remaining > 125 * 60 ))
-          go test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -v \
+          go -C demos/nvke test ./internal/nvkedemo -run '^TestEndToEnd$' -count=1 -v \
             -exec "env --chdir \"$GITHUB_WORKSPACE\"" -timeout "${remaining}s"

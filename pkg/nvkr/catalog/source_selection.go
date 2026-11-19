@@ -22,9 +22,13 @@ type SourceSelection struct {
 	SourceDateEpoch int64  `json:"sourceDateEpoch"`
 }
 
-// FreezeSourceHead fetches main once, before any fan-out. Subsequent work uses
+// FreezeSourceHead observes main once, before any fan-out. Subsequent work uses
 // only the resulting exact commit, including when main advances or is rewritten.
 func FreezeSourceHead(ctx context.Context, repository, ref string) (SourceSelection, error) {
+	return freezeSourceHeadWithLimit(ctx, repository, ref, pinTreeObjectFileLimit)
+}
+
+func freezeSourceHeadWithLimit(ctx context.Context, repository, ref string, fileLimit int64) (SourceSelection, error) {
 	if err := pinContextError(ctx); err != nil {
 		return SourceSelection{}, err
 	}
@@ -41,25 +45,36 @@ func FreezeSourceHead(ctx context.Context, repository, ref string) (SourceSelect
 	defer cancel()
 	dir, err := os.MkdirTemp("", "nvkr-freeze-source-")
 	if err != nil {
-		return SourceSelection{}, e.Wrap(e.CodeFetchFailed, err, "creating source freeze repository")
+		return SourceSelection{}, e.Wrap(e.CodeFetchFailed, err, "creating source freeze temporary directory")
 	}
 	defer os.RemoveAll(dir)
-	for _, args := range [][]string{
-		{"init", "--bare", "--template=", "-q"},
-		{"fetch", "-q", "--depth=1", "--no-tags", "--recurse-submodules=no", "--no-write-fetch-head", "--", repository, ref + ":refs/nvkr/frozen"},
-	} {
-		if _, err := pinTreeGit(ctx, dir, 8192, args...); err != nil {
-			return SourceSelection{}, err
-		}
-	}
-	if err := validatePinTreeStore(ctx, dir); err != nil {
+	if _, err := pinTreeGit(ctx, dir, 8192, "init", "--bare", "--template=", "-q"); err != nil {
 		return SourceSelection{}, err
 	}
-	raw, err := pinTreeGit(ctx, dir, 128, "rev-parse", "refs/nvkr/frozen^{commit}")
+	// Observe only the ref here; the exact-revision owner below authenticates
+	// the commit and its metadata without this discovery step fetching a tree.
+	raw, err := pinTreeGitWithLimit(ctx, dir, 128, fileLimit, "ls-remote", "--refs", "--", repository, ref)
 	if err != nil {
 		return SourceSelection{}, err
 	}
-	revision, err := ResolveSourceRevision(ctx, repository, strings.TrimSpace(string(raw)))
+	var commit string
+	for _, line := range strings.Split(strings.TrimSuffix(string(raw), "\n"), "\n") {
+		observedCommit, observedRef, ok := strings.Cut(line, "\t")
+		if !ok || !fullSHA.MatchString(observedCommit) || observedRef == "" || strings.ContainsAny(observedRef, "\t\r ") {
+			return SourceSelection{}, e.New(e.CodeFetchFailed, "source freeze received a malformed ref observation for %s in %s", ref, repository)
+		}
+		if observedRef != ref {
+			continue
+		}
+		if commit != "" {
+			return SourceSelection{}, e.New(e.CodeFetchFailed, "source freeze received duplicate observations for %s in %s", ref, repository)
+		}
+		commit = observedCommit
+	}
+	if commit == "" {
+		return SourceSelection{}, e.New(e.CodeFetchFailed, "source freeze requires exactly one full commit for %s in %s", ref, repository)
+	}
+	revision, err := ResolveSourceRevision(ctx, repository, commit)
 	if err != nil {
 		return SourceSelection{}, err
 	}

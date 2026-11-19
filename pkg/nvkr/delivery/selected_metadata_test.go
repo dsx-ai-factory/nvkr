@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 
@@ -18,7 +19,7 @@ import (
 )
 
 func TestSelectedMetadataOwnsSparseBytesAndRevocation(t *testing.T) {
-	full, pin := selectedMetadataFixture(t)
+	full, pin := selectedMetadataFixtureWithSources(t, true)
 	for _, selected := range []string{"node-image", "tools"} {
 		t.Run(selected, func(t *testing.T) {
 			root := filepath.Join(t.TempDir(), "selected")
@@ -39,6 +40,26 @@ func TestSelectedMetadataOwnsSparseBytesAndRevocation(t *testing.T) {
 			view, err := shared.Description(reference)
 			if err != nil || len(view.Outputs) != 2 || view.RootDigest != pin {
 				t.Fatalf("original logical membership = %+v, %v", view, err)
+			}
+			if !strings.Contains(view.ReferenceScope, "omitted evidence source may be unchecked") {
+				t.Fatal("selected description lost its source-attribution scope")
+			}
+			unchecked, checked := 0, 0
+			for _, evidence := range view.Evidence {
+				if !slices.Contains(evidence.Binding.Outputs, selected) {
+					unchecked++
+					if evidence.Source != nil {
+						t.Fatal("unselected evidence claims checked source attribution")
+					}
+				} else {
+					checked++
+					if evidence.Source == nil || evidence.Source.Repo != "https://example.test/"+selected+".git" || evidence.Source.Commit != strings.Repeat("a", 40) {
+						t.Fatal("selected source-built evidence lost its checked attribution")
+					}
+				}
+			}
+			if unchecked == 0 || checked == 0 {
+				t.Fatal("fixture did not retain unselected evidence")
 			}
 			view.Outputs[0].Name = "substituted"
 			again, err := shared.Description(reference)
