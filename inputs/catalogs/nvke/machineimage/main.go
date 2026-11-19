@@ -233,7 +233,7 @@ func gitBlob(ctx context.Context, source, pin string) ([]byte, error) {
 
 func gitOutput(ctx context.Context, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, "git", append([]string{"--no-replace-objects", "--no-lazy-fetch"}, args...)...)
-	cmd.Env = append(os.Environ(), "GIT_NO_LAZY_FETCH=1")
+	cmd.Env = append(gitEnvironment(), "GIT_NO_LAZY_FETCH=1")
 	cmd.WaitDelay = time.Second
 	var stdout, stderr cappedBuffer
 	cmd.Stdout = &stdout
@@ -243,6 +243,25 @@ func gitOutput(ctx context.Context, args ...string) ([]byte, error) {
 	}
 	return stdout.buffer.Bytes(), nil
 }
+
+// The explicit source owns repository, object and index selection. Hook or
+// parent-process routing must not override it; trace settings remain available.
+func gitEnvironment() []string {
+	inherited := os.Environ()
+	env := make([]string, 0, len(inherited))
+	for _, entry := range inherited {
+		key, _, _ := strings.Cut(entry, "=")
+		switch key {
+		case "GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+			"GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_PREFIX",
+			"GIT_IMPLICIT_WORK_TREE", "GIT_GRAFT_FILE":
+			continue
+		}
+		env = append(env, entry)
+	}
+	return env
+}
+
 func catalogPin(ctx context.Context, catalog string, asserted string) (string, error) {
 	raw, err := read(ctx, filepath.Join(catalog, "..", "pins.lock.yaml"))
 	if err != nil {

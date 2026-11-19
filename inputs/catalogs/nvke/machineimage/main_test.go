@@ -272,7 +272,7 @@ func git(t *testing.T, repo string, input []byte, args ...string) []byte {
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", append([]string{"--no-replace-objects", "-C", repo}, args...)...)
 	cmd.Stdin = bytes.NewReader(input)
-	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Synthetic Fixture", "GIT_AUTHOR_EMAIL=fixture@example.invalid", "GIT_COMMITTER_NAME=Synthetic Fixture", "GIT_COMMITTER_EMAIL=fixture@example.invalid")
+	cmd.Env = append(gitEnvironment(), "GIT_AUTHOR_NAME=Synthetic Fixture", "GIT_AUTHOR_EMAIL=fixture@example.invalid", "GIT_COMMITTER_NAME=Synthetic Fixture", "GIT_COMMITTER_EMAIL=fixture@example.invalid")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("git %v: %v: %s", args, err, out)
@@ -362,6 +362,7 @@ func TestMissingPromisorBlobDoesNotFetch(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", "--no-replace-objects", "-C", repo, "cat-file", "blob", pin+"^{commit}:"+crdPath)
+	cmd.Env = gitEnvironment()
 	if err := cmd.Run(); err == nil {
 		t.Fatal("missing blob succeeded")
 	}
@@ -643,5 +644,32 @@ func TestOutputNamesMatchBootSelection(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestSourceIgnoresAmbientGitRepository(t *testing.T) {
+	source, catalog, pin := sourceFixture(t)
+	root := t.TempDir()
+	foreign := filepath.Join(root, "foreign.git")
+	git(t, root, nil, "init", "--bare", "--object-format=sha1", foreign)
+	for _, tc := range []struct {
+		name string
+		env  map[string]string
+	}{
+		{"git dir", map[string]string{"GIT_DIR": foreign}},
+		{"all routing", map[string]string{"GIT_DIR": foreign, "GIT_COMMON_DIR": foreign, "GIT_WORK_TREE": root, "GIT_OBJECT_DIRECTORY": filepath.Join(foreign, "objects"), "GIT_ALTERNATE_OBJECT_DIRECTORIES": filepath.Join(foreign, "objects"), "GIT_INDEX_FILE": filepath.Join(root, "foreign.index"), "GIT_NAMESPACE": "foreign", "GIT_SHALLOW_FILE": filepath.Join(root, "missing-shallow"), "GIT_PREFIX": "foreign/"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for k, v := range tc.env {
+				t.Setenv(k, v)
+			}
+			if _, err := loadCRD(t.Context(), source, catalog, pin); err != nil {
+				t.Fatalf("ambient repository overrode source: %v", err)
+			}
+			// Fixture operations must honor their explicit repository too.
+			if got := string(git(t, source, nil, "cat-file", "-t", pin)); got != "commit\n" {
+				t.Fatalf("fixture git used wrong repository: %q", got)
+			}
+		})
 	}
 }
