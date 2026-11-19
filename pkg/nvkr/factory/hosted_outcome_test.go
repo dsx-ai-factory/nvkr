@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -194,6 +195,10 @@ func TestProductionBuildTypeUsesStrongestNetworkRequirement(t *testing.T) {
 			plan := &Plan{Builds: []BuildPlan{{Graph: &ir.Graph{Nodes: tc.nodes}}}}
 			if got := productionBuildType(plan); got != tc.want {
 				t.Fatalf("build type=%s, want %s", got, tc.want)
+			}
+			plan.LifecycleOutputs = []LifecycleOutputPlan{{Name: "inventory", Derived: &derivedoutput.Binding{}}}
+			if got := productionBuildType(plan); got != tc.want {
+				t.Fatalf("a derived sibling changed ordinary producer classification: %s, want %s", got, tc.want)
 			}
 		})
 	}

@@ -32,6 +32,10 @@ smoke:
   # Their signatures, provenance and membership remain required; any authored embedded metadata is checked strictly.
   # Helm and disk outputs have their own fixed non-tool format rule and are not listed here.
   nonToolOutputs:
+    - output: aicr-inventory
+      kind: bundle-oci
+      components: []
+      reason: derived-inventory
     # Exact bundle wrappers and complete archives are validated by delivery.
     # No cluster deployment or application compatibility is evaluated.
     - output: aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm

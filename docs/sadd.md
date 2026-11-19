@@ -95,7 +95,10 @@ evidence and the production manifest; explicit policies select production/develo
 applicability without deployment claims. Member Release reuse and local composite qualification rehearsal remain
 deferred and refused. The [hosted composite publication record](adr/reconciliation/adr-26.md#hosted-gpu-site-publication)
 owns external execution evidence and its consumer-acceptance and qualification limits.
-The composite supplies all maintained NVKE production, development and floating-source nightly bundles.
+Production and floating-source nightly use a release composite that adds a publication-bound inventory
+to the same 83 member payloads. Development retains the 83-output composite; ADR-26 records this
+explicit exception to the shared-composite rule. Composite-owned derived outputs bind their member
+materials without acquiring a producer or member attribution.
 The explicit ADR-26 U10 maintainer cutover supersedes the former retirement prerequisites; it does not
 establish independent consumer acceptance or change member Build identities.
 
@@ -357,9 +360,16 @@ A proposed multi-platform executable output (ADR-28) compiles like an OCI aggreg
 [index publication](adr/0028-multi-platform-executable-indexes.md#6-publication-a-standard-image-index-over-minimal-per-platform-images).
 This path is designed, not implemented.
 
-The compiler derives each output's graph from its exact selected components and concrete
+The compiler derives each ordinary output's graph from its exact selected components and concrete
 target. `nvkr.build` identifies the logical projection of that validated graph. Output names, packaging and execution settings remain bound by their owning records. Equal Build
 Digests do not merge producer jobs, restore results, observations or evidence across named outputs.
+
+ADR-19/20 admit a source-less release-derived inventory bundle. Its explicit package dependencies precede
+in-process inventory projection, wrapping and publication. The derivation authenticates each selected sibling
+package and combines its observed facts with the namespace fixed at compilation; it performs no registry or
+Release readback. Its tagged logical identity binds encoding, namespace and named sibling Build identities.
+The qualifier re-projects final signed membership and compares the inventory document and canonical tar envelope from the held verified archive. Catalog and
+installer derivations remain deferred, and no external hosted acceptance is implied by local contracts.
 
 Raw Debian outputs select one ordinary `host-package` producer. Existing sessions, result authentication,
 held files and lifecycle staging own execution and archive retention; OS consumers use the existing material
@@ -602,7 +612,7 @@ schema, policy or output.
 |---|---|---|---|
 | Six public objects with generated internal relationships | Removes repeated authoring and caller-built receipt graphs while retaining typed trust boundaries | Requires compiler/verifier ownership | 17 |
 | Compile definitions into a graph rather than maintain hand-written CI | One reviewed model controls dependency and transport validation; regeneration makes changes inspectable | Compiler and provider adapters become security-sensitive infrastructure | 18/21 |
-| Separate build identity from environment and publication | A destination change does not change what is being built | Plan, bundle, artifact and evidence identities must remain distinct | 01/02/20 |
+| Separate payload identity from environment and publication | A destination change preserves ordinary payload identity; explicit release-derived outputs bind the destination | Plan, bundle, artifact and evidence identities must remain distinct | 01/02/20 |
 | Name the v1 evidence tier explicitly | Hosted production can ship without claiming reproduction | Trust shifts to workflow ownership and the hosted platform | 16 |
 | Run pinned source entrypoints for wrapped builds | Commit, tree and toolchain remain explicit inputs | External build behavior and declared privilege remain producer risks; fused execution needs its own implementation | 10 |
 | Keyless cosign for v1 | Consumer acceptance uses standard signature and attestation verification against a workflow identity | Online identity/transparency dependencies and permanent disclosure; no qualified clearance | 04 |
@@ -872,7 +882,8 @@ anchors completion; authenticated production output publications and aggregate r
 attempts of the same producer run under ADR-20's ordering and exact-input checks. Original evidence is retained, and an
 earlier attempt's unrelated job failure does not invalidate its successfully authenticated outputs.
 
-Hosted artifact checking verifies every output's complete payload sequentially and releases non-executable
+Hosted artifact checking retains explicitly marked bounded derived-inventory layers for comparison. It
+verifies every output's complete payload sequentially and releases other non-executable
 scratch after each output. The lifecycle owner issues an opaque check receipt retaining verified control
 documents, evidence, exact executable bundle bytes and the frozen Plan. The narrower owner cannot export discarded
 payloads; ordinary full-publication verification retains its complete export capability.
@@ -1028,7 +1039,7 @@ and remaining independent-consumer acceptance are scoped in reconciliation.
 | Change to the example | Identity effect |
 |---|---|
 | CLI source pin changes | Build Digest and enclosing plan change; new execution is needed to learn output identities |
-| Only registry destination changes | build identity is unchanged; Environment/plan/bundle can change; preserved package bytes retain their OCI digest |
+| Only registry destination changes | ordinary payload Build identity is unchanged; release-derived inventory identity and bytes change; Environment/plan/bundle can change |
 | Only signing policy changes | build identity is unchanged; Environment and production evidence change |
 | Same inputs run again | build identity stays fixed; production metadata can differ; v1 makes no reproduction guarantee |
 | SBOM structure becomes a new plan output | Plan bytes and identity change; existing attestations retain their original meaning |
