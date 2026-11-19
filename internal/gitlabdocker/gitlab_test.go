@@ -431,7 +431,9 @@ func (l *lab) authorAndGenerate(ctx context.Context, repo, bootstrap string) {
 	must(l.t, err)
 	env.Signing = nil
 	env.Publication = nil
-	env.GitLab = &definition.GitLab{APIURL: "https://gitlab.test/api/v4", ProjectID: uint64(l.project), APIReadCredentialRef: "gitlab:NVKR_API_READ", APIReadCredentialKind: "private-token", CertificateAuthority: string(read(l.t, filepath.Join(l.work, "secrets", "gitlab.test.crt"))), PipelineSources: []string{"api"}, Runners: map[string]definition.GitLabRunner{"linux/" + l.arch: {Tags: []string{l.name}, BootstrapImage: bootstrap}}}
+	// CI lint simulates a default-branch push; the real workload is API-submitted.
+	// The fixture's provisioning push separately uses ci.skip.
+	env.GitLab = &definition.GitLab{APIURL: "https://gitlab.test/api/v4", ProjectID: uint64(l.project), APIReadCredentialRef: "gitlab:NVKR_API_READ", APIReadCredentialKind: "private-token", CertificateAuthority: string(read(l.t, filepath.Join(l.work, "secrets", "gitlab.test.crt"))), PipelineSources: []string{"api", "push"}, Runners: map[string]definition.GitLabRunner{"linux/" + l.arch: {Tags: []string{l.name}, BootstrapImage: bootstrap}}}
 	writeJSON(l.t, filepath.Join(repo, envPath), env)
 	write(l.t, filepath.Join(repo, ".gitlab-ci.yml"), []byte("include:\n  - local: .gitlab/nvkr-run/pipeline.yml\n"), 0600)
 	binary := filepath.Join(l.work, "nvkr")
