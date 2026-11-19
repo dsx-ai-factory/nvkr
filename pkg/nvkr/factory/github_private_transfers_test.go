@@ -865,7 +865,8 @@ func TestGitHubPrivateBootstrapBuildsPinnedPublishedRelease(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			root, runnerTemp, published := t.TempDir(), t.TempDir(), t.TempDir()
 			// The consumer's own module must not take part in runner acquisition.
-			if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/recipes\n\ngo 9.99\n"), 0o600); err != nil {
+			const consumerModule = "module example.com/recipes\n\ngo 9.99\n"
+			if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte(consumerModule), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			for _, name := range []string{"go.mod", "go.sum"} {
@@ -913,6 +914,12 @@ PY
 				if !errors.As(runErr, &exit) || exit.ExitCode() != e.ExitCode(e.New(test.code, "")) || readErr == nil {
 					t.Fatalf("mismatched module was not refused with %s: %v\n%s", test.code, runErr, output)
 				}
+			}
+			if raw, err := os.ReadFile(filepath.Join(root, "go.mod")); err != nil || string(raw) != consumerModule {
+				t.Fatalf("bootstrap changed the consumer module: %v", err)
+			}
+			if _, err := os.Lstat(filepath.Join(root, "go.sum")); !os.IsNotExist(err) {
+				t.Fatalf("bootstrap created a consumer go.sum: %v", err)
 			}
 			for _, name := range []string{"go.mod", "go.sum"} {
 				if raw, err := os.ReadFile(filepath.Join(published, name)); err != nil || string(raw) != "published "+name {
