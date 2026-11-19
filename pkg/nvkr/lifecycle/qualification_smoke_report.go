@@ -69,7 +69,14 @@ func (report NativeToolSmokeReport) Validate() error {
 		default:
 			return invalid()
 		}
-		if output.ImageIndex != nil {
+		if output.Derived != nil {
+			if output.ImageIndex != nil || len(output.BuildSubjects) != 0 || output.Platform != "" {
+				return invalid()
+			}
+			if err := output.Derived.ValidateOutput(output.Name, output.Kind, output.BuildDigest, nil); err != nil {
+				return err
+			}
+		} else if output.ImageIndex != nil {
 			if output.Kind != OutputOCI || output.Platform != "" || len(output.BuildSubjects) != 0 {
 				return invalid()
 			}
@@ -86,6 +93,9 @@ func (report NativeToolSmokeReport) Validate() error {
 				return invalid()
 			}
 			seenChecks[check.Name] = true
+		}
+		if output.Derived != nil && !seenChecks["derived-inventory"] {
+			return invalid()
 		}
 		previousSubject := ""
 		for _, subject := range output.BuildSubjects {

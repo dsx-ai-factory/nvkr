@@ -77,6 +77,7 @@ func PrepareRun(definition Definition, environment Environment, plan *factory.Pl
 		}
 
 		slot := requiredOutput{Name: output.Name, Kind: output.Format, ArtifactID: artifactID, MemberArtifactID: memberArtifactID,
+			Derived:     compiledOutput.Derived.Clone(),
 			BuildDigest: compiledOutput.BuildDigest, Components: append([]string(nil), output.Components...), ImageIndex: compiledOutput.ImageIndex.Clone()}
 		bindings, err := requiredProducerBindings(slot)
 		if err != nil {
@@ -127,7 +128,7 @@ func bindObserved(run *Run, artifacts []Artifact) (*Run, error) {
 		if artifact.Kind != slot.Kind || artifact.BuildDigest != slot.BuildDigest || !equalStrings(artifact.Components, slot.Components) {
 			return nil, e.New(e.CodeVerifyFailed, "run artifact %q does not satisfy its frozen kind/build/component slot", artifact.Name)
 		}
-		if err := factory.ValidateLifecycleOutputs([]factory.LifecycleOutputPlan{{Name: slot.Name, Kind: slot.Kind, BuildDigest: slot.BuildDigest, Components: slot.Components, ImageIndex: slot.ImageIndex}}, []factory.LifecycleBoundOutput{artifact}); err != nil {
+		if err := factory.ValidateLifecycleOutputs([]factory.LifecycleOutputPlan{{Name: slot.Name, Kind: slot.Kind, BuildDigest: slot.BuildDigest, Components: slot.Components, ImageIndex: slot.ImageIndex, Derived: slot.Derived}}, []factory.LifecycleBoundOutput{artifact}); err != nil {
 			return nil, err
 		}
 		if artifact.Kind == OutputDiskImage && (artifact.Disk == nil || artifact.Disk.PlanDigest != run.PlanDigest) {
@@ -200,8 +201,13 @@ func validateRun(run *Run) error {
 	previous := ""
 	for _, slot := range run.Expected {
 		if !namePattern.MatchString(slot.Name) || slot.Name <= previous || slot.ArtifactID == "" || slot.MemberArtifactID == "" || !canonical.IsDigest(slot.BuildDigest) ||
-			(slot.Kind != OutputHelm && len(slot.Components) == 0) {
+			(slot.Kind != OutputHelm && slot.Derived == nil && len(slot.Components) == 0) {
 			return e.New(e.CodeVerifyFailed, "run required outputs must be canonical, sorted, unique, and complete")
+		}
+		if slot.Derived != nil {
+			if err := slot.Derived.ValidateOutput(slot.Name, slot.Kind, slot.BuildDigest, slot.Components); err != nil {
+				return err
+			}
 		}
 		bindings, err := requiredProducerBindings(slot)
 		if err != nil {
@@ -252,6 +258,7 @@ func cloneRequired(source []requiredOutput) []requiredOutput {
 	clone := make([]requiredOutput, len(source))
 	for index, slot := range source {
 		clone[index] = slot
+		clone[index].Derived = slot.Derived.Clone()
 		clone[index].ImageIndex = slot.ImageIndex.Clone()
 		clone[index].Components = append([]string(nil), slot.Components...)
 		clone[index].ComponentResults = append([]string(nil), slot.ComponentResults...)
