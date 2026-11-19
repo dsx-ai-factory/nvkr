@@ -371,6 +371,7 @@ func inspectOutputs(ctx context.Context, layout string, inspection Inspection, s
 			continue
 		} // Inspect already requires exact evidence membership for every other object.
 		output := Output{Name: object.Name, Kind: binding.Format, Digest: object.DescriptorDigest, BuildDigest: binding.BuildDigest, Components: append([]string(nil), binding.Components...), Disk: cloneDiskOutput(binding.Disk), ImageIndex: binding.ImageIndex.Clone()}
+		output.Derived = binding.Derived.Clone()
 		if binding.Format == "apt-repository" || binding.Format == outputFormatDebian {
 			output.Digest = object.SemanticDigest
 		}

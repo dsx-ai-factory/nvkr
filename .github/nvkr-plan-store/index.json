@@ -1196,21 +1196,21 @@
       {
         "operations": [
           {
-            "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/fetch-source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f",
-            "producer": "fetch-source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f",
-            "record": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64@f4e696ca4fe6.json",
+            "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+            "producer": "fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+            "record": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64@232f7d025e9d.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/aicr/vendor@12c04982c41c.sh"
             ],
-            "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-da51db1c34ae",
+            "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-389f4af3e94d",
             "target": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
           },
           {
             "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
             "producer": "build-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
-            "record": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64@f4e696ca4fe6.json",
+            "record": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64@232f7d025e9d.json",
             "scripts": [
-              ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build@569ec037bb57.sh"
+              ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build@85641776609c.sh"
             ],
             "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-c7891c8a286b",
             "target": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
@@ -1254,21 +1254,21 @@
       {
         "operations": [
           {
-            "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-flux/fetch-source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f",
-            "producer": "fetch-source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f",
-            "record": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/linux-arm64@635656dc6741.json",
+            "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-flux/fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+            "producer": "fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+            "record": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/linux-arm64@2500ea1f21e1.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/aicr/vendor@12c04982c41c.sh"
             ],
-            "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-bc40a2203c80",
+            "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-31293c55ec30",
             "target": "aicr-nvke-gb200-ubuntu-training-kubeflow-flux"
           },
           {
             "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-flux/build-aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
             "producer": "build-aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
-            "record": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/linux-arm64@635656dc6741.json",
+            "record": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/linux-arm64@2500ea1f21e1.json",
             "scripts": [
-              ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/build@569ec037bb57.sh"
+              ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/build@85641776609c.sh"
             ],
             "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-bf1c4a8c8b70",
             "target": "aicr-nvke-gb200-ubuntu-training-kubeflow-flux"
@@ -1312,21 +1312,21 @@
       {
         "operations": [
           {
-            "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-helm/fetch-source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f",
-            "producer": "fetch-source-e076bff70a59946f7fd03104ceba85567cb119bc31a809566e700f08227eab3f",
-            "record": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/linux-arm64@eb368740cd6d.json",
+            "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-helm/fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+            "producer": "fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+            "record": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/linux-arm64@54afb6be1711.json",
             "scripts": [
               ".github/nvkr-plan-store/scripts/aicr/vendor@12c04982c41c.sh"
             ],
-            "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-754e5a5bfa18",
+            "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-1bbecc5dfa28",
             "target": "aicr-nvke-gb200-ubuntu-training-kubeflow-helm"
           },
           {
             "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-helm/build-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
             "producer": "build-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
-            "record": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/linux-arm64@eb368740cd6d.json",
+            "record": ".github/nvkr-plan-store/steps/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/linux-arm64@54afb6be1711.json",
             "scripts": [
-              ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/build@569ec037bb57.sh"
+              ".github/nvkr-plan-store/scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/build@85641776609c.sh"
             ],
             "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-1708a9efa847",
             "target": "aicr-nvke-gb200-ubuntu-training-kubeflow-helm"
@@ -1355,6 +1355,38 @@
             "bundle": "nvkr-dev",
             "file": ".github/workflows/nvkr-dev.yml"
           },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-attest-sboms-output-aicr-inv-a373c6e21c34": [
+      {
+        "operations": [
+          {
+            "node": "attest-sboms/output-aicr-inventory",
+            "step": "nvkr-attest-sboms-output-aicr-inventory"
+          },
+          {
+            "node": "publish/output-aicr-inventory",
+            "step": "nvkr-publish-output-aicr-inventory"
+          },
+          {
+            "node": "sign/output-aicr-inventory",
+            "step": "nvkr-sign-output-aicr-inventory"
+          },
+          {
+            "node": "verify-publication/output-aicr-inventory",
+            "step": "nvkr-verify-publication-output-aicr-inventory"
+          }
+        ],
+        "workflows": [
           {
             "bundle": "nvkr-run-nvke",
             "file": ".github/workflows/nvkr-run-nvke.yml"
@@ -7577,6 +7609,30 @@
         ]
       }
     ],
+    "nvkr-process-package-aicr-inventory-packa-652cb36224b6": [
+      {
+        "operations": [
+          {
+            "node": "package/aicr-inventory",
+            "step": "nvkr-package-aicr-inventory"
+          },
+          {
+            "node": "package/publication-aicr-inventory",
+            "step": "nvkr-package-publication-aicr-inventory"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
     "nvkr-process-package-capnico-controller-p-5cbfb2d0ddf9": [
       {
         "operations": [
@@ -9071,8 +9127,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/catalog-aicr@c43061df9ae6.json",
-        "sha256": "sha256:c43061df9ae658fe7b4137dbfa0ea9cdec5662718f464a3c261bd523c327862d"
+        "file": "plan/catalog-aicr@809249666f0f.json",
+        "sha256": "sha256:809249666f0fdd62d0cae8cc0edea2c71bbfb2c9d1ac04be376bb2f2863fc62f"
       }
     ],
     "plan/catalog-local-path-provisioner": [
@@ -9142,23 +9198,39 @@
     "plan/composition-nvke-gpu-site": [
       {
         "bundles": [
-          "nvkr-dev",
-          "nvkr-run-nvke",
-          "nvkr-run-nvke-nightly"
+          "nvkr-dev"
         ],
         "file": "plan/composition-nvke-gpu-site@657b11c3ba7b.json",
         "sha256": "sha256:657b11c3ba7bb6787dfbd5194f6fc2c801d9e26cbedca7da77ff6f9d25d84f80"
       }
     ],
-    "plan/definition-nvke-gpu-site": [
+    "plan/composition-nvke-gpu-site-release": [
       {
         "bundles": [
-          "nvkr-dev",
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
+        "file": "plan/composition-nvke-gpu-site-release@166e086ba75e.json",
+        "sha256": "sha256:166e086ba75e2a044307e50a214789b53b7d5f56c7b9860f8cdd8c520b8401fa"
+      }
+    ],
+    "plan/definition-nvke-gpu-site": [
+      {
+        "bundles": [
+          "nvkr-dev"
+        ],
         "file": "plan/definition-nvke-gpu-site@b3a77aa2c9f8.json",
         "sha256": "sha256:b3a77aa2c9f8bb1c8db27e43f1233d54978cae98b08e1c92e975718daf440cf8"
+      }
+    ],
+    "plan/definition-nvke-gpu-site-release": [
+      {
+        "bundles": [
+          "nvkr-run-nvke",
+          "nvkr-run-nvke-nightly"
+        ],
+        "file": "plan/definition-nvke-gpu-site-release@c1f9d69a5b64.json",
+        "sha256": "sha256:c1f9d69a5b64fc7a1ac4af23ca20a6e576b378da752ce657b714c3adb04bc27a"
       }
     ],
     "plan/environment-nvke-github": [
@@ -9191,57 +9263,95 @@
     "plan/graph-nvke-gpu-site": [
       {
         "bundles": [
-          "nvkr-dev",
-          "nvkr-run-nvke",
+          "nvkr-dev"
+        ],
+        "file": "plan/graph-nvke-gpu-site@0d269eb7654d.json",
+        "sha256": "sha256:0d269eb7654df2a4b805e5ad0a8a95f6102ddd55268b67926ea3784665a03c3c"
+      }
+    ],
+    "plan/graph-nvke-gpu-site-release": [
+      {
+        "bundles": [
+          "nvkr-run-nvke"
+        ],
+        "file": "plan/graph-nvke-gpu-site-release@265a67324475.json",
+        "sha256": "sha256:265a673244751e003d17e59ea287c31162756641d07b8f4e7b98cdd8cc409d4c"
+      },
+      {
+        "bundles": [
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/graph-nvke-gpu-site@2797310a4527.json",
-        "sha256": "sha256:2797310a4527493f44f6abdfac38b8ef7b0facc787cf60d843cc5f2eb11ad93d"
+        "file": "plan/graph-nvke-gpu-site-release@8d953733a97e.json",
+        "sha256": "sha256:8d953733a97efd2b4188a5080e42b68793d8cf737c11bc6e42a74e688f07cfc2"
       }
     ],
     "plan/outputs-nvke-gpu-site": [
       {
         "bundles": [
-          "nvkr-dev",
-          "nvkr-run-nvke",
+          "nvkr-dev"
+        ],
+        "file": "plan/outputs-nvke-gpu-site@e05bc404d447.json",
+        "sha256": "sha256:e05bc404d44719ae851077590e8e59d107269f294b58fb7796ce94d0e6fe18dc"
+      }
+    ],
+    "plan/outputs-nvke-gpu-site-release": [
+      {
+        "bundles": [
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/outputs-nvke-gpu-site@d6307d7bf56f.json",
-        "sha256": "sha256:d6307d7bf56f24f4fd28798420a9ce0f35c186b0cbe5734b72d56f3f1dbc34dd"
+        "file": "plan/outputs-nvke-gpu-site-release@9affba4a4e4b.json",
+        "sha256": "sha256:9affba4a4e4bd24d1a4f466e7d5ea8a958be23a8b202e2c8a840c757d9c2ad7f"
+      },
+      {
+        "bundles": [
+          "nvkr-run-nvke"
+        ],
+        "file": "plan/outputs-nvke-gpu-site-release@bb58e68a7d8a.json",
+        "sha256": "sha256:bb58e68a7d8a5409c33c35652b0cc005aaa0c9c45cd89d4e8d6ad1a13bc106d0"
       }
     ],
     "plan/routes-nvke-gpu-site": [
       {
         "bundles": [
-          "nvkr-dev",
-          "nvkr-run-nvke",
-          "nvkr-run-nvke-nightly"
+          "nvkr-dev"
         ],
         "file": "plan/routes-nvke-gpu-site@0ad15842cec4.json",
         "sha256": "sha256:0ad15842cec4a702879ee87d6d0b4d068e25738b0ad37466090aaada5d4243fa"
       }
     ],
-    "plan/targets-nvke-gpu-site": [
+    "plan/routes-nvke-gpu-site-release": [
       {
         "bundles": [
-          "nvkr-run-nvke"
+          "nvkr-run-nvke",
+          "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/targets-nvke-gpu-site@3fadceecf5ff.json",
-        "sha256": "sha256:3fadceecf5ff313fc0a261e0f5b70aa16090dd47c7687461a62fef085ede3847"
-      },
+        "file": "plan/routes-nvke-gpu-site-release@88aaff8ab371.json",
+        "sha256": "sha256:88aaff8ab371bbb824333b2797ede95b4c5070996cfedf4a8fe8c759c4e88fab"
+      }
+    ],
+    "plan/targets-nvke-gpu-site": [
       {
         "bundles": [
           "nvkr-dev"
         ],
         "file": "plan/targets-nvke-gpu-site@481ca7239d1d.json",
         "sha256": "sha256:481ca7239d1d3ad9f142a72d38c9f6267db95afa3ab76df87ca3507fb6745e3e"
+      }
+    ],
+    "plan/targets-nvke-gpu-site-release": [
+      {
+        "bundles": [
+          "nvkr-run-nvke"
+        ],
+        "file": "plan/targets-nvke-gpu-site-release@36e911a60676.json",
+        "sha256": "sha256:36e911a60676007cf74eaaa08039d3e63fab9209f9baad6fabcd4db39d55b94b"
       },
       {
         "bundles": [
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/targets-nvke-gpu-site@980ae1d636e7.json",
-        "sha256": "sha256:980ae1d636e7f52d526d9bee15a27a9cd6ffa38aa510d209bbaf7f8caca06d11"
+        "file": "plan/targets-nvke-gpu-site-release@9dd766654878.json",
+        "sha256": "sha256:9dd766654878a1641a7bcc9c42e286d92ea6ea2ba9c8a746ddbba85fe79ba87f"
       }
     ],
     "scripts/aicr-gb300-generic-training-argocd-helm/build": [
@@ -9251,8 +9361,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "scripts/aicr-gb300-generic-training-argocd-helm/build@79b429bf61c7.sh",
-        "sha256": "sha256:79b429bf61c7f9899fa410057684d66a70e245b24ff2c6beeb00c30dac8e4cc9"
+        "file": "scripts/aicr-gb300-generic-training-argocd-helm/build@9d706a08ad2b.sh",
+        "sha256": "sha256:9d706a08ad2bf52cfe3d38c8be187316c5c9e825ba25c1cbd4e07ef5a96dadc6"
       }
     ],
     "scripts/aicr-gb300-generic-training-argocd/build": [
@@ -9262,8 +9372,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "scripts/aicr-gb300-generic-training-argocd/build@79b429bf61c7.sh",
-        "sha256": "sha256:79b429bf61c7f9899fa410057684d66a70e245b24ff2c6beeb00c30dac8e4cc9"
+        "file": "scripts/aicr-gb300-generic-training-argocd/build@9d706a08ad2b.sh",
+        "sha256": "sha256:9d706a08ad2bf52cfe3d38c8be187316c5c9e825ba25c1cbd4e07ef5a96dadc6"
       }
     ],
     "scripts/aicr-gb300-generic-training-helm/build": [
@@ -9273,8 +9383,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "scripts/aicr-gb300-generic-training-helm/build@79b429bf61c7.sh",
-        "sha256": "sha256:79b429bf61c7f9899fa410057684d66a70e245b24ff2c6beeb00c30dac8e4cc9"
+        "file": "scripts/aicr-gb300-generic-training-helm/build@9d706a08ad2b.sh",
+        "sha256": "sha256:9d706a08ad2bf52cfe3d38c8be187316c5c9e825ba25c1cbd4e07ef5a96dadc6"
       }
     ],
     "scripts/aicr-gb300-generic-training-helmfile/build": [
@@ -9284,8 +9394,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "scripts/aicr-gb300-generic-training-helmfile/build@79b429bf61c7.sh",
-        "sha256": "sha256:79b429bf61c7f9899fa410057684d66a70e245b24ff2c6beeb00c30dac8e4cc9"
+        "file": "scripts/aicr-gb300-generic-training-helmfile/build@9d706a08ad2b.sh",
+        "sha256": "sha256:9d706a08ad2bf52cfe3d38c8be187316c5c9e825ba25c1cbd4e07ef5a96dadc6"
       }
     ],
     "scripts/aicr-gb300-generic-training-terraform/build": [
@@ -9295,8 +9405,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "scripts/aicr-gb300-generic-training-terraform/build@79b429bf61c7.sh",
-        "sha256": "sha256:79b429bf61c7f9899fa410057684d66a70e245b24ff2c6beeb00c30dac8e4cc9"
+        "file": "scripts/aicr-gb300-generic-training-terraform/build@9d706a08ad2b.sh",
+        "sha256": "sha256:9d706a08ad2bf52cfe3d38c8be187316c5c9e825ba25c1cbd4e07ef5a96dadc6"
       }
     ],
     "scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build": [
@@ -9306,8 +9416,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build@569ec037bb57.sh",
-        "sha256": "sha256:569ec037bb57dab1cd0e65303e9b5fb0a708157b5a016941384e443a4a6f583f"
+        "file": "scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build@85641776609c.sh",
+        "sha256": "sha256:85641776609cb362ef162a5cafb90fa5179daad65705f5df0ee5f279d0c1f0cf"
       }
     ],
     "scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/build": [
@@ -9317,8 +9427,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/build@569ec037bb57.sh",
-        "sha256": "sha256:569ec037bb57dab1cd0e65303e9b5fb0a708157b5a016941384e443a4a6f583f"
+        "file": "scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/build@85641776609c.sh",
+        "sha256": "sha256:85641776609cb362ef162a5cafb90fa5179daad65705f5df0ee5f279d0c1f0cf"
       }
     ],
     "scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/build": [
@@ -9328,8 +9438,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/build@569ec037bb57.sh",
-        "sha256": "sha256:569ec037bb57dab1cd0e65303e9b5fb0a708157b5a016941384e443a4a6f583f"
+        "file": "scripts/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/build@85641776609c.sh",
+        "sha256": "sha256:85641776609cb362ef162a5cafb90fa5179daad65705f5df0ee5f279d0c1f0cf"
       }
     ],
     "scripts/aicr/vendor": [
@@ -10363,8 +10473,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "steps/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64@f4e696ca4fe6.json",
-        "sha256": "sha256:f4e696ca4fe6d48fa5ab43a0e22adcc79e9b07705e39526762e326f1bbf520f9"
+        "file": "steps/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64@232f7d025e9d.json",
+        "sha256": "sha256:232f7d025e9de1a3fbaf2eb73dcb2f7e0d338120ee156cfe8afb639f833147cd"
       }
     ],
     "steps/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/linux-arm64": [
@@ -10374,8 +10484,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "steps/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/linux-arm64@635656dc6741.json",
-        "sha256": "sha256:635656dc67415b0540378f1448aeecd6528bc9af802bc46943dac44eed5eda3c"
+        "file": "steps/aicr-nvke-gb200-ubuntu-training-kubeflow-flux/linux-arm64@2500ea1f21e1.json",
+        "sha256": "sha256:2500ea1f21e194f87c75daac4015687f4efe7780e05cc5fc2ee31dda162d9fe9"
       }
     ],
     "steps/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/linux-arm64": [
@@ -10385,8 +10495,8 @@
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "steps/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/linux-arm64@eb368740cd6d.json",
-        "sha256": "sha256:eb368740cd6dd3718247353c4d7d3e3bd435c6ba38f2f52091db82dad0e64399"
+        "file": "steps/aicr-nvke-gb200-ubuntu-training-kubeflow-helm/linux-arm64@54afb6be1711.json",
+        "sha256": "sha256:54afb6be1711ecd835d33e2aeb90101d0bf902a5df3f51b9426ea296fc3b5c1f"
       }
     ],
     "steps/capi-controller-image-arm64/linux-arm64": [

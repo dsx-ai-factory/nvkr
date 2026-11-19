@@ -56,11 +56,15 @@ build: go-version-check ## Compile the nvkr binary.
 
 .PHONY: demo demo-test-bin
 demo: go-version-check ## Build the downstream Go local NVKE demo CLI (calls nvkr).
-	go build -o $(DEMO_BIN) ./cmd/nvke-demo
+	go -C demos/nvke build -o $(abspath $(DEMO_BIN)) ./cmd/nvke-demo
 	chmod 0755 $(DEMO_BIN)
 
 demo-test-bin: go-version-check ## Compile opt-in native NVKE E2E tests; does not run them.
-	go test -c -o $(DEMO_TEST_BIN) ./internal/nvkedemo
+	go -C demos/nvke test -c -o $(abspath $(DEMO_TEST_BIN)) ./internal/nvkedemo
+
+.PHONY: demo-check
+demo-check: go-version-check ## Check the separate NVKE demo module (format, vet, build, test, lint, vulnerabilities).
+	$(MAKE) -C demos/nvke check
 
 .PHONY: install
 install: ## Install nvkr into $$(go env GOBIN).
@@ -195,9 +199,10 @@ cover: test-race ## Open the HTML coverage report in a browser.
 	go tool cover -html=coverage.out
 
 .PHONY: tidy
-tidy: ## Format + go mod tidy.
+tidy: ## Format + tidy both application modules.
 	gofmt -s -w $(GOSRC)
 	go mod tidy
+	$(MAKE) -C demos/nvke tidy
 
 .PHONY: notices
 notices: ## Regenerate THIRD_PARTY_NOTICES.md from the linked module set.
@@ -323,6 +328,7 @@ PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION
 .PHONY: workflows-check
 workflows-check: workflow-generator producer-overlays-check catalog-refresh-check catalog-index-check ## Check every maintained producer and qualification bundle from the authored inventory.
 	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
+	bin/nvkr-exec definition pin --check --definition $(NVKE_RELEASE)
 	python3 scripts/generate-maintained.py --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: producer-overlays-check producer-overlays-generate
@@ -370,6 +376,7 @@ workflows-generate: workflow-generator ## Regenerate all maintained bundles from
 
 # Composite member pin admission is independent of bundle inventory admission.
 NVKE_GPU_SITE := inputs/definitions/nvke/gpu-site.composite.yaml
+NVKE_RELEASE := inputs/definitions/nvke/gpu-site-release.composite.yaml
 
 .PHONY: nvke-generate nvke-check
 nvke-generate: workflow-generator ## Regenerate the NVKE production bundle.
@@ -377,6 +384,7 @@ nvke-generate: workflow-generator ## Regenerate the NVKE production bundle.
 
 nvke-check: workflow-generator ## Check NVKE member pins and generation.
 	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
+	bin/nvkr-exec definition pin --check --definition $(NVKE_RELEASE)
 	python3 scripts/generate-maintained.py --group main --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-generate pipeline-dev-check
@@ -398,7 +406,7 @@ check: go-version-check fmt-check definitions-location-check reconciliation-loca
 # merge gate runs. CodeQL and the DCO App run only on GitHub.
 # Checks needing extra tools or network access run before the long test suite.
 CI_CHECKS := fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check shellcheck actionlint test-workflow-scripts \
-	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test demo-hello
+	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test demo-hello demo-check
 
 .PHONY: ci-check
 ci-check: go-version-check $(CI_CHECKS) ## Complete local merge gate (needs public NVKE access, Node and Fern; see CONTRIBUTING.md).

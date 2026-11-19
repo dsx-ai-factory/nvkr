@@ -30,6 +30,7 @@ func (input Definition) Clone() Definition {
 	input.Outputs = append([]DefinitionOutput(nil), input.Outputs...)
 	for i := range input.Outputs {
 		out := &input.Outputs[i]
+		out.Derived = out.Derived.Clone()
 		out.Components = append([]string(nil), out.Components...)
 		out.Platforms = slices.Clone(out.Platforms)
 		if out.Catalog != nil {

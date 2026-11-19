@@ -21,6 +21,23 @@ func derivePublication(definition authored.Definition, environment authored.Envi
 	packages := make([]packageSpec, 0, len(definition.Outputs))
 	closureInputs := make([]string, 0, len(definition.Outputs))
 	for _, output := range definition.Outputs {
+		if output.Derived != nil {
+			byName := make(map[string]BuildPlan, len(builds))
+			for _, build := range builds {
+				byName[build.Name] = build
+			}
+			required, err := allOutputRequirements(output, definition, environment, byName)
+			if err != nil {
+				return nil, nil, nil, err
+			}
+			spec := packageSpec{Name: output.Name, Kind: PackageBundle, Derived: required.Derived}
+			for _, input := range required.Derived.Inputs {
+				spec.Inputs = append(spec.Inputs, "package/"+input.Name)
+			}
+			packages = append(packages, spec)
+			closureInputs = append(closureInputs, "package/"+output.Name)
+			continue
+		}
 		if output.Format == authored.OutputDebianPackage {
 			if environment.Publication != nil {
 				var root string
@@ -156,7 +173,7 @@ func packageProducerResults(inputs []string, nodes map[string]Node, artifacts ma
 			// A bound chart must reopen its selected image when independently
 			// reproducing the chart. Transport that package and its producer
 			// records; it remains a dependency, not another published output.
-			if producer.HelmImage != nil && member.Kind == PackageImage {
+			if (producer.HelmImage != nil && member.Kind == PackageImage) || (producer.Derived != nil && (member.Kind == PackageImage || member.Kind == PackageHelm)) {
 				results = append(results, memberID)
 				pending = append(pending, memberID)
 			}
@@ -329,6 +346,9 @@ func observationInputs(inputs []string, artifacts map[string]Artifact) []string 
 }
 
 func validatePackageInputs(spec packageSpec, inputs []string, artifacts map[string]Artifact) error {
+	if spec.Derived != nil {
+		return validateDerivedPackageInputs(spec, inputs, artifacts)
+	}
 	if spec.HelmImage != nil {
 		if spec.Kind != PackageHelm {
 			return e.New(e.CodeInvalidCatalog, "image bindings require Helm packaging")

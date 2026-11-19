@@ -47,7 +47,8 @@ The two retained focused Definitions keep their existing JSON paths and exact pr
 
 | Target Definition | Purpose |
 |---|---|
-| `nvke/gpu-site.composite.yaml` | Sole maintained NVKE product entry point; six pinned members own its selections |
+| `nvke/gpu-site-release.composite.yaml` | Maintained production/nightly entry point; six pinned members plus the derived release inventory |
+| `nvke/gpu-site.composite.yaml` | Maintained development entry point; the same six pinned members without the release inventory |
 | `demo/arm64-nvidia-tcg.yaml` | Complete ARM64 NVIDIA OVN demo with local TCG disk production |
 | `demo/arm64-upstream-tcg.yaml` | Complete ARM64 upstream OVN diagnostic demo with local TCG disk production |
 | `diagnostics/os-amd64.yaml` | One native AMD64 plain disk and its required material closure |

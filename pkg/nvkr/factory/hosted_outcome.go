@@ -355,10 +355,14 @@ func validateProductionPredicateOrigin(raw []byte, plan *Plan, signing *definiti
 	if err != nil {
 		return e.Wrap(e.CodeProvenanceMissing, err, "decoding hosted production predicate finish time")
 	}
+	materials, err := declaredDerivedDependencies(plan, predicate.BuildDefinition.ResolvedDependencies)
+	if err != nil {
+		return err
+	}
 	expected, err := productionPredicateForRun(plan, signing, hostedPredicateRun{
 		builderID: predicate.RunDetails.Builder.ID, invocationID: predicate.RunDetails.Metadata["invocationId"],
 		startedOn: startedOn, finishedOn: finishedOn,
-	})
+	}, materials...)
 	if err != nil {
 		return err
 	}

@@ -171,8 +171,8 @@ Normal confirmed cancellation retains its cleanup screen.
 Plain guest summaries suppress unchanged
 snapshots and independently advancing ages.
 Failed deployment stops unfinished active panes without
-claiming that their individual checks failed. [CLI contracts](../../../cmd/nvke-demo/dashboard_test.go)
-and [simulation-screen tests](../../../cmd/nvke-demo/dashboard_view_test.go) exercise
+claiming that their individual checks failed. [CLI contracts](../../../demos/nvke/cmd/nvke-demo/dashboard_test.go)
+and [simulation-screen tests](../../../demos/nvke/cmd/nvke-demo/dashboard_view_test.go) exercise
 layout, bounded/sanitized snapshots, concurrent reports, cancellation joining and
 terminal failures. These are controlled presentation/race contracts, not a completed
 fresh E2E or live interruption acceptance for this candidate.
@@ -269,7 +269,7 @@ later deployment-only replay naturally completed NVKE deletion and owned cleanup
 with the longer budgets, while preserving its failed smoke result. This does
 not establish a fresh successful E2E; that acceptance remains unproven.
 
-[Ordinary adapter tests](../../../internal/nvkedemo) cover controlled ownership,
+[Ordinary adapter tests](../../../demos/nvke/internal/nvkedemo) cover controlled ownership,
 journal, cleanup, artifact and tenant-description cases. Runner tests exercise
 bounded subprocess cancellation and joining; CLI tests exercise output-failure
 cancellation with controlled callbacks. The live cluster projection now crosses
@@ -322,7 +322,7 @@ mount and loopback forwarding checks, with natural exit 0 and joined removal of
 its VM/state/sockets. Native gateway traffic and complete demo/conformance
 acceptance remain separate runtime obligations; see [native Linux bootstrap](../../native-linux-bootstrap.md).
 
-[TestEndToEnd](../../../internal/nvkedemo/e2e_test.go) is explicitly opt-in; ordinary
+[TestEndToEnd](../../../demos/nvke/internal/nvkedemo/e2e_test.go) is explicitly opt-in; ordinary
 tests do not build images, deploy tenants or mutate host networking. No durable
 fresh-build/deploy acceptance record is supplied by this PR. Private logs,
 retained Runs, chart renders and tool probes are not public operational evidence,

@@ -127,7 +127,7 @@ one measured Packer toolchain, including Helm 4.3.1 and ORAS 1.3.6. Profiles are
 data bundles, not a separate container image. No publication/signing is enabled.
 The launcher prints its exact shell-escaped `nvkr` invocations to stderr before execution, without printing environment values.
 
-Contract tests: `go test ./internal/nvkedemo ./cmd/nvke-demo -count=1`.
+Contract tests: `go -C demos/nvke test ./internal/nvkedemo ./cmd/nvke-demo -count=1`.
 For qualification, add `--qualify-local` to `nvke-demo build` or `nvke-demo e2e`.
 It prepares fresh local keys, a Plan-bound demo policy, pinned cosign, scratch and an owned disk-backed
 loopback registry, then stops that registry after qualification while retaining data and evidence.

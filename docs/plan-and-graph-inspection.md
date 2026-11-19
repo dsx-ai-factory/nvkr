@@ -113,7 +113,7 @@ Save the previous exact Plan before regeneration, then compare it to the regener
 ```sh
 nvkr run plan --plan .github/nvkr-run-nvke/plan.json --json > /tmp/nvkr-plan-before.json
 GOTOOLCHAIN=local go run ./cmd/nvkr run generate \
-  --definition inputs/definitions/nvke/gpu-site.composite.yaml \
+  --definition inputs/definitions/nvke/gpu-site-release.composite.yaml \
   --environment inputs/environments/github-nvke-gpu-site.yaml --engine github --root .
 nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run-nvke/plan.json
 nvkr run diff --before /tmp/nvkr-plan-before.json --after .github/nvkr-run-nvke/plan.json --details

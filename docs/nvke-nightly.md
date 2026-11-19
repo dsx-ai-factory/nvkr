@@ -99,7 +99,7 @@ With Helm available, replace these paths with that matching pair:
 ```sh
 NVKR_NATIVE_PROFILE_NKTP_CHART=/path/to/selected/nktp-0.2.0.tgz \
 NVKR_NATIVE_PROFILE_NKTP_VALUES=/path/to/frozen-nvke/deploy/nico/nktp/values.yaml \
-  go test ./internal/nvkedemo -run '^TestNativeSiteStorageMatchesSourceNKTPChart$' -count=1
+  go -C demos/nvke test ./internal/nvkedemo -run '^TestNativeSiteStorageMatchesSourceNKTPChart$' -count=1
 ```
 
 The check validates rendered queue count, size and binding constraints. It skips
@@ -148,7 +148,7 @@ the legacy published-artifact consumer. The maintained signed candidate is the c
 ## Dispatch a complete floating GPU-site candidate
 
 The generated `nvkr-run-nvke-nightly.yml` producer uses the complete
-[GPU-site composite](../inputs/definitions/nvke/gpu-site.composite.yaml) with its own
+[release composite](../inputs/definitions/nvke/gpu-site-release.composite.yaml), including its derived inventory, with its own
 [Environment](../inputs/environments/github-nvke-nightly-gpu-site.yaml). On first dispatch
 it freezes main once for `dsx-ai-factory/nvke`, `dsx-ai-factory/ovn-kubernetes`,
 `dsx-ai-factory/cluster-api-provider-nico` and `NVIDIA/aicr`. Toolchains, acquired

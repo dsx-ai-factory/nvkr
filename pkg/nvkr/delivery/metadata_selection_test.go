@@ -9,16 +9,55 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"sort"
+	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
 func selectedMetadataFixture(t *testing.T) (string, string) {
 	t.Helper()
+	return selectedMetadataFixtureWithSources(t, false)
+}
+
+func selectedMetadataFixtureWithSources(t *testing.T, fromSource bool) (string, string) {
+	t.Helper()
 	disk, _ := diskPublicationRequest(t, "amd64")
 	executable := releasePublicationRequestFixture(t, "linux", "amd64")
 	disk.Objects = append(disk.Objects, executable.Objects...)
+	if fromSource {
+		for index := range disk.Objects {
+			object := &disk.Objects[index]
+			if object.Evidence == nil {
+				continue
+			}
+			var bom sbom.BOM
+			if err := canonical.UnmarshalExact(bytes.TrimSuffix(object.Bytes, []byte{'\n'}), &bom); err != nil {
+				t.Fatal(err)
+			}
+			bom.Metadata.Component.Properties = append(bom.Metadata.Component.Properties,
+				sbom.Property{Name: "nvkr:fromSource", Value: "true"},
+				sbom.Property{Name: "nvkr:repo", Value: "https://example.test/" + object.Evidence.Outputs[0] + ".git"},
+				sbom.Property{Name: "nvkr:commit", Value: strings.Repeat("a", 40)})
+			sort.Slice(bom.Metadata.Component.Properties, func(i, j int) bool {
+				return bom.Metadata.Component.Properties[i].Name < bom.Metadata.Component.Properties[j].Name
+			})
+			var err error
+			object.Bytes, err = bom.Marshal()
+			if err != nil {
+				t.Fatal(err)
+			}
+			object.SemanticDigest, err = bom.Digest()
+			if err != nil {
+				t.Fatal(err)
+			}
+			object.Name = "sbom-" + strings.TrimPrefix(object.SemanticDigest, "sha256:")
+		}
+	}
+
 	var outputs []Output
 	for _, object := range disk.Objects {
 		if object.Output == nil {

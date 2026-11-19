@@ -6,7 +6,7 @@
 
 ## AICR-specific post-render validation
 
-GB300 generic training Flux selects one Linux ARM64 AICR v1.2.0 release executable, one recipe file producer
+GB300 generic training Flux selects one Linux ARM64 AICR v1.3.0 release executable, one recipe file producer
 and one layout producer. Other eight AICR components retain their source-built behavior. Factory imports an
 exact private layout snapshot, the bounded archive owner extracts its admitted layer, and pipeline invokes
 fixed `aicr verify` arguments with the same pinned executable and execution image. The child has no network,
