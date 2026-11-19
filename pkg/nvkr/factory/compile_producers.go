@@ -87,7 +87,7 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 			nodes[nodeID] = Node{ID: nodeID, Kind: NodeBuild, BuildTarget: target, IRNode: irNode.ID,
 				Inputs: inputs, Outputs: []string{output, result}}
 			artifacts[output] = Artifact{ID: output, Name: irNode.Component, Kind: irNode.OutputType,
-				MediaType: artifactMediaType(irNode.OutputType), Producer: nodeID, BuildTarget: target,
+				MediaType: artifactMediaType(irNode.OutputType, targetSpec.Format), Producer: nodeID, BuildTarget: target,
 				Component: irNode.Component, Path: factoryBuildArtifactPath(target, irNode)}
 			artifacts[result] = Artifact{ID: result, Name: irNode.Component + "-result", Kind: "producer-result",
 				Producer: nodeID, BuildTarget: target, Component: irNode.Component,
@@ -105,7 +105,7 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 					name := path.Base(companion.Member)
 					id := releaseCompanionID(target, irNode.Component, name)
 					artifacts[id] = Artifact{ID: id, Name: name, Kind: ArtifactReleaseCompanion,
-						MediaType: artifactMediaType(ArtifactReleaseCompanion), Producer: nodeID, BuildTarget: target,
+						MediaType: artifactMediaType(ArtifactReleaseCompanion, targetSpec.Format), Producer: nodeID, BuildTarget: target,
 						Component: irNode.Component, Path: filepath.ToSlash(filepath.Join(".nvkr", "factory", target, "fetch", irNode.Component, name))}
 					outputs = append(outputs, id)
 				}
@@ -114,7 +114,7 @@ func addBuildDataflow(targetSpec authored.DefinitionOutput, runsOn string, graph
 			nodes[nodeID] = Node{ID: nodeID, Kind: NodeAcquire, BuildTarget: target, IRNode: irNode.ID,
 				Outputs: outputs}
 			artifacts[output] = Artifact{ID: output, Name: irNode.Component, Kind: irNode.OutputType,
-				MediaType: artifactMediaType(irNode.OutputType), Producer: nodeID, BuildTarget: target,
+				MediaType: artifactMediaType(irNode.OutputType, targetSpec.Format), Producer: nodeID, BuildTarget: target,
 				Component: irNode.Component, Path: factoryPullArtifactPath(target, irNode)}
 			artifacts[result] = Artifact{ID: result, Name: irNode.Component + "-result", Kind: "producer-result",
 				Producer: nodeID, BuildTarget: target, Component: irNode.Component,

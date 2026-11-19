@@ -471,9 +471,12 @@ func packageMediaType(kind string) string {
 	}
 }
 
-func artifactMediaType(kind string) string {
+func artifactMediaType(kind, outputFormat string) string {
 	switch kind {
 	case "host-package":
+		if outputFormat == authored.OutputExecutable {
+			return delivery.MediaOctetStream
+		}
 		return "application/vnd.debian.binary-package"
 	case "oci-image":
 		return "application/vnd.oci.image.manifest.v1+json"
