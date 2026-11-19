@@ -3,20 +3,18 @@
 # SPDX-License-Identifier: Apache-2.0
 
 """Emit THIRD_PARTY_NOTICES.md for the distributed NVKR binaries."""
-import os, re, subprocess, sys
+import os, re, sys
 
-def go(*a):
-    # Fail closed: a legal-attribution artifact must never be produced from a
-    # silently degraded `go list` (cold cache, offline, transient error), which
-    # would emit empty versions and "no license" for real dependencies and still
-    # exit 0.
-    env = dict(os.environ)
-    r = subprocess.run(["go", *a], capture_output=True, text=True, env=env)
-    if r.returncode != 0:
-        sys.exit(f"gen_notices: `go {' '.join(a)}` failed: {r.stderr.strip()}")
-    return r.stdout.strip()
-
-mods = [l.strip() for l in open(sys.argv[1]) if l.strip()]
+# Resolve metadata in each binary's own module. The nested demo can link
+# dependencies absent from the root graph; querying the root alone loses them.
+mods = {}
+with open(sys.argv[1]) as linked:
+    for line in linked:
+        module, version, directory = line.rstrip("\n").split("\t")
+        metadata = (version, directory)
+        if module in mods and mods[module] != metadata:
+            sys.exit(f"gen_notices: conflicting linked versions for {module}")
+        mods[module] = metadata
 print("# Third-Party Notices\n")
 print("NVKR (`nvkr`, `nvke-demo`, and the private `nvkr-site-identity-helper` and `nvkr-results-publish`) is")
 print("distributed under the Apache License 2.0. These binaries link the third-party")
@@ -34,8 +32,7 @@ print("by that reproduction.\n")
 print("Regenerate with `make notices`.\n")
 
 summary, bodies = [], []
-for m in mods:
-    version, directory = go("list", "-m", "-f", "{{.Version}}", m), go("list", "-m", "-f", "{{.Dir}}", m)
+for m, (version, directory) in sorted(mods.items()):
     if not directory or not os.path.isdir(directory):
         sys.exit(f"gen_notices: module {m}: no local module directory "
                  f"(run `go mod download {m}` and retry)")
