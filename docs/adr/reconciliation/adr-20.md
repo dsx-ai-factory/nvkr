@@ -82,3 +82,25 @@ in the observation transport. Metadata-member cancellation preserves the member 
 guidance before any write, and nested alias readback classification does not duplicate its message.
 Write probes remain absent; the library's mutating, asynchronously cleaned-up push-permission helper is not
 used. Live registry/version coverage and hosted validation of these changes remain unverified.
+
+## GitLab ordinary unsigned publication
+
+The GitLab publication path is implemented as anonymous HTTPS OCI transport or current-job
+`gitlab:CI_JOB_TOKEN` authentication confined to provider-reported same-project registry metadata.
+It checks every output/evidence repository, isolates registry/token endpoint traffic and independently
+reads back the complete closure before recording success. The anonymous route enforces HTTPS while
+retaining the HTTP client's ordinary redirect policy, without the authenticated route's one-hop or
+same-project authority bounds. A local TLS test of authenticated publication also checks one-hop blob
+redirects to credential-free HTTPS storage, refusal of manifest/token/foreign-repository delegation, and
+zero requests to an insecure redirect destination. This is transport contract coverage, not live object-store
+acceptance. Both isolated GitLab routes now share ADR-18's direct TLS trust owner and require
+provider-authenticated branch protection when publication is selected. The default non-isolated transport
+and signed publication lanes are unchanged. These current trust/admission changes are not exercised by
+the historical real-server snapshots below.
+The [GitLab validation record](adr-18.md#gitlab-ordinary-unsigned-profile) separates the real server/Runner
+CLI-build acceptance from the 26 controlled Linux HTTPS lifecycle subcases. The latter exercise publication
+and refusal with the production clients; the real recipe selected no registry destination. Neither establishes
+publication to a live GitLab registry, signing or qualification. API-reader access remains separate from
+registry-write authority. Protected publication also requires API-reader access to the exact branch
+endpoint; the optional job-token reader's access to it remains unverified. Full repository checks and
+maintainer review remain separate gates.

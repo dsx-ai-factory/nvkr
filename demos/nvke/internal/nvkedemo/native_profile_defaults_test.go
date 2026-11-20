@@ -37,7 +37,8 @@ func TestNativeSmallProfilePreservesBaselineDefaultBytes(t *testing.T) {
 		raw  []byte
 		want string
 	}{
-		{"startup", []byte(startup), "9aa597faff4cab41d371bf4952d89f10a2f4623a391ca4a1d4b764f66d084002"},
+		// Startup now emits TPM JSON with hex-guarded printf instead of Python.
+		{"startup", []byte(startup), "5775336e4a56db6f392d345e3c0ca49fc06e1d5f7254193781ca7d3be9c6e84c"},
 		{"telemetry", telemetry, "724ea863abea959ff0c1ef30a07457f2e94f1f4d13ba8350a908fa53671910b5"},
 		{"NVIDIA OVN", []byte(nvidia), "7502273181c4c11400e4724075443b2bd640f4aac74729a30f8f5dfdc295dac4"},
 		{"upstream OVN", []byte(upstream), "426c3268fec023c938cbf3e638ec182ddc8291455dcd8ce3a7139b0663c15691"},

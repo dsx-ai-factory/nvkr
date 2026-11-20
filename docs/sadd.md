@@ -48,6 +48,14 @@ signer roles, digest-bound transport and publication, and independent artifact q
 the shared Plan, runner and lifecycle gates with explicit cluster public keys and native per-task runtimes.
 Reconciliation records external acceptance separately from that design and provider-authentication tests.
 
+ADR-18's proposed ordinary GitLab extension projects the same complete Plan onto explicit native Linux runner routes.
+The provider API authenticates current jobs and original artifact carriers; shared owners retain producer
+execution, exact named-output membership and Run finalization. Optional bounded HTTPS publication checks the
+complete returned byte closure under ADR-20. This route stays unsigned and `static-unqualified`, including
+after publication; neither provider authentication nor byte integrity supplies signing or qualification authority.
+ADR-21 separates the fixed generated include namespace from the operator-owned root pipeline. The
+[GitLab ledger](adr/reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile) owns implementation and acceptance status.
+
 The tool and its catalogs are separate products: the tool owns resolution and verification rules; catalogs
 provide reusable component producers and pins, including tool releases and GitHub actions.
 Explicit digest-pinned fragments share authored declarations before resolution; each catalog retains its own

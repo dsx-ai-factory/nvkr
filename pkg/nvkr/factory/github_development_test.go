@@ -196,6 +196,13 @@ func TestGitHubDevelopmentRejectsBundlePathSubstitution(t *testing.T) {
 	}
 }
 
+func TestGitHubBundleRejectsForeignEngineBeforePlanAdmission(t *testing.T) {
+	// An invalid Plan must not make a GitHub validator interpret a forged
+	// engine as an instruction to enter another provider's admission path.
+	err := ValidateGitHubBundle(t.Context(), &Plan{}, &GeneratedBundle{Engine: EngineGitLab})
+	assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+}
+
 func TestGitHubDevelopmentBundleWritesAndChecksStayIndependent(t *testing.T) {
 	production, err := RenderGitHub(t.Context(), buildOnlyPlan(t, "ubuntu-24.04"))
 	if err != nil {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/buildgraph"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
@@ -388,7 +389,9 @@ func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
 			return e.New(e.CodePipelineDrift, "operation %q differs from compiler-derived operation %q", actual.ID, want.ID)
 		}
 	}
+	var executableMediaType string
 	for i, want := range expected.Artifacts {
+		actual := plan.Graph.Artifacts[i]
 		if plan.workspace != "" {
 			path, err := relocatedFactoryPath(want.Path, plan.workspace)
 			if err != nil {
@@ -396,8 +399,20 @@ func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
 			}
 			want.Path = filepath.ToSlash(path)
 		}
-		if plan.Graph.Artifacts[i] != want {
-			return e.New(e.CodePipelineDrift, "artifact %q differs from compiler-derived artifact %q", plan.Graph.Artifacts[i].ID, want.ID)
+		if want.Kind == "host-package" && want.MediaType == delivery.MediaOctetStream {
+			// Older Plans used the Debian media type for every raw executable.
+			// Accept that complete encoding without admitting mixed encodings
+			// or relaxing any other compiler-derived artifact field.
+			legacyMediaType := artifactMediaType(want.Kind, "")
+			if executableMediaType == "" {
+				executableMediaType = actual.MediaType
+			}
+			if executableMediaType == legacyMediaType {
+				want.MediaType = legacyMediaType
+			}
+		}
+		if actual != want {
+			return e.New(e.CodePipelineDrift, "artifact %q differs from compiler-derived artifact %q", actual.ID, want.ID)
 		}
 	}
 	return nil
