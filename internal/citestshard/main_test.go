@@ -213,7 +213,10 @@ func TestMatrix(t *testing.T) {
 		t.Fatalf("matrix %s", out.String())
 	}
 	n := 0
-	for _, g := range groups {
+	for _, g := range []struct {
+		name  string
+		count int
+	}{{"factory", 34}, {"lifecycle", 2}, {"qualification", 4}, {"cli", 4}, {"packages", 5}} {
 		for i := 0; i < g.count; i++ {
 			if matrix.Include[n].Group != g.name || matrix.Include[n].Index != i {
 				t.Fatal("matrix mismatch")
@@ -221,7 +224,7 @@ func TestMatrix(t *testing.T) {
 			n++
 		}
 	}
-	for _, args := range [][]string{nil, {"--group", "factory", "--index", "-1"}, {"--group", "packages", "--index", "5"}, {"--group", "unknown", "--index", "0"}, {"--matrix", "unexpected"}} {
+	for _, args := range [][]string{nil, {"--group", "factory", "--index", "-1"}, {"--group", "packages", "--index", "5"}, {"--group", "qualification", "--index", "4"}, {"--group", "cli", "--index", "4"}, {"--group", "unknown", "--index", "0"}, {"--matrix", "unexpected"}} {
 		if err := run(t.Context(), args, io.Discard, io.Discard); nerrors.ExitCode(err) != 2 {
 			t.Fatalf("expected coded usage error for %v, got %v", args, err)
 		}

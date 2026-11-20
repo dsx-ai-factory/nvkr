@@ -32,8 +32,8 @@ type group struct {
 var groups = []group{
 	{"factory", "pkg/nvkr/factory", 34},
 	{"lifecycle", "pkg/nvkr/lifecycle", 2},
-	{"command", "cmd/nvkr", 4},
 	{"qualification", "pkg/nvkr/qualification", 4},
+	{"cli", "cmd/nvkr", 4},
 	{"packages", "", 5},
 }
 var testName = regexp.MustCompile(`^(Test|Example|Fuzz)[\pL\pN_]*$`)
@@ -218,7 +218,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("ci-test-shard", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	matrix := flags.Bool("matrix", false, "emit the complete GitHub job matrix")
-	name := flags.String("group", "", "factory, lifecycle, command, qualification or packages")
+	name := flags.String("group", "", "factory, lifecycle, qualification, cli or packages")
 	index := flags.Int("index", -1, "shard index")
 	timeout := flags.String("timeout", "20m", "Go's per-package test timeout")
 	if err := flags.Parse(args); err != nil {
