@@ -168,7 +168,7 @@ test: ## Fast default tests for CI and agents (no extended fixtures or instrumen
 
 .PHONY: test-shard
 test-shard: go-version-check ## Reproduce one CI test shard (TEST_SHARD_GROUP and TEST_SHARD_INDEX required).
-	python3 -B scripts/ci-test-shard.py --group '$(TEST_SHARD_GROUP)' --index '$(TEST_SHARD_INDEX)' --timeout '$(GO_TEST_TIMEOUT)'
+	go run ./internal/citestshard --group '$(TEST_SHARD_GROUP)' --index '$(TEST_SHARD_INDEX)' --timeout '$(GO_TEST_TIMEOUT)'
 
 .PHONY: test-race
 test-race: ## Opt-in race detection and coverage for the default suite.
@@ -181,6 +181,7 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 
 .PHONY: test-ci-tools
 test-ci-tools: ## Require Go, jq and Python; check CI tooling, local adapters and the catalog renderer.
+	go test ./internal/citestshard ./internal/checkstatus ./internal/gennotices -count=1
 	go test ./scripts -run 'TestMaintainedGeneration|TestCITestSummary|TestDemoShellTools' -count=1
 	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
 	python3 -B -m unittest discover -s scripts -p '*_test.py'
@@ -195,7 +196,7 @@ STATUS_HEAD ?=
 
 .PHONY: status-restated-check
 status-restated-check: ## Fail when added docs restate validation status outside the reconciliation ledger.
-	python3 -B scripts/check-status-restated.py '$(STATUS_BASE)' '$(STATUS_HEAD)'
+	go run ./internal/checkstatus '$(STATUS_BASE)' '$(STATUS_HEAD)'
 
 .PHONY: cover
 cover: test-race ## Open the HTML coverage report in a browser.

@@ -377,11 +377,11 @@ func TestMergeGateTestMatrix(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
 			fake := `#!/bin/sh
-[ "$*" = '-B scripts/ci-test-shard.py --matrix' ] || exit 99
+[ "$*" = 'run ./internal/citestshard --matrix' ] || exit 99
 printf '%s\n' "$FAKE_MATRIX"
 exit "$FAKE_EXIT"
 `
-			if err := os.WriteFile(filepath.Join(root, "python3"), []byte(fake), 0o700); err != nil {
+			if err := os.WriteFile(filepath.Join(root, "go"), []byte(fake), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			outputPath := filepath.Join(root, "outputs")

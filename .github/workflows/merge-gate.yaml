@@ -76,7 +76,7 @@ jobs:
 
   check-paths:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     # `pull-requests: read` is required by dorny/paths-filter: on a
     # pull_request event it lists changed files via
     # GET /repos/{owner}/{repo}/pulls/{n}/files. On a public repository that
@@ -106,10 +106,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+        env:
+          GOTOOLCHAIN: local
+
       - name: Derive complete test matrix
         id: test-matrix
+        env:
+          GOTOOLCHAIN: local
         run: |
-          matrix=$(python3 -B scripts/ci-test-shard.py --matrix)
+          matrix=$(go run ./internal/citestshard --matrix)
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
       # Pull requests only: the outputs above already force every category
@@ -231,7 +240,7 @@ jobs:
               - 'demos/nvke/**'
               - 'THIRD_PARTY_NOTICES.md'
               - 'scripts/gen-notices.sh'
-              - 'scripts/gen_notices.py'
+              - 'internal/gennotices/**'
               - 'go.mod'
               - 'go.sum'
               - 'cmd/**'
@@ -781,6 +790,13 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+        env:
+          GOTOOLCHAIN: local
 
       - name: Check added docs for restated status
         env:
