@@ -29,7 +29,13 @@ type group struct {
 	count      int
 }
 
-var groups = []group{{"factory", "pkg/nvkr/factory", 8}, {"lifecycle", "pkg/nvkr/lifecycle", 2}, {"packages", "", 5}}
+var groups = []group{
+	{"factory", "pkg/nvkr/factory", 8},
+	{"lifecycle", "pkg/nvkr/lifecycle", 2},
+	{"qualification", "pkg/nvkr/qualification", 2},
+	{"cli", "cmd/nvkr", 2},
+	{"packages", "", 5},
+}
 var testName = regexp.MustCompile(`^(Test|Example|Fuzz)[\pL\pN_]*$`)
 
 func partition(names []string, index, count int) ([]string, error) {
@@ -212,7 +218,7 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	flags := flag.NewFlagSet("ci-test-shard", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	matrix := flags.Bool("matrix", false, "emit the complete GitHub job matrix")
-	name := flags.String("group", "", "factory, lifecycle or packages")
+	name := flags.String("group", "", "factory, lifecycle, qualification, cli or packages")
 	index := flags.Int("index", -1, "shard index")
 	timeout := flags.String("timeout", "20m", "Go's per-package test timeout")
 	if err := flags.Parse(args); err != nil {

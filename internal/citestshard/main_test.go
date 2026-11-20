@@ -77,7 +77,7 @@ func TestPartition(t *testing.T) {
 	}
 }
 func TestPackages(t *testing.T) {
-	packages := []string{"m/pkg/nvkr/factory", "m/pkg/nvkr/lifecycle", "m/cmd/nvkr"}
+	packages := []string{"m/pkg/nvkr/factory", "m/pkg/nvkr/lifecycle", "m/pkg/nvkr/qualification", "m/cmd/nvkr"}
 	for i := 0; i < 100; i++ {
 		packages = append(packages, fmt.Sprintf("m/new/package%d", i))
 	}
@@ -98,7 +98,7 @@ func TestPackages(t *testing.T) {
 		if strings.HasSuffix(p, "/factory") {
 			want = 8
 		}
-		if strings.HasSuffix(p, "/lifecycle") {
+		if p == "m/pkg/nvkr/lifecycle" || p == "m/pkg/nvkr/qualification" || p == "m/cmd/nvkr" {
 			want = 2
 		}
 		if counts[p] != want {
@@ -206,11 +206,14 @@ func TestMatrix(t *testing.T) {
 	if err := json.Unmarshal(out.Bytes(), &matrix); err != nil {
 		t.Fatal(err)
 	}
-	if len(matrix.Include) != 15 {
+	if len(matrix.Include) != 19 {
 		t.Fatalf("matrix %s", out.String())
 	}
 	n := 0
-	for _, g := range groups {
+	for _, g := range []struct {
+		name  string
+		count int
+	}{{"factory", 8}, {"lifecycle", 2}, {"qualification", 2}, {"cli", 2}, {"packages", 5}} {
 		for i := 0; i < g.count; i++ {
 			if matrix.Include[n].Group != g.name || matrix.Include[n].Index != i {
 				t.Fatal("matrix mismatch")
@@ -218,7 +221,7 @@ func TestMatrix(t *testing.T) {
 			n++
 		}
 	}
-	for _, args := range [][]string{nil, {"--group", "factory", "--index", "-1"}, {"--group", "packages", "--index", "5"}, {"--group", "unknown", "--index", "0"}, {"--matrix", "unexpected"}} {
+	for _, args := range [][]string{nil, {"--group", "factory", "--index", "-1"}, {"--group", "packages", "--index", "5"}, {"--group", "qualification", "--index", "2"}, {"--group", "cli", "--index", "2"}, {"--group", "unknown", "--index", "0"}, {"--matrix", "unexpected"}} {
 		if err := run(t.Context(), args, io.Discard, io.Discard); nerrors.ExitCode(err) != 2 {
 			t.Fatalf("expected coded usage error for %v, got %v", args, err)
 		}
