@@ -5330,6 +5330,98 @@
         ]
       }
     ],
+    "nvkr-process-dsx-imds-node-attestor-agent-0b5a972b58aa": [
+      {
+        "operations": [
+          {
+            "node": "dsx-imds-node-attestor-agent-linux-arm64/fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+            "producer": "fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+            "record": ".github/nvkr-plan-store/steps/dsx-imds-node-attestor-agent-linux-arm64/linux-arm64@cacc984b9b1f.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh"
+            ],
+            "step": "nvkr-dsx-imds-node-attestor-agent-linux-a-79c2ea08a915",
+            "target": "dsx-imds-node-attestor-agent-linux-arm64"
+          },
+          {
+            "node": "dsx-imds-node-attestor-agent-linux-arm64/build-dsx-imds-node-attestor-agent",
+            "producer": "build-dsx-imds-node-attestor-agent",
+            "record": ".github/nvkr-plan-store/steps/dsx-imds-node-attestor-agent-linux-arm64/linux-arm64@cacc984b9b1f.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/dsx-imds-node-attestor-agent/build@29e7bc421bfe.sh"
+            ],
+            "step": "nvkr-dsx-imds-node-attestor-agent-linux-a-d3a2e494a984",
+            "target": "dsx-imds-node-attestor-agent-linux-arm64"
+          },
+          {
+            "node": "dsx-imds-node-attestor-agent-linux-arm64/terminal-observe",
+            "step": "nvkr-dsx-imds-node-attestor-agent-linux-a-a829c18c9d01",
+            "target": "dsx-imds-node-attestor-agent-linux-arm64"
+          },
+          {
+            "node": "dsx-imds-node-attestor-agent-linux-arm64/sbom",
+            "step": "nvkr-dsx-imds-node-attestor-agent-linux-arm64-sbom",
+            "target": "dsx-imds-node-attestor-agent-linux-arm64"
+          },
+          {
+            "node": "package/dsx-imds-node-attestor-agent-linux-arm64",
+            "step": "nvkr-package-dsx-imds-node-attestor-agent-linux-arm64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-wli-imds-agent",
+            "file": ".github/workflows/nvkr-run-wli-imds-agent.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-dsx-imds-node-attestor-agent-adc01ba95923": [
+      {
+        "operations": [
+          {
+            "node": "dsx-imds-node-attestor-agent-linux-amd64/fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+            "producer": "fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+            "record": ".github/nvkr-plan-store/steps/dsx-imds-node-attestor-agent-linux-amd64/linux-amd64@07b098c815e4.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh"
+            ],
+            "step": "nvkr-dsx-imds-node-attestor-agent-linux-a-e6fbd972b55f",
+            "target": "dsx-imds-node-attestor-agent-linux-amd64"
+          },
+          {
+            "node": "dsx-imds-node-attestor-agent-linux-amd64/build-dsx-imds-node-attestor-agent",
+            "producer": "build-dsx-imds-node-attestor-agent",
+            "record": ".github/nvkr-plan-store/steps/dsx-imds-node-attestor-agent-linux-amd64/linux-amd64@07b098c815e4.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/dsx-imds-node-attestor-agent/build@328b8eb305bb.sh"
+            ],
+            "step": "nvkr-dsx-imds-node-attestor-agent-linux-a-ad878b3f5bba",
+            "target": "dsx-imds-node-attestor-agent-linux-amd64"
+          },
+          {
+            "node": "dsx-imds-node-attestor-agent-linux-amd64/terminal-observe",
+            "step": "nvkr-dsx-imds-node-attestor-agent-linux-a-95a74c79a6fd",
+            "target": "dsx-imds-node-attestor-agent-linux-amd64"
+          },
+          {
+            "node": "dsx-imds-node-attestor-agent-linux-amd64/sbom",
+            "step": "nvkr-dsx-imds-node-attestor-agent-linux-amd64-sbom",
+            "target": "dsx-imds-node-attestor-agent-linux-amd64"
+          },
+          {
+            "node": "package/dsx-imds-node-attestor-agent-linux-amd64",
+            "step": "nvkr-package-dsx-imds-node-attestor-agent-linux-amd64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-wli-imds-agent",
+            "file": ".github/workflows/nvkr-run-wli-imds-agent.yml"
+          }
+        ]
+      }
+    ],
     "nvkr-process-local-path-helper-image-arm6-ee133d2fe086": [
       {
         "operations": [
@@ -9114,7 +9206,8 @@
         "bundles": [
           "nvkr-dev",
           "nvkr-run-nvke",
-          "nvkr-run-nvke-nightly"
+          "nvkr-run-nvke-nightly",
+          "nvkr-run-wli-imds-agent"
         ],
         "file": "plan/actions-github@a255839cbafe.json",
         "sha256": "sha256:a255839cbafefa0bf4c67c7860dbe7e70a0bb8583beb5961d3901d05db589dc2"
@@ -9160,6 +9253,15 @@
         ],
         "file": "plan/catalog-node-images@d61f1d5e576e.json",
         "sha256": "sha256:d61f1d5e576edb61e4949751fe6c4915b665cf2980d1c79cca9454cf9e82f41b"
+      }
+    ],
+    "plan/catalog-nvidia-workload-identity": [
+      {
+        "bundles": [
+          "nvkr-run-wli-imds-agent"
+        ],
+        "file": "plan/catalog-nvidia-workload-identity@81a21ad7d103.json",
+        "sha256": "sha256:81a21ad7d103ca2aee6be46fc50fe5cff6272e56993ea877e3ead67bb1fe58fb"
       }
     ],
     "plan/catalog-nvke": [
@@ -9233,6 +9335,15 @@
         "sha256": "sha256:c1f9d69a5b64fc7a1ac4af23ca20a6e576b378da752ce657b714c3adb04bc27a"
       }
     ],
+    "plan/definition-wli-imds-agent": [
+      {
+        "bundles": [
+          "nvkr-run-wli-imds-agent"
+        ],
+        "file": "plan/definition-wli-imds-agent@b63fad130458.json",
+        "sha256": "sha256:b63fad1304585d8f4abc676157d45301a1e11e2faa48c4cc4206c44974eb7988"
+      }
+    ],
     "plan/environment-nvke-github": [
       {
         "bundles": [
@@ -9260,13 +9371,22 @@
         "sha256": "sha256:9f17df7ab4afd780500c779d624f9ab30d2f538c1a7bc8db12544c61d831cf37"
       }
     ],
+    "plan/environment-wli-imds-agent-github": [
+      {
+        "bundles": [
+          "nvkr-run-wli-imds-agent"
+        ],
+        "file": "plan/environment-wli-imds-agent-github@f89739e778fa.json",
+        "sha256": "sha256:f89739e778fa6984df8ca1f6dff8872d42e0e23bb5ddf0793dab36f340c18b6e"
+      }
+    ],
     "plan/graph-nvke-gpu-site": [
       {
         "bundles": [
           "nvkr-dev"
         ],
-        "file": "plan/graph-nvke-gpu-site@09f109c7d312.json",
-        "sha256": "sha256:09f109c7d312ca9f181add4ddef043e8a19ce36920d7bc8c4a857e75bc3c62f2"
+        "file": "plan/graph-nvke-gpu-site@aee3338cd6bf.json",
+        "sha256": "sha256:aee3338cd6bffda3b54260ffcf75e072675c7d2441d1bd64890fac2926bbc404"
       }
     ],
     "plan/graph-nvke-gpu-site-release": [
@@ -9274,15 +9394,24 @@
         "bundles": [
           "nvkr-run-nvke"
         ],
-        "file": "plan/graph-nvke-gpu-site-release@4587e4847627.json",
-        "sha256": "sha256:4587e48476276cf0266dc44611b4ebd073b932bed3d300a340375a0f2a7e9e95"
+        "file": "plan/graph-nvke-gpu-site-release@0eaead130c85.json",
+        "sha256": "sha256:0eaead130c85a0ff2c90483f68e62d10b3e74fd9b639e5fee18ae8cb143959dc"
       },
       {
         "bundles": [
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/graph-nvke-gpu-site-release@a2099e19245a.json",
-        "sha256": "sha256:a2099e19245a70f3c9bd4132662ac253a8d7e638df7391d5c6ebef810c8082f8"
+        "file": "plan/graph-nvke-gpu-site-release@3ee306fecab1.json",
+        "sha256": "sha256:3ee306fecab1b4ae049c47324ff73971a0241b2fd8c9859f71dc2614613932fc"
+      }
+    ],
+    "plan/graph-wli-imds-agent": [
+      {
+        "bundles": [
+          "nvkr-run-wli-imds-agent"
+        ],
+        "file": "plan/graph-wli-imds-agent@50ee67450c13.json",
+        "sha256": "sha256:50ee67450c1333195f74d9f87dce1573a5d50cb63f465dbd135206c1ecb067ae"
       }
     ],
     "plan/outputs-nvke-gpu-site": [
@@ -9308,6 +9437,15 @@
         ],
         "file": "plan/outputs-nvke-gpu-site-release@dc28563a4488.json",
         "sha256": "sha256:dc28563a448811c7cbccb9cc6f45716ec257a756f5e868a66ecef45532ab7078"
+      }
+    ],
+    "plan/outputs-wli-imds-agent": [
+      {
+        "bundles": [
+          "nvkr-run-wli-imds-agent"
+        ],
+        "file": "plan/outputs-wli-imds-agent@8dd099fa5cdb.json",
+        "sha256": "sha256:8dd099fa5cdb1a6dd748d5b5dc695e706e776cfd9a96639ce46a15498381f7aa"
       }
     ],
     "plan/routes-nvke-gpu-site": [
@@ -9486,6 +9624,29 @@
         "sha256": "sha256:b4bc342daafb17a8a4dc57e7ed22f1e7241e5cdf79735da2a4df7baf1204c830"
       }
     ],
+    "scripts/dsx-imds-node-attestor-agent/build": [
+      {
+        "bundles": [
+          "nvkr-run-wli-imds-agent"
+        ],
+        "file": "scripts/dsx-imds-node-attestor-agent/build@29e7bc421bfe.sh",
+        "sha256": "sha256:29e7bc421bfe02449dfcf21b96eaece9519c057c30790ddac88c196cf665564f"
+      },
+      {
+        "bundles": [
+          "nvkr-run-wli-imds-agent"
+        ],
+        "file": "scripts/dsx-imds-node-attestor-agent/build@328b8eb305bb.sh",
+        "sha256": "sha256:328b8eb305bb1db23b6431974eb82ebdde399eba2171f8c0aff4c11f5c3e2c17"
+      },
+      {
+        "bundles": [
+          "nvkr-run-wli-imds-agent"
+        ],
+        "file": "scripts/dsx-imds-node-attestor-agent/build@c3db711d9a0c.sh",
+        "sha256": "sha256:c3db711d9a0c97d3ec19257ded428e34e558f00ed2f7137df446ff7cb3801298"
+      }
+    ],
     "scripts/helm-installer-local/build": [
       {
         "bundles": [
@@ -9660,6 +9821,15 @@
         ],
         "file": "scripts/nktp-chart-nightly-site/build@7917c664e6cb.sh",
         "sha256": "sha256:7917c664e6cb22449fa8117837ec2183c41074f04f9fe0edb457171b0e659f80"
+      }
+    ],
+    "scripts/nvidia-workload-identity/vendor": [
+      {
+        "bundles": [
+          "nvkr-run-wli-imds-agent"
+        ],
+        "file": "scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh",
+        "sha256": "sha256:47bdd564b19bd668ff0ee62566494c9e3792dd5e7e271b86333dbdb5274876ca"
       }
     ],
     "scripts/nvke-agent-diagnostic/build": [
@@ -10728,6 +10898,24 @@
         ],
         "file": "steps/csi-node-driver-registrar-image/linux-amd64@52b076809116.json",
         "sha256": "sha256:52b0768091167b9b4765bfc9771d4483f2aa411bedb2f1e63bafa0ebbec64b31"
+      }
+    ],
+    "steps/dsx-imds-node-attestor-agent-linux-amd64/linux-amd64": [
+      {
+        "bundles": [
+          "nvkr-run-wli-imds-agent"
+        ],
+        "file": "steps/dsx-imds-node-attestor-agent-linux-amd64/linux-amd64@07b098c815e4.json",
+        "sha256": "sha256:07b098c815e44418e0f492315b92c91105d71f6b5a43c5e185943317d044ecc8"
+      }
+    ],
+    "steps/dsx-imds-node-attestor-agent-linux-arm64/linux-arm64": [
+      {
+        "bundles": [
+          "nvkr-run-wli-imds-agent"
+        ],
+        "file": "steps/dsx-imds-node-attestor-agent-linux-arm64/linux-arm64@cacc984b9b1f.json",
+        "sha256": "sha256:cacc984b9b1fc062ab8cffb390b37defa351404036399a6a6572bf2741dcb22a"
       }
     ],
     "steps/local-path-helper-image-arm64/linux-arm64": [

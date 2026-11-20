@@ -33,7 +33,7 @@ being prerequisites for understanding the deck.
 
 ## Prepare once
 
-Use the exact Go version in `.go-version`, Git, Python 3 and a running Docker daemon. Build the CLI
+Use the exact Go version in `.go-version`, Git, jq and a running Docker daemon. Build the CLI
 from the repository root, then rehearse the local demo to warm its helper and small Alpine image:
 
 ```sh
