@@ -28,6 +28,14 @@ Build the static helper from the exact NVKR source using `.go-version`, then
 assemble a local native image from the repository root. Record its actual image
 identity, executable hashes and package inventory; no tag is an authority pin:
 
+The package helper now preserves the observed OS distro as each package's vendor.
+This is required for conformant deb purls; the host rejects vendor-less package
+SBOMs and never guesses vendor. The currently selected appliances predate that
+projection. Refresh both native appliances and record their measured pins before
+activating `installed-packages-v1` in the maintained Environments. Cross-compiled
+helper files below are exactly the Dockerfile's `COPY` inputs; building them alone
+does not refresh a pinned appliance or establish hosted publication proof.
+
 ```sh
 CGO_ENABLED=0 GOOS=linux GOARCH=arm64 GOTOOLCHAIN=local \
   go build -trimpath -buildvcs=false \
@@ -274,5 +282,7 @@ go test ./pkg/nvkr/pipeline \
 
 That controlled test does not scan a real disk, measure a native closure or prove original live-Run
 reconciliation. The [inspection reconciliation](../../docs/adr/reconciliation/native-disk-execution-and-inspection.md)
-owns strict full-content discovery/receipt status and external validation limits. NVKE explicitly uses `build-provenance-v1`
-and defers deep inspection to M3; it does not prepare or execute these retained strict profiles.
+owns full-content discovery/receipt status and external validation limits. The implemented
+`installed-packages-v1` mode uses these frozen profiles for package-database inspection.
+Maintained NVKE inputs retain `build-provenance-v1` pending the appliance refresh and
+measured pins. Activation must retain producer-only FDE overrides; strict content/material reconciliation remains separate.

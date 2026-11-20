@@ -181,6 +181,7 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 
 .PHONY: test-ci-tools
 test-ci-tools: ## Require Go, jq and Python; check CI tooling, local adapters and the catalog renderer.
+	go test ./internal/checkdocs -count=1
 	go test ./scripts -run 'TestMaintainedGeneration|TestCITestSummary|TestDemoShellTools' -count=1
 	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
 	python3 -B -m unittest discover -s scripts -p '*_test.py'
@@ -240,10 +241,10 @@ fern-install: ## Install the locked Fern CLI into tools/fern (needs node and npm
 	npm ci --prefix tools/fern --omit=optional --ignore-scripts --no-audit --no-fund
 
 .PHONY: docs-check
-docs-check: ## Validate the published Fern docs (needs node and `make fern-install`).
+docs-check: ## Validate the published Fern docs (needs Go, node and `make fern-install`).
 	@[ -x "$(FERN)" ] || { echo "locked Fern CLI not installed — run make fern-install" >&2; exit 1; }
 	@[ -n "$(DOCS_PAGES)" ] || { echo "no pages listed in docs/index.yml" >&2; exit 1; }
-	python3 tools/check-docs-mdx $(DOCS_PAGES)
+	go run ./internal/checkdocs $(DOCS_PAGES)
 	@set -e; \
 	 work="$$(mktemp -d)"; trap 'rm -rf "$$work"' EXIT; \
 	 tar -cf - docs/index.yml $(DOCS_PAGES) | tar -xf - -C "$$work"; \

@@ -64,7 +64,7 @@ func githubPreflightSubjects(plan *Plan) (map[string][]imagepreflight.Subject, e
 			}
 		}
 		node := stage.Nodes[0]
-		if stage.DiskOutput != "" && githubDiskInspectionRequired(plan) {
+		if stage.DiskOutput != "" && githubDiskInspectionRequired(plan, stage.DiskOutput) {
 			if err := add(plan.Environment.DiskInspectionProfiles[node.Platform].Image, node.Platform, node.RunsOn, false); err != nil {
 				return nil, err
 			}
