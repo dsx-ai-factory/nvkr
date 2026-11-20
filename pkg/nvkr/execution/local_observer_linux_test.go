@@ -171,6 +171,9 @@ func TestLinuxLocalObservationExercisesSystemProbesOnce(t *testing.T) {
 	if facts.Resources.CPUMillis == 0 {
 		t.Fatalf("Linux CPU probe returned no capacity: %#v", facts.Resources)
 	}
+	if !errors.Is(facts.capabilityErrors[CapabilityKVM], unix.ENOENT) {
+		t.Fatalf("absent KVM lost its open error: %v", facts.capabilityErrors)
+	}
 	if len(facts.Capabilities) != 0 {
 		t.Fatalf("injected absent KVM was exposed: %#v", facts.Capabilities)
 	}
@@ -368,21 +371,26 @@ func TestAvailableScratchMiBFailClosed(t *testing.T) {
 
 func TestObserveKVMDetection(t *testing.T) {
 	for _, test := range []struct {
-		name        string
-		openErr     error
-		fstatErr    error
-		mode        uint32
-		version     int
-		ioctlErr    error
-		wantExposed bool
-		wantCode    nvkrerr.Code
-		wantClosed  bool
+		name            string
+		openErr         error
+		fstatErr        error
+		mode            uint32
+		version         int
+		ioctlErr        error
+		wantExposed     bool
+		wantUnavailable bool
+		wantCode        nvkrerr.Code
+		wantClosed      bool
 	}{
-		{name: "absent", openErr: unix.ENOENT},
-		{name: "permission denied", openErr: unix.EACCES},
+		{name: "absent", openErr: unix.ENOENT, wantCode: nvkrerr.CodeEngineCapability, wantUnavailable: true},
+		{name: "permission denied", openErr: unix.EACCES, wantCode: nvkrerr.CodeEngineCapability, wantUnavailable: true},
+		{name: "device unavailable", openErr: unix.ENODEV, wantCode: nvkrerr.CodeEngineCapability, wantUnavailable: true},
+		{name: "device disconnected", openErr: unix.ENXIO, wantCode: nvkrerr.CodeEngineCapability, wantUnavailable: true},
+		{name: "operation denied", openErr: unix.EPERM, wantCode: nvkrerr.CodeEngineCapability, wantUnavailable: true},
 		{name: "unexpected open failure", openErr: unix.EIO, wantCode: nvkrerr.CodeEngineCapability},
 		{name: "stat failure", fstatErr: unix.EIO, wantCode: nvkrerr.CodeEngineCapability, wantClosed: true},
 		{name: "not character device", mode: unix.S_IFREG, wantCode: nvkrerr.CodeEngineCapability, wantClosed: true},
+		{name: "ioctl permission failure", mode: unix.S_IFCHR, ioctlErr: unix.EACCES, wantCode: nvkrerr.CodeEngineCapability},
 		{name: "ioctl failure", mode: unix.S_IFCHR, ioctlErr: unix.EIO, wantCode: nvkrerr.CodeEngineCapability},
 		{name: "version mismatch", mode: unix.S_IFCHR, version: kvmExpectedVersion - 1, wantCode: nvkrerr.CodeEngineCapability},
 		{name: "exposed", mode: unix.S_IFCHR, version: kvmExpectedVersion, wantExposed: true},
@@ -416,6 +424,15 @@ func TestObserveKVMDetection(t *testing.T) {
 			if errorCode(err) != test.wantCode || exposed != test.wantExposed {
 				t.Fatalf("exposed = %t, error = %v; want exposed=%t code=%s",
 					exposed, err, test.wantExposed, test.wantCode)
+			}
+			if unavailableKVMOpen(err) != test.wantUnavailable {
+				t.Fatalf("KVM open classification changed: %v", err)
+			}
+			if test.openErr != nil {
+				var pathErr *os.PathError
+				if !errors.Is(err, test.openErr) || !errors.As(err, &pathErr) || pathErr.Op != "open" || pathErr.Path != "/dev/kvm" {
+					t.Fatalf("open errno or device path lost: %v", err)
+				}
 			}
 			if closed != test.wantClosed {
 				t.Fatalf("device closed = %t, want %t", closed, test.wantClosed)

@@ -655,6 +655,9 @@ under a five-second timeout with a five-second kill grace, within the one-minute
 failed access or timeout fail closed with a runner-capability fault naming the ARC runner pod from
 `RUNNER_NAME`. No helper binary is available before checkout and acquisition, so this early check
 establishes device access only; full Go-owned KVM API and capacity admission still follows.
+At both private-image preparation and disk execution admission, engine-capability failures identify the
+ARC pod and admission phase as a runner-capability fault. A failed KVM device open retains its path and
+OS error through required-KVM admission; unavailable, unselected KVM does not reject TCG discovery.
 There is no arbitrary path, background retry or change
 to the producer's UID/GID. ARC finalizers do not use KVM and omit this step. The separately authored
 repository OS-validation workflow retains its read-only, no-chmod preflight.

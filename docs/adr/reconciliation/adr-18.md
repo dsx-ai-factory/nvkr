@@ -5,7 +5,10 @@ in `engine-capability` failures. Local shell contracts cover invalid devices, ac
 permission-bootstrap failure and timed-out access; generation contracts retain the check before checkout
 and transfers. It adds no runner interpreter dependency. The helper is unavailable at this early stage,
 so only the later Go-owned admission authenticates API usability and capacity.
-Real KVM/ARC execution of this change remains unverified.
+Both ARC Go admission sites also name the pod and phase in engine-capability failures. The Linux
+observer retains the KVM open path and OS error for required-capability admission while allowing
+non-KVM host discovery. Controlled contracts cover the errno chain, unchanged non-capability errors,
+and required versus unselected KVM. Real KVM/ARC execution of this change remains unverified.
 
 GitHub per-output recovery preserves an original failed job's ID and, for execution stages, Plan-derived
 display label for the finalizer's completeness error, prioritizing actual failure over cancellation/skips.
