@@ -110,7 +110,7 @@ func PrepareGitHubImages(ctx context.Context, plan *Plan, stageID string, option
 			if instruction.BuilderType == ir.BuilderVMImage {
 				admission, err := AdmitLocalVMBuild(ctx, plan, node.ID, workspace)
 				if err != nil {
-					return err
+					return githubRunnerCapabilityError(err, "prepare-images VM admission")
 				}
 				defer func() {
 					returnErr = joinFactoryCleanupError(returnErr, admission.Close(), "close image preparation admission")
