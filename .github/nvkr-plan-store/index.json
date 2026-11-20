@@ -1,5 +1,226 @@
 {
   "jobs": {
+    "nvkr-aicr-nvke-gb200-ubuntu-training-kube-cf2a271b834f": [
+      {
+        "operations": [
+          {
+            "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+            "producer": "fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/aicr/vendor@12c04982c41c.sh"
+            ],
+            "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-389f4af3e94d",
+            "target": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          }
+        ]
+      },
+      {
+        "operations": [
+          {
+            "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+            "producer": "fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/aicr/vendor@12c04982c41c.sh"
+            ],
+            "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-389f4af3e94d",
+            "target": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          }
+        ]
+      },
+      {
+        "operations": [
+          {
+            "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+            "producer": "fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/aicr/vendor@12c04982c41c.sh"
+            ],
+            "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-389f4af3e94d",
+            "target": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-capnico-controller-linux-amd64-fetch-d7e509f127ef": [
+      {
+        "operations": [
+          {
+            "node": "capnico-controller/linux/amd64/fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
+            "producer": "fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site/capnico-controller/linux-amd64.json",
+            "step": "nvkr-capnico-controller-linux-amd64-fetch-358a637807f6",
+            "target": "capnico-controller/linux/amd64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          }
+        ]
+      },
+      {
+        "operations": [
+          {
+            "node": "capnico-controller/linux/amd64/fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
+            "producer": "fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/capnico-controller/linux-amd64.json",
+            "step": "nvkr-capnico-controller-linux-amd64-fetch-358a637807f6",
+            "target": "capnico-controller/linux/amd64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          }
+        ]
+      },
+      {
+        "operations": [
+          {
+            "node": "capnico-controller/linux/amd64/fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
+            "producer": "fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/capnico-controller/linux-amd64.json",
+            "step": "nvkr-capnico-controller-linux-amd64-fetch-358a637807f6",
+            "target": "capnico-controller/linux/amd64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-cluster-api-provider-provisioned-lin-233fabd1edbc": [
+      {
+        "operations": [
+          {
+            "node": "cluster-api-provider-provisioned/linux/arm64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+            "producer": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site/cluster-api-provider-provisioned/linux-arm64.json",
+            "step": "nvkr-cluster-api-provider-provisioned-lin-a202becc9fbe",
+            "target": "cluster-api-provider-provisioned/linux/arm64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          }
+        ]
+      },
+      {
+        "operations": [
+          {
+            "node": "cluster-api-provider-provisioned/linux/arm64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+            "producer": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/cluster-api-provider-provisioned/linux-arm64.json",
+            "step": "nvkr-cluster-api-provider-provisioned-lin-a202becc9fbe",
+            "target": "cluster-api-provider-provisioned/linux/arm64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          }
+        ]
+      },
+      {
+        "operations": [
+          {
+            "node": "cluster-api-provider-provisioned/linux/arm64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+            "producer": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/cluster-api-provider-provisioned/linux-arm64.json",
+            "step": "nvkr-cluster-api-provider-provisioned-lin-a202becc9fbe",
+            "target": "cluster-api-provider-provisioned/linux/arm64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-cluster-api-provider-provisioned-lin-3474f127ab2d": [
+      {
+        "operations": [
+          {
+            "node": "cluster-api-provider-provisioned/linux/amd64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+            "producer": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site/cluster-api-provider-provisioned/linux-amd64.json",
+            "step": "nvkr-cluster-api-provider-provisioned-lin-61237cf109c0",
+            "target": "cluster-api-provider-provisioned/linux/amd64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          }
+        ]
+      },
+      {
+        "operations": [
+          {
+            "node": "cluster-api-provider-provisioned/linux/amd64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+            "producer": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/cluster-api-provider-provisioned/linux-amd64.json",
+            "step": "nvkr-cluster-api-provider-provisioned-lin-61237cf109c0",
+            "target": "cluster-api-provider-provisioned/linux/amd64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          }
+        ]
+      },
+      {
+        "operations": [
+          {
+            "node": "cluster-api-provider-provisioned/linux/amd64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+            "producer": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/cluster-api-provider-provisioned/linux-amd64.json",
+            "step": "nvkr-cluster-api-provider-provisioned-lin-61237cf109c0",
+            "target": "cluster-api-provider-provisioned/linux/amd64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
     "nvkr-disk-nvke-node-fde-amd64": [
       {
         "operations": [
@@ -3724,6 +3945,28 @@
         ]
       }
     ],
+    "nvkr-dsx-imds-node-attestor-agent-linux-a-853c9431375e": [
+      {
+        "operations": [
+          {
+            "node": "dsx-imds-node-attestor-agent-linux-amd64/fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+            "producer": "fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+            "record": ".github/nvkr-plan-store/steps/wli-imds-agent/dsx-imds-node-attestor-agent-linux-amd64/linux-amd64.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh"
+            ],
+            "step": "nvkr-dsx-imds-node-attestor-agent-linux-a-e6fbd972b55f",
+            "target": "dsx-imds-node-attestor-agent-linux-amd64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-wli-imds-agent",
+            "file": ".github/workflows/nvkr-run-wli-imds-agent.yml"
+          }
+        ]
+      }
+    ],
     "nvkr-internal-nvke-node-fde-amd64-runtime-2d0e603259eb": [
       {
         "operations": [
@@ -3936,19 +4179,62 @@
         ]
       }
     ],
-    "nvkr-process-aicr-nvke-gb200-ubuntu-train-4f61b0c43b05": [
+    "nvkr-local-path-provisioner-arm64-fetch-l-e2d85fefbdbb": [
       {
         "operations": [
           {
-            "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
-            "producer": "fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/aicr/vendor@12c04982c41c.sh"
-            ],
-            "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-389f4af3e94d",
-            "target": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
-          },
+            "node": "local-path-provisioner-arm64/fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
+            "producer": "fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site/local-path-provisioner-arm64/linux-arm64.json",
+            "step": "nvkr-local-path-provisioner-arm64-fetch-s-d811516c42aa",
+            "target": "local-path-provisioner-arm64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          }
+        ]
+      },
+      {
+        "operations": [
+          {
+            "node": "local-path-provisioner-arm64/fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
+            "producer": "fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/local-path-provisioner-arm64/linux-arm64.json",
+            "step": "nvkr-local-path-provisioner-arm64-fetch-s-d811516c42aa",
+            "target": "local-path-provisioner-arm64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          }
+        ]
+      },
+      {
+        "operations": [
+          {
+            "node": "local-path-provisioner-arm64/fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
+            "producer": "fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
+            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/local-path-provisioner-arm64/linux-arm64.json",
+            "step": "nvkr-local-path-provisioner-arm64-fetch-s-d811516c42aa",
+            "target": "local-path-provisioner-arm64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-aicr-nvke-gb200-ubuntu-train-6c55322f7762": [
+      {
+        "operations": [
           {
             "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
             "producer": "build-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -3988,16 +4274,6 @@
       {
         "operations": [
           {
-            "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
-            "producer": "fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/aicr/vendor@12c04982c41c.sh"
-            ],
-            "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-389f4af3e94d",
-            "target": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
-          },
-          {
             "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
             "producer": "build-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
             "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64.json",
@@ -4035,16 +4311,6 @@
       },
       {
         "operations": [
-          {
-            "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
-            "producer": "fetch-source-1b40ad35f7c2187048a2ff81780961324417a4ad282818f90bd596474e06dc70",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/linux-arm64.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/aicr/vendor@12c04982c41c.sh"
-            ],
-            "step": "nvkr-aicr-nvke-gb200-ubuntu-training-kube-389f4af3e94d",
-            "target": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm"
-          },
           {
             "node": "aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm/build-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
             "producer": "build-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -4514,43 +4780,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-capi-con-6535e3245e96": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-capi-controller-image-arm64",
-            "step": "nvkr-attest-sboms-output-capi-controller-image-arm64"
-          },
-          {
-            "node": "publish/output-capi-controller-image-arm64",
-            "step": "nvkr-publish-output-capi-controller-image-arm64"
-          },
-          {
-            "node": "sign/output-capi-controller-image-arm64",
-            "step": "nvkr-sign-output-capi-controller-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-capi-controller-image-arm64",
-            "step": "nvkr-verify-publication-output-capi-contr-a309e0dde6c8"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-capi-con-c3e2faf63100": [
+    "nvkr-process-attest-sboms-output-capi-con-210011b0b1fe": [
       {
         "operations": [
           {
@@ -4568,6 +4798,14 @@
           {
             "node": "verify-publication/output-capi-controller-image",
             "step": "nvkr-verify-publication-output-capi-controller-image"
+          },
+          {
+            "node": "attest-sboms/output-capi-kubeadm-bootstrap-image",
+            "step": "nvkr-attest-sboms-output-capi-kubeadm-bootstrap-image"
+          },
+          {
+            "node": "publish/output-capi-kubeadm-bootstrap-image",
+            "step": "nvkr-publish-output-capi-kubeadm-bootstrap-image"
           }
         ],
         "workflows": [
@@ -4586,7 +4824,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-capi-kub-0b857b2a2e2f": [
+    "nvkr-process-attest-sboms-output-capi-kub-bced39e358b5": [
       {
         "operations": [
           {
@@ -4604,114 +4842,14 @@
           {
             "node": "verify-publication/output-capi-kubeadm-control-plane-image-arm64",
             "step": "nvkr-verify-publication-output-capi-kubea-459a501ddf86"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
           },
           {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
+            "node": "attest-sboms/output-cert-manager-cainjector-image-arm64",
+            "step": "nvkr-attest-sboms-output-cert-manager-cai-63e467a9fe7a"
           },
           {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-capi-kub-192145434453": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-capi-kubeadm-bootstrap-image",
-            "step": "nvkr-attest-sboms-output-capi-kubeadm-bootstrap-image"
-          },
-          {
-            "node": "publish/output-capi-kubeadm-bootstrap-image",
-            "step": "nvkr-publish-output-capi-kubeadm-bootstrap-image"
-          },
-          {
-            "node": "sign/output-capi-kubeadm-bootstrap-image",
-            "step": "nvkr-sign-output-capi-kubeadm-bootstrap-image"
-          },
-          {
-            "node": "verify-publication/output-capi-kubeadm-bootstrap-image",
-            "step": "nvkr-verify-publication-output-capi-kubea-400c7177454b"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-capi-kub-a0163af701ab": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-capi-kubeadm-bootstrap-image-arm64",
-            "step": "nvkr-attest-sboms-output-capi-kubeadm-boo-bcd3e61be11a"
-          },
-          {
-            "node": "publish/output-capi-kubeadm-bootstrap-image-arm64",
-            "step": "nvkr-publish-output-capi-kubeadm-bootstra-07670d07d213"
-          },
-          {
-            "node": "sign/output-capi-kubeadm-bootstrap-image-arm64",
-            "step": "nvkr-sign-output-capi-kubeadm-bootstrap-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-capi-kubeadm-bootstrap-image-arm64",
-            "step": "nvkr-verify-publication-output-capi-kubea-8c536327dae9"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-capi-kub-aacc41887f04": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-capi-kubeadm-control-plane-image",
-            "step": "nvkr-attest-sboms-output-capi-kubeadm-con-aff5fe5bef73"
-          },
-          {
-            "node": "publish/output-capi-kubeadm-control-plane-image",
-            "step": "nvkr-publish-output-capi-kubeadm-control-plane-image"
-          },
-          {
-            "node": "sign/output-capi-kubeadm-control-plane-image",
-            "step": "nvkr-sign-output-capi-kubeadm-control-plane-image"
-          },
-          {
-            "node": "verify-publication/output-capi-kubeadm-control-plane-image",
-            "step": "nvkr-verify-publication-output-capi-kubea-a1d9f5feb0f6"
+            "node": "publish/output-cert-manager-cainjector-image-arm64",
+            "step": "nvkr-publish-output-cert-manager-cainject-37550fcc232b"
           }
         ],
         "workflows": [
@@ -4766,187 +4904,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-cert-man-070fcfa57ec9": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-cert-manager-cainjector-image-arm64",
-            "step": "nvkr-attest-sboms-output-cert-manager-cai-63e467a9fe7a"
-          },
-          {
-            "node": "publish/output-cert-manager-cainjector-image-arm64",
-            "step": "nvkr-publish-output-cert-manager-cainject-37550fcc232b"
-          },
-          {
-            "node": "sign/output-cert-manager-cainjector-image-arm64",
-            "step": "nvkr-sign-output-cert-manager-cainjector-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-cert-manager-cainjector-image-arm64",
-            "step": "nvkr-verify-publication-output-cert-manag-d72fce3ac728"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-cert-man-674719c99ce6": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-cert-manager-webhook-image",
-            "step": "nvkr-attest-sboms-output-cert-manager-webhook-image"
-          },
-          {
-            "node": "publish/output-cert-manager-webhook-image",
-            "step": "nvkr-publish-output-cert-manager-webhook-image"
-          },
-          {
-            "node": "sign/output-cert-manager-webhook-image",
-            "step": "nvkr-sign-output-cert-manager-webhook-image"
-          },
-          {
-            "node": "verify-publication/output-cert-manager-webhook-image",
-            "step": "nvkr-verify-publication-output-cert-manag-02f76d39d687"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-cert-man-694b532ec2bb": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-cert-manager-controller-image-arm64",
-            "step": "nvkr-attest-sboms-output-cert-manager-con-d61492d4f3a1"
-          },
-          {
-            "node": "publish/output-cert-manager-controller-image-arm64",
-            "step": "nvkr-publish-output-cert-manager-controll-1c8e088fb6a6"
-          },
-          {
-            "node": "sign/output-cert-manager-controller-image-arm64",
-            "step": "nvkr-sign-output-cert-manager-controller-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-cert-manager-controller-image-arm64",
-            "step": "nvkr-verify-publication-output-cert-manag-9a8734354915"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-cert-man-9a7a8eb4fbc5": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-cert-manager-cainjector-image",
-            "step": "nvkr-attest-sboms-output-cert-manager-cai-f039262ad3e2"
-          },
-          {
-            "node": "publish/output-cert-manager-cainjector-image",
-            "step": "nvkr-publish-output-cert-manager-cainjector-image"
-          },
-          {
-            "node": "sign/output-cert-manager-cainjector-image",
-            "step": "nvkr-sign-output-cert-manager-cainjector-image"
-          },
-          {
-            "node": "verify-publication/output-cert-manager-cainjector-image",
-            "step": "nvkr-verify-publication-output-cert-manag-f1997a85223a"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-cert-man-d217422a8ef7": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-cert-manager-controller-image",
-            "step": "nvkr-attest-sboms-output-cert-manager-con-d67471e4f0b4"
-          },
-          {
-            "node": "publish/output-cert-manager-controller-image",
-            "step": "nvkr-publish-output-cert-manager-controller-image"
-          },
-          {
-            "node": "sign/output-cert-manager-controller-image",
-            "step": "nvkr-sign-output-cert-manager-controller-image"
-          },
-          {
-            "node": "verify-publication/output-cert-manager-controller-image",
-            "step": "nvkr-verify-publication-output-cert-manag-eecf216a547d"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-cert-man-e0cbc5b6ab19": [
+    "nvkr-process-attest-sboms-output-cert-man-0f00c803ce26": [
       {
         "operations": [
           {
@@ -4964,6 +4922,58 @@
           {
             "node": "verify-publication/output-cert-manager-webhook-image-arm64",
             "step": "nvkr-verify-publication-output-cert-manag-b56eb8b59b49"
+          },
+          {
+            "node": "attest-sboms/output-csi-node-driver-registrar-image-arm64",
+            "step": "nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442"
+          },
+          {
+            "node": "publish/output-csi-node-driver-registrar-image-arm64",
+            "step": "nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-attest-sboms-output-cert-man-825fd13fcf0c": [
+      {
+        "operations": [
+          {
+            "node": "attest-sboms/output-cert-manager-cainjector-image",
+            "step": "nvkr-attest-sboms-output-cert-manager-cai-f039262ad3e2"
+          },
+          {
+            "node": "publish/output-cert-manager-cainjector-image",
+            "step": "nvkr-publish-output-cert-manager-cainjector-image"
+          },
+          {
+            "node": "sign/output-cert-manager-cainjector-image",
+            "step": "nvkr-sign-output-cert-manager-cainjector-image"
+          },
+          {
+            "node": "verify-publication/output-cert-manager-cainjector-image",
+            "step": "nvkr-verify-publication-output-cert-manag-f1997a85223a"
+          },
+          {
+            "node": "attest-sboms/output-cert-manager-controller-image",
+            "step": "nvkr-attest-sboms-output-cert-manager-con-d67471e4f0b4"
+          },
+          {
+            "node": "publish/output-cert-manager-controller-image",
+            "step": "nvkr-publish-output-cert-manager-controller-image"
           }
         ],
         "workflows": [
@@ -5090,7 +5100,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-csi-node-c1d6d7794703": [
+    "nvkr-process-attest-sboms-output-csi-node-546d05c536ac": [
       {
         "operations": [
           {
@@ -5108,42 +5118,14 @@
           {
             "node": "verify-publication/output-csi-node-driver-registrar-image",
             "step": "nvkr-verify-publication-output-csi-node-d-914d7376ead0"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
           },
           {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
+            "node": "attest-sboms/output-local-path-helper-image",
+            "step": "nvkr-attest-sboms-output-local-path-helper-image"
           },
           {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-csi-node-c8bbad40ca65": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-csi-node-driver-registrar-image-arm64",
-            "step": "nvkr-attest-sboms-output-csi-node-driver-ca2c548b7442"
-          },
-          {
-            "node": "publish/output-csi-node-driver-registrar-image-arm64",
-            "step": "nvkr-publish-output-csi-node-driver-regis-b17474c2d7cb"
-          },
-          {
-            "node": "sign/output-csi-node-driver-registrar-image-arm64",
-            "step": "nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9"
-          },
-          {
-            "node": "verify-publication/output-csi-node-driver-registrar-image-arm64",
-            "step": "nvkr-verify-publication-output-csi-node-d-ed501e7759bf"
+            "node": "publish/output-local-path-helper-image",
+            "step": "nvkr-publish-output-local-path-helper-image"
           }
         ],
         "workflows": [
@@ -5198,78 +5180,6 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-local-pa-09c88c4868d7": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-local-path-helper-image",
-            "step": "nvkr-attest-sboms-output-local-path-helper-image"
-          },
-          {
-            "node": "publish/output-local-path-helper-image",
-            "step": "nvkr-publish-output-local-path-helper-image"
-          },
-          {
-            "node": "sign/output-local-path-helper-image",
-            "step": "nvkr-sign-output-local-path-helper-image"
-          },
-          {
-            "node": "verify-publication/output-local-path-helper-image",
-            "step": "nvkr-verify-publication-output-local-path-c572611510ec"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-local-pa-2ae6dde17516": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-local-path-helper-image-arm64",
-            "step": "nvkr-attest-sboms-output-local-path-helpe-d7c0ec47aa04"
-          },
-          {
-            "node": "publish/output-local-path-helper-image-arm64",
-            "step": "nvkr-publish-output-local-path-helper-image-arm64"
-          },
-          {
-            "node": "sign/output-local-path-helper-image-arm64",
-            "step": "nvkr-sign-output-local-path-helper-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-local-path-helper-image-arm64",
-            "step": "nvkr-verify-publication-output-local-path-15c3e80b49ce"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
     "nvkr-process-attest-sboms-output-local-pa-676708a1ad07": [
       {
         "operations": [
@@ -5306,43 +5216,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-local-pa-70815c6f5354": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-local-path-provisioner-image",
-            "step": "nvkr-attest-sboms-output-local-path-provisioner-image"
-          },
-          {
-            "node": "publish/output-local-path-provisioner-image",
-            "step": "nvkr-publish-output-local-path-provisioner-image"
-          },
-          {
-            "node": "sign/output-local-path-provisioner-image",
-            "step": "nvkr-sign-output-local-path-provisioner-image"
-          },
-          {
-            "node": "verify-publication/output-local-path-provisioner-image",
-            "step": "nvkr-verify-publication-output-local-path-e9f81d84678d"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-local-pa-7cd55fb2cf05": [
+    "nvkr-process-attest-sboms-output-local-pa-d881a0f13413": [
       {
         "operations": [
           {
@@ -5360,27 +5234,7 @@
           {
             "node": "verify-publication/output-local-path-provisioner-image-arm64",
             "step": "nvkr-verify-publication-output-local-path-b7cdb9064846"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
           },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-nktp-col-98aa450d2a81": [
-      {
-        "operations": [
           {
             "node": "attest-sboms/output-nktp-collector-image-arm64",
             "step": "nvkr-attest-sboms-output-nktp-collector-image-arm64"
@@ -5388,14 +5242,6 @@
           {
             "node": "publish/output-nktp-collector-image-arm64",
             "step": "nvkr-publish-output-nktp-collector-image-arm64"
-          },
-          {
-            "node": "sign/output-nktp-collector-image-arm64",
-            "step": "nvkr-sign-output-nktp-collector-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-nktp-collector-image-arm64",
-            "step": "nvkr-verify-publication-output-nktp-colle-3037712057c4"
           }
         ],
         "workflows": [
@@ -5414,7 +5260,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-nktp-col-c9e8019a40a7": [
+    "nvkr-process-attest-sboms-output-nktp-col-a4e9448c85f5": [
       {
         "operations": [
           {
@@ -5432,6 +5278,14 @@
           {
             "node": "verify-publication/output-nktp-collector-image",
             "step": "nvkr-verify-publication-output-nktp-collector-image"
+          },
+          {
+            "node": "attest-sboms/output-nktp-kube-state-metrics-image",
+            "step": "nvkr-attest-sboms-output-nktp-kube-state-5427c42def27"
+          },
+          {
+            "node": "publish/output-nktp-kube-state-metrics-image",
+            "step": "nvkr-publish-output-nktp-kube-state-metrics-image"
           }
         ],
         "workflows": [
@@ -5450,7 +5304,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-nktp-kub-38a63daab836": [
+    "nvkr-process-attest-sboms-output-nktp-kub-a63bd9c5de2e": [
       {
         "operations": [
           {
@@ -5468,135 +5322,7 @@
           {
             "node": "verify-publication/output-nktp-kubectl-image-arm64",
             "step": "nvkr-verify-publication-output-nktp-kubec-58bc88c11e26"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
           },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-nktp-kub-5638c7305c6a": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-nktp-kube-state-metrics-image-arm64",
-            "step": "nvkr-attest-sboms-output-nktp-kube-state-6248dc6aafc3"
-          },
-          {
-            "node": "publish/output-nktp-kube-state-metrics-image-arm64",
-            "step": "nvkr-publish-output-nktp-kube-state-metri-cecf76dda028"
-          },
-          {
-            "node": "sign/output-nktp-kube-state-metrics-image-arm64",
-            "step": "nvkr-sign-output-nktp-kube-state-metrics-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-nktp-kube-state-metrics-image-arm64",
-            "step": "nvkr-verify-publication-output-nktp-kube-59673e96b3e2"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-nktp-kub-c8449a367a99": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-nktp-kube-state-metrics-image",
-            "step": "nvkr-attest-sboms-output-nktp-kube-state-5427c42def27"
-          },
-          {
-            "node": "publish/output-nktp-kube-state-metrics-image",
-            "step": "nvkr-publish-output-nktp-kube-state-metrics-image"
-          },
-          {
-            "node": "sign/output-nktp-kube-state-metrics-image",
-            "step": "nvkr-sign-output-nktp-kube-state-metrics-image"
-          },
-          {
-            "node": "verify-publication/output-nktp-kube-state-metrics-image",
-            "step": "nvkr-verify-publication-output-nktp-kube-8edb2f9f5644"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-nktp-kub-c9a4d1b91ba8": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-nktp-kubectl-image",
-            "step": "nvkr-attest-sboms-output-nktp-kubectl-image"
-          },
-          {
-            "node": "publish/output-nktp-kubectl-image",
-            "step": "nvkr-publish-output-nktp-kubectl-image"
-          },
-          {
-            "node": "sign/output-nktp-kubectl-image",
-            "step": "nvkr-sign-output-nktp-kubectl-image"
-          },
-          {
-            "node": "verify-publication/output-nktp-kubectl-image",
-            "step": "nvkr-verify-publication-output-nktp-kubectl-image"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-nktp-lgt-86258a13b688": [
-      {
-        "operations": [
           {
             "node": "attest-sboms/output-nktp-lgtm-image-arm64",
             "step": "nvkr-attest-sboms-output-nktp-lgtm-image-arm64"
@@ -5604,14 +5330,6 @@
           {
             "node": "publish/output-nktp-lgtm-image-arm64",
             "step": "nvkr-publish-output-nktp-lgtm-image-arm64"
-          },
-          {
-            "node": "sign/output-nktp-lgtm-image-arm64",
-            "step": "nvkr-sign-output-nktp-lgtm-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-nktp-lgtm-image-arm64",
-            "step": "nvkr-verify-publication-output-nktp-lgtm-image-arm64"
           }
         ],
         "workflows": [
@@ -5630,7 +5348,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-nktp-lgt-c01c9ef82851": [
+    "nvkr-process-attest-sboms-output-nktp-lgt-6ecefe4ad398": [
       {
         "operations": [
           {
@@ -5648,27 +5366,7 @@
           {
             "node": "verify-publication/output-nktp-lgtm-image",
             "step": "nvkr-verify-publication-output-nktp-lgtm-image"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
           },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-nktp-met-5bfa54ed25c3": [
-      {
-        "operations": [
           {
             "node": "attest-sboms/output-nktp-metrics-server-image",
             "step": "nvkr-attest-sboms-output-nktp-metrics-server-image"
@@ -5676,14 +5374,6 @@
           {
             "node": "publish/output-nktp-metrics-server-image",
             "step": "nvkr-publish-output-nktp-metrics-server-image"
-          },
-          {
-            "node": "sign/output-nktp-metrics-server-image",
-            "step": "nvkr-sign-output-nktp-metrics-server-image"
-          },
-          {
-            "node": "verify-publication/output-nktp-metrics-server-image",
-            "step": "nvkr-verify-publication-output-nktp-metri-4773ec2231a9"
           }
         ],
         "workflows": [
@@ -5702,43 +5392,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-nktp-met-adbadf7d0d71": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-nktp-metrics-server-image-arm64",
-            "step": "nvkr-attest-sboms-output-nktp-metrics-ser-cc131630b796"
-          },
-          {
-            "node": "publish/output-nktp-metrics-server-image-arm64",
-            "step": "nvkr-publish-output-nktp-metrics-server-image-arm64"
-          },
-          {
-            "node": "sign/output-nktp-metrics-server-image-arm64",
-            "step": "nvkr-sign-output-nktp-metrics-server-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-nktp-metrics-server-image-arm64",
-            "step": "nvkr-verify-publication-output-nktp-metri-72d2044749d1"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-nktp-nod-588720f4bd6f": [
+    "nvkr-process-attest-sboms-output-nktp-nod-ad1dc857f1df": [
       {
         "operations": [
           {
@@ -5756,63 +5410,7 @@
           {
             "node": "verify-publication/output-nktp-node-exporter-image-arm64",
             "step": "nvkr-verify-publication-output-nktp-node-89687b0a3b8b"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
           },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-nktp-nod-a5920c5bad6d": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-nktp-node-exporter-image",
-            "step": "nvkr-attest-sboms-output-nktp-node-exporter-image"
-          },
-          {
-            "node": "publish/output-nktp-node-exporter-image",
-            "step": "nvkr-publish-output-nktp-node-exporter-image"
-          },
-          {
-            "node": "sign/output-nktp-node-exporter-image",
-            "step": "nvkr-sign-output-nktp-node-exporter-image"
-          },
-          {
-            "node": "verify-publication/output-nktp-node-exporter-image",
-            "step": "nvkr-verify-publication-output-nktp-node-308c6a04d0d9"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-nktp-ope-395e84d470b2": [
-      {
-        "operations": [
           {
             "node": "attest-sboms/output-nktp-operator-image-arm64",
             "step": "nvkr-attest-sboms-output-nktp-operator-image-arm64"
@@ -5820,14 +5418,6 @@
           {
             "node": "publish/output-nktp-operator-image-arm64",
             "step": "nvkr-publish-output-nktp-operator-image-arm64"
-          },
-          {
-            "node": "sign/output-nktp-operator-image-arm64",
-            "step": "nvkr-sign-output-nktp-operator-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-nktp-operator-image-arm64",
-            "step": "nvkr-verify-publication-output-nktp-opera-e8ca29886a10"
           }
         ],
         "workflows": [
@@ -5846,7 +5436,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-nktp-ope-47be94f632c0": [
+    "nvkr-process-attest-sboms-output-nktp-ope-82faa7550c78": [
       {
         "operations": [
           {
@@ -5864,6 +5454,14 @@
           {
             "node": "verify-publication/output-nktp-operator-image",
             "step": "nvkr-verify-publication-output-nktp-operator-image"
+          },
+          {
+            "node": "attest-sboms/output-nktp-target-allocator-image",
+            "step": "nvkr-attest-sboms-output-nktp-target-allocator-image"
+          },
+          {
+            "node": "publish/output-nktp-target-allocator-image",
+            "step": "nvkr-publish-output-nktp-target-allocator-image"
           }
         ],
         "workflows": [
@@ -5900,78 +5498,6 @@
           {
             "node": "verify-publication/output-nktp",
             "step": "nvkr-verify-publication-output-nktp"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-nktp-tar-e33c954ac0c3": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-nktp-target-allocator-image-arm64",
-            "step": "nvkr-attest-sboms-output-nktp-target-allo-bbd05f2a1798"
-          },
-          {
-            "node": "publish/output-nktp-target-allocator-image-arm64",
-            "step": "nvkr-publish-output-nktp-target-allocator-image-arm64"
-          },
-          {
-            "node": "sign/output-nktp-target-allocator-image-arm64",
-            "step": "nvkr-sign-output-nktp-target-allocator-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-nktp-target-allocator-image-arm64",
-            "step": "nvkr-verify-publication-output-nktp-targe-c21c44003a70"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-nktp-tar-e5f55427ab4d": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-nktp-target-allocator-image",
-            "step": "nvkr-attest-sboms-output-nktp-target-allocator-image"
-          },
-          {
-            "node": "publish/output-nktp-target-allocator-image",
-            "step": "nvkr-publish-output-nktp-target-allocator-image"
-          },
-          {
-            "node": "sign/output-nktp-target-allocator-image",
-            "step": "nvkr-sign-output-nktp-target-allocator-image"
-          },
-          {
-            "node": "verify-publication/output-nktp-target-allocator-image",
-            "step": "nvkr-verify-publication-output-nktp-targe-83f6218e2759"
           }
         ],
         "workflows": [
@@ -6458,7 +5984,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-postgres-0c397fe911fc": [
+    "nvkr-process-attest-sboms-output-postgres-2d70572766ce": [
       {
         "operations": [
           {
@@ -6476,42 +6002,14 @@
           {
             "node": "verify-publication/output-postgresql-image-arm64",
             "step": "nvkr-verify-publication-output-postgresql-image-arm64"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
           },
           {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
+            "node": "attest-sboms/output-spiffe-csi-image-arm64",
+            "step": "nvkr-attest-sboms-output-spiffe-csi-image-arm64"
           },
           {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-postgres-69dd756da415": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-postgresql-image",
-            "step": "nvkr-attest-sboms-output-postgresql-image"
-          },
-          {
-            "node": "publish/output-postgresql-image",
-            "step": "nvkr-publish-output-postgresql-image"
-          },
-          {
-            "node": "sign/output-postgresql-image",
-            "step": "nvkr-sign-output-postgresql-image"
-          },
-          {
-            "node": "verify-publication/output-postgresql-image",
-            "step": "nvkr-verify-publication-output-postgresql-image"
+            "node": "publish/output-spiffe-csi-image-arm64",
+            "step": "nvkr-publish-output-spiffe-csi-image-arm64"
           }
         ],
         "workflows": [
@@ -6566,7 +6064,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-spiffe-c-428ae4518b33": [
+    "nvkr-process-attest-sboms-output-spiffe-c-afb593ace72a": [
       {
         "operations": [
           {
@@ -6584,99 +6082,7 @@
           {
             "node": "verify-publication/output-spiffe-csi-image",
             "step": "nvkr-verify-publication-output-spiffe-csi-image"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
           },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-spiffe-c-6b62394cb783": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-spiffe-csi-image-arm64",
-            "step": "nvkr-attest-sboms-output-spiffe-csi-image-arm64"
-          },
-          {
-            "node": "publish/output-spiffe-csi-image-arm64",
-            "step": "nvkr-publish-output-spiffe-csi-image-arm64"
-          },
-          {
-            "node": "sign/output-spiffe-csi-image-arm64",
-            "step": "nvkr-sign-output-spiffe-csi-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-spiffe-csi-image-arm64",
-            "step": "nvkr-verify-publication-output-spiffe-csi-image-arm64"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-spire-ag-0b9313969a96": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-spire-agent-image-arm64",
-            "step": "nvkr-attest-sboms-output-spire-agent-image-arm64"
-          },
-          {
-            "node": "publish/output-spire-agent-image-arm64",
-            "step": "nvkr-publish-output-spire-agent-image-arm64"
-          },
-          {
-            "node": "sign/output-spire-agent-image-arm64",
-            "step": "nvkr-sign-output-spire-agent-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-spire-agent-image-arm64",
-            "step": "nvkr-verify-publication-output-spire-agen-690d58615fef"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-spire-ag-dfb26f54c9e7": [
-      {
-        "operations": [
           {
             "node": "attest-sboms/output-spire-agent-image",
             "step": "nvkr-attest-sboms-output-spire-agent-image"
@@ -6684,14 +6090,6 @@
           {
             "node": "publish/output-spire-agent-image",
             "step": "nvkr-publish-output-spire-agent-image"
-          },
-          {
-            "node": "sign/output-spire-agent-image",
-            "step": "nvkr-sign-output-spire-agent-image"
-          },
-          {
-            "node": "verify-publication/output-spire-agent-image",
-            "step": "nvkr-verify-publication-output-spire-agent-image"
           }
         ],
         "workflows": [
@@ -6710,43 +6108,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-spire-ba-0a23387d1b9d": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-spire-bash-image",
-            "step": "nvkr-attest-sboms-output-spire-bash-image"
-          },
-          {
-            "node": "publish/output-spire-bash-image",
-            "step": "nvkr-publish-output-spire-bash-image"
-          },
-          {
-            "node": "sign/output-spire-bash-image",
-            "step": "nvkr-sign-output-spire-bash-image"
-          },
-          {
-            "node": "verify-publication/output-spire-bash-image",
-            "step": "nvkr-verify-publication-output-spire-bash-image"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-spire-ba-e270b70f09ef": [
+    "nvkr-process-attest-sboms-output-spire-ba-d048685986bf": [
       {
         "operations": [
           {
@@ -6764,27 +6126,7 @@
           {
             "node": "verify-publication/output-spire-bash-image-arm64",
             "step": "nvkr-verify-publication-output-spire-bash-image-arm64"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
           },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-spire-co-e87f47677f39": [
-      {
-        "operations": [
           {
             "node": "attest-sboms/output-spire-controller-manager-image-arm64",
             "step": "nvkr-attest-sboms-output-spire-controller-f3890ce97c17"
@@ -6792,14 +6134,6 @@
           {
             "node": "publish/output-spire-controller-manager-image-arm64",
             "step": "nvkr-publish-output-spire-controller-mana-4c760c0ddb13"
-          },
-          {
-            "node": "sign/output-spire-controller-manager-image-arm64",
-            "step": "nvkr-sign-output-spire-controller-manager-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-spire-controller-manager-image-arm64",
-            "step": "nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91"
           }
         ],
         "workflows": [
@@ -6818,7 +6152,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-spire-co-f24ec18705d2": [
+    "nvkr-process-attest-sboms-output-spire-co-e704ba6a10c2": [
       {
         "operations": [
           {
@@ -6836,6 +6170,14 @@
           {
             "node": "verify-publication/output-spire-controller-manager-image",
             "step": "nvkr-verify-publication-output-spire-cont-81ba1c1e8041"
+          },
+          {
+            "node": "attest-sboms/output-spire-oidc-image",
+            "step": "nvkr-attest-sboms-output-spire-oidc-image"
+          },
+          {
+            "node": "publish/output-spire-oidc-image",
+            "step": "nvkr-publish-output-spire-oidc-image"
           }
         ],
         "workflows": [
@@ -6890,78 +6232,6 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-spire-oi-139ce0805f21": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-spire-oidc-image",
-            "step": "nvkr-attest-sboms-output-spire-oidc-image"
-          },
-          {
-            "node": "publish/output-spire-oidc-image",
-            "step": "nvkr-publish-output-spire-oidc-image"
-          },
-          {
-            "node": "sign/output-spire-oidc-image",
-            "step": "nvkr-sign-output-spire-oidc-image"
-          },
-          {
-            "node": "verify-publication/output-spire-oidc-image",
-            "step": "nvkr-verify-publication-output-spire-oidc-image"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-spire-oi-6df09148b189": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-spire-oidc-image-arm64",
-            "step": "nvkr-attest-sboms-output-spire-oidc-image-arm64"
-          },
-          {
-            "node": "publish/output-spire-oidc-image-arm64",
-            "step": "nvkr-publish-output-spire-oidc-image-arm64"
-          },
-          {
-            "node": "sign/output-spire-oidc-image-arm64",
-            "step": "nvkr-sign-output-spire-oidc-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-spire-oidc-image-arm64",
-            "step": "nvkr-verify-publication-output-spire-oidc-image-arm64"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
     "nvkr-process-attest-sboms-output-spire-pu-94c0dc5d203b": [
       {
         "operations": [
@@ -6998,7 +6268,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-spire-se-0ec9aa4ebdf4": [
+    "nvkr-process-attest-sboms-output-spire-se-1157aec678f4": [
       {
         "operations": [
           {
@@ -7016,6 +6286,14 @@
           {
             "node": "verify-publication/output-spire-server-image-arm64",
             "step": "nvkr-verify-publication-output-spire-serv-2ffabff52266"
+          },
+          {
+            "node": "attest-sboms/output-spire-tpm-server-image-arm64",
+            "step": "nvkr-attest-sboms-output-spire-tpm-server-image-arm64"
+          },
+          {
+            "node": "publish/output-spire-tpm-server-image-arm64",
+            "step": "nvkr-publish-output-spire-tpm-server-image-arm64"
           }
         ],
         "workflows": [
@@ -7034,43 +6312,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-spire-se-9d1b0bc84ce8": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-spire-server-image",
-            "step": "nvkr-attest-sboms-output-spire-server-image"
-          },
-          {
-            "node": "publish/output-spire-server-image",
-            "step": "nvkr-publish-output-spire-server-image"
-          },
-          {
-            "node": "sign/output-spire-server-image",
-            "step": "nvkr-sign-output-spire-server-image"
-          },
-          {
-            "node": "verify-publication/output-spire-server-image",
-            "step": "nvkr-verify-publication-output-spire-server-image"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-spire-tp-671d9f2c0ee8": [
+    "nvkr-process-attest-sboms-output-spire-tp-3b0dc63f049e": [
       {
         "operations": [
           {
@@ -7088,78 +6330,14 @@
           {
             "node": "verify-publication/output-spire-tpm-server-image",
             "step": "nvkr-verify-publication-output-spire-tpm-server-image"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
           },
           {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
+            "node": "attest-sboms/output-temporal-admin-tools-image",
+            "step": "nvkr-attest-sboms-output-temporal-admin-tools-image"
           },
           {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-spire-tp-8fd6cf5eb45c": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-spire-tpm-server-image-arm64",
-            "step": "nvkr-attest-sboms-output-spire-tpm-server-image-arm64"
-          },
-          {
-            "node": "publish/output-spire-tpm-server-image-arm64",
-            "step": "nvkr-publish-output-spire-tpm-server-image-arm64"
-          },
-          {
-            "node": "sign/output-spire-tpm-server-image-arm64",
-            "step": "nvkr-sign-output-spire-tpm-server-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-spire-tpm-server-image-arm64",
-            "step": "nvkr-verify-publication-output-spire-tpm-fdd5a5adf925"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-temporal-2b42edeb4497": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-temporal-server-image",
-            "step": "nvkr-attest-sboms-output-temporal-server-image"
-          },
-          {
-            "node": "publish/output-temporal-server-image",
-            "step": "nvkr-publish-output-temporal-server-image"
-          },
-          {
-            "node": "sign/output-temporal-server-image",
-            "step": "nvkr-sign-output-temporal-server-image"
-          },
-          {
-            "node": "verify-publication/output-temporal-server-image",
-            "step": "nvkr-verify-publication-output-temporal-server-image"
+            "node": "publish/output-temporal-admin-tools-image",
+            "step": "nvkr-publish-output-temporal-admin-tools-image"
           }
         ],
         "workflows": [
@@ -7214,79 +6392,7 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-temporal-50a38a9f05f0": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-temporal-admin-tools-image",
-            "step": "nvkr-attest-sboms-output-temporal-admin-tools-image"
-          },
-          {
-            "node": "publish/output-temporal-admin-tools-image",
-            "step": "nvkr-publish-output-temporal-admin-tools-image"
-          },
-          {
-            "node": "sign/output-temporal-admin-tools-image",
-            "step": "nvkr-sign-output-temporal-admin-tools-image"
-          },
-          {
-            "node": "verify-publication/output-temporal-admin-tools-image",
-            "step": "nvkr-verify-publication-output-temporal-a-9109bef2fded"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-temporal-55456dc4a7c9": [
-      {
-        "operations": [
-          {
-            "node": "attest-sboms/output-temporal-ui-image",
-            "step": "nvkr-attest-sboms-output-temporal-ui-image"
-          },
-          {
-            "node": "publish/output-temporal-ui-image",
-            "step": "nvkr-publish-output-temporal-ui-image"
-          },
-          {
-            "node": "sign/output-temporal-ui-image",
-            "step": "nvkr-sign-output-temporal-ui-image"
-          },
-          {
-            "node": "verify-publication/output-temporal-ui-image",
-            "step": "nvkr-verify-publication-output-temporal-ui-image"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-temporal-60a568433da4": [
+    "nvkr-process-attest-sboms-output-temporal-7fdf090689be": [
       {
         "operations": [
           {
@@ -7304,27 +6410,7 @@
           {
             "node": "verify-publication/output-temporal-server-image-arm64",
             "step": "nvkr-verify-publication-output-temporal-s-030929bd4981"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-dev",
-            "file": ".github/workflows/nvkr-dev.yml"
           },
-          {
-            "bundle": "nvkr-run-nvke",
-            "file": ".github/workflows/nvkr-run-nvke.yml"
-          },
-          {
-            "bundle": "nvkr-run-nvke-nightly",
-            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-attest-sboms-output-temporal-9e0e8c356a7b": [
-      {
-        "operations": [
           {
             "node": "attest-sboms/output-temporal-ui-image-arm64",
             "step": "nvkr-attest-sboms-output-temporal-ui-image-arm64"
@@ -7332,14 +6418,6 @@
           {
             "node": "publish/output-temporal-ui-image-arm64",
             "step": "nvkr-publish-output-temporal-ui-image-arm64"
-          },
-          {
-            "node": "sign/output-temporal-ui-image-arm64",
-            "step": "nvkr-sign-output-temporal-ui-image-arm64"
-          },
-          {
-            "node": "verify-publication/output-temporal-ui-image-arm64",
-            "step": "nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac"
           }
         ],
         "workflows": [
@@ -7358,24 +6436,32 @@
         ]
       }
     ],
-    "nvkr-process-attest-sboms-output-temporal-efbcb1393aa1": [
+    "nvkr-process-attest-sboms-output-temporal-a5ffee9fee3a": [
       {
         "operations": [
           {
-            "node": "attest-sboms/output-temporal-admin-tools-image-arm64",
-            "step": "nvkr-attest-sboms-output-temporal-admin-t-9e993584a415"
+            "node": "attest-sboms/output-temporal-ui-image",
+            "step": "nvkr-attest-sboms-output-temporal-ui-image"
           },
           {
-            "node": "publish/output-temporal-admin-tools-image-arm64",
-            "step": "nvkr-publish-output-temporal-admin-tools-image-arm64"
+            "node": "publish/output-temporal-ui-image",
+            "step": "nvkr-publish-output-temporal-ui-image"
           },
           {
-            "node": "sign/output-temporal-admin-tools-image-arm64",
-            "step": "nvkr-sign-output-temporal-admin-tools-image-arm64"
+            "node": "sign/output-temporal-ui-image",
+            "step": "nvkr-sign-output-temporal-ui-image"
           },
           {
-            "node": "verify-publication/output-temporal-admin-tools-image-arm64",
-            "step": "nvkr-verify-publication-output-temporal-a-325229721989"
+            "node": "verify-publication/output-temporal-ui-image",
+            "step": "nvkr-verify-publication-output-temporal-ui-image"
+          },
+          {
+            "node": "attest-sboms/output-capi-controller-image-arm64",
+            "step": "nvkr-attest-sboms-output-capi-controller-image-arm64"
+          },
+          {
+            "node": "publish/output-capi-controller-image-arm64",
+            "step": "nvkr-publish-output-capi-controller-image-arm64"
           }
         ],
         "workflows": [
@@ -8036,16 +7122,9 @@
         ]
       }
     ],
-    "nvkr-process-capnico-controller-linux-amd-a5f07f346eaa": [
+    "nvkr-process-capnico-controller-linux-amd-2a462bdf52a9": [
       {
         "operations": [
-          {
-            "node": "capnico-controller/linux/amd64/fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
-            "producer": "fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site/capnico-controller/linux-amd64.json",
-            "step": "nvkr-capnico-controller-linux-amd64-fetch-358a637807f6",
-            "target": "capnico-controller/linux/amd64"
-          },
           {
             "node": "capnico-controller/linux/amd64/build-capnico-controller",
             "producer": "build-capnico-controller",
@@ -8074,13 +7153,6 @@
       {
         "operations": [
           {
-            "node": "capnico-controller/linux/amd64/fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
-            "producer": "fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/capnico-controller/linux-amd64.json",
-            "step": "nvkr-capnico-controller-linux-amd64-fetch-358a637807f6",
-            "target": "capnico-controller/linux/amd64"
-          },
-          {
             "node": "capnico-controller/linux/amd64/build-capnico-controller",
             "producer": "build-capnico-controller",
             "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/capnico-controller/linux-amd64.json",
@@ -8107,13 +7179,6 @@
       },
       {
         "operations": [
-          {
-            "node": "capnico-controller/linux/amd64/fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
-            "producer": "fetch-source-dd9e8997ac5820a246ca1cb74549be46e3ee7669a17d947a754b45eff552246b",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/capnico-controller/linux-amd64.json",
-            "step": "nvkr-capnico-controller-linux-amd64-fetch-358a637807f6",
-            "target": "capnico-controller/linux/amd64"
-          },
           {
             "node": "capnico-controller/linux/amd64/build-capnico-controller",
             "producer": "build-capnico-controller",
@@ -8886,16 +7951,9 @@
         ]
       }
     ],
-    "nvkr-process-cluster-api-provider-provisi-4b71356d87da": [
+    "nvkr-process-cluster-api-provider-provisi-c318d75c1ef3": [
       {
         "operations": [
-          {
-            "node": "cluster-api-provider-provisioned/linux/arm64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
-            "producer": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site/cluster-api-provider-provisioned/linux-arm64.json",
-            "step": "nvkr-cluster-api-provider-provisioned-lin-a202becc9fbe",
-            "target": "cluster-api-provider-provisioned/linux/arm64"
-          },
           {
             "node": "cluster-api-provider-provisioned/linux/arm64/build-cluster-api-provider-provisioned",
             "producer": "build-cluster-api-provider-provisioned",
@@ -8924,13 +7982,6 @@
       {
         "operations": [
           {
-            "node": "cluster-api-provider-provisioned/linux/arm64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
-            "producer": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/cluster-api-provider-provisioned/linux-arm64.json",
-            "step": "nvkr-cluster-api-provider-provisioned-lin-a202becc9fbe",
-            "target": "cluster-api-provider-provisioned/linux/arm64"
-          },
-          {
             "node": "cluster-api-provider-provisioned/linux/arm64/build-cluster-api-provider-provisioned",
             "producer": "build-cluster-api-provider-provisioned",
             "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/cluster-api-provider-provisioned/linux-arm64.json",
@@ -8957,13 +8008,6 @@
       },
       {
         "operations": [
-          {
-            "node": "cluster-api-provider-provisioned/linux/arm64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
-            "producer": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/cluster-api-provider-provisioned/linux-arm64.json",
-            "step": "nvkr-cluster-api-provider-provisioned-lin-a202becc9fbe",
-            "target": "cluster-api-provider-provisioned/linux/arm64"
-          },
           {
             "node": "cluster-api-provider-provisioned/linux/arm64/build-cluster-api-provider-provisioned",
             "producer": "build-cluster-api-provider-provisioned",
@@ -8990,16 +8034,9 @@
         ]
       }
     ],
-    "nvkr-process-cluster-api-provider-provisi-5d22804caf69": [
+    "nvkr-process-cluster-api-provider-provisi-fceca324467e": [
       {
         "operations": [
-          {
-            "node": "cluster-api-provider-provisioned/linux/amd64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
-            "producer": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site/cluster-api-provider-provisioned/linux-amd64.json",
-            "step": "nvkr-cluster-api-provider-provisioned-lin-61237cf109c0",
-            "target": "cluster-api-provider-provisioned/linux/amd64"
-          },
           {
             "node": "cluster-api-provider-provisioned/linux/amd64/build-cluster-api-provider-provisioned",
             "producer": "build-cluster-api-provider-provisioned",
@@ -9028,13 +8065,6 @@
       {
         "operations": [
           {
-            "node": "cluster-api-provider-provisioned/linux/amd64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
-            "producer": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/cluster-api-provider-provisioned/linux-amd64.json",
-            "step": "nvkr-cluster-api-provider-provisioned-lin-61237cf109c0",
-            "target": "cluster-api-provider-provisioned/linux/amd64"
-          },
-          {
             "node": "cluster-api-provider-provisioned/linux/amd64/build-cluster-api-provider-provisioned",
             "producer": "build-cluster-api-provider-provisioned",
             "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/cluster-api-provider-provisioned/linux-amd64.json",
@@ -9061,13 +8091,6 @@
       },
       {
         "operations": [
-          {
-            "node": "cluster-api-provider-provisioned/linux/amd64/fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
-            "producer": "fetch-source-32433f31b61d1f5850d517f0b889f0b74e63c885e2e5b1f91f3aee2ecbd25bbd",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/cluster-api-provider-provisioned/linux-amd64.json",
-            "step": "nvkr-cluster-api-provider-provisioned-lin-61237cf109c0",
-            "target": "cluster-api-provider-provisioned/linux/amd64"
-          },
           {
             "node": "cluster-api-provider-provisioned/linux/amd64/build-cluster-api-provider-provisioned",
             "producer": "build-cluster-api-provider-provisioned",
@@ -9638,6 +8661,42 @@
         ]
       }
     ],
+    "nvkr-process-dsx-imds-node-attestor-agent-031eea85e4c1": [
+      {
+        "operations": [
+          {
+            "node": "dsx-imds-node-attestor-agent-linux-amd64/build-dsx-imds-node-attestor-agent",
+            "producer": "build-dsx-imds-node-attestor-agent",
+            "record": ".github/nvkr-plan-store/steps/wli-imds-agent/dsx-imds-node-attestor-agent-linux-amd64/linux-amd64.json",
+            "scripts": [
+              ".github/nvkr-plan-store/scripts/dsx-imds-node-attestor-agent/build@328b8eb305bb.sh"
+            ],
+            "step": "nvkr-dsx-imds-node-attestor-agent-linux-a-ad878b3f5bba",
+            "target": "dsx-imds-node-attestor-agent-linux-amd64"
+          },
+          {
+            "node": "dsx-imds-node-attestor-agent-linux-amd64/terminal-observe",
+            "step": "nvkr-dsx-imds-node-attestor-agent-linux-a-95a74c79a6fd",
+            "target": "dsx-imds-node-attestor-agent-linux-amd64"
+          },
+          {
+            "node": "dsx-imds-node-attestor-agent-linux-amd64/sbom",
+            "step": "nvkr-dsx-imds-node-attestor-agent-linux-amd64-sbom",
+            "target": "dsx-imds-node-attestor-agent-linux-amd64"
+          },
+          {
+            "node": "package/dsx-imds-node-attestor-agent-linux-amd64",
+            "step": "nvkr-package-dsx-imds-node-attestor-agent-linux-amd64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-run-wli-imds-agent",
+            "file": ".github/workflows/nvkr-run-wli-imds-agent.yml"
+          }
+        ]
+      }
+    ],
     "nvkr-process-dsx-imds-node-attestor-agent-0b5a972b58aa": [
       {
         "operations": [
@@ -9674,52 +8733,6 @@
           {
             "node": "package/dsx-imds-node-attestor-agent-linux-arm64",
             "step": "nvkr-package-dsx-imds-node-attestor-agent-linux-arm64"
-          }
-        ],
-        "workflows": [
-          {
-            "bundle": "nvkr-run-wli-imds-agent",
-            "file": ".github/workflows/nvkr-run-wli-imds-agent.yml"
-          }
-        ]
-      }
-    ],
-    "nvkr-process-dsx-imds-node-attestor-agent-adc01ba95923": [
-      {
-        "operations": [
-          {
-            "node": "dsx-imds-node-attestor-agent-linux-amd64/fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
-            "producer": "fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
-            "record": ".github/nvkr-plan-store/steps/wli-imds-agent/dsx-imds-node-attestor-agent-linux-amd64/linux-amd64.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh"
-            ],
-            "step": "nvkr-dsx-imds-node-attestor-agent-linux-a-e6fbd972b55f",
-            "target": "dsx-imds-node-attestor-agent-linux-amd64"
-          },
-          {
-            "node": "dsx-imds-node-attestor-agent-linux-amd64/build-dsx-imds-node-attestor-agent",
-            "producer": "build-dsx-imds-node-attestor-agent",
-            "record": ".github/nvkr-plan-store/steps/wli-imds-agent/dsx-imds-node-attestor-agent-linux-amd64/linux-amd64.json",
-            "scripts": [
-              ".github/nvkr-plan-store/scripts/dsx-imds-node-attestor-agent/build@328b8eb305bb.sh"
-            ],
-            "step": "nvkr-dsx-imds-node-attestor-agent-linux-a-ad878b3f5bba",
-            "target": "dsx-imds-node-attestor-agent-linux-amd64"
-          },
-          {
-            "node": "dsx-imds-node-attestor-agent-linux-amd64/terminal-observe",
-            "step": "nvkr-dsx-imds-node-attestor-agent-linux-a-95a74c79a6fd",
-            "target": "dsx-imds-node-attestor-agent-linux-amd64"
-          },
-          {
-            "node": "dsx-imds-node-attestor-agent-linux-amd64/sbom",
-            "step": "nvkr-dsx-imds-node-attestor-agent-linux-amd64-sbom",
-            "target": "dsx-imds-node-attestor-agent-linux-amd64"
-          },
-          {
-            "node": "package/dsx-imds-node-attestor-agent-linux-amd64",
-            "step": "nvkr-package-dsx-imds-node-attestor-agent-linux-amd64"
           }
         ],
         "workflows": [
@@ -9944,16 +8957,9 @@
         ]
       }
     ],
-    "nvkr-process-local-path-provisioner-arm64-a4a16230d525": [
+    "nvkr-process-local-path-provisioner-arm64-2d1824d3a217": [
       {
         "operations": [
-          {
-            "node": "local-path-provisioner-arm64/fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
-            "producer": "fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site/local-path-provisioner-arm64/linux-arm64.json",
-            "step": "nvkr-local-path-provisioner-arm64-fetch-s-d811516c42aa",
-            "target": "local-path-provisioner-arm64"
-          },
           {
             "node": "local-path-provisioner-arm64/build-local-path-provisioner-chart",
             "producer": "build-local-path-provisioner-chart",
@@ -9982,13 +8988,6 @@
       {
         "operations": [
           {
-            "node": "local-path-provisioner-arm64/fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
-            "producer": "fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/local-path-provisioner-arm64/linux-arm64.json",
-            "step": "nvkr-local-path-provisioner-arm64-fetch-s-d811516c42aa",
-            "target": "local-path-provisioner-arm64"
-          },
-          {
             "node": "local-path-provisioner-arm64/build-local-path-provisioner-chart",
             "producer": "build-local-path-provisioner-chart",
             "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release/local-path-provisioner-arm64/linux-arm64.json",
@@ -10015,13 +9014,6 @@
       },
       {
         "operations": [
-          {
-            "node": "local-path-provisioner-arm64/fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
-            "producer": "fetch-source-0a2b1fc90424f8277e7b645548de0aea3a463e52d9a5d6868c7303eefdee39ff",
-            "record": ".github/nvkr-plan-store/steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/local-path-provisioner-arm64/linux-arm64.json",
-            "step": "nvkr-local-path-provisioner-arm64-fetch-s-d811516c42aa",
-            "target": "local-path-provisioner-arm64"
-          },
           {
             "node": "local-path-provisioner-arm64/build-local-path-provisioner-chart",
             "producer": "build-local-path-provisioner-chart",
@@ -15961,6 +14953,826 @@
           }
         ],
         "workflows": [
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-capi-controller-e58f9c993fd6": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-capi-controller-image-arm64",
+            "step": "nvkr-sign-output-capi-controller-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-capi-controller-image-arm64",
+            "step": "nvkr-verify-publication-output-capi-contr-a309e0dde6c8"
+          },
+          {
+            "node": "attest-sboms/output-capi-kubeadm-bootstrap-image-arm64",
+            "step": "nvkr-attest-sboms-output-capi-kubeadm-boo-bcd3e61be11a"
+          },
+          {
+            "node": "publish/output-capi-kubeadm-bootstrap-image-arm64",
+            "step": "nvkr-publish-output-capi-kubeadm-bootstra-07670d07d213"
+          },
+          {
+            "node": "sign/output-capi-kubeadm-bootstrap-image-arm64",
+            "step": "nvkr-sign-output-capi-kubeadm-bootstrap-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-capi-kubeadm-bootstrap-image-arm64",
+            "step": "nvkr-verify-publication-output-capi-kubea-8c536327dae9"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-capi-kubeadm-boo-9473f64d0f24": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-capi-kubeadm-bootstrap-image",
+            "step": "nvkr-sign-output-capi-kubeadm-bootstrap-image"
+          },
+          {
+            "node": "verify-publication/output-capi-kubeadm-bootstrap-image",
+            "step": "nvkr-verify-publication-output-capi-kubea-400c7177454b"
+          },
+          {
+            "node": "attest-sboms/output-capi-kubeadm-control-plane-image",
+            "step": "nvkr-attest-sboms-output-capi-kubeadm-con-aff5fe5bef73"
+          },
+          {
+            "node": "publish/output-capi-kubeadm-control-plane-image",
+            "step": "nvkr-publish-output-capi-kubeadm-control-plane-image"
+          },
+          {
+            "node": "sign/output-capi-kubeadm-control-plane-image",
+            "step": "nvkr-sign-output-capi-kubeadm-control-plane-image"
+          },
+          {
+            "node": "verify-publication/output-capi-kubeadm-control-plane-image",
+            "step": "nvkr-verify-publication-output-capi-kubea-a1d9f5feb0f6"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-cert-manager-cai-6fa2839d7ece": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-cert-manager-cainjector-image-arm64",
+            "step": "nvkr-sign-output-cert-manager-cainjector-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-cert-manager-cainjector-image-arm64",
+            "step": "nvkr-verify-publication-output-cert-manag-d72fce3ac728"
+          },
+          {
+            "node": "attest-sboms/output-cert-manager-controller-image-arm64",
+            "step": "nvkr-attest-sboms-output-cert-manager-con-d61492d4f3a1"
+          },
+          {
+            "node": "publish/output-cert-manager-controller-image-arm64",
+            "step": "nvkr-publish-output-cert-manager-controll-1c8e088fb6a6"
+          },
+          {
+            "node": "sign/output-cert-manager-controller-image-arm64",
+            "step": "nvkr-sign-output-cert-manager-controller-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-cert-manager-controller-image-arm64",
+            "step": "nvkr-verify-publication-output-cert-manag-9a8734354915"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-cert-manager-con-b64b5999330c": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-cert-manager-controller-image",
+            "step": "nvkr-sign-output-cert-manager-controller-image"
+          },
+          {
+            "node": "verify-publication/output-cert-manager-controller-image",
+            "step": "nvkr-verify-publication-output-cert-manag-eecf216a547d"
+          },
+          {
+            "node": "attest-sboms/output-cert-manager-webhook-image",
+            "step": "nvkr-attest-sboms-output-cert-manager-webhook-image"
+          },
+          {
+            "node": "publish/output-cert-manager-webhook-image",
+            "step": "nvkr-publish-output-cert-manager-webhook-image"
+          },
+          {
+            "node": "sign/output-cert-manager-webhook-image",
+            "step": "nvkr-sign-output-cert-manager-webhook-image"
+          },
+          {
+            "node": "verify-publication/output-cert-manager-webhook-image",
+            "step": "nvkr-verify-publication-output-cert-manag-02f76d39d687"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-csi-node-driver-83b86c647ec6": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-csi-node-driver-registrar-image-arm64",
+            "step": "nvkr-sign-output-csi-node-driver-registra-1ee01f3e15c9"
+          },
+          {
+            "node": "verify-publication/output-csi-node-driver-registrar-image-arm64",
+            "step": "nvkr-verify-publication-output-csi-node-d-ed501e7759bf"
+          },
+          {
+            "node": "attest-sboms/output-local-path-helper-image-arm64",
+            "step": "nvkr-attest-sboms-output-local-path-helpe-d7c0ec47aa04"
+          },
+          {
+            "node": "publish/output-local-path-helper-image-arm64",
+            "step": "nvkr-publish-output-local-path-helper-image-arm64"
+          },
+          {
+            "node": "sign/output-local-path-helper-image-arm64",
+            "step": "nvkr-sign-output-local-path-helper-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-local-path-helper-image-arm64",
+            "step": "nvkr-verify-publication-output-local-path-15c3e80b49ce"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-local-path-helpe-0ec79402dde9": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-local-path-helper-image",
+            "step": "nvkr-sign-output-local-path-helper-image"
+          },
+          {
+            "node": "verify-publication/output-local-path-helper-image",
+            "step": "nvkr-verify-publication-output-local-path-c572611510ec"
+          },
+          {
+            "node": "attest-sboms/output-local-path-provisioner-image",
+            "step": "nvkr-attest-sboms-output-local-path-provisioner-image"
+          },
+          {
+            "node": "publish/output-local-path-provisioner-image",
+            "step": "nvkr-publish-output-local-path-provisioner-image"
+          },
+          {
+            "node": "sign/output-local-path-provisioner-image",
+            "step": "nvkr-sign-output-local-path-provisioner-image"
+          },
+          {
+            "node": "verify-publication/output-local-path-provisioner-image",
+            "step": "nvkr-verify-publication-output-local-path-e9f81d84678d"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-nktp-collector-i-6ce426a0cd86": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-nktp-collector-image-arm64",
+            "step": "nvkr-sign-output-nktp-collector-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-nktp-collector-image-arm64",
+            "step": "nvkr-verify-publication-output-nktp-colle-3037712057c4"
+          },
+          {
+            "node": "attest-sboms/output-nktp-kube-state-metrics-image-arm64",
+            "step": "nvkr-attest-sboms-output-nktp-kube-state-6248dc6aafc3"
+          },
+          {
+            "node": "publish/output-nktp-kube-state-metrics-image-arm64",
+            "step": "nvkr-publish-output-nktp-kube-state-metri-cecf76dda028"
+          },
+          {
+            "node": "sign/output-nktp-kube-state-metrics-image-arm64",
+            "step": "nvkr-sign-output-nktp-kube-state-metrics-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-nktp-kube-state-metrics-image-arm64",
+            "step": "nvkr-verify-publication-output-nktp-kube-59673e96b3e2"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-nktp-kube-state-da8aef477fa1": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-nktp-kube-state-metrics-image",
+            "step": "nvkr-sign-output-nktp-kube-state-metrics-image"
+          },
+          {
+            "node": "verify-publication/output-nktp-kube-state-metrics-image",
+            "step": "nvkr-verify-publication-output-nktp-kube-8edb2f9f5644"
+          },
+          {
+            "node": "attest-sboms/output-nktp-kubectl-image",
+            "step": "nvkr-attest-sboms-output-nktp-kubectl-image"
+          },
+          {
+            "node": "publish/output-nktp-kubectl-image",
+            "step": "nvkr-publish-output-nktp-kubectl-image"
+          },
+          {
+            "node": "sign/output-nktp-kubectl-image",
+            "step": "nvkr-sign-output-nktp-kubectl-image"
+          },
+          {
+            "node": "verify-publication/output-nktp-kubectl-image",
+            "step": "nvkr-verify-publication-output-nktp-kubectl-image"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-nktp-lgtm-image-a053456d6ab9": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-nktp-lgtm-image-arm64",
+            "step": "nvkr-sign-output-nktp-lgtm-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-nktp-lgtm-image-arm64",
+            "step": "nvkr-verify-publication-output-nktp-lgtm-image-arm64"
+          },
+          {
+            "node": "attest-sboms/output-nktp-metrics-server-image-arm64",
+            "step": "nvkr-attest-sboms-output-nktp-metrics-ser-cc131630b796"
+          },
+          {
+            "node": "publish/output-nktp-metrics-server-image-arm64",
+            "step": "nvkr-publish-output-nktp-metrics-server-image-arm64"
+          },
+          {
+            "node": "sign/output-nktp-metrics-server-image-arm64",
+            "step": "nvkr-sign-output-nktp-metrics-server-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-nktp-metrics-server-image-arm64",
+            "step": "nvkr-verify-publication-output-nktp-metri-72d2044749d1"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-nktp-metrics-ser-5592c2b22671": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-nktp-metrics-server-image",
+            "step": "nvkr-sign-output-nktp-metrics-server-image"
+          },
+          {
+            "node": "verify-publication/output-nktp-metrics-server-image",
+            "step": "nvkr-verify-publication-output-nktp-metri-4773ec2231a9"
+          },
+          {
+            "node": "attest-sboms/output-nktp-node-exporter-image",
+            "step": "nvkr-attest-sboms-output-nktp-node-exporter-image"
+          },
+          {
+            "node": "publish/output-nktp-node-exporter-image",
+            "step": "nvkr-publish-output-nktp-node-exporter-image"
+          },
+          {
+            "node": "sign/output-nktp-node-exporter-image",
+            "step": "nvkr-sign-output-nktp-node-exporter-image"
+          },
+          {
+            "node": "verify-publication/output-nktp-node-exporter-image",
+            "step": "nvkr-verify-publication-output-nktp-node-308c6a04d0d9"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-nktp-operator-im-da1e1c5eaaa4": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-nktp-operator-image-arm64",
+            "step": "nvkr-sign-output-nktp-operator-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-nktp-operator-image-arm64",
+            "step": "nvkr-verify-publication-output-nktp-opera-e8ca29886a10"
+          },
+          {
+            "node": "attest-sboms/output-nktp-target-allocator-image-arm64",
+            "step": "nvkr-attest-sboms-output-nktp-target-allo-bbd05f2a1798"
+          },
+          {
+            "node": "publish/output-nktp-target-allocator-image-arm64",
+            "step": "nvkr-publish-output-nktp-target-allocator-image-arm64"
+          },
+          {
+            "node": "sign/output-nktp-target-allocator-image-arm64",
+            "step": "nvkr-sign-output-nktp-target-allocator-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-nktp-target-allocator-image-arm64",
+            "step": "nvkr-verify-publication-output-nktp-targe-c21c44003a70"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-nktp-target-allo-8ab733ad8c4f": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-nktp-target-allocator-image",
+            "step": "nvkr-sign-output-nktp-target-allocator-image"
+          },
+          {
+            "node": "verify-publication/output-nktp-target-allocator-image",
+            "step": "nvkr-verify-publication-output-nktp-targe-83f6218e2759"
+          },
+          {
+            "node": "attest-sboms/output-postgresql-image",
+            "step": "nvkr-attest-sboms-output-postgresql-image"
+          },
+          {
+            "node": "publish/output-postgresql-image",
+            "step": "nvkr-publish-output-postgresql-image"
+          },
+          {
+            "node": "sign/output-postgresql-image",
+            "step": "nvkr-sign-output-postgresql-image"
+          },
+          {
+            "node": "verify-publication/output-postgresql-image",
+            "step": "nvkr-verify-publication-output-postgresql-image"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-spiffe-csi-image-c90168399632": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-spiffe-csi-image-arm64",
+            "step": "nvkr-sign-output-spiffe-csi-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-spiffe-csi-image-arm64",
+            "step": "nvkr-verify-publication-output-spiffe-csi-image-arm64"
+          },
+          {
+            "node": "attest-sboms/output-spire-agent-image-arm64",
+            "step": "nvkr-attest-sboms-output-spire-agent-image-arm64"
+          },
+          {
+            "node": "publish/output-spire-agent-image-arm64",
+            "step": "nvkr-publish-output-spire-agent-image-arm64"
+          },
+          {
+            "node": "sign/output-spire-agent-image-arm64",
+            "step": "nvkr-sign-output-spire-agent-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-spire-agent-image-arm64",
+            "step": "nvkr-verify-publication-output-spire-agen-690d58615fef"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-spire-agent-imag-759d74ba7fe3": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-spire-agent-image",
+            "step": "nvkr-sign-output-spire-agent-image"
+          },
+          {
+            "node": "verify-publication/output-spire-agent-image",
+            "step": "nvkr-verify-publication-output-spire-agent-image"
+          },
+          {
+            "node": "attest-sboms/output-spire-bash-image",
+            "step": "nvkr-attest-sboms-output-spire-bash-image"
+          },
+          {
+            "node": "publish/output-spire-bash-image",
+            "step": "nvkr-publish-output-spire-bash-image"
+          },
+          {
+            "node": "sign/output-spire-bash-image",
+            "step": "nvkr-sign-output-spire-bash-image"
+          },
+          {
+            "node": "verify-publication/output-spire-bash-image",
+            "step": "nvkr-verify-publication-output-spire-bash-image"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-spire-controller-12137df00cb4": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-spire-controller-manager-image-arm64",
+            "step": "nvkr-sign-output-spire-controller-manager-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-spire-controller-manager-image-arm64",
+            "step": "nvkr-verify-publication-output-spire-cont-0a3a6ec2cd91"
+          },
+          {
+            "node": "attest-sboms/output-spire-oidc-image-arm64",
+            "step": "nvkr-attest-sboms-output-spire-oidc-image-arm64"
+          },
+          {
+            "node": "publish/output-spire-oidc-image-arm64",
+            "step": "nvkr-publish-output-spire-oidc-image-arm64"
+          },
+          {
+            "node": "sign/output-spire-oidc-image-arm64",
+            "step": "nvkr-sign-output-spire-oidc-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-spire-oidc-image-arm64",
+            "step": "nvkr-verify-publication-output-spire-oidc-image-arm64"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-spire-oidc-image-3b9e40904d43": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-spire-oidc-image",
+            "step": "nvkr-sign-output-spire-oidc-image"
+          },
+          {
+            "node": "verify-publication/output-spire-oidc-image",
+            "step": "nvkr-verify-publication-output-spire-oidc-image"
+          },
+          {
+            "node": "attest-sboms/output-spire-server-image",
+            "step": "nvkr-attest-sboms-output-spire-server-image"
+          },
+          {
+            "node": "publish/output-spire-server-image",
+            "step": "nvkr-publish-output-spire-server-image"
+          },
+          {
+            "node": "sign/output-spire-server-image",
+            "step": "nvkr-sign-output-spire-server-image"
+          },
+          {
+            "node": "verify-publication/output-spire-server-image",
+            "step": "nvkr-verify-publication-output-spire-server-image"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-spire-tpm-server-09d93de646e5": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-spire-tpm-server-image-arm64",
+            "step": "nvkr-sign-output-spire-tpm-server-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-spire-tpm-server-image-arm64",
+            "step": "nvkr-verify-publication-output-spire-tpm-fdd5a5adf925"
+          },
+          {
+            "node": "attest-sboms/output-temporal-admin-tools-image-arm64",
+            "step": "nvkr-attest-sboms-output-temporal-admin-t-9e993584a415"
+          },
+          {
+            "node": "publish/output-temporal-admin-tools-image-arm64",
+            "step": "nvkr-publish-output-temporal-admin-tools-image-arm64"
+          },
+          {
+            "node": "sign/output-temporal-admin-tools-image-arm64",
+            "step": "nvkr-sign-output-temporal-admin-tools-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-temporal-admin-tools-image-arm64",
+            "step": "nvkr-verify-publication-output-temporal-a-325229721989"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-temporal-admin-t-047e02cb868d": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-temporal-admin-tools-image",
+            "step": "nvkr-sign-output-temporal-admin-tools-image"
+          },
+          {
+            "node": "verify-publication/output-temporal-admin-tools-image",
+            "step": "nvkr-verify-publication-output-temporal-a-9109bef2fded"
+          },
+          {
+            "node": "attest-sboms/output-temporal-server-image",
+            "step": "nvkr-attest-sboms-output-temporal-server-image"
+          },
+          {
+            "node": "publish/output-temporal-server-image",
+            "step": "nvkr-publish-output-temporal-server-image"
+          },
+          {
+            "node": "sign/output-temporal-server-image",
+            "step": "nvkr-sign-output-temporal-server-image"
+          },
+          {
+            "node": "verify-publication/output-temporal-server-image",
+            "step": "nvkr-verify-publication-output-temporal-server-image"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke-nightly",
+            "file": ".github/workflows/nvkr-run-nvke-nightly.yml"
+          }
+        ]
+      }
+    ],
+    "nvkr-process-sign-output-temporal-ui-imag-fc45e0079c5a": [
+      {
+        "operations": [
+          {
+            "node": "sign/output-temporal-ui-image-arm64",
+            "step": "nvkr-sign-output-temporal-ui-image-arm64"
+          },
+          {
+            "node": "verify-publication/output-temporal-ui-image-arm64",
+            "step": "nvkr-verify-publication-output-temporal-u-4bf6cb2a7cac"
+          }
+        ],
+        "workflows": [
+          {
+            "bundle": "nvkr-dev",
+            "file": ".github/workflows/nvkr-dev.yml"
+          },
+          {
+            "bundle": "nvkr-run-nvke",
+            "file": ".github/workflows/nvkr-run-nvke.yml"
+          },
           {
             "bundle": "nvkr-run-nvke-nightly",
             "file": ".github/workflows/nvkr-run-nvke-nightly.yml"

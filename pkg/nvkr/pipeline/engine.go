@@ -31,6 +31,9 @@ type RunOptions struct {
 	// It confers no build authority and exposes no directory descriptor.
 	// SourceRoot must be relative to this directory. Held Git execution is Linux-only.
 	SourceWorkspace *SourceWorkspace
+	// SourceSeed describes same-Run source bytes to authenticate before copying.
+	// It is admitted only by the held source-fetch route, after runtime admission.
+	SourceSeed *SourceSeed
 	// SourceGitEnvironment describes the factory-admitted source-only child
 	// environment. It is used only with SourceWorkspace; nil selects the fixed
 	// public-source baseline, never the ambient process environment.

@@ -41,6 +41,9 @@ func (l Local) ExecNode(n ir.Node, opts RunOptions) (*ArtifactResult, error) {
 	if opts.SourceGitEnvironment != nil && opts.SourceWorkspace == nil {
 		return nil, e.New(e.CodeEngineCapability, "source Git environment requires its held source workspace")
 	}
+	if opts.SourceSeed != nil && opts.SourceWorkspace == nil {
+		return nil, e.New(e.CodeEngineCapability, "shared source requires its held source workspace")
+	}
 	if err := rejectUnsupportedExecutionRequirements([]ir.Node{n}, "exec-node"); err != nil {
 		return nil, err
 	}
