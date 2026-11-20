@@ -322,7 +322,7 @@ _Avoid_: Producer catalog, upstream test implementation, executable plugin, qual
 **TestEnvironment**:
 Diagnostic execution configuration declaring the provider, capabilities, credential bindings and permitted
 network available to one validation invocation; the built-in `local` environment provides Docker. Distinct
-from the lifecycle Environment and Build identity ([ADR-24 §6](docs/adr/0024-imported-validator-catalog.md#6-admit-one-testenvironment-per-invocation)).
+from the lifecycle Environment and Build identity ([ADR-24 §5](docs/adr/0024-imported-validator-catalog.md#5-admit-one-testenvironment-per-invocation)).
 _Avoid_: Environment, runner, provider credentials
 
 **Cluster observation**:
