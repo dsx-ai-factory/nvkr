@@ -154,6 +154,8 @@ func exactDocumentFields(value any, schema reflect.Type) error {
 		return usage("null document value")
 	}
 	switch schema.Kind() {
+	case reflect.Pointer:
+		return exactDocumentFields(value, schema.Elem())
 	case reflect.Struct:
 		object, ok := value.(map[string]any)
 		if !ok {

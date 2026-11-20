@@ -261,3 +261,39 @@ func TestLocalDiagnosticArtifactsContextAdmission(t *testing.T) {
 		t.Fatalf("coded callback error changed: %v", err)
 	}
 }
+
+func TestLocalDiagnosticArtifactsPlanIsDetachedCapturedPlan(t *testing.T) {
+	owner, _, _ := localDiagnosticFixture(t)
+	description, err := owner.Description()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := owner.Plan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	digest, err := plan.Digest()
+	if err != nil || digest != description.PlanDigest {
+		t.Fatalf("captured Plan digest %q differs from Run Plan digest %q: %v", digest, description.PlanDigest, err)
+	}
+	if len(plan.Builds) == 0 {
+		t.Fatal("captured Plan has no builds")
+	}
+	plan.Builds[0].Name = "poison"
+	again, err := owner.Plan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if digest, err := again.Digest(); err != nil || digest != description.PlanDigest {
+		t.Fatal("caller mutated the captured Plan")
+	}
+	if err := owner.Close(); err != nil {
+		t.Fatal(err)
+	}
+	_, err = owner.Plan()
+	assertCode(t, err, e.CodeGateUnmet)
+	for _, zero := range []*LocalDiagnosticArtifacts{nil, {}} {
+		_, err := zero.Plan()
+		assertCode(t, err, e.CodeGateUnmet)
+	}
+}

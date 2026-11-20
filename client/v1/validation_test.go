@@ -55,7 +55,7 @@ func TestSDKValidatorMethodsRefuseMissingConfiguration(t *testing.T) {
 		}},
 		{"describe", func(t *testing.T, path string) error {
 			result, err := sdk.DescribeValidator(t.Context(), path, "nvke/nvkectl/contract")
-			if result.Available {
+			if result.ID != "" {
 				t.Fatal(result)
 			}
 			return err

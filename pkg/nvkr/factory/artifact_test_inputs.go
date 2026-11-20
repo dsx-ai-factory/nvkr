@@ -11,6 +11,10 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
+// ArtifactTestComponent is the producer component whose test inputs validation
+// admits. Selection below also accepts explicit CLI recipe variants.
+const ArtifactTestComponent = "nvkectl"
+
 // CLIArtifactTestInputs describes a validated Plan's CLI test runner inputs.
 // It authenticates neither supplied artifact bytes nor membership in a Run.
 type CLIArtifactTestInputs struct {
@@ -49,6 +53,16 @@ func LoadCLIArtifactPlan(ctx context.Context, path string) (*CLIArtifactPlan, er
 		return nil, err
 	}
 	return &CLIArtifactPlan{plan: plan, documentSHA256: digest}, nil
+}
+
+// SelectCLIArtifactTestInputs derives the test inputs of one explicitly named
+// CLI output from an already validated Plan, such as one replayed from a
+// completed Run. It never infers the output.
+func SelectCLIArtifactTestInputs(plan *Plan, output string) (*CLIArtifactTestInputs, error) {
+	if plan == nil || output == "" {
+		return nil, e.New(e.CodeUsage, "CLI test input selection requires a Plan and an explicit output")
+	}
+	return selectCLIArtifactTestInputs(plan, output)
 }
 
 func selectCLIArtifactTestInputs(plan *Plan, output string) (*CLIArtifactTestInputs, error) {
