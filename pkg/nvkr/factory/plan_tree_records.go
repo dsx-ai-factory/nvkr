@@ -15,8 +15,15 @@ import (
 )
 
 // Scalar identity labels and target names stay in the per-bundle index. Frozen
-// structured fields, including the complete graph, share exact stored bytes.
-var sharedPlanFields = []string{"actions", "appliedOverlays", "composition", "definition", "environment", "graph", "internalTools", "lifecycleOutputs", "routes", "runtimeInputs", "targets"}
+// structured fields share exact stored bytes; the artifact graph is derived.
+var sharedPlanFields = []string{"actions", "appliedOverlays", "composition", "definition", "environment", "internalTools", "lifecycleOutputs", "routes", "runtimeInputs", "targets"}
+
+func planTreeFields(storage string) []string {
+	if storage == legacyPlanTreeStorage || storage == storedGraphPlanTreeStorage {
+		return append(append([]string(nil), sharedPlanFields...), "graph")
+	}
+	return sharedPlanFields
+}
 
 func storeTreeJSON(value any, files map[string][]byte, logical string) (json.RawMessage, error) {
 	raw, err := treeJSON(value)
