@@ -114,7 +114,7 @@ The inventory `runtime` flag selects runtime admission only for checks. Writes r
 baseline without freezing dispatch-time source heads; the Environment owns runtime policy.
 
 For repository pipeline changes, `make pipeline-dev-run PIPELINE_DEV_REPO=owner/repo` checks the generated
-development bundle and calls `pipeline-dev.py`. The helper requires a clean named branch matching the
+development bundle and calls `pipeline-dev.sh`. The helper requires a clean named branch matching the
 remote commit and an active registered `nvkr-dev.yml`, then dispatches that branch explicitly. It performs
 no commit, push, environment-policy update or registry cleanup. `--check` runs only its provider preflight.
 See [pipeline development](../DEVELOPMENT.md#test-pipeline-changes-on-a-feature-branch) for full NVKE branch

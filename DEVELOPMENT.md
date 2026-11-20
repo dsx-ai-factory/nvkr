@@ -13,21 +13,20 @@ sets the variable.
 Ordinary local source admission uses Git's bounded `ls-files --format` query to reject indexed gitlinks;
 an unsupported query fails with a coded diagnostic naming this Git version floor.
 The required [authoring lab regression](docs/examples/authoring-lab/README.md) uses these tools and fails
-if a prerequisite is missing. `make check` additionally requires Python 3.12 or later (`python3` on `PATH`)
-for `make test-ci-tools`, which runs the remaining Python local adapter contract suites using
-only the Python standard library, plus Go CI sharding, status, notices, and shell/jq generation and summary contracts.
+if a prerequisite is missing. `make test-ci-tools` runs the Go CI sharding and local adapter contract suites,
+including the shell/jq generation, dispatch, diagnostics and summary contracts.
 That target also vets and tests the separate MachineImage catalog Go module, which requires Git 2.45 or newer
 with `--no-lazy-fetch` support for offline CRD reads. Its first build needs module-proxy access unless its
 hash-locked dependencies are already cached.
-Go-test adapter wrappers report an explicit skip when Python is
-absent; that is not full-gate coverage. The tooling gate fails if Python is missing or too old and
-runs every suite independently, so a Go-only test pass cannot stand in for the completion gate.
+Python is optional for the Packer observer's script-specific tests, which skip when `python3` is absent.
+The Packer toolchain image retains Python for that observer and NVKE's image-input composer. NVKE's
+native deployment scripts also require Python on the execution host; see the native demo prerequisites.
 The restated-status check in `make check` diffs against `origin/main`; set `STATUS_BASE` when your base
 branch has another name, and fetch full history in a shallow clone.
-On macOS with Homebrew, install the additional JSON, timeout, and Python tools with:
+On macOS with Homebrew, install the additional JSON and timeout tools with:
 
 ```sh
-brew install jq yq coreutils python
+brew install jq yq coreutils
 ```
 
 The checksum contract tests execute `sha256sum`, supplied by macOS (including `/sbin/sha256sum` on macOS 26)
@@ -45,7 +44,7 @@ GitHub.
 
 `make zizmor-report` runs optional report-only workflow security diagnostics, separate from
 `make ci-check`. It downloads zizmor 1.32.0 and verifies the pinned archive SHA-256 before
-execution (Linux AMD64 or Darwin ARM64; Python 3.12+ and curl required). The scan uses strict
+execution (Linux AMD64 or Darwin ARM64; curl, tar and the required shell/JSON tools). The scan uses strict
 collection and offline mode on Git-listed workflows and action definitions under `.github/`,
 including committed generated bundles and new non-ignored files. No generated scratch bundles
 are scanned. Online audits (including remote action/repository metadata checks) are omitted;
@@ -213,8 +212,8 @@ make pipeline-dev-run PIPELINE_DEV_REPO=dsx-ai-factory/nvkr
 
 The dispatch helper requires a clean named branch matching the selected repository's remote commit and
 an active registered workflow. It never commits, pushes or changes provider settings. For a preflight without
-dispatch, use `python3 scripts/pipeline-dev.py --repo dsx-ai-factory/nvkr --check` after
-`make pipeline-dev-check`. `make pipeline-dev-generate` regenerates just the development bundle.
+dispatch, use `bash scripts/pipeline-dev.sh --repo dsx-ai-factory/nvkr --check` after
+`make pipeline-dev-check`. `make pipeline-dev-generate` regenerates all maintained bundles together.
 
 Release metadata assembly and deliverable verification use four concurrent output workers. For a diagnostic
 factory invocation, `NVKR_VERIFY_WORKERS` selects a canonical integer from 1 through 16; invalid values fail

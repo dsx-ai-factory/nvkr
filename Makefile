@@ -153,8 +153,8 @@ ZIZMOR_REPORT_DIR ?= $(CURDIR)/.nvkr/zizmor-report
 export ZIZMOR_REPORT_DIR
 
 .PHONY: zizmor-report
-zizmor-report: ## Report offline workflow security findings with checksum-pinned zizmor (Python 3.12+, curl).
-	python3 -B scripts/zizmor-report.py
+zizmor-report: ## Report offline workflow security findings with checksum-pinned zizmor (shell, jq, curl, tar).
+	bash scripts/zizmor-report.sh
 
 .PHONY: test-workflow-scripts
 test-workflow-scripts: ## Test the triage and PR-metadata workflow scripts (needs node and npm).
@@ -184,12 +184,11 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 	NVKR_TEST_EXTENDED=1 $(MAKE) test-race
 
 .PHONY: test-ci-tools
-test-ci-tools: ## Require Go, jq and Python; check CI tooling, local adapters and the catalog renderer.
+test-ci-tools: ## Check CI tooling, local adapters and the catalog renderer with Go and shell tools.
 	go test ./internal/citestshard ./internal/checkstatus ./internal/gennotices -count=1
 	go test ./internal/checkdocs -count=1
 	go test ./scripts -run 'TestMaintainedGeneration|TestCITestSummary|TestDemoShellTools' -count=1
-	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
-	python3 -B -m unittest discover -s scripts -p '*_test.py'
+	go test ./internal/cicontract -run 'TestDemoHTML|TestHeartbeat|TestVulncheckTools|TestPipelineDev|TestZizmor' -count=1
 	go -C inputs/catalogs/nvke/machineimage vet ./...
 	go -C inputs/catalogs/nvke/machineimage test ./... -count=1
 
@@ -406,7 +405,7 @@ pipeline-dev-check: workflow-generator ## Check development workflow generation.
 
 .PHONY: pipeline-dev-run
 pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branch (PIPELINE_DEV_REPO=owner/repo).
-	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
+	bash scripts/pipeline-dev.sh --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
 check: go-version-check fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check vet lint shellcheck test-ci-tools test vulncheck ## Code gate: format, Definition and ledger location, license, restated status, vet, lint, shell, tool tests, Go tests, vulnerabilities.
