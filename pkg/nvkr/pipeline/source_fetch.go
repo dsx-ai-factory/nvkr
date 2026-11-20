@@ -37,6 +37,12 @@ func (l Local) fetch(n ir.Node, opts RunOptions) (returnErr error) {
 func (l Local) fetchWithSourceVendorAdmission(n ir.Node, opts RunOptions,
 	admitVendor func(context.Context, ir.Node, string) (*sourceVendor, error),
 ) (returnErr error) {
+	if opts.SourceSeed != nil && opts.SourceWorkspace == nil {
+		return e.New(e.CodeEngineCapability, "shared source requires a held source workspace")
+	}
+	if opts.SourceSeed != nil && opts.SourceSeed.Platform != "linux/amd64" && opts.SourceSeed.Platform != "linux/arm64" {
+		return e.New(e.CodeEngineCapability, "shared source requires an admitted native seed platform")
+	}
 	var vendor *sourceVendor
 	if opts.SourceWorkspace != nil {
 		environment := opts.SourceGitEnvironment
@@ -72,6 +78,12 @@ func (l Local) fetchWithSourceVendorAdmission(n ir.Node, opts RunOptions,
 					returnErr = errors.Join(returnErr, e.Wrap(e.CodeFetchFailed, err, "closing source vendor runtime"))
 				}
 			}()
+		}
+	}
+	if opts.SourceSeed != nil && !opts.DryRun {
+		seed := opts.SourceSeed
+		if err := seedSourceWorkspace(opts.ctx(), opts.fetchWorkspace, seed.Instruction, seed.Root, n, opts.SourceRoot, seed.Platform, opts.SourceGitEnvironment); err != nil {
+			return err
 		}
 	}
 	dir, err := pathWithin(opts.SourceRoot, n.Dest)
