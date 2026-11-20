@@ -20,6 +20,8 @@ const DiskInstalledPackagesMethod = "disk-installed-packages/v1"
 var installedDebName = regexp.MustCompile(`^[a-z0-9][a-z0-9+.-]+$`)
 var installedDebArch = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 var installedDebVendor = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]*$`)
+var installedDebUpstreamVersion = regexp.MustCompile(`^[0-9][A-Za-z0-9.+~-]*$`)
+var installedDebRevision = regexp.MustCompile(`^[A-Za-z0-9.+~]+$`)
 
 // DiskPackageDocument projects an issued final-disk inventory, without claiming
 // material correspondence or file coverage. Factory authenticates the original
@@ -46,11 +48,10 @@ func DiskPackageDocument(build, name string, inventory *DiskInstalledInventory) 
 			version += "-" + pkg.Release
 		}
 		if pkg.Epoch != "" && pkg.Epoch != "0" {
-			epoch, err := strconv.ParseUint(pkg.Epoch, 10, 31)
-			if err != nil || strconv.FormatUint(epoch, 10) != pkg.Epoch {
-				return nil, e.New(e.CodeVerifyFailed, "installed Debian package has an invalid epoch")
-			}
 			version = pkg.Epoch + ":" + version
+		}
+		if !validInstalledDebVersion(version) {
+			return nil, e.New(e.CodeVerifyFailed, "installed Debian package has an invalid version")
 		}
 		components = append(components, Component{Type: "library", Name: pkg.Name, Version: version,
 			PURL: installedDebPURL(pkg.Vendor, pkg.Name, version, pkg.Architecture), Properties: []Property{
@@ -89,6 +90,25 @@ func DiskPackageDocument(build, name string, inventory *DiskInstalledInventory) 
 		return nil, err
 	}
 	return bom, nil
+}
+
+// Debian Policy 5.6.12 splits the revision at the last hyphen. This evidence
+// profile also requires the reader's bounded, canonical epoch (zero is implicit).
+func validInstalledDebVersion(version string) bool {
+	if epoch, rest, found := strings.Cut(version, ":"); found {
+		value, err := strconv.ParseUint(epoch, 10, 31)
+		if err != nil || value == 0 || strconv.FormatUint(value, 10) != epoch {
+			return false
+		}
+		version = rest
+	}
+	if separator := strings.LastIndexByte(version, '-'); separator >= 0 {
+		if !installedDebRevision.MatchString(version[separator+1:]) {
+			return false
+		}
+		version = version[:separator]
+	}
+	return installedDebUpstreamVersion.MatchString(version)
 }
 
 func installedDebPURL(vendor, name, version, arch string) string {
@@ -134,7 +154,7 @@ func ValidateDiskInstalledPackages(bom *BOM) error {
 			}
 		}
 		key := component.Name + "\x00" + arch
-		if component.Type != "library" || !installedDebName.MatchString(component.Name) || component.Version == "" ||
+		if component.Type != "library" || !installedDebName.MatchString(component.Name) || !validInstalledDebVersion(component.Version) ||
 			!installedDebArch.MatchString(arch) || !installedDebVendor.MatchString(vendor) || vendor == "unknown" || format != "deb" || len(component.Hashes) != 0 ||
 			component.PURL != installedDebPURL(vendor, component.Name, component.Version, arch) || seen[key] {
 			return e.New(e.CodeVerifyFailed, "disk package inventory contains an invalid or conflicting Debian identity")

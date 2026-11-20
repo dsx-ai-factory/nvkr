@@ -138,7 +138,7 @@ func validateInventorySemantics(bom *BOM, artifact string) error {
 			}
 		}
 	}
-	if diskInventory && artifact == "" {
+	if (diskInventory || method == DiskInstalledPackagesMethod) && artifact == "" {
 		return e.New(e.CodeVerifyFailed, "disk inventory requires an exact per-artifact subject")
 	}
 	if (method == "disk-reconciled/v1" || method == DiskInstalledPackagesMethod) && bom.Metadata.Component.Type != "operating-system" {

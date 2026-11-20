@@ -114,6 +114,72 @@ func TestInstalledDebPURLCanonicalExamples(t *testing.T) {
 	}
 }
 
+func TestDiskPackageDocumentDebianVersions(t *testing.T) {
+	for _, test := range []struct {
+		name, epoch, version, release, joined string
+		valid                                 bool
+	}{
+		{"native", "0", "1.0+really0.9~rc1", "", "1.0+really0.9~rc1", true},
+		{"epoch", "2", "1.0", "", "2:1.0", true},
+		{"revision", "0", "1.0", "1~bpo12+1", "1.0-1~bpo12+1", true},
+		{"upstream hyphens", "1", "1.0", "beta-2+b1", "1:1.0-beta-2+b1", true},
+		{"version slash", "0", "1/2", "", "1/2", false},
+		{"revision slash", "0", "1.0", "1/2", "1.0-1/2", false},
+		{"empty revision", "0", "1.0-", "", "1.0-", false},
+		{"revision underscore", "0", "1.0", "1_2", "1.0-1_2", false},
+		{"non-numeric start", "0", "release1", "", "release1", false},
+		{"noncanonical epoch", "01", "1.0", "", "01:1.0", false},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			inventory := packageInventoryFixture("amd64")
+			inventory.packages = inventory.packages[:1]
+			pkg := &inventory.packages[0]
+			pkg.Epoch, pkg.Version, pkg.Release = test.epoch, test.version, test.release
+			build := "sha256:" + strings.Repeat("e", 64)
+			bom, err := DiskPackageDocument(build, "node", inventory)
+			if test.valid {
+				if err != nil || bom.Components[0].Version != test.joined {
+					t.Fatalf("valid Debian version lost: bom=%v err=%v", bom, err)
+				}
+			} else if bom != nil || sbomCode(err) != e.CodeVerifyFailed {
+				t.Fatalf("malformed Debian version accepted: bom=%v err=%v", bom, err)
+			}
+
+			// Exercise serialized validation independently, with matching purl,
+			// reference and edge so those checks cannot mask version syntax.
+			pkg.Epoch, pkg.Version, pkg.Release = "0", "1.0", ""
+			bom, err = DiskPackageDocument(build, "node", inventory)
+			if err != nil {
+				t.Fatal(err)
+			}
+			component := &bom.Components[0]
+			component.Version = test.joined
+			component.PURL = installedDebPURL(pkg.Vendor, pkg.Name, test.joined, pkg.Architecture)
+			component.BOMRef = component.PURL
+			bom.Dependencies[0].DependsOn[0] = component.BOMRef
+			err = ValidateDiskInstalledPackages(bom)
+			if test.valid && err != nil || !test.valid && sbomCode(err) != e.CodeVerifyFailed {
+				t.Fatalf("serialized Debian version %q: %v", test.joined, err)
+			}
+		})
+	}
+}
+
+func TestDiskPackageInventoryRequiresArtifactLabel(t *testing.T) {
+	build := "sha256:" + strings.Repeat("e", 64)
+	bom, err := DiskPackageDocument(build, "node", packageInventoryFixture("amd64"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	bom.Metadata.Props = slices.DeleteFunc(bom.Metadata.Props, func(p Property) bool {
+		return p.Name == "nvkr:artifact" || p.Name == "nvkr:evidenceStage"
+	})
+	bom.SerialNumber = deriveURN(build)
+	if err := bom.Validate(); sbomCode(err) != e.CodeVerifyFailed {
+		t.Fatalf("unlabeled serialized package inventory: %v", err)
+	}
+}
+
 func TestDiskPackageDocumentRejectsSignedClaimSubstitution(t *testing.T) {
 	for _, test := range []struct {
 		name string
