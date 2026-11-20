@@ -1,5 +1,10 @@
 ## Hosted artifact transport lifetime
 
+The lifetime and failure evidence below concerns the current CI-carrier path. The accepted 2026-11-20
+[destination-staging decision](adr-18.md) retires that payload round trip, but its implementation and
+development-disk release-root comparison remain pending. These measurements do not establish the storage
+or runtime of release by reference; residual input edges retain their current checks until migrated.
+
 The FDE build jobs in [Run 38480478189](https://github.com/dsx-ai-factory/nvkr/actions/runs/38480478189)
 succeeded, but the later hosted SBOM-attestation jobs failed restoring their prepared layouts: the
 [AMD64 job](https://github.com/dsx-ai-factory/nvkr/actions/runs/38480478189/job/115601071511)

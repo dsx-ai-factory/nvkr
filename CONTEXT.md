@@ -244,6 +244,8 @@ A shared pinned root tool may be an additional prerequisite for a job,
 which waits for its acquisition and restoration first. Required aggregate accounting changes,
 and an identical YAML anchor may gain an earlier owner without changing expanded execution. The current Plan determines this projection; previous
 generated files do not supply scheduling state.
+Until the [accepted destination-staging migration](docs/adr/0018-pipeline-ir-and-ci-adapter-emission.md) replaces these edges,
+the implemented payload-carrier and credential rules below apply.
 Payload carriers use an unlinked private/internal GHCR package with separate storage credentials.
 Actions stores their JSON locators and separately validated metadata records with exact schemas and file
 inventories. Metadata delivery uses workflow identity, preserves exact bytes and grants no release authority.
