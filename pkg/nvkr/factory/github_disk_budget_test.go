@@ -216,7 +216,7 @@ func TestGitHubDiskBudgetUsesClassAndLiveCompletion(t *testing.T) {
 					t.Fatal("helper deadline leaves no cleanup headroom")
 				}
 				boundedSteps := int((budget+time.Minute-1)/time.Minute) + githubDiskProviderOverheadMinutes + githubDiskCleanupHeadroomMinutes + githubDiskDiagnosticUploadMinutes
-				if !diskBuildProvenance(plan) {
+				if !diskBuildProvenance(plan, stage.DiskOutput) {
 					boundedSteps += githubDiskDiagnosticUploadMinutes
 				}
 				if boundedSteps > minutes {

@@ -185,7 +185,7 @@ Readable views, linked graph exports and semantic comparisons describe the valid
 its canonical identity bytes or grant execution or evidence authority. GitHub bundle storage splits
 the Plan into a per-bundle index and shared frozen records and command files under
 [ADR-21's storage contract](docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold).
-The loader reconstructs the same canonical bytes before execution. Packed canonical bytes remain the wire and Tekton form.
+The loader reconstructs the same canonical bytes before execution. Shared Plan records use stable names; environment bindings live in per-bundle targets records, and manifests verify exact bytes. Updating a shared record coordinates all its owners. Packed canonical bytes remain the wire and Tekton form.
 An opted-in dispatch-frozen Plan records an explicit repository/main allowlist's exact
 commits, trees and source timestamps together with captured authored inputs. Workers,
 retries and qualification reuse that selection; independent dependency and toolchain pins
@@ -373,8 +373,15 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
-documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. NVKE and the M3 MVP
-retain producer-only disk evidence. Strict inspection and material reconciliation are deferred hardening.
+documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory.
+The implemented `installed-packages-v1` mode binds observed Debian names, versions,
+architectures, vendor and purls to the exact final disk. Maintained NVKE Environments
+retain producer-only evidence until refreshed AMD64/ARM64 appliances preserve vendor
+and their measured pins are recorded. Activation selects package mode for plain disks
+with explicit producer-only FDE overrides. The consumer `packages` floor admits
+package or strict evidence and rejects producer-only members; a mixed FDE Release
+does not meet it. Strict inspection and material reconciliation remain separate
+hardening; package evidence asserts neither file integrity nor material correspondence.
 Embedded-component declarations are optional: omission is not applicable, while any authored declaration must
 match its referenced pinned upstream metadata. That comparison does not establish effective customized or
 installed composition; exact source, patch, configuration and material bindings remain required.

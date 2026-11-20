@@ -64,9 +64,9 @@ func TestRegenerationCheckPreservesOwnerError(t *testing.T) {
 			}
 			ownerErr := e.Wrap(tc.code, cause, "candidate check failed")
 			calls := 0
-			digest, err := regenerate(t.Context(), cfg, "test (deadbeef)", func(ctx context.Context, definition, environment, version, engine, root string, check bool) (string, error) {
+			digest, err := regenerate(t.Context(), cfg, "test (deadbeef)", func(ctx context.Context, selected Config, version string, check bool) (string, error) {
 				calls++
-				if ctx != t.Context() || definition != cfg.Definition || environment != cfg.Environment || version != "test (deadbeef)" || engine != "github" || root != "." {
+				if ctx != t.Context() || selected.Definition != cfg.Definition || selected.Environment != cfg.Environment || version != "test (deadbeef)" {
 					t.Fatal("generation changed selected inputs or context")
 				}
 				if check != (calls == 2) {

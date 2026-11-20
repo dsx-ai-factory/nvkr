@@ -77,7 +77,7 @@ func refresh(ctx context.Context, config Config, generatorVersion string, check 
 			return result, fmt.Errorf("pins committed but producer overlay regeneration failed; retain the disposable checkout for diagnosis: %w", err)
 		}
 	}
-	digest, err := regenerate(ctx, config, generatorVersion, lifecycle.GenerateFiles)
+	digest, err := regenerate(ctx, config, generatorVersion, generateClosure)
 	if err != nil {
 		return result, err
 	}
@@ -86,13 +86,13 @@ func refresh(ctx context.Context, config Config, generatorVersion string, check 
 }
 
 func regenerate(ctx context.Context, config Config, generatorVersion string,
-	generate func(context.Context, string, string, string, string, string, bool) (string, error),
+	generate func(context.Context, Config, string, bool) (string, error),
 ) (string, error) {
-	digest, err := generateClosure(ctx, config, generatorVersion, false, generate)
+	digest, err := generate(ctx, config, generatorVersion, false)
 	if err != nil {
 		return "", fmt.Errorf("pins committed but regeneration failed; retain the disposable checkout for diagnosis: %w", err)
 	}
-	if _, err := generateClosure(ctx, config, generatorVersion, true, generate); err != nil {
+	if _, err := generate(ctx, config, generatorVersion, true); err != nil {
 		return "", fmt.Errorf("pins committed but candidate regeneration did not reproduce; retain the disposable checkout for diagnosis: %w", err)
 	}
 	return digest, nil

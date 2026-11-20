@@ -71,10 +71,16 @@ results from committed regressions.
 
 ## Definition → Run
 
-`generate-maintained.sh` drives `make workflows-generate` and `make workflows-check` from
-`inputs/policies/maintained-generation.json`. That authored list selects every maintained Plan bundle and
-the default qualifier policy. Contract tests compare the list with committed Plans and manifests, so a
-new bundle must enter the same image-access contract. Group-specific Make targets use this list too.
+`make workflows-generate` invokes `generate-maintained.sh`, which coordinates writes through
+`run generate-set` with
+`inputs/policies/maintained-generation.json`, then regenerates the catalog-refresh workflow.
+`make nvke-generate` and `make pipeline-dev-generate` regenerate that complete producer/qualifier set too:
+shared stable records require coordinated owners even when only one group motivated the edit.
+The read-only `workflows-check`, `nvke-check` and `pipeline-dev-check` targets retain their respective
+all/group scopes through `generate-maintained.sh`. Contract tests compare the authored inventory with
+committed Plans and manifests, so a new bundle must enter the same image-access contract.
+The inventory `runtime` flag selects runtime admission only for checks. Writes regenerate the reviewed
+baseline without freezing dispatch-time source heads; the Environment owns runtime policy.
 
 For repository pipeline changes, `make pipeline-dev-run PIPELINE_DEV_REPO=owner/repo` checks the generated
 development bundle and calls `pipeline-dev.py`. The helper requires a clean named branch matching the
@@ -212,10 +218,10 @@ Signer-policy rejection is covered by the owning consumer contract tests.
 `verify-native-toolchains.sh` shares the committed-pin and candidate native checks.
 The [toolchain maintenance workflow](../docs/toolchain-maintenance.md) delegates subject admission,
 publication, read-back and authored pin changes to `pkg/nvkr/toolchainmaintenance`, then regenerates
-through the existing owners. `propose-toolchain-refresh.py` publishes only the checked review diff with
-the repository App. `report-native-toolchains.py` compares measured manifests with
-committed pins and routes actionable reports to one labeled tracking issue; both
-scripts' offline behavior tests run with `make test-ci-tools`.
+through the existing owners. Its internal Go adapter publishes only the checked review diff with
+the repository App, compares measured manifests with committed pins, and routes actionable reports
+to one labeled tracking issue. The ordinary Go suite covers these comparison, routing, and proposal
+contracts without live GitHub writes.
 
 The ARM64 build/publish/consume nightly cycle is retired. `nightly-build.sh` and
 `TestNightlyPublishedCandidate` remain as uninvoked legacy code pending removal;

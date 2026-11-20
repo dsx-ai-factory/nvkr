@@ -124,6 +124,25 @@ func TestFamilyRejectsStaleOverlayPredecessorBeforeResolution(t *testing.T) {
 	}
 }
 
+func TestFamilyBumpSharedStaticOwners(t *testing.T) {
+	cfg, promote := familyFixture(t)
+	const siblingEnvironment = "sibling.yaml"
+	writeFixture(t, siblingEnvironment, append(readFixture(t, cfg.Environment), []byte("githubBundle: sibling\n")...))
+	cfg.AdditionalRuns = []RunInput{{Definition: cfg.Definition, Environment: siblingEnvironment}}
+	if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, siblingEnvironment, "test (deadbeef)", "github", ".", false); err != nil {
+		t.Fatal(err)
+	}
+	writeJSON(t, "maintenance.yaml", cfg)
+	promote("1.1.0")
+	result, err := BumpFamily(t.Context(), "maintenance.yaml", "fixture", "test (deadbeef)", false)
+	if err != nil || !result.Complete {
+		t.Fatalf("incomplete shared-owner update: %+v %v", result, err)
+	}
+	if _, err := generateClosure(t.Context(), cfg, "test (deadbeef)", true); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestFamilyRegeneratesRuntimeAndQualificationOwners(t *testing.T) {
 	for _, kind := range []string{"runtime", "lagging runtime", "qualification"} {
 		t.Run(kind, func(t *testing.T) {
@@ -166,7 +185,7 @@ func TestFamilyRegeneratesRuntimeAndQualificationOwners(t *testing.T) {
 			if err != nil || !result.Complete {
 				t.Fatalf("incomplete family owner regeneration: %+v %v", result, err)
 			}
-			if _, err := generateClosure(t.Context(), cfg, "test (deadbeef)", true, lifecycle.GenerateFiles); err != nil {
+			if _, err := generateClosure(t.Context(), cfg, "test (deadbeef)", true); err != nil {
 				t.Fatal(err)
 			}
 			if kind != "qualification" {

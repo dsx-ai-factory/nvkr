@@ -62,6 +62,7 @@ type DiskEvidenceRequirement string
 
 const (
 	DiskEvidenceStrict          DiskEvidenceRequirement = "strict"
+	DiskEvidencePackages        DiskEvidenceRequirement = "packages"
 	DiskEvidenceBuildProvenance DiskEvidenceRequirement = sbom.DiskBuildProvenance
 )
 
@@ -179,7 +180,7 @@ func (policy VerificationPolicy) Validate() error {
 		}
 	}
 	switch policy.MinimumDiskEvidence {
-	case "", DiskEvidenceStrict, DiskEvidenceBuildProvenance:
+	case "", DiskEvidenceStrict, DiskEvidencePackages, DiskEvidenceBuildProvenance:
 	default:
 		return e.New(e.CodeTrustPolicyMissing, "minimum disk evidence %q is unsupported", policy.MinimumDiskEvidence)
 	}
@@ -188,8 +189,8 @@ func (policy VerificationPolicy) Validate() error {
 		if policy.Scope != ScopeRelease {
 			return e.New(e.CodeTrustPolicyMissing, "qualified verification requires full release scope")
 		}
-		if policy.MinimumDiskEvidence == DiskEvidenceBuildProvenance {
-			return e.New(e.CodeTrustPolicyMissing, "qualified verification cannot accept producer-only disk evidence")
+		if policy.MinimumDiskEvidence != "" && policy.MinimumDiskEvidence != DiskEvidenceStrict {
+			return e.New(e.CodeTrustPolicyMissing, "qualified verification requires strict disk evidence")
 		}
 		return nil
 	case LanePipeline:

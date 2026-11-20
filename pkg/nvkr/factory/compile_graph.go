@@ -20,6 +20,9 @@ import (
 // artifacts and their exact edges from admitted inputs and resolved producers.
 // It ignores the supplied Graph and never mutates the caller's Plan.
 func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSpecs []packageSpec) (ArtifactGraph, error) {
+	if err := plan.Environment.ValidateDiskEvidenceOutputs(plan.Definition); err != nil {
+		return ArtifactGraph{}, err
+	}
 	definition, delivery := plan.Definition, plan.Environment
 	runsOn := defaultUtilityRunner(delivery)
 	plan.Graph = ArtifactGraph{SchemaVersion: ArtifactGraphSchema}
@@ -88,7 +91,14 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				if err := admitDiskPublicationProducer(build); err != nil {
 					return ArtifactGraph{}, err
 				}
-				if diskBuildProvenance(&plan) {
+				for _, producer := range build.Graph.Nodes {
+					if producer.Disk != nil {
+						if err := admitDiskPublicationEncryption(&plan, target.Name, producer); err != nil {
+							return ArtifactGraph{}, err
+						}
+					}
+				}
+				if diskBuildProvenance(&plan, target.Name) {
 					continue
 				}
 				host, profile, err := diskPublicationInspectionProfile(build, delivery)
@@ -352,23 +362,29 @@ func containsString(values []string, wanted string) bool {
 	return false
 }
 
-// validateCompiledGraph checks the complete compiler-owned operation set after
-// authenticating the authored inputs, catalog snapshots and producer selections.
-func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
+// deriveCompiledGraph is shared by tree reconstruction and graph validation.
+// Its caller must first authenticate the inputs with validateGraphInputs.
+func (plan Plan) deriveCompiledGraph(packages []packageSpec) (ArtifactGraph, error) {
 	for _, build := range plan.Builds {
 		selection, ok := plan.selectionForBuild(build.Name)
 		if !ok {
-			return e.New(e.CodeUnverifiedRef, "build %q has no Definition selection", build.Name)
+			return ArtifactGraph{}, e.New(e.CodeUnverifiedRef, "build %q has no Definition selection", build.Name)
 		}
 		if selection.Catalog == nil && len(plan.Definition.Catalogs) == 0 && build.CatalogDigest != plan.CatalogDigest {
-			return e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", build.Name)
+			return ArtifactGraph{}, e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", build.Name)
 		}
 	}
 	tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot, plan.Builds)
 	if err != nil {
-		return err
+		return ArtifactGraph{}, err
 	}
-	expected, err := compileArtifactGraph(plan, tools, packages)
+	return compileArtifactGraph(plan, tools, packages)
+}
+
+// validateCompiledGraph checks the complete compiler-owned operation set after
+// authenticating the authored inputs, catalog snapshots and producer selections.
+func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
+	expected, err := plan.deriveCompiledGraph(packages)
 	if err != nil {
 		return err
 	}

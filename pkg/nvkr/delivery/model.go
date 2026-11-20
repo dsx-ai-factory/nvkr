@@ -15,7 +15,6 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
-	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
 
@@ -181,8 +180,8 @@ func (root PublicationRoot) Validate() error {
 			}
 		}
 		for _, object := range root.Objects {
-			if object.Output != nil && object.Output.Disk != nil && object.Output.Disk.EvidenceMode == sbom.DiskBuildProvenance {
-				return e.New(e.CodeGateUnmet, "qualified publication root cannot accept producer-provenance-only disk output %q", object.Name)
+			if object.Output != nil && object.Output.Disk != nil && object.Output.Disk.EvidenceMode != "" {
+				return e.New(e.CodeGateUnmet, "qualified publication root requires strict disk evidence for output %q", object.Name)
 			}
 		}
 	default:

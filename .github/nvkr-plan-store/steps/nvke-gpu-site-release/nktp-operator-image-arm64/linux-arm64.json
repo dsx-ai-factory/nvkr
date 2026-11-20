@@ -1,0 +1,60 @@
+{
+  "buildDigest": "sha256:e6d6fc1d419cf62f1990d41b8a8429de70972b6800fc226d015f976e74941197",
+  "catalogDigest": "sha256:abb063dd6200cfdd7324d2dcfc5319857c3c47904efa09f2023123befcdc54ae",
+  "components": [
+    "nktp-operator-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.161.0",
+        "component": "nktp-operator-image",
+        "digest": "sha256:e7f68d72660d0dd7bd82c0b27d488d7c626bc645124ebb9befead9209221d0b0",
+        "id": "pull-nktp-operator-image",
+        "imageParentDigest": "sha256:76ac4fa40512b60f85ff236c60c075ca3407858efe72e22d2e96a9cf1bc82dc2",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.1.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-nktp-operator-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "nktp-operator-image-arm64",
+  "platform": "linux/arm64",
+  "resolvedComponents": [
+    {
+      "Name": "nktp-operator-image",
+      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:623759f8e8495109c937b18ef017a7ad345e7f969f7b9cab79c8018c6d644547",
+          "arm64": "sha256:e7f68d72660d0dd7bd82c0b27d488d7c626bc645124ebb9befead9209221d0b0"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.161.0",
+        "imageParentDigest": "sha256:76ac4fa40512b60f85ff236c60c075ca3407858efe72e22d2e96a9cf1bc82dc2"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "sourceDateEpoch": 1793913052,
+      "tag": "nktp/v0.1.0"
+    }
+  ]
+}

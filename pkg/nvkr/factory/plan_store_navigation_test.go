@@ -142,7 +142,7 @@ func TestPlanStoreCorruptNeighborWorkflowRefusesPublication(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	incoming, err := RenderGitHub(t.Context(), freshGitHubRuntimePins(t, plans[0]))
+	incoming, err := RenderGitHub(t.Context(), recompileGitHubStabilityPlan(t, plans[0], func(in *githubStabilityInputs) { in.environment.Metadata.Description = "own environment update" }))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -188,6 +188,7 @@ func TestPlanStoreNavigationStructureAndOwnerScope(t *testing.T) {
 	})
 	second := recompileGitHubStabilityPlan(t, first, func(in *githubStabilityInputs) {
 		in.environment.GitHubBundle = "other-project"
+		in.definition.Metadata.Name = "other-selection"
 	})
 	root := t.TempDir()
 	var bundles []*GeneratedBundle

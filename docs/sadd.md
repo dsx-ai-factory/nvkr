@@ -399,10 +399,15 @@ NVKE OS producer owns its embedded contents. IR/Plan lowering binds the exact so
 projects the root QCOW2 without binary-bundle packaging. A process-local held-QCOW2 observer has contract coverage
 for exact delivery bytes and producer/Plan bindings; it grants no execution authority or qualified reproduction
 verdict. Production VM execution and held-result population use the separately admitted native ARC route;
-direct producer selection does not introduce independently built OS layers. The narrower candidate uses exact
-live producer/material evidence and reports inspection as not performed, satisfying the NVKE disk-evidence floor.
-NVKE still requires the remaining delivery and consumer gates. The approved M3 MVP retains producer-only disk
-evidence and source-metadata consistency. ADR-13's strict mode requires a full inventory reconciling traced
+direct producer selection does not introduce independently built OS layers. ADR-13's
+package-only mode inventories the exact held final plain disk through the pinned
+offline appliance and signs Debian package names, versions, architectures and purls.
+Maintained Environments retain producer-only evidence until refreshed appliances
+preserve observed distro/vendor and their measured pins are recorded. Activation
+requires explicit producer-only FDE overrides. Producer/material integrity, every evidence slot and the remaining
+delivery/consumer gates still apply. Consumer minima order producer-only, packages,
+then strict; package inspection never claims file integrity or material correspondence.
+ADR-13's strict mode requires a full inventory reconciling traced
 materials with read-only inspection of each selected disk; this is deferred hardening. That composition claim does not
 establish NVKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching
@@ -803,7 +808,7 @@ within one complete Plan, finalizer, Run and Release.
 GitHub stores the complete Plan as a per-bundle index into shared frozen records and byte-exact
 command files. [ADR-21](adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold)
 owns storage and admission. Loading reconstructs the same canonical Plan before execution;
-Plan and Build identity are unchanged. Runtime carriers and Tekton retain the packed canonical
+Plan and Build identity are unchanged. Stable Plan-record names bind exact bytes through each owning manifest; environment bindings are stored separately in each bundle's targets record. Shared-record updates require coordinated regeneration of all owners. Runtime carriers and Tekton retain the packed canonical
 form; helper consumers stage that form and let the generation owner reconstruct the GitHub bundle.
 [ADR-18 §8](adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
 owns the grouping, the jobs that stay in the entry workflow, result forwarding and the proposed signer
@@ -937,7 +942,9 @@ signed through the three local roles and passed registry read-back. The demo han
 coverage; downstream cluster deployment is a separate scope. Reconciliation tracks independent consumer
 and negative-case evidence and the remaining hosted acceptance work.
 
-The MVP keeps disk evidence producer-only. Embedded declarations are optional; omission is not applicable,
+Maintained disk evidence stays producer-only pending the appliance refresh required by ADR-13's
+implemented package-only mode. Qualification reports retain the authenticated disk evidence scope;
+package inventory does not establish file integrity or material reconciliation. Embedded declarations are optional; omission is not applicable,
 while authored declarations must match their referenced pinned upstream metadata. This supplies no effective
 customized or installed composition claim and does not replace exact build-input/material evidence.
 External suites outside scope are explicitly not evaluated. Future required suites must supply authenticated
@@ -1331,7 +1338,8 @@ pipeline-attested cross-Run reuse of complete named outputs: a Plan-derived key 
 toolchain profile, platform, evidence set, lane, origin and signer policy; untrusted discovery; owner-issued
 acceptance; and a `reused` Run origin that retains original provenance instead of claiming current execution.
 One frozen decision set serves every execution partition. It is not implemented. v1 production acceptance retains its AMD64 floor. Additional ARM64 candidate outputs remain mandatory
-when selected by the Definition. NVKE and the M3 MVP retain producer-only disk evidence; strict inspection and
+when selected by the Definition. Maintained NVKE inputs retain producer-only disk evidence until the
+package-mode appliance refresh and measured pin update; strict inspection and
 material reconciliation are deferred hardening (ADR-13 §6). Organizational ratification remains separate.
 
 ### Quality-attribute scenarios

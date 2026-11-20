@@ -166,8 +166,12 @@ func (evidence Evidence) validate() error {
 				return e.New(e.CodeGateUnmet, "qualification contains missing or failing artifact checks")
 			}
 		}
-		if output.Kind == lifecycle.OutputDiskImage && output.DiskEvidence != "producer-only; content inspection not performed" {
-			return e.New(e.CodeVerifyFailed, "qualification cannot claim disk inspection")
+		if output.Kind == lifecycle.OutputDiskImage {
+			switch output.DiskEvidence {
+			case lifecycle.DiskEvidenceDescriptionBuildProvenance, lifecycle.DiskEvidenceDescriptionPackages, lifecycle.DiskEvidenceDescriptionStrict:
+			default:
+				return e.New(e.CodeVerifyFailed, "qualification has an unknown disk evidence description")
+			}
 		}
 		if output.Kind != lifecycle.OutputDiskImage && output.DiskEvidence != "" {
 			return e.New(e.CodeVerifyFailed, "non-disk output claims disk evidence")

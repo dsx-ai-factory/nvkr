@@ -61,11 +61,12 @@ func TestMaintainedGeneration(t *testing.T) {
 		status       int
 		want         string
 	}{
-		{"generate", "", nil, 0, "--root\n.\n"},
+		{"generate", "", nil, 0, "run\ngenerate-set\n--inventory\ninputs/policies/maintained-generation.json\n--root\n.\n"},
+		{"write runtime flag", "runtime write", nil, 0, "generate-set\n"},
 		{"stdin-reading generator", "stdin", []string{"--check"}, 0, "--check\n"},
 		{"check runtime", "runtime", []string{"--check", "--projection-pilot", "in-process"}, 0, "--check\n--runtime\n"},
 		{"pilot", "", []string{"--check", "--projection-pilot", "in-process"}, 0, "--check\n--projection-pilot\nin-process\n"},
-		{"policy", "policy", nil, 0, "--qualification-policy\npolicy.yaml\n"},
+		{"policy", "policy", []string{"--check"}, 0, "--qualification-policy\npolicy.yaml\n"},
 		{"filter", "", []string{"--group", "nightly"}, 0, ""},
 		{"equals options", "", []string{"--group=main", "--projection-pilot=in-process"}, 0, "--projection-pilot\nin-process\n"},
 		{"unknown option", "", []string{"--nope"}, 2, ""},
@@ -87,7 +88,7 @@ func TestMaintainedGeneration(t *testing.T) {
 		{"later invalid selection", "later missing", nil, 1, ""},
 		{"child error", "child error", nil, 1, "--root\n.\n"},
 		{"timeout", "timeout", nil, 1, ""},
-		{"whitespace path", "whitespace", nil, 0, "--definition\na b\n.yaml\n"},
+		{"whitespace path", "whitespace", []string{"--check"}, 0, "--definition\na b\n.yaml\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
@@ -98,7 +99,7 @@ func TestMaintainedGeneration(t *testing.T) {
 				for _, bundle := range []string{"nvkr-two", "nvkr-z"} {
 					entries = append(entries, map[string]any{"bundle": bundle, "group": "main", "definition": "definition.yaml", "environment": "environment.yaml"})
 				}
-			case "runtime":
+			case "runtime", "runtime write":
 				entry["runtime"] = true
 			case "bundle newline":
 				entry["bundle"] = "nvkr-run\n"
@@ -161,7 +162,7 @@ func TestMaintainedGeneration(t *testing.T) {
 			if status == 1 && !strings.Contains(out, "NVKR-E-PIPELINE-DRIFT") {
 				t.Fatalf("missing coded error: %s", out)
 			}
-			if tc.change == "timeout" && !strings.Contains(out, "bundle nvkr-run, exit status 124") {
+			if tc.change == "timeout" && !strings.Contains(out, "selected bundles 1, exit status 124") {
 				t.Fatalf("missing timeout context: %s", out)
 			}
 			calls, _ := os.ReadFile(filepath.Join(root, "calls"))
@@ -173,6 +174,9 @@ func TestMaintainedGeneration(t *testing.T) {
 			}
 			if tc.want != "" && !strings.Contains(string(calls), tc.want) {
 				t.Fatalf("calls %q lack %q", calls, tc.want)
+			}
+			if tc.change == "runtime write" && (strings.Contains(string(calls), "--runtime") || strings.Count(string(calls), "generate-set\n") != 1) {
+				t.Fatal("inventory write did not use ordinary coordinated generation", string(calls))
 			}
 			if tc.change == "runtime" && strings.Contains(string(calls), "--projection-pilot") {
 				t.Fatal("runtime selection received projection pilot")

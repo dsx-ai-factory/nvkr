@@ -453,35 +453,44 @@ func prepareFamilyRuns(ctx context.Context, config Config, generatorVersion, roo
 				return nil, err
 			}
 		}
-		if err := commitFamilyRun(ctx, root, run, check); err != nil {
-			return nil, err
+		if check {
+			if err := checkFamilyRun(ctx, root, run); err != nil {
+				return nil, err
+			}
 		}
 		runs = append(runs, run)
+	}
+	if !check {
+		producers := make([]*factory.GeneratedBundle, 0, len(runs))
+		for _, run := range runs {
+			producers = append(producers, run.bundle)
+		}
+		if err := factory.WriteGeneratedBundles(ctx, root, producers); err != nil {
+			return nil, err
+		}
+		for _, run := range runs {
+			if run.pair != nil {
+				if err := qualification.WriteWorkflows(ctx, root, run.pair); err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 	return runs, nil
 }
 
-func commitFamilyRun(ctx context.Context, root string, run preparedFamilyRun, check bool) error {
-	if check {
-		var err error
-		if run.baselineRuntimePlan != nil {
-			err = factory.PrepareGitHubRuntimeBundle(ctx, run.baselineRuntimePlan, root, true)
-		} else {
-			err = factory.CheckGeneratedBundle(ctx, root, run.bundle)
-		}
-		if err != nil {
-			return err
-		}
-		if run.pair != nil {
-			return qualification.CheckWorkflows(ctx, root, run.pair)
-		}
-		return nil
+func checkFamilyRun(ctx context.Context, root string, run preparedFamilyRun) error {
+	var err error
+	if run.baselineRuntimePlan != nil {
+		err = factory.PrepareGitHubRuntimeBundle(ctx, run.baselineRuntimePlan, root, true)
+	} else {
+		err = factory.CheckGeneratedBundle(ctx, root, run.bundle)
 	}
-	if err := factory.WriteGeneratedBundle(ctx, root, run.bundle); err != nil {
+	if err != nil {
 		return err
 	}
 	if run.pair != nil {
-		return qualification.WriteWorkflows(ctx, root, run.pair)
+		return qualification.CheckWorkflows(ctx, root, run.pair)
 	}
 	return nil
 }
