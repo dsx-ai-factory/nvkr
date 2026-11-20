@@ -566,6 +566,7 @@ func generationOperatorToolsFixture(t *testing.T, publicationMode string) (*fact
 	inputs := maintained.Definition.Clone()
 	// This synthetic fixture compiles one captured stack, including its shared tools.
 	inputs.Catalogs = nil
+	inputs.InternalTools = nil
 	for _, output := range inputs.Outputs {
 		if output.Name == "operator-tools" {
 			output.Catalog = nil
@@ -590,6 +591,8 @@ func generationOperatorToolsFixture(t *testing.T, publicationMode string) (*fact
 		t.Fatal(err)
 	}
 	environment := maintained.Environment.Clone()
+	// No disk consumer survives this selection, so neither do its runtime bindings.
+	environment.Runtime.ProducedRuntimes = nil
 	environment.Publication.Mode = publicationMode
 	// This selected fixture only acquires prebuilt tools, so no source fetch credential is applicable.
 	environment.SourceAccess = nil

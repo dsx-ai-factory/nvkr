@@ -147,21 +147,29 @@ func TestLocalAutoTUIDiagnosticsReplayAfterRestorationAndJoining(t *testing.T) {
 
 func TestLocalTUIDiagnosticsTruncationKeepsFailureTail(t *testing.T) {
 	lifecycleCommandRepo(t)
-	var out, diagnostic bytes.Buffer
-	execute := func(_ context.Context, _ *lifecycle.PreparedRun, options lifecycle.LocalOptions) (*lifecycle.Run, error) {
-		_, _ = options.Stdout.Write(bytes.Repeat([]byte("x"), 3*rundiagnostics.MaxBytes))
-		_, _ = options.Stderr.Write([]byte("last failure sentinel"))
-		return nil, e.New(e.CodeBuildFailed, "producer failed")
-	}
-	services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(ctx context.Context, _ runpresenter.Options, _ runSnapshotSource, work func(context.Context) error) runpresenter.Result {
-		return runpresenter.Result{WorkErr: work(ctx)}
-	}}
-	app := localPresentationTestApp(execute, &out, services)
-	app.ErrWriter = &diagnostic
-	err := app.RunContext(t.Context(), localPresentationArgs("--ui=tui"))
-	assertLifecycleCommandCode(t, err, e.CodeBuildFailed)
-	if !strings.Contains(diagnostic.String(), "Earlier diagnostics truncated") || !strings.HasSuffix(diagnostic.String(), "last failure sentinel\n") || diagnostic.Len() > rundiagnostics.MaxBytes+200 {
-		t.Fatal("failure tail or truncation report was lost/unbounded")
+	t.Setenv("CI", "")
+	for _, mode := range []string{"auto", "tui"} {
+		t.Run(mode, func(t *testing.T) {
+			var out, diagnostic bytes.Buffer
+			execute := func(_ context.Context, _ *lifecycle.PreparedRun, options lifecycle.LocalOptions) (*lifecycle.Run, error) {
+				if _, ok := options.Stdout.(*rundiagnostics.Buffer); !ok || options.Stdout != options.Stderr {
+					t.Fatal("interactive caller did not select the runtime-admitted bounded collector")
+				}
+				_, _ = options.Stdout.Write(bytes.Repeat([]byte("x"), 3*rundiagnostics.MaxBytes))
+				_, _ = options.Stderr.Write([]byte("last failure sentinel"))
+				return nil, e.New(e.CodeBuildFailed, "producer failed")
+			}
+			services := runPresentationServices{eligible: func(io.Writer) bool { return true }, show: func(ctx context.Context, _ runpresenter.Options, _ runSnapshotSource, work func(context.Context) error) runpresenter.Result {
+				return runpresenter.Result{WorkErr: work(ctx)}
+			}}
+			app := localPresentationTestApp(execute, &out, services)
+			app.ErrWriter = &diagnostic
+			err := app.RunContext(t.Context(), localPresentationArgs("--ui="+mode))
+			assertLifecycleCommandCode(t, err, e.CodeBuildFailed)
+			if !strings.Contains(diagnostic.String(), "Earlier diagnostics truncated") || !strings.HasSuffix(diagnostic.String(), "last failure sentinel\n") || diagnostic.Len() > rundiagnostics.MaxBytes+200 {
+				t.Fatal("failure tail or truncation report was lost/unbounded")
+			}
+		})
 	}
 }
 

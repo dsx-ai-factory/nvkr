@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dsx-ai-factory/nvkr/internal/rundiagnostics"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -33,6 +34,8 @@ func TestRuntimeOutputsAdmitOnlyOwnedWriteBehavior(t *testing.T) {
 		{"absent", nil, true}, {"discard", io.Discard, true},
 		{"file", os.Stderr, true}, {"buffer", &buffer, true},
 		{"builder", &builder, true}, {"capture", capture, true},
+		{"interactive diagnostics", new(rundiagnostics.Buffer), true},
+		{"nil interactive diagnostics", (*rundiagnostics.Buffer)(nil), false},
 		{"callback", forbiddenOutput{t}, false}, {"nil file", (*os.File)(nil), false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -64,6 +67,28 @@ func TestRuntimeOutputsAdmitOnlyOwnedWriteBehavior(t *testing.T) {
 	}
 	if buffer.String() != "outerr" {
 		t.Fatal(buffer.String())
+	}
+}
+
+func TestRuntimeOutputsPreserveInteractiveDiagnosticsTail(t *testing.T) {
+	var diagnostics rundiagnostics.Buffer
+	stdout, stderr, err := Outputs(&diagnostics, &diagnostics)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if stdout != &diagnostics || stderr != &diagnostics {
+		t.Fatal("runtime replaced the CLI's shared bounded collector")
+	}
+	if _, err := stdout.Write(bytes.Repeat([]byte("x"), 3*rundiagnostics.MaxBytes)); err != nil {
+		t.Fatal(err)
+	}
+	const tail = "last runtime failure"
+	if _, err := io.WriteString(stderr, tail); err != nil {
+		t.Fatal(err)
+	}
+	raw, truncated := diagnostics.Snapshot()
+	if len(raw) != rundiagnostics.MaxBytes || !truncated || !bytes.HasSuffix(raw, []byte(tail)) {
+		t.Fatal("runtime lost the bounded interactive failure tail")
 	}
 }
 

@@ -7,10 +7,47 @@ package runtimeexec
 
 import (
 	"bytes"
+	"io"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/dsx-ai-factory/nvkr/internal/rundiagnostics"
 )
+
+func TestChildOutputsDrainInteractiveDiagnostics(t *testing.T) {
+	var diagnostics rundiagnostics.Buffer
+	stdout, stderr, err := Outputs(&diagnostics, &diagnostics)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var writers sync.WaitGroup
+	for _, writer := range []io.Writer{stdout, stderr} {
+		output, err := prepareChildOutput(writer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer output.close()
+		writers.Go(func() {
+			if _, err := output.file.Write(bytes.Repeat([]byte("x"), 3*rundiagnostics.MaxBytes)); err != nil {
+				t.Error(err)
+			}
+			output.started()
+			if err := output.finish(); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	writers.Wait()
+	const tail = "joined runtime output"
+	if _, err := diagnostics.Write([]byte(tail)); err != nil {
+		t.Fatal(err)
+	}
+	raw, truncated := diagnostics.Snapshot()
+	if len(raw) != rundiagnostics.MaxBytes || !truncated || !bytes.HasSuffix(raw, []byte(tail)) {
+		t.Fatal("child streams lost the bounded interactive tail")
+	}
+}
 
 func TestChildOutputsShareMemorySynchronization(t *testing.T) {
 	var buffer bytes.Buffer

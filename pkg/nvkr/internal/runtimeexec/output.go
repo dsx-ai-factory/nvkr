@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/dsx-ai-factory/nvkr/internal/rundiagnostics"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -29,6 +30,12 @@ func Outputs(stdout, stderr io.Writer) (io.Writer, io.Writer, error) {
 				return value, nil
 			}
 		case *Capture:
+			if value != nil {
+				return value, nil
+			}
+		case *rundiagnostics.Buffer:
+			// The interactive CLI's bounded tail owns its synchronization and
+			// performs no I/O or callbacks, including during live snapshots.
 			if value != nil {
 				return value, nil
 			}

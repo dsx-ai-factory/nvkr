@@ -185,12 +185,12 @@ func TestConfiguredProducerPreservesOriginalBytesAndFailureCauses(t *testing.T) 
 	} {
 		t.Run(tc.mode, func(t *testing.T) {
 			o := buildFixture(t, tc.mode)
-			// Use the normal per-command budget for real process startup. The
+			// Allow scheduling headroom for real process startup on shared CI. The
 			// slow-after fixture derives each observation delay from that budget;
 			// its complete phase exceeds one command budget, without delaying cleanup.
-			if tc.mode == "delayed-cleanup" {
-				o.CleanupTimeout = 12 * time.Second
-			}
+			// Timeout behavior has separate cancellation and after-observation cases.
+			o.CommandTimeout = 5 * time.Second
+			o.CleanupTimeout = 12 * time.Second
 			for _, key := range []string{"ACTIONS_ID_TOKEN_REQUEST_TOKEN", "SIGSTORE_ID_TOKEN", "DOCKER_CONFIG", "KUBECONFIG", "HTTP_PROXY"} {
 				t.Setenv(key, "MUST-NOT-LEAK")
 			}
