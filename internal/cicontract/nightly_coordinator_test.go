@@ -22,6 +22,7 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 	}
 	var workflow struct {
 		On          map[string]json.RawMessage `json:"on"`
+		Env         map[string]string          `json:"env"`
 		Permissions map[string]string          `json:"permissions"`
 		Concurrency struct {
 			Group            string `json:"group"`
@@ -31,6 +32,7 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 			If             string            `json:"if"`
 			RunsOn         string            `json:"runs-on"`
 			Environment    string            `json:"environment"`
+			Env            map[string]string `json:"env"`
 			TimeoutMinutes int               `json:"timeout-minutes"`
 			Permissions    map[string]string `json:"permissions"`
 			Steps          []struct {
@@ -43,6 +45,9 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 	}
 	if err := yaml.Unmarshal(raw, &workflow); err != nil {
 		t.Fatal(err)
+	}
+	if _, present := workflow.Env["NVKE_LOCAL_CLONE"]; present {
+		t.Fatal("nightly workflow must fetch public sources without NVKE prefix rewrites")
 	}
 	var schedule []struct{ Cron string }
 	if err := json.Unmarshal(workflow.On["schedule"], &schedule); err != nil || len(schedule) != 1 || schedule[0].Cron != "17 3 * * *" {
@@ -58,6 +63,9 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 		t.Fatal("nightly must have exactly one authored KVM device-mode rule")
 	}
 	for name, job := range workflow.Jobs {
+		if _, present := job.Env["NVKE_LOCAL_CLONE"]; present {
+			t.Fatalf("job %s must fetch public sources without NVKE prefix rewrites", name)
+		}
 		if job.RunsOn != "ubuntu-24.04" || job.Environment != "" || len(job.Permissions) != 0 || job.TimeoutMinutes <= 135 || job.TimeoutMinutes > 360 {
 			t.Fatalf("job %s must use a bounded public hosted runner without protected NVIDIA environments", name)
 		}
@@ -67,6 +75,9 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 		built, tenant, source, host, deadline, kvm := false, false, false, false, false, false
 		nvkrCheckouts, nvkeCheckouts := 0, 0
 		for _, step := range job.Steps {
+			if strings.Contains(step.Run, "NVKE_LOCAL_CLONE") || step.Env["NVKE_LOCAL_CLONE"] != "" {
+				t.Fatal("nightly must fetch public sources without NVKE prefix rewrites")
+			}
 			for _, line := range strings.Split(step.Run, "\n") {
 				if strings.Contains(line, "/dev/kvm") && (strings.Contains(line, "chmod") || strings.Contains(line, "setfacl")) {
 					t.Fatal("nightly KVM access must use its single udev rule")
@@ -104,8 +115,8 @@ func TestNightlyUsesOnlyHostedBuildAndGoE2E(t *testing.T) {
 					}
 				}
 			}
-			if strings.Contains(step.Run, "go test ./internal/nvkedemo -run '^TestEndToEnd$'") {
-				guard := "timeout --kill-after=10s 180s go test ./internal/nvkedemo -list '^TestEndToEnd$' | grep -Fx TestEndToEnd"
+			if strings.Contains(step.Run, "go -C demos/nvke test ./internal/nvkedemo -run '^TestEndToEnd$'") {
+				guard := "timeout --kill-after=10s 180s go -C demos/nvke test ./internal/nvkedemo -list '^TestEndToEnd$' | grep -Fx TestEndToEnd"
 				guardAt := strings.Index(step.Run, guard)
 				guardLines := 0
 				for _, line := range strings.Split(step.Run, "\n") {

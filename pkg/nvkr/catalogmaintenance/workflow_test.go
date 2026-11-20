@@ -167,10 +167,12 @@ func TestWorkflowPatchSelectsTheGeneratedBundleLayout(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if want := `git add -- "$POLICY_CATALOG/pins.lock.yaml" '` + test.directory + "' '" + test.workflow + "'"; !bytes.Contains(raw, []byte(want)) {
+			directories := []string{test.directory, factory.PlanStoreDirectory}
+			sort.Strings(directories)
+			if want := `git add -- "$POLICY_CATALOG/pins.lock.yaml" '` + strings.Join(directories, "' '") + "' '" + test.workflow + "'"; !bytes.Contains(raw, []byte(want)) {
 				t.Fatalf("review patch omits selected bundle paths: %s", raw)
 			}
-			if want := `"$catalog/pins.lock.yaml" | '` + test.directory + `'/* | '` + test.workflow + `')`; !bytes.Contains(raw, []byte(want)) {
+			if want := `"$catalog/pins.lock.yaml" | '` + strings.Join(directories, `'/* | '`) + `'/* | '` + test.workflow + `')`; !bytes.Contains(raw, []byte(want)) {
 				t.Fatalf("patch admission omits selected bundle paths: %s", raw)
 			}
 			if bytes.Contains(raw, []byte(test.excluded)) {

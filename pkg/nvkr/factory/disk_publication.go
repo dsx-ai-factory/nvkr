@@ -17,11 +17,11 @@ import (
 
 // Publication supports public-bootstrap LUKS2 only in the explicit native
 // producer-provenance lane. Transport metadata cannot create this admission.
-func admitDiskPublicationEncryption(plan *Plan, producer ir.Node) error {
+func admitDiskPublicationEncryption(plan *Plan, output string, producer ir.Node) error {
 	if err := pipeline.ValidateVMImagePackerDiskExecution(producer); err != nil {
 		return err
 	}
-	if producer.Disk.Encryption == "luks2" && (plan == nil || !diskBuildProvenance(plan) ||
+	if producer.Disk.Encryption == "luks2" && (plan == nil || !diskBuildProvenance(plan, output) ||
 		plan.Qualification != TierPipelineAttested || plan.Environment.GitHubARC != "native-kvm-v1" || plan.Environment.Publication == nil) {
 		return e.New(e.CodeEngineCapability, "public-bootstrap LUKS2 publication requires native build-provenance evidence")
 	}
@@ -43,7 +43,7 @@ func plannedDiskPublicationEncryption(plan *Plan, expected LifecycleOutputPlan) 
 	if build.Name != expected.Name || build.BuildDigest != expected.BuildDigest || producer.Component != raw.Component {
 		return "", e.New(e.CodePipelineDrift, "disk publication root differs from its named Build identity")
 	}
-	if err := admitDiskPublicationEncryption(plan, producer); err != nil {
+	if err := admitDiskPublicationEncryption(plan, expected.Name, producer); err != nil {
 		return "", err
 	}
 	return producer.Disk.Encryption, nil
@@ -169,7 +169,7 @@ func ObserveDiskPublicationPayload(ctx context.Context, plan *Plan, expected Lif
 		BuildDigest: expected.BuildDigest, Components: append([]string(nil), expected.Components...),
 		Disk: &delivery.DiskOutput{PayloadDigest: inspection.PayloadDigest, Producer: strings.TrimPrefix(raw.Producer, expected.Name+"/"),
 			Component: raw.Component, Format: "qcow2", Encryption: inspection.Encryption, Size: inspection.Size,
-			PlanDigest: planDigest, Outcome: "succeeded", EvidenceMode: plan.Environment.DiskEvidence}}
+			PlanDigest: planDigest, Outcome: "succeeded", EvidenceMode: plan.Environment.DiskEvidenceFor(expected.Name)}}
 	if err := output.Validate(); err != nil {
 		return delivery.Output{}, err
 	}

@@ -41,7 +41,7 @@ func developmentPublicationPlan(t *testing.T, base *Plan, prefix string) *Plan {
 	stack := &catalog.Stack{Catalog: base.CatalogSnapshot, Digest: base.CatalogDigest, Applied: base.AppliedOverlays}
 	stacks := map[string]*catalog.Stack{}
 	for _, output := range base.Definition.Outputs {
-		if output.Catalog == nil {
+		if output.Catalog == nil && len(base.CatalogCandidates) == 0 {
 			continue
 		}
 		for _, build := range base.Builds {
@@ -51,8 +51,8 @@ func developmentPublicationPlan(t *testing.T, base *Plan, prefix string) *Plan {
 			}
 		}
 	}
-	plan, err := compileWithTargetStacks(t.Context(), base.Definition, environment, stack, stacks,
-		base.GeneratorVersion, base.DefinitionPath, base.EnvironmentPath)
+	plan, err := compileWithTargetStacksFor(t.Context(), base.Definition, environment, stack, stacks,
+		base.GeneratorVersion, base.DefinitionPath, base.EnvironmentPath, nil, base.CatalogCandidates)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +323,9 @@ func TestDevelopmentPreservesProducerGraphAndPrivateToolchainReads(t *testing.T)
 	// full maintained product adds no distinct development credential boundary.
 	base := recompileGitHubStabilityPlan(t, privateImageTestPlan(t, "github:GITHUB_TOKEN"), func(inputs *githubStabilityInputs) {
 		inputs.environment.Publication.Mode = "per-output-v1"
-		inputs.environment.Publication.RepositoryPrefix = "ghcr.io/dsx-ai-factory/nvkr/m2-candidate"
+		inputs.environment.Publication.RepositoryPrefix = "ghcr.io/dsx-ai-factory/nvkr/candidate"
+		// Published private toolchains keep their independently approved root; changing
+		// product publication does not relocate them. See docs/toolchain-maintenance.md.
 		inputs.environment.ToolchainAccess.PrivateRoots = []string{"ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains"}
 		root := inputs.catalog.Components["image"]
 		for arch, image := range root.ToolchainImages {

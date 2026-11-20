@@ -74,6 +74,9 @@ func githubBootstrapRunner(runner string) string {
 }
 
 func admitGitHubRequirements(plan *Plan, adapter string) error {
+	if err := admitBootPublicationExecution(plan); err != nil {
+		return err
+	}
 	for _, tool := range plan.InternalTools {
 		if _, err := internalToolDiskOutput(plan, tool); err != nil {
 			return err
@@ -142,7 +145,7 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 				return err
 			}
 			if !GitHubDiskBuildOnly(plan) {
-				if err := admitDiskPublicationEncryption(plan, instruction); err != nil {
+				if err := admitDiskPublicationEncryption(plan, build.Name, instruction); err != nil {
 					return err
 				}
 			}
@@ -159,7 +162,7 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 			if !strings.Contains(instruction.Toolchain, "@sha256:") {
 				return e.New(e.CodeUnpinnedInput, "ARC disk toolchain requires a published native OCI digest")
 			}
-			if githubDiskInspectionRequired(plan) {
+			if githubDiskInspectionRequired(plan, build.Name) {
 				_, profile, err := diskPublicationInspectionProfile(build, plan.Environment)
 				if err != nil {
 					return err
@@ -167,7 +170,7 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 				if err := requireProductionDiskScratch(profile); err != nil {
 					return err
 				}
-				if err := validateDiskScannerSelection(plan, platform, profile.ScannerDigest); err != nil {
+				if err := validateSelectedDiskScanner(plan, platform, profile.ScannerDigest); err != nil {
 					return err
 				}
 			}
@@ -177,11 +180,15 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 	if disks == 0 {
 		return deny()
 	}
+	var evidenceOutputs []LifecycleOutputPlan
 	for _, output := range plan.LifecycleOutputs {
 		if output.Kind == PackageDiskImage && !GitHubDiskBuildOnly(plan) {
-			if _, err := admitDiskEvidenceBuild(plan, output); err != nil {
-				return err
-			}
+			evidenceOutputs = append(evidenceOutputs, output)
+		}
+	}
+	if len(evidenceOutputs) != 0 {
+		if _, err := admitDiskEvidenceBuilds(plan, evidenceOutputs); err != nil {
+			return err
 		}
 	}
 	for _, node := range plan.Graph.Nodes {

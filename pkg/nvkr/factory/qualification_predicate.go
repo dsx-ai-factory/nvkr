@@ -59,6 +59,9 @@ func ValidateQualificationOutputOrigin(raw []byte, plan *Plan, output delivery.P
 	if plan == nil || origin == nil {
 		return e.New(e.CodeVerifyFailed, "qualification output %q has no original publication binding", output.Name)
 	}
+	if err := validateDerivedPredicateMaterials(raw, plan, output); err != nil {
+		return err
+	}
 	target, found := plan.Targets[outputPublicationRoute(output.Name)]
 	repository, _, pinned := strings.Cut(origin.Ref, "@")
 	if !found || !pinned || delivery.ValidatePublicationReference(origin.Ref) != nil {

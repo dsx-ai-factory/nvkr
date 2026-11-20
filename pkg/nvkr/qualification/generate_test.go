@@ -26,24 +26,37 @@ import (
 
 func generationFixture(t *testing.T) (*factory.Plan, lifecycle.QualificationPolicy) {
 	t.Helper()
-	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run/plan.json")
+	plan, err := factory.LoadPlanContext(t.Context(), "../../../.github/nvkr-run-nvke/plan.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	policy := workerPolicyFixture()
 	policy.Source.Repository = "dsx-ai-factory/nvkr"
+	// Generic ownership tests exercise the unnamed layout on an in-memory fixture.
+	// The maintained named composite pair has its own production contract test.
+	plan.Environment.GitHubBundle = ""
+	plan.Environment.Signing.Identity = `^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run\.yml@refs/heads/main$`
+	plan.EnvironmentDigest, err = plan.Environment.Digest()
+	if err != nil {
+		t.Fatal(err)
+	}
 	policy.Source.Workflow = factory.GitHubWorkflowPath
 	policy.Cosign = lifecycle.QualificationCosignPolicy{Version: "v3.0.2", PlatformDigests: map[string]string{"linux/amd64": "sha256:" + strings.Repeat("a", 64), "linux/arm64": "sha256:" + strings.Repeat("b", 64)}}
 	policy.Smoke.Images = map[string]string{"linux/amd64": "ghcr.io/dsx-ai-factory/smoke@sha256:" + strings.Repeat("c", 64), "linux/arm64": "ghcr.io/dsx-ai-factory/smoke@sha256:" + strings.Repeat("d", 64)}
 	// Synthetic independent trust pins are test-only. Scope deliberately names
 	// the real maintained Plan's exact members; no payload or authority is faked.
-	policy.Smoke.Tools = map[string]string{"nvkectl": "nvkectl-version-json", "helm": "helm-version", "kubectl": "kubectl-client-version-json"}
+	policy.Smoke.Tools = map[string]string{"nvkectl-module-tags": "nvkectl-version-json", "helm-operator": "helm-version", "kubectl-operator": "kubectl-client-version-json"}
 	for _, output := range plan.LifecycleOutputs {
+		if output.Derived != nil {
+			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: []string{}, Reason: "derived-inventory"})
+		} else if output.Kind == lifecycle.OutputBundle {
+			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: append([]string(nil), output.Components...), Reason: "bundle-archive"})
+		}
 		if output.Kind == lifecycle.OutputOCI {
 			policy.Smoke.NonToolOutputs = append(policy.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: output.Name, Kind: output.Kind, Components: append([]string(nil), output.Components...), Reason: "deployment-image"})
 		}
 	}
-	if len(policy.Smoke.NonToolOutputs) != 56 {
+	if len(policy.Smoke.NonToolOutputs) != 64 {
 		t.Fatal("maintained candidate fixture changed its declared OCI membership")
 	}
 	return plan, policy
@@ -471,6 +484,15 @@ func TestQualificationProductionRegistryCredentialAdmission(t *testing.T) {
 }
 
 func TestQualificationGenerationAdmission(t *testing.T) {
+	imageRule := func(p *lifecycle.QualificationPolicy) int {
+		for i, scope := range p.Smoke.NonToolOutputs {
+			if scope.Kind == lifecycle.OutputOCI {
+				return i
+			}
+		}
+		t.Fatal("fixture has no deployment image rule")
+		return -1
+	}
 	for _, tc := range []struct {
 		name string
 		edit func(*factory.Plan, *lifecycle.QualificationPolicy, *string)
@@ -482,15 +504,18 @@ func TestQualificationGenerationAdmission(t *testing.T) {
 		{"missing selected architecture", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
 			delete(p.Smoke.Images, "linux/arm64")
 		}, e.CodeReleaseIncomplete},
-		{"missing tool", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) { delete(p.Smoke.Tools, "kubectl") }, e.CodeGateUnmet},
+		{"missing tool", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
+			delete(p.Smoke.Tools, "kubectl-operator")
+		}, e.CodeGateUnmet},
 		{"extra tool", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
 			p.Smoke.Tools["unselected"] = "helm-version"
 		}, e.CodeReleaseIncomplete},
 		{"missing image exemption", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
-			p.Smoke.NonToolOutputs = p.Smoke.NonToolOutputs[1:]
+			i := imageRule(p)
+			p.Smoke.NonToolOutputs = append(p.Smoke.NonToolOutputs[:i], p.Smoke.NonToolOutputs[i+1:]...)
 		}, e.CodeGateUnmet},
 		{"wrong image membership", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
-			p.Smoke.NonToolOutputs[0].Components = []string{"unselected"}
+			p.Smoke.NonToolOutputs[imageRule(p)].Components = []string{"unselected"}
 		}, e.CodeGateUnmet},
 		{"extra image exemption", func(_ *factory.Plan, p *lifecycle.QualificationPolicy, _ *string) {
 			p.Smoke.NonToolOutputs = append(p.Smoke.NonToolOutputs, lifecycle.QualificationNonToolOutput{Output: "unselected", Kind: lifecycle.OutputOCI, Components: []string{"image"}, Reason: "deployment-image"})
@@ -539,6 +564,8 @@ func generationOperatorToolsFixture(t *testing.T, publicationMode string) (*fact
 		t.Fatal("missing maintained operator-tools catalog")
 	}
 	inputs := maintained.Definition.Clone()
+	// This synthetic fixture compiles one captured stack, including its shared tools.
+	inputs.Catalogs = nil
 	for _, output := range inputs.Outputs {
 		if output.Name == "operator-tools" {
 			output.Catalog = nil
@@ -570,7 +597,7 @@ func generationOperatorToolsFixture(t *testing.T, publicationMode string) (*fact
 	if err != nil {
 		t.Fatal(err)
 	}
-	policy.Smoke.Tools = map[string]string{"helm": "helm-version", "kubectl": "kubectl-client-version-json"}
+	policy.Smoke.Tools = map[string]string{"helm-operator": "helm-version", "kubectl-operator": "kubectl-client-version-json"}
 	policy.Smoke.NonToolOutputs = nil
 	delete(policy.Smoke.Images, "linux/arm64")
 	delete(policy.Cosign.PlatformDigests, "linux/arm64")

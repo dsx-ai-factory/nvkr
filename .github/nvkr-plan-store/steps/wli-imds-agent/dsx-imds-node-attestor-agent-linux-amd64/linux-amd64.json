@@ -1,0 +1,144 @@
+{
+  "buildDigest": "sha256:5c1584d50c59d7c934c8d929ec7dd6f378ac5833fb03fad5097888b422f3d6db",
+  "catalogDigest": "sha256:b6bc23d432c2468d3594dc0d81687d99b6bd00aa1882eb5077c629cb8440ac08",
+  "components": [
+    "dsx-imds-node-attestor-agent"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifactPath": "nvkr-output/dsx-imds-node-attestor-agent",
+        "builderType": "oci-hermetic",
+        "command": [
+          "sh",
+          "-ec",
+          {
+            "file": ".github/nvkr-plan-store/scripts/dsx-imds-node-attestor-agent/build@328b8eb305bb.sh"
+          }
+        ],
+        "component": "dsx-imds-node-attestor-agent",
+        "env": [
+          {
+            "name": "CGO_ENABLED",
+            "value": "0"
+          },
+          {
+            "name": "GOAMD64",
+            "value": "v1"
+          },
+          {
+            "name": "GOARCH",
+            "value": "amd64"
+          },
+          {
+            "name": "GOFLAGS",
+            "value": "-trimpath -buildvcs=false"
+          },
+          {
+            "name": "GOOS",
+            "value": "linux"
+          },
+          {
+            "name": "GOTOOLCHAIN",
+            "value": "local"
+          },
+          {
+            "name": "LC_ALL",
+            "value": "C"
+          },
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1792708538"
+          },
+          {
+            "name": "TZ",
+            "value": "UTC"
+          }
+        ],
+        "id": "build-dsx-imds-node-attestor-agent",
+        "kind": "build",
+        "needs": [
+          "fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0"
+        ],
+        "network": "none",
+        "outputType": "host-package",
+        "platform": "linux/amd64",
+        "sourceCommit": "cd76f1d5ab4a887b9577ff601ce7cda52d5003b4",
+        "sourceDest": "source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+        "sourceReadOnly": true,
+        "sourceTreeHash": "b9c85948e417d42d7529d2306f1b80db61c629ae",
+        "toolchain": "docker.io/library/golang@sha256:78773c59d6d4ecedc0845b1a8e5379e7bf0e0be62f4ea796e689bbc97dab3ceb",
+        "vendorSpecDigest": "sha256:b9aa452f89f5d59781b7e78cec1aa69051235f8d099a99786643371e8fead69a",
+        "version": "1.15.0",
+        "workdir": "/src",
+        "writeDir": "nvkr-output"
+      },
+      {
+        "commit": "cd76f1d5ab4a887b9577ff601ce7cda52d5003b4",
+        "dest": "source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+        "id": "fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+        "kind": "fetch",
+        "network": "default",
+        "repo": "https://github.com/dsx-ai-factory/nvidia-workload-identity",
+        "treeHash": "b9c85948e417d42d7529d2306f1b80db61c629ae",
+        "vendorCmd": [
+          "sh",
+          "-ec",
+          {
+            "file": ".github/nvkr-plan-store/scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh"
+          }
+        ],
+        "vendorImage": "docker.io/library/golang@sha256:78773c59d6d4ecedc0845b1a8e5379e7bf0e0be62f4ea796e689bbc97dab3ceb",
+        "vendorSpecDigest": "sha256:b9aa452f89f5d59781b7e78cec1aa69051235f8d099a99786643371e8fead69a"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "build-dsx-imds-node-attestor-agent"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "dsx-imds-node-attestor-agent-linux-amd64",
+  "platform": "linux/amd64",
+  "resolvedComponents": [
+    {
+      "Name": "dsx-imds-node-attestor-agent",
+      "artifactPath": "nvkr-output/dsx-imds-node-attestor-agent",
+      "buildCommand": [
+        "sh",
+        "-ec",
+        {
+          "file": ".github/nvkr-plan-store/scripts/dsx-imds-node-attestor-agent/build@c3db711d9a0c.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "cd76f1d5ab4a887b9577ff601ce7cda52d5003b4",
+      "fromSource": true,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvidia-workload-identity",
+      "sourceDateEpoch": 1792708538,
+      "tag": "v1.15.0",
+      "toolchainImages": {
+        "amd64": "docker.io/library/golang@sha256:78773c59d6d4ecedc0845b1a8e5379e7bf0e0be62f4ea796e689bbc97dab3ceb",
+        "arm64": "docker.io/library/golang@sha256:7117c9e4e2c0becd23d1dbede3aea73ba91d084847c68e12d7e1fa3d9b3abf20"
+      },
+      "treeHash": "b9c85948e417d42d7529d2306f1b80db61c629ae",
+      "vendorCommand": [
+        "sh",
+        "-ec",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh"
+        }
+      ],
+      "writeDir": "nvkr-output"
+    }
+  ]
+}

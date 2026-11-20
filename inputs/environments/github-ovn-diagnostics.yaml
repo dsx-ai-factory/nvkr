@@ -14,7 +14,7 @@ toolchainAccess:
     - docker.io/moby/buildkit
 publication:
   mode: per-output-v1
-  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/candidate
   credentialRef: github:NVKR_REGISTRY_WRITE
 runtime:
   runtime: docker

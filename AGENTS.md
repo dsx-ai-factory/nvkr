@@ -43,7 +43,8 @@ paths; macOS builds and runs tests and diagnostics.
 
 1. Current ADR-01–31 contain the engineering contracts directly, accepted by njhensley on 2026-11-14.
    Each section states its lane and any deferred capability; this is one maintainer's acceptance, not an
-   organizational one.
+   organizational one. Sections explicitly marked proposed, including the GitLab extension, remain outside
+   that acceptance.
 2. `docs/adr/reconciliation/` (index: `README.md`) owns current implementation, evidence and disabled-path status.
 3. Code and tests establish implementation; unit tests do not prove external services or production workflows.
 
@@ -80,10 +81,13 @@ retains its original scope; superseded requirements and plans are available only
    errors, never warnings or silent defaults.
 4. **Never overclaim.** Distinguish implemented, contract-tested, and externally exercised. Mocks and unit tests
    do not prove registries, CI, signing services, or runners.
-5. **Generated CI defaults to generic hosted runners.** ADR-18 permits only the explicit `native-kvm-v1`
-   ARC disk route on `arc-amd64-kvm` and `arc-arm64-kvm`; no arbitrary self-hosted labels or qualified
-   claims. Execution targets are local, GitHub, and ADR-18's native Tekton route. Tekton publication and
-   signing require explicit cluster keys; external acceptance scope is recorded in reconciliation.
+5. **Generated GitHub CI defaults to generic hosted runners.** ADR-18 permits only the explicit `native-kvm-v1`
+   ARC disk route on `arc-amd64-kvm` and `arc-arm64-kvm`; no arbitrary GitHub self-hosted labels or qualified
+   claims. Execution targets are local, GitHub, ADR-18's native Tekton route and its proposed bounded unsigned GitLab
+   route. GitLab has no hosted-runner default: operators provision runners selected by authored native tags.
+   Bootstrap images must be digest-pinned; GitLab grants no signing or qualification capability.
+   Tekton publication and signing require explicit cluster keys; external acceptance
+   scope is recorded in reconciliation.
    ADR-31's unsigned qualification results index is a description, not publication.
 6. **Do not commit, push, tag, or open PRs unless explicitly asked.** Leave the working tree for the user to
    review.
@@ -103,7 +107,7 @@ make ci-check       # every merge-gate check that runs locally; CodeQL runs only
 make test           # fast default tests; matches PR checks
 make test-race      # opt-in race + coverage for the default suite
 make test-full      # opt-in extended fixtures, race + coverage
-make test-ci-tools  # CI timing report parser tests (requires python3)
+make test-ci-tools  # CI tooling contracts (requires Go, jq and shell tools)
 make lint           # golangci-lint v2 (.golangci.yml)
 make build          # build bin/nvkr
 make nvkr-exec-helper
@@ -168,8 +172,8 @@ and excluded from logical build identity; attempt metadata may affect its own Ru
 | Accept a caller-provided digest, path, or boolean as proof | Authenticate in the owning module and issue an opaque receipt bound to the bytes |
 | Raw `sha256.Sum256` as a structured identity | Use the canonical codec and an existing typed digest family |
 | Log a warning and continue on a validation, pin, or signature problem | Return a coded error; fail closed |
-| Emit an arbitrary self-hosted runner label or a `git tag` trigger in a generated workflow | Generic hosted runners, with only ADR-18's explicitly admitted native ARC disk exception; sign through the admitted default-branch workflow |
-| Hand-edit `.github/workflows/nvkr-run.yml` or `pins.lock.yaml` | Regenerate with `run generate` from the Definition and Environment, or `catalog pin`; edit authored inputs, not generated output |
+| Emit an arbitrary GitHub self-hosted runner label or a `git tag` signing trigger | Generic GitHub hosted runners with ADR-18's native ARC disk exception; GitLab uses its separate authored native routes and stays unsigned |
+| Hand-edit `.github/workflows/nvkr-run-nvke.yml`, `.gitlab/nvkr-run/` members or `pins.lock.yaml` | Regenerate with `run generate` from the Definition and Environment, or `catalog pin`; edit authored inputs, not generated output. Root `.gitlab-ci.yml` is operator-owned and must contain only the generated local include |
 | Claim a feature works because a unit test with a fake passes | Cite the exact external Run or release artifact and its scope in reconciliation |
 | Write repo paths, commands, or code identifiers into a product spec or epic | Specs use product nouns only; implementation detail belongs in ADRs and code |
 | Append an amendment chain for an existing decision | Update its owning ADR section and reconciliation directly; label lane and deferred behavior |
@@ -214,7 +218,9 @@ Use `docs/README.md` for documentation, `demos/README.md` for presentations and 
 contains the retained three-output NVKE inputs; `inputs/definitions/nvke/` supplies the maintained release candidate,
 and `inputs/definitions/diagnostics/fde-amd64.yaml` supplies the build-only FDE selection. `make workflows-check` repeats the exact input
 paths in the committed Plan. A branch's selection is not a ratified canonical-product decision.
-`.github/workflows/nvkr-run.yml` and `.github/nvkr-run/manifest.json` are generated. `toolchains/` owns toolchain
+`.github/workflows/nvkr-run-nvke.yml`, `.github/nvkr-run-nvke/manifest.json` and `.gitlab/nvkr-run/` members
+are generated. Root `.gitlab-ci.yml` is operator-owned and must contain only the exact generated local include.
+`toolchains/` owns toolchain
 sources and helper pins. `CONTRIBUTING.md` owns contribution rules.
 
 `.agents/skills/nvkr-operator/` is the customer agent entry point; maintainers keep it consistent with
@@ -250,7 +256,7 @@ make vulncheck
 git diff --check
 ```
 
-`make check` runs the code gate, including the license header check, shellcheck, Python report-tool tests
+`make check` runs the code gate, including the license header check, shellcheck, CI tooling contracts
 and the Go vulnerability scan. `make ci-check` adds the build, actionlint, notices, workflow drift and Fern
 checks; workflow drift needs network access to the public NVKE source. New source files need the two-line SPDX
 header; `make license` adds it. The direct commands above also include uncached tests and `git diff --check`. Tests that need local listeners may require execution

@@ -1,6 +1,6 @@
 # ADR-20 — Artifact publication & target-registry configuration
 
-- **Decision status:** Accepted (2026-11-14)
+- **Decision status:** Accepted (2026-11-14); selective boot-asset extension below proposed for review in issue #514; GitLab extension below proposed for maintainer review.
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
@@ -13,7 +13,9 @@
   SEC-13 (registry-by-digest).
 
 - **Scope:** Sections 3–4 specify deferred qualified publication. Diagnostic transport construction is
-  implemented as stated in §4. Section 6 defines v1 publication; §7 is deferred registration.
+  implemented as stated in §4. Section 2's selective boot-asset extension has core lifecycle APIs;
+  generated execution, producer integration and rendering remain deferred.
+  Section 6 defines v1 publication; §7 is deferred registration.
 
 ## Context
 
@@ -24,13 +26,32 @@ This ADR fixes the target-configuration surface and the emitted publish phase.
 
 ## Decision
 
-### 1. Targets are operator/transport configuration — never part of the build identity
+### 1. Payload identity is destination-free; derived outputs are publication-bound
 
 Publishing the same verified artifact bytes to *different* registries preserves their **artifact digests**;
 only the location differs. This makes no claim that two executions reproduce identical bytes. Target registries
 and repositories are **environment configuration**, declared **outside producer instructions** and **excluded from `buildDigest`**,
 because they are transport rather than a build input. This preserves define-once / publish-many and
-cross-environment byte-identity.
+cross-environment byte-identity for ordinary payload outputs.
+
+The bounded exception is an explicitly declared release-derived inventory (`aicr-inventory-v1`), delivered as
+`bundle-oci`. Its `nvkr.build` identity hashes a tagged canonical derivation binding: encoding, exact
+publication repository prefix and sorted sibling names, formats and logical Build Digests. Observed package
+digests are runtime dataflow, not retroactive logical identity. Derivation authenticates every named sibling
+package and uses the same inventory projection as release export, then emits a deterministic archive with
+one regular `artifacts/inventory.yaml` file. It reads neither the registry nor the Release.
+
+A publication block is mandatory; missing publication and development attempt relocation fail capability
+admission before work. The destination must be fixed at Plan compilation. A different prefix requires a new
+derivation, Build Digest, evidence and publication; copying or rewriting an old inventory does not authorize
+new locations. Other Environment changes remain bound by Environment and Plan identity. This exception
+does not change source producer identities, signing policy, credentials or the downstream deployment boundary.
+Catalog and installer derivations are deferred. This member is artifact bytes, not an ADR-31 description.
+
+A proposed catalog-owned downstream renderer consumes serving configuration as content. Its Build includes that configuration,
+render profile and selected producer Build dependencies. Mapping changes alter its Build, artifact and enclosing identities;
+source QCOW2/EFI bytes and Builds remain unchanged. Copy-only relocation retains the ordinary transport rule.
+Runtime versions, read times and receipts are excluded from render Build identity and YAML.
 
 ### 2. Target configuration surface
 
@@ -55,9 +76,46 @@ its publication mode is `per-output-v1`; signing and complete published-byte ver
 This route does not reinterpret GitHub secret references or keyless certificate policy as cluster authority.
 NVIDIA-specific services are optional adapters, not hard-coded signing authorities. Local development without
 publication/signing remains explicitly unsigned and unqualified. Required publication must fail before work
-when signing or trust inputs are absent; it cannot silently downgrade to unsigned output. APT/GPG adapter
+when its lane's signing or trust inputs are absent; it cannot silently downgrade to unsigned output. ADR-18's
+explicit ordinary unsigned GitLab profile is the bounded exception below. APT/GPG adapter
 configuration, key management and authenticated read-back remain deferred, so these defaults do not admit
 APT publication today.
+
+#### Ordinary unsigned GitLab publication
+
+This proposed GitLab extension requires maintainer review; the existing ADR acceptance does not ratify it.
+The ordinary GitLab profile may explicitly select unsigned HTTPS OCI publication without changing signed
+GitHub, Tekton or consumer-policy contracts. It accepts anonymous transport or the exact credential reference
+`gitlab:CI_JOB_TOKEN`, with no signing configuration. The job token is publication authentication, separate
+from the configured API reader. Every selected publication, including anonymous transport, requires an
+authenticated protected branch under ADR-18's exact invocation policy. Authenticated publication requires provider-reported enabled registry metadata
+for the authenticated current project and a destination inside that exact project's registry namespace.
+Every derived output and evidence repository must remain inside it; a lexical sibling is not a child.
+The native registry username is `gitlab-ci-token`. An isolated TLS transport confines authenticated requests
+to the selected registry, admitted repositories and the selected provider's exact `/jwt/auth` token endpoint,
+with only the admitted repository scopes. On this authenticated route, digest-addressed blob reads may
+follow one HTTPS redirect from an admitted repository to object storage. Storage requests carry no registry
+or API credentials; manifests and token requests gain no cross-origin authority. Anonymous publication
+enforces HTTPS on every request and may follow the HTTP client's ordinary redirect policy; it does not
+use the authenticated route's one-hop or same-project authority limits and sends no publication credentials.
+Both routes still verify each exact blob and its size during readback.
+No ambient registry keychain supplies publication credentials. Both isolated GitLab routes use the same
+direct TLS owner as API and carrier access: optional Plan-bound `gitlab.certificateAuthority` replaces
+system roots, omitted CA refuses ambient certificate-file/directory overrides, and ambient proxy settings
+are ignored. The default, non-isolated registry transport is unchanged.
+
+Only the compiled `publish/release` route is admitted. The publisher validates the complete local closure,
+writes its existing digest-addressed representation,
+then independently pulls and inspects the complete published closure before recording the immutable reference.
+Push success alone is insufficient. A failed operation grants no accepted publication outcome or rollback
+promise, even if remote uploads remain. The profile refuses plain HTTP, other publication credentials, `per-output-v1`,
+user-selected image aliases and object-store destinations. Existing chart-scoped discovery tags retain their
+ordinary non-authoritative semantics. Format compatibility remains an explicit packaging choice, never a
+response-driven rewrite. Publication and its Run remain unsigned and `static-unqualified`; byte integrity
+does not establish signer authenticity, qualification or production acceptance.
+The [publication ledger](reconciliation/adr-20.md#gitlab-ordinary-unsigned-publication) owns validation and provider acceptance.
+
+#### Shared destination and output rules
 
 Explicit OCI selection is independently bound to Environment and Plan identity without changing native or
 aggregate logical Build identity. Compiler snapshots own the selection independently of caller mutations.
@@ -121,7 +179,7 @@ serialized plan or transported source tree. Local and GitLab execution reject th
 adapters support equivalent credential isolation.
 
 OCI is the current v1 publication transport. Executable, APT-repository and Helm outputs can share a recursive
-OCI closure; an APT tree inside it is not an enabled direct APT-server publisher. Direct package repository publishers remain deferred and fail capability admission. Object-store copying follows the complete signed-publication contract below. Credential values never enter serialized inputs.
+OCI closure; an APT tree inside it is not an enabled direct APT-server publisher. Direct package repository publishers remain deferred and fail capability admission. Object-store copying retains the complete signed-publication contract below; the separate selective boot-asset extension has core lifecycle APIs with generated execution, producer integration and rendering deferred. Credential values never enter serialized inputs.
 Transport settings stay replaceable by environment owners.
 
 The pipeline-attested disk transport uses a distinct OCI manifest over the unchanged QCOW2 payload. Its one
@@ -154,18 +212,22 @@ The wrapper platform describes the guest artifact; inspection tooling, scanner p
 select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
 Strict inspection packaging consumes the original live Run's exact-subject reconciliation receipt.
 The explicit narrower candidate `build-provenance-v1` mode instead consumes the original live held disk and authenticated
-transitive material trace. Both paths rehash the exported QCOW2, use the same atomic package/evidence
+transitive material trace. The intermediate `installed-packages-v1` mode adds an original-live-Run
+package-inventory receipt for the exact plain disk (ADR-13 §6), without material reconciliation.
+All three paths rehash the exported QCOW2, use the same atomic package/evidence
 transaction, preserve every producer evidence slot and bind raw payload separately from OCI identity.
 The disk binding carries its descriptive evidence mode in signed release metadata. Document validators require
 matching source-bound documents and reject invented inspection claims. Consumer acceptance is independently
 bound by `VerificationPolicy.minimumDiskEvidence` in the policy digest: pipeline-attested policy defaults to
-`build-provenance-v1`, while explicit `strict` requires inspected evidence. Qualified policy defaults to strict
-and rejects producer-only acceptance. Neither path accepts a
+`build-provenance-v1`; `packages` requires installed-package inventory and `strict` requires full
+content/material reconciliation. Qualified policy defaults to strict and rejects either weaker minimum. No path accepts a
 restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
-the live inspection-and-packaging operation in strict mode; producer-provenance mode skips inspection and consumes
-the original producer/material owners instead. Producer provenance is the M2 and M3 MVP disk acceptance scope;
-full inspection and material reconciliation are deferred hardening (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
+the live inspection-and-packaging operation in strict or package-only mode; producer-provenance mode skips inspection and consumes
+the original producer/material owners instead. Maintained NVKE inputs retain producer provenance
+until refreshed appliances preserve observed vendor and their measured pins are recorded; activation
+will select package-only evidence for plain disks with producer-only FDE overrides.
+Full content/material reconciliation remains deferred hardening (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
 in [reconciliation: Native ARC disk route](reconciliation/native-arc-disk-route.md#native-arc-disk-route). The ordinary local scheduler
 still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;
@@ -195,7 +257,7 @@ policy is implied by accepting a disk. The separate raw diagnostic route remains
 
 #### S3 file delivery contract
 
-Object-store publication copies the complete existing signed artifact closure. The first provider is S3;
+The implemented full-mirror mode copies the complete existing signed artifact closure. The first provider is S3;
 other providers implement the same byte transport interface. The source remains the original OCI publication:
 its manifest, raw payload, build identity, SLSA provenance and SBOM bundles are unchanged. The copier admits
 every supported publication format through the same streaming path, including executables and assets,
@@ -209,7 +271,7 @@ The S3 configuration contains explicit `region`, `bucket`, nonempty literal rela
 origin; `addressing` is `virtual` or `path`. Omission selects the SDK's regional AWS endpoint and virtual
 addressing. The role reference resolves a protected workflow variable, never a credential value in a Plan.
 
-Each destination is required for the whole selected Definition. There is no implicit subset or best-effort
+In full-mirror mode each destination is required for the whole selected Definition. There is no implicit subset or best-effort
 success. A normal generated publish operation follows the original aggregate verification; the existing
 provider-job finalizer requires its success alongside every original operation. Missing or failed publication
 fails the Run. The publisher reauthenticates the exact whole-Plan input receipt and every original output
@@ -330,6 +392,176 @@ EFI/iPXE extraction, clean boot URLs, Secure Boot, installation and runtime qual
 contracts and independent acceptance. Publication tests establish transport and ownership behavior; live
 provider, generated-workflow and downstream boot/install evidence are recorded separately in reconciliation.
 Organizational ratification is separate from implementation and these operational observations.
+
+#### Selective boot-asset publication and MachineImage binding
+
+Pipeline-attested contract from [#514](https://github.com/dsx-ai-factory/nvkr/issues/514), with core API implementation in [#515](https://github.com/dsx-ai-factory/nvkr/issues/515).
+[Reconciliation](reconciliation/object-store-publication.md#selective-boot-asset-publication) owns acceptance/implementation. Existing full-mirror schemas, bytes and verification stay unchanged.
+Generated execution, producer integration and rendering remain separate acceptance work; compiling the versioned Plan does not enable those routes.
+
+NVKR's root Go module remains independent of downstream CRDs and rendering conventions. The NVKE catalog owns
+its MachineImage candidate as a separate Go module and maintained template under
+`inputs/catalogs/nvke/machineimage/`. It consumes generic preliminary or selected boot descriptions
+(named disk/platform raw digests, imager members/profiles and destination URLs), with separately supplied
+proposed disk metadata. It reads the CRD directly from the catalog's locked `nvke-controller` source commit;
+no CRD is vendored and no floating or dirty-working-tree schema is used. Rendering validates the complete
+set against that source's served OpenAPI schema with kube-openapi before emitting any manifests.
+Schema admission rejects unsupported features and references. A guarded table binds exact CEL rule text
+and schema location to Go predicates; any unknown rule in the CRD fails closed. The known immutability
+transition rule is inapplicable to new candidates. These checks are not a CEL interpreter, Kubernetes
+admission or boot evidence.
+
+This catalog experiment is not a declared producer, generated execution route or NVKR lifecycle API.
+Production rendering remains unavailable. Candidate descriptions authenticate nothing; metadata bindings,
+ordinary producer/material integration, signed artifact handoff and trusted import remain unimplemented.
+The candidate names fingerprint exact pre-name YAML bytes, not a typed Build or Release identity. Its
+annotations distinguish output/destination pairs and record the imager raw digest. No eventual aggregate,
+content or inventory identity enters the rendered bytes. Existing source Build and Plan identities are
+unchanged by this unregistered candidate. Future producer admission must bind the program, template,
+source CRD, exact raw dependencies and authorized metadata through the existing material/Build owners.
+
+NVKE owns CRD compatibility, iPXE/template conventions and downstream registration. Strict imager
+profile/source admission remains with [#516](https://github.com/dsx-ai-factory/nvkr/issues/516) after mkosi
+step 3 and [NVKE #2365](https://github.com/dsx-ai-factory/nvke/issues/2365), followed by recorded amd64/arm64
+boot evidence. [#517](https://github.com/dsx-ai-factory/nvkr/issues/517) remains open for those integrations.
+The remaining render ordering and binding requirements below describe future admitted catalog producers,
+not an NVKE-specific renderer or general templating engine in NVKR Go.
+
+**Admission.** `selective-boot-v1` requires a new Environment/Plan version and explicit destination modes.
+The new schema has no mode default; old schemas keep full mirror on omission and reject selective fields. Select sorted, nonempty QCOW2 outputs, one
+compatible EFI output/regular member/profile per architecture, and named destinations. Require every selected asset
+at every boot destination; additional full mirrors require complete copies. Reject empty, duplicate, unknown, unused, ambiguous, foreign
+or incompatible selections, globs, implicit platforms and unsupported formats before effects.
+The compiler fixes complete OCI membership and an acyclic graph before work, including any render. Revalidate at every
+executable boundary; equal bytes/Build Digests never authorize siblings. Selection/destination/serving configuration binds
+Environment/Plan; render Build follows §1. Mapping changes require new render bytes/identities, never rewrites. No late members may attach.
+
+Admit only GitHub Linux, keyless signing and `publication.mode: per-output-v1`; reject local/dry-run, development, Tekton
+and aggregate-only routes. A Definition declaring rendering fails before partial output on other routes or without selective destinations.
+Selective publication without rendering skips only render/sign.
+Before I/O, admit signer/evidence policy, capabilities, serving/read access and resource/session limits. Inherit the S3
+rules above. Unsupported routes/stronger policy use `CodeEngineCapability`, malformed selection the owning input code,
+missing trust `CodeTrustPolicyMissing`, and subject/membership failures `CodeVerifyFailed`.
+
+**Bindings.** Canonical `nvkr.dev/publication-boot-selection/v1` inventory binds aggregate reference/invocation,
+Definition/Environment/Plan, selection and serving configuration, with sorted records below. Reject unknown versions,
+duplicate keys and missing, extra, unbound or conflicting records. Neither inventory schema decodes as the other. Preserve old wire bytes with golden fixtures.
+
+| Record | Required binding |
+|---|---|
+| Selected use | Output name/kind, platform, Build, output-local root and preparation/signing invocations, OCI descriptor, raw QCOW2 or EFI member name/hash/size, compatible profile |
+| Stored object | Payload/control/proof role, raw digest/size, literal destination/key, exact version or strong validator, every shared logical use |
+| Original proof | Aggregate index/config/manifests, original signature/production attestation, selected output-local controls/signatures/provenance, policy-required SBOM/disk evidence and subject/stage joins |
+| Serving mapping | Raw binding, authorized configuration identity, destination pin, content-addressed client URL |
+| Declared render | Output name, signed descriptor and complete dependency/profile/URL set; required iff declared |
+
+Preserve signed documents intact, including required shared SBOMs owned by unselected repositories. Retain
+every document required by `minimumDiskEvidence` and signed encryption declarations; match encryption to the wrapper. Original EFI metadata must
+bind member name/hash/size/architecture; otherwise reject or extend its original format before signing. Copy only selected
+raw payloads and required proofs. No unselected layers, bundle fallback, truncated documents, reference-only proofs,
+copier signatures or unsigned subset assertions.
+Delivery owns raw-member inspection/transport, `sign` proof authentication, `lifecycle` policy/input/membership joins and
+opaque receipts, factory dependencies/finalization, CLI/SDK adaptation. Catalog producers own downstream schema/template rendering;
+NVKR consumes their ordinary artifacts without CRD-specific Go types or logic. Structured records use canonical typed identities;
+raw SHA-256 is blob integrity only.
+
+**Limits.** Preparation/rendering and final publication each admit a fresh store/session and operation/cleanup deadlines
+before I/O; no background refresh. Each defaults to 1200 seconds, maximum 3509. SDK/multipart retries share that phase's
+deadline/read allowance; restarted phases admit fresh limits. Per destination, retain full-mirror object/total/count ceilings.
+
+| Budget | Bound and reservation before payload writes |
+|---|---|
+| Controls/evidence | Owner document caps; 512 MiB cap/reservation per required aggregate/output-local root. |
+| Signatures/provenance | 8 MiB per bundle; 16 MiB combined cap/reservation. SBOM/disk evidence stays in the control pool. |
+| Inventory | Maximum/reservation 128 MiB; reserve one object. |
+| Total/count | Exact payload sizes plus all reservations and Plan-derived maximum control/proof object count. Count shared bytes once; check every use. |
+| Reads | Plan-declared finite allowance per phase covering acquisition, proof verification, pinned/HTTPS reads and retry/failed responses. Reject insufficient mandatory-pass allowance before I/O; debit actual bytes locally. |
+
+The conservative source-read reservation uses the delivery source-layer ceiling (64 GiB per selected
+output-local disk or executable), independently of the destination raw-object ceiling. Preparation acquires
+the whole executable bundle before extracting the selected EFI; unselected bundle members can be larger
+than that EFI. Phase accounting bounds response reads during acquisition; `OpenPublication` enforces
+source-layer admission after staging. The reservation covers successful sources, not a per-layer preflight
+check. Selected destination object/total limits remain unchanged. Both compiled phase allowances retain this conservative source
+reservation. This correction changes opt-in v7 Plan Digests on recompilation when the destination object
+ceiling is below 64 GiB; it changes neither producer Build Digests nor existing full-mirror Plans.
+
+Reject insufficient reservations or oversized documents. Later phases recompute unique bytes/count from the Plan,
+authenticated controls and checked destination objects, never transported counters. Controls must fit owner caps and
+reservations.
+
+**Order.** Inventory and signature attachments stay outside Release membership. Each step requires prior checks.
+
+1. Authenticate remotely verified signed output-local publications and raw bindings under policy, never producer-workspace paths.
+2. Copy raw QCOW2/EFI to immutable keys; fully hash/size-check pinned S3 readback and declared HTTPS responses.
+   Issue a live preliminary receipt bound to output/member, inputs/invocations, policy, bytes, destination pins and mapping.
+   It proves bytes and observed availability, never aggregate membership.
+3. Hand generic receipt-bound inputs and authenticated metadata to the predeclared catalog producer.
+   Its script/template renders the artifact using the CRD from its locked NVKE source and admitted profile;
+   lifecycle owns the authority handoff, without interpreting downstream CRD fields.
+   Exclude its eventual aggregate root, release-content and inventory digests from bytes and identity inputs. Predicted URLs
+   cannot replace receipts. The ordinary output job publishes/signs the prepared artifact through authenticated producer handoff.
+4. Assemble/publish/sign/verify every required OCI member. A separate final selective job reauthenticates aggregate membership
+   and selected output/local-root/descriptor/platform/Build/raw-file/input/invocation joins, repeats pinned S3/HTTPS checks,
+   and authenticates any signed render through OCI against the complete expected dependency/profile/URL set.
+5. Publish/read back intact proofs at every destination, then commit and fully read back inventory last at
+   `<prefix>/boot-publications/<original-root-hex>/<inventory-raw-hex>.json`. Record render identity; keep YAML in OCI.
+   Lifecycle then issues selected-publication completion; provider success also requires successful cleanup.
+
+Preparation holds S3-writer, registry-reader and serving-reader access. Signing holds only registry/signing credentials.
+The final selective job gets a fresh S3-writer session and registry/serving-reader access. Credentials never enter render bytes;
+transported descriptions cannot restore receipts. The registry-read-only finalizer fetches no payloads and requires aggregate
+authentication plus provider-observed success of every exact compiled destination job, never local success files. Run completion is not a selected-artifact receipt.
+Return inventory locators through completed Runs/authenticated discovery, never by patching signed renders. Inventory/discovery remain
+descriptive pending independent verification. Separately signed downstream rendering requires a different reviewed contract.
+
+**Serving.** Admit an authorized HTTPS origin, literal content-addressed mapping, exact destination/key/pin and explicit
+anonymous or credential-reference reader. Reject userinfo, credentials, expiring URLs, queries/fragments, redirects, mutable
+aliases and ambiguous versions. Runtime versions/validators belong in receipts/inventory, never render URLs/YAML.
+Require full hash/size checks; HEAD/status is insufficient. Exact-version denial fails without URL/current-version fallback.
+Generic hosted-network checks prove equality at check time; inaccessible origins fail. Provisioning-network retrieval needs
+separate #383 evidence and independent reader access. Operators preserve TLS hostname, digest-to-bytes mapping and retained
+objects/exact versions for the promised period. Transport verifies no durable routing/availability and provisions no networking,
+IAM or credentials; trust roots, signing roles and branch policies stay unchanged. Full mirror retains no serving claim.
+Record TLS/read-auth/parser assumptions in the profile.
+
+**Verification.** Independently supply expected aggregate digest reference, invocation, authored inputs, selection/platforms,
+Verification Policy, serving configuration, pinned inventory locator and storage/proof/read/time limits. Obtain selected payloads/proofs entirely from
+S3 with OCI/attestation retrieval disabled. Provision ADR-04 workflow identity/issuer, pinned verifier and certificate/transparency
+trust independently; fully disconnected verification is excluded. Repeat all original proof, evidence, membership and raw-byte
+joins above, compare exact selection/mapping, and fully read pinned S3 objects and HTTPS bytes from the consumer's network.
+Lifecycle's selected-artifact receipt binds those expectations/bytes. It grants no whole-publication/exact-input receipt,
+full export, omitted-payload checks, qualified acceptance, freshness/revocation or boot safety. Stronger policy fails admission.
+Before registration/use, the importer also authenticates the render through the normal Release path, compares dependencies
+and preserves authenticated script/checksum. Imager checksum-before-write, firmware enforcement, Secure Boot, chainload,
+imaging, reboot and first boot need their own mechanisms and external evidence.
+
+**Recovery.** Missing selected payload/proof, mismatch, denied pinned read or exhausted budget fails without partial receipt
+or fallback; omitted unselected payloads are expected. Cancellation/cleanup failure revokes incomplete receipts, closes reads
+and stops/joins work under bounded cleanup. Retries repeat admission/authentication, including signed-output reuse under §6's
+same-run rules; changed bindings require new Run/Plan identities. Reconcile conflicts/lost acknowledgements by full pinned hash/size
+readback. Lost inventory acknowledgement requires its exact attempted locator and reauthentication of every object/proof.
+The API retains that descriptive locator in `BootInventoryError`, including any observed version/validator;
+`RetryBootSelection` requires the reconstructed inventory to match it. An unknown pin permits conditional creation
+and pinned readback; a known pin permits only that exact read, with no current-version fallback. Cleanup failure
+after inventory readback also retains the locator and withholds completion.
+The expected inventory invocation is the aggregate's exact authenticated invocation, including when retrying
+from a later process or workflow attempt; it is not the retry's current attempt. Earlier output-local
+preparation/signing invocations retain their same-run ordering checks.
+Aggregate signing may occur on a later same-run attempt than assembly. The original authenticated production
+proof supplies that signing invocation; it must not precede assembly or cross runs. It does not replace the
+aggregate assembly invocation in the inventory or receipt.
+Exclude timestamps/sessions/attempt counters from canonical inventory; equal subjects/pins
+yield identical bytes. Changed pins require new authenticated completion and separately addressed inventory, never mutable aliases.
+Local commits retain kernel-released locks, byte-CAS/no-replace, recovery and directory fsync. Orphans may remain; no atomic
+multi-destination rollback, garbage collection or transport retention guarantee is provided.
+
+The render profile declares one CR per disk/architecture/destination QCOW2/EFI URL pair before work; the signed output is exactly that deterministic set.
+For example, two amd64 disks and two destinations require four CRs; one selected amd64 EFI may serve both disks.
+Every pair is mandatory, with no first-success destination or automatic URL fallback.
+
+Tests cover every rule above. Prove complete OCI membership, selected-only S3 payloads and sufficient intact proofs with
+OCI retrieval disabled. ADR-11/12/19 and #517 own render schema/packaging/evidence.
 
 ### 3. The emitted publish phase
 
@@ -557,9 +789,9 @@ for another named output/platform use. Consumer validation checks the complete m
 it, and release navigation describes the index and each child without claiming signature authority. Helm
 bindings require their chart platform to belong to the index's declared and observed coverage and embed the
 complete index digest. No post-build manifest rewrite or `platform: multi` is admitted. Explicit discovery
-aliases follow the post-readback rule in section 2. M2 ARC/per-output metadata-only publication composition
+aliases follow the post-readback rule in section 2. NVKE ARC/per-output metadata-only publication composition
 and a dual-native hosted build/sign/publication remain separate, unexercised integration work. See
-[multi-architecture CWE delivery](../multiarch-cwe-delivery.md).
+[multi-architecture nvke-controller delivery](../multiarch-nvke-controller-delivery.md).
 
 ### 5. Credentials by reference, never embedded
 
@@ -593,7 +825,13 @@ metadata or registry operations and is not added to producer execution.
 Repeated metadata checks may use ADR-18's bounded operation-local authenticated ETag revalidation; no
 admission check is skipped, and errors cannot reuse an earlier successful policy response.
 Public, unknown or inaccessible policy fails closed. A missing package can receive only a metadata-only
-seed before admission. The existing metadata inspector derives sibling references without opening product
+seed before admission. After that seed, API absence alone permits up to six confirmation attempts with
+2-, 4-, 8-, 16- and 32-second cancellation-aware waits. Each API check retains its existing bounded
+availability/rate-limit retries under the caller's operation deadline. A 404 can also hide a package
+that the credential cannot access; retrying it never grants access or bypasses the privacy check.
+An explicit unsafe policy or another API error stops confirmation immediately; six absent responses
+retain `trust-policy-missing`, and deadline/cancellation failures retain `timeout`. No payload upload or
+repeat seed occurs during confirmation. The existing metadata inspector derives sibling references without opening product
 payloads; the actual push must retain that inspected root digest. Hosted GHCR layouts outside this metadata
 contract are rejected rather than falling back to unchecked publication. Local and other-registry transport
 contracts remain unchanged. These checks cannot lock future provider visibility or establish independent
@@ -675,6 +913,20 @@ the digest-pinned output-local root reference and its original preparation and s
 These descriptions acquire authority only through the authenticated release; assembly derives them from
 the verified output receipt. A finalizer retry may authenticate an unchanged aggregate from an earlier
 attempt of the same run under the same ordering and Plan checks.
+Assembly authenticates independent output roots with a bounded worker pool; the receipt join and shared-evidence
+selection retain canonical output order. Aggregate deliverable signature/provenance verification occurs once in
+the mandatory post-sign publication-verification operation, using subjects derived from the served, digest-bound
+metadata closure and the unchanged identity/issuer policy. Aggregate signing does not repeat that check. A signed
+aggregate alone cannot authorize a successful publication or Run: any failed output check prevents the verification
+record and completion. No persisted verification record, cross-process cache or prior Run authorizes skipping a check.
+Finalization and independent consumers retain their separate authentication boundaries.
+The execution-only `NVKR_VERIFY_WORKERS` budget defaults to four and admits canonical integers from one through
+sixteen; it changes no Plan, Build, release or evidence bytes. Workers join before return, preserve input order in
+results and error reporting, and check all outputs on ordinary verification failure. Caller cancellation stops new
+checks and joins active checks. Assembly emits diagnostic timings for metadata validation, remote signature/provenance,
+SBOM verification and metadata construction; these timings never enter identity or evidence.
+Cancellation selects the timeout code, including when an earlier output failed; the error chain and diagnostic
+retain those earlier failures. A retry must perform the complete verification again.
 Assembly, aggregate signing/verification and Run finalization use bounded manifests, configs, evidence bundles
 and digest references; they never retrieve output payload layers. Metadata inspection issues no full-payload
 verification capability. It admits at most 512 MiB of control/evidence blobs per root and rejects extra blobs.
@@ -819,7 +1071,7 @@ config under OCI's empty-config media type, subject and bundle layer in the owni
 no raw SBOM copy is published. Its OCI subject is the associated deliverable manifest, while the statement
 subject remains the exact inventoried binary, native image manifest, or source/final archive. Shared evidence
 belongs to the first sorted output membership's repository. Membership binds the exact subject, stage,
-canonical document digest, bundle blob and manifest digests, and typed document identity. The CLI inventories its exact binary; CWE inventories
+canonical document digest, bundle blob and manifest digests, and typed document identity. The CLI inventories its exact binary; nvke-controller inventories
 the native manifest and records the scanned OCI-export input; Helm has distinct source-archive and final-bound-
 package inventories. Identical evidence may have one published document with sorted output memberships only
 after each output's exact producer/evidence handoff is validated. Equal Build Digests cannot satisfy missing
@@ -837,7 +1089,9 @@ with a substituted semantic identity or subject fails with `CodeVerifyFailed`. B
 Signatures, SLSA provenance and SBOMs use the same standard Sigstore v0.3 bundle format as OCI referrers
 (ADR-04); their predicate types remain distinct. One root signature covers evidence and output repository/digest bindings through metadata; one SLSA attestation targets that
 same root. Signature/attestation attachments stay outside the signed index to avoid circular identity. Each deliverable manifest also receives its own signature and subject-bound production attestation in its
-own repository for independent consumption. Signing processes deliverables before the root; hosted verification
+own repository for independent consumption. Output-local and legacy signing process deliverables before their
+root; per-output aggregate signing binds the assembled metadata without re-signing or re-verifying deliverables.
+Hosted verification
 requires every child signature and attestation before recording success. The Release consumer still authenticates
 membership and SBOM coverage through the root. Standalone verification does not establish that release-wide claim. Run completion is a separate descriptive
 record, not signed merely because its referenced bytes are signed. Production consumers resolve only sibling repositories within the chosen release namespace and fetch every pinned manifest.
@@ -856,7 +1110,7 @@ its name discovered from the archive itself rather than assumed, the same shape 
 — extracted through the bounded transport adapter and repacked deterministically, re-rooted onto the chart's
 own declared name exactly as `helm package` would produce it. Lifecycle observation checks the exact archive
 against its producer result and independently reproduces the publication payload. Optional Definition Helm
-settings contain only a named relationship map: `helm.images: {controller: cwe}` binds a chart slot to an OCI
+settings contain only a named relationship map: `helm.images: {controller: nvke-controller}` binds a chart slot to an OCI
 output on the same platform, or an aggregate output containing that platform. The selected source producer owns `helm.chart` (`.` for the archive root or a
 direct child directory) and each slot's `values.digest` path in `values.yaml`. Compilation joins the relationships with that output's resolved catalog,
 including catalog overrides. Every catalog slot must be bound exactly once; missing mappings, unbound slots
@@ -887,7 +1141,7 @@ Acquired charts remain immutable and cannot use these bindings.
 Contract tests cover multiple slots, admission, unchanged templates and identical package bytes across
 Environment repository choices. Opt-in real Helm tests render the pinned NVKE controller chart for two
 repositories using the packaged digest value. This does not establish installation, signatures, runtime
-availability or a new full CWE-plus-charts build. See the [binding implementation guide](../declarative-helm-bindings.md).
+availability or a new full nvke-controller-plus-charts build. See the [binding implementation guide](../declarative-helm-bindings.md).
 
 A Helm output may instead select one acquired `raw` chart package. The compiler requires an acquisition
 producer and transports its result explicitly. Packaging checks the result and a bounded, no-follow held
@@ -1038,7 +1292,7 @@ The container-image delivery adapter has contract tests for exact OCI-export arc
 manifest/config/layer closure, decompressed layer identities, platform selection, safe archive members and
 unchanged image identities inside a publication root. Public OCI outputs lower to one built OCI-export
 component, checked against its producer bytes before publication; consumer projection checks the native image
-and its platform. The [combined hosted Run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md) exercises CLI, CWE and
+and its platform. The [combined hosted Run](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-09-10-combined-run.md) exercises CLI, nvke-controller and
 source Helm production, image-bound chart packaging, GHCR publication, real keyless signing and complete
 finalization. This historical layout had three duplicated publications. Independent consumers authenticated all three; downloaded payload checks
 exercise the native image, recovered CLI and rendered chart binding. Acquired native OCI and Docker-schema-2

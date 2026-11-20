@@ -12,6 +12,11 @@ and dependency graphs; actual builds and output checks validate the declared pro
 The example packages two application tools: `app-cli` for users and `config-cli` for administrators.
 The `client-bundle` contains `app-cli`; the `admin-bundle` contains both tools.
 
+GitHub tree generation uses `metadata.name` in a readable frozen-record path. Catalog validation alone
+need not reject a name that storage cannot represent: generation refuses parent segments, control/format
+characters and other unsafe path spellings with `NVKR-E-PIPELINE-DRIFT`. It does not normalize names.
+Uppercase letters and safe nested names are permitted. See the [tree layout](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/generated-plan-tree.md).
+
 ## Author declarations; generate pins
 
 The catalog has two files:
@@ -49,6 +54,32 @@ operation fails closed. See the [current limitation](https://github.com/dsx-ai-f
 A source can serve several components. A pin set can derive several source or acquired-artifact versions
 from one upstream release's version file. Update those members through their owning source. Use
 `catalog bump --check` to preview changes without writing the lock; pending changes return `NVKR-E-DIFF`.
+
+`--catalog` is the catalog-directory flag for inspection, resolution, pinning and starter authoring.
+`--data` and `--dir` remain compatibility aliases. Supply only one spelling per invocation;
+combining aliases is a coded usage error before catalog reads or writes. The separate validator
+commands use `--catalog` for a validator index, not a producer catalog directory; these aliases do not apply there.
+
+## Producer bytes and final formats
+
+A catalog's `outputType` describes what its producer emits. A Definition's `format` describes the
+named deliverable assembled from the selected producers. They are separate stages; the compiler
+validates the selected bytes, material closure and packaging requirements together.
+
+| Producer output | Typical final format | Meaning |
+|---|---|---|
+| `oci-image` | `oci` | Native container image; supported platform sets form an image index. |
+| `host-package` | `executable` | Selected executable files packaged for delivery. |
+| `host-package` | `apt-repository` | Debian package producers assembled into an APT repository. |
+| `host-package` | `debian-package` | One source-produced Debian archive retained as the final file. |
+| `tarball` | `helm-oci` | A chart archive with chart packaging requirements. |
+| `tarball` | `bundle-oci` | One bundle root and its explicitly selected material closure. |
+| `disk-image` | `disk-image` | One QCOW2 root and its explicit material closure. |
+
+These are packaging relationships, not automatic conversions or aliases. A tarball is not necessarily
+a Helm chart, and a host package is not necessarily a Debian archive. Specialized pinned-tool producers
+also have their own admitted output contracts. Existing `SourceBuildRegistry`, producer output types
+and final format spellings remain unchanged; this vocabulary introduces no serialized schema migration.
 
 ## Share sources with explicit roles
 
@@ -88,13 +119,78 @@ Both outputs use the default catalog. `components` selects exact producer keys; 
 them. Neither output selects `app-cli-alt` yet. Each output remains
 independently required even when it shares a component with another output.
 
+## Share catalog selections across outputs
+
+Keep `catalog` for shared action and utility pins. Add an optional ordered `catalogs` list when outputs
+select producers from several stacks:
+
+```yaml
+catalog:
+  base: ./tools
+catalogs:
+  - base: ./applications
+  - base: ./images
+    overlays: [./image-toolchains.yaml]
+outputs:
+  - name: client-bundle
+    components: [app-cli]
+    platform: linux/amd64
+    format: executable
+```
+
+An output without an override must find its complete component selection and every required platform
+in exactly one listed stack. No match returns `NVKR-E-NO-MATCH`; multiple matches return
+`NVKR-E-AMBIGUOUS`, even if their producers are identical. List order never resolves a collision.
+Set that output's `catalog` explicitly to choose a stack. All listed stacks are validated, including
+unused candidates. At most 64 distinct stacks are admitted; an omitted or empty list retains the
+singular catalog behavior. Internal tools use the same selection rule. Composite members must share
+the same ordered list after rebasing paths.
+
+`run plan` shows each selected catalog, overlays and digest in its producer section. Its JSON view
+records `builds[].selectedCatalog` and the complete `catalogCandidates` snapshots. Validation rechecks
+the whole output's choice, including every native child of a platform set.
+
+The retained combined NVKE comparison fixture uses four stacks: `nvke`, `runtime-dependencies`, `node-images`
+with its native-toolchain overlay, and `tools`. Two explicit `nvkectl` overrides retain the
+module-tag producer selection within the consolidated `nvke` catalog. Its 69 output names and all
+73 native producer selections stay unchanged. Source-built image outputs already use platform sets. Acquired
+image pairs remain separate: aggregate packaging currently requires built OCI exports. Disk outputs
+remain native, and executable-index migration belongs to issues #297, #296 and #376 with their
+qualification prerequisites. Catalog-list selection alone does not rename outputs or change consumer mappings.
+Maintained generation still uses the composite built from family files.
+
 ## Find components
 
-`nvkr catalog list --data DIR` prints every component. Two optional selectors narrow it, and
+Browse all catalogs without first choosing a producer:
+
+```sh
+nvkr catalog list --catalog inputs/catalogs
+nvkr catalog find --catalog inputs/catalogs nvkectl
+```
+
+Root listing includes imported components and keeps duplicate names separate by catalog path.
+`find` matches an exact component name and reports each location with its recorded source or
+acquisition pins; an unknown name returns a no-match error (exit 10). Both accept `--format json`.
+Root JSON groups descriptions under root-relative `path`, catalog `name`, and `components`.
+Missing locks, invalid imports and unsafe directory entries fail before results are printed.
+Discovery is offline and read-only: it validates local declarations and recorded lock structure,
+but does not re-derive pin sets from upstream Git trees or select anything for a Definition.
+Normal executable catalog loading retains that upstream verification requirement.
+The root scan admits at most 1,024 total files and directories and 16 directory levels,
+using the same no-symlink entry policy as catalog loading. Scan a narrower root if it exceeds
+those bounds. Each catalog load retains its existing file and aggregate byte limits.
+
+The [generated catalog inventory](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/INDEX.md) lists locations, component names and
+producer modes from these same descriptions. Pins remain in `catalog find` so automated pin refreshes
+do not change this navigation index.
+After editing catalog inputs, run `make catalog-index-generate`; `make catalog-index-check`
+rejects stale content and also runs as part of `make workflows-check`.
+
+`nvkr catalog list --catalog DIR` prints every component. Two optional selectors narrow it, and
 `--format json` prints a machine-readable projection:
 
 ```bash
-nvkr catalog list --data inputs/catalogs/tools/operator-arm64 \
+nvkr catalog list --catalog inputs/catalogs/tools \
   --platform linux/arm64 --output-type host-package --format json
 ```
 
@@ -106,7 +202,7 @@ nvkr catalog list --data inputs/catalogs/tools/operator-arm64 \
   valid selector that matches nothing is a no-match error (exit 10). Neither prints a result.
 - Unfiltered text output is unchanged.
 
-The JSON output is a stable array sorted by component name. Each entry has `name`, `platforms`,
+For a leaf catalog, JSON output remains a stable array sorted by component name. Each entry has `name`, `platforms`,
 `outputType` and `producerMode`. `producerMode` is one of:
 
 | Value | Meaning |
@@ -115,6 +211,34 @@ The JSON output is a stable array sorted by component name. Each entry has `name
 | `acquired` | an executable or image delivered from a prebuilt URL or image (the `prebuilt` lane) |
 | `pinned-tool` | a pinned build tool (`file` or `oci-layout` output) |
 | `excluded` | declared but neither built nor acquired |
+
+## Explain authored inputs
+
+Use an explicit input root to inspect a file and the supported authored files that refer to it:
+
+```sh
+nvkr explain --root inputs inputs/definitions/nvke/definition.yaml
+nvkr explain --root inputs inputs/catalogs/shared/nvke.yaml --json
+```
+
+The command recognizes Definitions, Environments, composites, catalogs, overlays, catalog fragments,
+generated pin locks, hosted qualification policies and local qualification policies. Paths in the report are relative to the
+printed scan root; the JSON `root` is an absolute locator and differs between checkouts. Fragment imports label local-to-fragment selections and fragment-to-local source bindings separately; Definition catalog selections
+show overlay order, and overlays identify their exact predecessor binding. Locks identify their owning
+catalog and the pin-generation commands. The public consumer `VerificationPolicy` currently has no
+authored file form; the supported policy files here are hosted and local qualification policies.
+
+The root must contain the referenced input closure. Reverse references cover these supported kinds only
+within that root. Other schemas and the `.git`, `.nvkr` and `node_modules` directories are excluded.
+An unsupported target schema, missing files, stale
+fragment or composite pins, and ambiguous or unmatched overlay predecessors fail with coded errors and
+no partial report. The scan is bounded to 4,096 entries, depth 16 and 32 MiB of YAML/JSON input; symlinks
+are refused. Choose a smaller complete input tree if a broad repository scan exceeds those limits.
+
+Explanation is read-only and offline. It validates recorded declarations through their existing loaders,
+but does not re-derive upstream pin sets, execute producers, or authenticate release evidence. A fragment's
+complete producer meaning still depends on its importing registry's mappings and pins. A validation error
+elsewhere in the scanned authored graph must be fixed before the command prints an explanation.
 
 ## Replace a producer or change a selection
 
@@ -176,7 +300,7 @@ unrelated extras. Root-only selection does not expand dependencies automatically
 To see what to select, explain the root component:
 
 ```sh
-bin/nvkr catalog show --data inputs/catalogs/node-images/release nvke-node-fde-amd64
+bin/nvkr catalog show --catalog inputs/catalogs/node-images nvke-node-fde-amd64
 ```
 
 It prints the producer mode, exact pins and platforms, the sorted material closure, and every binding
@@ -187,16 +311,20 @@ platform is not a claim that the current host can execute it.
 ## Acquired executables
 
 A source `tool` selects an exact upstream executable with `format: raw`, `tar-gzip` or `zip`, an HTTPS
-URL, a concrete platform and an exact `executablePath`. Its `releaseExecutable: true` component uses
+URL, either one `platform` or a sorted nonempty `platforms` list, and an exact `executablePath`.
+Multi-platform URLs, executable members and companion members render `{{.OS}}` and `{{.Arch}}`;
+the lock retains one complete native asset record per declared platform. A missing or extra platform fails
+validation, and pinning commits the set only after every acquisition succeeds. Its `releaseExecutable: true` component uses
 `outputType: host-package`. `catalog pin` records both carrier and executable digests. Acquisition checks
 both identities and scans all archive entries with bounded standard-library readers; it never extracts
 archive paths into the filesystem. Archive format is part of the compiled identity. Existing tar-gzip IR
-records retain their original encoding.
+records retain their original encoding. Each Definition output still selects one concrete platform;
+shared tool declarations do not create executable image indexes.
 
 An archive `tool` may also list sorted `companions`, exact members that ship beside the executable. A
 companion is delivered under its base name with mode 0644 in the same executable output. `catalog pin`
 records each companion digest, and observation and packaging check it against that pin. The
-[AICR CLI catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/tools/aicr-arm64/README.md)
+[AICR CLI catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/aicr/notes/tools-aicr-arm64-README.md)
 delivers `aicr-attestation.sigstore.json` beside `aicr` this way. A companion is pinned bytes, not verified
 upstream evidence.
 
@@ -217,7 +345,7 @@ A different scanner executable changes its digest in dependency SBOMs even when 
 
 A `builderType: pinned-tool` component runs a source's pinned tool once, offline, inside a digest-pinned
 `toolchainImage`, and produces new bytes. It names the source with `tool`, has no `source` or `fromSource`, and
-declares exactly one platform equal to the tool's platform:
+declares exactly one platform. It selects that platform's exact tool pin from the source:
 
 ```yaml
 components:
@@ -270,7 +398,7 @@ checking the expected old digest. It keeps the existing source and command decla
 `components` fields. This differs from replacing the complete producer.
 
 **Version stamps** render source-pin values into build environment variables. This excerpt from the
-[NVKE CLI producer](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/nvke/module-tags/registry.yaml) embeds its exact commit, release tag and source date:
+[NVKE CLI producer](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/nvke/registry.yaml) embeds its exact commit, release tag and source date:
 
 ```yaml
 versionStamp:

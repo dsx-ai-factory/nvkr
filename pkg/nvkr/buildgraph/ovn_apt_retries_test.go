@@ -18,7 +18,7 @@ import (
 
 func TestOVNAPTRetryPatch(t *testing.T) {
 	var patch string
-	for _, path := range []string{"../../../inputs/catalogs/node-images/release", "../../../inputs/catalogs/ovn-nvidia"} {
+	for _, path := range []string{"../../../inputs/catalogs/node-images", "../../../inputs/catalogs/ovn/nvidia"} {
 		cat, err := catalog.LoadContext(t.Context(), catalog.Dir(path))
 		if err != nil {
 			t.Fatal(err)

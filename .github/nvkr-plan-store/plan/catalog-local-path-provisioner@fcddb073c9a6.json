@@ -1,0 +1,109 @@
+{
+  "APIVersion": "nvkr.dev/catalog/v3",
+  "Actions": {},
+  "Components": {
+    "local-path-helper-image": {
+      "commit": "49b2be8e26d6d34c9afaa21fa33108d2e82f8955",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4",
+          "arm64": "sha256:d82c2ab94640ded77cf76514ce6a84870761105058a4a9e51b05a8a79be97a6c"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "docker.io/library/busybox:1.37.0",
+        "imageParentDigest": "sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec"
+      },
+      "repo": "https://github.com/rancher/local-path-provisioner",
+      "sourceDateEpoch": 1785898268,
+      "tag": "v0.0.37"
+    },
+    "local-path-provisioner-chart": {
+      "artifactPath": "charts/local-path-provisioner-0.0.37.tgz",
+      "buildCommand": [
+        "package",
+        "deploy/chart/local-path-provisioner",
+        "--destination=charts/"
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "49b2be8e26d6d34c9afaa21fa33108d2e82f8955",
+      "fromSource": true,
+      "helm": {
+        "chart": ".",
+        "images": {
+          "helper": {
+            "values": {
+              "digest": "helperImage.digest"
+            }
+          },
+          "provisioner": {
+            "values": {
+              "digest": "image.digest"
+            }
+          }
+        }
+      },
+      "outputType": "tarball",
+      "patches": [
+        {
+          "content": "diff --git a/deploy/chart/local-path-provisioner/templates/_helpers.tpl b/deploy/chart/local-path-provisioner/templates/_helpers.tpl\nindex cc8429e..bc5f2ff 100644\n--- a/deploy/chart/local-path-provisioner/templates/_helpers.tpl\n+++ b/deploy/chart/local-path-provisioner/templates/_helpers.tpl\n@@ -80,3 +80,14 @@ cluster.local/{{ template \"local-path-provisioner.fullname\" . -}}\n {{- define \"local-path-provisioner.secret\" }}\n {{- printf \"{\\\"auths\\\": {\\\"%s\\\": {\\\"auth\\\": \\\"%s\\\"}}}\" .Values.privateRegistry.registryUrl (printf \"%s:%s\" .Values.privateRegistry.registryUser .Values.privateRegistry.registryPasswd | b64enc) | b64enc }}\n {{- end }}\n+\n+{{/*\n+Reference an image by digest when one is set, otherwise by tag.\n+*/}}\n+{{- define \"local-path-provisioner.imageSuffix\" -}}\n+{{- if .digest -}}\n+@{{ .digest }}\n+{{- else -}}\n+:{{ .tag }}\n+{{- end -}}\n+{{- end -}}\ndiff --git a/deploy/chart/local-path-provisioner/templates/configmap.yaml b/deploy/chart/local-path-provisioner/templates/configmap.yaml\nindex bc626e0..aea9040 100644\n--- a/deploy/chart/local-path-provisioner/templates/configmap.yaml\n+++ b/deploy/chart/local-path-provisioner/templates/configmap.yaml\n@@ -59,9 +59,9 @@ data:\n       containers:\n         - name: helper-pod\n           {{- if .Values.privateRegistry.registryUrl }}\n-          image: {{ .Values.privateRegistry.registryUrl }}/{{ .Values.helperImage.repository }}:{{ .Values.helperImage.tag }}\n+          image: {{ .Values.privateRegistry.registryUrl }}/{{ .Values.helperImage.repository }}{{ include \"local-path-provisioner.imageSuffix\" .Values.helperImage }}\n           {{- else }}\n-          image: {{ .Values.helperImage.repository }}:{{ .Values.helperImage.tag }}\n+          image: {{ .Values.helperImage.repository }}{{ include \"local-path-provisioner.imageSuffix\" .Values.helperImage }}\n           {{- end }}\n           imagePullPolicy: {{ .Values.image.pullPolicy }}\n           resources:\ndiff --git a/deploy/chart/local-path-provisioner/templates/deployment.yaml b/deploy/chart/local-path-provisioner/templates/deployment.yaml\nindex 8bf442d..748a28d 100644\n--- a/deploy/chart/local-path-provisioner/templates/deployment.yaml\n+++ b/deploy/chart/local-path-provisioner/templates/deployment.yaml\n@@ -36,9 +36,9 @@ spec:\n           securityContext:\n             {{- toYaml .Values.securityContext | nindent 12 }}\n         {{- if .Values.privateRegistry.registryUrl }}\n-          image: \"{{ .Values.privateRegistry.registryUrl }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}\"\n+          image: \"{{ .Values.privateRegistry.registryUrl }}/{{ .Values.image.repository }}{{ include \"local-path-provisioner.imageSuffix\" .Values.image }}\"\n         {{- else }}\n-          image: \"{{ .Values.image.repository }}:{{ .Values.image.tag }}\"\n+          image: \"{{ .Values.image.repository }}{{ include \"local-path-provisioner.imageSuffix\" .Values.image }}\"\n         {{- end }}\n           imagePullPolicy: {{ .Values.image.pullPolicy }}\n           command:\n@@ -55,9 +55,9 @@ spec:\n             - {{ template \"local-path-provisioner.provisionerName\" . }}\n             - --helper-image\n           {{- if .Values.privateRegistry.registryUrl }}\n-            - \"{{ .Values.privateRegistry.registryUrl }}/{{ .Values.helperImage.repository }}:{{ .Values.helperImage.tag }}\"\n+            - \"{{ .Values.privateRegistry.registryUrl }}/{{ .Values.helperImage.repository }}{{ include \"local-path-provisioner.imageSuffix\" .Values.helperImage }}\"\n           {{- else }}\n-            - \"{{ .Values.helperImage.repository }}:{{ .Values.helperImage.tag }}\"\n+            - \"{{ .Values.helperImage.repository }}{{ include \"local-path-provisioner.imageSuffix\" .Values.helperImage }}\"\n           {{- end }}\n             - --configmap-name\n             - {{ .Values.configmap.name }}\ndiff --git a/deploy/chart/local-path-provisioner/values.yaml b/deploy/chart/local-path-provisioner/values.yaml\nindex 1511601..0e98397 100644\n--- a/deploy/chart/local-path-provisioner/values.yaml\n+++ b/deploy/chart/local-path-provisioner/values.yaml\n@@ -7,11 +7,15 @@ namespaceOverride: \"\"\n image:\n   repository: docker.io/rancher/local-path-provisioner\n   tag: v0.0.37\n+  # When set, the image is referenced by digest instead of tag.\n+  digest: \"\"\n   pullPolicy: IfNotPresent\n \n helperImage:\n   repository: docker.io/library/busybox\n   tag: latest\n+  # When set, the image is referenced by digest instead of tag.\n+  digest: \"\"\n \n defaultSettings:\n   registrySecret: ~\n",
+          "name": "patches/chart-image-digest.patch",
+          "sha256": "sha256:cf85c4eb81ac76d3f3ba42924968357bd01b903667b71aba247667873da748bb"
+        }
+      ],
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/rancher/local-path-provisioner",
+      "sourceDateEpoch": 1785898268,
+      "tag": "v0.0.37",
+      "toolchainImage": "alpine/helm@sha256:a6cf54599ccb99d90cf0712b30f03fdb3cab062e6b94e0418cc4db7e8a1464b2",
+      "treeHash": "bd2f817f389e539ec884bf65d737ebaa62bc95ec",
+      "writeDir": "charts"
+    },
+    "local-path-provisioner-image": {
+      "commit": "49b2be8e26d6d34c9afaa21fa33108d2e82f8955",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:c3f2c60ee2490eb83ac00101d7e239fd8c20a5b8b4038e2dfc36a7e66fe99c08",
+          "arm64": "sha256:6a6bade778f51df4e3f9710db6b62ff6eb366cac897e7eccc3528ebd6d22e86c"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "docker.io/rancher/local-path-provisioner:v0.0.37",
+        "imageParentDigest": "sha256:e757967a5ec338f6a9b371c5a9688bedaa8c3578ea3dd4db329ea0084be0a86f"
+      },
+      "repo": "https://github.com/rancher/local-path-provisioner",
+      "sourceDateEpoch": 1785898268,
+      "tag": "v0.0.37"
+    }
+  },
+  "Kind": "SourceBuildRegistry",
+  "Metadata": {
+    "description": "Rancher local-path-provisioner chart packaged from one source pin with its acquired provisioner and helper images bound by digest; Rancher publishes no Helm repository.",
+    "name": "local-path-provisioner"
+  },
+  "Sources": {
+    "local-path-provisioner": {
+      "constraint": "v0.0.37",
+      "repo": "https://github.com/rancher/local-path-provisioner",
+      "toolchainImage": "alpine/helm@sha256:a6cf54599ccb99d90cf0712b30f03fdb3cab062e6b94e0418cc4db7e8a1464b2"
+    }
+  },
+  "Tools": {}
+}

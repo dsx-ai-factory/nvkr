@@ -1,5 +1,11 @@
 ## Local ARM64 development inputs
 
+The demo/site stack is partially extracted into the nested `demos/nvke` Go module.
+It retains a temporary root-library dependency; the binary-only boundary remains
+deferred. Core package discovery excludes the nested module, which has a separate
+`demo-check` merge-gate job. Shared helpers remain in core. This move does not add
+external execution evidence or change the selected catalog pins.
+
 The shared native downstream path uses host Go CLIs/TUI, one QEMU site and two tenant guests. NVKR owns
 tool acquisition/builds and payload verification; the source-owned NVKE CLI owns bootstrap, deployment
 and tenant operations. Both host selections and the older Linux simulator output use one dependency
@@ -46,7 +52,7 @@ and complete Mac/Linux runtime acceptance remain unverified.
 
 The downstream Go owner exposes a callback-scoped native site and independently
 created/deleted tenants through the same native engine. The provisional
-`pkg/nvkr/demo.WithSite` facade and descriptive/opaque type aliases make that
+`demos/nvke/pkg/nvkr/demo.WithSite` facade and descriptive/opaque type aliases make that
 owner importable by separate NVKE or customer modules without another lifecycle
 or deployment engine. Independent external-module compile and nil/canceled/zero-handle
 admission coverage establish importability, not real VM acceptance. Existing matching
@@ -74,7 +80,7 @@ inventory/cleanup and retained-child transport without changing artifact or
 source selection. The [AMD64 nightly record](../../nvke-nightly.md#evidence-and-privacy)
 exercises the small profile at its exact source revisions; other topologies remain separate.
 
-A separate fixed site-identity helper now has one deep `pkg/nvkr/siteidentity`
+A separate fixed site-identity helper now has one deep `demos/nvke/pkg/nvkr/siteidentity`
 owner and thin private Linux ARM64/AMD64 build targets. It reuses the upstream
 generated NodeAgent client and GoSPIFFE/gRPC, admits its bounded output before
 remote work, and distinguishes not-started, joined failure and unknown remote
@@ -261,7 +267,7 @@ their historical scope and do not establish acceptance of the current host workf
 Maintained OS Definitions, catalog execution and Packer toolchain assembly select Docker.
 The older authored Podman Environment and its TCG Definition are removed; generic
 NVKR Podman support remains. The ARM64 catalog baseline retains the already-published
-historical M2 Docker candidate, not a newly measured current toolchain. Local Docker
+historical NVKE Docker candidate, not a newly measured current toolchain. Local Docker
 launchers still freeze their freshly validated image into an attempt overlay.
 Static Plan and wrapper tests cover these selections, not a new native bake.
 
@@ -351,7 +357,7 @@ unchanged zero-retry workload/DNS and natural deletion plus joined owned cleanup
 The [exact-revision evidence](../../evidence/local-upstream-ovn-2026-10-11.md)
 retains the bindings, runtime checks and recording integrity. This is an
 unqualified local diagnostic, not live acceptance of later changes, a supported
-release combination, M2 or qualification. This option neither fixes nor
+release combination, NVKE or qualification. This option neither fixes nor
 validates the NVIDIA fork's open startup issue.
 
 Fresh profiles selections produce a native OCI image through the existing
@@ -365,7 +371,7 @@ into a Kind host directory. Local-only APT installation and uplink naming are
 explicit profile choices, not a general NVKE offline boot contract.
 [Profile factory tests](../../../pkg/nvkr/factory/nvke_laptop_profiles_test.go)
 cover additive patch authentication, native-image compilation, exact staging
-bytes and modeled APT/uplink cases. [Consumer tests](../../../internal/nvkedemo/site_test.go)
+bytes and modeled APT/uplink cases. [Consumer tests](../../../demos/nvke/internal/nvkedemo/site_test.go)
 reject substituted images, incomplete/failed init states and alternate volumes.
 The opt-in exact pinned source-chart rendering check and the following native
 exercises were reported locally; their private attempt paths are not a

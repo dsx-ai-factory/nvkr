@@ -1,0 +1,59 @@
+{
+  "buildDigest": "sha256:d73672244fa7ed51044ae2c8654eae25e0921f567ba480e3f92626361bd9948a",
+  "catalogDigest": "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87",
+  "components": [
+    "spire-crds-chart"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "https://github.com/spiffe/helm-charts-hardened/releases/download/spire-crds-0.6.1/spire-crds-0.6.1.tgz",
+        "artifactPath": "spire-crds-chart",
+        "component": "spire-crds-chart",
+        "digest": "sha256:ce982e63fc375e392b014fc99e621a55442ab886052413e9bb052f72d66580a8",
+        "id": "pull-spire-crds-chart",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "raw",
+        "platform": "linux/amd64",
+        "version": "0.6.1"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-spire-crds-chart"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "spire-crds",
+  "platform": "linux/amd64",
+  "resolvedComponents": [
+    {
+      "Name": "spire-crds-chart",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": false,
+      "outputType": "raw",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:ce982e63fc375e392b014fc99e621a55442ab886052413e9bb052f72d66580a8",
+          "arm64": "sha256:ce982e63fc375e392b014fc99e621a55442ab886052413e9bb052f72d66580a8"
+        },
+        "evidence": {
+          "none": true
+        },
+        "url": "https://github.com/spiffe/helm-charts-hardened/releases/download/spire-crds-0.6.1/spire-crds-0.6.1.tgz"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "sourceDateEpoch": 1793236039,
+      "tag": "0.6.1"
+    }
+  ]
+}

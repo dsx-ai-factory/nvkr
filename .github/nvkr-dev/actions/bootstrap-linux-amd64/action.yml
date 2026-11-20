@@ -21,7 +21,7 @@ runs:
       shell: bash -e {0}
     - name: Verify committed Run generation is current
       id: validate-catalog
-      run: ./nvkr-exec run generate --engine github --definition inputs/definitions/nvke/gpu-site.composite.yaml --environment inputs/environments/github-development.yaml --root . --check
+      run: ./nvkr-exec run generate --engine github --definition inputs/definitions/nvke/nvke.composite.yaml --environment inputs/environments/github-development.yaml --root . --check
       shell: bash -e {0}
     - name: 'Upload NVKR runner'
       uses: ./.github/nvkr-dev/actions/ci-upload

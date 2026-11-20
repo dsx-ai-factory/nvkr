@@ -14,11 +14,11 @@ Copy the example to a writable directory, then pin the NVKE release tag. Flags p
 ```sh
 mkdir -p /tmp/nvke-chart-catalog
 cp docs/examples/nvke-pin-set/registry.yaml /tmp/nvke-chart-catalog/registry.yaml
-go run ./cmd/nvkr catalog pin --dir /tmp/nvke-chart-catalog \
+go run ./cmd/nvkr catalog pin --catalog /tmp/nvke-chart-catalog \
   --tag v0.23.0 --check nvke-controller
-go run ./cmd/nvkr catalog pin --dir /tmp/nvke-chart-catalog \
+go run ./cmd/nvkr catalog pin --catalog /tmp/nvke-chart-catalog \
   --tag v0.23.0 nvke-controller
-go run ./cmd/nvkr catalog validate --data /tmp/nvke-chart-catalog
+go run ./cmd/nvkr catalog validate --catalog /tmp/nvke-chart-catalog
 ```
 
 `--check` reports the umbrella and all acquired member changes without writing; available changes return
@@ -47,7 +47,7 @@ With Docker running and the pinned Go toolchain available:
 mkdir -p .nvkr/acquired-charts
 cp docs/examples/nvke-pin-set/*.yaml .nvkr/acquired-charts/
 # On ARM64, set utilityPlatform to linux/arm64 in environment-local.yaml.
-go run ./cmd/nvkr catalog pin --dir .nvkr/acquired-charts \
+go run ./cmd/nvkr catalog pin --catalog .nvkr/acquired-charts \
   --tag v0.23.0 nvke-controller
 go run ./cmd/nvkr run local \
   --definition .nvkr/acquired-charts/definition.yaml \

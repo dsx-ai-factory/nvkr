@@ -1,0 +1,60 @@
+{
+  "buildDigest": "sha256:f52766eb6c7875e38083f1b136af7a3c15d2b37e391e3e86aa1802a4becab6eb",
+  "catalogDigest": "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87",
+  "components": [
+    "nktp-node-exporter-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "quay.io/prometheus/node-exporter:v1.12.1",
+        "component": "nktp-node-exporter-image",
+        "digest": "sha256:c9ef89f9464f09e7234decaae68a80ab856ff0014435677a99fd48b03dd410ea",
+        "id": "pull-nktp-node-exporter-image",
+        "imageParentDigest": "sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.1.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-nktp-node-exporter-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "nktp-node-exporter-image-arm64",
+  "platform": "linux/arm64",
+  "resolvedComponents": [
+    {
+      "Name": "nktp-node-exporter-image",
+      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:da83fae85603c4e47e6c68369a7d746e2dda683dc35ea2e234b4f171e0d92798",
+          "arm64": "sha256:c9ef89f9464f09e7234decaae68a80ab856ff0014435677a99fd48b03dd410ea"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "quay.io/prometheus/node-exporter:v1.12.1",
+        "imageParentDigest": "sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline",
+      "sourceDateEpoch": 1793913052,
+      "tag": "nktp/v0.1.0"
+    }
+  ]
+}

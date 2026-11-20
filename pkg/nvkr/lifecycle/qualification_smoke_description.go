@@ -120,7 +120,7 @@ func (description ToolSmokeDescription) Validate() error {
 					unique = append(unique, component)
 				}
 			}
-			if !ok || rule.Kind != output.Kind || !sameSmokeComponents(rule.Components, unique) {
+			if !ok || rule.Kind != output.Kind || !sameSmokeComponents(rule.Components, unique) || (output.Derived != nil) != (rule.Reason == "derived-inventory") {
 				return e.New(e.CodeGateUnmet, "smoke non-tool applicability differs from exact selected output")
 			}
 			delete(exemptions, output.Name)

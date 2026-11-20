@@ -67,17 +67,19 @@ area/security:
   - changed-files:
       - any-glob-to-any-file:
           - 'SECURITY.md'
-          - 'cmd/nvkr-site-identity-helper/**'
+          - 'demos/nvke/cmd/nvkr-site-identity-helper/**'
           - 'pkg/nvkr/attest/**'
           - 'pkg/nvkr/provenance/**'
           - 'pkg/nvkr/sbom/**'
           - 'pkg/nvkr/sign/**'
-          - 'pkg/nvkr/siteidentity/**'
+          - 'demos/nvke/pkg/nvkr/siteidentity/**'
           - 'pkg/nvkr/trust/**'
 
 area/cli:
   - changed-files:
-      - any-glob-to-any-file: 'cmd/**'
+      - any-glob-to-any-file:
+          - 'cmd/**'
+          - 'demos/nvke/cmd/**'
 
 area/sdk:
   - changed-files:

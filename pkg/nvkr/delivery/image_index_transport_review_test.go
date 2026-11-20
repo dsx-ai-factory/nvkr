@@ -95,7 +95,7 @@ func TestRegistryImageIndexPullBlobFailureClassification(t *testing.T) {
 			ctx, cancel := context.WithCancel(t.Context())
 			defer cancel()
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if broken.Load() && r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v2/product/cwe/blobs/") {
+				if broken.Load() && r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/v2/product/nvke-controller/blobs/") {
 					hits.Add(1)
 					rec := httptest.NewRecorder()
 					handler.ServeHTTP(rec, r)

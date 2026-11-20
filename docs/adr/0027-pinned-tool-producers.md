@@ -150,8 +150,9 @@ A pinned-tool node runs through the shared helper launcher as an ordinary build 
   platform. The image is part of Build identity, so a static executable does not make its execution root
   invisible to identity.
 - **Platforms agree exactly.** The tool pin's platform must equal the producer's target platform and its
-  toolchain platform. There is no emulation, cross-platform fallback or inferred alternative pin. A second
-  platform needs a separate source name with its own tool pin (ADR-22).
+  toolchain platform. There is no emulation, cross-platform fallback or inferred alternative pin. A source
+  may carry the complete per-platform `tools` lock set under ADR-22; each concrete producer selects its exact
+  target entry.
 - **Inputs are exact and read-only.** Only the digest-checked executable and the declared materials are staged,
   read-only, at fixed paths. Other members of the tool archive, including companion files, are never staged
   (§6).
@@ -192,6 +193,11 @@ twice, produced for another platform or not a regular file fails before work.
 
 Authored files from the Definition repository, remote inputs and Environment-supplied inputs are not admitted.
 Adding them needs its own content-addressed input decision.
+
+ADR-19/20 admit one separate package-time derivation: an in-process AICR inventory from authenticated
+sibling packages and the compiled publication namespace. This is not a pinned-tool producer, a fetched
+`prebuilt` input, or permission to read its own Release. Source-built consumers of this material and injected
+AICR execution remain deferred; the existing pinned-tool material restrictions above are unchanged.
 
 ### 5. Outputs: one file or a producer-written OCI layout
 

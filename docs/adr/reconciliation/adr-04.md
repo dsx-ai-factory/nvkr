@@ -1,5 +1,12 @@
 ## Support by owner
 
+Concurrent bundle verification uses per-subprocess private TUF caches unless the metered path supplies
+its authenticated root snapshot. `TestConcurrentBundleVerificationIsolatesTUFCache` exercises four
+overlapping verifier calls, distinct cache contents, cleanup on success/failure/cancellation and unchanged
+ambient state through an injected runner. This is a local concurrency contract, not a live Sigstore or
+Linux held-executable exercise. The triggering [release assembly failure](https://github.com/dsx-ai-factory/nvkr/actions/runs/44577627888/job/135836897140)
+reported TUF metadata persistence failure with four workers; no corrected hosted Run is recorded yet.
+
 The Tekton change adds explicit OCI public-key trust, role-key snapshots and separate keyless/keyed bundle
 admission. Focused controlled tests cover policy separation, credential scrubbing and error redaction.
 On 2026-11-09, `TestTektonKeyedCosignInteroperability` passed against a loopback OCI registry with the real
@@ -11,4 +18,4 @@ publication acceptance. See [ADR-18](adr-18.md).
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
-| 04 Signing and consumption | Linux held-executable exact-byte signing/verification, pinned cosign keyless OCI adapter, policy-bound authenticity and artifact-publication consumers with separate capabilities; authenticity checks root/output signatures, production provenance and SBOM bundles without payloads; qualification predicate attachment/read-back verification with real local-key cosign interoperability | Authenticity has contract coverage only; one recorded external consumer attempt failed closed before authentication. `release verify` reads signature bundles anonymously, so a private-registry Release fails closed, as recorded in [output-local publication](output-local-publication-and-metadata-assembly.md#output-local-publication-and-metadata-assembly). Earlier independent cosign and public/private artifact-publication acceptance is recorded; qualification hosted OIDC, M2 independent full-payload disk consumption and root rotation remain unproved. Full release and qualified scopes remain closed |
+| 04 Signing and consumption | Linux held-executable exact-byte signing/verification, pinned cosign keyless OCI adapter, policy-bound authenticity and artifact-publication consumers with separate capabilities; authenticity checks root/output signatures, production provenance and SBOM bundles without payloads; qualification predicate attachment/read-back verification with real local-key cosign interoperability | Authenticity has contract coverage only; one recorded external consumer attempt failed closed before authentication. `release verify` reads signature bundles anonymously, so a private-registry Release fails closed, as recorded in [output-local publication](output-local-publication-and-metadata-assembly.md#output-local-publication-and-metadata-assembly). Earlier independent cosign and public/private artifact-publication acceptance is recorded; qualification hosted OIDC, NVKE independent full-payload disk consumption and root rotation remain unproved. Full release and qualified scopes remain closed |

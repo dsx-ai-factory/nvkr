@@ -10,6 +10,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/google/go-containerregistry/pkg/v1/types"
 )
@@ -30,7 +31,9 @@ type ReleaseMetadata struct {
 // OutputBinding adds meaning to the object's one descriptor; it does not repeat
 // the name or artifact digest already owned by the release index object.
 type OutputBinding struct {
-	Bundle *BundleBinding `json:"bundle,omitempty"`
+	DerivedMaterials []derivedoutput.Material `json:"derivedMaterials,omitempty"`
+	Derived          *derivedoutput.Binding   `json:"derived,omitempty"`
+	Bundle           *BundleBinding           `json:"bundle,omitempty"`
 	// Publication retains the authenticated output-local handoff selected by assembly.
 	Publication *PublicationOrigin `json:"publication,omitempty"`
 	// Repository is a sibling name in the original Publication namespace when
@@ -103,6 +106,19 @@ func validateReleaseMetadata(root PublicationRoot) error {
 		if o.Output == nil {
 			continue
 		}
+		if o.Output.Derived != nil {
+			if err := o.Output.Derived.ValidateMaterials(o.Output.DerivedMaterials); err != nil {
+				return err
+			}
+			if err := o.Output.Derived.ValidateOutput(o.Name, o.Output.Format, o.Output.BuildDigest, o.Output.Components); err != nil {
+				return err
+			}
+			if o.Output.Bundle != nil || len(o.Output.BuildSubjects) != 0 {
+				return e.New(e.CodeVerifyFailed, "derived inventory cannot claim source producers")
+			}
+		} else if len(o.Output.DerivedMaterials) != 0 {
+			return e.New(e.CodeVerifyFailed, "ordinary output carries derived materials")
+		}
 		if origin := o.Output.Publication; origin != nil {
 			if ValidatePublicationReference(origin.Ref) != nil || len(origin.Ref) > 2048 || m.InvocationID == "" ||
 				origin.PreparedInvocationID == "" || len(origin.PreparedInvocationID) > 2048 ||
@@ -148,7 +164,7 @@ func validateReleaseMetadata(root PublicationRoot) error {
 					return err
 				}
 				media = MediaAICRArtifact
-			} else if len(o.Output.Components) != 1 {
+			} else if o.Output.Derived == nil && len(o.Output.Components) != 1 {
 				return e.New(e.CodeVerifyFailed, "archive bundle requires one producer")
 			}
 			if o.Output.TransportPath != "" || o.SemanticDigest != o.BlobDigest {
@@ -190,7 +206,7 @@ func validateReleaseMetadata(root PublicationRoot) error {
 			}
 			previous = component
 		}
-		if o.Output.Format != outputFormatHelm && len(o.Output.Components) == 0 {
+		if o.Output.Format != outputFormatHelm && o.Output.Derived == nil && len(o.Output.Components) == 0 {
 			return e.New(e.CodeProvenanceMissing, "release output has no build subjects")
 		}
 		if o.Output.Format == "oci" && len(o.Output.Components) != 1 {
@@ -200,6 +216,9 @@ func validateReleaseMetadata(root PublicationRoot) error {
 	}
 	if len(outputs) == 0 {
 		return e.New(e.CodeReleaseIncomplete, "release has no deliverables")
+	}
+	if err := validateDerivedMembership(outputs); err != nil {
+		return err
 	}
 	if m.Composition != nil {
 		// A per-output publication carries the complete Plan record but one output;
@@ -212,3 +231,27 @@ func validateReleaseMetadata(root PublicationRoot) error {
 }
 
 var siblingRepositoryPattern = regexp.MustCompile(`^[a-z0-9]+(?:[._-][a-z0-9]+)*$`)
+
+func validateDerivedMembership(outputs map[string]PublishedObject) error {
+	for _, object := range outputs {
+		binding := object.Output
+		if binding.Derived == nil {
+			continue
+		}
+		for i, input := range binding.Derived.Inputs {
+			sibling, present := outputs[input.Name]
+			if !present {
+				// Output-local publication carries only its own payload. Aggregate
+				// roots must include every sibling used to derive their inventory.
+				if len(outputs) == 1 {
+					continue
+				}
+				return e.New(e.CodeReleaseIncomplete, "derived inventory lacks a sibling in the aggregate publication")
+			}
+			if sibling.Output.Derived != nil || sibling.Output.Format != input.Kind || sibling.Output.BuildDigest != input.BuildDigest || sibling.Output.Repository != input.Name || sibling.DescriptorDigest != binding.DerivedMaterials[i].Digest {
+				return e.New(e.CodeVerifyFailed, "derived materials differ from sibling publication objects")
+			}
+		}
+	}
+	return nil
+}

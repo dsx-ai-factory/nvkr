@@ -1,13 +1,24 @@
 # Documentation
 
-Start with the [hello demo](../demos/hello/README.md), then the [quickstart](quickstart.md): copy one block to build NVKR from source and produce
-the NVKE CLI, controller image, Helm chart and dependency SBOMs locally on macOS or Linux.
-The guide shows the resulting files and links to larger builds, publication and deployment.
-For a preview without Docker, see the [tutorial inputs](examples/nvke-tutorial/README.md#preview-the-native-build).
-[What is NVKR?](overview/what-is-nvkr.md) introduces the lifecycle.
-The [34-concept reference](user-concepts.md) explains the vocabulary and connects each concept to a worked example.
+Choose one worked journey. Each starts with prerequisites, a runnable example, an expected result and
+its next step. Keep [Preview limits](overview/preview-status.md) nearby for shared scope and evidence boundaries.
 
-## User tasks
+| Journey | Start here |
+|---|---|
+| Build a small artifact | [Build hello with a real local Run](journeys.md#build-a-small-artifact) |
+| Change a component | [Select a new source version and compare the result](journeys.md#change-a-component) |
+| Inspect a Run | [Read the recorded outcome, Plan and graph](journeys.md#inspect-a-run) |
+| Build a larger selection | [Preview and build the NVKE CLI, image and chart](journeys.md#build-a-larger-selection) |
+| Publish a Release | [Review a bundle, configure publication and dispatch it](journeys.md#publish-a-release) |
+| Verify or consume a Release | [Apply consumer policy and download a named output](journeys.md#verify-or-consume-a-release) |
+
+## Reference index
+
+[What is NVKR?](overview/what-is-nvkr.md) introduces the lifecycle.
+[Concepts](user-concepts.md) connects the vocabulary to worked examples.
+The task and reference indexes below retain the detailed command, schema, maintenance and demo guides.
+
+### User tasks
 
 | I want to… | Read |
 |---|---|
@@ -19,11 +30,12 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | Build and run the native Ubuntu ARM64 or Mac demo | [Shared build-and-demo guide and validation limits](local-nvke-demo.md) |
 | Understand native Linux/Mac execution with one QEMU site and two tenant guests | [Shared native topology and validation scope](local-nvke-demo.md#native-linux-and-mac-path) |
 | Inspect my first Plan | [Plan and graph inspection](plan-and-graph-inspection.md) |
+| Trace workflow jobs to frozen scripts or understand the adapter boundary | [Generated Plan tree](generated-plan-tree.md) |
 | Browse public command results | [Command result browser](lifecycle.md#browse-public-command-results) |
 | Watch a local Run or inspect its recorded outcome | [Lifecycle dashboard and read-only inspection](lifecycle.md#choose-local-run-presentation) |
 | Choose components, pin inputs, and scope replacements | [Catalogs and components](catalogs-and-components.md) |
 | Start a small executable Definition from catalog components | [Definition init](lifecycle.md#start-a-small-executable-definition) |
-| Visualize dependencies and generate GitHub Actions or Tekton | [Pipeline generation](generate-pipeline.md) |
+| Visualize dependencies and generate GitHub Actions, Tekton or the proposed native GitLab adapter | [Pipeline generation](generate-pipeline.md), [GitLab profile](generate-pipeline.md#native-gitlab-execution) |
 | Understand how heterogeneous materials become a disk | [Node images](node-images.md) |
 | Build AICR deployment bundles as OCI artifacts | [AICR inputs, supported hardware recipes and rendering limits](../inputs/definitions/aicr/README.md) |
 | Find published outputs, download a named output, and verify a consumer claim | [Release quickstart](release-quickstart.md) |
@@ -36,7 +48,7 @@ The [34-concept reference](user-concepts.md) explains the vocabulary and connect
 | Build and recover the local NVKE CLI publication | [Local NVKE walkthrough](../demos/m1-local.md) |
 
 Example-specific inputs and commands live beside their Definitions: [three-output tutorial](examples/nvke-tutorial/README.md),
-[nine-output deploy example](examples/nvke-deploy/README.md), [69-output M2 candidate and committed workflow](../inputs/definitions/nvke/README.md),
+[nine-output deploy example](examples/nvke-deploy/README.md), [84-output NVKE release composite and committed workflow](../inputs/definitions/nvke/README.md),
 and [OS-image routes](../inputs/definitions/diagnostics/README.md). The separate
 [Ubuntu 24 inputs](../inputs/definitions/diagnostics/ubuntu24/README.md) select build-only native plain and
 public-bootstrap FDE disk diagnostics; the sibling Ubuntu 24.04 disks family selects them for publication. The
@@ -44,11 +56,11 @@ public-bootstrap FDE disk diagnostics; the sibling Ubuntu 24.04 disks family sel
 The [demo index](../demos/README.md) lists presentations, runnable journeys, and prerequisites.
 
 Experimental [public OS source producers](../inputs/experiments/public-os-sources/README.md) and the
-[OVN source-build option](../inputs/catalogs/ovn-nvidia/README.md) are separate candidates, not full OS
-migration or maintained M2 membership. The [v0.21.0 dependency inventory](nvke-v0.21.0-os-dependency-inventory.md)
+[OVN source-build option](../inputs/catalogs/ovn/nvidia/notes/ovn-nvidia-README.md) are separate candidates, not full OS
+migration or maintained NVKE membership. The [v0.21.0 dependency inventory](nvke-v0.21.0-os-dependency-inventory.md)
 records source availability and remaining gaps.
 
-## Detailed references
+### Detailed references
 
 | Topic | Reference |
 |---|---|
@@ -68,7 +80,7 @@ records source availability and remaining gaps.
 | Bounded guest capture format and acquisition ownership | [OS acquisition contract](nvke-os-acquisition-contract.md) |
 | Optional live-owner disk inspection and material observations | [OS live inspection](nvke-os-live-inspection.md) |
 
-## Local ARM64 diagnostics
+### Local ARM64 diagnostics
 
 | Task | Guide |
 |---|---|
@@ -78,7 +90,7 @@ records source availability and remaining gaps.
 | Inspect older staged-installer sessions and recovery controls | [Legacy handoff and recovery](nvkr-to-nvke-demo.md) |
 | Determine what remains for a full source-built local NVKE distribution | [Full-source gap map](full-nvke-source-build.md) |
 
-## Engineering and maintenance
+### Engineering and maintenance
 
 [Input layout and consolidation](input-layout-migration.md) maps every relocated Definition and Environment,
 separates the completed ownership move from conditional consolidation, and records the remaining parity gaps.
@@ -91,8 +103,9 @@ implementation/evidence ledger. The [roadmap](milestones.md) links outcomes to t
 
 [Definition partitioning strategy](definition-partitioning-strategy.md) explains the NVKE family
 pilot, historical graph-capacity measurements, shared catalog ownership and related Release options.
-The [input instructions](../inputs/definitions/nvke/README.md#family-pilot) own generation and checking;
-the combined candidate remains available pending consumer and qualification cutover.
+The [input instructions](../inputs/definitions/nvke/README.md#generate-and-check-the-maintained-workflow) own generation and checking.
+The composite owns all three maintained bundles under the ADR-26 U10 cutover; the former combined input
+remains only a comparison fixture.
 
 [ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
 adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.
@@ -114,7 +127,8 @@ owns execution evidence, unsupported capabilities and remaining hosted and consu
 [ADR-28: Multi-platform executables](adr/0028-multi-platform-executable-indexes.md) designs one tool
 source for every platform of a release, where the platforms share a format, companions and admitted URL
 spellings, and executable outputs published as standard OCI image indexes. The AICR CLI is the first
-migration, and the ADR inventories existing executables to retrofit. It is design only.
+index migration. Multi-platform tool declarations, complete locks and exact native selection are implemented
+under ADR-22; executable-index publication and the output retrofits remain design only.
 
 [ADR-29: Cluster observation and artifact attribution](adr/0029-cluster-observation-and-artifact-attribution.md)
 and its [feature design](cluster-observation-and-artifact-attribution.md) describe gathering cluster facts
@@ -145,7 +159,7 @@ Reconciliation cites scoped external Runs and historical observations. Unit test
 browsing, and authenticated consumer verification establish different facts. Historical captures,
 superseded plans, and completed progress reports remain in Git history.
 
-## Demos
+### Demos
 
 The [demos directory](../demos/README.md) contains the 14-slide deck, 34 concept examples,
 HTML walkthrough, offline graph explorer, facilitator guide, and self-guided scripts. The presentation
@@ -154,4 +168,4 @@ own current user instructions.
 
 [NVKE customer choices](nvke-customer-choices.md) explains supplier replacement and its current validation scope.
 
-[Multiarch CWE delivery](multiarch-cwe-delivery.md) describes aggregate image membership, evidence and current validation limits.
+[Multiarch nvke-controller delivery](multiarch-nvke-controller-delivery.md) describes aggregate image membership, evidence and current validation limits.

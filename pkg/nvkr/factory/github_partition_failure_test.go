@@ -256,7 +256,14 @@ func TestGitHubPartitionedRunPreservesOperationOutcomesThroughFinalization(t *te
 			for _, id := range run.jobs {
 				complete = complete && got[id] == executionSucceeded
 			}
-			assertRestoreOutcome(t, "all-provider-jobs", map[bool]string{true: "restored:success", false: "job-failed"}[complete])
+			if complete {
+				assertRestoreOutcome(t, "all-provider-jobs", "restored:success")
+			} else {
+				raw, err := os.ReadFile(HostedRestoreOutcomePath(".nvkr/factory", "all-provider-jobs"))
+				if err != nil || !strings.HasPrefix(string(raw), "job-failed:") {
+					t.Fatalf("failed provider closure lost its upstream diagnostic: %q, %v", raw, err)
+				}
+			}
 			for _, artifact := range run.plan.Graph.Artifacts {
 				if finalizerArtifact(run.plan, artifact) {
 					succeeded := got[run.nodeJobs[artifact.Producer]] == executionSucceeded

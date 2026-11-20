@@ -201,7 +201,7 @@ func (plan *Plan) validateSBOMGraph() error {
 			continue
 		}
 		if plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) {
-			if diskBuildProvenance(plan) {
+			if diskBuildProvenance(plan, node.BuildTarget) {
 				continue
 			}
 			var selected BuildPlan

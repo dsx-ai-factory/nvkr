@@ -13,7 +13,7 @@ and packages outputs. Helm binding embeds the selected image digest before packa
 signing/attestation, and signature verification have separate isolation and credentials.
 
 The top-level workflow shows jobs, dependencies, permissions and protected Environments in ordinary YAML.
-After native preflight and checkout, local composite calls point into `.github/nvkr-run/actions/` for shared
+After native preflight and checkout, local composite calls point into `.github/nvkr-run-nvke/actions/` for shared
 execution and transport interfaces. Calls such as `execute-node`, `execute-source` and `collect-node-outputs`
 name their operation. Grouped jobs repeat the same node interface; differing output counts use declared
 optional slots and further individual upload calls, without output-count or group-size action variants.
@@ -54,7 +54,7 @@ These diagnostic messages support investigation; authenticated records establish
 Start with the closing Run summary for required-job counts and the finalization outcome, then open the failed
 job's named step. Each executed operation logs its result, exit status, elapsed seconds
 and last phase. For example, `execute package/controller-chart` identifies the failed logical operation;
-`restore sbom/cwe` identifies a transport failure before the consumer could execute. Expected outputs are
+`restore sbom/nvke-controller` identifies a transport failure before the consumer could execute. Expected outputs are
 explicitly labeled; only a successful operation prints `Produced` for its outputs.
 
 The corresponding named step retains child-process output and the helper's original error. Stable execution
@@ -111,7 +111,7 @@ The generated invocation data is not an authored transport manifest or an altern
 `pack-outputs` remains a separate step.
 
 These excerpts illustrate the expanded controller-chart operations and finalizer. Exact names and node IDs
-come from the selected Plan; the repository currently selects the 69-output M2 Definition.
+come from the selected Plan; the repository currently selects the 84-output NVKE release composite.
 Composite shell steps preserve the original default with `bash -e {0}` on
 the host or `sh -e {0}` in a job container. Caller-only
 expressions such as `toJSON(needs)` are passed as explicit inputs and mapped to the original consuming field.
@@ -121,10 +121,10 @@ Source credentials likewise reach only the source step's environment, never the 
       - name: 'Build nvke-controller-chart (controller-chart)'
         id: nvkr-controller-chart-build-nvke-controller-chart
         run: |
-          ./nvkr-exec factory github run-node --plan .github/nvkr-run/plan.json --node controller-chart/build-nvke-controller-chart
+          ./nvkr-exec factory github run-node --plan .github/nvkr-run-nvke/plan.json --node controller-chart/build-nvke-controller-chart
       - name: 'Prepare output carriers: Build nvke-controller-chart (controller-chart)'
         run: |
-          ./nvkr-exec factory github pack-outputs --plan .github/nvkr-run/plan.json --node controller-chart/build-nvke-controller-chart
+          ./nvkr-exec factory github pack-outputs --plan .github/nvkr-run-nvke/plan.json --node controller-chart/build-nvke-controller-chart
 ```
 
 ```yaml
@@ -132,7 +132,7 @@ Source credentials likewise reach only the source step's environment, never the 
         id: recover-artifacts
         env:
           NVKR_JOB_RESULTS: ${{ toJSON(needs) }}
-        run: ./nvkr-exec factory github recover --plan .github/nvkr-run/plan.json
+        run: ./nvkr-exec factory github recover --plan .github/nvkr-run-nvke/plan.json
 ```
 
 The recovery helper bounds and validates the provider JSON before touching carriers. It requires exactly the
@@ -143,7 +143,7 @@ failure to persist outcomes stops recovery. The finalizer still authenticates co
 ## Historical six-output workflow comparison
 
 The October 4 compact-helper review used the six-output `nke-deploy` Definition (now `nvke-deploy`) and identical canonical Plan bytes.
-These measurements describe that review, rather than the current M2 workflow:
+These measurements describe that review, rather than the current NVKE workflow:
 
 | Item | Initial PR #90 (`582ab01`) | Compact helper |
 |---|---:|---:|

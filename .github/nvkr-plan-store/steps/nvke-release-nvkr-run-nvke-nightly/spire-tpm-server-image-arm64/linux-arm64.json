@@ -1,0 +1,60 @@
+{
+  "buildDigest": "sha256:ac8f1485574b987beaa699ec3fb7192e4d243f9c1764ce4ea7ffa72feca6413a",
+  "catalogDigest": "sha256:846dcc17957d283482e241ed117d4d61060b1a37930c85f2a799e3de717ba092",
+  "components": [
+    "spire-tpm-server-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "ghcr.io/spiffe/spire-tpm-plugin-tpm-attestor-server:v1.9.0",
+        "component": "spire-tpm-server-image",
+        "digest": "sha256:d5a0bd84d06ce4a7cd8d0cc5f7f05ca041ed3e1cdd0f8fd129831d871669f2bf",
+        "id": "pull-spire-tpm-server-image",
+        "imageParentDigest": "sha256:9d3c69f9a9a59b274e7d6d9f8e75d89691d7d9204f2063d7917685a17b8828dc",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-spire-tpm-server-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "spire-tpm-server-image-arm64",
+  "platform": "linux/arm64",
+  "resolvedComponents": [
+    {
+      "Name": "spire-tpm-server-image",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:0ba43be0bd5cee7afc54fb351989692ddd07c106111ecda3cf6e9cbe23da137c",
+          "arm64": "sha256:d5a0bd84d06ce4a7cd8d0cc5f7f05ca041ed3e1cdd0f8fd129831d871669f2bf"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "ghcr.io/spiffe/spire-tpm-plugin-tpm-attestor-server:v1.9.0",
+        "imageParentDigest": "sha256:9d3c69f9a9a59b274e7d6d9f8e75d89691d7d9204f2063d7917685a17b8828dc"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0"
+    }
+  ]
+}

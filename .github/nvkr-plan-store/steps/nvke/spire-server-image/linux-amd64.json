@@ -1,0 +1,60 @@
+{
+  "buildDigest": "sha256:c673faa102ca431c8289e166ee81ad4d9b430712db7a2ec002de9a4437995b64",
+  "catalogDigest": "sha256:846dcc17957d283482e241ed117d4d61060b1a37930c85f2a799e3de717ba092",
+  "components": [
+    "spire-server-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "ghcr.io/spiffe/spire-server:1.15.3",
+        "component": "spire-server-image",
+        "digest": "sha256:3aa2dce70fc1098d6718a87c629aa8cadb83e4672c71dd63c5575ea5d0603789",
+        "id": "pull-spire-server-image",
+        "imageParentDigest": "sha256:4082f30d3e0ddc4000a171392c4ea174345ee44d161ee917c70b97b2ecfba141",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-spire-server-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "spire-server-image",
+  "platform": "linux/amd64",
+  "resolvedComponents": [
+    {
+      "Name": "spire-server-image",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:3aa2dce70fc1098d6718a87c629aa8cadb83e4672c71dd63c5575ea5d0603789",
+          "arm64": "sha256:b2fb59ac8ec292b2d0e3685008b4a72726fc2298923a569ada9b2700f8b86380"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "ghcr.io/spiffe/spire-server:1.15.3",
+        "imageParentDigest": "sha256:4082f30d3e0ddc4000a171392c4ea174345ee44d161ee917c70b97b2ecfba141"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0"
+    }
+  ]
+}
