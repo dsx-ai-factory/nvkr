@@ -92,7 +92,7 @@ func TestDiskInspectionRuntimeRejectsDescriptions(t *testing.T) {
 func TestContainerInstalledPackagesCheckBindingAndMetadata(t *testing.T) {
 	digest := "sha256:" + strings.Repeat("1", 64)
 	valid := diskInspectionReport{Subject: digest, Size: 123, Inspector: digest, Codec: digest,
-		Packages: []InstalledDiskPackage{{Name: "hello", Version: "1", Architecture: "arm64", Format: "deb"}}}
+		Packages: []InstalledDiskPackage{{Name: "hello", Version: "1", Architecture: "arm64", Format: "deb", Vendor: "debian"}}}
 	for _, tt := range []struct {
 		name  string
 		edit  func(*diskInspectionReport)

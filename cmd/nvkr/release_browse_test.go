@@ -181,7 +181,7 @@ func TestReleaseVerifyForwardsCompleteExactInputsToLifecycleUseCase(t *testing.T
 
 func TestReleaseVerifyForwardsDiskEvidencePolicyWithExactInputs(t *testing.T) {
 	lifecycleCommandRepo(t)
-	for _, minimum := range []lifecycle.DiskEvidenceRequirement{"", lifecycle.DiskEvidenceBuildProvenance, lifecycle.DiskEvidenceStrict} {
+	for _, minimum := range []lifecycle.DiskEvidenceRequirement{"", lifecycle.DiskEvidenceBuildProvenance, lifecycle.DiskEvidencePackages, lifecycle.DiskEvidenceStrict} {
 		t.Run(string(minimum), func(t *testing.T) {
 			called := false
 			verify := func(_ context.Context, _ string, policy lifecycle.VerificationPolicy,

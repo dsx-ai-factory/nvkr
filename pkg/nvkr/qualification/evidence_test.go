@@ -121,6 +121,21 @@ func requireCode(t *testing.T, err error, code e.Code) {
 	}
 }
 
+func TestQualificationEvidenceRetainsDiskScope(t *testing.T) {
+	for _, scope := range []string{lifecycle.DiskEvidenceDescriptionBuildProvenance, lifecycle.DiskEvidenceDescriptionPackages, lifecycle.DiskEvidenceDescriptionStrict} {
+		t.Run(scope, func(t *testing.T) {
+			v := evidenceFixture()
+			output := &v.ArtifactChecks.Outputs[1]
+			output.Kind, output.Platform, output.DiskEvidence = lifecycle.OutputDiskImage, "linux/arm64", scope
+			v.ToolSmoke.ArtifactChecks = v.ArtifactChecks
+			v.ToolSmoke.Workers[0].ArtifactChecks = v.ArtifactChecks
+			if err := v.Validate(); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
 func TestQualificationEvidenceStrictContract(t *testing.T) {
 	for _, tc := range []struct {
 		name string

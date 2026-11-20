@@ -24,6 +24,11 @@ measurements and successful publication. Native image push paths are checked aga
 the module-local inspector dependency graph for both Linux architectures. Manifest
 comparison and routing are diagnostic only; these offline tests do not exercise
 GitHub issue writes, hosted matrix outputs or a live refresh.
+The comparison, notification and review-proposal adapters now live in
+`pkg/nvkr/toolchainmaintenance`. Comparison uses the existing packed/tree Plan loader directly;
+proposal checks the complete candidate file set before creating remote blobs. Go contracts cover
+manifest equality and refusal, issue reuse, create-once routing, review-branch retries and closed
+proposals. These ports have no new hosted publication or notification evidence.
 
 The [publication attempt](https://github.com/dsx-ai-factory/nvkr/actions/runs/42939744937)
 admitted preparation `42904976235` attempt 1, published all four approved candidate subjects, and passed

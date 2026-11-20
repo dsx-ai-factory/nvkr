@@ -249,7 +249,11 @@ jobs:
               # tree is watched rather than only the pages listed in the nav.
               - 'docs/**'
               - 'fern/**'
-              - 'tools/check-docs-mdx'
+              - 'internal/checkdocs/**'
+              - 'pkg/nvkr/errors/**'
+              - '.go-version'
+              - 'go.mod'
+              - 'go.sum'
               - 'tools/fern/**'
               - 'Makefile'
               - '.github/workflows/merge-gate.yaml'
@@ -742,6 +746,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
