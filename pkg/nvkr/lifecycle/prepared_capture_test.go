@@ -110,3 +110,38 @@ func TestExecuteLocalHandsCapturedInputsToFactory(t *testing.T) {
 		})
 	}
 }
+
+func TestPreparedRunCLIArtifactTestInputs(t *testing.T) {
+	prepared, err := PrepareCapturedFiles(t.Context(), "../../..", "docs/examples/nvke-tutorial/definition-amd64.yaml",
+		"docs/examples/nvke-tutorial/environment-local-amd64.yaml", "test", "cli-inputs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputs, err := prepared.CLIArtifactTestInputs("nvkectl")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := factory.SelectCLIArtifactTestInputs(prepared.plan, "nvkectl")
+	if err != nil || *inputs != *want || inputs.Platform != "linux/amd64" || inputs.ExpectedVersion == "" {
+		t.Fatalf("unexpected inputs: %+v, %v", inputs, err)
+	}
+	for _, tc := range []struct {
+		name     string
+		prepared *PreparedRun
+		output   string
+		code     e.Code
+	}{
+		{"unknown-output", prepared, "missing", e.CodeUsage},
+		{"implicit-output", prepared, "", e.CodeUsage},
+		{"nil", nil, "nvkectl", e.CodeUsage},
+		{"zero", &PreparedRun{}, "nvkectl", e.CodeUsage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inputs, err := tc.prepared.CLIArtifactTestInputs(tc.output)
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != tc.code || inputs != nil {
+				t.Fatalf("expected %v, got %+v, %v", tc.code, inputs, err)
+			}
+		})
+	}
+}

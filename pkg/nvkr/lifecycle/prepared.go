@@ -8,6 +8,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 )
 
@@ -92,6 +93,15 @@ func PrepareFiles(ctx context.Context, definitionPath, environmentPath, generato
 		return nil, err
 	}
 	return &PreparedRun{plan: plan, run: run}, nil
+}
+
+// CLIArtifactTestInputs derives one explicitly named CLI output's test inputs
+// from the compiled Plan before any build. The Plan itself stays owned here.
+func (prepared *PreparedRun) CLIArtifactTestInputs(output string) (*factory.CLIArtifactTestInputs, error) {
+	if prepared == nil || prepared.plan == nil {
+		return nil, e.New(e.CodeUsage, "CLI test inputs require a prepared Run")
+	}
+	return factory.SelectCLIArtifactTestInputs(prepared.plan, output)
 }
 
 func (prepared *PreparedRun) Description() Run {
