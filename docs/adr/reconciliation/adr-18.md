@@ -6,11 +6,6 @@ permission-bootstrap failure and timed-out access; generation contracts retain t
 and transfers. It adds no runner interpreter dependency. The helper is unavailable at this early stage,
 so only the later Go-owned admission authenticates API usability and capacity.
 Real KVM/ARC execution of this change remains unverified.
-The [failed ARM64 job](https://github.com/dsx-ai-factory/nvkr/actions/runs/44779649479/job/136448934013)
-opened the device successfully on `arc-arm64-kvm-swwv6-runner-wkvwm`, then failed later runtime KVM admission;
-its log does not establish why the later admission could not obtain KVM. GitHub Actions has no native bounded
-job retry that guarantees another runner. Separate retry jobs or API orchestration could request a new assignment but
-cannot guarantee a different host; neither is added here.
 
 GitHub per-output recovery preserves an original failed job's ID and, for execution stages, Plan-derived
 display label for the finalizer's completeness error, prioritizing actual failure over cancellation/skips.

@@ -2,13 +2,11 @@
 
 The maintained release and NVIDIA candidate OVN image producers now select an authenticated source patch
 that bind-mounts an APT wrapper only during the two package-install build steps. It preserves repository
-and package selection and signature verification, adds three acquire retries with thirty-second transport
+and package selection and signature verification, pins three acquire retries with thirty-second transport
 timeouts, and bounds whole-command attempts to three with five-/ten-second delays. Whole-command retries
 cover HTTP 520, which APT does not classify as transient; partial index updates fail. The wrapper is absent
 from the final image. Local contracts cover argument preservation, recovery and permanent-failure exit status.
-The [failed Ubuntu 24 AMD64 job](https://github.com/dsx-ai-factory/nvkr/actions/runs/44779649479/job/136452858760)
-records HTTP 520 followed by unsigned-repository errors from Ubuntu's archive. A fresh image build has not
-validated this patch. Mutable Ubuntu/UCA/DOCA/Kubernetes repositories remain a reproducibility limitation:
+A fresh OVN image build has not validated this patch. Mutable Ubuntu/UCA/DOCA/Kubernetes repositories remain a reproducibility limitation:
 a snapshot migration would need a compatible reviewed package set across those feeds and is deferred.
 
 The separate `inputs/experiments/public-os-sources/catalog` catalog builds public OS binaries from

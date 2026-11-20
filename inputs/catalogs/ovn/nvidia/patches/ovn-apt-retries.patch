@@ -41,7 +41,7 @@ new file mode 100755
 +        exit "$status"
 +    fi
 +    delay=$((attempt * 5))
-+    printf 'APT acquisition failed (exit %s); retry %s/3 in %ss\n' "$status" "$((attempt + 1))" "$delay" >&2
++    printf 'apt-get failed (exit %s); retry %s/3 in %ss\n' "$status" "$((attempt + 1))" "$delay" >&2
 +    sleep "$delay"
 +    attempt=$((attempt + 1))
 +done

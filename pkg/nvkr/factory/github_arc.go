@@ -44,7 +44,7 @@ if ! kvm_access; then
   stat -c 'uid=%%u gid=%%g mode=%%a' /dev/kvm >&2 || true
   runner_fault 'cannot open /dev/kvm read/write or access check timed out'
 fi
-printf 'KVM access ready on ARC pod %%s\n' "${RUNNER_NAME:-unknown}"`, e.ExitCode(e.New(e.CodeEngineCapability, "KVM access unavailable"))),
+printf 'KVM access ready on ARC pod %%s: %%s\n' "${RUNNER_NAME:-unknown}" "$(stat -c 'uid=%%u gid=%%g mode=%%a' /dev/kvm)"`, e.ExitCode(e.New(e.CodeEngineCapability, "KVM access unavailable"))),
 	}
 }
 
