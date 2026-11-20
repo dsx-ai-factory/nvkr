@@ -484,3 +484,13 @@ func TestClonePreservesHelmMappingOwnership(t *testing.T) {
 		t.Fatal("resolved chart mappings alias the caller's catalog")
 	}
 }
+
+func TestClonePreservesSourceRecipeOwnership(t *testing.T) {
+	original := catalog.Component{SourceRecipe: &catalog.SourceRecipe{BuildCommand: []string{"--version={{.ReleaseVersion}}"}, ArtifactPath: "chart-{{.ReleaseVersion}}.tgz"}}
+	cloned := cloneComponent(original)
+	cloned.SourceRecipe.BuildCommand[0] = "changed"
+	cloned.SourceRecipe.ArtifactPath = "changed"
+	if original.SourceRecipe.BuildCommand[0] != "--version={{.ReleaseVersion}}" || original.SourceRecipe.ArtifactPath != "chart-{{.ReleaseVersion}}.tgz" {
+		t.Fatal("resolved source recipe aliases caller state")
+	}
+}

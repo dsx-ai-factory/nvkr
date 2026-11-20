@@ -188,6 +188,9 @@ func sourceExecutableTarget(fromSource bool, builder string, output string) bool
 }
 
 func validateComponent(name string, c Component) error {
+	if err := c.validateSourceRecipe(); err != nil {
+		return e.Wrap(e.CodeInvalidCatalog, err, "component %q", name)
+	}
 	if _, err := c.SourceMetadataEnv(); err != nil {
 		return e.Wrap(e.CodeInvalidCatalog, err, "component %q", name)
 	}

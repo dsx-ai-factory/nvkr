@@ -302,6 +302,53 @@ func TestRefreshProducerOverlayBaselineBeforePinMutation(t *testing.T) {
 	}
 }
 
+func TestSourceBoundOverlayAdvancesPinPreservingProducer(t *testing.T) {
+	filename, input := producerOverlayFixture(t)
+	cat, err := catalog.LoadContext(t.Context(), catalog.Dir("inputs/catalogs/nvidia"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	declaration := cat.Components["producer"]
+	declaration.Repo, declaration.Tag, declaration.Commit, declaration.TreeHash, declaration.SourceDate = "", "", "", "", 0
+	input.Overlays[0].Producers = nil
+	input.Overlays[0].SourceBound = map[string]SourceBoundProducer{"producer": {Catalog: "inputs/catalogs/nvidia", Component: "producer", Producer: declaration}}
+	writeJSON(t, filename, input)
+	if err := GenerateProducerOverlays(t.Context(), filename, false); err != nil {
+		t.Fatal(err)
+	}
+	before, err := catalog.LoadOverlayContext(t.Context(), input.Overlays[0].Destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lock, err := catalog.LoadLockContext(t.Context(), "inputs/catalogs/nvidia")
+	if err != nil {
+		t.Fatal(err)
+	}
+	pin := lock.Pins["source"]
+	pin.Tag = "v1.1.0"
+	pin.Commit = strings.Repeat("f", 40)
+	lock.Pins["source"] = pin
+	if err := catalog.WriteLockContext(t.Context(), "inputs/catalogs/nvidia", lock); err != nil {
+		t.Fatal(err)
+	}
+	if err := GenerateProducerOverlays(t.Context(), filename, false); err != nil {
+		t.Fatal(err)
+	}
+	after, err := catalog.LoadOverlayContext(t.Context(), input.Overlays[0].Destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := *before.Components["producer"].Component
+	want.Tag = pin.Tag
+	want.Commit = pin.Commit
+	if !reflect.DeepEqual(want, *after.Components["producer"].Component) {
+		t.Fatal("source binding changed the declared producer contract")
+	}
+	if err := GenerateProducerOverlays(t.Context(), filename, true); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRefreshProducerOverlayJourney(t *testing.T) {
 	for _, failGeneration := range []bool{false, true} {
 		t.Run(map[bool]string{false: "complete", true: "failure after pin commit"}[failGeneration], func(t *testing.T) {

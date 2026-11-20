@@ -307,6 +307,8 @@ type Component struct {
 	// SourceMetadata holds opt-in NVKR_SOURCE_* templates, rendered against this
 	// component's owning pin at every compilation, including resolved overlays.
 	SourceMetadata map[string]string `json:"sourceMetadata,omitempty"`
+	// SourceRecipe retains opt-in release-derived argv/path declarations.
+	SourceRecipe *SourceRecipe `json:"sourceRecipe,omitempty"`
 
 	// prebuilt (the no-compile lane): set when this component is acquired, not built.
 	// The URL/Image templates are already version-rendered (only {{.Arch}} may remain);
