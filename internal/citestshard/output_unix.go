@@ -47,14 +47,24 @@ func commandOutput(ctx context.Context, writer io.Writer) (io.Writer, func() err
 	if info.Mode()&os.ModeNamedPipe == 0 {
 		return writer, func() error { return nil }, nil
 	}
-	fd := file.Fd()
-	flags, err := unix.FcntlInt(fd, unix.F_GETFL, 0)
+	// Fd changes a runtime-managed pipe to blocking mode. Inspect and duplicate
+	// through RawConn instead so cleanup can restore the caller's original mode.
+	raw, err := file.SyscallConn()
 	if err != nil {
 		return nil, nil, err
 	}
-	duplicate, err := unix.FcntlInt(fd, unix.F_DUPFD_CLOEXEC, 3)
-	if err != nil {
+	var flags, duplicate int
+	var descriptorErr error
+	if err := raw.Control(func(fd uintptr) {
+		flags, descriptorErr = unix.FcntlInt(fd, unix.F_GETFL, 0)
+		if descriptorErr == nil {
+			duplicate, descriptorErr = unix.FcntlInt(fd, unix.F_DUPFD_CLOEXEC, 3)
+		}
+	}); err != nil {
 		return nil, nil, err
+	}
+	if descriptorErr != nil {
+		return nil, nil, descriptorErr
 	}
 	if err := unix.SetNonblock(duplicate, true); err != nil {
 		_ = unix.Close(duplicate)

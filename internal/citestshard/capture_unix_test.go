@@ -236,3 +236,60 @@ func TestCaptureBlockedOutput(t *testing.T) {
 		})
 	}
 }
+
+func TestCommandOutputPreservesPipeMode(t *testing.T) {
+	for _, blocking := range []bool{false, true} {
+		t.Run(fmt.Sprintf("blocking=%t", blocking), func(t *testing.T) {
+			reader, writer, err := os.Pipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer reader.Close()
+			defer writer.Close()
+			if blocking {
+				_ = writer.Fd()
+			}
+			flags := func() int {
+				t.Helper()
+				raw, err := writer.SyscallConn()
+				if err != nil {
+					t.Fatal(err)
+				}
+				var value int
+				var flagErr error
+				if err := raw.Control(func(fd uintptr) { value, flagErr = unix.FcntlInt(fd, unix.F_GETFL, 0) }); err != nil {
+					t.Fatal(err)
+				}
+				if flagErr != nil {
+					t.Fatal(flagErr)
+				}
+				return value
+			}
+			before := flags()
+			if (before&unix.O_NONBLOCK == 0) != blocking {
+				t.Fatalf("unexpected initial flags: %d", before)
+			}
+			output, release, err := commandOutput(t.Context(), writer)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, writeErr := output.Write([]byte("x"))
+			if err := release(); err != nil {
+				t.Fatal(err)
+			}
+			if writeErr != nil {
+				t.Fatal(writeErr)
+			}
+			if after := flags(); after&unix.O_NONBLOCK != before&unix.O_NONBLOCK {
+				t.Fatalf("pipe mode changed: before=%d after=%d", before, after)
+			}
+			if _, err := writer.Write([]byte("y")); err != nil {
+				t.Fatal("caller lost its pipe", err)
+			}
+			var got [2]byte
+			if _, err := io.ReadFull(reader, got[:]); err != nil || string(got[:]) != "xy" {
+				t.Fatalf("output %q: %v", got, err)
+			}
+		})
+	}
+}
