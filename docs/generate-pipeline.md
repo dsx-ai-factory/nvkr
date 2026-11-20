@@ -335,6 +335,33 @@ workflow. Producer jobs retain explicit dependencies and separate results; produ
 callable workflows remain deferred. The optional qualification bundle has its own fixed reusable native
 worker and selected-platform matrix (ADR-21).
 
+## Planned platform-token destination setup
+
+The accepted [destination-staging decision](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0020-artifact-publication-and-target-configuration.md#destination-staging-and-release-by-reference)
+defines a future default using this repository's GHCR namespace and job tokens, with no configured registry
+secrets. The instructions above describe the current private-carrier and independent-credential setup;
+the [publication implementation boundary](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-20.md)
+tracks the migration. Do not replace current credentials or package grants based on this planned profile.
+Destinations default to internal/private visibility; an unexpected public package must stop publication.
+The planned Environment field `publication.allowPublicPackages: true` is the explicit public-visibility
+opt-in, and must be implemented and enforced before public platform-token publication is admitted. It does
+not change package visibility or relax the Actions role requirement below.
+
+Before using the platform-token profile, a human package administrator must perform this one-time setup
+for each destination package, including output, evidence, release and development-attempt packages:
+
+1. Open the package's **Package settings → Manage Actions access**.
+2. Add or select the publishing repository and set its role to **Write**, not **Admin**.
+3. Remove or reduce any other grant giving that repository Admin access. Keep package administration with
+   a human administrator and outside workflow credentials.
+
+The effective Write-only role is required so producer and development-branch job tokens cannot delete or
+restore released versions. The workflow's `packages: write` permission is not a substitute for this package
+setting. Unknown or broader roles must stop publication. Package creation or a metadata-only seed must not
+bypass the role check; repeat the setup for each new package or changed grant before dispatch. This includes
+disposable development-attempt packages. Deletion and restoration remain human-admin operations for this
+profile. Zero registry secrets still requires this package setup; this documentation changes no live setting.
+
 ## Tekton cluster execution
 
 Select `--engine tekton` with an Environment containing `tekton` configuration. Generation writes

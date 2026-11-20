@@ -1540,7 +1540,11 @@ constraints above. Each release job consumes bounded controls and immutable dest
 authenticates served bytes; it does not restore and repush a payload carrier. OIDC remains job-scoped, so a
 fused producer/release job is rejected. Step-scoped credentials limit what each operation is given; they are
 not a machine boundary between operations in one job. A compromised producer may add unsigned destination
-objects or move non-authoritative tags. Only the signed release root and subject-bound evidence can authorize
+objects or move non-authoritative tags. The platform-token profile must admit the publishing repository's
+Actions access role as Write, not Admin, on every destination package under ADR-20. Producer and
+development-branch tokens must not be able to delete or restore released versions; those actions remain
+with a human package administrator. Unknown or broader effective package roles fail admission before
+payload writes. Only the signed release root and subject-bound evidence can authorize
 consumer acceptance; stage presence and tags cannot. [Reconciliation](reconciliation/adr-18.md) owns validation status.
 
 Tekton keeps the earlier grouping. Offline terminal observation, SBOM and packaging join one Build or

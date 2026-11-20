@@ -11,6 +11,15 @@ The revised contract retains the post-sign verifier's own complete payload readb
 readback-receipt protocol is specified. Dedicated stage-writer references and secret homes must be fixed
 by the implementation before their profiles are admitted. Platform-token publication does not authorize
 either production or development qualification's dedicated-credential pair.
+The platform-token profile additionally requires Write-only repository Actions access on every destination
+package, excluding Admin grants and leaving deletion/restoration to a human package administrator. Role
+admission and proof that producer/development job tokens cannot delete or restore versions are not
+implemented or externally exercised. New-package and disposable-attempt setup must preserve this boundary;
+neither existing privacy tests nor a workflow's `packages: write` declaration proves the required package role.
+Destination visibility defaults to internal/private. The named Environment opt-in
+`publication.allowPublicPackages` is designed but not implemented; unexpected public packages must fail
+closed, and public platform-token publication cannot be admitted until the field and every boundary's
+enforcement exist. The dedicated GHCR credential profile retains its private/internal requirement.
 
 The revised platform-token profile accepts repository-linked packages and fork exposure; independent package principals
 and binary confidentiality from public-source forks are not promised. `NVKR_REGISTRY_WRITE` remains an opt-in
