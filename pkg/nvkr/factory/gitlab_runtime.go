@@ -381,7 +381,7 @@ func RunGitLabNode(ctx context.Context, plan *Plan, nodeID string, options GitLa
 	var runErr error
 	switch node.Kind {
 	case NodeFetch:
-		runErr = executeSourceFetchInContext(bounded, plan, node.ID, []string{"PATH=" + os.Getenv("PATH")}, options.Stdout, options.Stderr, (pipeline.Local{}).ExecNode)
+		runErr = executeSourceFetchInContext(bounded, plan, node.ID, []string{"PATH=" + os.Getenv("PATH")}, options.Stdout, options.Stderr, (pipeline.Local{}).ExecNode, nil)
 	case NodePublish:
 		runErr = executeGitLabPublication(bounded, plan, node, artifacts, owner.state)
 	default:
