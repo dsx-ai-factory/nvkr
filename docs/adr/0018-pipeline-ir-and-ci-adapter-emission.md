@@ -1404,8 +1404,10 @@ Development finalization emits its Run record without a production qualification
 admission rejects development before qualification evidence collection.
 
 Development publication and signing jobs use `nvkr-dev-release`; native disk jobs use `nvkr-dev-arc`.
-They never inherit the production deployment environments. The platform-token profile uses each job's platform token; the
-opt-in dedicated development profile keeps separate read, stage-write and release-write bindings. Only the
+They never inherit the production deployment environments. Signed development requires the dedicated
+credential profile until ADR-20's per-attempt package-creation and verifiable Actions-role prerequisites
+for platform tokens are specified and implemented; that route remains refused. The dedicated development
+profile keeps separate read, stage-write and release-write bindings. Only the
 fixed stage step receives the stage writer. Only a release job that signs or attests receives OIDC minting
 permission, at job scope. Read-only toolchain preparation requires the Environment-declared independent reader for its private
 roots; credentials are removed before producer execution. ARC jobs never receive source credentials, the
@@ -1413,7 +1415,8 @@ release-environment writer or OIDC authority; destination staging is their bound
 remain confined to the existing fixed source-fetch and catalog-validation steps. Branch code must be
 reviewed before dispatch. In the independent-credential profile, provider ACLs must exclude production write
 access from development principals; a namespace or protected environment alone cannot enforce token scope.
-The platform-token profile retains distinct development namespaces and signing identities but does not promise separate package principals.
+Any future platform-token development route must retain distinct development namespaces and signing
+identities but does not promise separate package principals.
 
 Development and production have separate generated layouts and concurrency groups (ADR-21). Unsigned
 development cancels superseded same-branch Runs and retains helpers/carriers for one day. Signed development,

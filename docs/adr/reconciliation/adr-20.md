@@ -16,6 +16,12 @@ package, excluding Admin grants and leaving deletion/restoration to a human pack
 admission and proof that producer/development job tokens cannot delete or restore versions are not
 implemented or externally exercised. New-package and disposable-attempt setup must preserve this boundary;
 neither existing privacy tests nor a workflow's `packages: write` declaration proves the required package role.
+The platform-token profile is not admitted until a verifiable provider-authenticated Actions-role check
+exists; no such mechanism is specified or implemented, and an operator's setup statement is not a substitute.
+Signed development continues to require dedicated credentials: a per-attempt package-creation and Write-role
+admission mechanism is an open prerequisite, keeping platform-token development refused. Fixed destination
+setup requires package creation outside the generated workflow and removal of inherited repository access
+before assigning the repository's Actions role. Those steps alone do not admit the profile.
 Destination visibility defaults to internal/private. The named Environment opt-in
 `publication.allowPublicPackages` is designed but not implemented; unexpected public packages must fail
 closed, and public platform-token publication cannot be admitted until the field and every boundary's

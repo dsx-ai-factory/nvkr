@@ -881,12 +881,19 @@ administrator. Workflow `packages: write` alone does not establish this conditio
 Actions role must also be admitted. An Admin, missing, unknown or unverifiable role refuses the profile
 before payload writes. Newly created packages must pass the same admission; automatic creation or a
 metadata-only seed cannot bypass it or leave the workflow with an Admin grant.
+The platform-token profile is not admitted until a verifiable, provider-authenticated Actions-role check
+exists. This decision specifies no such mechanism. An operator statement or record of completing setup
+cannot substitute for the check; the existing visibility/linkage query and workflow permissions do not prove
+the effective Actions role. The profile remains refused until that prerequisite is implemented.
 
-One-time adopter setup, for each destination package: a human package administrator opens **Package
-settings → Manage Actions access**, adds or selects the publishing repository, and sets its role to
-**Write**. The administrator must remove or reduce any other grant that gives that repository Admin access
-and retain package administration outside workflow credentials. Repeat this setup for newly created packages
-or changed grants before dispatch, including disposable development-attempt packages. Zero configured
+One-time adopter setup, for each fixed destination package: a human package administrator creates or
+initializes a missing package outside the generated workflow. In **Package settings**, disable **Inherit
+access from repository** before configuring package-level roles. Under **Manage Actions access**, add or
+select the publishing repository and set its role to **Write**. Remove or reduce any other grant that gives
+that repository Admin access and retain package administration outside workflow credentials. Repeat this
+setup for newly created fixed packages or changed grants before dispatch. Disposable development-attempt
+names cannot be prepared this way before dispatch; their separate prerequisite below keeps that route refused.
+Zero configured
 registry secrets does not mean zero package setup. The [pipeline setup guide](../generate-pipeline.md#planned-platform-token-destination-setup)
 records this prerequisite; reconciliation owns implementation and provider-validation status.
 
@@ -1293,18 +1300,21 @@ canonical non-future attempts of the same development run; ordinary production r
 Each attempt's packages remain independently discoverable for cleanup. Expired or deleted inputs require
 rebuilding the affected dependency closure; a fresh dispatch does not implicitly reuse another run.
 
-The platform-token profile is also the adopter default for signed development in the reserved namespace. An operator may
-instead select the dedicated development credential profile. Its fixed `github:NVKR_DEV_REGISTRY_WRITE`
+Signed development uses the dedicated development credential profile. Its run/attempt-derived package names
+are not available before dispatch, so the fixed-package setup above cannot admit platform-token development.
+That route remains refused until a per-attempt package-creation and effective Write-role admission mechanism
+is specified and implemented, with deletion/restoration retained by a human package administrator. This is
+an open prerequisite, not an exception to role verification or permission to grant a job token Admin.
+The dedicated profile's fixed `github:NVKR_DEV_REGISTRY_WRITE`
 reference selects only the development release publisher, with a distinct stage-only writer for producers.
 Generated publishing/signing steps use that secret and `NVKR_DEV_REGISTRY_WRITE_USER`; verification,
 assembly and finalization instead receive `NVKR_DEV_REGISTRY_READ` and `NVKR_DEV_REGISTRY_READ_USER`.
-The usernames are provider variables. This opt-in profile grants no repository-token package-write permission;
-the platform-token profile grants it only to jobs with a stage or release write operation.
+The usernames are provider variables. This dedicated profile grants no repository-token package-write permission.
 For the independent-credential profile, the operator must configure token scopes and package ACLs so these
 development principals cannot modify production packages. The same development account may hold separate
 write, read-only and cleanup tokens;
 token scope still differs by phase. Provider ACLs are external prerequisites, never inferred from a prefix.
-The platform-token profile preserves development namespaces and distinct signing identities, but does not promise independent
+Any future platform-token development route must preserve development namespaces and distinct signing identities, but does not promise independent
 package principals or credential isolation from other packages accessible to the repository token.
 Only a release job that signs or attests holds `id-token: write`. The grant is at job scope, so that job's
 publication and verification steps share it (ADR-18 §8). For the dedicated-credential profile, the distinct

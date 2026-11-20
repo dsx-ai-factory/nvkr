@@ -348,19 +348,28 @@ opt-in, and must be implemented and enforced before public platform-token public
 not change package visibility or relax the Actions role requirement below.
 
 Before using the platform-token profile, a human package administrator must perform this one-time setup
-for each destination package, including output, evidence, release and development-attempt packages:
+for each fixed destination package, including output, evidence and release packages:
 
-1. Open the package's **Package settings → Manage Actions access**.
-2. Add or select the publishing repository and set its role to **Write**, not **Admin**.
-3. Remove or reduce any other grant giving that repository Admin access. Keep package administration with
+1. Create or initialize a missing package outside the generated workflow, using the human administrator's
+   access. Do not rely on the producer workflow to create an already-admitted package.
+2. Open **Package settings** and disable **Inherit access from repository** so package-level roles apply.
+3. Under **Manage Actions access**, add or select the publishing repository and set its role to **Write**,
+   not **Admin**.
+4. Remove or reduce any other grant giving that repository Admin access. Keep package administration with
    a human administrator and outside workflow credentials.
 
 The effective Write-only role is required so producer and development-branch job tokens cannot delete or
 restore released versions. The workflow's `packages: write` permission is not a substitute for this package
 setting. Unknown or broader roles must stop publication. Package creation or a metadata-only seed must not
-bypass the role check; repeat the setup for each new package or changed grant before dispatch. This includes
-disposable development-attempt packages. Deletion and restoration remain human-admin operations for this
-profile. Zero registry secrets still requires this package setup; this documentation changes no live setting.
+bypass the role check; repeat the setup for each new fixed package or changed grant before dispatch.
+Deletion and restoration remain human-admin operations for this profile. Zero registry secrets still
+requires this package setup; this documentation changes no live setting.
+
+The platform-token profile remains refused until a verifiable provider-authenticated Actions-role check
+exists. An operator statement that these steps were completed cannot replace that check. Signed development
+uses the dedicated credential profile: its run/attempt-derived package names cannot be prepared before
+dispatch. Platform-token development remains refused until a per-attempt creation and Write-role admission
+mechanism is specified and implemented, preserving human-admin deletion and restoration.
 
 ## Tekton cluster execution
 
