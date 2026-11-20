@@ -107,11 +107,11 @@ if ! printf '%s\n' "$running_containers" | grep -Fx -- "$REGISTRY_CONTAINER" >/d
   demo_die "registry endpoint $REGISTRY_HOSTPORT is already in use; stop the existing service or select another REGISTRY_HOSTPORT"
 fi
 
-# Pretty-print a small canonical JSON record. python3 is a convenience for reading, never
+# Pretty-print a small canonical JSON record. jq is a convenience for reading, never
 # a correctness dependency: without it the raw canonical bytes are shown instead.
 demo_show_json() {
-  if command -v python3 >/dev/null 2>&1; then
-    python3 -m json.tool "$1"
+  if command -v jq >/dev/null 2>&1; then
+    jq . "$1"
   else
     cat "$1"
     printf '\n'

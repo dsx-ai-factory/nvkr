@@ -21,7 +21,7 @@ no Docker or source checkout needed.
 --deploy selects the nine-output nvke-deploy inputs and requires private pinned Git
 source access because that catalog revalidates an upstream pin set.
 
-Prerequisites: Python 3 and make build with the Go patch in .go-version. NVKR_BIN
+Prerequisites: jq and make build with the Go patch in .go-version. NVKR_BIN
 may name an already built binary. No build, pin mutation, CI dispatch, signing or publication
 is performed. Generated files and exports are retained in a new temporary directory
 unless --out is supplied; its parent must exist and the directory must not exist.
@@ -70,7 +70,7 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 [ -x "$NVKR" ] || die "build nvkr first (make build), or set NVKR_BIN to an executable: $NVKR"
-command -v python3 >/dev/null || die 'Python 3 is required for the readable summary'
+command -v jq >/dev/null || die 'jq is required for the readable summary'
 NVKR=$(cd "$(dirname "$NVKR")" && printf '%s/%s\n' "$PWD" "$(basename "$NVKR")")
 if [ "$NON_INTERACTIVE" -eq 0 ] && [ ! -t 0 ]; then die 'use --non-interactive when stdin is not a terminal'; fi
 if [ -n "$OUT" ]; then mkdir -- "$OUT"; OUT=$(cd "$OUT" && pwd); else OUT=$(mktemp -d "${TMPDIR:-/tmp}/nvkr-team-catalog.XXXXXX"); fi
@@ -103,15 +103,10 @@ heading '2 / 4  Choose the outputs'
 show_command definition inspect --definition "$DEFINITION"
 export_command "$OUT/definition-validation.txt" "$NVKR" definition validate --definition "$DEFINITION"
 export_command "$OUT/definition.json" "$NVKR" definition inspect --definition "$DEFINITION"
-python3 - "$OUT/definition.json" <<'PY'
-import json
-import sys
-definition = json.load(open(sys.argv[1]))
-print(f"  {'Output':<24} {'Format':<12} Platform")
-for output in definition['outputs']:
-    print(f"  {output['name']:<24} {output['format']:<12} {output['platform']}")
-    print(f"    components: {', '.join(output['components'])}")
-PY
+jq -r 'def pad($n): . + (" " * ([$n - length, 0] | max));
+  "  \("Output" | pad(24)) \("Format" | pad(12)) Platform",
+  (.outputs[] | "  \(.name | pad(24)) \(.format | pad(12)) \(.platform)",
+    "    components: \(.components | join(", "))")' "$OUT/definition.json"
 printf 'Definition:  %s\n' "$DEFINITION"
 printf 'Environment: %s\n' "$ENVIRONMENT"
 printf 'The Environment supplies runners, publication destinations, and signing policy.\n'
@@ -125,13 +120,8 @@ export_command "$OUT/plan.pretty.json" "$NVKR" run plan --plan "$OUT/plan.json" 
 for format in mermaid dot json; do
   export_command "$OUT/plan-graph.$format" "$NVKR" run graph --plan "$OUT/plan.json" --format "$format"
 done
-python3 - "$OUT/plan.json" <<'PY'
-import json
-import sys
-plan = json.load(open(sys.argv[1]))
-print(f"  {len(plan['builds'])} outputs | {len(plan['graph']['nodes'])} operations | {len(plan['graph']['artifacts'])} artifact records")
-print(f"  Requested execution lane: {plan['qualification']}")
-PY
+jq -r '"  \(.builds | length) outputs | \(.graph.nodes | length) operations | \(.graph.artifacts | length) artifact records",
+  "  Requested execution lane: \(.qualification)"' "$OUT/plan.json"
 printf 'Load plan.json in demos/demo-team-explorer.html.\n'
 printf 'Follow a component from source to build, package, publication, and evidence.\n'
 printf 'Native text and graph exports are saved beside the Plan. No build has run.\n'

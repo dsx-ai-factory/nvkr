@@ -145,6 +145,12 @@ workflow concurrency serializes scheduled runs, not human editors.
 
 ## Generate the maintenance workflow
 
+`catalog update-ci` supports only the GitHub workflow provider (`--engine github`, the default).
+Selecting another recognized engine, including `tekton` or `gitlab`, fails with
+`NVKR-E-ENGINE-CAPABILITY` before policy discovery or workflow output; it never substitutes a GitHub
+workflow for the requested provider. Native producer generation through `run generate` does not add a
+catalog-maintenance adapter for that provider.
+
 Run the generator from the repository root. It takes no policy path: the workflow it renders discovers the one
 `inputs/policies/*-catalog-maintenance.yaml` itself when it runs.
 

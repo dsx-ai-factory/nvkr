@@ -59,6 +59,7 @@ Recorded declarations only; no producer selection or upstream pin-set verificati
 | <code>"node-images"</code> | <code>"ovn-kubernetes-chart-diagnostic"</code> | <code>"source"</code> |
 | <code>"node-images"</code> | <code>"ubuntu-installer-iso"</code> | <code>"acquisition"</code> |
 | <code>"node-images"</code> | <code>"ubuntu-installer-iso-amd64"</code> | <code>"acquisition"</code> |
+| <code>"nvidia-workload-identity"</code> | <code>"dsx-imds-node-attestor-agent"</code> | <code>"source"</code> |
 | <code>"nvke"</code> | <code>"capi-controller-image"</code> | <code>"acquisition"</code> |
 | <code>"nvke"</code> | <code>"capi-kubeadm-bootstrap-image"</code> | <code>"acquisition"</code> |
 | <code>"nvke"</code> | <code>"capi-kubeadm-control-plane-image"</code> | <code>"acquisition"</code> |
