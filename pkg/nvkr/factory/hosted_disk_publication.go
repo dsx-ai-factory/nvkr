@@ -23,7 +23,7 @@ func CompleteHostedDiskPublication(ctx context.Context, plan *Plan, expected Lif
 	if ctx == nil {
 		return e.New(e.CodeUsage, "hosted disk completion requires a context")
 	}
-	if plan == nil || owner == nil || (runtime == nil && !diskBuildProvenance(plan)) {
+	if plan == nil || owner == nil || (runtime == nil && !diskBuildProvenance(plan, expected.Name)) {
 		return e.New(e.CodeProvenanceMissing, "hosted disk completion requires its original Plan, live owner and admitted inspector")
 	}
 	if err := ctx.Err(); err != nil {
@@ -69,12 +69,16 @@ func CompleteHostedDiskPublication(ctx context.Context, plan *Plan, expected Lif
 	if err := writeFactoryFile(ctx, record.Path, raw, 0o644); err != nil {
 		return err
 	}
-	if diskBuildProvenance(plan) {
+	if diskBuildProvenance(plan, expected.Name) {
 		if err := owner.packageDiskBuildProvenance(ctx, plan, expected, output); err != nil {
 			return err
 		}
 	} else {
-		receipt, err := owner.ReconcileDiskEvidence(ctx, plan, expected, runtime)
+		inspect := owner.ReconcileDiskEvidence
+		if plan.Environment.DiskEvidenceFor(expected.Name) == sbom.DiskInstalledPackages {
+			inspect = owner.InspectDiskPackageEvidence
+		}
+		receipt, err := inspect(ctx, plan, expected, runtime)
 		if err != nil {
 			return err
 		}

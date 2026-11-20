@@ -1,5 +1,20 @@
 ## Support by owner
 
+The `installed-packages-v1` plain-disk extension joins the existing held Packer
+package reader to per-output signed SBOM production. The helper now preserves the
+observed distro for the required deb purl vendor namespace. Maintained development,
+production and nightly NVKE Environments retain `build-provenance-v1` pending refreshed
+AMD64/ARM64 appliance publication and measured pins in all three Environments.
+Only then may plain outputs select package mode with explicit producer-only FDE overrides.
+Old helper reports lack vendor and fail package publication closed. Consumer policy admits the intermediate
+`packages` floor; strict remains stronger. Contract coverage checks deterministic
+Debian version/architecture/purl projection, exact subject/tool bindings, FDE
+admission, live receipt ownership and signed publication policy ordering.
+No hosted populated-SBOM acceptance for this extension is recorded yet, on either
+AMD64 or ARM64. Historical ARM64 730-package diagnostics are not this proof.
+FDE has no authenticated pre-encryption inventory handoff. Full strict
+reconciliation and issue #362's unexplained-file acceptance remain unfulfilled.
+
 The native scanner adapter admits Syft JSON `16.1.10` and `16.1.13`, preserving
 the retained image schema while the inspector source advances to Syft v1.57.1.
 Contract tests cover exact schema admission and rejection of nested package

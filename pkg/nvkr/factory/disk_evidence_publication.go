@@ -50,13 +50,24 @@ func diskPublicationInspectionProfile(build BuildPlan, environment definition.En
 // planned inspection pins. It authenticates no receipt; the producer calls it
 // only after live export, and read-back remains subject to normal signing gates.
 func validateReconciledDiskDocument(plan *Plan, output, component, subject string, bom *sbom.BOM) error {
-	if diskBuildProvenance(plan) {
+	if diskBuildProvenance(plan, output) {
 		return validateDiskBuildDocument(plan, output, component, subject, bom)
 	}
 	if err := bom.Validate(); err != nil {
 		return err
 	}
 	_, artifacts := planIndex(plan)
+	packages := plan.Environment.DiskEvidenceFor(output) == sbom.DiskInstalledPackages
+	if packages {
+		for _, binding := range plan.LifecycleOutputs {
+			if binding.Name == output && artifacts[binding.ArtifactID].Component != component {
+				return validateDiskBuildDocument(plan, output, component, subject, bom)
+			}
+		}
+		if err := sbom.ValidateDiskInstalledPackages(bom); err != nil {
+			return err
+		}
+	}
 	var expected LifecycleOutputPlan
 	var platform string
 	var profile definition.DiskInspectionProfile
@@ -142,8 +153,12 @@ func validateReconciledDiskDocument(plan *Plan, output, component, subject strin
 		}
 	}
 	method := "disk-content/v1"
+	scanner := profile.ScannerDigest
 	if component == root.Component {
 		method = "disk-reconciled/v1"
+		if packages {
+			method, scanner = sbom.DiskInstalledPackagesMethod, profile.InspectorDigest
+		}
 		if !canonical.IsDigest(properties["nvkr:diskInspectionRuntimeDigest"]) ||
 			properties["nvkr:diskInspectorDigest"] != profile.InspectorDigest || properties["nvkr:diskCodecDigest"] != profile.CodecDigest {
 			return e.New(e.CodeVerifyFailed, "root disk evidence differs from planned inspector or codec")
@@ -151,7 +166,7 @@ func validateReconciledDiskDocument(plan *Plan, output, component, subject strin
 	}
 	if properties["nvkr:buildDigest"] != expected.BuildDigest || properties["nvkr:artifact"] != component ||
 		properties["nvkr:evidenceStage"] != "build-output" || properties["nvkr:dependencyInspection"] != method ||
-		properties["nvkr:dependencyScannerDigest"] != profile.ScannerDigest {
+		properties["nvkr:dependencyScannerDigest"] != scanner {
 		return e.New(e.CodeVerifyFailed, "disk component evidence differs from exact build, stage or scanner")
 	}
 	return nil

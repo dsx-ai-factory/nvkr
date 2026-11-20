@@ -954,6 +954,8 @@ func TestConsumerDiskEvidenceMinimumFailsClosed(t *testing.T) {
 	producerAllowed := VerificationPolicy{MinimumDiskEvidence: DiskEvidenceBuildProvenance}
 	strictDisk := delivery.Output{Name: "disk", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{}}
 	producerDisk := delivery.Output{Name: "disk", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{EvidenceMode: "build-provenance-v1"}}
+	packageDisk := delivery.Output{Name: "disk", Kind: OutputDiskImage, Disk: &delivery.DiskOutput{EvidenceMode: sbom.DiskInstalledPackages}}
+	packages := VerificationPolicy{MinimumDiskEvidence: DiskEvidencePackages}
 	nonDisk := delivery.Output{Name: "tools", Kind: OutputExecutable}
 	tests := []struct {
 		name     string
@@ -962,6 +964,11 @@ func TestConsumerDiskEvidenceMinimumFailsClosed(t *testing.T) {
 		want     nvkrerr.Code
 	}{
 		{name: "pipeline default admits producer evidence", artifact: producerDisk},
+		{name: "packages rejects producer evidence", policy: packages, artifact: producerDisk, want: nvkrerr.CodeGateUnmet},
+		{name: "packages accepts package inventory", policy: packages, artifact: packageDisk},
+		{name: "packages accepts strict inventory", policy: packages, artifact: strictDisk},
+		{name: "default accepts package inventory", artifact: packageDisk},
+		{name: "strict rejects package-only inventory", policy: strict, artifact: packageDisk, want: nvkrerr.CodeGateUnmet},
 		{name: "qualified default requires inspected disk", policy: VerificationPolicy{Lane: LaneQualified}, artifact: producerDisk, want: nvkrerr.CodeGateUnmet},
 		{name: "explicit strict requires inspected disk", policy: strict, artifact: producerDisk, want: nvkrerr.CodeGateUnmet},
 		{name: "strict inventory satisfies strict policy", policy: strict, artifact: strictDisk},
@@ -1004,13 +1011,13 @@ func TestConsumerEnforcesDiskEvidencePolicyAgainstPublication(t *testing.T) {
 		t.Run(arch, func(t *testing.T) {
 			for _, mode := range []struct {
 				name, value, inspection, encryption string
-			}{{name: "strict"}, {name: "producer-only", value: string(DiskEvidenceBuildProvenance)},
+			}{{name: "strict"}, {name: "packages", value: sbom.DiskInstalledPackages}, {name: "producer-only", value: string(DiskEvidenceBuildProvenance)},
 				{name: "public-bootstrap FDE", value: string(DiskEvidenceBuildProvenance), encryption: "luks2"},
 				{name: "historical producer-only", value: string(DiskEvidenceBuildProvenance), inspection: "deferred-m3"}} {
 				t.Run(mode.name, func(t *testing.T) {
 					layout, digest := testDiskPublication(t, arch, mode.value, mode.inspection, mode.encryption)
 					reference := "registry.example.test/product@" + digest
-					for _, minimum := range []DiskEvidenceRequirement{"", DiskEvidenceBuildProvenance, DiskEvidenceStrict} {
+					for _, minimum := range []DiskEvidenceRequirement{"", DiskEvidenceBuildProvenance, DiskEvidencePackages, DiskEvidenceStrict} {
 						name := "default-producer-minimum"
 						if minimum != "" {
 							name = "explicit-" + string(minimum)
@@ -1030,7 +1037,7 @@ func TestConsumerEnforcesDiskEvidencePolicyAgainstPublication(t *testing.T) {
 							}}
 							policy := VerificationPolicy{Lane: LanePipeline, Scope: ScopeArtifactPublication, IdentityRegexp: "^builder$", Issuer: "issuer", MinimumDiskEvidence: minimum}
 							verified, err := consumer.Verify(t.Context(), reference, policy)
-							accepted := mode.value == "" || minimum != DiskEvidenceStrict
+							accepted := mode.value == "" || minimum == "" || minimum == DiskEvidenceBuildProvenance || (minimum == DiskEvidencePackages && mode.value == sbom.DiskInstalledPackages)
 							if !accepted {
 								assertCode(t, err, nvkrerr.CodeGateUnmet)
 								if verified != nil || verifier.calls != 1 || held == nil {
@@ -1122,7 +1129,14 @@ func testDiskPublication(t *testing.T, arch, evidenceMode, inspection string, se
 		if err != nil {
 			t.Fatal(err)
 		}
-		bom, err = sbom.WithDependencies(bom, []sbom.Component{{Type: "library", Name: "fixture-package", Version: "1"}}, "disk-reconciled/v1", buildDigest)
+		method := "disk-reconciled/v1"
+		component := sbom.Component{Type: "library", Name: "fixture-package", Version: "1"}
+		if evidenceMode == sbom.DiskInstalledPackages {
+			method = sbom.DiskInstalledPackagesMethod
+			component.PURL = "pkg:deb/ubuntu/fixture-package@1?arch=" + arch
+			component.Properties = []sbom.Property{{Name: "nvkr:packageArchitecture", Value: arch}, {Name: "nvkr:packageFormat", Value: "deb"}, {Name: "nvkr:packageVendor", Value: "ubuntu"}}
+		}
+		bom, err = sbom.WithDependencies(bom, []sbom.Component{component}, method, buildDigest)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1130,6 +1144,9 @@ func testDiskPublication(t *testing.T, arch, evidenceMode, inspection string, se
 			sbom.Property{Name: "nvkr:diskInspectionRuntimeDigest", Value: buildDigest},
 			sbom.Property{Name: "nvkr:diskInspectorDigest", Value: buildDigest},
 			sbom.Property{Name: "nvkr:diskCodecDigest", Value: buildDigest})
+		if evidenceMode == sbom.DiskInstalledPackages {
+			bom.Metadata.Props = append(bom.Metadata.Props, sbom.Property{Name: "nvkr:diskEvidence", Value: sbom.DiskInstalledPackages}, sbom.Property{Name: "nvkr:diskInspection", Value: "installed-packages"})
+		}
 		sort.Slice(bom.Metadata.Props, func(i, j int) bool { return bom.Metadata.Props[i].Name < bom.Metadata.Props[j].Name })
 	}
 	raw, err := bom.Marshal()

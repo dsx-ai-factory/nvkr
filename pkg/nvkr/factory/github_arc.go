@@ -141,7 +141,7 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 				return err
 			}
 			if !GitHubDiskBuildOnly(plan) {
-				if err := admitDiskPublicationEncryption(plan, instruction); err != nil {
+				if err := admitDiskPublicationEncryption(plan, build.Name, instruction); err != nil {
 					return err
 				}
 			}
@@ -158,7 +158,7 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 			if !strings.Contains(instruction.Toolchain, "@sha256:") {
 				return e.New(e.CodeUnpinnedInput, "ARC disk toolchain requires a published native OCI digest")
 			}
-			if githubDiskInspectionRequired(plan) {
+			if githubDiskInspectionRequired(plan, build.Name) {
 				_, profile, err := diskPublicationInspectionProfile(build, plan.Environment)
 				if err != nil {
 					return err
@@ -166,7 +166,7 @@ func admitSharedExecutionRequirements(plan *Plan, adapter string) error {
 				if err := requireProductionDiskScratch(profile); err != nil {
 					return err
 				}
-				if err := validateDiskScannerSelection(plan, platform, profile.ScannerDigest); err != nil {
+				if err := validateSelectedDiskScanner(plan, platform, profile.ScannerDigest); err != nil {
 					return err
 				}
 			}

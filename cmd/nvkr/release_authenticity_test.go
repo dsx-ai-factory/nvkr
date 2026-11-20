@@ -31,7 +31,7 @@ func TestReleaseVerifyAuthenticityHelpStatesPayloadLimit(t *testing.T) {
 }
 
 func TestReleaseVerifyAuthenticityUsesNarrowOperationAndResult(t *testing.T) {
-	for _, minimum := range []lifecycle.DiskEvidenceRequirement{"", lifecycle.DiskEvidenceBuildProvenance, lifecycle.DiskEvidenceStrict} {
+	for _, minimum := range []lifecycle.DiskEvidenceRequirement{"", lifecycle.DiskEvidenceBuildProvenance, lifecycle.DiskEvidencePackages, lifecycle.DiskEvidenceStrict} {
 		t.Run(string(minimum), func(t *testing.T) {
 			workspace := filepath.Join(t.TempDir(), "metadata")
 			called := false
