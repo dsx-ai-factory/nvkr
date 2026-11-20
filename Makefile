@@ -352,12 +352,12 @@ producer-overlays-generate: workflow-generator ## Regenerate configured producer
 .PHONY: catalog-index-check catalog-index-generate
 catalog-index-check: workflow-generator ## Check the offline catalog inventory for drift.
 	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
-	 bin/nvkr-exec catalog index --data inputs/catalogs --ui plain > "$$rendered" && \
+	 bin/nvkr-exec catalog index --catalog inputs/catalogs --ui plain > "$$rendered" && \
 	 { diff -u inputs/catalogs/INDEX.md "$$rendered" || { echo "run 'make catalog-index-generate'" >&2; exit 1; }; }
 
 catalog-index-generate: workflow-generator ## Regenerate the offline catalog inventory.
 	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
-	 bin/nvkr-exec catalog index --data inputs/catalogs --ui plain > "$$rendered" && \
+	 bin/nvkr-exec catalog index --catalog inputs/catalogs --ui plain > "$$rendered" && \
 	 chmod 0644 "$$rendered" && mv "$$rendered" inputs/catalogs/INDEX.md
 
 .PHONY: catalog-refresh-check
@@ -427,7 +427,7 @@ clean: ## Remove build output, coverage, and the local engine workspace.
 
 .PHONY: run-resolve
 run-resolve: build ## Resolve the pinned kubectl producer and print its build graph.
-	$(BIN) resolve --data testdata/catalogs/kubernetes-layered --component kubectl --platform linux/amd64
+	$(BIN) resolve --catalog testdata/catalogs/kubernetes-layered --component kubectl --platform linux/amd64
 
 .PHONY: demo-hello
 demo-hello: ## Build and verify the hello demo (requires running Docker).

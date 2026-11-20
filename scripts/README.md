@@ -130,7 +130,7 @@ NVKE_LOCAL_CLONE=/path/to/nvke scripts/demo-m1-local.sh
 ```
 
 `demo-m1-local.sh` generates and checks its three-output GitHub bundle in a fresh temporary directory,
-whose path it prints for inspection. The repository's committed bundle selects the 34-output NVKE candidate.
+whose path it prints for inspection. The repository's committed bundle selects the 83-output NVKE composite.
 The local walkthrough publishes to its loopback registry using dry-run signing. Local attempts are immutable and
 `unqualified-local-execution`; plans remain `static-unqualified`. See the
 [M1 walkthrough and acceptance limits](../demos/m1-local.md).

@@ -108,7 +108,7 @@ func (r *runner) source(ctx context.Context, platform string) error {
 			return err
 		}
 	}
-	_, err := r.cli(ctx, "pin", "catalog", "pin", "--dir", "catalog", "--tag", "v1.0.0", "hello")
+	_, err := r.cli(ctx, "pin", "catalog", "pin", "--catalog", "catalog", "--tag", "v1.0.0", "hello")
 	return err
 }
 

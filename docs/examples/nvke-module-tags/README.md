@@ -147,14 +147,14 @@ bin/nvkr run generate \
 
 Generated CI recompiles these repository-relative inputs, executes the internal graph, and finalizes an immutable Run record from exact restored outcomes. Static generation and contract tests do not establish that GitHub, a registry, OIDC, or cosign ran.
 
-The CLI source `nvke` and the shared controller/chart source `nvke-controller-module-tags` are pinned to
+The CLI source `nvke-cli` and the shared controller/chart source `nvke-controller-module-tags` are pinned to
 `v0.23.0` (`2cfd00081b468d85a4894ec17e9deac13c9d8169`). The controller pin supplies the
 source chart's existing digest support. Each source role has its own lock entry;
 update both for a shared NVKE release:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/nvke --tag v0.23.0 nvke
-bin/nvkr catalog pin --dir inputs/catalogs/nvke --tag v0.23.0 nvke-controller-module-tags
+bin/nvkr catalog pin --catalog inputs/catalogs/nvke --tag v0.23.0 nvke-cli
+bin/nvkr catalog pin --catalog inputs/catalogs/nvke --tag v0.23.0 nvke-controller-module-tags
 ```
 
 Repin only through `nvkr catalog pin`; never hand-edit the lock. Regenerate CI after changing pins.
@@ -180,8 +180,8 @@ use the existing command-scoped mirror override described above.
 `../../../inputs/catalogs/nvke/registry.yaml`; `../../../inputs/catalogs/nvke/pins.lock.yaml` binds source and executable bytes. Update through:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/nvke --tag v1.51.1 syft-module-tags
-bin/nvkr catalog bump --dir inputs/catalogs/nvke syft-module-tags cosign-module-tags
+bin/nvkr catalog pin --catalog inputs/catalogs/nvke --tag v1.51.1 syft-module-tags
+bin/nvkr catalog bump --catalog inputs/catalogs/nvke syft-module-tags cosign-module-tags
 ```
 
 Regenerate the workflow after changing the lock. Each Environment configures one
@@ -194,8 +194,8 @@ Workflow dependencies are catalog sources with `kind: github-action`. Their cons
 release lines; their exact commits are in the same lock as NVKE and tool pins.
 
 ```sh
-bin/nvkr catalog bump --dir inputs/catalogs/nvke --check checkout download-artifact setup-go upload-artifact
-bin/nvkr catalog bump --dir inputs/catalogs/nvke checkout download-artifact setup-go upload-artifact
+bin/nvkr catalog bump --catalog inputs/catalogs/nvke --check checkout download-artifact setup-go upload-artifact
+bin/nvkr catalog bump --catalog inputs/catalogs/nvke checkout download-artifact setup-go upload-artifact
 ```
 
 Regenerate the Run workflow after applying an update. No generator rebuild is needed. The adapter rejects

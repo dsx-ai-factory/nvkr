@@ -29,7 +29,7 @@ These commands compile upstream source directly. They do not invoke NVKE's `os-i
 
 ```sh
 make build
-bin/nvkr catalog bump --dir inputs/experiments/public-os-sources/catalog --all --timeout 15m
+bin/nvkr catalog bump --catalog inputs/experiments/public-os-sources/catalog --all --timeout 15m
 ```
 
 The source preparation lane is network-capable. For TPM and Helm, it downloads Go modules under the upstream checksums, verifies them, vendors offline, and checks that `go.mod` and `go.sum` stayed unchanged. Kubernetes, containerd, cri-tools and CNI use the vendor tree committed at their pinned Git revision. Compilation is offline with a read-only authenticated source tree and a separate output directory.

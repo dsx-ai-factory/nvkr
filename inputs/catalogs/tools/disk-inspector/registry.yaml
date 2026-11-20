@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/catalog/v3
 kind: SourceBuildRegistry
 metadata:
-  name: nvkr-internal-inspector
+  name: tools/disk-inspector
   description: Native static disk inspection helper; Run-only tool, not a delivery output.
 sources:
   nvkr-inspector:
