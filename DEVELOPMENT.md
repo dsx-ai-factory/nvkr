@@ -16,6 +16,9 @@ The required [authoring lab regression](docs/examples/authoring-lab/README.md) u
 if a prerequisite is missing. `make check` additionally requires Python 3.12 or later (`python3` on `PATH`)
 for `make test-ci-tools`, which runs the remaining Python CI sharding and local adapter contract suites using
 only the Python standard library, plus Go-driven shell/jq generation and summary contracts.
+That target also vets and tests the separate MachineImage catalog Go module, which requires Git 2.45 or newer
+with `--no-lazy-fetch` support for offline CRD reads. Its first build needs module-proxy access unless its
+hash-locked dependencies are already cached.
 Go-test adapter wrappers report an explicit skip when Python is
 absent; that is not full-gate coverage. The tooling gate fails if Python is missing or too old and
 runs every suite independently, so a Go-only test pass cannot stand in for the completion gate.
