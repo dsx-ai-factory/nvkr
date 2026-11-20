@@ -15,12 +15,23 @@ binary="$evidence/factory.test"
 fixture=''
 mounted=false
 cleanup() {
+  local status=$?
   if [[ $mounted == true ]]; then
-    sudo -n umount -- "$fixture/root"
+    if sudo -n timeout --kill-after=5s 30s umount -- "$fixture/root"; then
+      mounted=false
+    else
+      printf 'runtime proof cleanup could not confirm unmount; retained fixture: %s\n' "$fixture/root" >&2
+      if [[ $status == 0 ]]; then status=1; fi
+      return "$status"
+    fi
   fi
   if [[ -n $fixture ]]; then
-    sudo -n rmdir -- "$fixture/root" "$fixture"
+    if ! sudo -n timeout --kill-after=5s 30s rmdir -- "$fixture/root" "$fixture"; then
+      printf 'runtime proof cleanup could not remove fixture: %s\n' "$fixture" >&2
+      if [[ $status == 0 ]]; then status=1; fi
+    fi
   fi
+  return "$status"
 }
 trap cleanup EXIT
 

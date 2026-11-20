@@ -135,6 +135,7 @@ func TestStageRejectsUnsafeLayersAndCleans(t *testing.T) {
 		{name: "missing parent", members: []tar.Header{{Name: "absent/file", Typeflag: tar.TypeReg}}},
 		{name: "hard link escape", members: []tar.Header{{Name: "link", Typeflag: tar.TypeLink, Linkname: "../escape"}}},
 		{name: "hard link to symlink", members: []tar.Header{{Name: "symlink", Typeflag: tar.TypeSymlink, Linkname: "/tmp"}, {Name: "link", Typeflag: tar.TypeLink, Linkname: "symlink"}}},
+		{name: "hard link to directory", members: []tar.Header{{Name: "directory", Typeflag: tar.TypeDir, Mode: 0o755}, {Name: "link", Typeflag: tar.TypeLink, Linkname: "directory"}}},
 		{name: "hard link cycle", members: []tar.Header{{Name: "first", Typeflag: tar.TypeLink, Linkname: "second"}, {Name: "second", Typeflag: tar.TypeLink, Linkname: "first"}}},
 		{name: "missing hard link target", members: []tar.Header{{Name: "link", Typeflag: tar.TypeLink, Linkname: "absent"}}},
 		{name: "unknown PAX", members: []tar.Header{{Name: "file", Typeflag: tar.TypeReg, PAXRecords: map[string]string{"SCHILY.xattr.security.capability": "synthetic"}}}},
