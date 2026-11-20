@@ -243,7 +243,7 @@ func (f *fakeReports) client() reviewClient {
 }
 func TestRefreshReportRouting(t *testing.T) {
 	issue := func(n int, title string, labeled bool) refreshIssue {
-		v := refreshIssue{Number: n, Title: title}
+		v := refreshIssue{Number: n, Title: title, Labels: []issueLabel{}}
 		if labeled {
 			v.Labels = []issueLabel{{Name: refreshLabel}}
 		}
@@ -315,6 +315,29 @@ func TestRefreshReportRouting(t *testing.T) {
 		}}
 		requireReviewError(t, c.postReport(t.Context(), "report"))
 	})
+}
+func TestIncompleteIssueRowsRefuseWrites(t *testing.T) {
+	for _, lookup := range []string{"labeled", "legacy"} {
+		for _, row := range []string{
+			`{}`, `{"number":1,"labels":[]}`, `{"title":"Unrelated","labels":[]}`,
+			`{"number":1,"title":"Unrelated"}`, `{"number":1,"title":"Unrelated","labels":null}`,
+			`{"number":1,"title":"Unrelated","labels":[null]}`,
+			`{"number":1,"title":"Unrelated","labels":[{}]}`,
+		} {
+			t.Run(lookup+"/"+row, func(t *testing.T) {
+				c := reviewClient{invoke: func(_ context.Context, args []string, payload []byte) ([]byte, error) {
+					if payload != nil {
+						t.Fatal("incomplete lookup authorized a remote write")
+					}
+					if lookup == "legacy" && strings.Contains(args[len(args)-1], "labels=") {
+						return []byte(`[[]]`), nil
+					}
+					return []byte(`[[` + row + `]]`), nil
+				}}
+				requireReviewError(t, c.postReport(t.Context(), "report"))
+			})
+		}
+	}
 }
 func TestRefreshActionableOutcomes(t *testing.T) {
 	type scenario struct {

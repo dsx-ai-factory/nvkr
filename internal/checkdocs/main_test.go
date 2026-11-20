@@ -12,6 +12,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
@@ -170,5 +171,27 @@ func TestRunObservesCancellationDuringReporting(t *testing.T) {
 	}
 	if strings.Contains(out.String(), "OK:") || stderr.Len() != 0 {
 		t.Fatalf("reported completion after cancellation: %q %q", out.String(), stderr.String())
+	}
+}
+
+func TestRunCancellationDuringCollection(t *testing.T) {
+	for _, deadline := range []bool{false, true} {
+		file := writeDoc(t, t.TempDir(), "input.md", "<br>\n")
+		ctx, cancel := context.WithCancel(t.Context())
+		cancel()
+		if deadline {
+			ctx, cancel = context.WithDeadline(t.Context(), time.Unix(0, 0))
+			defer cancel()
+		}
+		var out, stderr bytes.Buffer
+		code, err := run(ctx, []string{file, "--fix"}, &out, &stderr)
+		var coded *e.Error
+		if code != 1 || !errors.Is(err, ctx.Err()) || !errors.As(err, &coded) || coded.Code != e.CodeTimeout {
+			t.Fatalf("canceled collection returned code=%d error=%v", code, err)
+		}
+		raw, err := os.ReadFile(file)
+		if err != nil || string(raw) != "<br>\n" || out.Len() != 0 || stderr.Len() != 0 {
+			t.Fatalf("canceled collection changed input or reported results: %q %v %q %q", raw, err, out.String(), stderr.String())
+		}
 	}
 }

@@ -6,6 +6,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -305,6 +306,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) (int, err
 	}
 	files, err := collect(ctx, paths, excludes)
 	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return 1, e.Wrap(e.CodeTimeout, err, "collect MDX inputs")
+		}
 		return 2, e.Wrap(e.CodeUsage, err, "collect MDX inputs")
 	}
 	total := 0

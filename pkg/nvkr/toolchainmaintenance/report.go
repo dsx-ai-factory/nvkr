@@ -145,9 +145,26 @@ func hasRefreshLabel(labels []issueLabel) bool {
 	}
 	return false
 }
+func (c reviewClient) issuePages(ctx context.Context, endpoint string) ([]refreshIssue, error) {
+	var issues []refreshIssue
+	if err := c.pages(ctx, endpoint, &issues); err != nil {
+		return nil, err
+	}
+	for _, issue := range issues {
+		if issue.Number < 1 || issue.Title == "" || issue.Labels == nil {
+			return nil, e.New(e.CodeGateUnmet, "incomplete refresh issue lookup row")
+		}
+		for _, label := range issue.Labels {
+			if label.Name == "" {
+				return nil, e.New(e.CodeGateUnmet, "incomplete refresh issue label")
+			}
+		}
+	}
+	return issues, nil
+}
 func (c reviewClient) postReport(ctx context.Context, body string) error {
-	var labeled []refreshIssue
-	if err := c.pages(ctx, "issues?state=open&labels="+refreshLabel+"&per_page=100", &labeled); err != nil {
+	labeled, err := c.issuePages(ctx, "issues?state=open&labels="+refreshLabel+"&per_page=100")
+	if err != nil {
 		return err
 	}
 	candidates := []refreshIssue{}
@@ -157,8 +174,8 @@ func (c reviewClient) postReport(ctx context.Context, body string) error {
 		}
 	}
 	if len(candidates) == 0 {
-		var issues []refreshIssue
-		if err := c.pages(ctx, "issues?state=open&per_page=100", &issues); err != nil {
+		issues, err := c.issuePages(ctx, "issues?state=open&per_page=100")
+		if err != nil {
 			return err
 		}
 		for _, issue := range issues {
@@ -169,9 +186,6 @@ func (c reviewClient) postReport(ctx context.Context, body string) error {
 	}
 	var chosen *refreshIssue
 	for i := range candidates {
-		if candidates[i].Number < 1 {
-			return e.New(e.CodeGateUnmet, "invalid refresh issue number")
-		}
 		if chosen == nil || candidates[i].Number < chosen.Number {
 			chosen = &candidates[i]
 		}
