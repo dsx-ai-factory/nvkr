@@ -26,6 +26,9 @@ func TestRawDebianOriginalProducerThroughNormalPublicationPackage(t *testing.T) 
 	nodes, artifacts := planIndex(plan)
 	expected := plan.LifecycleOutputs[0]
 	payload := artifacts[expected.ArtifactID]
+	if payload.Kind != "host-package" || payload.MediaType != "application/vnd.debian.binary-package" {
+		t.Fatalf("Debian producer metadata changed: %+v", payload)
+	}
 	instruction, err := producerInstructionFor(plan, payload)
 	if err != nil {
 		t.Fatal(err)

@@ -45,6 +45,27 @@ func executeSourceFetch(ctx context.Context, plan *Plan, nodeID string, environm
 }
 
 func executeSourceFetchWithSeed(ctx context.Context, plan *Plan, nodeID string, environment []string, stdout, stderr io.Writer,
+	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error), sourceSeed *pipeline.SourceSeed) error {
+	if err := executionContext(ctx); err != nil {
+		return err
+	}
+	if plan == nil || run == nil {
+		return e.New(e.CodeUsage, "source fetch requires a complete Plan and an executor")
+	}
+	if err := plan.Validate(); err != nil {
+		return err
+	}
+	bounded, cancel, err := githubUtilityContext(ctx, plan, nodeID)
+	if err != nil {
+		return err
+	}
+	defer cancel()
+	return executeSourceFetchInContext(bounded, plan, nodeID, environment, stdout, stderr, run, sourceSeed)
+}
+
+// executeSourceFetchInContext shares the exact held source/credential owner with
+// providers which have already bounded their own single-operation context.
+func executeSourceFetchInContext(ctx context.Context, plan *Plan, nodeID string, environment []string, stdout, stderr io.Writer,
 	run func(ir.Node, pipeline.RunOptions) (*pipeline.ArtifactResult, error), sourceSeed *pipeline.SourceSeed) (returnErr error) {
 	if ctx == nil {
 		return e.New(e.CodeUsage, "source fetch requires a context")
@@ -80,12 +101,6 @@ func executeSourceFetchWithSeed(ctx context.Context, plan *Plan, nodeID string, 
 	if instruction.Kind != ir.KindFetch {
 		return e.New(e.CodePipelineDrift, "source fetch %q does not bind a fetch instruction", nodeID)
 	}
-	bounded, cancel, err := githubUtilityContext(ctx, plan, nodeID)
-	if err != nil {
-		return err
-	}
-	defer cancel()
-	ctx = bounded
 	childEnvironment, err := admitSourceFetchEnvironment(plan, node, environment)
 	if err != nil {
 		return err

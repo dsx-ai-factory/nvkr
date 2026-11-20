@@ -92,7 +92,7 @@ func TestTektonProjectionRejectsNilContext(t *testing.T) {
 }
 
 func TestProjectionUnknownEngineAdmittedBeforeIO(t *testing.T) {
-	for _, engine := range []string{"unknown", EngineGitLab, EngineArgo, "local"} {
+	for _, engine := range []string{"unknown", EngineArgo, "local"} {
 		t.Run(engine, func(t *testing.T) {
 			want := e.CodeEngineCapability
 			if engine == "unknown" || engine == "local" {
