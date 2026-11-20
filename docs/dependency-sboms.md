@@ -64,8 +64,8 @@ output names and requested package inspection of LUKS2 fail admission. A failed
 plain-disk inspection fails the Run rather than falling back to an empty SBOM.
 `release verify --minimum-disk-evidence packages` accepts package-only or strict
 evidence and rejects producer-only members. Strict disk inventory/reconciliation
-remains separate hardening. Hosted acceptance of the new package mode remains
-unrecorded; historical producer-only Runs do not prove this extension.
+remains separate hardening. The [ADR-13 reconciliation](adr/reconciliation/adr-13.md)
+owns package-mode acceptance status and the limits of historical producer-only Runs.
 
 ## Verification on real outputs
 
