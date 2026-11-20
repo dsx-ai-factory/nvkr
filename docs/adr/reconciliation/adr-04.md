@@ -1,5 +1,12 @@
 ## Support by owner
 
+Concurrent bundle verification uses per-subprocess private TUF caches unless the metered path supplies
+its authenticated root snapshot. `TestConcurrentBundleVerificationIsolatesTUFCache` exercises four
+overlapping verifier calls, distinct cache contents, cleanup on success/failure/cancellation and unchanged
+ambient state through an injected runner. This is a local concurrency contract, not a live Sigstore or
+Linux held-executable exercise. The triggering [release assembly failure](https://github.com/dsx-ai-factory/nvkr/actions/runs/44577627888/job/135836897140)
+reported TUF metadata persistence failure with four workers; no corrected hosted Run is recorded yet.
+
 The Tekton change adds explicit OCI public-key trust, role-key snapshots and separate keyless/keyed bundle
 admission. Focused controlled tests cover policy separation, credential scrubbing and error redaction.
 On 2026-11-09, `TestTektonKeyedCosignInteroperability` passed against a loopback OCI registry with the real

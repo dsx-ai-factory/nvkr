@@ -209,7 +209,7 @@ func TestGitHubProducerStageFailureCannotAuthorizePartialOutputs(t *testing.T) {
 				t.Fatal(err)
 			}
 			raw, err := os.ReadFile(HostedRestoreOutcomePath(".nvkr/factory", "all-provider-jobs"))
-			if err != nil || string(raw) != "job-failed\n" {
+			if err != nil || string(raw) != "job-failed:"+status+":"+stage.ID+"\n" {
 				t.Fatalf("unsuccessful producer admitted partial carrier set: status=%q error=%v", raw, err)
 			}
 			assertFactoryErrorCode(t, ValidateHostedRestores(t.Context(), ".nvkr/factory", plan), e.CodeProvenanceMissing)
