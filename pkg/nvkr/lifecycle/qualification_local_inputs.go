@@ -138,8 +138,8 @@ func replayLocalQualificationInputs(ctx context.Context, rawPlan, rawRun, rawInp
 	if err := original.Validate(); err != nil {
 		return nil, err
 	}
-	if original.Composition != nil {
-		return nil, e.New(e.CodeEngineCapability, "qualification of a composite Definition Run is deferred (ADR-26 §7)")
+	if err := admitLocalDiagnosticPlan(&original); err != nil {
+		return nil, err
 	}
 	compiled, err := factory.CompileSnapshot(ctx, inputs, original.GeneratorVersion)
 	if err != nil {
@@ -217,4 +217,12 @@ func readLocalQualificationMetadata(ctx context.Context, root *os.File, name str
 		return nil, runInspectionReadError(ctx, err)
 	}
 	return raw, nil
+}
+
+// admitLocalDiagnosticPlan refuses Plans whose Runs local capture cannot replay.
+func admitLocalDiagnosticPlan(plan *factory.Plan) error {
+	if plan.Composition != nil {
+		return e.New(e.CodeEngineCapability, "qualification of a composite Definition Run is deferred (ADR-26 §7)")
+	}
+	return nil
 }

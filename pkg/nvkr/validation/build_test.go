@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+//go:build linux || darwin
+
 package validation
 
 import (
@@ -9,6 +11,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -18,30 +21,39 @@ import (
 // fakeBuild stands in for a compiled, not yet executed local Run.
 type fakeBuild struct {
 	producers  map[string]*factory.CLIArtifactTestInputs
+	components map[string]string // output -> producer component; default nvkectl
+	captureErr error
 	executeErr error
-	attempt    string
+	built      builtRun
 	executed   int
 }
 
-func (b *fakeBuild) Producer(output string) (*factory.CLIArtifactTestInputs, error) {
+func (b *fakeBuild) Producer(output, component string) (*factory.CLIArtifactTestInputs, error) {
 	inputs, ok := b.producers[output]
 	if !ok {
 		return nil, e.New(e.CodeUsage, "no matching standalone CLI output")
+	}
+	if built, ok := b.components[output]; ok && built != component {
+		return nil, e.New(e.CodeEngineCapability, "output %q is built from %q, not %q", output, built, component)
 	}
 	copied := *inputs
 	return &copied, nil
 }
 
-func (b *fakeBuild) Execute(context.Context) (string, error) {
+func (b *fakeBuild) AdmitCapture() error { return b.captureErr }
+
+func (b *fakeBuild) Execute(context.Context) (builtRun, error) {
 	b.executed++
 	if b.executeErr != nil {
-		return "", b.executeErr
+		return builtRun{}, b.executeErr
 	}
-	return b.attempt, nil
+	return b.built, nil
 }
 
 func fixtureBuild() *fakeBuild {
-	return &fakeBuild{producers: fixtureRun().producers, attempt: ".nvkr/runs/build-001"}
+	description := fixtureRun().description
+	return &fakeBuild{producers: fixtureRun().producers, built: builtRun{directory: ".nvkr/runs/build-001",
+		identity: RunIdentity{Attempt: description.Attempt, PlanDigest: description.PlanDigest, ContentSubject: description.ContentSubject}}}
 }
 
 func fixtureBuildRequest() BuildRequest {
@@ -86,6 +98,10 @@ func TestBuildRefusedBeforeBuilding(t *testing.T) {
 		{"output-not-in-plan", func(b *fakeBuild) { delete(b.producers, "nvkectl") }, e.CodeUsage},
 		{"platform-not-declared", func(b *fakeBuild) { b.producers["nvkectl"].Platform = "linux/riscv64" }, e.CodeEngineCapability},
 		{"producer-output-differs", func(b *fakeBuild) { b.producers["nvkectl"].Output = "other" }, e.CodeVerifyFailed},
+		// Selection admits CLI recipe variants; the declared component must still match.
+		{"producer-component-variant", func(b *fakeBuild) { b.components = map[string]string{"nvkectl": "nvkectl-local-site"} }, e.CodeEngineCapability},
+		// Capture cannot bind a composite Definition's Run, so it is refused before building.
+		{"capture-refused", func(b *fakeBuild) { b.captureErr = e.New(e.CodeEngineCapability, "composite") }, e.CodeEngineCapability},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			build, run, planned, opened := fixtureBuild(), fixtureRun(), []BuildRequest{}, []string{}
@@ -159,9 +175,9 @@ func TestBuildUsesLifecycleCompilation(t *testing.T) {
 	prepared := preparedFixture(t)
 	t.Chdir(t.TempDir())
 	bound, err := prepared.Build(t.Context(), fixtureBuildRequest())
-	var coded *e.Error
-	if bound != nil || !errors.As(err, &coded) {
-		t.Fatalf("missing inputs were built or uncoded: %v", err)
+	catalogCode(t, err, e.CodeInvalidCatalog)
+	if bound != nil {
+		t.Fatal("missing inputs were built")
 	}
 }
 
@@ -187,5 +203,40 @@ func TestBuildRealPlanCheckRefusesBeforeBuilding(t *testing.T) {
 	}
 	if _, statErr := os.Stat(filepath.Join(attempts, "plan-check")); !errors.Is(statErr, os.ErrNotExist) {
 		t.Fatalf("refused build created its attempt: %v", statErr)
+	}
+}
+
+// A completed build is kept when binding refuses it, and the error names it.
+func TestBuildKeepsUnboundAttempt(t *testing.T) {
+	build, run, planned, opened := fixtureBuild(), fixtureRun(), []BuildRequest{}, []string{}
+	run.description.Outputs[0].Name = "other"
+	bound, err := preparedFixture(t).build(t.Context(), fixtureBuildRequest(), planner(build, &planned), opener(run, &opened))
+	catalogCode(t, err, e.CodeVerifyFailed)
+	if bound != nil || build.executed != 1 || !strings.Contains(err.Error(), ".nvkr/runs/build-001") {
+		t.Fatalf("unbound attempt was not named: %v", err)
+	}
+}
+
+// Build binds only the Run it completed.
+func TestBuildRefusesADifferentRun(t *testing.T) {
+	build, run, planned, opened := fixtureBuild(), fixtureRun(), []BuildRequest{}, []string{}
+	build.built.identity.PlanDigest = fixtureBuildDigest
+	bound, err := preparedFixture(t).build(t.Context(), fixtureBuildRequest(), planner(build, &planned), opener(run, &opened))
+	catalogCode(t, err, e.CodeVerifyFailed)
+	if bound != nil || run.closes != 1 {
+		t.Fatalf("different Run was bound or kept open: closes=%d", run.closes)
+	}
+}
+
+// Inputs of one suite must be planned for one platform, as binding requires,
+// so a mixed-platform suite is refused before anything is built.
+func TestBuildRefusesMixedPlatformsBeforeBuilding(t *testing.T) {
+	build, run, planned, opened := fixtureBuild(), multiRoleRun(), []BuildRequest{}, []string{}
+	build.producers = run.producers
+	build.producers["nvkectl-source"].Platform = "linux/amd64"
+	bound, err := multiRolePrepared(t).build(t.Context(), fixtureBuildRequest(), planner(build, &planned), opener(run, &opened))
+	catalogCode(t, err, e.CodeEngineCapability)
+	if bound != nil || build.executed != 0 || len(opened) != 0 {
+		t.Fatalf("mixed-platform suite was built: executed=%d opened=%v", build.executed, opened)
 	}
 }
