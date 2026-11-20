@@ -107,10 +107,10 @@ The [input instructions](../inputs/definitions/nvke/README.md#generate-and-check
 The composite owns all three maintained bundles under the ADR-26 U10 cutover; the former combined input
 remains only a comparison fixture.
 
-[ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines discovery,
-adapter selection and artifact bindings across repositories, including its diagnostic and evidence limits.
-The provisional local-plan CLI slice implements catalog discovery and versioned-profile execution;
-broader adapter and profile support remains deferred.
+[ADR-24: imported validator catalog](adr/0024-imported-validator-catalog.md) defines registered container
+commands discovered by repository and suite group, their selection, binding to a completed Run, test
+environments and results, including their diagnostic and evidence limits. The provisional local-plan CLI
+slice implements catalog discovery and versioned-profile execution until it migrates to that model.
 
 [ADR-26: Definition composition](adr/0026-definition-composition.md) designs composite Definitions
 that release several digest-pinned Definitions as one Release, with a worked NVKE four-family example and
