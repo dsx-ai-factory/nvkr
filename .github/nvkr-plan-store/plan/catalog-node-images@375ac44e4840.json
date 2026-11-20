@@ -2,13 +2,47 @@
   "APIVersion": "nvkr.dev/catalog/v3",
   "Actions": {},
   "Components": {
+    "dsx-imds-node-attestor-agent": {
+      "artifactPath": "nvkr-output/dsx-imds-node-attestor-agent",
+      "buildCommand": [
+        "sh",
+        "-ec",
+        {
+          "file": ".github/nvkr-plan-store/scripts/dsx-imds-node-attestor-agent/build@c3db711d9a0c.sh"
+        }
+      ],
+      "builderType": "oci-hermetic",
+      "commit": "cd76f1d5ab4a887b9577ff601ce7cda52d5003b4",
+      "fromSource": true,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "repo": "https://github.com/dsx-ai-factory/nvidia-workload-identity",
+      "sourceDateEpoch": 1792708538,
+      "tag": "v1.15.0",
+      "toolchainImages": {
+        "amd64": "docker.io/library/golang@sha256:78773c59d6d4ecedc0845b1a8e5379e7bf0e0be62f4ea796e689bbc97dab3ceb",
+        "arm64": "docker.io/library/golang@sha256:7117c9e4e2c0becd23d1dbede3aea73ba91d084847c68e12d7e1fa3d9b3abf20"
+      },
+      "treeHash": "b9c85948e417d42d7529d2306f1b80db61c629ae",
+      "vendorCommand": [
+        "sh",
+        "-ec",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh"
+        }
+      ],
+      "writeDir": "nvkr-output"
+    },
     "nvke-agent": {
       "artifactPath": "agent/bin/nvke-agent.deb",
       "buildCommand": [
         "bash",
         "-ec",
         {
-          "file": ".github/nvkr-plan-store/scripts/nvke-agent/build@6d74f4b38e48.sh"
+          "file": ".github/nvkr-plan-store/scripts/nvke-agent/build@708c184d26f9.sh"
         }
       ],
       "builderType": "oci-hermetic",
@@ -22,22 +56,27 @@
       ],
       "repo": "https://github.com/dsx-ai-factory/nvke.git",
       "sourceDateEpoch": 1793236039,
+      "sourceRecipe": {
+        "artifactPath": "agent/bin/nvke-agent.deb",
+        "buildCommand": [
+          "bash",
+          "-ec",
+          "test \"$(getconf GNU_LIBC_VERSION)\" = 'glibc 2.36' || {\n  echo 'Ubuntu 24 agent requires the pinned Bookworm glibc 2.36 builder' >&2; exit 1;\n}\nPATH=\"/src/.nvkr-tools/go/bin:$PATH\" GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \\\n  VERSION={{.Tag}} \\\n  NFPM_BIN=/src/agent/nvkr-tools/nfpm \\\n  DEB_OUTPUT=/src/agent/bin/nvke-agent.deb\n# Match the pinned source's build-guest.sh: the agent is dynamic, but\n# its updater must remain static. A failed check denies the package output.\nbash /src/os-image/nix/check-ubuntu-elf.sh --arch {{.Arch}} \\\n  /src/agent/bin/linux_{{.Arch}}/nvke-agent\nreadonly updater=/src/agent/bin/linux_{{.Arch}}/nvke-agent-updater\ntest -f \"$updater\" || { echo 'expected updater binary' >&2; exit 1; }\nheaders=$(readelf -lW \"$updater\")\n[[ \"$headers\" != *INTERP* ]] || {\n  echo 'expected a static updater, found a program interpreter' >&2; exit 1;\n}\n"
+        ]
+      },
       "tag": "v0.23.0",
       "toolchainImages": {
-        "amd64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:915623e06b2d599ccdaee545d9e657112cd9740603a86e652077564181892f70",
-        "arm64": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/packer-native@sha256:2dcb63fc894ec25f8763d37d5139d904be3f6f42c897ca0dd3b32a51f8d36140"
+        "amd64": "docker.io/library/golang@sha256:55395706e9703db746cc507abfc4eb2aea75918f8a8024e4848e2cb81004f5ad",
+        "arm64": "docker.io/library/golang@sha256:2bcff0c6ad6e8c5353e8c0d5c7f17bfcc87d667d0169615e34db1acc0db985b9"
       },
       "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
       "vendorCommand": [
         "bash",
         "-ec",
         {
-          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@3c436b37fae5.sh"
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@42481e224c2f.sh"
         }
       ],
-      "versionStamp": {
-        "BUILD_VERSION": "v0.23.0"
-      },
       "writeDir": "agent/bin"
     },
     "nvke-agent-diagnostic": {
@@ -224,7 +263,6 @@
           "file": ".github/nvkr-plan-store/scripts/nvke-doca-ovs/build@f80bc8ab2915.sh"
         }
       ],
-      "builderType": "oci-hermetic",
       "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
       "fromSource": true,
       "outputType": "tarball",
@@ -244,7 +282,7 @@
         "bash",
         "-ec",
         {
-          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@5406111272af.sh"
+          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@ee674ffa04d7.sh"
         }
       ],
       "writeDir": "nvkr-output"
@@ -458,7 +496,7 @@
           "efi_firmware_vars": "/usr/share/OVMF/OVMF_VARS_4M.fd",
           "luks_passphrase": "changeit",
           "ssh_timeout": "180m",
-          "ubuntu_series": "26.04"
+          "ubuntu_series": "24.04"
         }
       },
       "patches": [
@@ -545,7 +583,7 @@
           "guest_memory_mib": "4096",
           "luks_passphrase": "changeit",
           "ssh_timeout": "180m",
-          "ubuntu_series": "26.04"
+          "ubuntu_series": "24.04"
         }
       },
       "patches": [
@@ -631,7 +669,7 @@
           "efi_firmware_vars": "/usr/share/AAVMF/AAVMF_VARS.fd",
           "guest_memory_mib": "4096",
           "ssh_timeout": "180m",
-          "ubuntu_series": "26.04"
+          "ubuntu_series": "24.04"
         }
       },
       "patches": [
@@ -716,7 +754,7 @@
           "efi_firmware_code": "/usr/share/OVMF/OVMF_CODE_4M.fd",
           "efi_firmware_vars": "/usr/share/OVMF/OVMF_VARS_4M.fd",
           "ssh_timeout": "180m",
-          "ubuntu_series": "26.04"
+          "ubuntu_series": "24.04"
         }
       },
       "patches": [
@@ -990,12 +1028,15 @@
         "bash",
         "-ec",
         {
-          "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@880033d43a5b.sh"
+          "file": ".github/nvkr-plan-store/scripts/nvke-spire-agent/build@edc609679900.sh"
         }
       ],
       "builderType": "oci-hermetic",
       "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
       "fromSource": true,
+      "materials": {
+        "imds-agent": "dsx-imds-node-attestor-agent"
+      },
       "outputType": "tarball",
       "platforms": [
         "linux/amd64",
@@ -1179,7 +1220,6 @@
       "writeDir": "nvkr-output"
     },
     "ubuntu-installer-iso": {
-      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
       "fromSource": false,
       "outputType": "raw",
       "platforms": [
@@ -1187,19 +1227,17 @@
       ],
       "prebuilt": {
         "digests": {
-          "arm64": "sha256:af78753c94b924c85c4964c670692a853f7c80299a4064e317edad95462e3168"
+          "arm64": "sha256:f12484464c7d4d73e2167e0a7dbda1e669f8fae9bcf778dc0944937034b320cb"
         },
         "evidence": {
           "none": true
         },
-        "url": "https://cdimage.ubuntu.com/ubuntu/releases/26.04.1/release/ubuntu-26.04.1-live-server-arm64.iso"
+        "url": "https://cdimage.ubuntu.com/ubuntu/releases/24.04.5/release/ubuntu-24.04.5-live-server-arm64.iso"
       },
-      "repo": "https://github.com/dsx-ai-factory/nvke.git",
-      "sourceDateEpoch": 1793236039,
-      "tag": "v0.23.0"
+      "sourceDateEpoch": 1791257393,
+      "tag": "24.04.5"
     },
     "ubuntu-installer-iso-amd64": {
-      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
       "fromSource": false,
       "outputType": "raw",
       "platforms": [
@@ -1207,16 +1245,15 @@
       ],
       "prebuilt": {
         "digests": {
-          "amd64": "sha256:cc8a95cde20f6ced61a322420de00f10cc3c90ced545daa46cb9c1a117f1d927"
+          "amd64": "sha256:97f3d7ffb032c3eb3b23d2c8be9cc76e60c2c1f2c0146ba5ba9fe01cafae0fd8"
         },
         "evidence": {
           "none": true
         },
-        "url": "https://releases.ubuntu.com/26.04.1/ubuntu-26.04.1-live-server-amd64.iso"
+        "url": "https://releases.ubuntu.com/24.04.5/ubuntu-24.04.5-live-server-amd64.iso"
       },
-      "repo": "https://github.com/dsx-ai-factory/nvke.git",
-      "sourceDateEpoch": 1793236039,
-      "tag": "v0.23.0"
+      "sourceDateEpoch": 1791257393,
+      "tag": "24.04.5"
     }
   },
   "Kind": "SourceBuildRegistry",
@@ -1225,6 +1262,20 @@
     "name": "node-images"
   },
   "Sources": {
+    "nvidia-workload-identity": {
+      "repo": "https://github.com/dsx-ai-factory/nvidia-workload-identity",
+      "toolchainImagesByArch": {
+        "amd64": "docker.io/library/golang@sha256:78773c59d6d4ecedc0845b1a8e5379e7bf0e0be62f4ea796e689bbc97dab3ceb",
+        "arm64": "docker.io/library/golang@sha256:7117c9e4e2c0becd23d1dbede3aea73ba91d084847c68e12d7e1fa3d9b3abf20"
+      },
+      "vendorCommand": [
+        "sh",
+        "-ec",
+        {
+          "file": ".github/nvkr-plan-store/scripts/nvidia-workload-identity/vendor@47bdd564b19b.sh"
+        }
+      ]
+    },
     "nvke-cni-calico-source": {
       "constraint": "v0.23.0",
       "repo": "https://github.com/dsx-ai-factory/nvke.git",

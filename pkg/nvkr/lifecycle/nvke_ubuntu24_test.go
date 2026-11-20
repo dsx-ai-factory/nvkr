@@ -55,9 +55,9 @@ func TestNVKEUbuntu24NativeDiskSelections(t *testing.T) {
 				if variant.output == "fde" {
 					root = "nvke-node-fde-" + tc.arch
 				}
-				wantComponents := []string{"nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-doca-ovs", "nvke-image-inputs", "nvke-kubeadm-distro",
+				wantComponents := []string{"dsx-imds-node-attestor-agent", "nvke-agent", "nvke-cni-calico", "nvke-cni-ovn", "nvke-doca-ovs", "nvke-image-inputs", "nvke-kubeadm-distro",
 					root, tc.patched, "nvke-spire-agent", "ovn-kube-ubuntu", "ovn-kubernetes-chart", tc.installer}
-				if build.Platform != "linux/"+tc.arch || !slices.Equal(build.Components, wantComponents) || len(build.ResolvedComponents) != 12 {
+				if build.Platform != "linux/"+tc.arch || !slices.Equal(build.Components, wantComponents) || len(build.ResolvedComponents) != len(wantComponents) {
 					t.Fatalf("unexpected native material closure: %s / %v", build.Platform, build.Components)
 				}
 				if build.BuildDigest == original.BuildDigest || identities[build.BuildDigest] {

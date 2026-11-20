@@ -213,6 +213,7 @@ outputs:
   - linux/amd64
   - linux/arm64
 - components:
+  - dsx-imds-node-attestor-agent
   - nvke-agent
   - nvke-cni-calico
   - nvke-cni-ovn
@@ -229,6 +230,7 @@ outputs:
   name: nvke-node-fde-amd64
   platform: linux/amd64
 - components:
+  - dsx-imds-node-attestor-agent
   - nvke-agent
   - nvke-cni-calico
   - nvke-cni-ovn
@@ -245,6 +247,7 @@ outputs:
   name: nvke-node-fde-arm64
   platform: linux/arm64
 - components:
+  - dsx-imds-node-attestor-agent
   - nvke-agent
   - nvke-cni-calico
   - nvke-cni-ovn
@@ -261,6 +264,7 @@ outputs:
   name: nvke-node-image-amd64
   platform: linux/amd64
 - components:
+  - dsx-imds-node-attestor-agent
   - nvke-agent
   - nvke-cni-calico
   - nvke-cni-ovn

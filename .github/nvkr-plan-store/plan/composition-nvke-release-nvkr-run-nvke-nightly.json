@@ -17,7 +17,7 @@
       "platform": "linux/amd64"
     }
   ],
-  "effectiveDefinitionDigest": "sha256:9c2390ab22b5a52d9041724edd41167a35178c5edec3c99df42b6cfbd2ed002a",
+  "effectiveDefinitionDigest": "sha256:78cc9b3641d16ce7eb53a78c96adf684d4f9cd866b5470d24a358d6e05e382d6",
   "kind": "CompositeDefinition",
   "members": [
     {
@@ -29,11 +29,11 @@
       "name": "nvke-core"
     },
     {
-      "digest": "sha256:6d0770da5060e5a17620ee6678f16218172234b76f65a95fa37dd1c53fdec7b5",
+      "digest": "sha256:37e4ee792ec089a1169236403426dd7545984cc9f3cb165abc8b68d599d4f9d6",
       "name": "nvke-disks"
     },
     {
-      "digest": "sha256:4590053e9d1e607e9b37faf697a72d93237cebe3ba7139527b106da6715c61cf",
+      "digest": "sha256:43a9346ec46910091a6545fecdb45ceb0cb0f01b6c50bf0f4565b9926bcfe462",
       "name": "nvke-disks-ubuntu24"
     },
     {

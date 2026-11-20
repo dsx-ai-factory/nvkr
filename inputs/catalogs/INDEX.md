@@ -33,6 +33,7 @@ Recorded declarations only; no producer selection or upstream pin-set verificati
 | <code>"nico"</code> | <code>"nico-flow-chart"</code> | <code>"source"</code> |
 | <code>"nico"</code> | <code>"nico-flow-image"</code> | <code>"source"</code> |
 | <code>"nico"</code> | <code>"nico-prereqs-chart"</code> | <code>"source"</code> |
+| <code>"node-images"</code> | <code>"dsx-imds-node-attestor-agent"</code> | <code>"source"</code> |
 | <code>"node-images"</code> | <code>"nvke-agent"</code> | <code>"source"</code> |
 | <code>"node-images"</code> | <code>"nvke-agent-diagnostic"</code> | <code>"source"</code> |
 | <code>"node-images"</code> | <code>"nvke-cni-calico"</code> | <code>"source"</code> |
