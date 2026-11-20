@@ -23,7 +23,6 @@ command:
   - test
   - GO=go
   - GO_TEST_FLAGS=-count=1 -timeout=15m -json
-  - COVERAGE_DIR=/cache/coverage
 environment:
   NVKECTL: ${inputs.executable.path}
   NVKECTL_EXPECTED_VERSION: ${inputs.executable.version}

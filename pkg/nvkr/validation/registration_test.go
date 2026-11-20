@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+//go:build linux || darwin
+
 package validation
 
 import (
@@ -175,8 +177,8 @@ func TestRegistrationFieldValidation(t *testing.T) {
 		{"working-directory-unclean", "workingDirectory: cli", "workingDirectory: cli/./cmd"},
 		{"working-directory-dot", "workingDirectory: cli", "workingDirectory: ."},
 		{"working-directory-backslash", "workingDirectory: cli", "workingDirectory: 'cli\\cmd'"},
-		{"command-missing", "command:\n  - make\n  - --no-print-directory\n  - test-artifact\n  - GO=go\n  - GO_TEST_FLAGS=-count=1 -timeout=15m -json\n  - COVERAGE_DIR=/cache/coverage\n", ""},
-		{"command-empty", "command:\n  - make\n  - --no-print-directory\n  - test-artifact\n  - GO=go\n  - GO_TEST_FLAGS=-count=1 -timeout=15m -json\n  - COVERAGE_DIR=/cache/coverage\n", "command: []\n"},
+		{"command-missing", "command:\n  - make\n  - --no-print-directory\n  - test-artifact\n  - GO=go\n  - GO_TEST_FLAGS=-count=1 -timeout=15m -json\n", ""},
+		{"command-empty", "command:\n  - make\n  - --no-print-directory\n  - test-artifact\n  - GO=go\n  - GO_TEST_FLAGS=-count=1 -timeout=15m -json\n", "command: []\n"},
 		{"command-empty-argument", "  - --no-print-directory\n", "  - ''\n"},
 		{"command-unsafe-argument", "  - --no-print-directory\n", "  - \"a\\nb\"\n"},
 		{"acquisition-empty", "acquisition:\n  command: [go, mod, download]", "acquisition: {}"},
@@ -186,6 +188,9 @@ func TestRegistrationFieldValidation(t *testing.T) {
 		{"environment-reference-attribute", "${inputs.executable.path}", "${inputs.executable.digest}"},
 		{"environment-reference-unclosed", "${inputs.executable.path}", "${inputs.executable.path"},
 		{"environment-reference-scope", "${inputs.executable.path}", "${env.HOME}"},
+		{"command-reference-role", "  - --no-print-directory\n", "  - ${inputs.typo.path}\n"},
+		{"command-reference-unclosed", "  - --no-print-directory\n", "  - ${inputs.executable.path\n"},
+		{"acquisition-reference-scope", "command: [go, mod, download]", "command: [go, mod, '${env.HOME}']"},
 		{"platforms-missing", "  platforms: [linux/amd64, linux/arm64]\n", ""},
 		{"platforms-empty", "platforms: [linux/amd64, linux/arm64]", "platforms: []"},
 		{"platform-form", "platforms: [linux/amd64, linux/arm64]", "platforms: [linux]"},
@@ -219,6 +224,7 @@ func TestRegistrationOptionalFields(t *testing.T) {
 		{"literal-environment", "${inputs.executable.path}", "/opt/nvkectl"},
 		{"empty-literal-environment", "${inputs.executable.path}", "''"},
 		{"embedded-reference", "${inputs.executable.path}", "path=${inputs.executable.path};v=${inputs.executable.version}"},
+		{"command-reference", "  - --no-print-directory\n", "  - ${inputs.executable.path}\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw := shippedContract(t)
@@ -280,11 +286,6 @@ func TestRegistrationsDirectoryLayout(t *testing.T) {
 				t.Fatal(err)
 			}
 		}},
-		{"too-many-directory-entries", func(t *testing.T, root string) {
-			for i := 0; i <= maxRegistrationDirectoryEntries; i++ {
-				writeCatalogFile(t, filepath.Join(root, fmt.Sprintf("nvke/many/s%d.yaml", i)), nil)
-			}
-		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := registrationFixture(t)
@@ -311,4 +312,95 @@ func TestRegistrationsRefuseMissingRootAndCancellation(t *testing.T) {
 	cancel()
 	_, err = LoadRegistrations(canceled, shippedRegistrations)
 	catalogCode(t, err, e.CodeTimeout)
+}
+
+// registrationText returns the shipped contract rewritten for id.
+func registrationText(t *testing.T, id string) string {
+	t.Helper()
+	return strings.Replace(string(shippedContract(t)), "id: nvke/nvkectl/contract", "id: "+id, 1)
+}
+
+// catalogMessage requires a coded refusal that names the intended rule.
+func catalogMessage(t *testing.T, err error, code e.Code, rule string) {
+	t.Helper()
+	catalogCode(t, err, code)
+	if !strings.Contains(err.Error(), rule) {
+		t.Fatalf("expected refusal for %q, got %v", rule, err)
+	}
+}
+
+func TestRegistrationsCatalogBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name, rule string
+		mutate     func(*testing.T, string)
+	}{
+		{"directory-entries", "entry limit", func(t *testing.T, root string) {
+			for i := 0; i <= maxRegistrationDirectoryEntries; i++ {
+				id := fmt.Sprintf("nvke/many/s%d", i)
+				writeCatalogFile(t, filepath.Join(root, id+".yaml"), []byte(registrationText(t, id)))
+			}
+		}},
+		{"registrations", "registration limit", func(t *testing.T, root string) {
+			for i := 0; i < maxRegistrations; i++ {
+				id := fmt.Sprintf("nvke/g%d/s%d", i%2, i)
+				writeCatalogFile(t, filepath.Join(root, id+".yaml"), []byte(registrationText(t, id)))
+			}
+		}},
+		{"catalog-bytes", "byte limit", func(t *testing.T, root string) {
+			for i := 0; i <= maxRegistrationCatalogBytes/maxRegistrationBytes; i++ {
+				id := fmt.Sprintf("nvke/large/s%d", i)
+				text := registrationText(t, id)
+				text += "#" + strings.Repeat(" ", maxRegistrationBytes-len(text)-3) + "\n"
+				writeCatalogFile(t, filepath.Join(root, id+".yaml"), []byte(text))
+			}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := registrationFixture(t)
+			tc.mutate(t, root)
+			_, err := LoadRegistrations(t.Context(), root)
+			catalogMessage(t, err, e.CodeUsage, tc.rule)
+		})
+	}
+}
+
+func TestRegistrationFieldBounds(t *testing.T) {
+	repeat := func(n int, line func(int) string) string {
+		var b strings.Builder
+		for i := range n {
+			b.WriteString(line(i))
+		}
+		return b.String()
+	}
+	for _, tc := range []struct{ name, old, replacement, rule string }{
+		{"inputs", "inputs:\n", "inputs:\n" + repeat(64, func(i int) string {
+			return fmt.Sprintf("  r%d:\n    output: nvkectl\n    component: nvkectl\n    format: executable\n", i)
+		}), "1..64 input roles"},
+		{"command-arguments", "  - --no-print-directory\n", repeat(256, func(int) string { return "  - x\n" }), "command requires"},
+		{"acquisition-arguments", "command: [go, mod, download]", "command: [go" + repeat(256, func(int) string { return ", x" }) + "]", "acquisition command requires"},
+		{"environment-bindings", "environment:\n", "environment:\n" + repeat(255, func(i int) string { return fmt.Sprintf("  E%d: x\n", i) }), "256 bindings"},
+		{"platforms", "platforms: [linux/amd64, linux/arm64]", "platforms: [linux/amd64, linux/arm64" + repeat(63, func(i int) string { return fmt.Sprintf(", linux/a%d", i) }) + "]", "requires.platforms"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := shippedContract(t)
+			if !bytes.Contains(raw, []byte(tc.old)) {
+				t.Fatalf("fixture no longer contains %q", tc.old)
+			}
+			root := registrationFixture(t)
+			writeCatalogFile(t, filepath.Join(root, "nvke/nvkectl/contract.yaml"), bytes.Replace(raw, []byte(tc.old), []byte(tc.replacement), 1))
+			_, err := LoadRegistrations(t.Context(), root)
+			catalogMessage(t, err, e.CodeUsage, tc.rule)
+		})
+	}
+}
+
+// With several invalid bindings, the refusal names the first in sorted order.
+func TestRegistrationEnvironmentRefusalDeterministic(t *testing.T) {
+	raw := bytes.Replace(shippedContract(t), []byte("environment:\n"), []byte("environment:\n  E: ${x}\n  D: ${x}\n  C: ${x}\n  B: ${x}\n  A: ${x}\n"), 1)
+	root := registrationFixture(t)
+	writeCatalogFile(t, filepath.Join(root, "nvke/nvkectl/contract.yaml"), raw)
+	for range 20 {
+		_, err := LoadRegistrations(t.Context(), root)
+		catalogMessage(t, err, e.CodeUsage, `binding "A"`)
+	}
 }

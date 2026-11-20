@@ -7,6 +7,7 @@ import (
 	"context"
 	"maps"
 	"path"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"sort"
@@ -98,16 +99,17 @@ func (r *Registration) validate(id string) error {
 	if r.WorkingDirectory != "" && !relativeDirectory(r.WorkingDirectory) {
 		return usage("workingDirectory must be a clean relative path within the test origin")
 	}
-	if !validCommand(r.Command) {
-		return usage("command requires 1..256 safe, non-empty arguments")
+	if !r.validCommand(r.Command) {
+		return usage("command requires 1..256 safe, non-empty arguments with declared input references")
 	}
-	if r.Acquisition != nil && !validCommand(r.Acquisition.Command) {
-		return usage("acquisition command requires 1..256 safe, non-empty arguments")
+	if r.Acquisition != nil && !r.validCommand(r.Acquisition.Command) {
+		return usage("acquisition command requires 1..256 safe, non-empty arguments with declared input references")
 	}
 	if len(r.Environment) > 256 {
 		return usage("registration environment exceeds 256 bindings")
 	}
-	for name, value := range r.Environment {
+	for _, name := range slices.Sorted(maps.Keys(r.Environment)) {
+		value := r.Environment[name]
 		if !environmentName.MatchString(name) || !safetext.Valid(value, 4096, true) || !r.validReferences(value) {
 			return e.New(e.CodeUsage, "invalid environment binding %q", name)
 		}
@@ -157,12 +159,12 @@ func relativeDirectory(dir string) bool {
 		dir != "." && dir != ".." && !strings.HasPrefix(dir, "../")
 }
 
-func validCommand(arguments []string) bool {
+func (r *Registration) validCommand(arguments []string) bool {
 	if len(arguments) == 0 || len(arguments) > 256 {
 		return false
 	}
 	for _, argument := range arguments {
-		if !validText(argument) {
+		if !validText(argument) || !r.validReferences(argument) {
 			return false
 		}
 	}
@@ -193,8 +195,9 @@ func LoadRegistrations(ctx context.Context, path string) (*Registrations, error)
 	if ctx == nil {
 		return nil, usage("validator catalog requires context")
 	}
-	if !pathText(path) {
-		return nil, usage("validator catalog requires a directory path")
+	// A trailing separator or dot would make the final component follow a symlink.
+	if !pathText(path) || filepath.Clean(path) != path {
+		return nil, usage("validator catalog requires a clean directory path")
 	}
 	root, err := openCatalogRoot(ctx, path)
 	if err != nil {

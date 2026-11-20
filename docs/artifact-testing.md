@@ -51,6 +51,10 @@ requires:
 timeout: 30m
 ```
 
+Arguments of `command` and `acquisition.command`, and `environment` values, may reference only
+`${inputs.<declared role>.path|version}`; any other `${` text is refused. The catalog path must be
+a clean directory path (no trailing `/` or `.`).
+
 Registrations are not yet executed: selection, Run binding and the executor that runs
 `command` are follow-up work. `validators run --profile` below still uses the earlier indexed
 catalog under `inputs/testing/validators/` until it is migrated.
