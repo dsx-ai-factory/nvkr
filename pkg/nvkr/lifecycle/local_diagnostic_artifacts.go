@@ -13,6 +13,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/safetext"
 )
 
@@ -41,6 +42,7 @@ type localDiagnosticArtifactState struct {
 	mu         sync.RWMutex
 	closed     bool
 	raw        string
+	plan       string
 	capture    *localQualificationCapture
 	context    context.Context
 	cancel     context.CancelFunc
@@ -84,12 +86,16 @@ func CaptureLocalDiagnosticArtifacts(ctx context.Context, attemptDirectory strin
 	if err != nil {
 		return nil, errors.Join(err, capture.Close())
 	}
+	plan, err := canonical.Marshal(inputs.plan)
+	if err != nil {
+		return nil, errors.Join(err, capture.Close())
+	}
 	if err := ctx.Err(); err != nil {
 		return nil, errors.Join(e.Wrap(e.CodeTimeout, err, "local diagnostic capture canceled"), capture.Close())
 	}
 	operationContext, cancel := context.WithCancel(context.WithoutCancel(ctx))
 	return &LocalDiagnosticArtifacts{state: &localDiagnosticArtifactState{
-		raw: string(raw), capture: capture, context: operationContext, cancel: cancel,
+		raw: string(raw), plan: string(plan), capture: capture, context: operationContext, cancel: cancel,
 	}}, nil
 }
 
@@ -110,6 +116,26 @@ func (owner *LocalDiagnosticArtifacts) Description() (LocalDiagnosticDescription
 		return LocalDiagnosticDescription{}, e.Wrap(e.CodeGateUnmet, err, "reading local diagnostic description")
 	}
 	return description, nil
+}
+
+// Plan returns a detached copy of the Plan this owner replayed from the Run's
+// captured compiler inputs; its digest is the description's PlanDigest. It is
+// a description for deriving producer inputs, not a receipt.
+func (owner *LocalDiagnosticArtifacts) Plan() (*factory.Plan, error) {
+	if owner == nil || owner.state == nil {
+		return nil, e.New(e.CodeGateUnmet, "local diagnostic artifacts have not been captured")
+	}
+	state := owner.state
+	state.mu.RLock()
+	defer state.mu.RUnlock()
+	if state.closed || state.capture == nil || state.plan == "" {
+		return nil, e.New(e.CodeGateUnmet, "local diagnostic artifacts are closed")
+	}
+	var plan factory.Plan
+	if err := canonical.UnmarshalExact([]byte(state.plan), &plan); err != nil {
+		return nil, e.Wrap(e.CodeGateUnmet, err, "reading local diagnostic Plan")
+	}
+	return &plan, nil
 }
 
 func (owner *LocalDiagnosticArtifacts) beginOperation(ctx context.Context) (context.Context, func(), error) {

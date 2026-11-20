@@ -11,6 +11,10 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 )
 
+// ArtifactTestComponent is the producer component whose test inputs validation
+// admits. Selection below also accepts explicit CLI recipe variants.
+const ArtifactTestComponent = "nvkectl"
+
 // CLIArtifactTestInputs describes a validated Plan's CLI test runner inputs.
 // It authenticates neither supplied artifact bytes nor membership in a Run.
 type CLIArtifactTestInputs struct {
@@ -49,6 +53,27 @@ func LoadCLIArtifactPlan(ctx context.Context, path string) (*CLIArtifactPlan, er
 		return nil, err
 	}
 	return &CLIArtifactPlan{plan: plan, documentSHA256: digest}, nil
+}
+
+// SelectCLIArtifactTestInputs derives the test inputs of one explicitly named
+// CLI output from an already validated Plan, such as one replayed from a
+// completed Run. It never infers the output, and refuses an output built from
+// any component other than the named one.
+func SelectCLIArtifactTestInputs(plan *Plan, output, component string) (*CLIArtifactTestInputs, error) {
+	if plan == nil || output == "" || component == "" {
+		return nil, e.New(e.CodeUsage, "CLI test input selection requires a Plan, an explicit output and a component")
+	}
+	inputs, err := selectCLIArtifactTestInputs(plan, output)
+	if err != nil {
+		return nil, err
+	}
+	// Selection admits CLI recipe variants; the caller names the one it accepts.
+	for _, build := range plan.Builds {
+		if build.Name == inputs.Output && len(build.Components) == 1 && build.Components[0] != component {
+			return nil, e.New(e.CodeEngineCapability, "output %q is built from %q, not %q", output, build.Components[0], component)
+		}
+	}
+	return inputs, nil
 }
 
 func selectCLIArtifactTestInputs(plan *Plan, output string) (*CLIArtifactTestInputs, error) {

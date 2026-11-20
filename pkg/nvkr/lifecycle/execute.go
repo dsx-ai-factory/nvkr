@@ -20,6 +20,17 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
+// defaultAttemptsRoot holds local attempts when LocalOptions.AttemptsRoot is empty.
+const defaultAttemptsRoot = ".nvkr/runs"
+
+// LocalAttemptDirectory is the workspace ExecuteLocal uses for attempt beneath root.
+func LocalAttemptDirectory(root, attempt string) string {
+	if root == "" {
+		root = defaultAttemptsRoot
+	}
+	return filepath.ToSlash(filepath.Join(root, attempt))
+}
+
 type LocalOptions struct {
 	AttemptsRoot string
 	RunnerSource string
@@ -124,9 +135,9 @@ func executeLocalWithDependencies(ctx context.Context, prepared *PreparedRun, op
 	}
 	root := options.AttemptsRoot
 	if root == "" {
-		root = filepath.ToSlash(filepath.Join(".nvkr", "runs"))
+		root = defaultAttemptsRoot
 	}
-	workspace := filepath.ToSlash(filepath.Join(root, prepared.run.Attempt))
+	workspace := LocalAttemptDirectory(root, prepared.run.Attempt)
 	recordPath := filepath.Join(workspace, "lifecycle.json")
 	factoryOptions := factory.LocalRunOptions{Workspace: workspace, RunnerSource: options.RunnerSource,
 		CompileInputs: prepared.inputs,

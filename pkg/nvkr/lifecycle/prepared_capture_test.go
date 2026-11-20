@@ -110,3 +110,78 @@ func TestExecuteLocalHandsCapturedInputsToFactory(t *testing.T) {
 		})
 	}
 }
+
+func TestPreparedRunCLIArtifactTestInputs(t *testing.T) {
+	prepared, err := PrepareCapturedFiles(t.Context(), "../../..", "docs/examples/nvke-tutorial/definition-amd64.yaml",
+		"docs/examples/nvke-tutorial/environment-local-amd64.yaml", "test", "cli-inputs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputs, err := prepared.CLIArtifactTestInputs("nvkectl", factory.ArtifactTestComponent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := factory.SelectCLIArtifactTestInputs(prepared.plan, "nvkectl", factory.ArtifactTestComponent)
+	if err != nil || *inputs != *want || inputs.Platform != "linux/amd64" || inputs.ExpectedVersion == "" {
+		t.Fatalf("unexpected inputs: %+v, %v", inputs, err)
+	}
+	for _, tc := range []struct {
+		name              string
+		prepared          *PreparedRun
+		output, component string
+		code              e.Code
+	}{
+		{"unknown-output", prepared, "missing", factory.ArtifactTestComponent, e.CodeUsage},
+		{"other-component", prepared, "nvkectl", "nvkectl-local-site", e.CodeEngineCapability},
+		{"implicit-output", prepared, "", factory.ArtifactTestComponent, e.CodeUsage},
+		{"implicit-component", prepared, "nvkectl", "", e.CodeUsage},
+		{"nil", nil, "nvkectl", factory.ArtifactTestComponent, e.CodeUsage},
+		{"zero", &PreparedRun{}, "nvkectl", factory.ArtifactTestComponent, e.CodeUsage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			inputs, err := tc.prepared.CLIArtifactTestInputs(tc.output, tc.component)
+			var coded *e.Error
+			if !errors.As(err, &coded) || coded.Code != tc.code || inputs != nil {
+				t.Fatalf("expected %v, got %+v, %v", tc.code, inputs, err)
+			}
+		})
+	}
+}
+
+func TestPreparedRunAdmitsLocalDiagnosticCapture(t *testing.T) {
+	prepared, err := PrepareCapturedFiles(t.Context(), "../../..", "docs/examples/nvke-tutorial/definition-amd64.yaml",
+		"docs/examples/nvke-tutorial/environment-local-amd64.yaml", "test", "capture-admission")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := prepared.AdmitLocalDiagnosticCapture(); err != nil {
+		t.Fatal(err)
+	}
+	// Capture refuses composite Runs, so a composite Plan is refused before building.
+	composite := &PreparedRun{plan: &factory.Plan{Composition: &factory.CompositionRecord{}}}
+	for _, tc := range []struct {
+		name     string
+		prepared *PreparedRun
+		code     e.Code
+	}{
+		{"composite", composite, e.CodeEngineCapability},
+		{"nil", nil, e.CodeUsage},
+		{"zero", &PreparedRun{}, e.CodeUsage},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var coded *e.Error
+			if err := tc.prepared.AdmitLocalDiagnosticCapture(); !errors.As(err, &coded) || coded.Code != tc.code {
+				t.Fatalf("expected %v, got %v", tc.code, err)
+			}
+		})
+	}
+}
+
+func TestLocalAttemptDirectory(t *testing.T) {
+	if got := LocalAttemptDirectory("", "a1"); got != ".nvkr/runs/a1" {
+		t.Fatal(got)
+	}
+	if got := LocalAttemptDirectory("custom/root", "a1"); got != "custom/root/a1" {
+		t.Fatal(got)
+	}
+}

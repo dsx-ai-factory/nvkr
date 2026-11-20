@@ -19,3 +19,6 @@ func (*catalogRoot) Close() error { return nil }
 func (*catalogRoot) read(context.Context, string, int) ([]byte, error) {
 	return nil, e.New(e.CodeEngineCapability, "catalog safe file loading requires Linux or Darwin")
 }
+func (*catalogRoot) names(context.Context, string, int) ([]string, error) {
+	return nil, e.New(e.CodeEngineCapability, "catalog safe file loading requires Linux or Darwin")
+}
