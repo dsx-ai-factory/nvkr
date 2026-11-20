@@ -158,8 +158,8 @@ func TestReleaseVerifyForwardsCompleteExactInputsToLifecycleUseCase(t *testing.T
 		"--reference", reference,
 		"--lane", "pipeline-attested", "--scope", "artifact-publication",
 		"--identity", "^builder$", "--issuer", "issuer", "--anonymous",
-		"--definition", "inputs/definitions/nvke/gpu-site-release.composite.yaml",
-		"--environment", "inputs/environments/github-nvke-gpu-site.yaml",
+		"--definition", "inputs/definitions/nvke/nvke-release.composite.yaml",
+		"--environment", "inputs/environments/github-nvke.yaml",
 		"--plan", ".github/nvkr-run-nvke/plan.json",
 	}
 	app := &cli.App{Commands: []*cli.Command{cmdReleaseWithVerify(verify)}}
@@ -198,8 +198,8 @@ func TestReleaseVerifyForwardsDiskEvidencePolicyWithExactInputs(t *testing.T) {
 				"--reference", "registry.example.test/releases@sha256:" + strings.Repeat("a", 64),
 				"--lane", "pipeline-attested", "--scope", "artifact-publication",
 				"--identity", "^builder$", "--issuer", "issuer",
-				"--definition", "inputs/definitions/nvke/gpu-site-release.composite.yaml",
-				"--environment", "inputs/environments/github-nvke-gpu-site.yaml",
+				"--definition", "inputs/definitions/nvke/nvke-release.composite.yaml",
+				"--environment", "inputs/environments/github-nvke.yaml",
 				"--plan", ".github/nvkr-run-nvke/plan.json",
 			}
 			if minimum != "" {

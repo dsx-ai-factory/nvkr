@@ -31,7 +31,7 @@ jobs:
           [ ! -L "$GITHUB_STEP_SUMMARY" ] || exit 0
           [ ! -e "$GITHUB_STEP_SUMMARY" ] || [ -f "$GITHUB_STEP_SUMMARY" ] || exit 0
           {
-            printf '%s\n' '## NVKR Run started' '' '<code>nvke-gpu-site-release</code> · 84 planned outputs · <code>linux/amd64, linux/arm64</code>' '' 'Lane: <code>pipeline-attested</code>. Execution and completeness checks are pending.' ''
+            printf '%s\n' '## NVKR Run started' '' '<code>nvke-release</code> · 84 planned outputs · <code>linux/amd64, linux/arm64</code>' '' 'Lane: <code>pipeline-attested</code>. Execution and completeness checks are pending.' ''
           } >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
       - &checkout-workflow-source
         name: Check out workflow source
@@ -61,7 +61,7 @@ jobs:
         run: ./nvkr-exec factory github install-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
       - name: Verify committed Run generation is current
         id: validate-catalog
-        run: ./nvkr-exec run generate --engine github --definition inputs/definitions/nvke/gpu-site-release.composite.yaml --environment inputs/environments/github-nvke-nightly-gpu-site.yaml --root . --runtime
+        run: ./nvkr-exec run generate --engine github --definition inputs/definitions/nvke/nvke-release.composite.yaml --environment inputs/environments/github-nvke-nightly.yaml --root . --runtime
       - name: 'Stage packed runtime inputs'
         run: |
           ./nvkr-exec factory github stage-runtime-inputs --plan .github/nvkr-run-nvke-nightly/plan.json
@@ -4765,7 +4765,7 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
       - name: Finalize Run and check completeness
         id: finalize-catalog
-        run: ./nvkr-exec run finalize --definition inputs/definitions/nvke/gpu-site-release.composite.yaml --environment inputs/environments/github-nvke-nightly-gpu-site.yaml --plan .github/nvkr-run-nvke-nightly/plan.json --attempt "${{ github.run_id }}-${{ github.run_attempt }}" --workspace .nvkr/factory --out .nvkr/run.json --handoff .nvkr/qualification/handoff.json
+        run: ./nvkr-exec run finalize --definition inputs/definitions/nvke/nvke-release.composite.yaml --environment inputs/environments/github-nvke-nightly.yaml --plan .github/nvkr-run-nvke-nightly/plan.json --attempt "${{ github.run_id }}-${{ github.run_attempt }}" --workspace .nvkr/factory --out .nvkr/run.json --handoff .nvkr/qualification/handoff.json
       - name: Upload final Run record
         id: upload-run-record
         uses: ./.github/nvkr-run-nvke-nightly/actions/ci-upload

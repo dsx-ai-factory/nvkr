@@ -4,19 +4,9 @@
 apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
-  description: Dispatch-frozen NVKE GPU site composite candidate publication in its own partitioned workflow and registry namespace. Native disks retain build provenance; deep inspection and material reconciliation remain deferred.
-  name: nvke-nightly-github
-githubBundle: nvke-nightly
-githubRuntimePlan: true
-githubRuntimeSources:
-  - repository: https://github.com/NVIDIA/aicr
-    ref: refs/heads/main
-  - repository: https://github.com/dsx-ai-factory/cluster-api-provider-nico
-    ref: refs/heads/main
-  - repository: https://github.com/dsx-ai-factory/nvke
-    ref: refs/heads/main
-  - repository: https://github.com/dsx-ai-factory/ovn-kubernetes
-    ref: refs/heads/main
+  description: Signed NVKE composite candidate publication in its own partitioned workflow and registry namespace. Native disks retain build provenance; deep inspection and material reconciliation remain deferred.
+  name: nvke-github
+githubBundle: nvke
 githubExecutionPartitions: true
 githubARC: native-kvm-v1
 toolchainAccess:
@@ -90,12 +80,12 @@ diskInspectionProfiles:
 publication:
   mode: per-output-v1
   credentialRef: github:NVKR_REGISTRY_WRITE
-  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/candidate/nvke
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared
 signing:
-  identity: ^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run-nvke-nightly\.yml@refs/heads/main$
+  identity: ^https://github\.com/dsx-ai-factory/nvkr/\.github/workflows/nvkr-run-nvke\.yml@refs/heads/main$
   issuer: https://token.actions.githubusercontent.com
   mode: cosign
 utilityContainer: busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1

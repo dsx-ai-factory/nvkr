@@ -10,17 +10,17 @@ sources: [nvke, nvke-helm]
 producerOverlays: inputs/policies/ovn-producer-overlays.json
 sameRelease:
   - [nvke, nvke-helm]
-definition: inputs/definitions/nvke/gpu-site-release.composite.yaml
-environment: inputs/environments/github-nvke-gpu-site.yaml
-qualificationPolicy: inputs/policies/nvke-gpu-site-qualification.yaml
+definition: inputs/definitions/nvke/nvke-release.composite.yaml
+environment: inputs/environments/github-nvke.yaml
+qualificationPolicy: inputs/policies/nvke-composite-qualification.yaml
 # Production and nightly own the derived inventory; development retains its payload-only composite.
 additionalRuns:
-  - definition: inputs/definitions/nvke/gpu-site.composite.yaml
+  - definition: inputs/definitions/nvke/nvke.composite.yaml
     environment: inputs/environments/github-development.yaml
-    qualificationPolicy: inputs/policies/nvke-gpu-site-development-qualification.yaml
-  - definition: inputs/definitions/nvke/gpu-site-release.composite.yaml
-    environment: inputs/environments/github-nvke-nightly-gpu-site.yaml
-    qualificationPolicy: inputs/policies/nvke-nightly-gpu-site-qualification.yaml
+    qualificationPolicy: inputs/policies/nvke-composite-development-qualification.yaml
+  - definition: inputs/definitions/nvke/nvke-release.composite.yaml
+    environment: inputs/environments/github-nvke-nightly.yaml
+    qualificationPolicy: inputs/policies/nvke-composite-nightly-qualification.yaml
   # Independent build-only bundle shares action pins and the generator/store owner.
   # Refresh checks its complete closure; it does not repin WLI or add NVKE outputs.
   - definition: inputs/definitions/nvidia-workload-identity/imds-agent.yaml
