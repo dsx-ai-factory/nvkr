@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:bf71f635b11ba43d2aa5023da455f2dc7eeda3cceb3dd8dd808b63bfcb8a3ccc",
-  "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
+  "catalogDigest": "sha256:846dcc17957d283482e241ed117d4d61060b1a37930c85f2a799e3de717ba092",
   "components": [
     "csi-node-driver-registrar-image"
   ],

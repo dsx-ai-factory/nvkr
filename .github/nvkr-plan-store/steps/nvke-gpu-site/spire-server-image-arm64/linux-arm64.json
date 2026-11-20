@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:363e2fd1a57e4a582656b047cfe98d2edf26ccc79727beafc4c91432e821142b",
-  "catalogDigest": "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99",
+  "catalogDigest": "sha256:846dcc17957d283482e241ed117d4d61060b1a37930c85f2a799e3de717ba092",
   "components": [
     "spire-server-image"
   ],

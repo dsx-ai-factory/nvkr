@@ -33,7 +33,7 @@ The [development guide](../DEVELOPMENT.md#test-the-gitlab-adapter-against-a-real
 resources, token isolation, HTTPS trust, API submission and retained evidence. It is opt-in and fails
 when prerequisites are absent. This is an ordinary unsigned build, not signing or qualification.
 
-`go run ./internal/citestshard` discovers the ordinary Go suite and partitions it across the Merge Gate's fifteen
+`go run ./internal/citestshard` discovers the ordinary Go suite and partitions it across the Merge Gate's nineteen
 test jobs. It includes examples and fuzz seed tests, and requires exact completion of the discovered
 selection. New packages and tests need no allowlist update. `make test-shard` reproduces one matrix
 entry; `make test` still runs the full suite. Each child command may retain at most 32 MiB of stdout;
@@ -130,7 +130,7 @@ NVKE_LOCAL_CLONE=/path/to/nvke scripts/demo-m1-local.sh
 ```
 
 `demo-m1-local.sh` generates and checks its three-output GitHub bundle in a fresh temporary directory,
-whose path it prints for inspection. The repository's committed bundle selects the 34-output NVKE candidate.
+whose path it prints for inspection. The repository's committed bundle selects the 83-output NVKE composite.
 The local walkthrough publishes to its loopback registry using dry-run signing. Local attempts are immutable and
 `unqualified-local-execution`; plans remain `static-unqualified`. See the
 [M1 walkthrough and acceptance limits](../demos/m1-local.md).

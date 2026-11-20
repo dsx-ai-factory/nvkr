@@ -34,7 +34,7 @@ func cmdCatalog() *cli.Command {
 				Usage:     "print one validated source pin as JSON",
 				ArgsUsage: "<source>",
 				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"},
+					&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Required: true, Usage: "path to the catalog directory"},
 				},
 				Action: func(c *cli.Context) error {
 					view, err := selectCommandPresentation(c)
@@ -66,9 +66,9 @@ func cmdCatalog() *cli.Command {
 			{
 				Name:  "digest",
 				Usage: "print the exact resolved catalog snapshot digest used to pin an ordered component overlay",
-				Flags: []cli.Flag{&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"}},
+				Flags: []cli.Flag{&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Required: true, Usage: "path to the catalog directory"}},
 				Action: func(c *cli.Context) error {
-					if err := rejectUnusedArguments(c, "data"); err != nil {
+					if err := rejectUnusedArguments(c, "catalog"); err != nil {
 						return err
 					}
 					view, err := selectCommandPresentation(c)
@@ -95,9 +95,9 @@ func cmdCatalog() *cli.Command {
 			{
 				Name:  "validate",
 				Usage: "load and fail-closed-validate a catalog",
-				Flags: []cli.Flag{&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"}},
+				Flags: []cli.Flag{&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Required: true, Usage: "path to the catalog directory"}},
 				Action: func(c *cli.Context) error {
-					if err := rejectUnusedArguments(c, "data"); err != nil {
+					if err := rejectUnusedArguments(c, "catalog"); err != nil {
 						return err
 					}
 					view, err := selectCommandPresentation(c)
@@ -119,13 +119,13 @@ func cmdCatalog() *cli.Command {
 				Name:  "list",
 				Usage: "list components in a catalog or catalog root, optionally filtered by platform and output type",
 				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"},
+					&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Required: true, Usage: "path to the catalog directory"},
 					&cli.StringSliceFlag{Name: "platform", Usage: "only components declaring this exact platform (for example linux/arm64); give at most once"},
 					&cli.StringSliceFlag{Name: "output-type", Usage: "only components with this exact output type (for example host-package); give at most once"},
 					&cli.StringFlag{Name: "format", Value: "text", Usage: "text or json"},
 				},
 				Action: func(c *cli.Context) error {
-					if err := rejectUnusedArguments(c, "data"); err != nil {
+					if err := rejectUnusedArguments(c, "catalog"); err != nil {
 						return err
 					}
 					format := c.String("format")
@@ -143,7 +143,7 @@ func cmdCatalog() *cli.Command {
 					if err := catalog.ValidateSelectors(platform, outputType); err != nil {
 						return err
 					}
-					if _, err := os.Lstat(filepath.Join(c.String("data"), catalog.RegistryFile)); os.IsNotExist(err) {
+					if _, err := os.Lstat(filepath.Join(c.String("catalog"), catalog.RegistryFile)); os.IsNotExist(err) {
 						return presentCatalogInventory(c, "", platform, outputType)
 					}
 					view, err := selectCommandPresentation(c)
@@ -201,7 +201,7 @@ func cmdCatalog() *cli.Command {
 				Usage:     "explain one validated component: producer mode, pins, platforms and material closure",
 				ArgsUsage: "<component>",
 				Flags: []cli.Flag{
-					&cli.StringFlag{Name: "data", Required: true, Usage: "path to the catalog directory"},
+					&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Required: true, Usage: "path to the catalog directory"},
 					&cli.StringFlag{Name: "format", Value: "text", Usage: "text or json"},
 				},
 				Action: func(c *cli.Context) error {
@@ -243,7 +243,7 @@ func cmdCatalog() *cli.Command {
 					&cli.StringFlag{Name: "tag", Usage: "tag to pin (default: newest matching the source constraint)"},
 					&cli.StringFlag{Name: "commit", Usage: "full Git source commit to pin without a release-tag claim; incompatible with --tag"},
 					&cli.BoolFlag{Name: "check", Usage: "resolve and show the complete pin update without writing"},
-					&cli.StringFlag{Name: "dir", Required: true, Usage: "on-disk catalog directory to update"},
+					&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Required: true, Usage: "on-disk catalog directory to update"},
 					&cli.StringFlag{Name: "runtime", Value: "docker", Usage: "legacy default-only option (docker); image pins use anonymous HTTPS"},
 					&cli.DurationFlag{Name: "timeout", Value: 5 * time.Minute, Usage: "maximum duration for upstream git/container resolution"},
 				},
@@ -255,22 +255,22 @@ func cmdCatalog() *cli.Command {
 				Description: "Family bump is supported only on a checkout the operator exclusively owns, with no uncoordinated writers during the run.",
 				ArgsUsage:   "[source...]",
 				Flags: []cli.Flag{
-					&cli.BoolFlag{Name: "all", Usage: "with --dir, bump every source in that catalog; with a family name and no --dir, coordinate its declared catalogs"},
+					&cli.BoolFlag{Name: "all", Usage: "with --catalog, bump every source in that catalog; with a family name and no --catalog, coordinate its declared catalogs"},
 					&cli.BoolFlag{Name: "check", Usage: "dry-run: print the lockfile diff, write nothing (ADR-22 §4)"},
-					&cli.StringFlag{Name: "dir", Usage: "on-disk catalog directory for legacy single-catalog bump"},
+					&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Usage: "on-disk catalog directory for single-catalog bump"},
 					&cli.StringFlag{Name: "family-config", Value: "inputs/policies/nvke-catalog-maintenance.yaml", Usage: "reviewed family maintenance policy (family mode only)"},
 					&cli.StringFlag{Name: "runtime", Value: "docker", Usage: "legacy default-only option (docker); image pins use anonymous HTTPS"},
 					&cli.DurationFlag{Name: "timeout", Value: 5 * time.Minute, Usage: "maximum duration for upstream git/container resolution"},
 				},
 				Action: func(c *cli.Context) error {
-					if !c.IsSet("dir") && c.Bool("all") && c.Args().Len() == 1 {
+					if !c.IsSet("catalog") && c.Bool("all") && c.Args().Len() == 1 {
 						return bumpCatalogFamily(c)
 					}
-					if c.String("dir") == "" {
-						return e.New(e.CodeUsage, "bump requires --dir, or --all followed by one declared family name")
+					if c.String("catalog") == "" {
+						return e.New(e.CodeUsage, "bump requires --catalog, or --all followed by one declared family name")
 					}
 					if c.IsSet("family-config") {
-						return e.New(e.CodeUsage, "--family-config requires family mode without --dir")
+						return e.New(e.CodeUsage, "--family-config requires family mode without --catalog")
 					}
 					return pinSources(c, true)
 				},
@@ -282,7 +282,7 @@ func cmdCatalog() *cli.Command {
 				Flags: []cli.Flag{
 					&cli.BoolFlag{Name: "all", Usage: "pin every prebuilt component"},
 					&cli.StringSliceFlag{Name: "arch", Usage: "optional exact declared architecture set to pin"},
-					&cli.StringFlag{Name: "dir", Required: true, Usage: "on-disk catalog directory to update"},
+					&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Required: true, Usage: "on-disk catalog directory to update"},
 					&cli.StringFlag{Name: "runtime", Aliases: []string{"docker"}, Value: "docker", Usage: "legacy default-only option (docker); image pins use anonymous HTTPS"},
 					&cli.DurationFlag{Name: "timeout", Value: 5 * time.Minute, Usage: "maximum duration for artifact digest resolution"},
 				},
@@ -310,7 +310,7 @@ func pinSources(c *cli.Context, bump bool) error {
 	ctx, cancel := context.WithTimeout(c.Context, c.Duration("timeout"))
 	defer cancel()
 	update, err := catalog.UpdateSourcePins(ctx, catalog.SourcePinRequest{
-		Directory: c.String("dir"), Sources: c.Args().Slice(), Tag: c.String("tag"), Commit: c.String("commit"),
+		Directory: c.String("catalog"), Sources: c.Args().Slice(), Tag: c.String("tag"), Commit: c.String("commit"),
 		Bump: bump, All: c.Bool("all"), Check: c.Bool("check"), Runtime: c.String("runtime"),
 	})
 	if view.tui {
@@ -340,7 +340,7 @@ func pinSources(c *cli.Context, bump bool) error {
 		}
 	}
 	if errors.As(err, &coded) && coded.Code == e.CodeDiff {
-		fmt.Printf("(dry-run) %d pin(s) would change in %s/%s\n", update.Changed, c.String("dir"), catalog.LockFile)
+		fmt.Printf("(dry-run) %d pin(s) would change in %s/%s\n", update.Changed, c.String("catalog"), catalog.LockFile)
 	}
 	if err != nil {
 		return err
@@ -348,7 +348,7 @@ func pinSources(c *cli.Context, bump bool) error {
 	if update.Changed == 0 {
 		fmt.Println("no changes")
 	} else {
-		fmt.Printf("wrote %d pin(s) to %s/%s\n", update.Changed, c.String("dir"), catalog.LockFile)
+		fmt.Printf("wrote %d pin(s) to %s/%s\n", update.Changed, c.String("catalog"), catalog.LockFile)
 	}
 	return nil
 }
@@ -361,7 +361,7 @@ func pinArtifacts(c *cli.Context) error {
 	ctx, cancel := context.WithTimeout(c.Context, c.Duration("timeout"))
 	defer cancel()
 	update, err := catalog.UpdateArtifactPins(ctx, catalog.ArtifactPinRequest{
-		Directory: c.String("dir"), Components: c.Args().Slice(), All: c.Bool("all"),
+		Directory: c.String("catalog"), Components: c.Args().Slice(), All: c.Bool("all"),
 		Architectures: c.StringSlice("arch"), Runtime: c.String("runtime"),
 	})
 	if view.tui {
@@ -385,7 +385,7 @@ func pinArtifacts(c *cli.Context) error {
 	if update.Changed == 0 {
 		fmt.Println("no changes")
 	} else {
-		fmt.Printf("wrote artifact pin(s) to %s/%s\n", c.String("dir"), catalog.LockFile)
+		fmt.Printf("wrote artifact pin(s) to %s/%s\n", c.String("catalog"), catalog.LockFile)
 	}
 	return nil
 }

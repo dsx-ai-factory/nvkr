@@ -27,7 +27,7 @@ additionalRuns:
     environment: inputs/environments/github-wli-imds-agent.yaml
 validation: static
 
-# Explicit release cohort for `catalog bump --all nvke` without --dir.
+# Explicit release cohort for `catalog bump --all nvke` without a catalog path.
 # Shared domain sources also advance their diagnostic, local-site, module CLI
 # and NVIDIA profile consumers. Local-site Helm and NKTP remain separate.
 family:

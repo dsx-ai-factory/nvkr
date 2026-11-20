@@ -77,8 +77,8 @@ source key. Use `catalog pin-artifacts` for its supported acquired-artifact path
 rather than assuming every pin command has check mode. Derived members update through their owning source. The
 [pin-set guide](../../../../docs/generic-pin-set-example.md) and [catalog maintenance
 guide](../../../../docs/catalog-maintenance.md) cover coordinated updates and matching generator identity.
-`catalog bump --all FAMILY` without `--dir` selects only the reviewed maintenance family's explicit roots
-and consumer closure; `--all --dir PATH` retains single-catalog behavior. Preview the declared scope before
+`catalog bump --all FAMILY` without a catalog path selects only the reviewed maintenance family's explicit roots
+and consumer closure; `--all --catalog PATH` retains single-catalog behavior. Preview the declared scope before
 applying. Keep independent cohorts and the separately authored commit-only packaging stream explicit.
 
 When a pin feeds configured producer copies, follow the maintenance guide's

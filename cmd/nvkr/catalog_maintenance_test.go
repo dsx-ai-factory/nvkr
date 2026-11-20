@@ -53,11 +53,15 @@ func TestCatalogBumpFamilyCompatibility(t *testing.T) {
 		contains string
 	}{
 		{"family without directory", []string{"--all", "--family-config", "absent.yaml", "nvke"}, e.CodeInvalidCatalog, "maintenance"},
-		{"legacy all requires directory", []string{"--all"}, e.CodeUsage, "--dir"},
-		{"legacy named requires directory", []string{"nvke"}, e.CodeUsage, "--dir"},
-		{"multiple families", []string{"--all", "nvke", "other"}, e.CodeUsage, "--dir"},
+		{"legacy all requires directory", []string{"--all"}, e.CodeUsage, "--catalog"},
+		{"legacy named requires directory", []string{"nvke"}, e.CodeUsage, "--catalog"},
+		{"multiple families", []string{"--all", "nvke", "other"}, e.CodeUsage, "--catalog"},
 		{"family config and directory conflict", []string{"--all", "--dir", "absent", "--family-config", "absent.yaml"}, e.CodeUsage, "family mode"},
 		{"legacy all directory", []string{"--all", "--dir", "absent"}, e.CodeInvalidCatalog, ""},
+		{"canonical all catalog", []string{"--all", "--catalog", "absent"}, e.CodeInvalidCatalog, ""},
+		{"data alias all catalog", []string{"--all", "--data", "absent"}, e.CodeInvalidCatalog, ""},
+		{"family config and canonical catalog conflict", []string{"--all", "--catalog", "absent", "--family-config", "absent.yaml", "nvke"}, e.CodeUsage, "family mode"},
+		{"family config and data alias conflict", []string{"--all", "--data", "absent", "--family-config", "absent.yaml", "nvke"}, e.CodeUsage, "family mode"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Chdir(t.TempDir())

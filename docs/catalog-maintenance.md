@@ -22,9 +22,10 @@ The preview lists each catalog's old/new pins, recipe versions, maintained overl
 consumers. It compiles the candidate privately before returning `NVKR-E-DIFF` when changes are needed.
 Family mode defaults to a 15-minute timeout; `--timeout` overrides it.
 
-With `--dir`, `--all` retains its single-catalog meaning: `catalog bump --all --dir PATH` updates
+With `--catalog`, `--all` retains its single-catalog meaning: `catalog bump --all --catalog PATH` updates
 all sources in that catalog and does not enroll any other catalog. Family mode requires one family
-name and no `--dir`; it uses the policy's explicit roots rather than discovering repositories by URL.
+name and no catalog path; `--data` and `--dir` remain aliases for `--catalog`. Family mode uses the
+policy's explicit roots rather than discovering repositories by URL.
 The scheduled `catalog refresh` workflow retains its existing selected-source behavior.
 
 The maintained NVKE family selects 21 source roles across four domain catalogs used by the maintained Plans.
@@ -134,7 +135,7 @@ For NVIDIA TCG pin updates, follow the commands beside its
 [source catalog](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/ovn/nvidia/notes/ovn-nvidia-README.md).
 For the native NVIDIA overlay, update the release node-image catalog instead: review the constraints for
 both `ovn-kubernetes` and `nvke-cni-ovn-source`, then use `catalog pin` with
-`--dir inputs/catalogs/node-images` to pin each source to the same reviewed revision. Review the
+`--catalog inputs/catalogs/node-images` to pin each source to the same reviewed revision. Review the
 release producers' version and commit constants in that same change; they do not inherit the TCG catalog's
 source-metadata bindings. Keep lock updates machine-managed. Then regenerate the copies:
 

@@ -26,7 +26,7 @@ current main is the source of NVKE v0.21.0's OVN 1.4.0 release. A rebuilt image 
 new bytes and identity. The source lock was generated with:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/ovn/nvidia \
+bin/nvkr catalog pin --catalog inputs/catalogs/ovn/nvidia \
   --tag v2.4.2 --timeout 5m ovn-kubernetes
 ```
 

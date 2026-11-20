@@ -55,6 +55,32 @@ A source can serve several components. A pin set can derive several source or ac
 from one upstream release's version file. Update those members through their owning source. Use
 `catalog bump --check` to preview changes without writing the lock; pending changes return `NVKR-E-DIFF`.
 
+`--catalog` is the catalog-directory flag for inspection, resolution, pinning and starter authoring.
+`--data` and `--dir` remain compatibility aliases. Supply only one spelling per invocation;
+combining aliases is a coded usage error before catalog reads or writes. The separate validator
+commands use `--catalog` for a validator index, not a producer catalog directory; these aliases do not apply there.
+
+## Producer bytes and final formats
+
+A catalog's `outputType` describes what its producer emits. A Definition's `format` describes the
+named deliverable assembled from the selected producers. They are separate stages; the compiler
+validates the selected bytes, material closure and packaging requirements together.
+
+| Producer output | Typical final format | Meaning |
+|---|---|---|
+| `oci-image` | `oci` | Native container image; supported platform sets form an image index. |
+| `host-package` | `executable` | Selected executable files packaged for delivery. |
+| `host-package` | `apt-repository` | Debian package producers assembled into an APT repository. |
+| `host-package` | `debian-package` | One source-produced Debian archive retained as the final file. |
+| `tarball` | `helm-oci` | A chart archive with chart packaging requirements. |
+| `tarball` | `bundle-oci` | One bundle root and its explicitly selected material closure. |
+| `disk-image` | `disk-image` | One QCOW2 root and its explicit material closure. |
+
+These are packaging relationships, not automatic conversions or aliases. A tarball is not necessarily
+a Helm chart, and a host package is not necessarily a Debian archive. Specialized pinned-tool producers
+also have their own admitted output contracts. Existing `SourceBuildRegistry`, producer output types
+and final format spellings remain unchanged; this vocabulary introduces no serialized schema migration.
+
 ## Share sources with explicit roles
 
 Several producers can refer to one source key and reuse its exact pinned checkout. A single repository
@@ -138,8 +164,8 @@ Maintained generation still uses the composite built from family files.
 Browse all catalogs without first choosing a producer:
 
 ```sh
-nvkr catalog list --data inputs/catalogs
-nvkr catalog find --data inputs/catalogs nvkectl
+nvkr catalog list --catalog inputs/catalogs
+nvkr catalog find --catalog inputs/catalogs nvkectl
 ```
 
 Root listing includes imported components and keeps duplicate names separate by catalog path.
@@ -160,11 +186,11 @@ do not change this navigation index.
 After editing catalog inputs, run `make catalog-index-generate`; `make catalog-index-check`
 rejects stale content and also runs as part of `make workflows-check`.
 
-`nvkr catalog list --data DIR` prints every component. Two optional selectors narrow it, and
+`nvkr catalog list --catalog DIR` prints every component. Two optional selectors narrow it, and
 `--format json` prints a machine-readable projection:
 
 ```bash
-nvkr catalog list --data inputs/catalogs/tools \
+nvkr catalog list --catalog inputs/catalogs/tools \
   --platform linux/arm64 --output-type host-package --format json
 ```
 
@@ -274,7 +300,7 @@ unrelated extras. Root-only selection does not expand dependencies automatically
 To see what to select, explain the root component:
 
 ```sh
-bin/nvkr catalog show --data inputs/catalogs/node-images nvke-node-fde-amd64
+bin/nvkr catalog show --catalog inputs/catalogs/node-images nvke-node-fde-amd64
 ```
 
 It prints the producer mode, exact pins and platforms, the sorted material closure, and every binding

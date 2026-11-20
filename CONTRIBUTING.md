@@ -92,10 +92,10 @@ Select it directly in an output with a concrete platform, with every source, too
 content identity. A qualified prebuilt entry must also declare digest-pinned typed evidence or an exact authenticated
 waiver; v1 acquisition uses the separate production-evidence contract. Run `make build` and validate the changed Definition with `bin/nvkr definition validate --definition <path>`. The source bake-off command is retired;
 release qualification also requires the authenticated producer, terminal, evidence, policy, and status chain
-described in the ADR reconciliation. Operators may ship an entirely separate catalog via `--data` (see
+described in the ADR reconciliation. Operators may ship an entirely separate catalog via `--catalog` (see
 `testdata/examples/operator-catalog/`).
 
-Catalog diagnostics require an explicit `--data` path. There is no embedded worker catalog or backward-compatibility
+Catalog diagnostics require an explicit `--catalog` path. There is no embedded worker catalog or backward-compatibility
 requirement. Worker binaries belong to the NVKE OS-image build; add product outputs through a Definition.
 
 ## Pull request process

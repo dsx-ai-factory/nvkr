@@ -38,6 +38,17 @@ both `resolve` and `catalog bump`.
   prebuilt (no-compile) components. A source-version bump changes the lock, then regenerates explicitly
   maintained producer copies and Run bundles; the registry's source-derived bindings stay unchanged.
 
+Maintained catalog metadata uses the slash-separated directory identity relative to `inputs/catalogs/`,
+for example `ovn/nvidia`. This is descriptive naming, not a schema or producer-key rename.
+Existing catalog names remain accepted. Renaming metadata changes the catalog snapshot digest;
+rebind authored overlay predecessors through the snapshot/stack owner and regenerate generated copies
+and dependent Plans through their owners. Update explicit name-keyed local toolchain binding selectors in the same migration. Lock bytes and selected producer Build Digests remain unchanged
+when only names change. Previously captured Plans retain their original bytes and identities.
+The maintained Definition retains the `nvke` name and the composite generation inventory owns workflow
+names and result paths. Historical results and registry namespaces containing `m2-candidate` remain
+compatibility identifiers; catalog metadata migration does not rewrite them.
+
+
 Both files carry explicit `apiVersion` and `kind`. Readers dispatch to an exact versioned schema, reject unknown
 versions/kinds/fields, and never interpret a future lock as the current version. A missing lock is an input error,
 not an implicit empty lock.
@@ -114,7 +125,7 @@ from the new pin; ordinary command contracts remain unchanged. The existing `sou
 remains tag-only. This opt-in form neither introduces recipe selection nor changes source identity.
 
 An explicit maintenance `family` selects catalog/source roots across the policy's generated closure.
-`catalog bump --all FAMILY` without `--dir` uses that selection; `--all --dir PATH` retains one-catalog
+`catalog bump --all FAMILY` without a catalog path uses that selection; `--all --catalog PATH` retains one-catalog
 semantics. Family members must share exact constraint and tag-prefix text and resolve one release identity,
 while retaining distinct fetch and producer contracts. ADR-21 owns candidate preparation and commitment.
 
@@ -245,9 +256,9 @@ No second fetch by a caller-supplied child, standalone unbounded layer client, o
 store substitutes for the parent's selected image. This is pipeline-attested acquisition-origin evidence,
 not an upstream signature, build reproduction, source approval or production delivery claim.
 
-- `catalog pin --dir <catalog> --tag vX.Y.Z <source>` — resolve that tag to
+- `catalog pin --catalog <catalog> --tag vX.Y.Z <source>` — resolve that tag to
   `{tag, commit, treeHash, sourceDateEpoch}` and update the lock.
-- `catalog pin --dir <catalog> --commit <full-commit> <source>` pins an exact Git
+- `catalog pin --catalog <catalog> --commit <full-commit> <source>` pins an exact Git
   source revision through the same acquisition and atomic lock writer. It cannot
   be combined with `--tag` or bump. The held Git commit, tree and epoch are checked;
   the lock's descriptive `tag` is that full commit, not an invented release tag.
@@ -257,9 +268,9 @@ not an upstream signature, build reproduction, source approval or production del
   `bump` rejects selected commit-mode pins (`tag == commit`) before upstream work;
   moving one requires explicit `pin --commit` or `pin --tag` intent, not a routine
   automatic conversion to the newest release tag.
-- `catalog bump --dir <catalog> [--all] [source...]` — resolve the newest tag matching each selected source's
+- `catalog bump --catalog <catalog> [--all] [source...]` — resolve the newest tag matching each selected source's
   `constraint` (e.g. `1.32.x`). `--all` selects independent roots and visits each explicitly nested set once.
-- `catalog pin-artifacts --dir <catalog> [--all] [component...]` — resolve the complete declared architecture
+- `catalog pin-artifacts --catalog <catalog> [--all] [component...]` — resolve the complete declared architecture
   set of prebuilt digests through the existing URL or image acquisition path.
 
 - `catalog pin` and `catalog bump` accept `--check`: resolve and print the complete update without writing.
@@ -295,7 +306,7 @@ differs only by withholding the commit.
 
 ### 5. The lock is DATA and ships on its own train, decoupled from the tool
 
-Because the lock is data, a newer lock ships as a **catalog release**, consumed via `--data` / a catalog
+Because the lock is data, a newer lock ships as a **catalog release**, consumed via `--catalog` / a catalog
 reference, on its **own cadence independent of `nvkr` releases**. `nvkr` (the tool) is released only when
 its *logic* changes; the embedded default lock is a **periodically-refreshed known-good default**, not the
 mechanism operators rely on to stay current. An operator tracking security fixes pulls a **newer catalog, not a

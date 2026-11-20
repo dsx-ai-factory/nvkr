@@ -362,7 +362,7 @@ implement these owned, bounded cancellation mechanics; the acceptance section be
 exhaustive zero-orphan proof for the remaining daemon/adapter matrix.
 
 Catalog I/O follows the same rule. Authority-bearing loads admit a deep context-aware provider rather than
-placing checkpoints around a legacy blocking call. The stock `--data` provider descriptor-resolves every path
+placing checkpoints around a legacy blocking call. The stock `--catalog` provider descriptor-resolves every path
 component without following symlinks, accepts regular files only, caps each file and the aggregate load, and
 bounds recursive listing count and depth. `client/v1.WithProvider` rejects a legacy provider before invoking it.
 Catalog parsing and I/O use the same context-aware loading API.
