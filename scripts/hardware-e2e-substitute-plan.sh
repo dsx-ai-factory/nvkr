@@ -22,7 +22,10 @@
 # from NVKE. The fixture checks below apply to both forms.
 #
 # Each node image in the outputs manifest names its source: where it came from and the NVKE
-# version it was built at. A node image built at a different version than the plan's subject
+# version it was built at. The source kind says whether NVKR built it: nvkr-release cites an NVKR
+# release's digest, and ci-run cites the https URL of another CI run, such as the NVKE run that
+# published a release. Only the first is NVKR-built; the stage script and the run summary name the
+# second as not NVKR-built. A node image built at a different version than the plan's subject
 # is refused unless --allow-node-image-version-skew is given; the substitution record then says
 # the combination is skewed, and the run summary repeats that. The flag permits a combination
 # nobody has run before. It does not make it a tested one.
@@ -32,7 +35,9 @@
 # {method: s3-readback, run, bytes, qcow2Version, virtualSizeBytes} cites the publication run that
 # read the object back from the object store. The second exists because the HTTPS front end can sit
 # behind an address allowlist that a hosted runner is not on. This script checks the shape only; it
-# does not authenticate the cited run, and the summary says this run did not observe it.
+# does not authenticate the cited run, and the summary says this run did not observe it. The two sizes
+# must be whole numbers, and a whole number spelled 538.0 is recorded as 538, so the record never
+# carries a spelling that the image check, which reads integers, would refuse.
 #
 # Exit codes: 0 ok, 2 usage, 13 unsupported input, 22 fixture differs from its provenance,
 # 29 unsupported node image location, 41 a required slot is missing, 47 output exists,
@@ -192,7 +197,9 @@ record=$(jq -n --indent 2 --argjson slots "$slots" --slurpfile o "$outputs" --sl
       to: $o[0].outputs[$name].url,
       sha256: ($o[0].outputs[$name].sha256 // null),
       source: ($o[0].outputs[$name].source // null),
-      verification: ($o[0].outputs[$name].verification // null)} | with_entries(select(.value != null))],
+      verification: (($o[0].outputs[$name].verification // null)
+        | if type == "object" and .method == "s3-readback" then (.bytes |= floor | .virtualSizeBytes |= floor) else . end)}
+      | with_entries(select(.value != null))],
     retainedFromNvke: [entries | select(.name as $n | $slots | has($n) | not)
       | {name, version, url} | with_entries(select(.value != null))] | unique}')
 
@@ -200,4 +207,7 @@ record=$(jq -n --indent 2 --argjson slots "$slots" --slurpfile o "$outputs" --sl
 mkdir -m 700 "$out"
 printf '%s\n' "$result" >"$out/plan.json"
 printf '%s\n' "$record" >"$out/substitutions.json"
-printf 'nvkr: substituted %s NVKR-built references into %s\n' "$(jq -r '.replaced | length' <<<"$record")" "$out/plan.json"
+printf 'nvkr: substituted %s references into %s (%s of %s node images are NVKR releases)\n' \
+  "$(jq -r '.replaced | length' <<<"$record")" "$out/plan.json" \
+  "$(jq -r '[.replaced[] | select((.slot | startswith("os-image-")) and .source.kind == "nvkr-release")] | length' <<<"$record")" \
+  "$(jq -r '[.replaced[] | select(.slot | startswith("os-image-"))] | length' <<<"$record")"

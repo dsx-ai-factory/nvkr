@@ -18,6 +18,12 @@ name: NVKR NVKE node image publication
 # A re-run is safe: the key holds the digest, so a second publication rewrites identical bytes and a
 # different image can never replace this one. That is why, unlike the hardware E2E workflow, a later attempt
 # is allowed.
+#
+# A dry run is its own job. A job's permissions and environment cannot depend on an input, so a dry run
+# holds no credential, requests no OIDC token and waits for no approval only by being a job that never has
+# them. The environment's variables are out of its sight for the same reason: it pulls and checks the
+# image for real and names the object key, which the image's bytes decide, and it prints a placeholder
+# store and host that are not addresses.
 
 'on':
   workflow_dispatch:
@@ -39,7 +45,7 @@ name: NVKR NVKE node image publication
         type: string
         required: true
       dry-run:
-        description: Pull and check each image and name where it would go, without credentials, an upload or a record.
+        description: Pull and check each image and name its object key, in a job without the s3-publish environment, credentials, an upload or a record.
         type: boolean
         default: false
 
@@ -50,9 +56,76 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # No environment and no id-token: nothing here can reach the object store or its role.
+  check:
+    name: ${{ matrix.slot }} (dry run)
+    if: github.repository == 'dsx-ai-factory/nvkr' && inputs.dry-run
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - slot: os-image-amd64
+            output: ${{ inputs.amd64-output }}
+          - slot: os-image-arm64
+            output: ${{ inputs.arm64-output }}
+    steps:
+      - name: Check out NVKR
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
+
+      # Only release pull is used, so nothing here builds, signs or verifies anything.
+      - name: Build nvkr
+        env:
+          GOTOOLCHAIN: local
+          CGO_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/bin"
+          go build -trimpath -ldflags '-X main.version=dev -X main.commit=unknown' -o "$RUNNER_TEMP/bin/nvkr" ./cmd/nvkr
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The store root and host are placeholders: the s3-publish environment's variables are not visible to
+      # this job, by design, and ".invalid" never resolves. The key is the part the image decides.
+      - name: Pull and check the image
+        env:
+          SLOT: ${{ matrix.slot }}
+          OUTPUT: ${{ matrix.output }}
+          RELEASE: ${{ inputs.release }}
+          NVKE_VERSION: ${{ inputs.nvke-version }}
+          S3_URI: s3://nvkr-dry-run-placeholder
+          REGION: us-west-2
+          CDN_DOMAIN: dry-run.invalid
+          PREFIX: nvkr/os-image
+        run: |
+          set -euo pipefail
+          df -h "$RUNNER_TEMP"
+          python3 scripts/hardware-e2e-publish-node-image.py --dry-run \
+            --slot "$SLOT" --reference "$RELEASE" --output "$OUTPUT" --version "$NVKE_VERSION" \
+            --s3-uri "$S3_URI" --prefix "$PREFIX" --cdn-domain "$CDN_DOMAIN" --region "$REGION" \
+            --nvkr "$RUNNER_TEMP/bin/nvkr" \
+            --work-dir "$RUNNER_TEMP/pull" --out "$RUNNER_TEMP/record"
+
   publish:
-    name: ${{ matrix.slot }}${{ inputs.dry-run && ' (dry run)' || '' }}
-    if: github.repository == 'dsx-ai-factory/nvkr'
+    name: ${{ matrix.slot }}
+    if: github.repository == 'dsx-ai-factory/nvkr' && !inputs.dry-run
     runs-on: ubuntu-24.04
     # The variables and the role live in this environment, outside the repository.
     environment: s3-publish
@@ -74,26 +147,23 @@ jobs:
       # credential step. Say so before a checkout instead.
       - name: Admit the dispatch
         env:
-          DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
           REF: ${{ github.ref }}
         run: |
           set -euo pipefail
-          if [ "$DRY_RUN" != true ] && [ "$REF" != refs/heads/main ]; then
+          if [ "$REF" != refs/heads/main ]; then
             echo "::error::a real publication starts from refs/heads/main, not $REF"
             exit 1
           fi
 
       - name: Check the publication is configured
         env:
-          DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
           S3_URI: ${{ vars.S3_PUBLISH_S3_URI }}
           ROLE_ARN: ${{ vars.S3_PUBLISH_AWS_ROLE_ARN }}
           REGION: ${{ vars.S3_PUBLISH_AWS_REGION }}
           CDN_DOMAIN: ${{ vars.S3_PUBLISH_CLOUDFRONT_DOMAIN }}
         run: |
           set -euo pipefail
-          required=(S3_URI REGION CDN_DOMAIN)
-          if [ "$DRY_RUN" != true ]; then required+=(ROLE_ARN); fi
+          required=(S3_URI ROLE_ARN REGION CDN_DOMAIN)
           missing=()
           for name in "${required[@]}"; do
             [ -n "${!name}" ] || missing+=("$name")
@@ -131,9 +201,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # A dry run takes no credentials: it pulls and checks, and names where the image would go.
       - name: Configure AWS credentials
-        if: ${{ !inputs.dry-run }}
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ vars.S3_PUBLISH_AWS_ROLE_ARN }}
@@ -145,7 +213,6 @@ jobs:
           OUTPUT: ${{ matrix.output }}
           RELEASE: ${{ inputs.release }}
           NVKE_VERSION: ${{ inputs.nvke-version }}
-          DRY_RUN: ${{ inputs.dry-run && 'true' || 'false' }}
           S3_URI: ${{ vars.S3_PUBLISH_S3_URI }}
           REGION: ${{ vars.S3_PUBLISH_AWS_REGION }}
           CDN_DOMAIN: ${{ vars.S3_PUBLISH_CLOUDFRONT_DOMAIN }}
@@ -153,10 +220,8 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/attempts/${{ github.run_attempt }}
         run: |
           set -euo pipefail
-          flags=()
-          if [ "$DRY_RUN" = true ]; then flags+=(--dry-run); fi
           df -h "$RUNNER_TEMP"
-          python3 scripts/hardware-e2e-publish-node-image.py ${flags[@]+"${flags[@]}"} \
+          python3 scripts/hardware-e2e-publish-node-image.py \
             --slot "$SLOT" --reference "$RELEASE" --output "$OUTPUT" --version "$NVKE_VERSION" \
             --s3-uri "$S3_URI" --prefix "$PREFIX" --cdn-domain "$CDN_DOMAIN" --region "$REGION" \
             --run-url "$RUN_URL" --nvkr "$RUNNER_TEMP/bin/nvkr" \
@@ -164,7 +229,6 @@ jobs:
 
       # The entry to paste into the outputs manifest, with the run that checked it.
       - name: Show the outputs manifest entry
-        if: ${{ !inputs.dry-run }}
         env:
           SLOT: ${{ matrix.slot }}
         run: |
@@ -176,11 +240,11 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # The attempt is in the name because a re-run is allowed and an artifact name cannot repeat in a run.
       - name: Upload the publication record
-        if: ${{ !inputs.dry-run }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: nvkr-hardware-e2e-node-image-publication-${{ matrix.slot }}-${{ github.run_id }}
+          name: nvkr-hardware-e2e-node-image-publication-${{ matrix.slot }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/record
           if-no-files-found: error
           retention-days: 90

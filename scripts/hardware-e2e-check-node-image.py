@@ -15,7 +15,8 @@ What this establishes is narrow. It proves the URL served those bytes to the run
 moment. It does not prove the hardware site's network can reach the host, that the imager trusts its certificate,
 that the image boots, or that the object will still be there when the run starts. Whether the server
 honours Range is recorded, not required: it is a fact about the server, and what the imager needs is
-a question for the imager.
+a question for the imager. A server that refuses the Range probe outright is recorded as such, and the
+plain GET still decides whether the URL serves the named bytes.
 
 With --substitutions the URL, the digest and the method come from the substituted plan's record, where
 the outputs manifest named how each image was checked. http-get is the fetch above. s3-readback
@@ -53,7 +54,11 @@ METHOD_READBACK = "s3-readback"
 READBACK_KEYS = ["bytes", "method", "qcow2Version", "run", "virtualSizeBytes"]
 SUBSTITUTIONS_SCHEMA = "nvkr.dev/hardware-e2e-substitutions/v1"
 QCOW2_MAGIC = b"QFI\xfb"
+# The base header every version has. Version 3 adds the feature fields and the header length, to 104 bytes.
 QCOW2_HEADER_BYTES = 72
+QCOW2_V3_HEADER_BYTES = 104
+# Incompatible feature bit 2: the guest data lives in a separate file this one object does not carry.
+QCOW2_INCOMPATIBLE_EXTERNAL_DATA_FILE = 1 << 2
 CHUNK_BYTES = 1 << 20
 DEFAULT_MAX_BYTES = 64 << 30
 DEFAULT_TIMEOUT_SECONDS = 60
@@ -99,9 +104,19 @@ def get(opener, url, headers, timeout):
         return opener(url, headers, timeout)
     except urllib.error.HTTPError as error:
         what = "a redirect, which is not followed" if 300 <= error.code < 400 else "an error"
+        # An HTTPError is also the open response; nothing reads it, so release its connection here.
+        if getattr(error, "fp", None) is not None:
+            error.close()
         raise verify_failed(f"{url} answered HTTP {error.code} {error.reason}, {what}") from error
     except (urllib.error.URLError, OSError, http.client.HTTPException) as error:
         raise verify_failed(f"{url} could not be fetched: {error}") from error
+
+
+def qcow2_header_bytes(head):
+    """How many leading bytes a header parse needs: the version field says whether the feature fields follow."""
+    if len(head) >= 8 and struct.unpack(">I", head[4:8])[0] == 3:
+        return QCOW2_V3_HEADER_BYTES
+    return QCOW2_HEADER_BYTES
 
 
 def parse_qcow2_header(data):
@@ -119,20 +134,48 @@ def parse_qcow2_header(data):
         raise unsupported(f"the image is encrypted at the qcow2 layer (method {crypt_method})")
     if not 9 <= cluster_bits <= 21:
         raise unsupported(f"qcow2 cluster size 2^{cluster_bits} is out of range")
+    if size <= 0:
+        raise unsupported("the image declares no virtual size")
+    if version == 3:
+        if len(data) < QCOW2_V3_HEADER_BYTES:
+            raise unsupported(f"the image is {len(data)} bytes, too small to hold a version 3 qcow2 header")
+        (incompatible,) = struct.unpack(">Q", data[72:80])
+        if incompatible & QCOW2_INCOMPATIBLE_EXTERNAL_DATA_FILE:
+            raise unsupported("the image keeps its data in an external data file, which one published object cannot carry")
     return {"version": version, "virtualSizeBytes": size, "clusterSizeBytes": 1 << cluster_bits}
 
 
 def probe_range(opener, url, timeout):
-    """Ask for one byte. Recorded, never required: a 200 means the server ignored the Range header."""
-    response = get(opener, url, {**BASE_HEADERS, "Range": "bytes=0-0"}, timeout)
+    """Ask for one byte. Recorded, never required.
+
+    A 206 means the server honours Range, a 200 that it ignored the header, and anything else that the probe
+    was unavailable: a server may reject a Range request and still serve the whole object. The plain GET that
+    follows decides whether the URL serves the named bytes.
+    """
+    try:
+        response = get(opener, url, {**BASE_HEADERS, "Range": "bytes=0-0"}, timeout)
+    except Failure:
+        return "unavailable", ""
     try:
         status = status_of(response)
         accept = response.headers.get("Accept-Ranges", "")
-        if status not in (200, 206):
-            raise verify_failed(f"{url} answered the range request with HTTP {status}")
-        return status == 206, accept
+        if status == 206:
+            return "honoured", accept
+        return ("ignored" if status == 200 else "unavailable"), accept
     finally:
         response.close()
+
+
+def limit_next_read(response, seconds):
+    """Bound the next read by the time left.
+
+    A socket timeout restarts with every byte, so a server that trickles one byte inside it would keep a read
+    open for as long as it likes. Each read gets the smaller of the inactivity limit and what is left of the
+    whole-body deadline. A response with no socket behind it (a test's) has nothing to bound.
+    """
+    sock = getattr(getattr(getattr(response, "fp", None), "raw", None), "_sock", None)
+    if sock is not None:
+        sock.settimeout(seconds)
 
 
 def stream(opener, url, expected_sha256, timeout, max_bytes, max_seconds, clock):
@@ -153,11 +196,16 @@ def stream(opener, url, expected_sha256, timeout, max_bytes, max_seconds, clock)
 
         digest, count, head, qcow2 = hashlib.sha256(), 0, b"", None
         while True:
-            if clock() - started > max_seconds:
+            remaining = max_seconds - (clock() - started)
+            if remaining <= 0:
                 raise verify_failed(f"{url} was still streaming after {max_seconds}s, at {count} of {declared} bytes")
+            limit_next_read(response, min(timeout, remaining))
             try:
-                chunk = response.read(CHUNK_BYTES)
+                # read1: one read of the transport, so the deadline is looked at between reads.
+                chunk = response.read1(CHUNK_BYTES)
             except (OSError, http.client.HTTPException) as error:
+                if clock() - started >= max_seconds:
+                    raise verify_failed(f"{url} was still streaming after {max_seconds}s, at {count} of {declared} bytes") from error
                 raise verify_failed(f"{url} failed after {count} of {declared} bytes: {error}") from error
             if not chunk:
                 break
@@ -167,7 +215,7 @@ def stream(opener, url, expected_sha256, timeout, max_bytes, max_seconds, clock)
             digest.update(chunk)
             if qcow2 is None:
                 head += chunk
-                if len(head) >= QCOW2_HEADER_BYTES:
+                if len(head) >= qcow2_header_bytes(head):
                     qcow2 = parse_qcow2_header(head)
         if count != declared:
             raise verify_failed(f"{url} sent {count} of its declared {declared} bytes")
@@ -185,7 +233,7 @@ def check(slot, url, expected_sha256, opener=open_url, timeout=DEFAULT_TIMEOUT_S
           max_bytes=DEFAULT_MAX_BYTES, max_seconds=DEFAULT_MAX_SECONDS, clock=time.monotonic):
     if not URL.match(url):
         raise unsupported("the node image must be a plain https URL to a .qcow2, with no credentials, query or fragment")
-    range_supported, accept_ranges = probe_range(opener, url, timeout)
+    range_probe, accept_ranges = probe_range(opener, url, timeout)
     size, qcow2 = stream(opener, url, expected_sha256, timeout, max_bytes, max_seconds, clock)
     return {
         "schema": SCHEMA,
@@ -195,7 +243,8 @@ def check(slot, url, expected_sha256, opener=open_url, timeout=DEFAULT_TIMEOUT_S
         "url": url,
         "sha256": expected_sha256,
         "bytes": size,
-        "rangeSupported": range_supported,
+        "rangeProbe": range_probe,
+        "rangeSupported": range_probe == "honoured",
         "acceptRanges": accept_ranges,
         "qcow2": qcow2,
     }
@@ -330,7 +379,7 @@ def main(argv, opener=open_url, clock=time.monotonic):
         return failure.exit_code
     if record["method"] == METHOD_GET:
         print(f"nvkr: node image ok: {args.slot}, {record['bytes']} bytes, sha256 {record['sha256']}, "
-              f"range {'honoured' if record['rangeSupported'] else 'not honoured'}")
+              f"range {record['rangeProbe']}")
     else:
         print(f"nvkr: node image recorded, not fetched: {args.slot}, {record['bytes']} bytes, sha256 {record['sha256']}, "
               f"read back by {record['run']}")

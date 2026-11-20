@@ -618,6 +618,53 @@ func TestHardwareE2ESubstitutePlanCarriesEachNodeImageVerificationAndOnlyThose(t
 	}
 }
 
+// A producer written in another language may spell a whole size as 538000000.0. jq 1.7 carries that literal
+// into the record, where the node image check's whole number would no longer be equal to it.
+func TestHardwareE2ESubstitutePlanRecordsReadbackSizesAsWholeNumbers(t *testing.T) {
+	root := hardwareE2ERoot(t)
+	manifest := hardwareE2EOutputs()
+	hardwareE2EUseReadback(manifest)
+	encoded, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(encoded)
+	for _, field := range []string{
+		`"bytes":` + strconv.Itoa(hardwareE2ENodeImageBytes),
+		`"virtualSizeBytes":` + strconv.FormatInt(12<<30, 10),
+	} {
+		if !strings.Contains(text, field) {
+			t.Fatalf("the manifest has no %s to respell", field)
+		}
+		text = strings.ReplaceAll(text, field, field+".0")
+	}
+	scratch := t.TempDir()
+	outputs := filepath.Join(scratch, "outputs.json")
+	if err := os.WriteFile(outputs, []byte(text), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(scratch, "out")
+	result := hardwareE2ERun(t, hardwareE2ESubstituteTool, filepath.Join(root, hardwareE2EPlanFile),
+		filepath.Join(root, hardwareE2EProvenanceFile), outputs, out)
+	if result.exit != 0 {
+		t.Fatalf("exit %d, want 0:\n%s", result.exit, result.output)
+	}
+	record, err := os.ReadFile(filepath.Join(out, "substitutions.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, spelled := range []string{strconv.Itoa(hardwareE2ENodeImageBytes) + ".0", strconv.FormatInt(12<<30, 10) + ".0"} {
+		if strings.Contains(string(record), spelled) {
+			t.Errorf("the substitution record carries %s, want the whole number", spelled)
+		}
+	}
+	for _, spelled := range []string{strconv.Itoa(hardwareE2ENodeImageBytes), strconv.FormatInt(12<<30, 10)} {
+		if !strings.Contains(string(record), spelled) {
+			t.Errorf("the substitution record does not carry %s", spelled)
+		}
+	}
+}
+
 func TestHardwareE2ESubstitutePlanNodeImageVersionSkew(t *testing.T) {
 	const older = "v0.23.1"
 	root := hardwareE2ERoot(t)
@@ -887,6 +934,21 @@ func TestHardwareE2EMatrixRejectsStreamsTheLaneCannotRun(t *testing.T) {
 			streams: []map[string]any{hardwareE2EStream("c", "riscv", "riscv64", hardwareE2EHarnessProvider)}},
 		{name: "missing architecture", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "blank=",
 			streams: []map[string]any{hardwareE2EStream("c", "blank", "", hardwareE2EHarnessProvider)}},
+		// A non-forge entry is refused whatever it is called, so an entry with no stream name cannot slip past.
+		{name: "stream of another provider without a stream name", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "c/null=dsx",
+			streams: []map[string]any{hardwareE2EStream("c", "harness-stream", "amd64", hardwareE2EHarnessProvider), {"combination": "c", "arch": "amd64", "provider": "dsx"}}},
+		{name: "entry with another provider and an empty stream name", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "c/=dsx",
+			streams: []map[string]any{hardwareE2EStream("c", "", "amd64", "dsx")}},
+		{name: "entry with no stream name", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "without a combination and stream name, at positions: 1",
+			streams: []map[string]any{hardwareE2EStream("c", "named", "amd64", hardwareE2EHarnessProvider), {"combination": "c", "arch": "amd64", "provider": hardwareE2EHarnessProvider}}},
+		{name: "entry with an empty stream name", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "without a combination and stream name, at positions: 0",
+			streams: []map[string]any{hardwareE2EStream("c", "", "amd64", hardwareE2EHarnessProvider)}},
+		{name: "entry with no combination", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "without a combination and stream name, at positions: 0",
+			streams: []map[string]any{{"stream": "s", "arch": "amd64", "provider": hardwareE2EHarnessProvider}}},
+		{name: "entry with an empty combination", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "without a combination and stream name, at positions: 0",
+			streams: []map[string]any{hardwareE2EStream("", "s", "amd64", hardwareE2EHarnessProvider)}},
+		{name: "two entries with no stream name are not a duplicate to ignore", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "positions: 0, 1",
+			streams: []map[string]any{{"combination": "c", "arch": "amd64", "provider": hardwareE2EHarnessProvider}, {"combination": "c", "arch": "arm64", "provider": hardwareE2EHarnessProvider}}},
 		{name: "duplicate stream in one combination", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "twice",
 			streams: []map[string]any{hardwareE2EStream("c", "twice", "amd64", hardwareE2EHarnessProvider), hardwareE2EStream("c", "twice", "amd64", hardwareE2EHarnessProvider)}},
 		{name: "no streams", wantExit: 13, wantCode: "NVKR-E-UNSUPPORTED", wantText: "named no streams",

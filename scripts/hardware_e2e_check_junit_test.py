@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+import unittest.mock
 import xml.etree.ElementTree as ET
 
 HERE = Path(__file__).parent
@@ -37,14 +38,21 @@ TENANT = (
     f"[site-controller, needs:cpu=2, needs:gpu=1, {TENANT_LABEL}, lifecycle]"
 )
 NOT_SELECTED = "[It] NVKE e2e qualification a spec the dry run never selected [site-controller, nico-dsx]"
+# What the workflow passes the suite: the fixture's own filter.
+FILTER = "site-controller && !nico-dsx"
 
 
 class Report:
-    """An editable copy of the fixture, written to a temporary file on demand."""
+    """An editable copy of the fixture, written to a temporary file on demand.
 
-    def __init__(self, tree=None):
+    The fixture is a dry run's report. A copy stands in for a real run's report unless it is made with
+    dry=True, so it is stamped DryRun=false the way Ginkgo stamps a real run.
+    """
+
+    def __init__(self, tree=None, dry=False):
         self.root = copy.deepcopy(tree) if tree is not None else ET.parse(FIXTURE).getroot()
         self.suite = self.root if self.root.tag == "testsuite" else next(self.root.iter("testsuite"))
+        self.prop("DryRun", "true" if dry else "false")
 
     def case(self, name):
         for element in self.suite.iter("testcase"):
@@ -78,6 +86,14 @@ class Report:
                 return
         raise KeyError(name)
 
+    def drop_prop(self, name):
+        for properties in self.suite.iter("properties"):
+            for element in list(properties):
+                if element.get("name") == name:
+                    properties.remove(element)
+                    return
+        raise KeyError(name)
+
     def labels_of(self, predicate):
         return [e.get("name") for e in self.suite.iter("testcase") if predicate(e.get("name"))]
 
@@ -102,16 +118,20 @@ class CheckerCase(unittest.TestCase):
         self.addCleanup(self._directory.cleanup)
         self.directory = Path(self._directory.name)
 
-    def run_check(self, real, *, dry=FIXTURE, stage="full", extra=(), out=None):
-        out = out or self.directory / "coverage.json"
-        argv = ["--dry", str(dry), "--real", str(real), "--stage", stage, "--out", str(out), *extra]
+    def main(self, argv):
         stderr = io.StringIO()
         with contextlib.redirect_stderr(stderr):
             try:
                 code = checker.main(argv)
             except SystemExit as exit_:
                 code = exit_.code
-        return Run(code, stderr.getvalue(), out)
+        return code, stderr.getvalue()
+
+    def run_check(self, real, *, dry=FIXTURE, stage="full", extra=(), out=None, label_filter=FILTER):
+        out = out or self.directory / "coverage.json"
+        argv = ["--dry", str(dry), "--real", str(real), "--stage", stage, "--label-filter", label_filter, "--out", str(out), *extra]
+        code, stderr = self.main(argv)
+        return Run(code, stderr, out)
 
     def real_from(self, edit=None, **kwargs):
         report = Report()
@@ -182,7 +202,7 @@ class AcceptedRuns(CheckerCase):
             for element in report.suite.iter("testcase"):
                 element.set("name", element.get("name").replace(f"{TENANT_LABEL},", "nico-other,"))
 
-        dry = Report()
+        dry = Report(dry=True)
         rename(dry)
         dry_path = dry.write(self.directory, "dry.junit.xml")
         real = Report()
@@ -312,7 +332,7 @@ class EarlierStages(CheckerCase):
 
 class DryRunAdmission(CheckerCase):
     def dry(self, edit):
-        report = Report()
+        report = Report(dry=True)
         edit(report)
         return report.write(self.directory, "dry.junit.xml")
 
@@ -320,7 +340,8 @@ class DryRunAdmission(CheckerCase):
         real = Report().write(self.directory)
         cases = [
             ("the dry run did not succeed", lambda r: r.prop("SuiteSucceeded", "false"), "the dry run did not succeed"),
-            ("filter does not select site-controller", lambda r: r.prop("LabelFilter", "!nico-dsx"), "does not select the site-controller specs"),
+            ("filter is not the one the workflow passes", lambda r: r.prop("LabelFilter", "!nico-dsx"), "is not the 'site-controller && !nico-dsx' the workflow expects"),
+            ("a selected spec lacks the site-controller label", lambda r: r.case(PROVISIONING).set("name", "[It] NVKE e2e qualification provisions a node [needs:cpu=2, needs:gpu=1]"), "does not carry the site-controller label"),
             ("a selected spec has no labels", lambda r: r.case(TENANT).set("name", f"[It] NVKE e2e qualification tenant on the built site {TENANT_LABEL} creates the cluster"), "carries no labels"),
             ("a selected spec failed in the dry run", lambda r: r.fail(TENANT), "the dry run reports"),
             ("a spec is listed twice", lambda r: r.add_passed(TENANT), "more than once"),
@@ -340,7 +361,7 @@ class DryRunAdmission(CheckerCase):
         ]
         for name, extra, group in cases:
             with self.subTest(name):
-                report = Report()
+                report = Report(dry=True)
                 if group == "site-checks":
                     for element in report.suite.iter("testcase"):
                         for label in checker.SITE_CHECK_LABELS:
@@ -352,7 +373,132 @@ class DryRunAdmission(CheckerCase):
                             element.set("name", n.replace("]", ", readiness]") if n.endswith("]") else n)
                 dry = report.write(self.directory, "dry.junit.xml")
                 run = self.run_check(real, dry=dry, extra=extra, out=self.directory / f"{group}.json")
-                self.assertRejected(run, "NVKR-E-UNSUPPORTED", 13, "the dry run selects no specs for", group, "the harness changed")
+                self.assertRejected(run, "NVKR-E-UNSUPPORTED", 13, "selects no specs for", group, "the harness changed")
+
+
+class StageRegistration(CheckerCase):
+    """The harness registers specs by stage, so a lower stage's dry run has no tenant or site-check specs at all.
+
+    These dry runs are trimmed the way the harness trims them (the specs are absent, not skipped), which is
+    what the stage-by-stage coverage check has to accept.
+    """
+
+    def trimmed(self, groups):
+        probe = checker.read_report(Report(dry=True).write(self.directory, "probe.xml"))
+        doomed = [
+            case.name for case in probe.cases
+            if case.is_spec and case.status != "skipped" and checker.category(case, TENANT_LABEL) in groups
+        ]
+        dry, real = Report(dry=True), Report()
+        for report in (dry, real):
+            for name in doomed:
+                report.remove(name)
+        return dry.write(self.directory, "dry.junit.xml"), real.write(self.directory, "real.junit.xml")
+
+    def test_each_stage_is_asked_only_for_what_it_registers(self):
+        cases = [
+            ("provision", {"tenant", "site-checks"}, {"provisioning"}),
+            ("bootstrap", {"tenant", "site-checks"}, {"provisioning"}),
+            ("deployment", {"tenant"}, {"provisioning", "site-checks"}),
+        ]
+        for stage, absent, present in cases:
+            with self.subTest(stage):
+                dry, real = self.trimmed(absent)
+                run = self.run_check(real, dry=dry, stage=stage, out=self.directory / f"{stage}.json")
+                self.assertEqual(run.exit_code, 0, run.stderr)
+                record = run.record
+                self.assertFalse(record["complete"])
+                self.assertGreater(record["selected"], 0)
+                self.assertEqual(record["passed"], record["selected"])
+                for group in absent:
+                    self.assertEqual(record["categories"][group], {"selected": 0, "passed": 0})
+                for group in present:
+                    self.assertGreater(record["categories"][group]["selected"], 0)
+
+    def test_the_full_stage_still_needs_all_three_groups(self):
+        for absent in ({"tenant"}, {"site-checks"}, {"provisioning"}):
+            with self.subTest(sorted(absent)):
+                dry, real = self.trimmed(absent)
+                run = self.run_check(real, dry=dry, stage="full", out=self.directory / f"{sorted(absent)[0]}.json")
+                self.assertRejected(run, "NVKR-E-UNSUPPORTED", 13, "the dry run at stage full selects no specs for", sorted(absent)[0])
+
+    def test_a_stage_still_needs_the_groups_it_registers(self):
+        cases = [("deployment", {"site-checks"}), ("deployment", {"provisioning"}), ("provision", {"provisioning"}), ("bootstrap", {"provisioning"})]
+        for stage, absent in cases:
+            with self.subTest(stage, absent=sorted(absent)):
+                dry, real = self.trimmed(absent)
+                run = self.run_check(real, dry=dry, stage=stage, out=self.directory / f"{stage}-{sorted(absent)[0]}.json")
+                self.assertRejected(run, "NVKR-E-UNSUPPORTED", 13, f"the dry run at stage {stage} selects no specs for", sorted(absent)[0])
+
+    def test_the_required_groups_are_the_harnesss_stage_gates(self):
+        self.assertEqual(set(checker.REQUIRED_GROUPS), set(checker.STAGES))
+        self.assertEqual(checker.REQUIRED_GROUPS["full"], checker.CATEGORIES)
+        self.assertNotIn("tenant", checker.REQUIRED_GROUPS["deployment"])
+        self.assertNotIn("site-checks", checker.REQUIRED_GROUPS["bootstrap"])
+
+
+class DryRunFlag(CheckerCase):
+    """A report says which kind it is, and each place the check reads one demands the right kind."""
+
+    def test_a_dry_run_report_cannot_stand_in_for_the_run(self):
+        # The committed fixture is a dry run's report; passed as both, it must not read as complete coverage.
+        run = self.run_check(FIXTURE)
+        self.assertRejected(run, "NVKR-E-UNSUPPORTED", 13, "the run's report carries DryRun='true', not DryRun='false'")
+
+    def test_the_selection_must_be_a_dry_run_report(self):
+        real_as_selection = Report().write(self.directory, "selection.junit.xml")
+        run = self.run_check(Report().write(self.directory), dry=real_as_selection)
+        self.assertRejected(run, "NVKR-E-UNSUPPORTED", 13, "the dry run's report carries DryRun='false', not DryRun='true'")
+
+    def test_a_report_that_does_not_say_what_it_is_is_refused(self):
+        def forget(report):
+            report.drop_prop("DryRun")
+
+        run = self.run_check(self.real_from(forget)[0])
+        self.assertRejected(run, "NVKR-E-UNSUPPORTED", 13, "the run's report carries no DryRun property")
+        dry = Report(dry=True)
+        dry.drop_prop("DryRun")
+        run = self.run_check(Report().write(self.directory, "r.xml"), dry=dry.write(self.directory, "d.xml"), out=self.directory / "b.json")
+        self.assertRejected(run, "NVKR-E-UNSUPPORTED", 13, "the dry run's report carries no DryRun property")
+
+
+class DryOnly(CheckerCase):
+    """The dry run is admitted before a machine is held, so a harness that changed is found for free."""
+
+    def dry_argv(self, dry, stage="full", label_filter=FILTER):
+        return ["--dry", str(dry), "--stage", stage, "--label-filter", label_filter, "--dry-only"]
+
+    def test_a_usable_dry_run_is_admitted_and_nothing_is_written(self):
+        before = sorted(p.name for p in self.directory.iterdir())
+        code, stderr = self.main(self.dry_argv(FIXTURE))
+        self.assertEqual((code, stderr), (0, ""))
+        self.assertEqual(sorted(p.name for p in self.directory.iterdir()), before)
+
+    def test_a_dry_run_that_will_fail_the_check_is_refused_before_any_machine(self):
+        cases = [
+            ("the harness changed its tenant label", lambda r: None, ("--tenant-label", "nico-missing"), "full", "tenant"),
+            ("the filter is not the one passed", lambda r: r.prop("LabelFilter", "site-controller"), (), "full", "is not the"),
+            ("the dry run failed", lambda r: r.prop("SuiteSucceeded", "false"), (), "provision", "the dry run did not succeed"),
+            ("the report is a real run's", lambda r: r.prop("DryRun", "false"), (), "provision", "DryRun='false'"),
+        ]
+        for name, edit, extra, stage, fragment in cases:
+            with self.subTest(name):
+                report = Report(dry=True)
+                edit(report)
+                code, stderr = self.main([*self.dry_argv(report.write(self.directory, "dry.xml"), stage=stage), *extra])
+                self.assertEqual(code, 13, stderr)
+                self.assertIn("[NVKR-E-UNSUPPORTED]", stderr)
+                self.assertIn(fragment, stderr)
+
+    def test_a_lower_stage_dry_run_with_only_the_groups_it_registers_is_admitted(self):
+        probe = checker.read_report(FIXTURE)
+        keep = Report(dry=True)
+        for case in probe.cases:
+            if case.is_spec and case.status != "skipped" and checker.category(case, TENANT_LABEL) != "provisioning":
+                keep.remove(case.name)
+        path = keep.write(self.directory, "provision-dry.xml")
+        self.assertEqual(self.main(self.dry_argv(path, stage="provision"))[0], 0)
+        self.assertEqual(self.main(self.dry_argv(path, stage="full"))[0], 13)
 
 
 class MalformedReports(CheckerCase):
@@ -362,7 +508,7 @@ class MalformedReports(CheckerCase):
         return path
 
     def test_unusable_reports_are_unsupported(self):
-        good = Report().write(self.directory, "good.junit.xml")
+        good = Report(dry=True).write(self.directory, "good.junit.xml")
         # Each report needs its own file: the list is built before any case runs.
         cases = [
             ("not XML", self.write("not xml", "not-xml.xml"), "not well-formed XML"),
@@ -388,6 +534,31 @@ class MalformedReports(CheckerCase):
         self.addCleanup(setattr, checker, "MAX_REPORT_BYTES", original)
         self.assertRejected(self.run_check(Report().write(self.directory)), "NVKR-E-UNSUPPORTED", 13, "exceeds 100 bytes")
 
+    def test_a_report_is_never_read_past_the_limit_plus_one_byte(self):
+        # read_bytes() would hold the whole file before the limit applies.
+        original = checker.MAX_REPORT_BYTES
+        checker.MAX_REPORT_BYTES = 100
+        self.addCleanup(setattr, checker, "MAX_REPORT_BYTES", original)
+        big = self.write("<testsuite name='s'>" + " " * 10_000 + "</testsuite>", "big.xml")
+        reads = []
+        real_open = Path.open
+
+        def watched_open(path, mode="r", *args, **kwargs):
+            handle = real_open(path, mode, *args, **kwargs)
+            if str(path) == str(big) and mode == "rb":
+                real_read = handle.read
+                handle.read = lambda size=-1: (reads.append(size), real_read(size))[1]
+            return handle
+
+        with unittest.mock.patch.object(Path, "open", watched_open), unittest.mock.patch.object(
+            Path, "read_bytes", side_effect=AssertionError("read_bytes holds the whole file")
+        ):
+            with self.assertRaises(checker.Failure) as raised:
+                checker.read_report(big)
+        self.assertEqual((raised.exception.code, raised.exception.exit_code), ("NVKR-E-UNSUPPORTED", 13))
+        self.assertIn("exceeds 100 bytes", str(raised.exception))
+        self.assertEqual(reads, [101])
+
 
 class CaseStatus(unittest.TestCase):
     def test_status_table(self):
@@ -405,6 +576,12 @@ class CaseStatus(unittest.TestCase):
             ({}, ["skipped"], "skipped"),
             ({}, ["failure"], "failed"),
             ({"status": "skipped"}, ["failure"], "failed"),
+            # A skip marker explains a spec that did not run; it cannot hide one that ended another way.
+            ({"status": "interrupted"}, ["skipped"], "failed"),
+            ({"status": "panicked"}, ["skipped"], "failed"),
+            ({"status": "unheard-of"}, ["skipped"], "failed"),
+            ({"status": "pending"}, ["skipped"], "skipped"),
+            ({"status": "pending"}, [], "failed"),
         ]
         for attrs, children, want in cases:
             with self.subTest(attrs=attrs, children=children):
@@ -434,11 +611,17 @@ class CommandLine(CheckerCase):
 
     def test_usage_errors_are_coded_and_exit_2(self):
         real = Report().write(self.directory)
+        base = ["--dry", str(FIXTURE), "--label-filter", FILTER]
+        out = str(self.directory / "x")
         cases = [
-            ("unknown stage", ["--dry", str(FIXTURE), "--real", str(real), "--stage", "rollout", "--out", str(self.directory / "x")]),
-            ("missing stage", ["--dry", str(FIXTURE), "--real", str(real), "--out", str(self.directory / "x")]),
-            ("missing out", ["--dry", str(FIXTURE), "--real", str(real), "--stage", "full"]),
-            ("unknown flag", ["--dry", str(FIXTURE), "--real", str(real), "--stage", "full", "--out", str(self.directory / "x"), "--force"]),
+            ("unknown stage", [*base, "--real", str(real), "--stage", "rollout", "--out", out]),
+            ("missing stage", [*base, "--real", str(real), "--out", out]),
+            ("missing out", [*base, "--real", str(real), "--stage", "full"]),
+            ("missing real", [*base, "--stage", "full", "--out", out]),
+            ("missing label filter", ["--dry", str(FIXTURE), "--real", str(real), "--stage", "full", "--out", out]),
+            ("unknown flag", [*base, "--real", str(real), "--stage", "full", "--out", out, "--force"]),
+            ("dry-only with a real report", [*base, "--dry-only", "--stage", "full", "--real", str(real)]),
+            ("dry-only with an output", [*base, "--dry-only", "--stage", "full", "--out", out]),
         ]
         for name, argv in cases:
             with self.subTest(name):

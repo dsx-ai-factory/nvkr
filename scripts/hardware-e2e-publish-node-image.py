@@ -234,8 +234,12 @@ def pull(cfg):
         raise verify_failed("release pull answered for a different reference or output than the one asked")
     if output.get("kind") != "disk-image":
         raise unsupported(f"output {cfg.output} is a {output.get('kind')!r}, not a disk-image")
+    # A published disk image always names its architecture, taken from its verified wrapper. An output that
+    # names none is not one this lane can place in a slot: a wrong-architecture image would boot nothing.
     declared = output.get("arch")
-    if declared is not None and declared != cfg.arch:
+    if declared is None:
+        raise verify_failed(f"output {cfg.output} declares no architecture, so it cannot be placed in the slot {cfg.slot} ({cfg.arch})")
+    if declared != cfg.arch:
         raise verify_failed(f"output {cfg.output} is built for {declared}, but the slot {cfg.slot} is {cfg.arch}")
     if not isinstance(files, list) or len(files) != 1 or files[0].get("path") != f"{cfg.output}.qcow2":
         raise verify_failed(f"release pull wrote {len(files) if isinstance(files, list) else 'no'} files; expected only {cfg.output}.qcow2")
@@ -266,7 +270,7 @@ def inspect_image(path, want_sha256, want_size):
             digest.update(chunk)
             if qcow2 is None:
                 head += chunk
-                if len(head) >= checker.QCOW2_HEADER_BYTES:
+                if len(head) >= checker.qcow2_header_bytes(head):
                     qcow2 = parse_header(head)
     if qcow2 is None:
         qcow2 = parse_header(head)

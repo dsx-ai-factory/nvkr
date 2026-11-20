@@ -714,10 +714,13 @@ the run unless the summary meets that contract.
 The suite runs from an NVKE checkout at a pinned harness commit, against a committed copy of NVKE's `qualify plan`
 output whose bytes are checked against a provenance record before use. A required `artifact-source` input, with no
 default, selects one of two admitted sources. `nvkr-outputs` runs the controller, capi-provisioned and nvkectl images
-NVKR built, pulled by digest, with the node image NVKR built served at an HTTPS URL. The outputs manifest names,
+NVKR built, pulled by digest, with the node image served at an HTTPS URL. The outputs manifest names,
 for each node image, how its bytes are checked before any machine is taken: fetched and hashed from the runner
 (`http-get`), or the read-back a publication run recorded (`s3-readback`), which the lane records without
-fetching and labels as not observed by its own run. A node image with no named method is refused.
+fetching and labels as not observed by its own run. A node image with no named method is refused. The manifest
+also names each node image's source. An image whose source is an NVKR release is NVKR-built. An image whose source
+is another CI run, such as the NVKE run that published a release image, is recorded and summarized as not
+NVKR-built, and the run summary is refused if it claims otherwise in either direction.
 `build-subject` runs the same three built from the plan's subject commit by NVKE's own
 build, keeps the plan unmodified and labels every artifact NVKE-built. In both, the deploy path, the imager EFI and
 the site profiles are NVKE's, and the summary says so. A source that is not one of the two is refused before any
@@ -729,16 +732,33 @@ covers this repository. A real run starts only from `refs/heads/main` and only a
 the plan job and by each leg. Legs run one at a time, amd64 before arm64, never fail fast and are never cancelled,
 because a cancelled leg dies before its teardown and leaks its machines.
 
+A dry run joins no Teleport and takes no machine, but it is not credential-free. A job's permissions and
+environment cannot depend on an input, so a dry run's leg still enters the protected environment and waits for its
+approval, holds the permission to request an OIDC token it never requests, and reads the environment's variables.
+It shows that the plan, the staged inputs, the configuration and the specs selected for the stage agree; it runs no
+spec and reaches no hardware site.
+
 Each leg lists the specs its label filter selects with a Ginkgo dry run and requires the real run's JUnit to contain
-every one as passed, run nothing else, and use the same label filter. This is a coverage check on a report; it does
-not judge a spec or prove anything about the hardware.
+every one as passed, run nothing else, and use the same label filter. The dry-run list is checked before any machine
+is taken: it must carry the filter the leg expects, and it must select at least one spec from each group the chosen
+stage needs (provisioning for `provision` and `bootstrap`, provisioning and site checks for `deployment`, and also
+the tenant group for `full`), so a stage cannot pass by selecting nothing that exercises it. At `full` every
+selected spec must have passed and a skipped one is a shortfall. Below `full` the suite stops by design, so the
+check requires no failure and at least one selected spec passed, and the record says it is not complete. The run
+summary records, per leg, the selected and passed counts in total and per group, and its contract is refused if the
+groups do not add up to the totals, if a group the stage needs was not selected, or if a `full` leg did not pass
+everything it selected. This is a coverage check on a report; it does not judge a spec or prove anything about the
+hardware. Which specs the suite registers at each stage is read from the pinned NVKE harness source, not exercised
+by a recorded run.
 
 A third authored workflow, dispatch-only, stands in for NVKR's own boot-asset publication. It pulls one disk output
 of an NVKR release by exact digest, requires a plain qcow2 of the declared architecture, copies it in a protected
 environment that holds the object-store role to a key that contains its SHA-256, reads the object back from the
 store with credentials and hashes it, and leaves an unsigned record naming the entry an outputs manifest cites. A
 real publication starts only from `refs/heads/main`. A later attempt is allowed because the key holds the digest, so
-a different image can never replace an existing object. It signs, verifies and gates nothing, and its record states
+a different image can never replace an existing object, and each attempt uploads its record under its own artifact
+name. The dry run is a separate job with no environment, no object-store role and no token permission, so it
+checks the pull, the image and the record without credentials. It signs, verifies and gates nothing, and its record states
 `qualificationAuthority: "none"`. The hardware E2E workflow does not look up the publication run a manifest cites, so the
 citation is a description.
 

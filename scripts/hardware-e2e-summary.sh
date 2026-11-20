@@ -32,15 +32,20 @@
 #                        refused: the node images are the ones the plan names, which NVKR did not
 #                        check.
 #       A leg directory holds leg.json, coverage.json (hardware-e2e-check-junit.py) and staged.json
-#       (hardware-e2e-stage-inputs.sh or hardware-e2e-build-subject.sh). The summary must pass `assert`
-#       before it is written. --node-user is the login the suite was given for the
+#       (hardware-e2e-stage-inputs.sh or hardware-e2e-build-subject.sh). Every dispatched stream must be
+#       one the plan names, on the architecture the plan gives it, so a stream the plan lacks can never
+#       stand in for one it has; a run that dispatched fewer streams than the plan names is incomplete.
+#       For NVKR outputs each leg's staged record must name the controller, capi-provisioned and CLI
+#       references the substitution record names, and each node image's URL must be the plan's own.
+#       The summary must pass `assert` before it is written. --node-user is the login the suite was given for the
 #       node image (empty is the harness's default for the OSS image); an image
 #       whose baked user differs fails as a publickey rejection late in the run.
 #   hardware-e2e-summary.sh assert FILE
 #       Check FILE against the summary contract; the workflow runs this before the
 #       run is allowed to pass.
 #
-# Exit codes: 0 ok, 2 usage, 13 malformed input, 22 contract violation or a node image
+# Exit codes: 0 ok, 2 usage, 13 malformed input, 22 contract violation, a dispatched stream the plan
+# does not name, staged evidence for other artifacts than the substitution record, or a node image
 # record that names other bytes, or another verification, than the plan, 29 missing tool,
 # 41 a dispatched leg or a node image has no evidence, 47 output exists.
 set -euo pipefail
@@ -99,11 +104,13 @@ def rule($message; test): try (if test then empty else $message end) catch $mess
     rule("legs must be ordered by start time"; [.legs[].startedAt] == ([.legs[].startedAt] | sort)),
     rule("a stream appears in more than one leg"; ([.legs[] | [.combination, .stream]] | length) == ([.legs[] | [.combination, .stream]] | unique | length)),
     rule("every leg coverage must match the summary stage and be complete exactly at the full stage"; .legs | all(.coverage | keys_are(["categories","complete","dryRunSha256","labelFilter","passed","reportSha256","schema","selected","specsInSuite","stage","tenantLabel"]) and .schema == "nvkr.dev/hardware-e2e-coverage/v1" and .stage == $s.stage and .complete == ($s.stage == "full") and .selected >= 1 and (if .complete then .passed == .selected else true end))),
+    rule("every leg coverage must count its groups, the groups must add up to the totals, and each group the stage registers must be selected and, at the full stage, passed"; .legs | all(.coverage as $c | $c.categories | (type == "object" and keys == ["provisioning","site-checks","tenant"] and all(.[]; keys_are(["passed","selected"]) and (.selected | type == "number" and . >= 0 and . == floor) and (.passed | type == "number" and . >= 0 and . == floor) and .passed <= .selected) and ([.[].selected] | add) == $c.selected and ([.[].passed] | add) == $c.passed and (if $c.complete then all(.[]; .passed == .selected) else true end) and (({"provision":["provisioning"],"bootstrap":["provisioning"],"deployment":["provisioning","site-checks"],"full":["provisioning","site-checks","tenant"]}[$s.stage]) as $need | $need != null and ($need | all(. as $g | $c.categories[$g].selected >= 1)))))),
     rule("every leg must record what it staged and what is not NVKR-built"; .legs | all(.staged | keys_are(["builtFromCommit","controllerVersionCheck","files","notNvkrBuilt","source"]) and (.controllerVersionCheck == "matched" or .controllerVersionCheck == "not-determined") and (.files | type == "object" and length > 0 and all(.[]; hex(64))) and (.notNvkrBuilt | type == "array" and all(type == "string")))),
     rule("every leg must have staged from the artifact source the summary names"; .legs | all(.staged.source == $s.artifactSource)),
     rule("a build from the subject commit must name that commit as the harness commit and the plan's, and NVKR outputs must name none"; .legs | all(.staged | if .source == "build-subject" then (.builtFromCommit == $s.subject.commit and .builtFromCommit == $s.harness.commit) else .builtFromCommit == null end)),
     rule("every leg must say that the deploy path, the imager EFI and the site profiles are not NVKR-built"; .legs | all((["deploy-path","imager-efi","site-profiles"] - .staged.notNvkrBuilt) == [])),
     rule("a build from the subject commit must say that the controller, capi-provisioned, the CLI and the node image are not NVKR-built"; .legs | all(if .staged.source == "build-subject" then ((["capi-provisioned","cli","controller","node-image"] - .staged.notNvkrBuilt) == []) else true end)),
+    rule("for NVKR outputs, a node image whose source is not an NVKR release must be named as not NVKR-built, and an NVKR release must not be"; if .artifactSource == "build-subject" then true else (.legs | all(. as $leg | ($s.nodeImages | map(select(.slot == "os-image-\($leg.arch)")) | first) as $img | (($img.source.kind == "nvkr-release") == (($leg.staged.notNvkrBuilt | any(. == "node-image")) | not)))) end),
     rule("armStartedAfterAmd must be true and match the leg start times"; (([.legs[] | select(.arch == "amd64") | .startedAt] | max) as $amd | ([.legs[] | select(.arch == "arm64") | .startedAt] | min) as $arm | (if $amd == null or $arm == null then true else $amd < $arm end) as $computed | .armStartedAfterAmd == true and $computed == true)),
     rule("complete must be true exactly for a full-stage run whose legs cover every planned stream"; .complete == (.stage == "full" and (.legs | length) == .plannedStreams and (.legs | all(.coverage.complete))))
   ] | .[]
@@ -185,6 +192,18 @@ cmd_write() {
   jq -e '(.include | type == "array") and (.include | length > 0)' "$matrix" >/dev/null ||
     fail NVKR-E-UNSUPPORTED 'the matrix names no streams' 13
 
+  # Every dispatched stream must be one the plan names, on the architecture the plan gives it. Without this
+  # a matrix that names a stream the plan lacks would pass the checks below with equal counts, and the
+  # stream the plan does name would have no evidence.
+  local foreign
+  foreign=$(jq -n -r --slurpfile p "$plan" --slurpfile m "$matrix" '
+    [$p[0].combinations[] as $c | $c.streams[] | {combination: $c.id, stream: .name, arch: .capabilities.arch}] as $planned
+    | [$m[0].include[] as $e
+        | select([$planned[] | select(. == {combination: $e.combination, stream: $e.stream, arch: $e.arch})] | length != 1)
+        | "\($e.combination)/\($e.stream)"] | join(", ")') ||
+    fail NVKR-E-UNSUPPORTED 'the plan could not be read for its streams' 13
+  [[ -z $foreign ]] || fail NVKR-E-VERIFY-FAILED "the matrix names streams the plan does not: $foreign" 22
+
   # One check record per node image, naming the exact URL and bytes the substituted plan carries.
   local node_images=() check node_array='[]' mismatch absent
   if [[ $artifact_source == nvkr-outputs ]]; then
@@ -193,6 +212,8 @@ cmd_write() {
       node_images+=("$(jq -n -e --slurpfile c "$check" --slurpfile s "$subs" '
         $c[0] as $chk
         | select($chk.schema == "nvkr.dev/hardware-e2e-node-image-check/v1")
+        | select(($chk.method == "http-get" and $chk.observedByThisRun == true)
+                 or ($chk.method == "s3-readback" and $chk.observedByThisRun == false))
         | [$s[0].replaced[] | select(.slot == $chk.slot and (.slot | startswith("os-image-")))] as $named
         | select($named | length == 1)
         | $named[0] as $n
@@ -210,19 +231,26 @@ cmd_write() {
                        {method: "s3-readback", observedByThisRun: false, run: $chk.run, bytes: $chk.bytes,
                         qcow2Version: $chk.qcow2.version, virtualSizeBytes: $chk.qcow2.virtualSizeBytes}
                      else error("unknown node image check method") end)}')") ||
-        fail NVKR-E-UNSUPPORTED "node image check $check has an unsupported schema or method, or names a slot the plan did not substitute" 13
+        fail NVKR-E-UNSUPPORTED "node image check $check has an unsupported schema or method, an observation flag that does not fit its method (http-get was observed by this run, s3-readback was not), or names a slot the plan did not substitute" 13
     done
     node_array=$(printf '%s\n' "${node_images[@]}" | jq -s -c 'sort_by(.slot)')
     mismatch=$(jq -n -r --argjson n "$node_array" '[$n[] | select(.url != .urlChecked or .sha256 != .sha256Checked) | .slot] | join(", ")')
     [[ -z $mismatch ]] || fail NVKR-E-VERIFY-FAILED "node image check names other bytes than the plan for: $mismatch" 22
     mismatch=$(jq -n -r --argjson n "$node_array" '[$n[] | select(.agrees | not) | .slot] | join(", ")')
     [[ -z $mismatch ]] || fail NVKR-E-VERIFY-FAILED "node image check disagrees with the verification the plan names for: $mismatch" 22
+    # The check and the substitution record agree with each other; the plan this summary will digest must
+    # name the same location, or its digest would sit beside another image's verification.
+    mismatch=$(jq -n -r --argjson n "$node_array" --slurpfile p "$plan" '
+      def entries: $p[0].combinations[] | ((.components[]), (.dependencies[]), (.streams[].dependencies[]));
+      [$n[] | . as $i | select(([entries | select(.name == $i.slot) | .url] | unique) != [$i.url]) | .slot] | join(", ")') ||
+      fail NVKR-E-UNSUPPORTED 'the plan could not be read for its node image locations' 13
+    [[ -z $mismatch ]] || fail NVKR-E-VERIFY-FAILED "the plan names other node image locations than the checks and the substitution record for: $mismatch" 22
     absent=$(jq -n -r --argjson n "$node_array" --slurpfile s "$subs" '
       [$s[0].replaced[] | select(.slot | startswith("os-image-")) | .slot | select(. as $slot | [$n[] | select(.slot == $slot)] | length != 1)] | join(", ")')
     [[ -z $absent ]] || fail NVKR-E-RELEASE-INCOMPLETE "node image slots without exactly one check: $absent" 41
   fi
 
-  local built=() dir
+  local built=() dir stale
   for dir in "${legs[@]}"; do
     [[ -d $dir && ! -L $dir ]] || fail NVKR-E-USAGE "leg directory does not exist: $dir" 2
     for part in leg coverage staged; do regular "$dir/$part.json"; done
@@ -235,6 +263,19 @@ cmd_write() {
       | {stream: $leg.stream, combination: $leg.combination, arch: $leg.arch, startedAt: $leg.startedAt,
          coverage: $cov, staged: ($st | {builtFromCommit, controllerVersionCheck, files, notNvkrBuilt, source})}')") ||
       fail NVKR-E-UNSUPPORTED "leg evidence in $dir has an unsupported schema or mixes architectures" 13
+    # What was staged must be what this run's substitution record names: a staged record from another run
+    # passes every other check, and its archive hashes would be reported as evidence for this one.
+    if [[ $artifact_source == nvkr-outputs ]]; then
+      stale=$(jq -n -r --slurpfile st "$dir/staged.json" --slurpfile s "$subs" '
+        $st[0] as $staged
+        | def named($slot): [$s[0].replaced[] | select(.slot == $slot) | .to] | if length == 1 then .[0] else null end;
+          ["controller", "capi-provisioned", "cli-\($staged.arch)"] as $slots
+        | [$slots[] | select($staged.pulledByDigest[.] == null or $staged.pulledByDigest[.] != named(.))] as $differ
+        | (if ($staged.pulledByDigest | type) == "object" and ($staged.pulledByDigest | keys) != ($slots | sort)
+           then ["the set of pulled references"] else [] end) + $differ | join(", ")') ||
+        fail NVKR-E-UNSUPPORTED "staged evidence in $dir has no readable pulledByDigest" 13
+      [[ -z $stale ]] || fail NVKR-E-VERIFY-FAILED "staged evidence in $dir names other artifacts than the substitution record for: $stale" 22
+    fi
   done
   local leg_array
   leg_array=$(printf '%s\n' "${built[@]}" | jq -s -c 'sort_by(.startedAt, .arch, .stream)')

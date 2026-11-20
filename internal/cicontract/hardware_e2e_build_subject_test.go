@@ -430,6 +430,66 @@ func TestHardwareE2EBuildSubjectBuildsFromTheSubjectCommitAndRecordsThatNothingI
 	})
 }
 
+// The build runs under `make -C` in the checkout, so a path relative to the caller must be made absolute
+// before make sees it: the fake make does not change directory, so what proves it is the argument it gets.
+func TestHardwareE2EBuildSubjectResolvesRelativePathsBeforeMakeChangesDirectory(t *testing.T) {
+	root := hardwareE2ERoot(t)
+	relative := func(path string) string {
+		t.Helper()
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return rel
+	}
+	physical := func(path string) string {
+		t.Helper()
+		resolved, err := filepath.EvalSymlinks(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return resolved
+	}
+	for name, suffix := range map[string]string{"a relative inputs path": "", "a relative inputs path with a trailing slash": "/"} {
+		t.Run(name, func(t *testing.T) {
+			r := hardwareE2ENewBuildRun(t, "amd64")
+			harness, inputs := physical(r.harness), filepath.Join(physical(filepath.Dir(r.inputs)), filepath.Base(r.inputs))
+			r.args = hardwareE2EDropFlag(hardwareE2EDropFlag(r.args, "--harness", ""), "--inputs", "")
+			r.args = append(r.args, "--harness", relative(r.harness), "--inputs", relative(r.inputs)+suffix)
+			if result := r.run(); result.exit != 0 {
+				t.Fatalf("exit %d, want 0:\n%s", result.exit, result.output)
+			}
+			var made string
+			for _, call := range r.calls() {
+				if strings.HasPrefix(call, "make -C ") {
+					made = call
+				}
+			}
+			if !strings.HasPrefix(made, "make -C "+harness+"/controller/test/e2e ") || !strings.Contains(made, " SITE_INPUTS="+inputs+" ") {
+				t.Errorf("make was handed %q, want the absolute checkout %s and inputs %s", made, harness, inputs)
+			}
+			if got := hardwareE2EReadFile(t, r.stepEnv); !strings.Contains(got, "SITE_NVKECTL="+harness+"/cli/dist/nvkectl-linux-amd64\n") {
+				t.Errorf("the step environment names a relative nvkectl path: %q", got)
+			}
+			if _, err := os.Stat(filepath.Join(inputs, "controller.tar")); err != nil {
+				t.Errorf("the inputs were not written where they were named: %v", err)
+			}
+		})
+	}
+	t.Run("a relative inputs path whose parent does not exist", func(t *testing.T) {
+		r := hardwareE2ENewBuildRun(t, "amd64")
+		r.args = hardwareE2EDropFlag(r.args, "--inputs", "")
+		r.args = append(r.args, "--inputs", relative(filepath.Join(r.scratch, "no-such-parent", "inputs")))
+		result := r.run()
+		if result.exit != 2 || !strings.Contains(result.output, "[NVKR-E-USAGE]") || !strings.Contains(result.output, "the parent of --inputs does not exist") {
+			t.Fatalf("exit %d, want 2 with NVKR-E-USAGE:\n%s", result.exit, result.output)
+		}
+		if r.madeAnything() {
+			t.Error("nothing may be built for a refused path")
+		}
+	})
+}
+
 type hardwareE2EBuildRefusal struct {
 	name     string
 	skip     []string

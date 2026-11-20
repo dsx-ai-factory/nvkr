@@ -6,6 +6,7 @@ package cicontract
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -32,6 +33,7 @@ type hardwareE2EWorkflowStep struct {
 	WorkingDirectory string            `json:"working-directory"`
 	Env              map[string]string `json:"env"`
 	With             map[string]any    `json:"with"`
+	ContinueOnError  any               `json:"continue-on-error"`
 }
 
 type hardwareE2EWorkflowJob struct {
@@ -43,6 +45,7 @@ type hardwareE2EWorkflowJob struct {
 	TimeoutMinutes any               `json:"timeout-minutes"`
 	Permissions    map[string]string `json:"permissions"`
 	Env            map[string]string `json:"env"`
+	Outputs        map[string]string `json:"outputs"`
 	Strategy       struct {
 		FailFast    *bool  `json:"fail-fast"`
 		MaxParallel int    `json:"max-parallel"`
@@ -71,7 +74,9 @@ type hardwareE2EWorkflowDoc struct {
 func hardwareE2ELoadWorkflow(t *testing.T) (hardwareE2EWorkflowDoc, string) {
 	t.Helper()
 	var doc hardwareE2EWorkflowDoc
-	return doc, hardwareE2ELoadWorkflowFile(t, hardwareE2EWorkflowFile, &doc)
+	// The text first: the return statement would otherwise leave the order of reading doc and filling it open.
+	raw := hardwareE2ELoadWorkflowFile(t, hardwareE2EWorkflowFile, &doc)
+	return doc, raw
 }
 
 // hardwareE2ELoadWorkflowFile parses one workflow into doc and returns its text.
@@ -386,6 +391,117 @@ func TestHardwareE2EWorkflowUploadsNothingThatCarriesRemoteOutput(t *testing.T) 
 	if withhold.If != "always()" || index <= runIndex || index >= firstUpload || withhold.Run != "nvke/release/hack/qualify-e2e.sh withhold" {
 		t.Fatal("the run files must be redacted, even after a failure, after the suite and before the first upload")
 	}
+	// Redaction that fails must not be followed by an upload of what it failed to redact, and no other
+	// upload may carry the suite's files around that gate.
+	if withhold.ID != "withhold" {
+		t.Fatalf("the redaction step must be addressable by id, got %q", withhold.ID)
+	}
+	const gated = "always() && steps.withhold.outcome == 'success'"
+	for _, job := range hardwareE2EJobNames(doc) {
+		for _, step := range doc.Jobs[job].Steps {
+			if !strings.HasPrefix(step.Uses, "actions/upload-artifact@") {
+				continue
+			}
+			path, _ := step.With["path"].(string)
+			if strings.Contains(path, "controller/test/e2e/") && step.If != gated {
+				t.Fatalf("%s/%s uploads the suite's files and runs when %q, want %q", job, step.Name, step.If, gated)
+			}
+		}
+	}
+	_, upload := hardwareE2EWorkflowStepNamed(t, leg, "Upload the run files")
+	if upload.If != gated || !strings.Contains(upload.With["path"].(string), "controller/test/e2e/qualify-e2e.junit.xml") {
+		t.Fatalf("the run files upload runs when %q and uploads %v", upload.If, upload.With["path"])
+	}
+	// Teardown never waits on the redaction: the daemon and its identity are removed whatever happened.
+	for _, name := range []string{"Stop the Teleport identity daemon", "Remove the Teleport identity"} {
+		if _, step := hardwareE2EWorkflowStepNamed(t, leg, name); step.If != "always()" {
+			t.Fatalf("%q must run always, got %q", name, step.If)
+		}
+	}
+}
+
+// A step allowed to fail would let the coverage, summary or redaction checks pass by being ignored.
+// Teardown alone may tolerate a missing process, and says so in one named step.
+func TestHardwareE2EWorkflowNoStepMayFailQuietly(t *testing.T) {
+	doc, _ := hardwareE2ELoadWorkflow(t)
+	const tolerant = "Stop the Teleport identity daemon"
+	masking := regexp.MustCompile(`\|\|\s*(true|:)\b|;\s*(true|:)\s*$|\bset \+e\b`)
+	for _, name := range hardwareE2EJobNames(doc) {
+		for _, step := range doc.Jobs[name].Steps {
+			if step.ContinueOnError != nil {
+				t.Fatalf("%s/%s sets continue-on-error (%v); a failing step must fail the job", name, step.Name, step.ContinueOnError)
+			}
+			if masking.MatchString(step.Run) && step.Name != tolerant {
+				t.Fatalf("%s/%s masks a failing command; only %q may tolerate one: %q", name, step.Name, tolerant, step.Run)
+			}
+		}
+	}
+	// The evidence checks run under a shell that stops at the first failure.
+	leg := doc.Jobs["hardware-e2e"]
+	for _, check := range []string{"Check the selected specs fit the stage", "Check the run covered what it selected"} {
+		if _, step := hardwareE2EWorkflowStepNamed(t, leg, check); !strings.Contains(step.Run, "set -euo pipefail") {
+			t.Fatalf("%q must stop at the first failure", check)
+		}
+	}
+}
+
+// The summary job has no environment, so it cannot see the variable the legs read; it must take the
+// account from the legs themselves, and the legs must publish only a plain account name.
+func TestHardwareE2EWorkflowSummaryRecordsTheNodeAccountTheLegsUsed(t *testing.T) {
+	doc, _ := hardwareE2ELoadWorkflow(t)
+	leg, summary := doc.Jobs["hardware-e2e"], doc.Jobs["summarize"]
+	if leg.Outputs["node-user"] != "${{ steps.node-user.outputs.value }}" {
+		t.Fatalf("the leg job must publish the account its steps used, got %v", leg.Outputs)
+	}
+	if summary.Env["NODE_USER"] != "${{ needs.hardware-e2e.outputs.node-user }}" {
+		t.Fatalf("the summary must record the account the legs used, got %q", summary.Env["NODE_USER"])
+	}
+	serialized, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(serialized), "vars.") || strings.Contains(string(serialized), "inputs.node-user") {
+		t.Fatalf("the summary job must not read the node account itself: %s", serialized)
+	}
+	if leg.Env["NODE_USER"] != "${{ inputs.node-user || vars.QUALIFY_E2E_NODE_USER }}" {
+		t.Fatalf("the legs' account is the input, then the environment's variable, got %q", leg.Env["NODE_USER"])
+	}
+	publishIndex, publish := hardwareE2EWorkflowStepNamed(t, leg, "Publish the node account")
+	configIndex, _ := hardwareE2EWorkflowStepNamed(t, leg, "Write the e2e config")
+	if publish.ID != "node-user" || publishIndex >= configIndex || publish.If != "" {
+		t.Fatalf("the account is published, unconditionally, before the config uses it: id %q at %d, config at %d, if %q", publish.ID, publishIndex, configIndex, publish.If)
+	}
+	for _, want := range []string{`^[A-Za-z0-9._-]*$`, "exit 1", `printf 'value=%s\n' "$NODE_USER" >> "$GITHUB_OUTPUT"`} {
+		if !strings.Contains(publish.Run, want) {
+			t.Fatalf("the account step lacks %q", want)
+		}
+	}
+}
+
+// The account pattern is the only thing between an input and the job's output file, so run it: a
+// newline must not slip past the anchors and start a second output line.
+func TestHardwareE2EWorkflowNodeAccountPatternRefusesWhatCouldForgeAnOutput(t *testing.T) {
+	doc, _ := hardwareE2ELoadWorkflow(t)
+	_, publish := hardwareE2EWorkflowStepNamed(t, doc.Jobs["hardware-e2e"], "Publish the node account")
+	for value, admitted := range map[string]bool{
+		"":                    true,
+		"ubuntu":              true,
+		"node.user_1-a":       true,
+		"ubuntu\nmatrix=evil": false,
+		"ubuntu\n":            false,
+		"a b":                 false,
+		"a=b":                 false,
+		"$(id)":               false,
+		"a;b":                 false,
+	} {
+		cmd := exec.Command("bash", "-c", "set -euo pipefail\n"+
+			publish.Run[strings.Index(publish.Run, "if [["):strings.Index(publish.Run, "printf")]+"echo admitted")
+		cmd.Env = append(os.Environ(), "NODE_USER="+value)
+		out, err := cmd.CombinedOutput()
+		if got := err == nil && strings.Contains(string(out), "admitted"); got != admitted {
+			t.Errorf("NODE_USER %q admitted = %v, want %v:\n%s", value, got, admitted, out)
+		}
+	}
 }
 
 func TestHardwareE2EWorkflowAdmitsOnlyARealRunFromMainAndItsFirstAttempt(t *testing.T) {
@@ -485,9 +601,12 @@ func TestHardwareE2EWorkflowCallsOnlyTheHarnessStepsItIsMeantTo(t *testing.T) {
 func TestHardwareE2EWorkflowSelectsItsArtifactSourceBeforeAnyMachine(t *testing.T) {
 	doc, _ := hardwareE2ELoadWorkflow(t)
 	leg := doc.Jobs["hardware-e2e"]
-	positions := map[string]int{}
-	for index, step := range leg.Steps {
-		positions[step.Name] = index
+	// Every step is resolved by name first, so a renamed or removed step fails here and cannot be read as
+	// position zero and pass an order check by accident.
+	at := func(name string) int {
+		t.Helper()
+		index, _ := hardwareE2EWorkflowStepNamed(t, leg, name)
+		return index
 	}
 	want := map[string]string{
 		"Stage the NVKR-built inputs":              "inputs.artifact-source == 'nvkr-outputs'",
@@ -500,6 +619,7 @@ func TestHardwareE2EWorkflowSelectsItsArtifactSourceBeforeAnyMachine(t *testing.
 		"Check the run covered what it selected":   "always() && env.DRY_RUN != 'true'",
 		"Record the qualification result":          "always() && env.DRY_RUN != 'true'",
 		"Check every artifact the plan names":      "inputs.verify-plan",
+		"Check the selected specs fit the stage":   "",
 	}
 	for name, condition := range want {
 		_, step := hardwareE2EWorkflowStepNamed(t, leg, name)
@@ -507,17 +627,18 @@ func TestHardwareE2EWorkflowSelectsItsArtifactSourceBeforeAnyMachine(t *testing.
 			t.Fatalf("step %q runs when %q, want %q", name, step.If, condition)
 		}
 	}
-	run := positions["Run the e2e suite${{ inputs.dry-run && ' (dry run)' || '' }}"]
+	run := at("Run the e2e suite${{ inputs.dry-run && ' (dry run)' || '' }}")
 	for _, name := range []string{
 		"Stage the NVKR-built inputs", "Build the inputs from the subject commit", "Start the Teleport identity daemon",
-		"Write the e2e config", "List the specs the run selects", "Resolve the stream", "Check the leg is what the plan job prepared",
+		"Write the e2e config", "List the specs the run selects", "Check the selected specs fit the stage",
+		"Resolve the stream", "Check the leg is what the plan job prepared",
 	} {
-		if positions[name] >= run {
+		if at(name) >= run {
 			t.Fatalf("step %q must run before the suite takes a machine", name)
 		}
 	}
 	// The stamp precedes every step that takes time, so the recorded start belongs to the leg.
-	if positions["Admit a GitHub-hosted AMD64 runner and the first attempt"] != 0 || positions["Check out NVKR"] != 1 || positions["Stamp the leg"] != 2 {
+	if at("Admit a GitHub-hosted AMD64 runner and the first attempt") != 0 || at("Check out NVKR") != 1 || at("Stamp the leg") != 2 {
 		t.Fatal("a leg must admit its runner, fetch NVKR's scripts and stamp its start before it does any other work")
 	}
 	// "Re-run failed jobs" does not run the plan job again, so the plan job's own attempt check cannot
@@ -533,21 +654,45 @@ func TestHardwareE2EWorkflowSelectsItsArtifactSourceBeforeAnyMachine(t *testing.
 			t.Fatalf("a leg's admission lacks %q", want)
 		}
 	}
-	if positions["Stage the NVKR-built inputs"] <= positions["Resolve the stream"] || positions["Build the inputs from the subject commit"] <= positions["Resolve the stream"] {
-		t.Fatal("inputs are staged for the versions the stream resolved, so staging follows the resolution")
-	}
-	if positions["Write the e2e config"] <= positions["Stage the NVKR-built inputs"] {
-		t.Fatal("the e2e config names the staged images, so it is written after staging")
+	// Both staging steps run for the versions the stream resolved, and the config names what they staged.
+	for _, staging := range []string{"Stage the NVKR-built inputs", "Build the inputs from the subject commit"} {
+		if at(staging) <= at("Resolve the stream") {
+			t.Fatalf("%q stages for the versions the stream resolved, so it follows the resolution", staging)
+		}
+		if at("Write the e2e config") <= at(staging) {
+			t.Fatalf("the e2e config names the staged images, so it is written after %q", staging)
+		}
 	}
 	_, list := hardwareE2EWorkflowStepNamed(t, leg, "List the specs the run selects")
+	const filter = `"site-controller && !${SITE_TENANT_EXCLUDE}"`
 	for _, flag := range []string{
-		"-ginkgo.dry-run", `-ginkgo.label-filter="site-controller && !${SITE_TENANT_EXCLUDE}"`,
+		"-ginkgo.dry-run", "-ginkgo.label-filter=" + filter,
 		`-ginkgo.junit-report="$GITHUB_WORKSPACE/leg/dry-run.junit.xml"`, `-e2e.site-stage="${SITE_STAGE}"`,
 		"-e2e.capabilities=",
 	} {
 		if !strings.Contains(list.Run, flag) {
 			t.Fatalf("the spec list must use the real run's selection; it lacks %q", flag)
 		}
+	}
+	// The dry report is validated before any machine, against the stage and the filter this lane expects;
+	// the real run's check repeats the filter, so a run cannot be judged against a different selection.
+	if at("Check the selected specs fit the stage") <= at("List the specs the run selects") {
+		t.Fatal("the dry report is validated after it is written")
+	}
+	_, dry := hardwareE2EWorkflowStepNamed(t, leg, "Check the selected specs fit the stage")
+	_, covered := hardwareE2EWorkflowStepNamed(t, leg, "Check the run covered what it selected")
+	for name, step := range map[string]hardwareE2EWorkflowStep{"dry validation": dry, "coverage check": covered} {
+		for _, flag := range []string{"hardware-e2e-check-junit.py", "--dry leg/dry-run.junit.xml", `--stage "$SITE_STAGE"`, "--label-filter " + filter} {
+			if !strings.Contains(step.Run, flag) {
+				t.Fatalf("the %s lacks %q", name, flag)
+			}
+		}
+	}
+	if !strings.Contains(dry.Run, "--dry-only") || strings.Contains(dry.Run, "--real") {
+		t.Fatalf("the pre-run validation reads the dry report only, got %q", dry.Run)
+	}
+	if !strings.Contains(covered.Run, "--real nvke/controller/test/e2e/qualify-e2e.junit.xml") || strings.Contains(covered.Run, "--dry-only") {
+		t.Fatalf("the post-run check reads the real report, got %q", covered.Run)
 	}
 }
 

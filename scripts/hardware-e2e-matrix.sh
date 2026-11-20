@@ -35,8 +35,13 @@ jq -e '(.include | type == "array") and (.include | length > 0)' <<<"$matrix" >/
   fail NVKR-E-UNSUPPORTED 'the harness matrix named no streams' 13
 
 # Integration boundary: "forge" is the pinned harness's own name for this provider, not NVKR's.
-others=$(jq -r '[.include[] | select(.provider != "forge") | .stream] | join(", ")' <<<"$matrix")
+# Each entry is named by an interpolation that is never empty, so an entry with no stream name is still
+# listed: joining the bare names would print a null as nothing and let that entry through.
+others=$(jq -r '[.include[] | select(.provider != "forge") | "\(.combination)/\(.stream)=\(.provider)"] | join(", ")' <<<"$matrix")
 [[ -z $others ]] || fail NVKR-E-UNSUPPORTED "this workflow carries the hardware site's credentials only; the plan also names: $others" 13
+# A stream is named by its combination and its stream, and the run summary joins evidence on that pair.
+unnamed=$(jq -r '[.include | to_entries[] | select((.value.combination | type) != "string" or .value.combination == "" or (.value.stream | type) != "string" or .value.stream == "") | .key] | join(", ")' <<<"$matrix")
+[[ -z $unnamed ]] || fail NVKR-E-UNSUPPORTED "the matrix has entries without a combination and stream name, at positions: $unnamed" 13
 unknown=$(jq -r '[.include[] | select(.arch != "amd64" and .arch != "arm64") | "\(.stream)=\(.arch)"] | join(", ")' <<<"$matrix")
 [[ -z $unknown ]] || fail NVKR-E-UNSUPPORTED "streams with an architecture other than amd64 or arm64: $unknown" 13
 duplicate=$(jq -r '[.include | group_by([.combination, .stream])[] | select(length > 1) | .[0].stream] | join(", ")' <<<"$matrix")

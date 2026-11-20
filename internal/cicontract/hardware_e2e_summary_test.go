@@ -88,6 +88,9 @@ type hardwareE2ESummary struct {
 		Coverage  struct {
 			Complete bool `json:"complete"`
 		} `json:"coverage"`
+		Staged struct {
+			NotNvkrBuilt []string `json:"notNvkrBuilt"`
+		} `json:"staged"`
 	} `json:"legs"`
 }
 
@@ -150,8 +153,16 @@ func hardwareE2EExpectFailure(t *testing.T, result hardwareE2EResult, exit int, 
 
 func hardwareE2ECoverage(stage string) map[string]any {
 	passed := 80
+	// Below the full stage the later specs skip by design: only the provisioning group passes here.
+	categories := map[string]any{
+		"provisioning": map[string]any{"selected": 7, "passed": 7},
+		"site-checks":  map[string]any{"selected": 31, "passed": 31},
+		"tenant":       map[string]any{"selected": 42, "passed": 42},
+	}
 	if stage != "full" {
 		passed = 7
+		categories["site-checks"] = map[string]any{"selected": 31, "passed": 0}
+		categories["tenant"] = map[string]any{"selected": 42, "passed": 0}
 	}
 	return map[string]any{
 		"schema":       "nvkr.dev/hardware-e2e-coverage/v1",
@@ -162,12 +173,15 @@ func hardwareE2ECoverage(stage string) map[string]any {
 		"specsInSuite": 530,
 		"labelFilter":  "site-controller && !nico-dsx",
 		"tenantLabel":  hardwareE2ETenantLabel,
-		"categories":   map[string]any{"provisioning": 7, "site-checks": 31, "tenant": 42},
+		"categories":   categories,
 		"dryRunSha256": hardwareE2EDigest("1"),
 		"reportSha256": hardwareE2EDigest("2"),
 	}
 }
 
+// hardwareE2EStaged is what hardware-e2e-stage-inputs.sh records for a leg of NVKR outputs whose node
+// image comes from another CI run, as the default synthetic manifest's does: the node image is named
+// as not NVKR-built. hardwareE2EFinishSummaryInputs drops it for a leg whose image is an NVKR release.
 func hardwareE2EStaged(arch string) map[string]any {
 	return map[string]any{
 		"schema": "nvkr.dev/hardware-e2e-staged/v1",
@@ -180,8 +194,34 @@ func hardwareE2EStaged(arch string) map[string]any {
 		"source":                 "nvkr-outputs",
 		"builtFromCommit":        nil,
 		"controllerVersionCheck": "matched",
-		"notNvkrBuilt":           []any{"deploy-path", "imager-efi", "site-profiles"},
+		"notNvkrBuilt":           []any{"deploy-path", "imager-efi", "node-image", "site-profiles"},
 	}
+}
+
+// hardwareE2ENodeSourceKindOf is the kind of source the substitution record gives an architecture's
+// node image, as the staging script reads it.
+func hardwareE2ENodeSourceKindOf(t *testing.T, substitutions, arch string) string {
+	t.Helper()
+	for _, entry := range hardwareE2EReadMap(t, substitutions)["replaced"].([]any) {
+		replacement := entry.(map[string]any)
+		if replacement["slot"] == "os-image-"+arch {
+			return replacement["source"].(map[string]any)["kind"].(string)
+		}
+	}
+	t.Fatalf("the substitution record has no node image for %s", arch)
+	return ""
+}
+
+// hardwareE2EReplacedTo is the reference or location the substitution record gives a slot.
+func hardwareE2EReplacedTo(t *testing.T, substitutions, slot string) string {
+	t.Helper()
+	for _, entry := range hardwareE2EReadMap(t, substitutions)["replaced"].([]any) {
+		if replacement := entry.(map[string]any); replacement["slot"] == slot {
+			return replacement["to"].(string)
+		}
+	}
+	t.Fatalf("the substitution record has no replacement for %s", slot)
+	return ""
 }
 
 // hardwareE2EStagedBuilt is what hardware-e2e-build-subject.sh records for a leg: everything built from
@@ -200,6 +240,13 @@ const hardwareE2ENodeImageBytes = 538 * 1000 * 1000
 
 // hardwareE2ENodeImageRule is the summary rule that holds each node image's check record.
 const hardwareE2ENodeImageRule = "each node image must record how it was checked, whether this run observed that, and what the check saw"
+
+// hardwareE2ECoverageGroupsRule is the summary rule that holds each leg's per-group coverage counts.
+const hardwareE2ECoverageGroupsRule = "every leg coverage must count its groups, the groups must add up to the totals"
+
+// hardwareE2ENodeBuiltRule is the summary rule that ties a leg's list of what NVKR did not build to the
+// source of its node image.
+const hardwareE2ENodeBuiltRule = "a node image whose source is not an NVKR release must be named as not NVKR-built"
 
 // hardwareE2ENodeImageCheck is what hardware-e2e-check-node-image.py writes for a node image, built
 // from the same synthetic outputs manifest the substitution script was given.
@@ -382,6 +429,17 @@ func hardwareE2EFinishSummaryInputs(t *testing.T, in hardwareE2ESummaryInputs, a
 		staged := hardwareE2EStaged(stream.arch)
 		if in.source == "build-subject" {
 			staged = hardwareE2EStagedBuilt(stream.arch)
+		} else if hardwareE2ENodeSourceKindOf(t, in.path("sub", "substitutions.json"), stream.arch) == "nvkr-release" {
+			// Only an NVKR release is claimed as NVKR-built.
+			staged["notNvkrBuilt"] = []any{"deploy-path", "imager-efi", "site-profiles"}
+		}
+		if in.source == "nvkr-outputs" {
+			substitutions := in.path("sub", "substitutions.json")
+			staged["pulledByDigest"] = map[string]any{
+				"controller":         hardwareE2EReplacedTo(t, substitutions, "controller"),
+				"capi-provisioned":   hardwareE2EReplacedTo(t, substitutions, "capi-provisioned"),
+				"cli-" + stream.arch: hardwareE2EReplacedTo(t, substitutions, "cli-"+stream.arch),
+			}
 		}
 		hardwareE2EWriteJSON(t, directory, "staged.json", staged)
 	}
@@ -658,6 +716,61 @@ func hardwareE2EReplacedSource(slot, field string, value any) func(map[string]an
 	}
 }
 
+// hardwareE2EPlanNodeURL sets the location a plan names for a node image slot, wherever the plan lists it.
+func hardwareE2EPlanNodeURL(slot string, url any) func(map[string]any) {
+	return func(plan map[string]any) {
+		visit := func(list any) {
+			for _, entry := range list.([]any) {
+				if e := entry.(map[string]any); e["name"] == slot {
+					e["url"] = url
+				}
+			}
+		}
+		for _, combination := range plan["combinations"].([]any) {
+			c := combination.(map[string]any)
+			visit(c["components"])
+			visit(c["dependencies"])
+			for _, stream := range c["streams"].([]any) {
+				visit(stream.(map[string]any)["dependencies"])
+			}
+		}
+	}
+}
+
+// hardwareE2ECoverageEdit edits one leg's coverage record and leaves the arguments alone.
+func hardwareE2ECoverageEdit(arch string, edit func(map[string]any)) hardwareE2EMutation {
+	return func(t *testing.T, in hardwareE2ESummaryInputs, args []string) []string {
+		t.Helper()
+		hardwareE2EEditJSON(t, filepath.Join(in.leg(arch), "coverage.json"), edit)
+		return args
+	}
+}
+
+// hardwareE2EStagedEdit edits one leg's staged record and leaves the arguments alone.
+func hardwareE2EStagedEdit(arch string, edit func(map[string]any)) hardwareE2EMutation {
+	return func(t *testing.T, in hardwareE2ESummaryInputs, args []string) []string {
+		t.Helper()
+		hardwareE2EEditJSON(t, filepath.Join(in.leg(arch), "staged.json"), edit)
+		return args
+	}
+}
+
+// hardwareE2EPlanNodeURLOf is the location a plan names for a node image slot.
+func hardwareE2EPlanNodeURLOf(t *testing.T, plan map[string]any, slot string) string {
+	t.Helper()
+	for _, combination := range plan["combinations"].([]any) {
+		for _, stream := range combination.(map[string]any)["streams"].([]any) {
+			for _, entry := range stream.(map[string]any)["dependencies"].([]any) {
+				if e := entry.(map[string]any); e["name"] == slot {
+					return e["url"].(string)
+				}
+			}
+		}
+	}
+	t.Fatalf("the plan names no location for %s", slot)
+	return ""
+}
+
 // hardwareE2ENodeCheckEdit edits one node image's check record and leaves the arguments alone.
 func hardwareE2ENodeCheckEdit(slot string, edit func(map[string]any)) hardwareE2EMutation {
 	return func(t *testing.T, in hardwareE2ESummaryInputs, args []string) []string {
@@ -673,6 +786,10 @@ func hardwareE2ENodeImageBoth(slot, replacedField, checkField string, value any)
 	return func(t *testing.T, in hardwareE2ESummaryInputs, args []string) []string {
 		t.Helper()
 		hardwareE2EEditJSON(t, in.path("sub", "substitutions.json"), hardwareE2EReplaced(slot, replacedField, value))
+		if replacedField == "to" {
+			// The plan names the same location, so only the summary contract can refuse it.
+			hardwareE2EEditJSON(t, in.path("sub", "plan.json"), hardwareE2EPlanNodeURL(slot, value))
+		}
 		hardwareE2EEditJSON(t, in.nodeCheck(slot), func(check map[string]any) {
 			if value == nil {
 				delete(check, checkField)
@@ -742,7 +859,7 @@ func TestHardwareE2ESummaryWriteRefusesWhatItCannotSupport(t *testing.T) {
 			mutate: hardwareE2EEdit(func(m map[string]any) { m["schema"] = "nvkr.dev/hardware-e2e-substitutions/v2" }, "sub", "substitutions.json")},
 		{name: "matrix naming no streams", exit: 13, code: "NVKR-E-UNSUPPORTED", message: "names no streams",
 			mutate: hardwareE2EEdit(func(m map[string]any) { m["include"] = []any{} }, "matrix.json")},
-		{name: "plan that is not JSON", exit: 13, code: "NVKR-E-UNSUPPORTED", message: "could not be assembled",
+		{name: "plan that is not JSON", exit: 13, code: "NVKR-E-UNSUPPORTED", message: "the plan could not be read for its streams",
 			mutate: func(t *testing.T, in hardwareE2ESummaryInputs, a []string) []string {
 				t.Helper()
 				if err := os.WriteFile(in.path("sub", "plan.json"), []byte("not json\n"), 0o600); err != nil {
@@ -774,8 +891,16 @@ func TestHardwareE2ESummaryWriteRefusesWhatItCannotSupport(t *testing.T) {
 			mutate: hardwareE2EArgs(func(in hardwareE2ESummaryInputs, a []string) []string {
 				return append(slices.Clone(a), "--leg", in.leg("amd64"))
 			})},
-		{name: "evidence on another architecture than was dispatched", exit: 41, code: "NVKR-E-RELEASE-INCOMPLETE", message: "no evidence for dispatched legs",
+		{name: "a dispatched stream on another architecture than the plan gives it", exit: 22, code: "NVKR-E-VERIFY-FAILED", message: "the matrix names streams the plan does not",
 			mutate: hardwareE2EEdit(func(m map[string]any) { m["include"].([]any)[0].(map[string]any)["arch"] = "arm64" }, "matrix.json")},
+		{name: "a dispatched stream the plan does not name", exit: 22, code: "NVKR-E-VERIFY-FAILED", message: "/gb200-not-in-the-plan",
+			mutate: hardwareE2EEdit(func(m map[string]any) {
+				m["include"].([]any)[1].(map[string]any)["stream"] = "gb200-not-in-the-plan"
+			}, "matrix.json")},
+		{name: "a dispatched combination the plan does not name", exit: 22, code: "NVKR-E-VERIFY-FAILED", message: "the matrix names streams the plan does not",
+			mutate: hardwareE2EEdit(func(m map[string]any) {
+				m["include"].([]any)[0].(map[string]any)["combination"] = "some-other-combination"
+			}, "matrix.json")},
 
 		// The contract the summary must meet before it is written.
 		{name: "a stage the harness does not have", exit: 22, code: verify, message: "stage is not one of the harness stages",
@@ -810,6 +935,91 @@ func TestHardwareE2ESummaryWriteRefusesWhatItCannotSupport(t *testing.T) {
 				hardwareE2EEditJSON(t, filepath.Join(in.leg("amd64"), "coverage.json"), func(m map[string]any) { m["selected"] = 0 })
 				return a
 			}},
+		// The groups a leg's coverage is made of: counted, adding up, and present where the stage registers them.
+		{name: "coverage whose groups do not add up to its totals", exit: 22, code: verify, message: hardwareE2ECoverageGroupsRule,
+			mutate: hardwareE2ECoverageEdit("amd64", func(m map[string]any) {
+				m["categories"].(map[string]any)["tenant"] = map[string]any{"selected": 41, "passed": 41}
+			})},
+		{name: "coverage that counts its groups with bare numbers", exit: 22, code: verify, message: hardwareE2ECoverageGroupsRule,
+			mutate: hardwareE2ECoverageEdit("arm64", func(m map[string]any) {
+				m["categories"] = map[string]any{"provisioning": 7, "site-checks": 31, "tenant": 42}
+			})},
+		{name: "full stage where every group reports zero passes", exit: 22, code: verify, message: hardwareE2ECoverageGroupsRule,
+			mutate: hardwareE2ECoverageEdit("amd64", func(m map[string]any) {
+				for _, group := range m["categories"].(map[string]any) {
+					group.(map[string]any)["passed"] = 0
+				}
+			})},
+		{name: "a group that passed more than it selected", exit: 22, code: verify, message: hardwareE2ECoverageGroupsRule,
+			mutate: hardwareE2ECoverageEdit("amd64", func(m map[string]any) {
+				categories := m["categories"].(map[string]any)
+				categories["provisioning"] = map[string]any{"selected": 7, "passed": 8}
+				categories["tenant"] = map[string]any{"selected": 42, "passed": 41}
+			})},
+		{name: "below the full stage a group that passed more than it selected", stage: "deployment", exit: 22, code: verify, message: hardwareE2ECoverageGroupsRule,
+			mutate: hardwareE2ECoverageEdit("amd64", func(m map[string]any) {
+				m["categories"].(map[string]any)["site-checks"] = map[string]any{"selected": 31, "passed": 32}
+				m["passed"] = 39
+			})},
+		{name: "a group the coverage does not count", exit: 22, code: verify, message: hardwareE2ECoverageGroupsRule,
+			mutate: hardwareE2ECoverageEdit("amd64", func(m map[string]any) { delete(m["categories"].(map[string]any), "tenant") })},
+		{name: "a group with a count it should not have", exit: 22, code: verify, message: hardwareE2ECoverageGroupsRule,
+			mutate: hardwareE2ECoverageEdit("amd64", func(m map[string]any) {
+				m["categories"].(map[string]any)["tenant"].(map[string]any)["skipped"] = 0
+			})},
+		{name: "full stage with no tenant specs selected", exit: 22, code: verify, message: hardwareE2ECoverageGroupsRule,
+			mutate: hardwareE2ECoverageEdit("amd64", func(m map[string]any) {
+				m["categories"].(map[string]any)["tenant"] = map[string]any{"selected": 0, "passed": 0}
+				m["selected"], m["passed"] = 38, 38
+			})},
+		{name: "deployment stage with no site checks selected", stage: "deployment", exit: 22, code: verify, message: hardwareE2ECoverageGroupsRule,
+			mutate: hardwareE2ECoverageEdit("amd64", func(m map[string]any) {
+				m["categories"].(map[string]any)["site-checks"] = map[string]any{"selected": 0, "passed": 0}
+				m["selected"] = 49
+			})},
+
+		// What a leg staged must be what this run's substitution record names.
+		{name: "staged evidence that pulled another controller", exit: 22, code: verify, message: "names other artifacts than the substitution record for: controller",
+			mutate: hardwareE2EStagedEdit("amd64", func(m map[string]any) {
+				m["pulledByDigest"].(map[string]any)["controller"] = "oci://ghcr.io/example/other-run/controller@sha256:" + strings.Repeat("f", 64)
+			})},
+		{name: "staged evidence that pulled another CLI for its architecture", exit: 22, code: verify, message: "names other artifacts than the substitution record for: cli-arm64",
+			mutate: hardwareE2EStagedEdit("arm64", func(m map[string]any) {
+				m["pulledByDigest"].(map[string]any)["cli-arm64"] = "oci://ghcr.io/example/other-run/cli@sha256:" + strings.Repeat("e", 64)
+			})},
+		{name: "staged evidence that pulled the other architecture's CLI", exit: 22, code: verify, message: "names other artifacts than the substitution record for: cli-amd64",
+			mutate: func(t *testing.T, in hardwareE2ESummaryInputs, args []string) []string {
+				t.Helper()
+				arm := hardwareE2EReplacedTo(t, in.path("sub", "substitutions.json"), "cli-arm64")
+				return hardwareE2EStagedEdit("amd64", func(m map[string]any) { m["pulledByDigest"].(map[string]any)["cli-amd64"] = arm })(t, in, args)
+			}},
+		{name: "staged evidence that names nothing it pulled", exit: 22, code: verify, message: "names other artifacts than the substitution record for: controller, capi-provisioned, cli-amd64",
+			mutate: hardwareE2EStagedEdit("amd64", func(m map[string]any) { delete(m, "pulledByDigest") })},
+		{name: "staged evidence that pulled something more", exit: 22, code: verify, message: "the set of pulled references",
+			mutate: hardwareE2EStagedEdit("amd64", func(m map[string]any) {
+				m["pulledByDigest"].(map[string]any)["cli-arm64"] = "oci://ghcr.io/example/cli@sha256:" + strings.Repeat("d", 64)
+			})},
+		{name: "staged evidence whose pulled references are not text", exit: 22, code: verify, message: "names other artifacts than the substitution record for: controller",
+			mutate: hardwareE2EStagedEdit("amd64", func(m map[string]any) { m["pulledByDigest"].(map[string]any)["controller"] = 5 })},
+		{name: "staged evidence whose pulled references are not an object", exit: 13, code: "NVKR-E-UNSUPPORTED", message: "has no readable pulledByDigest",
+			mutate: hardwareE2EStagedEdit("amd64", func(m map[string]any) { m["pulledByDigest"] = "controller" })},
+
+		// The plan the summary digests must name the node image locations the checks saw.
+		{name: "a plan that names another node image location than the checks and the record", exit: 22, code: verify,
+			message: "the plan names other node image locations than the checks and the substitution record for: os-image-amd64",
+			mutate:  hardwareE2EEdit(hardwareE2EPlanNodeURL("os-image-amd64", "https://cdn.example.test/another-image.qcow2"), "sub", "plan.json")},
+		{name: "a plan that names no location for a node image", exit: 22, code: verify,
+			message: "the plan names other node image locations than the checks and the substitution record for: os-image-arm64",
+			mutate:  hardwareE2EEdit(hardwareE2EPlanNodeURL("os-image-arm64", nil), "sub", "plan.json")},
+
+		// An observation flag must fit its method: a fetch was observed by this run, a read-back was not.
+		{name: "an amd64 node image check whose observation flag does not fit its method", exit: 13, code: "NVKR-E-UNSUPPORTED", message: "observation flag that does not fit its method",
+			mutate: hardwareE2ENodeCheckEdit("os-image-amd64", func(m map[string]any) { m["observedByThisRun"] = !m["observedByThisRun"].(bool) })},
+		{name: "an arm64 node image check whose observation flag does not fit its method", exit: 13, code: "NVKR-E-UNSUPPORTED", message: "observation flag that does not fit its method",
+			mutate: hardwareE2ENodeCheckEdit("os-image-arm64", func(m map[string]any) { m["observedByThisRun"] = !m["observedByThisRun"].(bool) })},
+		{name: "a node image check with no observation flag", exit: 13, code: "NVKR-E-UNSUPPORTED", message: "observation flag that does not fit its method",
+			mutate: hardwareE2ENodeCheckEdit("os-image-amd64", func(m map[string]any) { delete(m, "observedByThisRun") })},
+
 		{name: "harness commit that is not a full hash", exit: 22, code: verify, message: "harness must name exactly a 40-hex commit",
 			mutate: hardwareE2EArgs(func(_ hardwareE2ESummaryInputs, a []string) []string {
 				return hardwareE2ESetFlag(a, "--harness-commit", "c044392")
@@ -1042,6 +1252,14 @@ func TestHardwareE2ESummaryStatesWhereNodeImagesCameFromAndWhetherTheyAreSkewed(
 		if summary.NodeImageVersionSkew {
 			t.Error("no image differs from the plan, so there is no skew to declare")
 		}
+		// Only the NVKR release is claimed as NVKR-built: the amd64 leg does not name its node image as
+		// built elsewhere, and the arm64 leg, whose image is another CI run's, does.
+		for _, leg := range summary.Legs {
+			listed := slices.Contains(leg.Staged.NotNvkrBuilt, "node-image")
+			if want := leg.Arch != "amd64"; listed != want {
+				t.Errorf("%s leg lists node-image as not NVKR-built = %v, want %v (not NVKR-built: %v)", leg.Arch, listed, want, leg.Staged.NotNvkrBuilt)
+			}
+		}
 	})
 }
 
@@ -1240,6 +1458,12 @@ func TestHardwareE2ESummaryAssertRefusesAnySummaryThatClaimsMore(t *testing.T) {
 		}, "each node image must name its source"},
 		{"node image source with an extra field", fullBytes, func(s map[string]any) { imageField(s, "source")["trusted"] = true }, "each node image must name its source"},
 		{"node image source removed", fullBytes, func(s map[string]any) { delete(image(s), "source") }, "each node image must name its source"},
+		{"a CI-run node image not named as not NVKR-built", fullBytes, func(s map[string]any) {
+			staged(s, 0)["notNvkrBuilt"] = []any{"deploy-path", "imager-efi", "site-profiles"}
+		}, hardwareE2ENodeBuiltRule},
+		{"an NVKR release node image named as not NVKR-built", fullBytes, func(s map[string]any) {
+			imageField(s, "source")["kind"], imageField(s, "source")["reference"] = "nvkr-release", "oci://registry.example.test/team/node@sha256:"+hardwareE2EDigest("1")
+		}, hardwareE2ENodeBuiltRule},
 		{"node image check removed", fullBytes, func(s map[string]any) { delete(image(s), "checked") }, hardwareE2ENodeImageRule},
 		{"node image check that is null", fullBytes, func(s map[string]any) { image(s)["checked"] = nil }, hardwareE2ENodeImageRule},
 		{"node image check that is text", fullBytes, func(s map[string]any) { image(s)["checked"] = "fetched" }, hardwareE2ENodeImageRule},

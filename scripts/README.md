@@ -49,15 +49,20 @@ pull request against the PR's base and head. `make status-restated-check` runs i
 
 ## NVKE hardware E2E
 
-The [NVKE hardware E2E](../.github/workflows/nvkr-nvke-hardware-e2e.yml) workflow calls these scripts; each one runs offline against
-files, so `internal/cicontract` tests cover them without hardware, a registry or an object store.
+The [NVKE hardware E2E](../.github/workflows/nvkr-nvke-hardware-e2e.yml) workflow calls these scripts. Their contract tests
+in `internal/cicontract` and the Python tests beside them replace every external dependency (the hardware site, a
+registry, an object store, the container engine) with a stand-in, so they show what the scripts do with the inputs the
+stand-ins give them. Whether the real services behave as the stand-ins do is a question only a recorded run answers;
+the [ADR-18 reconciliation row](../docs/adr/reconciliation/adr-18.md) says which runs exist.
 
 `hardware-e2e-substitute-plan.sh PLAN PROVENANCE OUTPUTS OUT` checks the committed plan fixture's bytes against its
 provenance record, then replaces the slots NVKR builds with the references in an outputs manifest and writes
 `plan.json` and `substitutions.json` into a fresh `OUT`. OCI references must be pinned by digest, node images must be
 plain HTTPS `.qcow2` URLs with a SHA-256 and a named verification (`http-get`, or `s3-readback` citing the
 publication run and what it read back), every slot is required, and a result that still names an `nvcr.io`
-artifact is refused. Each replaced node image carries its verification into `substitutions.json`. A node image built at another NVKE version than the plan's is refused unless
+artifact is refused. Each replaced node image carries its verification and its source into `substitutions.json`; the source
+is `nvkr-release` (an NVKR release digest) or `ci-run` (another CI run's HTTPS URL, such as the NVKE run that published a
+release image), and only the first is NVKR-built. A node image built at another NVKE version than the plan's is refused unless
 `--allow-node-image-version-skew` is given. `hardware-e2e-substitute-plan.sh --build-subject PLAN PROVENANCE OUT` keeps the
 plan byte for byte and records that nothing was replaced. Failures carry the stable `NVKR-E-*` codes and leave no
 partial output.
@@ -71,15 +76,22 @@ partial output.
 - `hardware-e2e-publish-node-image.py` pulls one disk output of an NVKR release by exact digest, checks it is a plain
   qcow2, copies it under a key holding its SHA-256, reads it back from the object store with credentials and writes
   the record, with the outputs-manifest entry, that the
-  [publication workflow](../.github/workflows/nvkr-nvke-node-image-publish.yml) uploads. Its tests replace the pull and
-  the object store with fake executables.
+  [publication workflow](../.github/workflows/nvkr-nvke-node-image-publish.yml) uploads. The declared architecture is
+  required and the image must declare a positive virtual size. Its tests replace the pull and the object store with
+  fake executables.
 - `hardware-e2e-stage-inputs.sh` pulls the NVKR-built controller, capi-provisioned and nvkectl by digest, retags the
-  images under a `localhost/` name and saves the archives the suite loads onto the node.
+  images under a `localhost/` name and saves the archives the suite loads onto the node. It records the node image as
+  not NVKR-built unless the substitution record shows an NVKR release as its source for that architecture.
 - `hardware-e2e-build-subject.sh` builds the same inputs from the subject commit with NVKE's own `make site-inputs`,
   after checking the checkout is exactly that commit. Nothing it produces is NVKR-built.
-- `hardware-e2e-check-junit.py` compares a run's JUnit with the specs a Ginkgo dry run selected.
+- `hardware-e2e-check-junit.py` compares a run's JUnit with the specs a Ginkgo dry run selected. The dry run must carry
+  the leg's label filter and select a spec from each group the stage registers (site checks from `deployment`, tenant
+  specs at `full`); `--dry-only` checks that before any machine is taken. At `full` every selected spec must pass; below
+  it the check requires no failure and at least one pass and records that it is not complete.
 - `hardware-e2e-summary.sh` stamps each leg, writes the run summary and asserts its contract, including
-  `qualificationAuthority: "none"`.
+  `qualificationAuthority: "none"`, that a node image is named as not NVKR-built unless it is an NVKR release, that the
+  matrix, plan, staged record and node-image check name the same streams, digests and URLs, and that each leg's
+  coverage counts agree with its stage.
 
 Each script's header states its arguments and exit codes. The Python scripts have standard-library tests beside them
 (`make test-ci-tools`).

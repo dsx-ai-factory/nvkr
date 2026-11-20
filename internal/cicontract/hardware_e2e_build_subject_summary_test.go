@@ -165,6 +165,17 @@ func TestHardwareE2ESummaryBuildSubjectWriteRefusesWhatItCannotSupport(t *testin
 				if err != nil {
 					t.Fatal(err)
 				}
+				// Make the record and the checks name the fixture's own node image locations, so that
+				// only the rule about an unchanged plan can refuse this run.
+				var plan map[string]any
+				if err := json.Unmarshal(fixture, &plan); err != nil {
+					t.Fatal(err)
+				}
+				for _, slot := range []string{"os-image-amd64", "os-image-arm64"} {
+					url := hardwareE2EPlanNodeURLOf(t, plan, slot)
+					hardwareE2ENodeImageBoth(slot, "to", "url", url)(t, in, a)
+				}
+				// The fixture's exact bytes go last: the edits above re-encode the plan they touch.
 				if err := os.WriteFile(in.path("sub", "plan.json"), fixture, 0o600); err != nil {
 					t.Fatal(err)
 				}

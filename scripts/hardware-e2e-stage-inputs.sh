@@ -21,6 +21,11 @@
 #   - builds the site profiles fixture from the harness checkout. That fixture is NVKE's, not
 #     NVKR's, and the staged record says so.
 #
+# The staged record's notNvkrBuilt names what this leg runs that NVKR did not build. The node image
+# is named there unless the substitution record gives it an NVKR release as its source: an image from
+# another CI run, such as a published NVKE release, and a record with no source at all both count
+# as not NVKR-built, so nothing is claimed that the record does not show.
+#
 # DIR for --inputs and the --staged FILE must not exist. --staged is written last, only on success;
 # a failure removes --inputs, so nothing a later suite run could mistake for staged inputs remains.
 # --step-env receives the two harness variables the replaced steps would have emitted
@@ -106,6 +111,8 @@ artifact_ref() { # artifact_ref SLOT: the reference the plan carries for it, pin
 controller_ref=$(artifact_ref controller)
 capi_ref=$(artifact_ref capi-provisioned)
 cli_ref=$(artifact_ref "cli-$arch")
+# Only an NVKR release is claimed as NVKR-built; any other kind, or none, is not.
+node_source_kind=$(jq -r --arg slot "os-image-$arch" '[.replaced[] | select(.slot == $slot) | .source.kind] | if length == 1 then (.[0] // "") else "" end' "$subs")
 
 mkdir -m 700 "$inputs"
 cleanup() {
@@ -159,7 +166,7 @@ SITE_CLI_REF=${cli_ref#oci://} timeout --kill-after=30s "$PULL_TIMEOUT" "$fetche
 nvkectl=$inputs/nvkectl/nvkectl-linux-$arch
 [[ -f $nvkectl && ! -L $nvkectl ]] || fail NVKR-E-VERIFY-FAILED "staging nvkectl left no regular file at $nvkectl" 22
 
-record=$(jq -n -S --indent 2 --arg arch "$arch" --arg check "$controller_check" \
+record=$(jq -n -S --indent 2 --arg arch "$arch" --arg check "$controller_check" --arg node_source_kind "$node_source_kind" \
   --arg controller "$controller_ref" --arg capi "$capi_ref" --arg cli "$cli_ref" --arg prefix "$prefix" \
   --arg controller_sha "$(sha256_of "$inputs/controller.tar")" --arg capi_sha "$(sha256_of "$inputs/capi-provisioned.tar")" \
   --arg profiles_sha "$(sha256_of "$inputs/profiles.tar")" --arg nvkectl_sha "$(sha256_of "$nvkectl")" '
@@ -173,7 +180,7 @@ record=$(jq -n -S --indent 2 --arg arch "$arch" --arg check "$controller_check" 
             ("nvkectl-linux-" + $arch): $nvkectl_sha},
     imagePrefix: $prefix,
     pulledByDigest: {controller: $controller, "capi-provisioned": $capi, ("cli-" + $arch): $cli},
-    notNvkrBuilt: ["deploy-path", "imager-efi", "site-profiles"]
+    notNvkrBuilt: ((["deploy-path", "imager-efi", "site-profiles"] + (if $node_source_kind == "nvkr-release" then [] else ["node-image"] end)) | sort)
   }')
 
 if [[ -n $step_env ]]; then

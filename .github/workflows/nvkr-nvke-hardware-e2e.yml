@@ -12,8 +12,10 @@ name: NVKR NVKE hardware E2E
 # What the node runs is chosen by the required artifact-source input, with no default:
 #
 #   nvkr-outputs   the controller, capi-provisioned and nvkectl images NVKR built, pulled by the
-#                  digest the outputs manifest names, and the node image NVKR built, served at the
-#                  https URL the manifest names after that exact URL has been fetched and hashed.
+#                  digest the outputs manifest names, and the node image the manifest names at an
+#                  https URL, checked by the method its entry names before any machine is taken.
+#                  A node image from an NVKR release is NVKR-built. One another CI run published,
+#                  such as an NVKE release image, is not, and the summary says so.
 #   build-subject  the controller, capi-provisioned and nvkectl built inside the job from the
 #                  subject commit, and the node image the plan itself names. Nothing is NVKR-built,
 #                  and the summary says so.
@@ -21,6 +23,13 @@ name: NVKR NVKE hardware E2E
 # Either way the deploy path, the imager EFI and the site profiles are NVKE's. Each stream holds two
 # CPU machines and one GPU machine for about an hour on the hardware site NVKE's own lanes use. Never
 # cancel a run in flight: teardown is the suite's, and a killed runner leaks the instances.
+#
+# A dry run joins no Teleport and takes no machine, but it is not credential-free. A job's permissions
+# and environment cannot depend on an input, so a dry run's leg still enters the protected environment
+# (and waits for its approval), holds the permission to request an OIDC token that it never requests,
+# and reads the environment's variables. It runs no spec and reaches no hardware site: it shows that the
+# plan, the staged inputs, the config and the specs selected for the stage agree. The node image
+# publisher's dry run is its own job, without the environment or the token permission.
 
 'on':
   workflow_dispatch:
@@ -280,6 +289,10 @@ jobs:
     # The suite's own timeout plus cleanup and setup, from the harness matrix. The go test timeout is
     # shorter so Ginkgo can tear the node down before this kills the runner.
     timeout-minutes: ${{ matrix.job_timeout_minutes }}
+    # The account every leg baked into its machines, read where the environment's variables are visible.
+    # The summary job has no environment, so it cannot read them itself.
+    outputs:
+      node-user: ${{ steps.node-user.outputs.value }}
     permissions:
       contents: read
       # The GHCR pull of NVKR-built images.
@@ -375,6 +388,18 @@ jobs:
           set -euo pipefail
           mkdir leg
           nvkr/scripts/hardware-e2e-summary.sh leg leg "$STREAM" "$COMBINATION" "$MATRIX_ARCH"
+
+      # Empty is valid: the OSS os-image releases bake no account. Anything but a plain account name is
+      # refused, so the value can neither carry a second output line nor name something else.
+      - name: Publish the node account
+        id: node-user
+        run: |
+          set -euo pipefail
+          if [[ ! $NODE_USER =~ ^[A-Za-z0-9._-]*$ ]]; then
+            echo "::error::the node account must be letters, digits, dot, underscore or hyphen"
+            exit 1
+          fi
+          printf 'value=%s\n' "$NODE_USER" >> "$GITHUB_OUTPUT"
 
       # At the harness commit, with every tag: the deploy path is exported from the subject commit's
       # tree, or from the controller/<version> tag, in this clone.
@@ -563,6 +588,18 @@ jobs:
             -e2e.versions="controller=${SITE_NVKE_CONTROLLER_VERSION},cli=${CLI_VERSION},capi-provisioned=${CAPI_PROVISIONED_VERSION},${OS_IMAGE_VERSIONS}" \
             -e2e.capabilities="${CAPABILITIES}"
 
+      # Before any machine: the specs the stage selects must be the ones it can pass, under the label
+      # filter this lane expects. Looking only after the run would leave a stage the suite cannot satisfy
+      # to burn an hour of hardware before the coverage check refused it.
+      - name: Check the selected specs fit the stage
+        run: |
+          set -euo pipefail
+          python3 nvkr/scripts/hardware-e2e-check-junit.py \
+            --dry leg/dry-run.junit.xml \
+            --stage "$SITE_STAGE" \
+            --label-filter "site-controller && !${SITE_TENANT_EXCLUDE}" \
+            --dry-only
+
       # The harness's own run step: the three nested timeouts, the flags and why each is there are in
       # release/hack/qualify-e2e.sh. A dry run lists what it would run and takes no machine.
       - name: Run the e2e suite${{ inputs.dry-run && ' (dry run)' || '' }}
@@ -573,6 +610,7 @@ jobs:
       # The suite names the jump host in its own errors. GitHub masks a secret in the job log but not in
       # an uploaded artifact.
       - name: Withhold credentials from the run files
+        id: withhold
         if: always()
         run: nvke/release/hack/qualify-e2e.sh withhold
 
@@ -585,7 +623,9 @@ jobs:
           python3 nvkr/scripts/hardware-e2e-check-junit.py \
             --dry leg/dry-run.junit.xml \
             --real nvke/controller/test/e2e/qualify-e2e.junit.xml \
-            --stage "$SITE_STAGE" --out leg/coverage.json
+            --stage "$SITE_STAGE" \
+            --label-filter "site-controller && !${SITE_TENANT_EXCLUDE}" \
+            --out leg/coverage.json
 
       # Recorded on every real run, including a failed one, and published nowhere: NVKE's TestGrid
       # identity trusts only NVKE's own refs.
@@ -614,9 +654,10 @@ jobs:
           retention-days: 30
 
       # The site bundle is redacted by the suite before it is written. The Ginkgo JSON report is not
-      # uploaded: it carries remote command output.
+      # uploaded: it carries remote command output. Nothing is uploaded unless the redaction succeeded:
+      # a failed redaction would otherwise publish exactly what it was there to withhold.
       - name: Upload the run files
-        if: always()
+        if: always() && steps.withhold.outcome == 'success'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: nvkr-hardware-e2e-run-${{ inputs.stage }}-${{ matrix.stream }}-${{ github.run_id }}
@@ -655,7 +696,8 @@ jobs:
     env:
       SOURCE: ${{ inputs.artifact-source }}
       SITE_STAGE: ${{ inputs.stage }}
-      NODE_USER: ${{ inputs.node-user || vars.QUALIFY_E2E_NODE_USER }}
+      # What the legs used. This job has no environment, so its own reading of the variable could differ.
+      NODE_USER: ${{ needs.hardware-e2e.outputs.node-user }}
       HARNESS_COMMIT: ${{ needs.plan.outputs.harness-commit }}
       MATRIX: ${{ needs.plan.outputs.matrix }}
     steps:

@@ -35,9 +35,12 @@ URL = "https://artifacts.example.test/jobs/7/artifacts/outputs/node-image.qcow2"
 SLOT = "os-image-amd64"
 
 
-def qcow2(version=3, backing=0, bits=16, size=12 << 30, crypt=0, magic=b"QFI\xfb"):
-    head = struct.pack(">4sIQIIQI", magic, version, backing, 0, bits, size, crypt)
-    return head.ljust(checker.QCOW2_HEADER_BYTES, b"\0")
+def qcow2(version=3, backing=0, bits=16, size=12 << 30, crypt=0, magic=b"QFI\xfb", incompatible=0):
+    head = struct.pack(">4sIQIIQI", magic, version, backing, 0, bits, size, crypt).ljust(checker.QCOW2_HEADER_BYTES, b"\0")
+    if version == 3:
+        # The feature fields: incompatible, compatible and autoclear bits, the refcount order, the header length.
+        head += struct.pack(">QQQII", incompatible, 0, 0, 4, checker.QCOW2_V3_HEADER_BYTES)
+    return head
 
 
 IMAGE = qcow2() + b"synthetic payload " * 64
@@ -59,6 +62,9 @@ class Response:
         if self.fail_after is not None and not self.chunks:
             raise ConnectionResetError(self.fail_after)
         return self.chunks.pop(0) if self.chunks else b""
+
+    def read1(self, size):
+        return self.read(size)
 
     def close(self):
         self.closed = True
@@ -116,6 +122,7 @@ class CheckTest(unittest.TestCase):
                 "url": URL,
                 "sha256": DIGEST,
                 "bytes": len(IMAGE),
+                "rangeProbe": "ignored",
                 "rangeSupported": False,
                 "acceptRanges": "bytes",
                 "qcow2": {"version": 3, "virtualSizeBytes": 12 << 30, "clusterSizeBytes": 65536},
@@ -123,8 +130,32 @@ class CheckTest(unittest.TestCase):
         )
 
     def test_records_whether_the_server_honours_range_without_requiring_it(self):
-        self.assertTrue(self.check(Opener(probe(206), body()))["rangeSupported"])
-        self.assertFalse(self.check(Opener(probe(200, accept=""), body()))["rangeSupported"])
+        honoured = self.check(Opener(probe(206), body()))
+        self.assertEqual((honoured["rangeProbe"], honoured["rangeSupported"]), ("honoured", True))
+        ignored = self.check(Opener(probe(200, accept=""), body()))
+        self.assertEqual((ignored["rangeProbe"], ignored["rangeSupported"], ignored["acceptRanges"]), ("ignored", False, ""))
+
+    def test_a_server_that_rejects_the_range_probe_is_still_checked_by_the_full_get(self):
+        # A server may refuse a Range request and serve the whole object; the full GET decides.
+        for code, reason in ((403, "Forbidden"), (405, "Method Not Allowed"), (416, "Range Not Satisfiable"), (500, "Server Error")):
+            with self.subTest(code=code):
+                opener = Opener(urllib.error.HTTPError(URL, code, reason, {}, None), body())
+                record = self.check(opener)
+                self.assertEqual((record["rangeProbe"], record["rangeSupported"], record["acceptRanges"]), ("unavailable", False, ""))
+                self.assertEqual((record["bytes"], record["sha256"]), (len(IMAGE), DIGEST))
+                self.assertEqual([call[0] for call in opener.calls], [URL, URL])
+
+    def test_an_unusable_probe_answer_is_unavailable_and_the_full_get_still_runs(self):
+        for answer in (probe(status=500), probe(status=404), urllib.error.URLError("reset"), TimeoutError("timed out")):
+            with self.subTest(answer=repr(answer)):
+                record = self.check(Opener(answer, body()))
+                self.assertEqual(record["rangeProbe"], "unavailable")
+
+    def test_a_rejected_probe_never_lets_a_bad_full_get_pass(self):
+        rejected = urllib.error.HTTPError(URL, 416, "Range Not Satisfiable", {}, None)
+        self.assertFails(22, Opener(rejected, body(image=qcow2() + b"other " * 64)), "not the")
+        self.assertFails(22, Opener(rejected, urllib.error.HTTPError(URL, 403, "Forbidden", {}, None)), "HTTP 403")
+        self.assertFails(13, Opener(rejected, body(image=qcow2(crypt=2) + b"x" * 200)), "encrypted", sha256=DIGEST)
 
     def test_fetches_the_exact_url_anonymously_with_no_other_headers(self):
         opener = good()
@@ -165,25 +196,25 @@ class CheckTest(unittest.TestCase):
     def test_a_http_error_is_a_failure_naming_its_status(self):
         for code, reason in ((401, "Unauthorized"), (403, "Forbidden"), (404, "Not Found"), (500, "Server Error")):
             error = urllib.error.HTTPError(URL, code, reason, {}, None)
-            with self.subTest(code=code, at="probe"):
-                self.assertFails(22, Opener(error), f"HTTP {code}")
+            with self.subTest(code=code, at="probe and body"):
+                self.assertFails(22, Opener(error, error), f"HTTP {code}")
             with self.subTest(code=code, at="body"):
                 self.assertFails(22, Opener(probe(), error), f"HTTP {code}")
 
     def test_a_redirect_is_reported_and_not_followed(self):
         redirect = urllib.error.HTTPError(URL, 302, "Found", {"Location": "https://elsewhere.example.test/x.qcow2"}, None)
-        opener = Opener(redirect)
+        opener = Opener(redirect, redirect)
         self.assertFails(22, opener, "redirect")
-        self.assertEqual(len(opener.calls), 1)
+        self.assertEqual([call[0] for call in opener.calls], [URL, URL])
 
     def test_a_transport_failure_is_a_failure(self):
-        self.assertFails(22, Opener(urllib.error.URLError("no route")), "could not be fetched")
+        self.assertFails(22, Opener(urllib.error.URLError("no route"), urllib.error.URLError("no route")), "could not be fetched")
         self.assertFails(22, Opener(probe(), TimeoutError("timed out")), "could not be fetched")
         dropped = Response(200, {"Content-Length": str(len(IMAGE))}, [IMAGE[:100]], fail_after="reset by peer")
         self.assertFails(22, Opener(probe(), dropped), "failed after 100 of")
 
     def test_a_non_success_answer_that_is_not_an_exception_is_a_failure(self):
-        self.assertFails(22, Opener(probe(status=500)), "HTTP 500")
+        self.assertFails(22, Opener(probe(), Response(500, {"Content-Length": "5"}, [b"12345"])), "HTTP 500")
         self.assertFails(22, Opener(probe(), Response(206, {"Content-Length": "5"}, [b"12345"])), "not 200")
 
     def test_the_body_must_declare_and_match_its_length(self):
@@ -225,6 +256,9 @@ class CheckTest(unittest.TestCase):
             "backing file": (qcow2(backing=4096), "backing file"),
             "qcow2-layer encryption": (qcow2(crypt=2), "encrypted"),
             "absurd cluster size": (qcow2(bits=3), "cluster size"),
+            "no virtual size": (qcow2(size=0), "no virtual size"),
+            "version 3 with an external data file": (qcow2(incompatible=1 << 2), "external data file"),
+            "version 3 with an external data file and other bits": (qcow2(incompatible=(1 << 2) | 1), "external data file"),
         }
         for name, (header, message) in cases.items():
             image = header + b"x" * 200
@@ -238,13 +272,64 @@ class CheckTest(unittest.TestCase):
                          sha256=hashlib.sha256(image).hexdigest())
 
     def test_a_header_split_across_chunks_is_still_read(self):
-        record = self.check(Opener(probe(), body(split=10)))
+        # 80 is past the version 2 header and short of the version 3 one: the check waits for the rest.
+        for split in (10, checker.QCOW2_HEADER_BYTES, 80, checker.QCOW2_V3_HEADER_BYTES - 1):
+            with self.subTest(split=split):
+                record = self.check(Opener(probe(), body(split=split)))
+                self.assertEqual(record["qcow2"]["version"], 3)
+
+    def test_a_version_3_header_with_its_feature_fields_is_what_is_read(self):
+        # The external-data-file flag sits after the 72-byte base header, so a base-header parse would pass it.
+        image = qcow2(incompatible=1 << 2) + b"x" * 200
+        self.assertFails(13, Opener(probe(), body(image=image, split=80)), "external data file", sha256=hashlib.sha256(image).hexdigest())
+
+    def test_other_incompatible_feature_bits_do_not_decide_this_check(self):
+        image = qcow2(incompatible=1) + b"x" * 200
+        record = self.check(Opener(probe(), body(image=image)), sha256=hashlib.sha256(image).hexdigest())
         self.assertEqual(record["qcow2"]["version"], 3)
 
+    def test_a_version_2_image_is_read_from_its_72_byte_header(self):
+        image = qcow2(version=2) + b"x" * 200
+        self.assertEqual(len(qcow2(version=2)), checker.QCOW2_HEADER_BYTES)
+        record = self.check(Opener(probe(), body(image=image)), sha256=hashlib.sha256(image).hexdigest())
+        self.assertEqual(record["qcow2"]["version"], 2)
+
+    def test_a_version_3_header_cut_short_is_too_small(self):
+        image = qcow2()[:90]
+        self.assertFails(13, Opener(probe(), body(image=image, split=90)), "version 3 qcow2 header",
+                         sha256=hashlib.sha256(image).hexdigest())
+
     def test_an_unsupported_image_is_refused_before_the_rest_is_streamed(self):
-        response = body(image=qcow2(crypt=2) + b"x" * 200, split=checker.QCOW2_HEADER_BYTES)
+        response = body(image=qcow2(crypt=2) + b"x" * 200, split=checker.QCOW2_V3_HEADER_BYTES)
         self.assertFails(13, Opener(probe(), response), "encrypted", sha256=DIGEST)
         self.assertEqual(len(response.chunks), 1)
+
+    def test_every_read_is_bounded_by_the_time_left(self):
+        class Sock:
+            def __init__(self):
+                self.timeouts = []
+
+            def settimeout(self, seconds):
+                self.timeouts.append(seconds)
+
+        class Raw:
+            def __init__(self, sock):
+                self._sock = sock
+
+        class Fp:
+            def __init__(self, sock):
+                self.raw = Raw(sock)
+
+        sock = Sock()
+        response = body()
+        response.fp = Fp(sock)
+        ticks = itertools.count(0, 2).__next__
+        self.check(Opener(probe(), response), timeout=60, max_seconds=100, clock=ticks)
+        self.assertTrue(sock.timeouts)
+        # The inactivity limit while there is time, then what is left of the deadline.
+        self.assertEqual(sock.timeouts[0], min(60, 100 - 2))
+        self.assertEqual(sock.timeouts, sorted(sock.timeouts, reverse=True))
+        self.assertTrue(all(0 < seconds <= 60 for seconds in sock.timeouts))
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -264,6 +349,18 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif self.path == "/head-only.qcow2" and self.command == "GET":
             self.send_response(403)  # HEAD answers 200 for the same path, as GitLab artifact downloads do
             self.end_headers()
+        elif self.path == "/trickle.qcow2" and self.command == "GET":
+            # One byte at a time, each inside any socket timeout, for far longer than the check will wait.
+            self.send_response(200)
+            self.send_header("Content-Length", str(1 << 20))
+            self.end_headers()
+            try:
+                for _ in range(100):
+                    self.wfile.write(b"\0")
+                    self.wfile.flush()
+                    time.sleep(0.2)
+            except OSError:
+                pass  # the check gave up and closed the connection, which is the point
         elif self.path in ("/image.qcow2", "/head-only.qcow2"):
             self.send_response(200)
             self.send_header("Content-Length", str(len(IMAGE)))
@@ -319,19 +416,31 @@ class RealTransportTest(unittest.TestCase):
     def test_a_url_that_answers_head_but_refuses_get_fails(self):
         url = f"{self.base}/head-only.qcow2"
         head = urllib.request.Request(url, method="HEAD")
-        with urllib.request.urlopen(head, timeout=5) as response:  # noqa: S310 (loopback test server)
+        # No proxy: a proxy set in the environment would answer for a loopback address.
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(head, timeout=5) as response:  # noqa: S310 (loopback test server)
             self.assertEqual(response.status, 200)
         with self.assertRaises(checker.Failure) as raised:
             checker.stream(checker.open_url, url, DIGEST, 5, checker.DEFAULT_MAX_BYTES, 60, time.monotonic)
         self.assertIn("HTTP 403", str(raised.exception))
 
-    def test_a_missing_object_fails(self):
+    def test_a_missing_object_fails_at_the_full_get_not_the_probe(self):
+        self.assertEqual(checker.probe_range(checker.open_url, f"{self.base}/gone.qcow2", 5), ("unavailable", ""))
         with self.assertRaises(checker.Failure) as raised:
-            checker.probe_range(checker.open_url, f"{self.base}/gone.qcow2", 5)
+            checker.stream(checker.open_url, f"{self.base}/gone.qcow2", DIGEST, 5, checker.DEFAULT_MAX_BYTES, 60, time.monotonic)
         self.assertIn("HTTP 404", str(raised.exception))
 
     def test_the_probe_records_that_this_server_ignores_range(self):
-        self.assertEqual(checker.probe_range(checker.open_url, f"{self.base}/image.qcow2", 5), (False, ""))
+        self.assertEqual(checker.probe_range(checker.open_url, f"{self.base}/image.qcow2", 5), ("ignored", ""))
+
+    def test_a_server_that_trickles_bytes_is_cut_off_at_the_deadline_not_the_socket_timeout(self):
+        # Each byte arrives inside the 5 second socket timeout, so only a deadline that interrupts the read ends this.
+        started = time.monotonic()
+        with self.assertRaises(checker.Failure) as raised:
+            checker.stream(checker.open_url, f"{self.base}/trickle.qcow2", DIGEST, 5, checker.DEFAULT_MAX_BYTES, 1, time.monotonic)
+        self.assertEqual(raised.exception.exit_code, 22)
+        self.assertIn("still streaming after 1s", str(raised.exception))
+        self.assertLess(time.monotonic() - started, 4)
 
 
 class WriteNewTest(unittest.TestCase):
@@ -373,12 +482,13 @@ class CommandTest(unittest.TestCase):
         record = json.loads(self.out.read_text())
         self.assertEqual(
             sorted(record),
-            ["acceptRanges", "bytes", "method", "observedByThisRun", "qcow2", "rangeSupported", "schema", "sha256", "slot", "url"],
+            ["acceptRanges", "bytes", "method", "observedByThisRun", "qcow2", "rangeProbe", "rangeSupported", "schema", "sha256", "slot", "url"],
         )
 
     def test_a_failure_writes_nothing_and_carries_its_code(self):
         cases = (
-            (Opener(urllib.error.HTTPError(URL, 403, "Forbidden", {}, None)), URL, 22, "NVKR-E-VERIFY-FAILED"),
+            (Opener(urllib.error.HTTPError(URL, 403, "Forbidden", {}, None), urllib.error.HTTPError(URL, 403, "Forbidden", {}, None)),
+             URL, 22, "NVKR-E-VERIFY-FAILED"),
             (good(), "http://artifacts.example.test/node.qcow2", 13, "NVKR-E-UNSUPPORTED"),
             (Opener(probe(), body(image=qcow2(crypt=2) + b"x" * 200)), URL, 13, "NVKR-E-UNSUPPORTED"),
         )

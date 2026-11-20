@@ -88,6 +88,23 @@ makefile=$harness/controller/test/e2e/Makefile
 [[ ! -e $staged_out && ! -L $staged_out ]] || fail NVKR-E-IMMUTABLE-VIOLATION "refusing to replace $staged_out" 47
 [[ -z $step_env || -f $step_env ]] || fail NVKR-E-USAGE "--step-env is not a file: $step_env" 2
 
+# The build runs under `make -C` in the harness checkout, so a path relative to the caller would name
+# another tree there: the inputs would be written where the checks below never look, and the harness
+# would be handed a relative nvkectl path. A relative path becomes absolute before anything is created;
+# an absolute one is used as given. Only shell builtins are used.
+if [[ $harness != /* ]]; then
+  harness=$(cd -- "$harness" && pwd -P) || fail NVKR-E-USAGE "--harness cannot be resolved: $harness" 2
+fi
+if [[ $inputs != /* ]]; then
+  while [[ $inputs == */ ]]; do inputs=${inputs%/}; done
+  inputs_dir=. inputs_name=$inputs
+  if [[ $inputs == */* ]]; then inputs_dir=${inputs%/*} inputs_name=${inputs##*/}; fi
+  [[ -n $inputs_name ]] || fail NVKR-E-USAGE '--inputs must name a directory' 2
+  inputs_dir=$(cd -- "$inputs_dir" && pwd -P) || fail NVKR-E-USAGE "the parent of --inputs does not exist: $inputs" 2
+  inputs=$inputs_dir/$inputs_name
+fi
+[[ ! -e $inputs && ! -L $inputs ]] || fail NVKR-E-IMMUTABLE-VIOLATION "refusing to replace $inputs" 47
+
 commit=$(jq -er '.commit | select(type == "string" and test("^[0-9a-f]{40}$"))' "$plan") ||
   fail NVKR-E-UNSUPPORTED 'the plan names no 40-hex subject commit' 13
 

@@ -295,6 +295,73 @@ func hardwareE2EReadFile(t *testing.T, filename string) string {
 	return string(data)
 }
 
+// The staged record names the leg's node image as not NVKR-built unless the substitution record gives
+// that image an NVKR release as its source. Any other kind, an unknown one and a missing one all count as
+// not NVKR-built, and another architecture's image says nothing about this leg's.
+func TestHardwareE2EStageInputsNamesTheNodeImageAsNotNvkrBuiltUnlessItIsAnNvkrRelease(t *testing.T) {
+	notBuilt := []string{"deploy-path", "imager-efi", "node-image", "site-profiles"}
+	built := []string{"deploy-path", "imager-efi", "site-profiles"}
+	release := func(replacement map[string]any) {
+		replacement["source"] = map[string]any{
+			"kind": "nvkr-release", "reference": "oci://registry.example.test/team/node@sha256:" + hardwareE2EDigest("1"),
+			"version": hardwareE2EVersion,
+		}
+	}
+	cases := []struct {
+		name string
+		edit func(own bool, replacement map[string]any)
+		want []string
+	}{
+		{"an NVKR release", func(own bool, r map[string]any) {
+			if own {
+				release(r)
+			}
+		}, built},
+		{"another CI run", func(bool, map[string]any) {}, notBuilt},
+		{"a source of a kind it does not know", func(own bool, r map[string]any) {
+			if own {
+				r["source"].(map[string]any)["kind"] = "docker-hub"
+			}
+		}, notBuilt},
+		{"a source with no kind", func(own bool, r map[string]any) {
+			if own {
+				delete(r["source"].(map[string]any), "kind")
+			}
+		}, notBuilt},
+		{"no source", func(own bool, r map[string]any) {
+			if own {
+				delete(r, "source")
+			}
+		}, notBuilt},
+		{"an NVKR release for the other architecture only", func(own bool, r map[string]any) {
+			if !own {
+				release(r)
+			}
+		}, notBuilt},
+	}
+	for _, arch := range []string{"amd64", "arm64"} {
+		for _, tc := range cases {
+			t.Run(arch+"/"+tc.name, func(t *testing.T) {
+				r := hardwareE2ENewStageRun(t, arch)
+				hardwareE2EEditJSON(t, r.subs, func(record map[string]any) {
+					for _, entry := range record["replaced"].([]any) {
+						replacement := entry.(map[string]any)
+						if slot, _ := replacement["slot"].(string); strings.HasPrefix(slot, "os-image-") {
+							tc.edit(slot == "os-image-"+arch, replacement)
+						}
+					}
+				})
+				if result := r.run(); result.exit != 0 {
+					t.Fatalf("exit %d, want 0:\n%s", result.exit, result.output)
+				}
+				if got := hardwareE2EReadStaged(t, r.staged).NotNvkrBuilt; !slices.Equal(got, tc.want) {
+					t.Errorf("notNvkrBuilt = %v, want %v", got, tc.want)
+				}
+			})
+		}
+	}
+}
+
 func TestHardwareE2EStageInputsPullsByDigestStagesLocalArchivesAndRecordsIt(t *testing.T) {
 	for _, arch := range []string{"amd64", "arm64"} {
 		t.Run(arch, func(t *testing.T) {
@@ -324,19 +391,17 @@ func TestHardwareE2EStageInputsPullsByDigestStagesLocalArchivesAndRecordsIt(t *t
 			} {
 				hardwareE2ERequireCall(t, calls, want)
 			}
-			// The fake engine logs each call it receives and the fake timeout logs each bound it
-			// was given, so every engine call needs a timeout line that ends with it.
+			// The fake timeout logs the bound it was given and then runs the command, which logs its own
+			// call, so each engine call must directly follow the timeout line that wrapped it. Looking
+			// for any matching line would let one wrapper vouch for two identical calls.
 			engineCalls := 0
-			for _, call := range calls {
+			for index, call := range calls {
 				if !strings.HasPrefix(call, "docker ") {
 					continue
 				}
 				engineCalls++
-				bounded := slices.ContainsFunc(calls, func(other string) bool {
-					return strings.HasPrefix(other, "timeout ") && strings.HasSuffix(other, " "+call)
-				})
-				if !bounded {
-					t.Errorf("an engine call ran outside a timeout: %q", call)
+				if index == 0 || !strings.HasPrefix(calls[index-1], "timeout ") || !strings.HasSuffix(calls[index-1], " "+call) {
+					t.Errorf("an engine call ran outside its own timeout: %q", call)
 				}
 			}
 			if engineCalls == 0 {
@@ -362,7 +427,9 @@ func TestHardwareE2EStageInputsPullsByDigestStagesLocalArchivesAndRecordsIt(t *t
 			if record.ImagePrefix != prefix {
 				t.Errorf("imagePrefix = %q, want %q", record.ImagePrefix, prefix)
 			}
-			if want := []string{"deploy-path", "imager-efi", "site-profiles"}; !slices.Equal(record.NotNvkrBuilt, want) {
+			// The synthetic manifest's node images come from another CI run, not an NVKR release, so the
+			// record does not claim them as NVKR-built.
+			if want := []string{"deploy-path", "imager-efi", "node-image", "site-profiles"}; !slices.Equal(record.NotNvkrBuilt, want) {
 				t.Errorf("notNvkrBuilt = %v, want %v", record.NotNvkrBuilt, want)
 			}
 			wantPulled := map[string]string{"controller": controller, "capi-provisioned": capi, "cli-" + arch: cli}

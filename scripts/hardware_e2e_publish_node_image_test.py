@@ -329,6 +329,8 @@ class PullTest(unittest.TestCase):
             ("another output", lambda r: r["output"].update(name="other"), 22, "different reference or output"),
             ("not a disk", lambda r: r["output"].update(kind="executable"), 13, "not a disk-image"),
             ("the wrong architecture", lambda r: r["output"].update(arch="arm64"), 22, "built for arm64"),
+            ("no architecture", lambda r: r["output"].pop("arch"), 22, "declares no architecture"),
+            ("an architecture that is not text", lambda r: r["output"].update(arch=["amd64"]), 22, "built for"),
             ("two files", lambda r: r["files"].append(dict(r["files"][0], path="extra.qcow2")), 22, "expected only"),
             ("another file name", lambda r: r["files"][0].update(path="other.qcow2"), 22, "expected only"),
             ("no digest", lambda r: r["files"][0].pop("sha256"), 22, "no usable sha256"),
@@ -348,10 +350,22 @@ class PullTest(unittest.TestCase):
                 self.assertIn(text, err)
                 harness.untouched(self)
 
-    def test_an_architecture_the_output_does_not_declare_is_recorded_as_undeclared(self):
+    def test_an_output_that_declares_no_architecture_publishes_nothing(self):
         harness = Harness(self, pull=self.mutate(lambda r: r["output"].pop("arch")))
-        self.assertEqual(harness.run()[0], 0)
-        self.assertIsNone(harness.record()["pulled"]["declaredArch"])
+        code, _, err = harness.run()
+        self.assertEqual(code, 22, err)
+        self.assertIn("declares no architecture", err)
+        self.assertEqual(harness.calls(harness.aws_log), [])
+        harness.untouched(self)
+
+    def test_an_image_that_declares_no_virtual_size_publishes_nothing(self):
+        image = qcow2(size=0) + b"synthetic payload " * 64
+        harness = Harness(self, image=image, pull={"result": pull_result(image)})
+        code, _, err = harness.run()
+        self.assertEqual(code, 13, err)
+        self.assertIn("declares no virtual size", err)
+        self.assertEqual(harness.calls(harness.aws_log), [])
+        harness.untouched(self)
 
     def test_the_bytes_on_disk_must_be_the_bytes_the_pull_reported(self):
         wrong_sha, wrong_size = pull_result(), pull_result()
