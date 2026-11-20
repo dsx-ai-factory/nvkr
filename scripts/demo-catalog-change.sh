@@ -79,15 +79,15 @@ export GIT_CONFIG_COUNT=1
 export GIT_CONFIG_KEY_0="url.$UPSTREAM.insteadOf"
 export GIT_CONFIG_VALUE_0='https://github.com/kubernetes-sigs/cri-tools'
 
-"$NVKR" catalog validate --data "$CATALOG"
-OLD_DIGEST=$("$NVKR" resolve --data "$CATALOG" --component crictl --platform linux/amd64 -o digest)
-"$NVKR" resolve --data "$CATALOG" --component crictl --platform linux/amd64 -o nodes > "$WORK/ir-before.json"
+"$NVKR" catalog validate --catalog "$CATALOG"
+OLD_DIGEST=$("$NVKR" resolve --catalog "$CATALOG" --component crictl --platform linux/amd64 -o digest)
+"$NVKR" resolve --catalog "$CATALOG" --component crictl --platform linux/amd64 -o nodes > "$WORK/ir-before.json"
 LOCK="$CATALOG/pins.lock.yaml"
 LOCK_BEFORE=$(demo_sha256 "$LOCK")
 
 demo_section "2/6  Preview the newest constraint-matching pin without writing"
 set +e
-CHECK_OUTPUT=$("$NVKR" catalog bump --dir "$CATALOG" --check crictl 2>&1)
+CHECK_OUTPUT=$("$NVKR" catalog bump --catalog "$CATALOG" --check crictl 2>&1)
 CHECK_STATUS=$?
 set -e
 [ "$CHECK_STATUS" -eq 3 ] || demo_die "catalog bump --check exited $CHECK_STATUS; want diff status 3: $CHECK_OUTPUT"
@@ -95,11 +95,11 @@ printf '%s\n' "$CHECK_OUTPUT"
 [ "$(demo_sha256 "$LOCK")" = "$LOCK_BEFORE" ] || demo_die "catalog bump --check modified the lock"
 
 demo_section "3/6  Commit the exact v1.34.1 pin through the lock writer"
-"$NVKR" catalog pin --dir "$CATALOG" --tag v1.34.1 crictl
-"$NVKR" catalog validate --data "$CATALOG"
-NEW_DIGEST=$("$NVKR" resolve --data "$CATALOG" --component crictl --platform linux/amd64 -o digest)
+"$NVKR" catalog pin --catalog "$CATALOG" --tag v1.34.1 crictl
+"$NVKR" catalog validate --catalog "$CATALOG"
+NEW_DIGEST=$("$NVKR" resolve --catalog "$CATALOG" --component crictl --platform linux/amd64 -o digest)
 [ "$NEW_DIGEST" != "$OLD_DIGEST" ] || demo_die "source pin changed without changing buildDigest"
-"$NVKR" resolve --data "$CATALOG" --component crictl --platform linux/amd64 -o nodes > "$WORK/ir-after.json"
+"$NVKR" resolve --catalog "$CATALOG" --component crictl --platform linux/amd64 -o nodes > "$WORK/ir-after.json"
 
 demo_section "4/6  Inspect the resolved-IR change"
 set +e
@@ -108,7 +108,7 @@ DIFF_STATUS=$?
 set -e
 [ "$DIFF_STATUS" -eq 1 ] || demo_die "IR diff exited $DIFF_STATUS; want changed bytes"
 cat "$WORK/ir-diff.txt"
-"$NVKR" resolve --data "$CATALOG" --component crictl --platform linux/amd64 \
+"$NVKR" resolve --catalog "$CATALOG" --component crictl --platform linux/amd64 \
   -o nodes > "$WORK/ir-repeated.json"
 cmp "$WORK/ir-after.json" "$WORK/ir-repeated.json"
 
@@ -117,12 +117,12 @@ cp "$LOCK" "$WORK/pins.lock.valid.yaml"
 awk 'BEGIN { changed=0 } !changed && /commit: [0-9a-f][0-9a-f]*/ { sub(/commit: [0-9a-f][0-9a-f]*/, "commit: deadbeef"); changed=1 } { print }' \
   "$LOCK" > "$WORK/pins.lock.tampered.yaml"
 cp "$WORK/pins.lock.tampered.yaml" "$LOCK"
-if "$NVKR" catalog validate --data "$CATALOG" > "$WORK/hand-edit.out" 2>&1; then
+if "$NVKR" catalog validate --catalog "$CATALOG" > "$WORK/hand-edit.out" 2>&1; then
   demo_die "malformed hand-edited pin unexpectedly validated"
 fi
 cat "$WORK/hand-edit.out"
 cp "$WORK/pins.lock.valid.yaml" "$LOCK"
-"$NVKR" catalog validate --data "$CATALOG"
+"$NVKR" catalog validate --catalog "$CATALOG"
 
 demo_section "6/6  Summarize the identity change"
 cat <<EOF

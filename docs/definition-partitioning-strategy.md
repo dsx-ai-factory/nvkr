@@ -416,7 +416,7 @@ satisfy the current single-Run M3 qualification contract.
 
 ## Cutover work and acceptance
 
-The authored four-family pilot and maintained generation/maintenance enrollment are the first step.
+The authored product-family split and maintained generation/maintenance enrollment are the first step.
 Before replacing the combined path:
 
 1. Check exact union membership, native platform sets and per-output Build identities against the combined
