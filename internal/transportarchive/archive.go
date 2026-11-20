@@ -68,6 +68,18 @@ func (info transportSymlinkInfo) Sys() any           { return nil }
 // source receipts, runner bytes, result receipts, and artifact digests independently.
 // The archive must be beneath root so publication can remain descriptor-relative.
 func Pack(ctx context.Context, archive, root string, paths []string) error {
+	return pack(ctx, archive, root, paths, false)
+}
+
+// PackSourceSeed preserves only the Git object store and optional shallow
+// boundary alongside one source closure. It never transports checkout config,
+// hooks, refs or index state. Consumers must authenticate both closure and Git
+// objects independently; this transport grants no source authority.
+func PackSourceSeed(ctx context.Context, archive, root, source string) error {
+	return pack(ctx, archive, root, []string{source}, true)
+}
+
+func pack(ctx context.Context, archive, root string, paths []string, sourceSeed bool) error {
 	if err := requireTransportContext(ctx, "packing transport"); err != nil {
 		return err
 	}
@@ -84,7 +96,7 @@ func Pack(ctx context.Context, archive, root string, paths []string) error {
 		return e.Wrap(e.CodeReleaseIncomplete, err, "opening transport root %s", rootAbs)
 	}
 	defer rootDir.Close()
-	entries, err := enumerateTransportEntries(ctx, rootDir, cleanPaths, maxTransportEntries)
+	entries, err := enumerateTransportEntriesWithSeed(ctx, rootDir, cleanPaths, maxTransportEntries, sourceSeed)
 	if err != nil {
 		return transportError(ctx, e.CodeReleaseIncomplete, err, "enumerating transport members")
 	}
@@ -250,6 +262,10 @@ func Pack(ctx context.Context, archive, root string, paths []string) error {
 // queued descendants are processed so a deeply nested input cannot exhaust the
 // process descriptor table before reaching the entry bound.
 func enumerateTransportEntries(ctx context.Context, root *os.File, bases []string, limit int) ([]transportEntry, error) {
+	return enumerateTransportEntriesWithSeed(ctx, root, bases, limit, false)
+}
+
+func enumerateTransportEntriesWithSeed(ctx context.Context, root *os.File, bases []string, limit int, sourceSeed bool) ([]transportEntry, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("transport enumeration requires a non-nil context")
 	}
@@ -279,6 +295,20 @@ func enumerateTransportEntries(ctx context.Context, root *os.File, bases []strin
 		seen[relative] = true
 
 		entry := transportEntry{relative: relative, base: base, kind: inspected.Kind, link: inspected.Target}
+		gitRoot := base + "/.git"
+		if sourceSeed && (relative == base || relative == gitRoot || relative == gitRoot+"/objects") && inspected.Kind != "directory" {
+			if inspected.File != nil {
+				_ = inspected.File.Close()
+			}
+			return fmt.Errorf("source seed root and Git object store must be directories")
+		}
+		if sourceSeed && strings.HasPrefix(relative, gitRoot+"/") &&
+			(inspected.Kind == "symlink" || relative == gitRoot+"/shallow" && inspected.Kind != "file") {
+			if inspected.File != nil {
+				_ = inspected.File.Close()
+			}
+			return fmt.Errorf("source seed Git metadata requires regular files and directories")
+		}
 		switch inspected.Kind {
 		case "directory", "file":
 			entry.info = inspected.Info
@@ -370,7 +400,10 @@ func enumerateTransportEntries(ctx context.Context, root *os.File, bases []strin
 				// A checkout's administrative database is not a build input and can
 				// carry mutable remotes/hooks. Preserve the historical policy of
 				// excluding only the declared member root's immediate .git child.
-				if parent.relative == parent.base && name == ".git" {
+				if parent.relative == parent.base && name == ".git" && !sourceSeed {
+					continue
+				}
+				if sourceSeed && parent.relative == parent.base+"/.git" && name != "objects" && name != "shallow" {
 					continue
 				}
 				if len(entries) >= limit {
@@ -417,6 +450,13 @@ func enumerateTransportEntries(ctx context.Context, root *os.File, bases []strin
 		}
 		if closeErr != nil {
 			return nil, closeErr
+		}
+	}
+	if sourceSeed {
+		for _, base := range bases {
+			if !seen[base+"/.git"] || !seen[base+"/.git/objects"] {
+				return nil, fmt.Errorf("source seed requires a Git object store")
+			}
 		}
 	}
 	return entries, nil

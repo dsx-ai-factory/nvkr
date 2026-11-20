@@ -98,11 +98,11 @@ jobs:
     permissions:
       actions: read
       contents: read
-  nvkr-process-dsx-imds-node-attestor-agent-adc01ba95923:
-    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-dsx-imds-node-attestor-agent-adc01ba95923)
-    name: 'Build and prepare dsx-imds-node-attestor-agent-linux-amd64'
+  nvkr-dsx-imds-node-attestor-agent-linux-a-853c9431375e:
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-dsx-imds-node-attestor-agent-linux-a-853c9431375e)
+    name: 'Fetch pinned source for dsx-imds-node-attestor-agent (dsx-imds-node-attestor-agent-linux-amd64)'
     runs-on: 'ubuntu-24.04'
-    timeout-minutes: 300
+    timeout-minutes: 60
     needs: [preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
@@ -122,6 +122,21 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-1'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+    permissions:
+      actions: read
+      contents: read
+  nvkr-process-dsx-imds-node-attestor-agent-031eea85e4c1:
+    # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-process-dsx-imds-node-attestor-agent-031eea85e4c1)
+    name: 'Build and prepare dsx-imds-node-attestor-agent-linux-amd64'
+    runs-on: 'ubuntu-24.04'
+    timeout-minutes: 240
+    needs: [nvkr-dsx-imds-node-attestor-agent-linux-a-853c9431375e]
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    steps:
+      - *check-native-linux-amd64
+      - *checkout-workflow-source
+      - *prepare-stage-nvkr-exec-ubuntu-24-04
+      - *operation-execute-node-part-1
       - &operation-execute-node-part-2
         name: execute node part-2
         uses: ./.github/nvkr-run-wli-imds-agent/actions/shared/execute-node
@@ -143,13 +158,6 @@ jobs:
           parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-4'] }}
           nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
-      - &operation-execute-node-part-5
-        name: execute node part-5
-        uses: ./.github/nvkr-run-wli-imds-agent/actions/shared/execute-node
-        with:
-          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
-          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
-          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -158,7 +166,7 @@ jobs:
     name: 'Build and prepare dsx-imds-node-attestor-agent-linux-arm64'
     runs-on: 'ubuntu-24.04-arm'
     timeout-minutes: 300
-    needs: [preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [nvkr-dsx-imds-node-attestor-agent-linux-a-853c9431375e]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-arm64
@@ -173,7 +181,12 @@ jobs:
       - *operation-execute-node-part-2
       - *operation-execute-node-part-3
       - *operation-execute-node-part-4
-      - *operation-execute-node-part-5
+      - name: execute node part-5
+        uses: ./.github/nvkr-run-wli-imds-agent/actions/shared/execute-node
+        with:
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['part-5'] }}
+          nvkr-ci-storage-read-token: ${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
     permissions:
       actions: read
       contents: read
@@ -181,7 +194,7 @@ jobs:
     name: Finalize Run and check completeness
     runs-on: 'ubuntu-24.04'
     timeout-minutes: 120
-    needs: [build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-process-dsx-imds-node-attestor-agent-0b5a972b58aa, nvkr-process-dsx-imds-node-attestor-agent-adc01ba95923, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
+    needs: [build-runner-ubuntu-24-04, build-runner-ubuntu-24-04-arm, nvkr-dsx-imds-node-attestor-agent-linux-a-853c9431375e, nvkr-process-dsx-imds-node-attestor-agent-031eea85e4c1, nvkr-process-dsx-imds-node-attestor-agent-0b5a972b58aa, preflight-images-ubuntu-24-04, preflight-images-ubuntu-24-04-arm]
     if: ${{ always() && github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     steps:
       - *check-native-linux-amd64
@@ -254,7 +267,7 @@ jobs:
             status=Failed
           elif [ "$skipped" -gt 0 ] || [ "${NVKR_FINALIZE_OUTCOME:-}" = skipped ]; then
             status='Incomplete (skipped)'
-          elif [ "$total" -eq 6 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
+          elif [ "$total" -eq 7 ] && [ "$success" -eq "$total" ] && [ "$unknown" -eq 0 ] && [ "${NVKR_FINALIZE_OUTCOME:-}" = success ] && [ "${NVKR_JOB_STATUS:-}" = success ] && [ "${NVKR_UPLOAD_OUTCOME:-}" = success ]; then
             status=Completed
           fi
           {
