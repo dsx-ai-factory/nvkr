@@ -416,6 +416,13 @@ func renderGitHubFlat(ctx context.Context, plan *Plan, validate bool) (*Generate
 					diagnostic.Name, diagnostic.Uses, diagnostic.If, diagnostic.ContinueOnError, diagnostic.TimeoutMinutes,
 					yamlSingle(diagnostic.With["name"]), yamlSingle(diagnostic.With["path"]), diagnostic.With["include-hidden-files"], diagnostic.With["if-no-files-found"], diagnostic.With["retention-days"])
 			}
+			if stagedDiskRoute(plan, outputPublicationRoute(stage.DiskOutput)) {
+				fmt.Fprintln(&body, "      - name: Stage disk at destination by digest\n        id: stage-disk\n        timeout-minutes: 35\n        env:")
+				for _, key := range sortedKeys(stagedDiskEnvironment()) {
+					fmt.Fprintf(&body, "          %s: %s\n", key, yamlSingle(stagedDiskEnvironment()[key]))
+				}
+				fmt.Fprintf(&body, "        run: %s\n", githubRunnerCommand(plan, "stage-disk", "output", stage.DiskOutput))
+			}
 			for _, member := range stage.Nodes {
 				writeGitHubOutputSteps(&body, plan, member, artifacts, nodeJobs, actions)
 			}

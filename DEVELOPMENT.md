@@ -249,7 +249,7 @@ Configure these **separate development environments**, retaining the existing pr
 | Environment | Configuration |
 |---|---|
 | `nvkr-dev-release` | Admit reviewed feature branches. Store `NVKR_DEV_REGISTRY_WRITE` and `NVKR_DEV_REGISTRY_READ` secrets, plus `NVKR_DEV_REGISTRY_WRITE_USER` and `NVKR_DEV_REGISTRY_READ_USER` variables. |
-| `nvkr-dev-arc` | Admit the reviewed development workflow and selected branch refs to the existing ephemeral `arc-amd64-kvm` and `arc-arm64-kvm` pools. Preserve the existing capacity, Docker/KVM and isolation requirements. |
+| `nvkr-dev-arc` | Admit the reviewed development workflow and selected branch refs to the existing ephemeral `arc-amd64-kvm` and `arc-arm64-kvm` pools. Store the separate `NVKR_DEV_REGISTRY_STAGE_WRITE` secret and `NVKR_DEV_REGISTRY_STAGE_WRITE_USER` variable for the fixed disk push step. Preserve the existing capacity, Docker/KVM and isolation requirements. |
 | `nvkr-dev-cleanup` | Admit **only the default branch**. Store `NVKR_DEV_REGISTRY_CLEANUP`; allow its hourly scheduled job to run without a per-run approval if automatic cleanup is desired. |
 
 Use a dedicated development publishing account with no production-package write/admin access. Its write
@@ -265,6 +265,19 @@ no package-write permission to their repository `GITHUB_TOKEN`; verification, as
 receive only the dedicated read credential. Only artifact signing and SBOM attestation receive OIDC.
 GHCR publication jobs use the automatic repository token separately for source-repository metadata checks;
 the development publishing token does not need repository scope for that lookup.
+
+Development disks stage their unsigned prepared layout directly at their final destination, without a tag.
+Only the fixed push step receives the stage writer; the producer job has no OIDC or release-environment
+credential. This is a step scope, not a machine isolation boundary: candidate code runs on that ARC host.
+The stage writer must be a separate credential from the release writer, scoped to the disposable
+development packages. Verify that the release reader can read newly staged packages.
+The staged digest and bounded controls travel through Actions metadata. The release job reads the
+complete preparation back by digest without retaining its payload. SBOM attestation uses only controls
+and no registry credential; the publisher binds its bundles to the readback before publishing evidence
+and root metadata. Signing and independent full-payload verification follow. Other outputs and production lanes retain private CI
+payload transport, and all `NVKR_CI_STORAGE_*` settings remain required for those and shared inputs.
+This maintained lane retains its explicit scoped accounts; the adopter platform-token default is a
+separate migration step. No hosted validation of the staged-disk path has been recorded.
 
 Configure repository secret `NVKR_REGISTRY_READ` and variable `NVKR_REGISTRY_READ_USER` for the
 shared private toolchain and smoke images as well. These are additional prerequisites to the development

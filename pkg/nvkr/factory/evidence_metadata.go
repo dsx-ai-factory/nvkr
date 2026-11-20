@@ -48,6 +48,8 @@ func bindMetadataEvidenceAttestation(plan *Plan, route Route, index int) error {
 	attested := Artifact{ID: attestedEvidenceMetadataID(route.Name), Name: route.Name, Kind: ArtifactAttestedEvidenceMetadata,
 		Producer: NodeAttestEvidence + "/" + route.Name, Target: route.Target, Path: filepath.ToSlash(filepath.Join(".nvkr", "factory", "attested-controls", route.Name))}
 	tool := "tool/" + plan.Definition.CosignTool
+	staged := Artifact{ID: stagedDiskReferenceID(route.Name), Name: route.Name, Kind: "published-reference", Producer: payload.Producer,
+		Target: route.Target, Path: filepath.ToSlash(filepath.Join(".nvkr", "factory", "staged", route.Name+".txt"))}
 	stage := Node{ID: attested.Producer, Kind: NodeAttestEvidence, Target: route.Target,
 		Inputs: uniqueSorted([]string{prepared.ID, tool}), Outputs: []string{attested.ID}, Network: ir.NetworkDefault}
 	producerFound, publisherFound := false, false
@@ -57,6 +59,10 @@ func bindMetadataEvidenceAttestation(plan *Plan, route Route, index int) error {
 				return e.New(e.CodePipelineDrift, "metadata SBOM preparation requires its exact package producer")
 			}
 			plan.Graph.Nodes[i].Outputs = uniqueSorted([]string{payload.ID, prepared.ID})
+			if stagedDiskRoute(plan, route.Name) {
+				plan.Graph.Nodes[i].Outputs = uniqueSorted([]string{payload.ID, prepared.ID, staged.ID})
+				stage.Inputs = uniqueSorted([]string{prepared.ID, staged.ID, tool})
+			}
 			stage.RunsOn = node.RunsOn
 			if plan.Environment.UtilityContainers != nil {
 				stage.RunsOn = defaultUtilityRunner(plan.Environment)
@@ -68,6 +74,9 @@ func bindMetadataEvidenceAttestation(plan *Plan, route Route, index int) error {
 				return e.New(e.CodePipelineDrift, "metadata SBOM completion requires its exact publisher")
 			}
 			plan.Graph.Nodes[i].Inputs = uniqueSorted([]string{payload.ID, attested.ID, tool})
+			if stagedDiskRoute(plan, route.Name) {
+				plan.Graph.Nodes[i].Inputs = uniqueSorted([]string{staged.ID, attested.ID, tool})
+			}
 			publisherFound = true
 		}
 	}
@@ -76,6 +85,9 @@ func bindMetadataEvidenceAttestation(plan *Plan, route Route, index int) error {
 	}
 	plan.Graph.Artifacts[index] = payload
 	plan.Graph.Artifacts = append(plan.Graph.Artifacts, prepared, attested)
+	if stagedDiskRoute(plan, route.Name) {
+		plan.Graph.Artifacts = append(plan.Graph.Artifacts, staged)
+	}
 	plan.Graph.Nodes = append(plan.Graph.Nodes, stage)
 	return nil
 }
@@ -139,6 +151,15 @@ func executeAttestEvidenceMetadata(ctx context.Context, plan *Plan, node Node, r
 	if err := admitEvidenceMetadata(plan, route, inspection); err != nil {
 		return err
 	}
+	if stagedDiskRoute(plan, route.Name) {
+		subject, _, err := stagedDiskSubject(ctx, plan, route, artifacts)
+		if err != nil {
+			return err
+		}
+		if subject.Digest != inspection.RootDigest {
+			return e.New(e.CodeVerifyFailed, "staged preparation differs from exact evidence controls")
+		}
+	}
 	signer, err := newSigner(ctx, plan, node, artifacts)
 	if err != nil {
 		return err
@@ -163,13 +184,25 @@ func validateMetadataEvidenceGraph(plan *Plan, route Route, nodes map[string]Nod
 	stage := nodes[NodeAttestEvidence+"/"+route.Name]
 	publisher := nodes[NodePublish+"/"+route.Name]
 	tool := "tool/" + plan.Definition.CosignTool
+	producerOutputs := uniqueSorted([]string{payload.ID, prepared.ID})
+	attestInputs := uniqueSorted([]string{prepared.ID, tool})
+	publishInputs := uniqueSorted([]string{payload.ID, attested.ID, tool})
+	if stagedDiskRoute(plan, route.Name) {
+		staged := artifacts[stagedDiskReferenceID(route.Name)]
+		if staged.Kind != "published-reference" || staged.Producer != producer.ID || staged.Target != route.Target {
+			return e.New(e.CodePipelineDrift, "staged disk requires its exact producer reference")
+		}
+		producerOutputs = uniqueSorted([]string{payload.ID, prepared.ID, staged.ID})
+		attestInputs = uniqueSorted([]string{prepared.ID, staged.ID, tool})
+		publishInputs = uniqueSorted([]string{staged.ID, attested.ID, tool})
+	}
 	if payload.ID != route.Input || payload.Kind != PackageOCI || producer.Kind != NodePackage || producer.PackageKind != PackageOCI ||
 		prepared.Kind != ArtifactPreparedEvidenceMetadata || prepared.Producer != producer.ID ||
 		attested.Kind != ArtifactAttestedEvidenceMetadata || attested.Producer != stage.ID ||
 		stage.Kind != NodeAttestEvidence || stage.Target != route.Target || publisher.Kind != NodePublish || publisher.Target != route.Target ||
-		!slices.Equal(producer.Outputs, uniqueSorted([]string{payload.ID, prepared.ID})) ||
-		!slices.Equal(stage.Inputs, uniqueSorted([]string{prepared.ID, tool})) || !slices.Equal(stage.Outputs, []string{attested.ID}) ||
-		!slices.Equal(publisher.Inputs, uniqueSorted([]string{payload.ID, attested.ID, tool})) {
+		!slices.Equal(producer.Outputs, producerOutputs) ||
+		!slices.Equal(stage.Inputs, attestInputs) || !slices.Equal(stage.Outputs, []string{attested.ID}) ||
+		!slices.Equal(publisher.Inputs, publishInputs) {
 		return e.New(e.CodePipelineDrift, "production route must join original payload with independently attested SBOM controls")
 	}
 	return nil

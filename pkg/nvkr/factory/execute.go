@@ -304,6 +304,9 @@ func executeObservationWithHeldDisk(ctx context.Context, plan *Plan, node Node,
 }
 
 func executePublish(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
+	if route, ok := preparedEvidenceRoute(plan, node); ok && stagedDiskRoute(plan, route.Name) {
+		return executeStagedDiskPublish(ctx, plan, node, artifacts, stdout)
+	}
 	return executePublishWithAdmission(ctx, plan, node, artifacts, stdout, cistore.AdmitPrivatePublication)
 }
 

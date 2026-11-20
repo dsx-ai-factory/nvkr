@@ -1,15 +1,17 @@
 ## Support by owner
 
 ADR-20's 2026-11-20 revision accepts separate destination staging and release-by-reference operations,
-with repository-local GHCR/job-token access as the adopter default. Implementation still combines payload
-upload with the hosted publisher and requires unlinked private/internal GHCR packages. The stage step,
-profile-specific admission, full streaming readback receipt and release-by-reference owner are not implemented
-or externally exercised. Current tests and recorded publications below do not establish the revised path,
-zero-registry-secret adoption or release-root byte equivalence. The [ADR-18 migration gates](adr-18.md)
+with repository-local GHCR/job-token access as the adopter default. Development ARC disks now stage
+directly with a dedicated writer and use a process-local complete streaming readback receipt before
+publishing attested controls. Their [local transport contracts](hosted-artifact-transport-lifetime.md)
+compare exact release-root bytes with the legacy path; hosted acceptance remains unverified.
+Other outputs retain hosted payload upload. All current profiles require unlinked private/internal GHCR
+packages; zero-registry-secret adoption remains unimplemented. The [ADR-18 migration gates](adr-18.md)
 separate development disks, all outputs and residual input-edge removal.
 The revised contract retains the post-sign verifier's own complete payload readback; no cross-process
-readback-receipt protocol is specified. Dedicated stage-writer references and secret homes must be fixed
-by the implementation before their profiles are admitted. Platform-token publication does not authorize
+readback-receipt protocol is specified. Development disks fix `NVKR_DEV_REGISTRY_STAGE_WRITE` and
+`NVKR_DEV_REGISTRY_STAGE_WRITE_USER` in `nvkr-dev-arc`, separate from the `nvkr-dev-release` writer.
+Production staging remains unadmitted. Platform-token publication does not authorize
 either production or development qualification's dedicated-credential pair.
 The platform-token profile additionally requires Write-only repository Actions access on every destination
 package, excluding Admin grants and leaving deletion/restoration to a human package administrator. Role

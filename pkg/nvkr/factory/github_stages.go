@@ -132,6 +132,9 @@ func githubDiskStageBudget(plan *Plan, stage githubStage) (time.Duration, int, e
 	// The helper returns before the provider boundary, leaving time for owner
 	// cleanup and failure diagnostics. Earlier caller deadlines still win.
 	uploadMinutes := githubDiskDiagnosticUploadMinutes // failed Packer diagnostics
+	if stagedDiskRoute(plan, outputPublicationRoute(stage.DiskOutput)) {
+		uploadMinutes += 35 // fixed destination stage-writer step
+	}
 	if githubDiskInspectionRequired(plan, stage.DiskOutput) {
 		uploadMinutes += githubDiskDiagnosticUploadMinutes // always-run inspection diagnostics
 	}

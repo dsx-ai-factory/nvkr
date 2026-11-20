@@ -309,6 +309,10 @@ func validateGitHubBundleFlat(ctx context.Context, plan *Plan, bundle *Generated
 				continue
 			}
 			sourceStage, sourceJob := byNodeForJob(stages, jobID)
+			if sourceJob && sourceStage.DiskOutput != "" && stagedDiskRoute(plan, outputPublicationRoute(sourceStage.DiskOutput)) &&
+				step.ID == "stage-disk" && step.Run == githubRunnerCommand(plan, "stage-disk", "output", sourceStage.DiskOutput) && maps.Equal(step.Env, stagedDiskEnvironment()) {
+				continue // The fixed step's complete shape and ordering are checked below.
+			}
 			// A release operation's registry credential is admitted only on its
 			// own execution step; stage execution checks its exact value below.
 			if sourceJob && githubReleaseCredentialStep(plan, sourceStage, step) {
@@ -808,6 +812,31 @@ func validateGitHubStageExecution(plan *Plan, stage githubStage, steps []githubS
 				}
 				diagnostics++
 			}
+		}
+		stagePushes := 0
+		for i, step := range steps {
+			if step.ID != "stage-disk" && step.Run != githubRunnerCommand(plan, "stage-disk", "output", stage.DiskOutput) {
+				if step.Env["NVKR_CREDENTIAL"] != "" || step.Env["NVKR_REGISTRY_USER"] != "" {
+					return e.New(e.CodeEngineCapability, "disk writer credential escaped its fixed push step")
+				}
+				continue
+			}
+			if !stagedDiskRoute(plan, outputPublicationRoute(stage.DiskOutput)) || stagePushes != 0 || i == 0 ||
+				step.ID != "stage-disk" || step.Name != "Stage disk at destination by digest" || step.If != "" || step.Uses != "" || step.ContinueOnError || step.TimeoutMinutes != 35 ||
+				step.Run != githubRunnerCommand(plan, "stage-disk", "output", stage.DiskOutput) || !maps.Equal(step.Env, stagedDiskEnvironment()) {
+				return e.New(e.CodeEngineCapability, "disk stage writer differs from its fixed operation")
+			}
+			foundExecutor := false
+			for _, previous := range steps[:i] {
+				foundExecutor = foundExecutor || previous.ID == "run-disk"
+			}
+			if !foundExecutor {
+				return e.New(e.CodeEngineCapability, "disk stage push precedes producer completion")
+			}
+			stagePushes++
+		}
+		if stagedDiskRoute(plan, outputPublicationRoute(stage.DiskOutput)) && stagePushes != 1 {
+			return e.New(e.CodeEngineCapability, "disk stage omits destination push")
 		}
 		if executors != 1 || diagnostics != 1 {
 			return e.New(e.CodeEngineCapability, "disk stage requires one live executor and one failure diagnostic transport")

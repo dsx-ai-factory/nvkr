@@ -1,9 +1,25 @@
 ## Hosted artifact transport lifetime
 
-The lifetime and failure evidence below concerns the current CI-carrier path. The accepted 2026-11-20
-[destination-staging decision](adr-18.md) retires that payload round trip, but its implementation and
-development-disk release-root comparison remain pending. These measurements do not establish the storage
-or runtime of release by reference; residual input edges retain their current checks until migrated.
+The Design B disk migration is limited to the signed development ARC lane. Its fixed
+stage-writer step uploads the unsigned preparation directly to the final digest-addressed
+destination; the output edge carries only a staged reference and bounded controls through
+Actions metadata. The release publisher streams and authenticates the complete staged closure and publishes
+only attested evidence and root metadata before the existing signing and independent full-payload verification.
+Other outputs, production lanes and residual input edges retain their existing transport.
+This implements the accepted 2026-11-20 ADR-18/ADR-20 transport decision; the decision text is
+maintained separately from this implementation change.
+
+`TestStagedDiskMatchesCurrentReleaseRoot` uses AMD64 and ARM64 synthetic disk preparations
+and one fixed set of synthetic attestation bundles for both paths. A local Distribution
+fixture receives the staged preparation, then the evidence-only completion; the test compares
+the resulting reference and exact root index bytes with `CompleteAttestedPreparation` plus
+the existing full-layout push. It also asserts that completion streams the complete payload without writes or a
+retained payload file and that a subsequent full registry read succeeds. These are local
+byte-equivalence contracts, not hosted signing or NVKE disk reproduction evidence.
+The generated-boundary tests check reference-only graph edges and reject stage-writer, OIDC,
+ordering and optional-step substitutions. The maintained development profile requires its
+own stage-only credential in the ARC environment. No hosted comparison or provider mutation
+was authorized or performed; current-candidate hosted acceptance remains unverified.
 
 The FDE build jobs in [Run 38480478189](https://github.com/dsx-ai-factory/nvkr/actions/runs/38480478189)
 succeeded, but the later hosted SBOM-attestation jobs failed restoring their prepared layouts: the

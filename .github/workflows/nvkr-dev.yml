@@ -1237,7 +1237,7 @@ jobs:
     # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-fde-amd64)
     name: 'Build and package producer evidence for nvke-node-fde-amd64'
     runs-on: 'arc-amd64-kvm'
-    timeout-minutes: 1105
+    timeout-minutes: 1140
     needs: [nvkr-process-nvke-node-fde-amd64-fetch-ov-9b482bbb2e2f]
     if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     environment: 'nvkr-dev-arc'
@@ -1300,6 +1300,14 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
+      - name: Stage disk at destination by digest
+        id: stage-disk
+        timeout-minutes: 35
+        env:
+          NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+          NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_STAGE_WRITE }}'
+          NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_STAGE_WRITE_USER }}'
+        run: ./nvkr-exec factory github stage-disk --plan .github/nvkr-dev/plan.json --output nvke-node-fde-amd64
       - &operation-collect-node-outputs-part-3
         name: collect node outputs part-3
         uses: ./.github/nvkr-dev/actions/shared/collect-node-outputs
@@ -1437,7 +1445,7 @@ jobs:
     # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-fde-arm64)
     name: 'Build and package producer evidence for nvke-node-fde-arm64'
     runs-on: 'arc-arm64-kvm'
-    timeout-minutes: 1105
+    timeout-minutes: 1140
     needs: [nvkr-process-nvke-node-fde-arm64-fetch-nv-64dff97482f1, nvkr-process-nvke-node-fde-arm64-fetch-ov-464ac8f0f11b]
     if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     environment: 'nvkr-dev-arc'
@@ -1489,6 +1497,14 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
+      - name: Stage disk at destination by digest
+        id: stage-disk
+        timeout-minutes: 35
+        env:
+          NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+          NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_STAGE_WRITE }}'
+          NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_STAGE_WRITE_USER }}'
+        run: ./nvkr-exec factory github stage-disk --plan .github/nvkr-dev/plan.json --output nvke-node-fde-arm64
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
@@ -1551,7 +1567,7 @@ jobs:
     # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-fde-ubuntu24-amd64)
     name: 'Build and package producer evidence for nvke-node-fde-ubuntu24-amd64'
     runs-on: 'arc-amd64-kvm'
-    timeout-minutes: 1105
+    timeout-minutes: 1140
     needs: [nvkr-process-nvke-node-fde-ubuntu24-amd64-1d015a140907, nvkr-process-nvke-node-fde-ubuntu24-amd64-68929548ea3f]
     if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     environment: 'nvkr-dev-arc'
@@ -1597,6 +1613,14 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
+      - name: Stage disk at destination by digest
+        id: stage-disk
+        timeout-minutes: 35
+        env:
+          NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+          NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_STAGE_WRITE }}'
+          NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_STAGE_WRITE_USER }}'
+        run: ./nvkr-exec factory github stage-disk --plan .github/nvkr-dev/plan.json --output nvke-node-fde-ubuntu24-amd64
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
@@ -1667,7 +1691,7 @@ jobs:
     # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-fde-ubuntu24-arm64)
     name: 'Build and package producer evidence for nvke-node-fde-ubuntu24-arm64'
     runs-on: 'arc-arm64-kvm'
-    timeout-minutes: 1105
+    timeout-minutes: 1140
     needs: [nvkr-process-nvke-node-fde-ubuntu24-arm64-a56b24fa4b5a, nvkr-process-nvke-node-fde-ubuntu24-arm64-dde6af2e8bf0]
     if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     environment: 'nvkr-dev-arc'
@@ -1713,6 +1737,14 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
+      - name: Stage disk at destination by digest
+        id: stage-disk
+        timeout-minutes: 35
+        env:
+          NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+          NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_STAGE_WRITE }}'
+          NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_STAGE_WRITE_USER }}'
+        run: ./nvkr-exec factory github stage-disk --plan .github/nvkr-dev/plan.json --output nvke-node-fde-ubuntu24-arm64
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
@@ -1783,7 +1815,7 @@ jobs:
     # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-image-amd64)
     name: 'Build and package producer evidence for nvke-node-image-amd64'
     runs-on: 'arc-amd64-kvm'
-    timeout-minutes: 1105
+    timeout-minutes: 1140
     needs: [nvkr-process-nvke-node-image-amd64-fetch-a0e20b2b6193, nvkr-process-nvke-node-image-amd64-fetch-da60ac6eb51c]
     if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     environment: 'nvkr-dev-arc'
@@ -1829,6 +1861,14 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
+      - name: Stage disk at destination by digest
+        id: stage-disk
+        timeout-minutes: 35
+        env:
+          NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+          NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_STAGE_WRITE }}'
+          NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_STAGE_WRITE_USER }}'
+        run: ./nvkr-exec factory github stage-disk --plan .github/nvkr-dev/plan.json --output nvke-node-image-amd64
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
@@ -1886,7 +1926,7 @@ jobs:
     # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-image-arm64)
     name: 'Build and package producer evidence for nvke-node-image-arm64'
     runs-on: 'arc-arm64-kvm'
-    timeout-minutes: 1105
+    timeout-minutes: 1140
     needs: [nvkr-process-nvke-node-image-arm64-fetch-9eb6f62464bb, nvkr-process-nvke-node-image-arm64-fetch-d7223cad4f91]
     if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     environment: 'nvkr-dev-arc'
@@ -1932,6 +1972,14 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
+      - name: Stage disk at destination by digest
+        id: stage-disk
+        timeout-minutes: 35
+        env:
+          NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+          NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_STAGE_WRITE }}'
+          NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_STAGE_WRITE_USER }}'
+        run: ./nvkr-exec factory github stage-disk --plan .github/nvkr-dev/plan.json --output nvke-node-image-arm64
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
@@ -1989,7 +2037,7 @@ jobs:
     # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-image-ubuntu24-amd64)
     name: 'Build and package producer evidence for nvke-node-image-ubuntu24-amd64'
     runs-on: 'arc-amd64-kvm'
-    timeout-minutes: 1105
+    timeout-minutes: 1140
     needs: [nvkr-process-nvke-node-image-ubuntu24-amd-309e0b0b668e, nvkr-process-nvke-node-image-ubuntu24-amd-414a3d348ba5]
     if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     environment: 'nvkr-dev-arc'
@@ -2035,6 +2083,14 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
+      - name: Stage disk at destination by digest
+        id: stage-disk
+        timeout-minutes: 35
+        env:
+          NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+          NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_STAGE_WRITE }}'
+          NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_STAGE_WRITE_USER }}'
+        run: ./nvkr-exec factory github stage-disk --plan .github/nvkr-dev/plan.json --output nvke-node-image-ubuntu24-amd64
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
@@ -2105,7 +2161,7 @@ jobs:
     # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-image-ubuntu24-arm64)
     name: 'Build and package producer evidence for nvke-node-image-ubuntu24-arm64'
     runs-on: 'arc-arm64-kvm'
-    timeout-minutes: 1105
+    timeout-minutes: 1140
     needs: [nvkr-process-nvke-node-image-ubuntu24-arm-d06d399d5548, nvkr-process-nvke-node-image-ubuntu24-arm-e2b6ca37b5c9]
     if: ${{ github.event_name == 'workflow_dispatch' && startsWith(github.ref, 'refs/heads/') }}
     environment: 'nvkr-dev-arc'
@@ -2151,6 +2207,14 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
+      - name: Stage disk at destination by digest
+        id: stage-disk
+        timeout-minutes: 35
+        env:
+          NVKR_CI_REPOSITORY_TOKEN: '${{ github.token }}'
+          NVKR_CREDENTIAL: '${{ secrets.NVKR_DEV_REGISTRY_STAGE_WRITE }}'
+          NVKR_REGISTRY_USER: '${{ vars.NVKR_DEV_REGISTRY_STAGE_WRITE_USER }}'
+        run: ./nvkr-exec factory github stage-disk --plan .github/nvkr-dev/plan.json --output nvke-node-image-ubuntu24-arm64
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
