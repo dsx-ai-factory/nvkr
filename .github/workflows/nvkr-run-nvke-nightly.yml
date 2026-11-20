@@ -1874,9 +1874,9 @@ jobs:
       - *operation-execute-node-part-6
   nvkr-disk-nvke-node-image-amd64:
     # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-image-amd64)
-    name: 'Build and package producer evidence for nvke-node-image-amd64'
+    name: 'Build, inspect and package nvke-node-image-amd64'
     runs-on: 'arc-amd64-kvm'
-    timeout-minutes: 1105
+    timeout-minutes: 1120
     needs: [nvkr-process-nvke-node-image-amd64-fetch-a0e20b2b6193, nvkr-process-nvke-node-image-amd64-fetch-da60ac6eb51c]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
@@ -1911,7 +1911,7 @@ jobs:
       - *prepare-stage-nvkr-exec-arc-amd64-kvm
       - *operation-prepare-inputs-part-1
       - *operation-prepare-images-part-2
-      - name: 'Build and package producer evidence for nvke-node-image-amd64'
+      - name: 'Build, inspect and package nvke-node-image-amd64'
         id: run-disk
         run: ./nvkr-exec factory github run-disk --plan .github/nvkr-run-nvke-nightly/plan.json --output nvke-node-image-amd64
       - name: Upload failed Packer diagnostics
@@ -1922,6 +1922,15 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
+      - name: Retain inspection diagnostics
+        uses: ./.github/nvkr-run-nvke-nightly/actions/shared/upload-carrier-always
+        with:
+          with-path: ""
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-2'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+        if: ${{ always() }}
+        timeout-minutes: 5
+        continue-on-error: true
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
@@ -1977,9 +1986,9 @@ jobs:
       - *operation-execute-node-part-6
   nvkr-disk-nvke-node-image-arm64:
     # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-image-arm64)
-    name: 'Build and package producer evidence for nvke-node-image-arm64'
+    name: 'Build, inspect and package nvke-node-image-arm64'
     runs-on: 'arc-arm64-kvm'
-    timeout-minutes: 1105
+    timeout-minutes: 1120
     needs: [nvkr-process-nvke-node-image-arm64-fetch-9eb6f62464bb, nvkr-process-nvke-node-image-arm64-fetch-d7223cad4f91]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
@@ -2014,7 +2023,7 @@ jobs:
       - *prepare-stage-nvkr-exec-arc-arm64-kvm
       - *operation-prepare-inputs-part-1
       - *operation-prepare-images-part-2
-      - name: 'Build and package producer evidence for nvke-node-image-arm64'
+      - name: 'Build, inspect and package nvke-node-image-arm64'
         id: run-disk
         run: ./nvkr-exec factory github run-disk --plan .github/nvkr-run-nvke-nightly/plan.json --output nvke-node-image-arm64
       - name: Upload failed Packer diagnostics
@@ -2025,6 +2034,15 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
+      - name: Retain inspection diagnostics
+        uses: ./.github/nvkr-run-nvke-nightly/actions/shared/upload-carrier-always
+        with:
+          with-path: ""
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-2'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+        if: ${{ always() }}
+        timeout-minutes: 5
+        continue-on-error: true
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
@@ -2080,9 +2098,9 @@ jobs:
       - *operation-execute-node-part-6
   nvkr-disk-nvke-node-image-ubuntu24-amd64:
     # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-image-ubuntu24-amd64)
-    name: 'Build and package producer evidence for nvke-node-image-ubuntu24-amd64'
+    name: 'Build, inspect and package nvke-node-image-ubuntu24-amd64'
     runs-on: 'arc-amd64-kvm'
-    timeout-minutes: 1105
+    timeout-minutes: 1120
     needs: [nvkr-process-nvke-node-image-ubuntu24-amd-309e0b0b668e, nvkr-process-nvke-node-image-ubuntu24-amd-414a3d348ba5]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
@@ -2117,7 +2135,7 @@ jobs:
       - *prepare-stage-nvkr-exec-arc-amd64-kvm
       - *operation-prepare-inputs-part-1
       - *operation-prepare-images-part-2
-      - name: 'Build and package producer evidence for nvke-node-image-ubuntu24-amd64'
+      - name: 'Build, inspect and package nvke-node-image-ubuntu24-amd64'
         id: run-disk
         run: ./nvkr-exec factory github run-disk --plan .github/nvkr-run-nvke-nightly/plan.json --output nvke-node-image-ubuntu24-amd64
       - name: Upload failed Packer diagnostics
@@ -2128,6 +2146,15 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
+      - name: Retain inspection diagnostics
+        uses: ./.github/nvkr-run-nvke-nightly/actions/shared/upload-carrier-always
+        with:
+          with-path: ""
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-2'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+        if: ${{ always() }}
+        timeout-minutes: 5
+        continue-on-error: true
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5
@@ -2196,9 +2223,9 @@ jobs:
       - *operation-execute-node-part-6
   nvkr-disk-nvke-node-image-ubuntu24-arm64:
     # Producer commands: .github/nvkr-plan-store/index.json (job nvkr-disk-nvke-node-image-ubuntu24-arm64)
-    name: 'Build and package producer evidence for nvke-node-image-ubuntu24-arm64'
+    name: 'Build, inspect and package nvke-node-image-ubuntu24-arm64'
     runs-on: 'arc-arm64-kvm'
-    timeout-minutes: 1105
+    timeout-minutes: 1120
     needs: [nvkr-process-nvke-node-image-ubuntu24-arm-d06d399d5548, nvkr-process-nvke-node-image-ubuntu24-arm-e2b6ca37b5c9]
     if: ${{ github.event_name == 'workflow_dispatch' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
     environment: 'nvkr-arc'
@@ -2233,7 +2260,7 @@ jobs:
       - *prepare-stage-nvkr-exec-arc-arm64-kvm
       - *operation-prepare-inputs-part-1
       - *operation-prepare-images-part-2
-      - name: 'Build and package producer evidence for nvke-node-image-ubuntu24-arm64'
+      - name: 'Build, inspect and package nvke-node-image-ubuntu24-arm64'
         id: run-disk
         run: ./nvkr-exec factory github run-disk --plan .github/nvkr-run-nvke-nightly/plan.json --output nvke-node-image-ubuntu24-arm64
       - name: Upload failed Packer diagnostics
@@ -2244,6 +2271,15 @@ jobs:
           nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
         if: '${{ failure() && steps.run-disk.outputs.packer_diagnostics != '''' }}'
         timeout-minutes: 5
+      - name: Retain inspection diagnostics
+        uses: ./.github/nvkr-run-nvke-nightly/actions/shared/upload-carrier-always
+        with:
+          with-path: ""
+          parameters: ${{ fromJSON(steps.nvkr-context.outputs.data)['transfer-2'] }}
+          nvkr-ci-storage-write-token: ${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}
+        if: ${{ always() }}
+        timeout-minutes: 5
+        continue-on-error: true
       - *operation-collect-node-outputs-part-3
       - *operation-collect-node-outputs-part-4
       - *operation-collect-node-outputs-part-5

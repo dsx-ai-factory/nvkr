@@ -395,10 +395,14 @@ NVKE OS producer owns its embedded contents. IR/Plan lowering binds the exact so
 projects the root QCOW2 without binary-bundle packaging. A process-local held-QCOW2 observer has contract coverage
 for exact delivery bytes and producer/Plan bindings; it grants no execution authority or qualified reproduction
 verdict. Production VM execution and held-result population use the separately admitted native ARC route;
-direct producer selection does not introduce independently built OS layers. The narrower candidate uses exact
-live producer/material evidence and reports inspection as not performed, satisfying the NVKE disk-evidence floor.
-NVKE still requires the remaining delivery and consumer gates. The approved M3 MVP retains producer-only disk
-evidence and source-metadata consistency. ADR-13's strict mode requires a full inventory reconciling traced
+direct producer selection does not introduce independently built OS layers. ADR-13's
+package-only mode inventories the exact held final plain disk through the pinned
+offline appliance and signs Debian package names, versions, architectures and purls.
+The maintained Environments select it by default with explicit producer-only FDE
+overrides. Producer/material integrity, every evidence slot and the remaining
+delivery/consumer gates still apply. Consumer minima order producer-only, packages,
+then strict; package inspection never claims file integrity or material correspondence.
+ADR-13's strict mode requires a full inventory reconciling traced
 materials with read-only inspection of each selected disk; this is deferred hardening. That composition claim does not
 establish NVKE-owned runtime correctness.
 It also does not establish disk reproduction. The exact QCOW2 digest names the delivered artifact; matching

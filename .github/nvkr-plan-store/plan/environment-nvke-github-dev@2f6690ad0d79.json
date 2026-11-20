@@ -1,6 +1,12 @@
 {
   "apiVersion": "nvkr.dev/environment/v1",
-  "diskEvidence": "build-provenance-v1",
+  "diskEvidence": "installed-packages-v1",
+  "diskEvidenceOverrides": {
+    "nvke-node-fde-amd64": "build-provenance-v1",
+    "nvke-node-fde-arm64": "build-provenance-v1",
+    "nvke-node-fde-ubuntu24-amd64": "build-provenance-v1",
+    "nvke-node-fde-ubuntu24-arm64": "build-provenance-v1"
+  },
   "diskInspectionProfiles": {
     "linux/amd64": {
       "codecDigest": "sha256:634320b91165669917123e8e79cce1c4d00cee0a4aa4d662d7c0a8186479b3fb",
@@ -66,7 +72,7 @@
     }
   ],
   "githubARC": "native-kvm-v1",
-  "githubBundle": "nvke",
+  "githubDevelopment": true,
   "githubExecutionPartitions": true,
   "githubRunners": {
     "linux/amd64": "ubuntu-24.04",
@@ -74,20 +80,20 @@
   },
   "kind": "Environment",
   "metadata": {
-    "description": "Signed NVKE GPU site composite candidate publication in its own partitioned workflow and registry namespace. Native disks retain build provenance; deep inspection and material reconciliation remain deferred.",
-    "name": "nvke-github"
+    "description": "Full feature-branch development pipeline; isolated signed publications expire after their completed attempt becomes eligible for cleanup.",
+    "name": "nvke-github-dev"
   },
   "publication": {
-    "credentialRef": "github:NVKR_REGISTRY_WRITE",
+    "credentialRef": "github:NVKR_DEV_REGISTRY_WRITE",
     "mode": "per-output-v1",
-    "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/candidate/gpu-site"
+    "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/development"
   },
   "runtime": {
     "buildNetworkPolicy": "producer-declared",
     "runtime": "docker"
   },
   "signing": {
-    "identity": "^https://github\\.com/dsx-ai-factory/nvkr/\\.github/workflows/nvkr-run-nvke\\.yml@refs/heads/main$",
+    "identity": "^https://github\\.com/dsx-ai-factory/nvkr/\\.github/workflows/nvkr-dev\\.yml@refs/heads/[^[:space:]]+$",
     "issuer": "https://token.actions.githubusercontent.com",
     "mode": "cosign"
   },

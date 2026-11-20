@@ -212,18 +212,20 @@ The wrapper platform describes the guest artifact; inspection tooling, scanner p
 select the native host profile from the frozen root producer's execution binding, including cross-guest TCG builds.
 Strict inspection packaging consumes the original live Run's exact-subject reconciliation receipt.
 The explicit narrower candidate `build-provenance-v1` mode instead consumes the original live held disk and authenticated
-transitive material trace. Both paths rehash the exported QCOW2, use the same atomic package/evidence
+transitive material trace. The intermediate `installed-packages-v1` mode adds an original-live-Run
+package-inventory receipt for the exact plain disk (ADR-13 §6), without material reconciliation.
+All three paths rehash the exported QCOW2, use the same atomic package/evidence
 transaction, preserve every producer evidence slot and bind raw payload separately from OCI identity.
 The disk binding carries its descriptive evidence mode in signed release metadata. Document validators require
 matching source-bound documents and reject invented inspection claims. Consumer acceptance is independently
 bound by `VerificationPolicy.minimumDiskEvidence` in the policy digest: pipeline-attested policy defaults to
-`build-provenance-v1`, while explicit `strict` requires inspected evidence. Qualified policy defaults to strict
-and rejects producer-only acceptance. Neither path accepts a
+`build-provenance-v1`; `packages` requires installed-package inventory and `strict` requires full
+content/material reconciliation. Qualified policy defaults to strict and rejects either weaker minimum. No path accepts a
 restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
-the live inspection-and-packaging operation in strict mode; producer-provenance mode skips inspection and consumes
-the original producer/material owners instead. Producer provenance is the NVKE and M3 MVP disk acceptance scope;
-full inspection and material reconciliation are deferred hardening (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
+the live inspection-and-packaging operation in strict or package-only mode; producer-provenance mode skips inspection and consumes
+the original producer/material owners instead. Maintained NVKE plain disks select package-only evidence;
+FDE retains producer provenance. Full content/material reconciliation remains deferred hardening (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
 in [reconciliation: Native ARC disk route](reconciliation/native-arc-disk-route.md#native-arc-disk-route). The ordinary local scheduler
 still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;

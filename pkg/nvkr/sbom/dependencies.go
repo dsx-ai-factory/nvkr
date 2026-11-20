@@ -141,7 +141,7 @@ func validateInventorySemantics(bom *BOM, artifact string) error {
 	if diskInventory && artifact == "" {
 		return e.New(e.CodeVerifyFailed, "disk inventory requires an exact per-artifact subject")
 	}
-	if method == "disk-reconciled/v1" && bom.Metadata.Component.Type != "operating-system" {
+	if (method == "disk-reconciled/v1" || method == DiskInstalledPackagesMethod) && bom.Metadata.Component.Type != "operating-system" {
 		return e.New(e.CodeVerifyFailed, "reconciled disk inventory requires an operating-system subject")
 	}
 	if method == BundleFilesMethod && artifact == "" {
@@ -226,7 +226,7 @@ func validateDependencies(bom *BOM) error {
 }
 
 func supportedDependencyMethod(method string) bool {
-	return method == "helm-manifests/v1" || method == "syft-cyclonedx/v1" || method == "disk-reconciled/v1" || method == "disk-content/v1" || method == archiveContentMethod || method == BundleFilesMethod || method == DebianPayloadMethod
+	return method == DiskInstalledPackagesMethod || method == "helm-manifests/v1" || method == "syft-cyclonedx/v1" || method == "disk-reconciled/v1" || method == "disk-content/v1" || method == archiveContentMethod || method == BundleFilesMethod || method == DebianPayloadMethod
 }
 
 func dependencyMethodNeedsScanner(method string) bool {

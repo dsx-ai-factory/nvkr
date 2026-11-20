@@ -264,12 +264,16 @@ it declares no storage-driver field or ambient runtime-variable workaround. Stor
 is admitted and observed by the existing runtime owner. The historical explicit-VFS probe
 is diagnostic evidence, not this Environment's configuration or production approval.
 Runner labels do not supply runtime-capacity or full-inspector profile authority.
-The current candidate selects `diskEvidence: build-provenance-v1`, authenticating all eight held disks and their
-material producers without deep inspection. Profiles remain available for plain-image strict mode but are not pulled or
-executed in this mode; its signed evidence reports inspection as `not-performed`. The approved October 12
-M3 MVP retains this producer-provenance floor. Full disk inspection and material reconciliation are deferred
-beyond that MVP ([ADR-13](../../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)
-and [NKX-18052](https://nvidia.atlassian.net/browse/NKX-18052)).
+The maintained development, production and nightly Environments select
+`diskEvidence: installed-packages-v1` with explicit `diskEvidenceOverrides` retaining
+`build-provenance-v1` for all four FDE outputs. Plain disks use the pinned offline
+inspection profiles to emit installed Debian package names, versions, architectures
+and purls bound to the final QCOW2 digest. Every held disk and its material producers
+remain authenticated. FDE evidence reports inspection as `not-performed`: no
+authenticated pre-encryption inventory handoff exists. Full disk inspection and
+material reconciliation remain separate hardening
+([ADR-13](../../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)).
+Hosted publication acceptance for the new package mode is not yet recorded.
 The product acceptance floor remains AMD64; this candidate retains the separately selected ARM64
 extension, and all eight disk outputs remain mandatory for completion of this Definition.
 Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
@@ -278,8 +282,9 @@ The [failed delivery attempt](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47
 records the earlier aggregate transport failure; the per-output route below avoids aggregate payload downloads.
 Per-output storage peaks still require measured admission.
 The signed disk mode is descriptive. `VerificationPolicy.minimumDiskEvidence` defaults to `build-provenance-v1`
-for pipeline-attested verification. Explicit `strict` rejects producer-only evidence; qualified policy defaults
-to strict and rejects the producer-only minimum. The selected minimum is
+for pipeline-attested verification. Explicit `packages` accepts package-only or strict
+evidence and rejects producer-only FDE members; `strict` accepts only reconciled
+evidence. Qualified policy defaults to strict and rejects weaker minima. The selected minimum is
 policy-digest-bound. The historical validation run below predates these consumer-policy and timeout changes
 and does not validate this updated head, current main execution, strict inspection or independent full-payload
 consumer acceptance.
@@ -314,10 +319,10 @@ The direct-Packer contract opts into APT capture and declares the matching plain
 source-owned material projection. Capture byte correspondence alone does not authenticate repository
 origin or establish a complete installed-software inventory.
 
-The Environment explicitly selects `diskEvidence: build-provenance-v1`. The composite authenticates each held disk
-and its live producer/material subjects and signs evidence describing the deferred inspection scope.
-Deep content inspection and reconciliation are deferred beyond the approved M3 MVP. The existing strict
-inspection profiles remain available for plain disks, but this mode neither prepares nor invokes the inspector.
+The maintained Environment selects package inventory for plain disks and explicitly
+overrides FDE outputs to producer-only evidence. The composite authenticates each held
+disk and its live producer/material subjects, signing the actual per-output scope.
+Deep content inspection and reconciliation remain separate from package inventory.
 A successful composite pipeline still
 requires every named output, exact-subject evidence, publication, signing and verification; deferral
 cannot substitute for those gates or establish qualified reproduction.
@@ -338,8 +343,9 @@ The Disks Ubuntu 24 family's `nvke-node-image-ubuntu24-<arch>` and `nvke-node-fd
 installers, the agent, DOCA OVS and the four disk producers with their 24.04 declarations; the targets,
 passphrase, evidence mode and every other material producer are unchanged. The
 [Ubuntu 24 inputs](../diagnostics/ubuntu24/README.md) record the agent's libc contract and installer pins.
-The composite Environment keeps the native ARC route, execution classes, inspection profiles and
-`build-provenance-v1` disk evidence. The [Ubuntu 24 reconciliation record](../../../docs/adr/reconciliation/ubuntu-24-node-image-inputs.md)
+The composite Environment keeps the native ARC route, execution classes and inspection
+profiles; plain Ubuntu 24 disks select package inventory and FDE overrides remain
+`build-provenance-v1`. The [Ubuntu 24 reconciliation record](../../../docs/adr/reconciliation/ubuntu-24-node-image-inputs.md)
 owns historical publication scope and current-candidate guest acceptance.
 
 The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)

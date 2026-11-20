@@ -120,7 +120,7 @@ func TestGitHubToolchainAccessPrivateInspectorOnly(t *testing.T) {
 					in.environment.ToolchainAccess.Reader = nil
 				}
 			})
-			if !githubDiskInspectionRequired(plan) {
+			if !githubDiskInspectionRequired(plan, plan.LifecycleOutputs[0].Name) {
 				t.Fatal("fixture does not require strict inspection")
 			}
 			publicProducers := 0

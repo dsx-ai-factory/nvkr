@@ -248,6 +248,16 @@ func verifySelectedReleaseEvidenceSources(ctx context.Context, root string, publ
 				}
 				continue
 			}
+			if diskModes[outputName] == sbom.DiskInstalledPackages {
+				if diskRoot == binding.Component {
+					if err := sbom.ValidateDiskInstalledPackages(&bom); err != nil {
+						return err
+					}
+				} else if err := sbom.ValidateDiskBuildProvenance(&bom); err != nil {
+					return err
+				}
+				continue
+			}
 			keys := []string{"nvkr:dependencyScannerDigest"}
 			if diskRoot == binding.Component {
 				if len(bom.Components) == 0 || props["nvkr:dependencyInspection"] != "disk-reconciled/v1" {
@@ -280,7 +290,7 @@ func verifySelectedReleaseEvidenceSources(ctx context.Context, root string, publ
 			} else if method == sbom.BundleFilesMethod {
 				return e.New(e.CodeVerifyFailed, "bundle file inspection is not valid for a non-bundle output")
 			}
-			if diskRoot == "" && (method == "disk-content/v1" || method == "disk-reconciled/v1") {
+			if diskRoot == "" && (method == "disk-content/v1" || method == "disk-reconciled/v1" || method == sbom.DiskInstalledPackagesMethod) {
 				return e.New(e.CodeVerifyFailed, "disk inspection method is not valid for a non-disk output")
 			}
 		}

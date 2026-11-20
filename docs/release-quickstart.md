@@ -119,8 +119,12 @@ Authenticity verifies the root and every required output's signatures and produc
 required signed SBOMs and their metadata membership. Its result explicitly reports
 `payloadIntegrityVerified: false`: **authenticity verified; payload integrity not checked**. It cannot
 authorize payload export or exact-input matching. Both scopes enforce the selected disk-evidence minimum;
-`--minimum-disk-evidence strict` requires signed inspected-disk evidence, but authenticity does not inspect
-the disk itself. Neither scope provides qualification or the capability-gated full `release` scope.
+`--minimum-disk-evidence packages` requires a signed installed-package inventory or
+strict reconciliation for every disk member; `strict` requires reconciled evidence.
+The default `build-provenance-v1` also accepts producer-only evidence. Maintained
+LUKS2 outputs remain producer-only, so a mixed Release containing them fails a
+packages or strict minimum. Authenticity does not inspect the disk itself. Neither
+scope provides qualification or the capability-gated full `release` scope.
 
 To export the verified held closure, also supply the exact producing inputs and
 originating invocation. Set these paths and identities from the accepted producing

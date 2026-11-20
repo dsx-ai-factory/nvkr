@@ -392,9 +392,10 @@ an unavailable stronger scope never falls back to weaker verification.
 
 For disk outputs, `VerificationPolicy.minimumDiskEvidence` is included in the policy digest. Pipeline-attested
 verification defaults to `build-provenance-v1`, accepting signed producer/material evidence without an inspected
-disk inventory. Use `--minimum-disk-evidence strict` to require inspected evidence. The
-SDK exposes `DiskEvidenceStrict` and `DiskEvidenceBuildProvenance`. Qualified verification defaults to strict
-and cannot opt into the producer-only mode. Authenticity enforces the same minimum against signed evidence
+disk inventory. Use `--minimum-disk-evidence packages` to require installed-package inventory,
+or `strict` to require full content/material reconciliation. The SDK exposes `DiskEvidenceStrict`,
+`DiskEvidencePackages` and `DiskEvidenceBuildProvenance`. Qualified verification defaults to strict
+and cannot opt into either weaker mode. Authenticity enforces the same minimum against signed evidence
 and metadata; it does not inspect or re-hash the disk.
 
 The CLI expresses build-evidence acceptance as `--scope artifact-publication`. On Linux, with a pinned cosign

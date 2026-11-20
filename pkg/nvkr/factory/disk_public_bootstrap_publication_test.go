@@ -89,7 +89,7 @@ func TestPublicBootstrapPublicationRejectsDuplicateAndQualified(t *testing.T) {
 				} else {
 					plan.Qualification = "qualified"
 				}
-				assertFactoryErrorCode(t, admitDiskPublicationEncryption(plan, producer), e.CodeEngineCapability)
+				assertFactoryErrorCode(t, admitDiskPublicationEncryption(plan, plan.Builds[0].Name, producer), e.CodeEngineCapability)
 				return
 			}
 			t.Fatal("missing VM producer")

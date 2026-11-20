@@ -274,5 +274,6 @@ go test ./pkg/nvkr/pipeline \
 
 That controlled test does not scan a real disk, measure a native closure or prove original live-Run
 reconciliation. The [inspection reconciliation](../../docs/adr/reconciliation/native-disk-execution-and-inspection.md)
-owns strict full-content discovery/receipt status and external validation limits. NVKE explicitly uses `build-provenance-v1`
-and defers deep inspection to M3; it does not prepare or execute these retained strict profiles.
+owns full-content discovery/receipt status and external validation limits. Maintained NVKE plain disks
+select `installed-packages-v1`, which uses these frozen profiles for package-database inspection.
+FDE outputs explicitly retain `build-provenance-v1`; strict content/material reconciliation remains separate.

@@ -370,8 +370,13 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
-documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory. NVKE and the M3 MVP
-retain producer-only disk evidence. Strict inspection and material reconciliation are deferred hardening.
+documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory.
+Maintained NVKE plain disks select `installed-packages-v1`, binding observed Debian
+names, versions, architectures and purls to the exact final disk. Explicit per-output
+FDE overrides retain producer-only evidence. The consumer `packages` floor admits
+package or strict evidence and rejects producer-only members; a mixed FDE Release
+does not meet it. Strict inspection and material reconciliation remain separate
+hardening; package evidence asserts neither file integrity nor material correspondence.
 Embedded-component declarations are optional: omission is not applicable, while any authored declaration must
 match its referenced pinned upstream metadata. That comparison does not establish effective customized or
 installed composition; exact source, patch, configuration and material bindings remain required.
