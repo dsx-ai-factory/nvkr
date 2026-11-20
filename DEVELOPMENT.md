@@ -369,8 +369,8 @@ exceptions and completed Runs are scoped in [reconciliation](docs/adr/reconcilia
 ## Test timing and cache use
 
 Use `make test GO_TEST_FLAGS="-json -count=1"` to capture uncached ordinary test events. CI runs the same
-ordinary suite in fifteen shards: eight divide factory tests, two divide lifecycle tests, and five divide
-the remaining packages. Heavy-package selections come from Go's compiled test inventory, including
+ordinary suite in nineteen shards: eight divide factory tests; two each divide lifecycle, qualification,
+and CLI tests; and five divide the remaining packages. Heavy-package selections come from Go's compiled test inventory, including
 examples and fuzz seeds; all other packages run whole. New packages and tests are assigned automatically.
 Each test runs in one shard, and the gate requires every shard plus the independent static, lint and
 vulnerability checks to succeed. `make test` and `make check` retain the complete local suite.
