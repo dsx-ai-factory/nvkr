@@ -51,6 +51,14 @@ requires:
 timeout: 30m
 ```
 
+Arguments of `command` and `acquisition.command`, like `environment` values, may contain
+`${inputs.<declared role>.path|version}` anywhere in the text, any number of times. `path` stands
+for the staged input's path inside the test container and `version` for its expected version from
+the Run's build metadata. Each reference is replaced as plain text before the container starts;
+`command` is an argument vector with no shell evaluation, so a substituted value stays inside its
+argument. Any other `${` text, including a literal `${`, fails loading. The catalog directory
+may be given in any spelling (`./dir`, `dir/`); a symlinked catalog root is refused.
+
 Registrations are not yet executed: selection, Run binding and the executor that runs
 `command` are follow-up work. `validators run --profile` below still uses the earlier indexed
 catalog under `inputs/testing/validators/` until it is migrated.

@@ -68,6 +68,17 @@ func TestRegistrationsRefuseSymlinkedRoot(t *testing.T) {
 	if err := os.Symlink(root, link); err != nil {
 		t.Fatal(err)
 	}
-	_, err := LoadRegistrations(t.Context(), link)
-	catalogCode(t, err, e.CodeUsage)
+	// Trailing path syntax must not make the final component follow the link.
+	for _, spelling := range []string{link, link + "/", link + "/."} {
+		_, err := LoadRegistrations(t.Context(), spelling)
+		catalogCode(t, err, e.CodeUsage)
+	}
+	// An ordinary directory loads however it is spelled.
+	t.Chdir(filepath.Dir(root))
+	base := filepath.Base(root)
+	for _, spelling := range []string{root, root + "/", root + "/.", base, "./" + base, base + "/", "./" + base + "//"} {
+		if _, err := LoadRegistrations(t.Context(), spelling); err != nil {
+			t.Fatalf("%q: %v", spelling, err)
+		}
+	}
 }
