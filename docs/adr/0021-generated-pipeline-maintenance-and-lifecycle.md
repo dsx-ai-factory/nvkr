@@ -397,9 +397,33 @@ A pin or catalog change moves the IR, which moves the emitted pipeline. The two 
   failure after pin commit leaves a disposable checkout for diagnosis, never a publishable candidate.
   Recovery context preserves the generating owner's coded cause, including retryable cancellation and
   non-retryable generated-file drift during either generation pass.
+- Optional `family` selects explicit catalog/source roots for coordinated interactive bumping.
+  Family bump is supported only on a checkout the operator exclusively owns, with no uncoordinated writers during the run.
+  The family
+  owner prepares issued pin candidates, producer overlays and all configured bundles in a bounded private
+  input snapshot before touching working files. Preview describes old/new pins, derived recipe versions,
+  overlay paths and consumers; failed resolution or validation leaves working files unchanged. Applying
+  locks the existing owners, compares original bytes, stages replacements and recovery copies, and commits
+  manifests after payloads. It validates the captured baseline before mutation and the expected complete
+  input/output state before success. Each replacement withdraws the actual destination into a retained
+  sibling, checks its bytes, then links the candidate without replacing another writer. Restoration uses
+  the same protocol; a path can briefly be absent, so concurrent consumers must not use this checkout.
+  Ordinary commit failures roll back only this operation's bytes; conflicting
+  external edits detected by these checks are preserved and retained backups are reported. The shared Plan-store
+  guard covers publication and retirement. Ordinary generation in staging authenticates the baseline and
+  final ownership sets; family commitment may retire only captured shared objects removed by that owner.
+  It publishes payloads, manifests, shared-object retirements and the derived index in that order. Retired
+  objects retain recovery copies and use no-replace restoration on rollback. Directory additions or retirements
+  fail before commitment and require authored regeneration. Other file retirement requires
+  ordinary regeneration. This does not promise crash atomicity across files: an interrupted checkout must pass owner
+  regeneration and checks before use. The scheduled refresh operation retains its separate transactions.
 - Optional `producerOverlays` names a strict `nvkr.dev/producer-overlay-maintenance/v1` input. Its ordered
   entries declare source catalogs and exact producer IDs, existing named overlay destinations, base catalogs,
   ordered predecessors and any explicitly frozen complete replacements. The maintenance owner derives
+  source-bound complete replacements from explicit named catalog producers: templates omit repository
+  and source pin fields, retain their full fetch/patch/packaging contracts, and receive only the selected
+  source identity plus opted-in derived recipe values from the catalog owner. Explicit toolchain
+  substitutions retain their existing exact-pin contract. The maintenance owner derives
   predecessor digests and uses the catalog's whole-producer validator. Missing or ambiguous producers,
   invalid ordering, path escapes and destination ownership conflicts fail before any write. Check mode
   compares exact bytes without opening a writer guard. A persistent kernel-released guard serializes writers;

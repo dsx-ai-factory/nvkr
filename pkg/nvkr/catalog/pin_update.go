@@ -70,6 +70,17 @@ func updateSourcePinsWithArtifacts(ctx context.Context, request SourcePinRequest
 	resolvePin func(context.Context, Source, string) (Pin, error),
 	resolveArtifact func(context.Context, PrebuiltTarget, string) (ArtifactPin, error),
 ) (SourcePinUpdate, error) {
+	return resolveSourcePinsWithArtifacts(ctx, request, listTags, resolvePin, resolveArtifact, nil)
+}
+
+// retain receives a fully validated candidate before check/no-op/write handling.
+// It lets coordinated maintenance prepare without granting callers a writable lock.
+func resolveSourcePinsWithArtifacts(ctx context.Context, request SourcePinRequest,
+	listTags func(context.Context, string) ([]string, error),
+	resolvePin func(context.Context, Source, string) (Pin, error),
+	resolveArtifact func(context.Context, PrebuiltTarget, string) (ArtifactPin, error),
+	retain func(*PinLock) error,
+) (SourcePinUpdate, error) {
 	// Read one snapshot and select the independent sources to update.
 	var update SourcePinUpdate
 	if err := validatePinRuntime(request.Runtime); err != nil {
@@ -232,6 +243,9 @@ func updateSourcePinsWithArtifacts(ctx context.Context, request SourcePinRequest
 	}
 	if _, err := serializePinLock(lock); err != nil {
 		return update, err
+	}
+	if retain != nil {
+		return update, retain(lock)
 	}
 	if update.Changed == 0 {
 		return update, nil

@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"maps"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -30,12 +31,22 @@ type ProducerOverlayInputs struct {
 }
 
 type ProducerOverlayInput struct {
-	Name         string                                  `json:"name"`
-	Destination  string                                  `json:"destination"`
-	Base         string                                  `json:"base"`
-	Predecessors []string                                `json:"predecessors,omitempty"`
-	Producers    []ProducerCopy                          `json:"producers,omitempty"`
-	Frozen       map[string]catalog.ComponentReplacement `json:"frozen,omitempty"`
+	Name                   string                                  `json:"name"`
+	Destination            string                                  `json:"destination"`
+	Base                   string                                  `json:"base"`
+	Predecessors           []string                                `json:"predecessors,omitempty"`
+	Producers              []ProducerCopy                          `json:"producers,omitempty"`
+	Frozen                 map[string]catalog.ComponentReplacement `json:"frozen,omitempty"`
+	SourceBound            map[string]SourceBoundProducer          `json:"sourceBound,omitempty"`
+	ToolchainSubstitutions []catalog.ToolchainSubstitution         `json:"toolchainSubstitutions,omitempty"`
+}
+
+// SourceBoundProducer retains a complete authored producer contract while its
+// source identity follows one explicitly named producer in another catalog.
+type SourceBoundProducer struct {
+	Catalog   string            `json:"catalog"`
+	Component string            `json:"component"`
+	Producer  catalog.Component `json:"producer"`
 }
 
 // ProducerCopy copies complete named producers, without renaming or deep merge.
@@ -84,6 +95,10 @@ func checkOverlayFiles(files []overlayFile) error {
 }
 
 func loadProducerOverlayInputs(ctx context.Context, filename string) (ProducerOverlayInputs, error) {
+	return loadProducerOverlayInputsAtRoot(ctx, ".", filename)
+}
+
+func loadProducerOverlayInputsAtRoot(ctx context.Context, root, filename string) (ProducerOverlayInputs, error) {
 	var input ProducerOverlayInputs
 	if ctx == nil {
 		return input, e.New(e.CodeUsage, "producer overlay maintenance requires a context")
@@ -94,7 +109,7 @@ func loadProducerOverlayInputs(ctx context.Context, filename string) (ProducerOv
 	if !safeRelative(filename) {
 		return input, e.New(e.CodeUsage, "producer overlay inputs must be repository-relative")
 	}
-	raw, err := readOverlayInput(ctx, filename)
+	raw, err := readOverlayInputAtRoot(ctx, root, filename)
 	if err != nil {
 		return input, err
 	}
@@ -121,7 +136,7 @@ func loadProducerOverlayInputs(ctx context.Context, filename string) (ProducerOv
 		destinations[entry.Destination], names[entry.Name] = i, true
 	}
 	for i, entry := range input.Overlays {
-		if len(entry.Predecessors) > 64 || len(entry.Producers) > 64 || len(entry.Frozen) > 128 {
+		if len(entry.Predecessors) > 64 || len(entry.Producers) > 64 || len(entry.Frozen)+len(entry.SourceBound) > 128 || len(entry.ToolchainSubstitutions) > 128 {
 			return input, e.New(e.CodeInvalidCatalog, "producer overlay %q exceeds maintenance limits", entry.Name)
 		}
 		seen := map[string]bool{}
@@ -136,6 +151,12 @@ func loadProducerOverlayInputs(ctx context.Context, filename string) (ProducerOv
 		for name := range entry.Frozen {
 			selected[name] = true
 		}
+		for name, binding := range entry.SourceBound {
+			if !safeName.MatchString(name) || selected[name] || !safeRelative(binding.Catalog) || !safeName.MatchString(binding.Component) {
+				return input, e.New(e.CodeInvalidCatalog, "invalid or repeated source-bound producer %q", name)
+			}
+			selected[name] = true
+		}
 		for _, source := range entry.Producers {
 			if !safeRelative(source.Catalog) || len(source.Components) == 0 || len(source.Components) > 128 {
 				return input, e.New(e.CodeInvalidCatalog, "producer overlay %q requires an explicit bounded producer selection", entry.Name)
@@ -147,7 +168,7 @@ func loadProducerOverlayInputs(ctx context.Context, filename string) (ProducerOv
 				selected[name] = true
 			}
 		}
-		if len(selected) == 0 {
+		if len(selected) == 0 && len(entry.ToolchainSubstitutions) == 0 {
 			return input, e.New(e.CodeInvalidCatalog, "producer overlay %q selects no producers", entry.Name)
 		}
 	}
@@ -155,7 +176,11 @@ func loadProducerOverlayInputs(ctx context.Context, filename string) (ProducerOv
 }
 
 func renderProducerOverlays(ctx context.Context, filename string) ([]overlayFile, error) {
-	input, err := loadProducerOverlayInputs(ctx, filename)
+	return renderProducerOverlaysAtRoot(ctx, ".", filename)
+}
+
+func renderProducerOverlaysAtRoot(ctx context.Context, root, filename string) ([]overlayFile, error) {
+	input, err := loadProducerOverlayInputsAtRoot(ctx, root, filename)
 	if err != nil {
 		return nil, err
 	}
@@ -165,10 +190,10 @@ func renderProducerOverlays(ctx context.Context, filename string) ([]overlayFile
 		if cat, ok := loaded[directory]; ok {
 			return cat, nil
 		}
-		if err := admitPath(directory); err != nil {
+		if err := admitPathAtRoot(root, directory); err != nil {
 			return nil, err
 		}
-		cat, err := catalog.LoadContext(ctx, catalog.Dir(directory))
+		cat, err := catalog.LoadContext(ctx, catalog.Dir(filepath.Join(root, directory)))
 		if err == nil {
 			loaded[directory] = cat
 		}
@@ -184,10 +209,10 @@ func renderProducerOverlays(ctx context.Context, filename string) ([]overlayFile
 		for _, filename := range entry.Predecessors {
 			previous, ok := generated[filename]
 			if !ok {
-				if err := admitPath(filename); err != nil {
+				if err := admitPathAtRoot(root, filename); err != nil {
 					return nil, err
 				}
-				previous, err = catalog.LoadOverlayContext(ctx, filename)
+				previous, err = catalog.LoadOverlayContext(ctx, filepath.Join(root, filename))
 				if err != nil {
 					return nil, err
 				}
@@ -199,9 +224,21 @@ func renderProducerOverlays(ctx context.Context, filename string) ([]overlayFile
 			return nil, err
 		}
 		overlay := catalog.Overlay{APIVersion: catalog.OverlayAPIVersion, Kind: catalog.OverlayKind,
-			Name: entry.Name, RequiresCatalogDigest: stack.Digest, Components: maps.Clone(entry.Frozen)}
+			Name: entry.Name, RequiresCatalogDigest: stack.Digest, Components: maps.Clone(entry.Frozen), ToolchainSubstitutions: entry.ToolchainSubstitutions}
 		if overlay.Components == nil {
 			overlay.Components = map[string]catalog.ComponentReplacement{}
+		}
+		for _, name := range slices.Sorted(maps.Keys(entry.SourceBound)) {
+			binding := entry.SourceBound[name]
+			cat, err := load(binding.Catalog)
+			if err != nil {
+				return nil, err
+			}
+			component, err := cat.BindSourceProducer(binding.Component, binding.Producer)
+			if err != nil {
+				return nil, err
+			}
+			overlay.Components[name] = catalog.ComponentReplacement{Component: &component}
 		}
 		for _, source := range entry.Producers {
 			cat, err := load(source.Catalog)
@@ -224,10 +261,17 @@ func renderProducerOverlays(ctx context.Context, filename string) ([]overlayFile
 			return nil, e.Wrap(e.CodeInternal, err, "encoding generated producer overlay")
 		}
 		candidate = append(candidate, '\n')
+		if path.Ext(entry.Destination) == ".yaml" {
+			candidate, err = yaml.JSONToYAML(candidate)
+			if err != nil {
+				return nil, e.Wrap(e.CodeInternal, err, "encoding generated YAML producer overlay")
+			}
+			candidate = append([]byte("# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.\n# SPDX-License-Identifier: Apache-2.0\n\n"), candidate...)
+		}
 		if int64(len(candidate)) > catalog.OverlayMaxBytes {
 			return nil, e.New(e.CodeInvalidCatalog, "generated producer overlay %q exceeds byte limit", entry.Name)
 		}
-		before, err := readOverlayInput(ctx, entry.Destination)
+		before, err := readOverlayInputAtRoot(ctx, root, entry.Destination)
 		if err != nil {
 			return nil, err
 		}
@@ -245,13 +289,17 @@ func renderProducerOverlays(ctx context.Context, filename string) ([]overlayFile
 }
 
 func readOverlayInput(ctx context.Context, filename string) ([]byte, error) {
+	return readOverlayInputAtRoot(ctx, ".", filename)
+}
+
+func readOverlayInputAtRoot(ctx context.Context, root, filename string) ([]byte, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, contextError(ctx, err)
 	}
-	if err := admitPath(filename); err != nil {
+	if err := admitPathAtRoot(root, filename); err != nil {
 		return nil, err
 	}
-	held, err := heldfile.OpenContext(ctx, filename, heldfile.Options{Label: "producer-overlay-maintenance", MaxBytes: catalog.OverlayMaxBytes})
+	held, err := heldfile.OpenContext(ctx, filepath.Join(root, filename), heldfile.Options{Label: "producer-overlay-maintenance", MaxBytes: catalog.OverlayMaxBytes})
 	if err != nil {
 		return nil, contextError(ctx, e.Wrap(e.CodeInvalidCatalog, err, "reading producer overlay input %q", filename))
 	}
@@ -272,6 +320,9 @@ func admitProducerOverlayTransport(ctx context.Context, filename, repository str
 	for _, entry := range input.Overlays {
 		directories[entry.Base] = true
 		for _, source := range entry.Producers {
+			directories[source.Catalog] = true
+		}
+		for _, source := range entry.SourceBound {
 			directories[source.Catalog] = true
 		}
 	}
