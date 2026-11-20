@@ -27,12 +27,18 @@ and an in-cluster registry. The [Tekton guide](../docs/generate-pipeline.md#tekt
 lists prerequisites, trust scope and retained evidence. The GitHub acceptance workflow runs this same
 command; it needs no publishing secrets. This explicit integration test fails when prerequisites are absent.
 
+`test-gitlab-docker.sh` runs the single-output NVKE CLI Definition through a real GitLab server and
+Docker-executor Runner. It requires a local native AMD64/ARM64 Docker daemon, four CPUs and 12 GiB RAM.
+The [development guide](../DEVELOPMENT.md#test-the-gitlab-adapter-against-a-real-server) describes owned
+resources, token isolation, HTTPS trust, API submission and retained evidence. It is opt-in and fails
+when prerequisites are absent. This is an ordinary unsigned build, not signing or qualification.
+
 `ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's fifteen
 test jobs. It includes examples and fuzz seed tests, and requires exact completion of the discovered
 selection. New packages and tests need no allowlist update. `make test-shard` reproduces one matrix
 entry; `make test` still runs the full suite. Each child command may retain at most 32 MiB of stdout;
 exceeding that limit fails the shard and stops its process group while preserving diagnostics already
-read. `ci-test-summary.py` summarizes the retained Go JSON events. Partition, completeness, parser and
+read. `ci-test-summary.jq` summarizes the retained Go JSON events. Partition, completeness, parser and
 small offline Go composition contracts run with `make test-ci-tools`; the Go fixture exercises every
 matrix entry without rebuilding the product suite.
 
@@ -65,13 +71,16 @@ results from committed regressions.
 
 ## Definition → Run
 
-`make workflows-generate` invokes `run generate-set` directly with
+`make workflows-generate` invokes `generate-maintained.sh`, which coordinates writes through
+`run generate-set` with
 `inputs/policies/maintained-generation.json`, then regenerates the catalog-refresh workflow.
 `make nvke-generate` and `make pipeline-dev-generate` regenerate that complete producer/qualifier set too:
 shared stable records require coordinated owners even when only one group motivated the edit.
 The read-only `workflows-check`, `nvke-check` and `pipeline-dev-check` targets retain their respective
-all/group scopes through `generate-maintained.py`. Contract tests compare the authored inventory with
+all/group scopes through `generate-maintained.sh`. Contract tests compare the authored inventory with
 committed Plans and manifests, so a new bundle must enter the same image-access contract.
+The inventory `runtime` flag selects runtime admission only for checks. Writes regenerate the reviewed
+baseline without freezing dispatch-time source heads; the Environment owns runtime policy.
 
 For repository pipeline changes, `make pipeline-dev-run PIPELINE_DEV_REPO=owner/repo` checks the generated
 development bundle and calls `pipeline-dev.py`. The helper requires a clean named branch matching the

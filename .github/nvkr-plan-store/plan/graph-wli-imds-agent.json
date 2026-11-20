@@ -1,0 +1,253 @@
+{
+  "artifacts": [
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-amd64",
+      "component": "dsx-imds-node-attestor-agent",
+      "id": "artifact/dsx-imds-node-attestor-agent-linux-amd64/dsx-imds-node-attestor-agent",
+      "kind": "host-package",
+      "mediaType": "application/octet-stream",
+      "name": "dsx-imds-node-attestor-agent",
+      "path": ".nvkr/factory/dsx-imds-node-attestor-agent-linux-amd64/out/dsx-imds-node-attestor-agent/dsx-imds-node-attestor-agent",
+      "producer": "dsx-imds-node-attestor-agent-linux-amd64/build-dsx-imds-node-attestor-agent"
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-arm64",
+      "component": "dsx-imds-node-attestor-agent",
+      "id": "artifact/dsx-imds-node-attestor-agent-linux-arm64/dsx-imds-node-attestor-agent",
+      "kind": "host-package",
+      "mediaType": "application/octet-stream",
+      "name": "dsx-imds-node-attestor-agent",
+      "path": ".nvkr/factory/dsx-imds-node-attestor-agent-linux-arm64/out/dsx-imds-node-attestor-agent/dsx-imds-node-attestor-agent",
+      "producer": "dsx-imds-node-attestor-agent-linux-arm64/build-dsx-imds-node-attestor-agent"
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-amd64",
+      "id": "observation/dsx-imds-node-attestor-agent-linux-amd64",
+      "kind": "unqualified-terminal-observation",
+      "name": "dsx-imds-node-attestor-agent-linux-amd64-terminal-observation",
+      "path": ".nvkr/factory/dsx-imds-node-attestor-agent-linux-amd64/terminal-observation.json",
+      "producer": "dsx-imds-node-attestor-agent-linux-amd64/terminal-observe"
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-arm64",
+      "id": "observation/dsx-imds-node-attestor-agent-linux-arm64",
+      "kind": "unqualified-terminal-observation",
+      "name": "dsx-imds-node-attestor-agent-linux-arm64-terminal-observation",
+      "path": ".nvkr/factory/dsx-imds-node-attestor-agent-linux-arm64/terminal-observation.json",
+      "producer": "dsx-imds-node-attestor-agent-linux-arm64/terminal-observe"
+    },
+    {
+      "id": "package/dsx-imds-node-attestor-agent-linux-amd64",
+      "kind": "binary-bundle",
+      "mediaType": "application/vnd.nvkr.binary-bundle.v1",
+      "name": "dsx-imds-node-attestor-agent-linux-amd64",
+      "path": ".nvkr/factory/packages/dsx-imds-node-attestor-agent-linux-amd64",
+      "producer": "package/dsx-imds-node-attestor-agent-linux-amd64"
+    },
+    {
+      "id": "package/dsx-imds-node-attestor-agent-linux-arm64",
+      "kind": "binary-bundle",
+      "mediaType": "application/vnd.nvkr.binary-bundle.v1",
+      "name": "dsx-imds-node-attestor-agent-linux-arm64",
+      "path": ".nvkr/factory/packages/dsx-imds-node-attestor-agent-linux-arm64",
+      "producer": "package/dsx-imds-node-attestor-agent-linux-arm64"
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-amd64",
+      "component": "dsx-imds-node-attestor-agent",
+      "id": "result/dsx-imds-node-attestor-agent-linux-amd64/dsx-imds-node-attestor-agent",
+      "kind": "producer-result",
+      "name": "dsx-imds-node-attestor-agent-result",
+      "path": ".nvkr/factory/dsx-imds-node-attestor-agent-linux-amd64/results/build-dsx-imds-node-attestor-agent.json",
+      "producer": "dsx-imds-node-attestor-agent-linux-amd64/build-dsx-imds-node-attestor-agent"
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-arm64",
+      "component": "dsx-imds-node-attestor-agent",
+      "id": "result/dsx-imds-node-attestor-agent-linux-arm64/dsx-imds-node-attestor-agent",
+      "kind": "producer-result",
+      "name": "dsx-imds-node-attestor-agent-result",
+      "path": ".nvkr/factory/dsx-imds-node-attestor-agent-linux-arm64/results/build-dsx-imds-node-attestor-agent.json",
+      "producer": "dsx-imds-node-attestor-agent-linux-arm64/build-dsx-imds-node-attestor-agent"
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-amd64",
+      "id": "sbom/dsx-imds-node-attestor-agent-linux-amd64",
+      "kind": "sbom-set",
+      "mediaType": "application/vnd.nvkr.sbom-set.v1+json",
+      "name": "dsx-imds-node-attestor-agent-linux-amd64-sbom",
+      "path": ".nvkr/factory/dsx-imds-node-attestor-agent-linux-amd64/sbom",
+      "producer": "dsx-imds-node-attestor-agent-linux-amd64/sbom"
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-arm64",
+      "id": "sbom/dsx-imds-node-attestor-agent-linux-arm64",
+      "kind": "sbom-set",
+      "mediaType": "application/vnd.nvkr.sbom-set.v1+json",
+      "name": "dsx-imds-node-attestor-agent-linux-arm64-sbom",
+      "path": ".nvkr/factory/dsx-imds-node-attestor-agent-linux-arm64/sbom",
+      "producer": "dsx-imds-node-attestor-agent-linux-arm64/sbom"
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-amd64",
+      "id": "source-receipt/dsx-imds-node-attestor-agent-linux-amd64/fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+      "kind": "source-receipt",
+      "name": "fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0-receipt",
+      "path": ".nvkr/factory/dsx-imds-node-attestor-agent-linux-amd64/source-receipts/source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0-a38dd0258df4.json",
+      "producer": "dsx-imds-node-attestor-agent-linux-amd64/fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0"
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-arm64",
+      "id": "source-receipt/dsx-imds-node-attestor-agent-linux-arm64/fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+      "kind": "source-receipt",
+      "name": "fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177-receipt",
+      "path": ".nvkr/factory/dsx-imds-node-attestor-agent-linux-arm64/source-receipts/source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177-9d69bc2df011.json",
+      "producer": "dsx-imds-node-attestor-agent-linux-arm64/fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177"
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-amd64",
+      "id": "source/dsx-imds-node-attestor-agent-linux-amd64/fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+      "kind": "source-closure",
+      "name": "fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+      "path": ".nvkr/factory/dsx-imds-node-attestor-agent-linux-amd64/src/source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+      "producer": "dsx-imds-node-attestor-agent-linux-amd64/fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0"
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-arm64",
+      "id": "source/dsx-imds-node-attestor-agent-linux-arm64/fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+      "kind": "source-closure",
+      "name": "fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+      "path": ".nvkr/factory/dsx-imds-node-attestor-agent-linux-arm64/src/source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+      "producer": "dsx-imds-node-attestor-agent-linux-arm64/fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177"
+    }
+  ],
+  "nodes": [
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-amd64",
+      "id": "dsx-imds-node-attestor-agent-linux-amd64/build-dsx-imds-node-attestor-agent",
+      "inputs": [
+        "source-receipt/dsx-imds-node-attestor-agent-linux-amd64/fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+        "source/dsx-imds-node-attestor-agent-linux-amd64/fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0"
+      ],
+      "irNode": "build-dsx-imds-node-attestor-agent",
+      "kind": "build",
+      "outputs": [
+        "artifact/dsx-imds-node-attestor-agent-linux-amd64/dsx-imds-node-attestor-agent",
+        "result/dsx-imds-node-attestor-agent-linux-amd64/dsx-imds-node-attestor-agent"
+      ]
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-amd64",
+      "id": "dsx-imds-node-attestor-agent-linux-amd64/fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+      "irNode": "fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+      "kind": "fetch",
+      "outputs": [
+        "source-receipt/dsx-imds-node-attestor-agent-linux-amd64/fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0",
+        "source/dsx-imds-node-attestor-agent-linux-amd64/fetch-source-d0d65fb9b8739216432bb3812f069a7b8c0bd695c0fafaa598071db72c23c6a0"
+      ]
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-amd64",
+      "id": "dsx-imds-node-attestor-agent-linux-amd64/sbom",
+      "inputs": [
+        "observation/dsx-imds-node-attestor-agent-linux-amd64",
+        "result/dsx-imds-node-attestor-agent-linux-amd64/dsx-imds-node-attestor-agent"
+      ],
+      "kind": "sbom",
+      "network": "none",
+      "outputs": [
+        "sbom/dsx-imds-node-attestor-agent-linux-amd64"
+      ]
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-amd64",
+      "id": "dsx-imds-node-attestor-agent-linux-amd64/terminal-observe",
+      "inputs": [
+        "artifact/dsx-imds-node-attestor-agent-linux-amd64/dsx-imds-node-attestor-agent",
+        "result/dsx-imds-node-attestor-agent-linux-amd64/dsx-imds-node-attestor-agent"
+      ],
+      "kind": "terminal-observe",
+      "network": "none",
+      "outputs": [
+        "observation/dsx-imds-node-attestor-agent-linux-amd64"
+      ]
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-arm64",
+      "id": "dsx-imds-node-attestor-agent-linux-arm64/build-dsx-imds-node-attestor-agent",
+      "inputs": [
+        "source-receipt/dsx-imds-node-attestor-agent-linux-arm64/fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+        "source/dsx-imds-node-attestor-agent-linux-arm64/fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177"
+      ],
+      "irNode": "build-dsx-imds-node-attestor-agent",
+      "kind": "build",
+      "outputs": [
+        "artifact/dsx-imds-node-attestor-agent-linux-arm64/dsx-imds-node-attestor-agent",
+        "result/dsx-imds-node-attestor-agent-linux-arm64/dsx-imds-node-attestor-agent"
+      ]
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-arm64",
+      "id": "dsx-imds-node-attestor-agent-linux-arm64/fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+      "irNode": "fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+      "kind": "fetch",
+      "outputs": [
+        "source-receipt/dsx-imds-node-attestor-agent-linux-arm64/fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177",
+        "source/dsx-imds-node-attestor-agent-linux-arm64/fetch-source-cda11b4482f1637e753d800f0a6536f2636d5e420ead7b19ff5f372cd45de177"
+      ]
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-arm64",
+      "id": "dsx-imds-node-attestor-agent-linux-arm64/sbom",
+      "inputs": [
+        "observation/dsx-imds-node-attestor-agent-linux-arm64",
+        "result/dsx-imds-node-attestor-agent-linux-arm64/dsx-imds-node-attestor-agent"
+      ],
+      "kind": "sbom",
+      "network": "none",
+      "outputs": [
+        "sbom/dsx-imds-node-attestor-agent-linux-arm64"
+      ]
+    },
+    {
+      "buildTarget": "dsx-imds-node-attestor-agent-linux-arm64",
+      "id": "dsx-imds-node-attestor-agent-linux-arm64/terminal-observe",
+      "inputs": [
+        "artifact/dsx-imds-node-attestor-agent-linux-arm64/dsx-imds-node-attestor-agent",
+        "result/dsx-imds-node-attestor-agent-linux-arm64/dsx-imds-node-attestor-agent"
+      ],
+      "kind": "terminal-observe",
+      "network": "none",
+      "outputs": [
+        "observation/dsx-imds-node-attestor-agent-linux-arm64"
+      ]
+    },
+    {
+      "id": "package/dsx-imds-node-attestor-agent-linux-amd64",
+      "inputs": [
+        "artifact/dsx-imds-node-attestor-agent-linux-amd64/dsx-imds-node-attestor-agent",
+        "observation/dsx-imds-node-attestor-agent-linux-amd64"
+      ],
+      "kind": "package",
+      "network": "none",
+      "outputs": [
+        "package/dsx-imds-node-attestor-agent-linux-amd64"
+      ],
+      "packageKind": "binary-bundle"
+    },
+    {
+      "id": "package/dsx-imds-node-attestor-agent-linux-arm64",
+      "inputs": [
+        "artifact/dsx-imds-node-attestor-agent-linux-arm64/dsx-imds-node-attestor-agent",
+        "observation/dsx-imds-node-attestor-agent-linux-arm64"
+      ],
+      "kind": "package",
+      "network": "none",
+      "outputs": [
+        "package/dsx-imds-node-attestor-agent-linux-arm64"
+      ],
+      "packageKind": "binary-bundle"
+    }
+  ],
+  "schemaVersion": "nvkr.dev/artifact-graph/v5"
+}

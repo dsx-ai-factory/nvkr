@@ -21,6 +21,9 @@ import (
 // Registry publication preserves caller deadlines and otherwise bounds its own
 // work. The returned cleanup owns only a deadline installed by this boundary.
 func registryPublicationContext(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if _, ok := ctx.Value(registryPublicationProgressKey{}).(*registryPublicationProgress); !ok {
+		ctx = context.WithValue(ctx, registryPublicationProgressKey{}, &registryPublicationProgress{})
+	}
 	if _, bounded := ctx.Deadline(); bounded {
 		return ctx, func() {}
 	}
@@ -30,7 +33,29 @@ func registryPublicationContext(ctx context.Context, timeout time.Duration) (con
 // Classify responses, not error strings or presumed registry versions. A refusal
 // never authorizes rewriting an already identified manifest or dropping evidence.
 func registryPublishError(ctx context.Context, err error, operation string, args ...any) error {
-	return registryOperationError(ctx, err, fmt.Sprintf(operation, args...), true)
+	classified := registryOperationError(ctx, err, fmt.Sprintf(operation, args...), true)
+	if registryWriteAttempted(ctx) {
+		return uncertainRegistryPublication(classified)
+	}
+	return classified
+}
+
+// Upload uncertainty is an operation-phase fact, independent of its error code.
+// Keep it private and retain the native cause; it conveys no successful outcome.
+type registryPublicationUncertain struct{ cause error }
+
+func (failure registryPublicationUncertain) Error() string { return failure.cause.Error() }
+func (failure registryPublicationUncertain) Unwrap() error { return failure.cause }
+
+func uncertainRegistryPublication(err error) error {
+	if err == nil {
+		return nil
+	}
+	var marked registryPublicationUncertain
+	if errors.As(err, &marked) {
+		return err
+	}
+	return registryPublicationUncertain{cause: err}
 }
 
 // A successful base response with an unrecognized API (for example HTML) is
@@ -49,7 +74,7 @@ func registryOperationError(ctx context.Context, err error, operation string, pu
 		publishing = false
 	}
 	suffix := ""
-	if publishing {
+	if publishing && registryWriteAttempted(ctx) {
 		suffix = "; destination may contain partial uploads"
 	}
 	var coded *e.Error
@@ -132,8 +157,83 @@ func registryReadbackError(ctx context.Context, err error, operation string, arg
 			return e.Wrap(e.CodeUnavailable, registryResponseError{response}, "%s; publication readback is incomplete", message)
 		}
 	}
-	return registryPublishError(ctx, err, operation, args...)
+	return registryOperationError(ctx, err, fmt.Sprintf(operation, args...), true)
 }
+
+// SafeRegistryReadbackError retains the underlying typed error for callers but
+// never presents registry-supplied response bodies, details, or request URLs.
+func SafeRegistryReadbackError(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	if ctx == nil {
+		return e.Wrap(e.CodeUsage, registryRedactedCause{cause: err}, "registry readback requires a context")
+	}
+	classified := registryReadbackError(ctx, err, "reading back publication")
+	return redactRegistryError(err, classified, "registry readback failed")
+}
+
+// SafeRegistryPublishedReadbackError reports the caller-owned fact that its
+// push completed before readback failed. It grants no successful readback or
+// artifact authority; standalone readers use SafeRegistryReadbackError instead.
+func SafeRegistryPublishedReadbackError(ctx context.Context, err error) error {
+	classified := SafeRegistryReadbackError(ctx, err)
+	if classified == nil || ctx == nil {
+		return classified
+	}
+	code := e.CodeUnavailable
+	var coded *e.Error
+	if errors.As(classified, &coded) {
+		code = coded.Code
+	}
+	return e.Wrap(code, classified, "registry push completed, but readback did not verify the publication")
+}
+
+// SafeRegistryPublishError redacts remote details while retaining native causes.
+// Local validation errors keep their category and actionable guidance.
+func SafeRegistryPublishError(ctx context.Context, err error) error {
+	if err == nil {
+		return nil
+	}
+	if ctx == nil {
+		return e.Wrap(e.CodeUsage, registryRedactedCause{cause: err}, "registry publication requires a context")
+	}
+	classified := registryPublishError(ctx, err, "publishing release")
+	return redactRegistryError(err, classified, "registry publication failed")
+}
+
+func redactRegistryError(err, classified error, message string) error {
+	code := e.CodeUnavailable
+	var coded *e.Error
+	if errors.As(classified, &coded) {
+		code = coded.Code
+	}
+	// Fixed guidance depends only on the owning classification. A wrapped
+	// cause can be local too; neither wrapping nor its absence establishes the
+	// upload phase. Messages and causes may contain private paths or URLs.
+	switch code {
+	case e.CodeUsage, e.CodeInvalidCatalog:
+		message = "publication input is invalid; check the selected destination and publication settings"
+	case e.CodeVerifyFailed, e.CodeUnverifiedRef:
+		message = "publication integrity verification failed; verify the exact layout and expected digest before retrying"
+	case e.CodeUnpinnedSource:
+		message = "publication reference is not pinned; select the exact repository and SHA-256 digest"
+	case e.CodeTrustPolicyMissing, e.CodeProvenanceMissing:
+		message = "publication authority is invalid or missing; check the selected registry, project and admitted scope"
+	case e.CodeEngineCapability:
+		message = "publication requires an unsupported capability; select a supported publication configuration"
+	}
+	var uncertain registryPublicationUncertain
+	if (errors.As(err, &uncertain) || errors.As(classified, &uncertain)) && !strings.Contains(message, "destination may contain partial uploads") {
+		message += "; destination may contain partial uploads"
+	}
+	return e.Wrap(code, registryRedactedCause{cause: err}, "%s", message)
+}
+
+type registryRedactedCause struct{ cause error }
+
+func (cause registryRedactedCause) Error() string { return "registry response or transport failed" }
+func (cause registryRedactedCause) Unwrap() error { return cause.cause }
 
 func registryResponseCode(response *transport.Error) e.Code {
 	if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {

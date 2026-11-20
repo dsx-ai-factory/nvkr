@@ -49,3 +49,26 @@ do not execute the migrated commands or establish hosted acceptance.
 Before migrating sibling-fragment scripts, toolchain repinning's edited-fragment provider must capture
 those files as well; its current tracked edit set contains YAML/JSON declarations only and fails closed
 for other sibling inputs. Directory loading and factory snapshot capture/replay support these files.
+
+## NVIDIA Workload Identity agent
+
+The [independent WLI selection](../../../inputs/definitions/nvidia-workload-identity/README.md)
+declares two source-built Linux DSX IMDS NodeAttestor agent executables from its own
+pinned catalog. It owns the manual-only `nvkr-run-wli-imds-agent` bundle beside the
+three NVKE composite bundles; it adds no NVKE product output or derived-inventory member.
+The shared maintenance policy explicitly includes its generated closure to keep
+shared action declarations, generator interfaces and Plan-store ownership coherent.
+It does not repin the WLI source, select a server plugin, or add signing/publication.
+
+Catalog, graph and generation contracts cover exact source/toolchain selection,
+unsigned build-only topology and invalid selections. Controlled Linux fixtures use
+catalog-loaded command bytes, held source/vendor transport, receipt reuse and
+boundary-specific closure-tamper refusals with untampered controls. Sealed-execution
+fixtures distinguish helper and interpreter digests. These are contract tests,
+not an upstream WLI build or hosted acceptance record. No hosted WLI Run, paired
+SPIRE execution or hardware/node-attestation behavior is established here.
+Raw executable producer descriptions now use octet-stream media types; actual Debian
+outputs retain their media type. Complete uniform historical executable descriptions
+remain valid without rewriting frozen Plan bytes; mixed encodings and unrelated
+artifact changes fail compiler validation. Native execution and full-gate evidence
+remain with their separate custodians.

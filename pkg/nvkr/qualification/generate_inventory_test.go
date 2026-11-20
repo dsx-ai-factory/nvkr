@@ -4,6 +4,7 @@
 package qualification
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
@@ -20,6 +21,9 @@ func TestGenerateInventoryAdmissionBeforeCompilation(t *testing.T) {
 	// admission without resolving any input or creating an output directory.
 	for _, raw := range []string{
 		`[]`,
+		`[{"bundle":"run","group":"main","definition":"missing.yaml","environment":"missing.yaml"}]`,
+		`[{"bundle":"nvkr-z","group":"main","definition":"missing.yaml","environment":"missing.yaml"},{"bundle":"nvkr-a","group":"main","definition":"missing.yaml","environment":"missing.yaml"}]`,
+		`[{"bundle":"nvkr-run","group":"main","definition":"missing.yaml","environment":"missing.yaml"},{"bundle":"nvkr-run","group":"nightly","definition":"missing.yaml","environment":"missing.yaml"}]`,
 		`[{"bundle":"nvkr-run","group":"main","definition":"missing.yaml","environment":"missing.yaml","ignored":true}]`,
 		`[{"bundle":"nvkr-run","group":"main","group":"nightly","definition":"missing.yaml","environment":"missing.yaml"}]`,
 		`[{"bundle":"nvkr-run","group":"unknown","definition":"missing.yaml","environment":"missing.yaml"}]`,
@@ -100,6 +104,60 @@ func TestCoordinatedProducerQualificationOverlap(t *testing.T) {
 				requireCode(t, err, e.CodeEngineCapability)
 			} else if err != nil {
 				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestGenerateInventorySelectsGroupAndReservesRuntimeForChecks(t *testing.T) {
+	repo, err := filepath.Abs("../../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(repo)
+	var baseline []byte
+	for _, tc := range []struct {
+		name    string
+		runtime bool
+	}{{"ordinary", false}, {"runtime check flag", true}} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			selections := []generationSelection{
+				{Bundle: "nvkr-a", Group: "development", Definition: "missing-development.yaml", Environment: "missing.yaml"},
+				{Bundle: "nvkr-run", Group: "main", Definition: "docs/examples/nvke-module-tags/definition.yaml", Environment: "docs/examples/nvke-module-tags/environment-github.yaml", Runtime: tc.runtime},
+				{Bundle: "nvkr-z", Group: "nightly", Definition: "missing-nightly.yaml", Environment: "missing.yaml"},
+			}
+			raw, err := canonical.Marshal(selections)
+			if err != nil {
+				t.Fatal(err)
+			}
+			input := filepath.Join(root, "inventory.json")
+			if err := os.WriteFile(input, raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if err := GenerateInventory(t.Context(), input, "main", "test (deadbeef)", root); err != nil {
+				t.Fatal(err)
+			}
+			plan, err := factory.LoadPlanContext(t.Context(), filepath.Join(root, factory.FactoryPlanPath))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if plan.RuntimeInputs != nil || plan.Environment.GitHubRuntimePlan {
+				t.Fatal("inventory write changed runtime policy or froze sources")
+			}
+			raw, err = canonical.Marshal(plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if baseline == nil {
+				baseline = raw
+			} else if !bytes.Equal(baseline, raw) {
+				t.Fatal("check-only runtime flag changed generated Plan")
+			}
+			for _, name := range []string{"nvkr-a", "nvkr-z"} {
+				if _, err := os.Stat(filepath.Join(root, ".github", name)); !errors.Is(err, os.ErrNotExist) {
+					t.Fatal("unselected group wrote output", err)
+				}
 			}
 		})
 	}

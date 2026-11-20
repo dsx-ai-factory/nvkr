@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+apiVersion: nvkr.dev/definition/v5
+kind: Definition
+metadata:
+  name: wli-imds-agent
+  description: Source-built NVIDIA Workload Identity DSX IMDS NodeAttestor agent executable for Linux AMD64 and ARM64; build-only, unsigned, unpublished.
+catalog:
+  base: ../../catalogs/nvidia-workload-identity
+outputs:
+- name: dsx-imds-node-attestor-agent-linux-amd64
+  platform: linux/amd64
+  components:
+  - dsx-imds-node-attestor-agent
+  format: executable
+- name: dsx-imds-node-attestor-agent-linux-arm64
+  platform: linux/arm64
+  components:
+  - dsx-imds-node-attestor-agent
+  format: executable

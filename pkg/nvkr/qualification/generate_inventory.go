@@ -29,6 +29,8 @@ type generationSelection struct {
 // GenerateInventory coordinates the existing maintained producer selections.
 // Every Plan and optional qualifier is rendered before any bundle is published.
 // Qualification retains its separate manifest-last publication contract.
+// Inventory runtime flags select admission for shell-driver checks only. Writes
+// regenerate the reviewed baseline without dispatch-time source freezing.
 func GenerateInventory(ctx context.Context, filename, group, generatorVersion, root string) error {
 	if err := generationContext(ctx); err != nil {
 		return err
@@ -76,6 +78,7 @@ func GenerateInventory(ctx context.Context, filename, group, generatorVersion, r
 		if group != "" && selection.Group != group {
 			continue
 		}
+		// Deliberately omit Runtime: an inventory write establishes the baseline.
 		inputs = append(inputs, GenerationInput{Bundle: selection.Bundle, Definition: selection.Definition,
 			Environment: selection.Environment, QualificationPolicy: selection.QualificationPolicy})
 	}

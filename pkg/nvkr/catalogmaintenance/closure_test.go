@@ -203,6 +203,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 	wantAdditional := []RunInput{
 		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-development.yaml", QualificationPolicy: "inputs/policies/nvke-gpu-site-development-qualification.yaml"},
 		{Definition: "inputs/definitions/nvke/gpu-site-release.composite.yaml", Environment: "inputs/environments/github-nvke-nightly-gpu-site.yaml", QualificationPolicy: "inputs/policies/nvke-nightly-gpu-site-qualification.yaml"},
+		{Definition: "inputs/definitions/nvidia-workload-identity/imds-agent.yaml", Environment: "inputs/environments/github-wli-imds-agent.yaml"},
 	}
 	if len(cfg.AdditionalRuns) != len(wantAdditional) {
 		t.Fatalf("maintained policy selects %d additional Runs, want %d", len(cfg.AdditionalRuns), len(wantAdditional))
@@ -291,6 +292,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		".github/nvkr-qualification-nvke-nightly",
 		".github/nvkr-run-nvke",
 		".github/nvkr-run-nvke-nightly",
+		".github/nvkr-run-wli-imds-agent",
 	}
 	if !slices.Equal(directories, wantDirectories) {
 		t.Fatalf("closure directories = %v, want %v", directories, wantDirectories)
@@ -303,6 +305,7 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		".github/workflows/nvkr-qualify-nvke-nightly.yml",
 		".github/workflows/nvkr-run-nvke.yml",
 		".github/workflows/nvkr-run-nvke-nightly.yml",
+		".github/workflows/nvkr-run-wli-imds-agent.yml",
 		".github/workflows/nvkr-smoke-nvke.yml",
 		".github/workflows/nvkr-smoke-nvke-nightly.yml",
 	}

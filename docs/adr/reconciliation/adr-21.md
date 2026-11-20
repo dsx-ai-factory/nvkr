@@ -103,17 +103,20 @@ qualifier/producer overlap checks, qualification ownership conflicts and coded f
 `TestPlanStoreStructuralEnvironmentConflict` covers the distinct capability refusal for incompatible
 same-Definition static graph structures; selecting every owner cannot repair that incompatibility.
 The production and development regeneration Make targets include all maintained owners, while their
-check targets retain their group scope. Generation calls the coordinated CLI directly.
+check targets retain their group scope. The shell driver calls the coordinated CLI for writes.
+Inventory `runtime` flags select runtime admission only for checks; writes establish the reviewed
+baseline without dispatch-time source freezing. Entry-point tests cover sorted unique bundle names,
+the required prefix, mixed-group selection and identical writes with either runtime flag value.
 A shared-record change must include all owners. `TestRuntimePlanRefreshBesideProduction` covers
 independent runtime dispatch refresh and both carrier installers with unchanged production bytes.
 The v1 tree reader remains available for migration. Hosted execution of the v2 layout remains unrecorded.
 
-Local regeneration on 2026-11-19 from main `61eb0ca7205fb23f277a9b74a3d9e9d3d83a7574`
-preserved the exact canonical bytes of the three maintained Plans (261 named builds and 251 outputs).
+Local regeneration on 2026-11-19 from main `3772ca1a29f9eae50507db807009a9f9b8b2ec6c`
+preserved the exact canonical bytes of the four maintained Plans (263 named builds and 253 outputs).
 The recursive store inventory, including its shared index and excluding sibling leases, changed from
-224 files / 135,124 lines / 5,519,266 bytes to 402 files / 188,707 lines / 7,433,254 bytes.
-Stable selection-scoped step records and independent nightly records increase the store by 1,913,988
-bytes (34.7%). Nightly gives up graph/output/step sharing to preserve independent runtime refresh;
+235 files / 136,084 lines / 5,557,492 bytes to 414 files / 189,692 lines / 7,472,254 bytes.
+Stable selection-scoped step records and independent nightly records increase the store by 1,914,762
+bytes (34.5%). Nightly gives up graph/output/step sharing to preserve independent runtime refresh;
 the benefit is localized subsequent edits, not a smaller initial store. Replaying only the production publication prefix from `candidate/gpu-site` to
 `nightly/gpu-site` changed five store lines (two index hashes, one Environment value and two targets
 values), plus one line each in the private Plan, producer manifest and qualification manifest.
@@ -135,3 +138,26 @@ Runtime pin-refresh contracts retain exact executable programs while regeneratin
 `TestPlanStoreNamedPathGrammar` and `TestPlanStoreFullDigestDisagreementDoesNotPublish` directly cover the
 named-path predicate and both conflicting-full-digest refusal branches. These are local contracts;
 hosted execution of the navigation layout remains unrecorded.
+
+## GitLab generated bundle
+
+GitLab generation implements the fixed `.gitlab/nvkr-run/` pipeline/Plan/manifest namespace through the
+shared generated-file owner. Its Plan retains packed canonical bytes; the shared Plan store above is
+GitHub-only. Root `.gitlab-ci.yml` remains operator-owned; runtime admission requires its
+single exact local include and the project's default root CI configuration.
+The exact generated transport includes the native Docker-helper switch suppressing Runner's default
+`umask 0000`, the native fresh-clone strategy and the token-free Git URL flag before all job checkouts.
+Current workflow rules mirror the exact ref/source policy, require protected refs for publication and
+end with refusal. These later policy changes do not inherit the earlier provider-run evidence below. Contract tests cover all-job
+inheritance and coherent missing/disabled/substituted policy refusal. Shared manifest `0644` mode checks
+remain unchanged. Fresh job-owned source checkout avoids the reproduced unchanged-file mode retention in
+reused Runner storage. The historical [real server/Runner runs](adr-18.md#gitlab-ordinary-unsigned-profile)
+exercised that policy across all eight jobs in their recorded source snapshots, with unchanged source
+and zero retries; they do not validate this upstream integration.
+
+Exact projection, conditional dependencies, custody/tampering, coexistence, ownership/retirement and symlink-refusal contracts are included
+in the [validation record](adr-18.md#gitlab-ordinary-unsigned-profile). Controlled contracts, the real ARM64
+recipe Run and full repository checks have separate scopes; none grants signing or qualification.
+GitLab named namespaces, arbitrary root
+customization, runtime/source refresh, qualification generation, catalog maintenance and projection-pilot
+selection remain outside the admitted profile.

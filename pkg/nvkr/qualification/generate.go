@@ -75,6 +75,9 @@ func GenerateFiles(ctx context.Context, definitionPath, environmentPath, policyP
 	if err := generationContext(ctx); err != nil {
 		return "", err
 	}
+	if strings.EqualFold(strings.TrimSpace(engine), factory.EngineGitLab) {
+		return "", e.New(e.CodeEngineCapability, "GitLab qualification generation is unavailable")
+	}
 	if err := factory.ValidateGenerationEngine(engine); err != nil {
 		return "", err
 	}
