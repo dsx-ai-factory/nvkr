@@ -285,7 +285,8 @@ and its material producers remain authenticated. FDE evidence reports inspection
 authenticated pre-encryption inventory handoff exists. Full disk inspection and
 material reconciliation remain separate hardening
 ([ADR-13](../../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)).
-Hosted publication acceptance for the new package mode is not yet recorded.
+The [ADR-13 reconciliation](../../../docs/adr/reconciliation/adr-13.md) owns
+hosted publication acceptance and the remaining appliance activation work.
 The product acceptance floor remains AMD64; this candidate retains the separately selected ARM64
 extension, and all eight disk outputs remain mandatory for completion of this Definition.
 Omitting producer `diskEvidence` still selects the strict contract. A complete producer-provenance
