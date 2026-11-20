@@ -50,12 +50,16 @@ func TestOVNAPTRetryPatch(t *testing.T) {
 	}
 	for _, test := range []struct {
 		name, failures string
+		args           []string
 		calls          int
 		status         int
 	}{
-		{"first success", "0", 1, 0},
-		{"HTTP 520 then success", "1", 2, 0},
-		{"permanent signature failure", "3", 3, 100},
+		{"install first success", "0", []string{"install", "-y", "pinned-package=1.2.3"}, 1, 0},
+		{"install HTTP 520 then success", "1", []string{"install", "-y", "pinned-package=1.2.3"}, 2, 0},
+		{"install permanent signature failure", "3", []string{"install", "-y", "pinned-package=1.2.3"}, 3, 100},
+		{"update first success", "0", []string{"update"}, 1, 0},
+		{"update HTTP 520 then success", "1", []string{"update"}, 2, 0},
+		{"update permanent signature failure", "3", []string{"update"}, 3, 100},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -70,7 +74,7 @@ func TestOVNAPTRetryPatch(t *testing.T) {
 			script := strings.ReplaceAll(body.String(), "/usr/bin/apt-get", apt)
 			ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 			defer cancel()
-			command := exec.CommandContext(ctx, "sh", "-c", script, "apt-get", "install", "-y", "pinned-package=1.2.3")
+			command := exec.CommandContext(ctx, "sh", append([]string{"-c", script, "apt-get"}, test.args...)...)
 			command.Env = append(os.Environ(), "PATH="+dir+":"+os.Getenv("PATH"),
 				"TEST_STATE="+filepath.Join(dir, "state"), "TEST_ARGS="+filepath.Join(dir, "args"),
 				"TEST_DELAYS="+filepath.Join(dir, "delays"), "TEST_FAILURES="+test.failures)
@@ -89,7 +93,7 @@ func TestOVNAPTRetryPatch(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			want := "-o\nAcquire::Retries=3\n-o\nAcquire::http::Timeout=30\n-o\nAcquire::https::Timeout=30\n-o\nAPT::Update::Error-Mode=any\ninstall\n-y\npinned-package=1.2.3\n"
+			want := "-o\nAcquire::Retries=3\n-o\nAcquire::http::Timeout=30\n-o\nAcquire::https::Timeout=30\n-o\nAPT::Update::Error-Mode=any\n" + strings.Join(test.args, "\n") + "\n"
 			if string(args) != strings.Repeat(want, test.calls) {
 				t.Fatalf("arguments or attempt bound changed: %s", args)
 			}
