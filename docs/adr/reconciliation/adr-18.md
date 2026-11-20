@@ -1,5 +1,17 @@
 ## Support by owner
 
+The native ARC pre-transfer check now bounds its shell read/write-open attempts and names the runner pod
+in `engine-capability` failures. Local shell contracts cover invalid devices, access success,
+permission-bootstrap failure and timed-out access; generation contracts retain the check before checkout
+and transfers. It adds no runner interpreter dependency. The helper is unavailable at this early stage,
+so only the later Go-owned admission authenticates API usability and capacity.
+Real KVM/ARC execution of this change remains unverified.
+The [failed ARM64 job](https://github.com/dsx-ai-factory/nvkr/actions/runs/44779649479/job/136448934013)
+opened the device successfully on `arc-arm64-kvm-swwv6-runner-wkvwm`, then failed later runtime KVM admission;
+its log does not establish why the later admission could not obtain KVM. GitHub Actions has no native bounded
+job retry that guarantees another runner. Separate retry jobs or API orchestration could request a new assignment but
+cannot guarantee a different host; neither is added here.
+
 Container runtime selection defaults to Docker; local Runs inherit their Environment and reject conflicting executable overrides before work, including dry runs.
 
 Tekton implements ADR-18's explicit cluster trust contract. The provider authenticates

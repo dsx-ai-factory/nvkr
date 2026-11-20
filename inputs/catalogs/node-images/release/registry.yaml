@@ -91,6 +91,9 @@ components:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: ovn-kubernetes
+    patches:
+      - name: patches/ovn-apt-retries.patch
+        sha256: sha256:194efb5a752ac81aed400b4d251c2eeba9a3f2eaa90a5e5f69f44bdda284345c
     builderType: buildkit-rootless
     toolchainImage: moby/buildkit@sha256:80b15f0735e87bab7bf59ec4d695dfb4a7cfb25521cf56dc75d6f256285b63ef
     outputType: oci-image

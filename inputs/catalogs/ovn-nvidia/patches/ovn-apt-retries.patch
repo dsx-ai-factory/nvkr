@@ -1,0 +1,47 @@
+diff --git a/dist/images/Dockerfile.ubuntu.nv b/dist/images/Dockerfile.ubuntu.nv
+--- a/dist/images/Dockerfile.ubuntu.nv
++++ b/dist/images/Dockerfile.ubuntu.nv
+@@ -23,4 +23,5 @@ ARG TARGETARCH
+ # Each package source is selected independently. Only Artifactory needs a secret.
+ COPY dist/images/install-ovn-ovs.sh /tmp/install-ovn-ovs.sh
+ RUN --mount=type=secret,id=artifactory_cert \
++    --mount=type=bind,source=dist/images/nvkr-apt-get,target=/usr/local/bin/apt-get \
+     sh /tmp/install-ovn-ovs.sh && rm /tmp/install-ovn-ovs.sh
+@@ -28,5 +29,6 @@
+ COPY dist/images/install-kubectl.sh /tmp/install-kubectl.sh
+-RUN DEBIAN_FRONTEND=noninteractive apt-get update \
++RUN --mount=type=bind,source=dist/images/nvkr-apt-get,target=/usr/local/bin/apt-get \
++    DEBIAN_FRONTEND=noninteractive apt-get update \
+ && apt-get install -y --no-install-recommends gpg netcat-traditional net-tools nftables iptables iproute2 iputils-arping ncat dnsutils socat \
+ && sh /tmp/install-kubectl.sh && rm /tmp/install-kubectl.sh \
+ && apt-get autoremove -y \
+diff --git a/dist/images/nvkr-apt-get b/dist/images/nvkr-apt-get
+new file mode 100755
+--- /dev/null
++++ b/dist/images/nvkr-apt-get
+@@ -0,0 +1,25 @@
++#!/bin/sh
++# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
++# SPDX-License-Identifier: Apache-2.0
++set -eu
++
++# Build-only bind mount: keep the upstream repositories, versions and trust checks.
++# Acquire retries cover transient fetches; whole-command retries also cover HTTP
++# 520, which APT does not classify as transient. Never accept partial index updates.
++attempt=1
++while :; do
++    if /usr/bin/apt-get -o Acquire::Retries=3 \
++        -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 \
++        -o APT::Update::Error-Mode=any "$@"; then
++        exit 0
++    else
++        status=$?
++    fi
++    if [ "$attempt" -ge 3 ]; then
++        exit "$status"
++    fi
++    delay=$((attempt * 5))
++    printf 'APT acquisition failed (exit %s); retry %s/3 in %ss\n' "$status" "$((attempt + 1))" "$delay" >&2
++    sleep "$delay"
++    attempt=$((attempt + 1))
++done

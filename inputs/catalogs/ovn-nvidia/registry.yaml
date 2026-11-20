@@ -17,6 +17,9 @@ components:
     platforms: [linux/amd64, linux/arm64]
     fromSource: true
     source: ovn-kubernetes
+    patches:
+      - name: patches/ovn-apt-retries.patch
+        sha256: sha256:194efb5a752ac81aed400b4d251c2eeba9a3f2eaa90a5e5f69f44bdda284345c
     sourceMetadata:
       NVKR_SOURCE_COMMIT: "{{.Commit}}"
     builderType: buildkit-rootless

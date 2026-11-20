@@ -521,7 +521,12 @@ helper downloads or input restoration. The credential-free, one-minute step reje
 symlink or non-character device. If the invoking runner cannot open it read/write, the step makes one
 noninteractive `sudo -n -- chmod 0666 /dev/kvm` attempt, bounded to fifteen seconds with a five-second kill
 grace. A failed permission change or subsequent runner read/write-open fails with `engine-capability`.
-An already-accessible device requires no mutation. There is no arbitrary path, background retry or change
+An already-accessible device requires no permission mutation. Each read/write-open runs in a POSIX shell
+under a five-second timeout with a five-second kill grace, within the one-minute step. Missing tooling,
+failed access or timeout fail closed with a runner-capability fault naming the ARC runner pod from
+`RUNNER_NAME`. No helper binary is available before checkout and acquisition, so this early check
+establishes device access only; full Go-owned KVM API and capacity admission still follows.
+There is no arbitrary path, background retry or change
 to the producer's UID/GID. ARC finalizers do not use KVM and omit this step. The separately authored
 repository OS-validation workflow retains its read-only, no-chmod preflight.
 
