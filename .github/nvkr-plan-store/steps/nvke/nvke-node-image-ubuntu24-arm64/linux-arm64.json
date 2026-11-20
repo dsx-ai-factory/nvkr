@@ -9,12 +9,12 @@
     {
       "inputCatalogDigest": "sha256:4a02391f4c14d5c07f75bee2c1d5465c0561d357dc2fccb7e9f15630ce08a031",
       "name": "nvke-os-ubuntu24",
-      "outputCatalogDigest": "sha256:57856c8588c86d387af44869a8be7e453a51290c5417be23ea6507a25b600b64",
-      "overlayDigest": "sha256:d7113d3e79e048680494f9547c8747b1cf9cc6b4454d452a683bb1a7e090c5c4"
+      "outputCatalogDigest": "sha256:bcc5704c08108a3fa4fab9019283c2f7f05174511da2fbd87ac854172de69bdb",
+      "overlayDigest": "sha256:d2acbe67ccdba7802b40f8ea01f3c5390c646c8af753726aa73070ade8ae6fd3"
     }
   ],
   "buildDigest": "sha256:a04517a4d91a2645b1b34c525b151351d23870ae4966e8046aa4f6208c6aba22",
-  "catalogDigest": "sha256:57856c8588c86d387af44869a8be7e453a51290c5417be23ea6507a25b600b64",
+  "catalogDigest": "sha256:bcc5704c08108a3fa4fab9019283c2f7f05174511da2fbd87ac854172de69bdb",
   "components": [
     "nvke-agent",
     "nvke-cni-calico",
@@ -1097,6 +1097,14 @@
       ],
       "repo": "https://github.com/dsx-ai-factory/nvke.git",
       "sourceDateEpoch": 1793236039,
+      "sourceRecipe": {
+        "artifactPath": "agent/bin/nvke-agent.deb",
+        "buildCommand": [
+          "bash",
+          "-ec",
+          "test \"$(getconf GNU_LIBC_VERSION)\" = 'glibc 2.36' || {\n  echo 'Ubuntu 24 agent requires the pinned Bookworm glibc 2.36 builder' >&2; exit 1;\n}\nPATH=\"/src/.nvkr-tools/go/bin:$PATH\" GOTOOLCHAIN=local GOWORK=off GOFLAGS=-mod=vendor make -C agent deb-{{.Arch}} \\\n  VERSION={{.Tag}} \\\n  NFPM_BIN=/src/agent/nvkr-tools/nfpm \\\n  DEB_OUTPUT=/src/agent/bin/nvke-agent.deb\n# Match the pinned source's build-guest.sh: the agent is dynamic, but\n# its updater must remain static. A failed check denies the package output.\nbash /src/os-image/nix/check-ubuntu-elf.sh --arch {{.Arch}} \\\n  /src/agent/bin/linux_{{.Arch}}/nvke-agent\nreadonly updater=/src/agent/bin/linux_{{.Arch}}/nvke-agent-updater\ntest -f \"$updater\" || { echo 'expected updater binary' >&2; exit 1; }\nheaders=$(readelf -lW \"$updater\")\n[[ \"$headers\" != *INTERP* ]] || {\n  echo 'expected a static updater, found a program interpreter' >&2; exit 1;\n}\n"
+        ]
+      },
       "tag": "v0.23.0",
       "toolchainImages": {
         "amd64": "docker.io/library/golang@sha256:55395706e9703db746cc507abfc4eb2aea75918f8a8024e4848e2cb81004f5ad",

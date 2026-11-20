@@ -1,0 +1,423 @@
+// SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package catalogmaintenance
+
+import (
+	"bytes"
+	"context"
+	"os"
+	"slices"
+	"strings"
+	"testing"
+
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
+)
+
+func familyFixture(t *testing.T) (Config, func(string)) {
+	t.Helper()
+	cfg, promote := maintenanceFixture(t)
+	for _, name := range []string{"other", "unrelated"} {
+		if err := os.Mkdir(name, 0700); err != nil {
+			t.Fatal(err)
+		}
+		for _, file := range []string{catalog.RegistryFile, catalog.LockFile} {
+			writeFixture(t, name+"/"+file, readFixture(t, "catalog/"+file))
+		}
+	}
+	cfg.Family = &FamilyPolicy{Name: "fixture", Catalogs: []FamilyCatalog{{Catalog: "catalog", Sources: cfg.Sources}, {Catalog: "other", Sources: cfg.Sources}}}
+	writeJSON(t, "maintenance.yaml", cfg)
+	return cfg, promote
+}
+
+func TestFamilyBumpCrossCatalogJourney(t *testing.T) {
+	cfg, promote := familyFixture(t)
+	before := map[string][]byte{}
+	for _, name := range []string{"catalog/pins.lock.yaml", "other/pins.lock.yaml", "unrelated/pins.lock.yaml", ".github/nvkr-run/plan.json"} {
+		before[name] = readFixture(t, name)
+	}
+	promote("1.1.0")
+	preview, err := BumpFamily(t.Context(), "maintenance.yaml", "fixture", "test (deadbeef)", true)
+	assertCode(t, err, e.CodeDiff)
+	if preview.Complete || preview.Changed != 6 || len(preview.Catalogs) != 2 || len(preview.Consumers) != 1 {
+		t.Fatalf("incomplete preview: %+v", preview)
+	}
+	for name, raw := range before {
+		if !bytes.Equal(raw, readFixture(t, name)) {
+			t.Fatalf("dry run wrote %s", name)
+		}
+	}
+	result, err := BumpFamily(t.Context(), "maintenance.yaml", "fixture", "test (deadbeef)", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Complete || len(result.CommittedCatalogs) != 2 {
+		t.Fatalf("incomplete result: %+v", result)
+	}
+	for _, name := range []string{"catalog", "other"} {
+		lock, err := catalog.LoadLockContext(t.Context(), name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if lock.Pins["root"].Tag != "release/v1.1.0" || lock.Pins["role"].Commit != lock.Pins["root"].Commit {
+			t.Fatalf("inconsistent %s: %+v", name, lock.Pins)
+		}
+	}
+	if !bytes.Equal(before["unrelated/pins.lock.yaml"], readFixture(t, "unrelated/pins.lock.yaml")) {
+		t.Fatal("changed an excluded cohort")
+	}
+	if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, cfg.Environment, "test (deadbeef)", "github", ".", true); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFamilyPreparationFailureLeavesOriginals(t *testing.T) {
+	_, promote := familyFixture(t)
+	promote("1.1.0")
+	before := map[string][]byte{}
+	for _, name := range []string{"catalog/pins.lock.yaml", "other/pins.lock.yaml", ".github/nvkr-run/plan.json"} {
+		before[name] = readFixture(t, name)
+	}
+	calls := 0
+	result, err := bumpFamily(t.Context(), "maintenance.yaml", "fixture", "test (deadbeef)", false, func(ctx context.Context, req catalog.SourcePinRequest) (*catalog.PreparedSourcePins, catalog.SourcePinUpdate, error) {
+		calls++
+		if calls == 2 {
+			return nil, catalog.SourcePinUpdate{}, e.New(e.CodeFetchFailed, "injected second catalog resolution failure")
+		}
+		return catalog.PrepareSourcePins(ctx, req)
+	})
+	assertCode(t, err, e.CodeFetchFailed)
+	if calls != 2 || result.Complete || len(result.CommittedCatalogs) != 0 {
+		t.Fatalf("partial success: %+v", result)
+	}
+	for name, raw := range before {
+		if !bytes.Equal(raw, readFixture(t, name)) {
+			t.Fatalf("failed preparation wrote %s", name)
+		}
+	}
+}
+
+func TestFamilyRejectsStaleOverlayPredecessorBeforeResolution(t *testing.T) {
+	filename, input := producerOverlayFixture(t)
+	name := input.Overlays[1].Destination
+	overlay, err := catalog.LoadOverlayContext(t.Context(), name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	overlay.RequiresCatalogDigest = "sha256:" + strings.Repeat("a", 64)
+	writeJSON(t, name, overlay)
+	before := readFixture(t, name)
+	config := Config{APIVersion: SchemaVersion, Name: "test", Catalog: "inputs/catalogs/nvidia", Sources: []string{"source"}, Definition: "absent.yaml", Environment: "absent-env.yaml", Validation: "static", ProducerOverlays: filename,
+		Family: &FamilyPolicy{Name: "test", Catalogs: []FamilyCatalog{{Catalog: "inputs/catalogs/nvidia", Sources: []string{"source"}}}}}
+	writeJSON(t, "maintenance.yaml", config)
+	called := false
+	result, err := bumpFamily(t.Context(), "maintenance.yaml", "test", "test", false, func(context.Context, catalog.SourcePinRequest) (*catalog.PreparedSourcePins, catalog.SourcePinUpdate, error) {
+		called = true
+		return nil, catalog.SourcePinUpdate{}, nil
+	})
+	assertCode(t, err, e.CodePipelineDrift)
+	if called || result.Complete || !bytes.Equal(before, readFixture(t, name)) {
+		t.Fatal("stale predecessor reached pin work or changed files")
+	}
+}
+
+func TestFamilyBumpSharedStaticOwners(t *testing.T) {
+	cfg, promote := familyFixture(t)
+	const siblingEnvironment = "sibling.yaml"
+	writeFixture(t, siblingEnvironment, append(readFixture(t, cfg.Environment), []byte("githubBundle: sibling\n")...))
+	cfg.AdditionalRuns = []RunInput{{Definition: cfg.Definition, Environment: siblingEnvironment}}
+	if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, siblingEnvironment, "test (deadbeef)", "github", ".", false); err != nil {
+		t.Fatal(err)
+	}
+	writeJSON(t, "maintenance.yaml", cfg)
+	promote("1.1.0")
+	result, err := BumpFamily(t.Context(), "maintenance.yaml", "fixture", "test (deadbeef)", false)
+	if err != nil || !result.Complete {
+		t.Fatalf("incomplete shared-owner update: %+v %v", result, err)
+	}
+	if _, err := generateClosure(t.Context(), cfg, "test (deadbeef)", true); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFamilyRegeneratesRuntimeAndQualificationOwners(t *testing.T) {
+	for _, kind := range []string{"runtime", "lagging runtime", "qualification"} {
+		t.Run(kind, func(t *testing.T) {
+			var cfg Config
+			var promote func(string)
+			if kind == "qualification" {
+				cfg, promote = qualificationFixture(t)
+			} else {
+				cfg, promote = maintenanceFixture(t)
+				const repository = "https://github.com/example/family"
+				t.Setenv("GIT_CONFIG_VALUE_0", repository)
+				writeFixture(t, "catalog/registry.yaml", bytes.ReplaceAll(readFixture(t, "catalog/registry.yaml"), []byte("https://maintenance.example.invalid/source"), []byte(repository)))
+				if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, cfg.Environment, "test (deadbeef)", "github", ".", false); err != nil {
+					t.Fatal(err)
+				}
+				writeFixture(t, runtimeFixtureEnvironment, append(readFixture(t, cfg.Environment), ("githubBundle: runtime\ngithubRuntimePlan: true\ngithubRuntimeSource: {repository: "+repository+", ref: refs/heads/main}\n")...))
+				cfg.AdditionalRuns = []RunInput{{Definition: cfg.Definition, Environment: runtimeFixtureEnvironment}}
+				if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, runtimeFixtureEnvironment, "test (deadbeef)", "github", ".", false); err != nil {
+					t.Fatal(err)
+				}
+			}
+			nextRelease := "1.1.0"
+			if kind == "lagging runtime" {
+				promote("1.1.0")
+				if _, err := catalog.UpdateSourcePins(t.Context(), catalog.SourcePinRequest{Directory: cfg.Catalog, Sources: cfg.Sources, SameRelease: cfg.SameRelease, Bump: true}); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, cfg.Environment, "test (deadbeef)", "github", ".", false); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, runtimeFixtureEnvironment, "test (deadbeef)", "github", ".", true); err == nil {
+					t.Fatal("runtime baseline must lag pins")
+				}
+				nextRelease = "1.2.0"
+			}
+			cfg.Family = &FamilyPolicy{Name: "fixture", Catalogs: []FamilyCatalog{{Catalog: cfg.Catalog, Sources: cfg.Sources}}}
+			writeJSON(t, "maintenance.yaml", cfg)
+			promote(nextRelease)
+			result, err := BumpFamily(t.Context(), "maintenance.yaml", "fixture", "test (deadbeef)", false)
+			if err != nil || !result.Complete {
+				t.Fatalf("incomplete family owner regeneration: %+v %v", result, err)
+			}
+			if _, err := generateClosure(t.Context(), cfg, "test (deadbeef)", true); err != nil {
+				t.Fatal(err)
+			}
+			if kind != "qualification" {
+				plan, err := factory.LoadPlanContext(t.Context(), runtimeFixturePlan)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if plan.RuntimeInputs != nil || plan.RuntimeSourceCommit != "" {
+					t.Fatal("family maintenance froze dispatch authority")
+				}
+				_, _, err = factory.CaptureCompileFiles(t.Context(), ".", cfg.Definition, runtimeFixtureEnvironment, "test (deadbeef)")
+				assertCode(t, err, e.CodeEngineCapability)
+				// Maintenance authored a static bundle, not a dispatch/source receipt.
+				_, err = lifecycle.GenerateRuntimeFiles(t.Context(), cfg.Definition, runtimeFixtureEnvironment, "test (deadbeef)", "github", ".", false)
+				assertCode(t, err, e.CodeUnpinnedSource)
+			}
+		})
+	}
+}
+
+func TestFamilyBaselineValidatesCapturedBytes(t *testing.T) {
+	for _, edit := range []string{"unchanged", "workflow", "policy", "unnamed", "stamp"} {
+		t.Run(edit, func(t *testing.T) {
+			_, _ = familyFixture(t)
+			cfg, loadErr := Load(t.Context(), "maintenance.yaml")
+			if loadErr != nil {
+				t.Fatal(loadErr)
+			}
+			for i := range cfg.Family.Catalogs {
+				slices.Sort(cfg.Family.Catalogs[i].Sources)
+			}
+			if edit == "workflow" {
+				writeFixture(t, ".github/workflows/nvkr-run.yml", []byte("external workflow edit"))
+			}
+			if edit == "unnamed" {
+				if err := os.Mkdir(".github/nvkr-unknown", 0700); err != nil {
+					t.Fatal(err)
+				}
+				writeFixture(t, ".github/nvkr-unknown/manifest.json", []byte("{}"))
+			}
+			if edit == "stamp" {
+				raw := readFixture(t, ".github/nvkr-run/plan.json")
+				writeFixture(t, ".github/nvkr-run/plan.json", bytes.ReplaceAll(raw, []byte("test (deadbeef)"), []byte("other")))
+			}
+			if edit == "policy" {
+				changed := cfg
+				changed.Family = &FamilyPolicy{Name: "other", Catalogs: cfg.Family.Catalogs}
+				writeJSON(t, "maintenance.yaml", changed)
+			}
+			snapshot, err := snapshotFamilyInputs(t.Context(), cfg, "maintenance.yaml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = os.RemoveAll(snapshot.root) }()
+			err = validateFamilyBaseline(t.Context(), snapshot, cfg, "maintenance.yaml", "test (deadbeef)")
+			switch edit {
+			case "unchanged":
+				if err != nil {
+					t.Fatal(err)
+				}
+			case "policy":
+				assertCode(t, err, e.CodeWriteConflict)
+			case "unnamed":
+				assertCode(t, err, e.CodeEngineCapability)
+			case "workflow", "stamp":
+				assertCode(t, err, e.CodePipelineDrift)
+			}
+		})
+	}
+}
+
+func TestFamilyPolicyLeaseSuffix(t *testing.T) {
+	cfg, _ := familyFixture(t)
+	writeJSON(t, "family.lease", cfg)
+	before := readFixture(t, "family.lease")
+	result, err := BumpFamily(t.Context(), "family.lease", "fixture", "test (deadbeef)", true)
+	if err != nil || !result.Complete || result.Changed != 0 {
+		t.Fatalf("valid policy suffix refused: %+v %v", result, err)
+	}
+	if !bytes.Equal(before, readFixture(t, "family.lease")) {
+		t.Fatal("policy was changed")
+	}
+}
+
+func TestFamilyCapturedRuntimeBaseline(t *testing.T) {
+	for _, edited := range []bool{false, true} {
+		t.Run(map[bool]string{false: "lagging plan", true: "edited workflow"}[edited], func(t *testing.T) {
+			cfg := runtimeFixture(t)
+			cfg.Family = &FamilyPolicy{Name: "fixture", Catalogs: []FamilyCatalog{{Catalog: cfg.Catalog, Sources: cfg.Sources}}}
+			slices.Sort(cfg.Family.Catalogs[0].Sources)
+			writeJSON(t, "maintenance.yaml", cfg)
+			if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, runtimeFixtureEnvironment, "test (deadbeef)", "github", ".", true); err == nil {
+				t.Fatal("runtime baseline must lag pins")
+			}
+			if edited {
+				writeFixture(t, runtimeFixtureWorkflow, append(readFixture(t, runtimeFixtureWorkflow), "# edited\n"...))
+			}
+			beforePlan, beforeWorkflow := readFixture(t, runtimeFixturePlan), readFixture(t, runtimeFixtureWorkflow)
+			snapshot, err := snapshotFamilyInputs(t.Context(), cfg, "maintenance.yaml")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = os.RemoveAll(snapshot.root) }()
+			err = validateFamilyBaseline(t.Context(), snapshot, cfg, "maintenance.yaml", "test (deadbeef)")
+			if edited {
+				assertCode(t, err, e.CodePipelineDrift)
+			} else if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(beforePlan, readFixture(t, runtimeFixturePlan)) || !bytes.Equal(beforeWorkflow, readFixture(t, runtimeFixtureWorkflow)) {
+				t.Fatal("baseline check wrote original bundle")
+			}
+		})
+	}
+}
+
+func TestFamilyRejectsDifferentCohorts(t *testing.T) {
+	for _, tc := range []struct{ name, before, after string }{
+		{"repository", "https://maintenance.example.invalid/source", "https://maintenance.example.invalid/other"},
+		{"prefix", "release/", "other/"},
+		{"constraint", "1.x", "2.x"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			_, promote := familyFixture(t)
+			promote("1.1.0")
+			if tc.name == "repository" {
+				// Both descriptive URLs resolve locally so catalog loading reaches
+				// the family cohort comparison without an external fetch.
+				t.Setenv("GIT_CONFIG_COUNT", "2")
+				t.Setenv("GIT_CONFIG_KEY_1", os.Getenv("GIT_CONFIG_KEY_0"))
+				t.Setenv("GIT_CONFIG_VALUE_1", tc.after)
+			}
+			writeFixture(t, "other/registry.yaml", bytes.ReplaceAll(readFixture(t, "other/registry.yaml"), []byte(tc.before), []byte(tc.after)))
+			before := map[string][]byte{}
+			for _, name := range []string{"catalog/pins.lock.yaml", "other/pins.lock.yaml", "other/registry.yaml", ".github/nvkr-run/plan.json"} {
+				before[name] = readFixture(t, name)
+			}
+			result, err := BumpFamily(t.Context(), "maintenance.yaml", "fixture", "test (deadbeef)", false)
+			assertCode(t, err, e.CodeInvalidCatalog)
+			if result.Complete || len(result.CommittedCatalogs) != 0 {
+				t.Fatal("different cohort reported success")
+			}
+			for name, raw := range before {
+				if !bytes.Equal(raw, readFixture(t, name)) {
+					t.Fatalf("refusal wrote %s", name)
+				}
+			}
+		})
+	}
+}
+
+func TestFamilyRejectsDifferentResolvedIdentities(t *testing.T) {
+	for _, field := range []string{"commit", "tree", "epoch"} {
+		t.Run(field, func(t *testing.T) {
+			_, promote := familyFixture(t)
+			promote("1.1.0")
+			before := map[string][]byte{}
+			for _, name := range []string{"catalog/pins.lock.yaml", "other/pins.lock.yaml", ".github/nvkr-run/plan.json"} {
+				before[name] = readFixture(t, name)
+			}
+			result, err := bumpFamily(t.Context(), "maintenance.yaml", "fixture", "test (deadbeef)", false, func(ctx context.Context, req catalog.SourcePinRequest) (*catalog.PreparedSourcePins, catalog.SourcePinUpdate, error) {
+				receipt, update, err := catalog.PrepareSourcePins(ctx, req)
+				if err == nil && req.Directory == "other" {
+					for i := range update.Pins {
+						if update.Pins[i].Name == "root" {
+							switch field {
+							case "commit":
+								update.Pins[i].After.Commit = strings.Repeat("c", 40)
+							case "tree":
+								update.Pins[i].After.TreeHash = strings.Repeat("d", 40)
+							case "epoch":
+								update.Pins[i].After.SourceDateEpoch++
+							}
+						}
+					}
+				}
+				return receipt, update, err
+			})
+			assertCode(t, err, e.CodeUnverifiedRef)
+			if result.Complete || len(result.CommittedCatalogs) != 0 {
+				t.Fatal("mismatched identity reported success")
+			}
+			for name, raw := range before {
+				if !bytes.Equal(raw, readFixture(t, name)) {
+					t.Fatalf("refusal wrote %s", name)
+				}
+			}
+		})
+	}
+}
+
+func TestFamilyMixedNoopAndAdvancingCatalogs(t *testing.T) {
+	cfg, promote := familyFixture(t)
+	promote("1.1.0")
+	if _, err := catalog.UpdateSourcePins(t.Context(), catalog.SourcePinRequest{Directory: "other", Sources: cfg.Sources, Bump: true}); err != nil {
+		t.Fatal(err)
+	}
+	before := readFixture(t, "other/pins.lock.yaml")
+	result, err := BumpFamily(t.Context(), "maintenance.yaml", "fixture", "test (deadbeef)", false)
+	if err != nil || !result.Complete || result.Changed != 3 || !slices.Equal(result.CommittedCatalogs, []string{"catalog"}) {
+		t.Fatalf("mixed update failed: %+v %v", result, err)
+	}
+	if !bytes.Equal(before, readFixture(t, "other/pins.lock.yaml")) {
+		t.Fatal("no-op catalog changed")
+	}
+}
+
+func TestFamilyRecipesPreserveCommitTag(t *testing.T) {
+	commit := strings.Repeat("a", 40)
+	for _, tc := range []struct {
+		name, operand, stream, want string
+		invalid                     bool
+	}{
+		{"tag only", "{{.Tag}}", "", "", false},
+		{"release requires stream", "{{.ReleaseVersion}}", "", "", true},
+		{"explicit packaging stream", "{{.ReleaseVersion}}", "1.2.3", "1.2.3", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cat := &catalog.Catalog{Components: map[string]catalog.Component{
+				"unselected-recipe": {FromSource: true, Tag: commit, Commit: commit, SourceRecipe: &catalog.SourceRecipe{BuildCommand: []string{"echo", tc.operand}, ArtifactPath: "result", CommitVersion: tc.stream}},
+			}}
+			got, err := familyRecipeVersions(cat)
+			if tc.invalid {
+				assertCode(t, err, e.CodeInvalidCatalog)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != 1 || got["unselected-recipe"].tag != commit || got["unselected-recipe"].version != tc.want {
+				t.Fatalf("recipe report: %+v", got)
+			}
+		})
+	}
+}

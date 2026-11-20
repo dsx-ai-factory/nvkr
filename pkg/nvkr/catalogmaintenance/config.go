@@ -45,6 +45,9 @@ type Config struct {
 	AdditionalRuns []RunInput `json:"additionalRuns,omitempty"`
 	// ProducerOverlays selects explicit producer-copy maintenance inputs.
 	ProducerOverlays string `json:"producerOverlays,omitempty"`
+	// Family explicitly coordinates additional catalog roots; ordinary refresh
+	// retains its existing single-catalog selection.
+	Family *FamilyPolicy `json:"family,omitempty"`
 }
 
 // RunInput selects one generated Run bundle by its authored inputs.
@@ -156,6 +159,11 @@ func (config Config) Validate() error {
 				return e.New(e.CodeUsage, "same-release source %q must be selected once", source)
 			}
 			grouped[source] = true
+		}
+	}
+	if config.Family != nil {
+		if err := config.Family.validate(config.Catalog, config.Sources); err != nil {
+			return err
 		}
 	}
 	if config.Validation != "static" && config.Validation != "local-run" {

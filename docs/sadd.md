@@ -62,6 +62,10 @@ Explicit digest-pinned fragments share authored declarations before resolution; 
 complete lock. Snapshot capture includes those fragment bytes and replay remains confined to captured inputs.
 File-backed build/vendor argv operands expand to exact bytes during catalog loading and join that captured
 closure; their paths do not enter resolved command identities (ADR-22).
+Opt-in source-derived argv/path bindings and complete source-bound producer copies retain explicit producer
+contracts. Catalog-family maintenance prepares selected pins, overlay predecessors and consumer bundles
+before guarded commitment, preserving independently selected cohorts (ADR-21/22). It generates static
+authored bundles; runtime source freezing and release authorization remain separate owners.
 [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies) owns how generated
 Runs bind action commits from the catalog lock. Definitions declare named deliverable outputs once.
 An optional ordered catalog list supplies complete producer selections for outputs without an override;
@@ -753,7 +757,8 @@ If the runner cannot open the fixed device read/write, one bounded noninteractiv
 sets mode 0666 and requires a successful open afterward. Failed mutation or access remains a capability
 rejection. Each shell read/write-open has a five-second timeout and five-second kill grace; failures
 name the ARC runner pod as a runner-capability fault. The early check proves access only.
-Full helper-owned capacity and held KVM API admission remain required before work. ARC admission\nfailures identify the pod and phase; unavailable KVM retains its failed open path and OS error.
+Full helper-owned capacity and held KVM API admission remain required before work. ARC admission
+failures identify the pod and phase; unavailable KVM retains its failed open path and OS error.
 [ADR-18 §8](adr/0018-pipeline-ir-and-ci-adapter-emission.md#8-pipeline-attested-generation-and-credential-admission)
 owns which jobs, including finalization and the final Run upload used by the closing summary, stay in the
 entry workflow under fallback partitioning; shared recovery precedes finalization. Static Plan/manifest references and source scheduling by target/consumer cohort
@@ -794,6 +799,8 @@ Identical complete host step sequences
 can share descriptive YAML anchors for native preflight, credential-free checkout, current-job preparation
 and one or two uncontrolled node calls. Expansion restores independent nodes before substituting each
 job's parameters; an earlier new anchor owner may change presentation while preserving expanded jobs.
+The carrier and credential rules below describe the implementation pending the
+[accepted destination-staging migration](adr/0018-pipeline-ir-and-ci-adapter-emission.md).
 Private carriers use Go-owned, digest-verified chunks in an unlinked private/internal GHCR package; Actions
 retain their JSON locators plus separately admitted metadata records. The factory validates exact schemas
 and inventories before exporting metadata; control layouts exclude output payload blobs. Same-Run provider

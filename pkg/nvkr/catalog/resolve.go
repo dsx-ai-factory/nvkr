@@ -42,6 +42,7 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		WriteDir:               raw.WriteDir,
 		ExclusionReason:        raw.ExclusionReason,
 		SourceMetadata:         cloneStringMap(raw.SourceMetadata),
+		SourceRecipe:           cloneSourceRecipe(raw.SourceRecipe),
 
 		BuildRequirements: execution.Clone(raw.BuildRequirements),
 	}
@@ -101,6 +102,14 @@ func resolveComponent(name string, raw rawComponent, sources map[string]Source, 
 		return c, e.Wrap(e.CodeInvalidCatalog, err, "component %q versionStamp", name)
 	}
 	c.VersionStamp = stamps
+	if c.SourceRecipe != nil {
+		if len(raw.BuildCommand) != 0 || len(raw.BuildCommandByPlatform) != 0 || raw.ArtifactPath != "" {
+			return c, e.New(e.CodeInvalidCatalog, "component %q sourceRecipe cannot also author buildCommand or artifactPath", name)
+		}
+		if err := c.resolveSourceRecipe(); err != nil {
+			return c, err
+		}
+	}
 	return c, nil
 }
 

@@ -1,6 +1,8 @@
 # ADR-18 — Pipeline IR & CI-adapter emission (hermetic execution)
 
 - **Decision status:** Accepted (2026-11-14); GitLab extension below proposed for maintainer review.
+- **Revised:** Accepted by njhensley on 2026-11-20 on the maintainer's own behalf — destination staging
+  by digest, with platform-token access as the adopter default.
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
@@ -15,7 +17,8 @@
 - **Scope:** Sections 1–7 define shared execution requirements and the deferred qualified provider protocol.
   Qualified CI renderers and their TransportPlan implementation are removed; shared local authority primitives
   remain. Section 1 also proposes the bounded ordinary unsigned GitLab profile, outside the existing
-  acceptance. Section 8 defines the GitHub Run emitter and event policy.
+  acceptance. Section 8 defines the GitHub Run emitter and event policy. The destination-staging decision is
+  accepted; its implementation boundary and migration gates are tracked in [reconciliation](reconciliation/adr-18.md).
 
 ## Context
 
@@ -330,10 +333,31 @@ materialize pinned inputs first; hermetic build and verification nodes enforce n
 private output and a fixed credential-free environment. The local byte-observation exception in §8 executes
 no producer code and carries no container-isolation or qualification claim. Shared code prevents semantic
 drift; it does not alone prove byte identity across hosts.
-The maintained pipeline-attested workflow trusts the bootstrap job and same-Run Actions delivery.
-Binary payloads, source archives, tools, unknown/mixed artifacts and raw diagnostics remain in a separately
-checked private or internal GHCR package. Their v2 JSON locators bind repository, Run, attempt, artifact
-name, exact image/config, and archive digest/size. There is no public-payload fallback.
+The pipeline-attested workflow trusts the bootstrap job and authenticated same-Run metadata delivery.
+The accepted target design retires product payload transport through a separate CI registry in favor of
+destination staging by digest; reconciliation records the current private-carrier implementation pending migration.
+After observation and offline packaging, one fixed stage step in the producer job pushes the exact
+payload closure, untagged, to its final output repository. It exports bounded controls, evidence documents and
+digest references; the release job reads back the staged closure, attests and signs by reference under ADR-20 §6.
+No product payload is restored from CI storage and pushed again by the release job. Stage success, a locator
+or a digest supplied by a producer is not release authority. Exact named-output, Plan, invocation, subject and
+evidence checks remain mandatory, including full served-byte readback before release acceptance.
+
+The platform-token profile is the default adopter profile: the source repository's own GHCR namespace, job-scoped
+`GITHUB_TOKEN` with `packages: write` for staging and release writes, and OIDC only in release jobs.
+It requires zero configured registry secrets. ADR-20 owns destination admission, the accepted fork-package
+exposure and the opt-in independent-credential profile. The planned GitLab equivalent uses `CI_JOB_TOKEN`;
+this decision does not add signing to the separate ordinary unsigned GitLab profile above. Tekton retains
+its explicit cluster-key policy.
+
+Residual helper, source, intermediate and diagnostic edges must either stay with their consumer or use
+digest-addressed destination siblings with exact membership and byte checks. This includes build-only
+workflows, which gain no release destination or authority implicitly. Their residual transport admission must
+be resolved before deleting CI storage. Until each edge migrates, the existing private carrier's visibility,
+credential and integrity checks continue to apply; there is no unchecked fallback. Migration proceeds through
+development disks with release-root byte comparison, all outputs and indexes, then residual edges and deletion
+of the private CI package dependency and every `NVKR_CI_STORAGE_*` secret/variable. These are separate changes;
+the current boundary is recorded in reconciliation.
 
 A separate `nvkr.dev/ci-metadata/v1` record carries admitted metadata directly in Actions storage.
 The factory derives its selection from the complete Plan and validates the held carrier's exact inventory:
@@ -351,7 +375,7 @@ Only validated text bytes, paths and modes enter the record; TAR headers, paddin
 Metadata records retain exact file bytes (including signed predicate terminators), one factory carrier
 member and its exact inner root. A record permits at most 4,096 entries, 8 MiB per file, 16 MiB total text
 and 32 MiB serialized JSON. Larger metadata is refused, not truncated or silently sent through another lane.
-Both transport forms confer no release or qualification authority. Signer separation, consumer signatures,
+Metadata and staged payloads confer no release or qualification authority. Signer separation, consumer signatures,
 exact artifact digests, source closure checks and finalizer completeness remain mandatory.
 
 The generated workflow admits at most 2,000 Actions uploads per attempt, counting helper, diagnostic and
@@ -438,7 +462,7 @@ joined independent failures cannot acquire it. Diagnostics distinguish the admit
 byte counts without retaining provider URLs, credentials or response bodies. Recovery restarts the entire
 archive rather than trusting a partially received prefix, and repeats neither publication nor signing.
 
-CI transfer admission requires an API-confirmed private/internal package with no linked repository,
+During migration, legacy CI transfer admission requires an API-confirmed private/internal package with no linked repository,
 including while the source remains private. A missing package may receive an empty metadata-only seed;
 payload upload requires a subsequent successful privacy check. Post-seed API absence uses the same
 bounded confirmation backoff as publication (ADR-20); no payload is admitted on retry exhaustion.
@@ -546,21 +570,23 @@ label or naming an Environment does not establish those facts.
 Production `nvkr-arc`/`nvkr-release` and development `nvkr-dev-arc`/`nvkr-dev-release` deployment policies
 and the corresponding signing identity must admit each selected ref.
 It permits no arbitrary setup, injected environment, job container or services.
-Docker is the initial admitted runtime. For publication workflows, bootstrap, source fetch, registry publication,
-signing and finalization remain on generic hosted runners. Each disk output contracts its acquisition/build, terminal observation, inspection
+Docker is the initial admitted runtime. For publication workflows, bootstrap, source fetch, release metadata publication,
+attestation, signing and finalization remain on generic hosted runners. Each disk output contracts its acquisition/build, terminal observation, inspection
 and packaging operations into one bounded helper invocation against the complete Plan. The original producer
 session and held disk survive through packaging; strict mode additionally requires reconciliation. The raw disk has no independent
 carrier; its standard OCI wrapper carries its exact bytes. All component evidence and producer-result slots
 remain required. Only fixed source-fetch steps receive private-source credentials. ARC producer commands
-receive no source token, CI-storage credential or OIDC signing token. Separate private-carrier transfer
-steps receive an explicit dedicated storage token; transfer does not use the workflow token for package
-access or add package-write permission. Step environment isolation does not enforce package-scoped grants or isolate
-it from trusted root-equivalent code sharing the runner. Product publication remains on hosted runners.
+receive no source token, registry credential or OIDC signing token. After packaging, one fixed stage step
+receives the destination writer and pushes the prepared payload by digest. Under the platform-token profile the producer job
+has `packages: write`; an opted-in independent-credential profile uses a stage-only writer distinct from the
+release-environment secret. Neither profile gives ARC the release environment or OIDC minting authority.
+Step environment isolation does not enforce package-scoped grants or isolate the writer from trusted
+root-equivalent code sharing the runner. This destination-write exposure is accepted; signing stays hosted.
 With `publication.mode: per-output-v1`, the
 same ARC group also prepares that disk's offline publication layout using its existing material files. The
-exact derived OCI package node is admitted only with network disabled; SBOM attestation and all credentialed
-publication operations remain on hosted runners. Those runners restore the prepared layout rather than the
-disk producer's full material closure.
+exact derived OCI package node is admitted only with network disabled; networked staging is a separate fixed
+step. Hosted release jobs receive bounded preparation controls and evidence plus the immutable destination
+reference. They authenticate the complete staged closure by readback without restoring a CI payload carrier.
 
 Environment `toolchainAccess` declares transport access separately from publication. Its sorted
 `privateRoots` and `publicRoots` contain explicit registry/repository paths, with no overlap or trailing
@@ -1339,7 +1365,7 @@ No fallback renderer exists.
 |---|---|
 | Fork pull request | Regeneration/schema checks; no credentials |
 | In-repository pull request | Build/package; read-only mirror credential on fetch steps only; no OIDC, push or environment access |
-| Default-branch push or manual dispatch on that ref | Publish/sign/attest/verify inside a protected environment; phase-scoped registry and OIDC credentials |
+| Default-branch push or manual dispatch on that ref | Stage by digest on producers; attest/sign/release inside a protected environment; phase-scoped registry access and release-only OIDC |
 | Explicitly allowed branch manual dispatch | Same publication lane; exact Environment allowlist, deployment policy and signing identity must admit the branch |
 | Development Environment branch manual dispatch | Unsigned hosted builds, or full signed publication using development environments/credentials, the admitted native ARC route, and disposable attempt namespaces |
 | Git tag | No signing trigger |
@@ -1357,9 +1383,11 @@ publication and in-repository PR builds remain deferred. Live release jobs name 
 `nvkr-release` GitHub deployment environment; operators must configure its deployment policy to admit only
 the default branch and any explicitly authorized dispatch branches. The signing identity policy must also
 recognize those exact workflow refs. Only a release job that signs or attests receives OIDC minting permission, at job scope.
-Its SBOM-attestation step receives no product-publication credentials. Private carrier upload steps require the
-dedicated CI storage write token; they do not elevate repository-token package permissions. The verification step receives only product
-registry read access; its private report-carrier uploads use the same CI storage boundary. Job timeouts are
+Its SBOM-attestation step receives no product-publication credentials. The producer's fixed stage step receives
+the admitted destination writer, while release writes use their own job token or environment-scoped writer.
+Verification performs only registry reads. The independent profile supplies its read credential; the platform-token profile retains
+the release job token's write grant because provider permissions cannot narrow per step. Legacy private carriers keep their dedicated
+storage credentials until their edges migrate. Job timeouts are
 bounded, and workflow concurrency does not cancel an in-progress publication. Terminal observation and Run
 finalization still run after failures within an admitted execution. The generated Run workflow does not
 start on pull requests.
@@ -1385,13 +1413,20 @@ Development finalization emits its Run record without a production qualification
 admission rejects development before qualification evidence collection.
 
 Development publication and signing jobs use `nvkr-dev-release`; native disk jobs use `nvkr-dev-arc`.
-They never inherit the production deployment environments. Dedicated write and read registry credentials
-are delivered only to their corresponding phases. Private carrier uploads use a separate storage writer
-without additional repository-token permissions or a product-publication route. Only a release job that signs or attests receives OIDC minting permission, at job scope. Read-only toolchain preparation requires the Environment-declared independent reader for its private
-roots; credentials are removed before producer execution. ARC jobs never receive source, publication-write or OIDC credentials. Source-read credentials
+They never inherit the production deployment environments. Signed development requires the dedicated
+credential profile until ADR-20's per-attempt package-creation and verifiable Actions-role prerequisites
+for platform tokens are specified and implemented; that route remains refused. The dedicated development
+profile keeps separate read, stage-write and release-write bindings. Only the
+fixed stage step receives the stage writer. Only a release job that signs or attests receives OIDC minting
+permission, at job scope. Read-only toolchain preparation requires the Environment-declared independent reader for its private
+roots; credentials are removed before producer execution. ARC jobs never receive source credentials, the
+release-environment writer or OIDC authority. The accepted target design adds destination staging as their
+bounded write exception; this stage-writer path remains implementation follow-up. Source-read credentials
 remain confined to the existing fixed source-fetch and catalog-validation steps. Branch code must be
-reviewed before dispatch. Provider ACLs must independently exclude production write access from development
-principals; selecting a namespace or protected environment alone cannot enforce token scope.
+reviewed before dispatch. In the independent-credential profile, provider ACLs must exclude production write
+access from development principals; a namespace or protected environment alone cannot enforce token scope.
+Any future platform-token development route must retain distinct development namespaces and signing
+identities but does not promise separate package principals.
 
 Development and production have separate generated layouts and concurrency groups (ADR-21). Unsigned
 development cancels superseded same-branch Runs and retains helpers/carriers for one day. Signed development,
@@ -1442,6 +1477,8 @@ qualifier code replays the original inputs and verifies the original Plan digest
 digest-checked bounded ZIPs restore only the Plan-selected public metadata controls through the existing
 metadata transport owner. Missing, expired, ambiguous or private-only controls fail closed before smoke.
 
+Development qualification requires the dedicated development credential profile; the default platform-token
+publication profile does not authorize this qualification pair.
 Both development qualification jobs use `nvkr-dev-release`. Workers receive the dedicated development
 reader and OIDC for their own reports; only the final qualifier receives the development writer and OIDC
 for qualification attachments. Repository-token package permissions remain read-only. All worker certificate,
@@ -1467,9 +1504,11 @@ source-patch and tree-state requirements; neither profile permits caller-supplie
 
 A GitHub job is one runner and one token scope, so the GitHub adapter sets job boundaries by authority and
 runner, not by operation kind. Each operation has one authority class. A producer operation (source fetch
-without a credential, build, acquisition, terminal observation, SBOM, packaging) holds no deployment
-environment, identity token or product registry credential; a private toolchain reader stays on its
-preparation step. A release operation (SBOM attestation, publication,
+without a credential, build, acquisition, terminal observation, SBOM, packaging) receives no identity token
+or registry credential; its job holds no release deployment environment. The explicit ARC group retains its
+separate pool environment. A private toolchain reader stays on its preparation step. Destination staging is a
+separate fixed push step permitted at the end of the producer job after packaging and before release work.
+It receives only the admitted stage writer. A release operation (SBOM attestation, release publication,
 signing, publication verification, release assembly) runs only NVKR's own code inside the protected release
 environment. A source fetch that holds a source credential, an object publication and the explicit native
 ARC disk group above each keep their own job.
@@ -1499,19 +1538,27 @@ No operation's timeout, command, evidence slot, signing subject or step-scoped c
 Every operation keeps its pinned execution, exact command, isolation, carrier and result slot. A job's
 token scope is exactly the union of its operations' scopes. Registry credentials and the repository token
 are bound only to the execution step of the operation that uses them; the attestation step receives none
-and the verification step receives only the read credential. No producer operation shares a job with the
-release environment, an identity token or a product registry credential. A job that starts with its own source
+and verification performs only reads. The platform-token profile's token remains write-capable throughout a release-write job;
+step binding is not a permission reduction. No producer operation shares a job with the
+release environment, an identity token or the environment-scoped release writer. The stage-writer exception
+does not grant attestation or signing authority. A job that starts with its own source
 or producer runs after success. A terminal observation outside its producer's job keeps the unconditional
 schedule of §7. Failure of any operation marks the whole provider job unsuccessful for finalization, and
 complete finalization still requires every required provider job to succeed. Scheduling does not change the
 logical graph, Plan identity or Build identity.
 
-An output's attestation, publication, signing and verification can share a job and a machine. Image batches
-may restore several outputs' carriers. The job that can mint the workflow identity therefore also restores
-the selected payload carriers. The carrier transport's
-extraction guard is the boundary, as it already was for the controls the attestation job restored.
-Step-scoped credentials limit what each operation is given; they are not a machine boundary between
-operations in one job. [Reconciliation](reconciliation/adr-18.md) owns this layout's validation status.
+An output's attestation, release publication, signing and verification can share a job and a machine,
+separate from candidate execution. Bounded image batches may serve several output routes under the
+constraints above. Each release job consumes bounded controls and immutable destination references and
+authenticates served bytes; it does not restore and repush a payload carrier. OIDC remains job-scoped, so a
+fused producer/release job is rejected. Step-scoped credentials limit what each operation is given; they are
+not a machine boundary between operations in one job. A compromised producer may add unsigned destination
+objects or move non-authoritative tags. The platform-token profile must admit the publishing repository's
+Actions access role as Write, not Admin, on every destination package under ADR-20. Producer and
+development-branch tokens must not be able to delete or restore released versions; those actions remain
+with a human package administrator. Unknown or broader effective package roles fail admission before
+payload writes. Only the signed release root and subject-bound evidence can authorize
+consumer acceptance; stage presence and tags cannot. [Reconciliation](reconciliation/adr-18.md) owns validation status.
 
 Tekton keeps the earlier grouping. Offline terminal observation, SBOM and packaging join one Build or
 Acquire stage only when every input is produced inside that stage, effective runner/platform agree and
@@ -1561,11 +1608,14 @@ an already-entered regular-file syscall cannot be interrupted, so this is not a 
 The compiler creates a private release preparation, a production SBOM-attestation operation, and a
 publish/sign/verify route. The attestation operation binds and verifies each CycloneDX document before final
 release identity is derived. In `per-output-v1`, that operation reads and returns only bounded controls and
-evidence. The original payload preparation goes directly to the publisher, which verifies and combines
-the signed evidence with its unchanged payload files under ADR-20 §6's exclusive ownership contract.
-The publisher retains full-byte checks and exports exact-root-bound metadata for the signer; the signer
-re-derives subjects and verifies SBOMs without downloading payloads. The remote verifier still reads the
-complete published payload. Signer and verifier take their own inputs and credentials on their own steps of
+evidence. The producer stages unchanged payload manifests and blobs in their final repositories. The release
+owner authenticates their complete served bytes and combines verified references with signed evidence under
+ADR-20 §6. It exports exact-root-bound metadata for the signer; the signer
+re-derives subjects and verifies SBOMs without downloading payloads. The post-sign verifier independently
+reads back the complete served payload closure and authenticates its final signed root and evidence.
+It cannot consume another step's process-local readback receipt or a persisted success flag. This retains
+the verifier's own payload pass in addition to the release publisher's pre-root readback.
+Signer and verifier take their own inputs and credentials on their own steps of
 the output's release job, under the job boundaries above; they are not separate machines. Legacy
 full-layout attestation retains its existing ownership and retry contract. These handoffs are internal
 transfers, not additional deliverables.
@@ -1580,7 +1630,8 @@ permissions, source credential scope, pinned actions and explicit operator setup
 step from source fetch so it receives no source credential. No authored transport manifest or arbitrary
 command argument is added.
 
-Each stage selects one exact set of external input carriers from its admitted Plan. Its split transfer
+During migration, each stage using legacy carriers selects one exact set of external inputs from its admitted
+Plan. Its split transfer
 operation admits the complete provider record index before payload work: missing, extra or duplicate
 locators fail, as do mismatched carrier members and overlapping or pre-existing destination roots.
 The generated semantic download/restore pair executes as one scoped transfer operation. It streams the
@@ -1618,9 +1669,12 @@ published reference, signing record, predicate, verification record and pinned c
 qualification handoff it also restores each output's original publication reference, signing record and
 predicate; these bounded metadata carriers do not download output payloads. Provider-result
 admission still covers every stage and bootstrap job; any failed, skipped or missing required job prevents
-completion. The assembly step and the finalizer receive only the registry-read credential. The finalizer
+completion. Assembly and finalization perform only registry reads. The independent profile supplies its reader;
+under the platform-token profile, assembly shares the aggregate release job's write-capable token,
+while the finalizer has a read-only token. The finalizer
 job has no OIDC minting or package-write permission; assembly shares the aggregate route's release job with
-its publication, signing and verification. All credentials and signing remain outside ARC producer jobs.
+its publication, signing and verification. Signing and release-environment credentials remain outside ARC
+producer jobs; only the fixed destination stage step receives a writer there.
 
 The top-level workflow keeps each named job, prerequisite closure and execution condition visible.
 All jobs retain their runner, timeout, permissions and protected Environment inline. Native-platform preflight
@@ -1788,7 +1842,7 @@ introducing `pipefail`. Job policies and the source checkout are not hidden insi
 
 The caller passes secrets and provider-result expressions as explicit action inputs. Each input is mapped
 only to the original inner step field that consumes it: source credentials remain on source execution,
-registry credentials and the repository token remain on release execution, private-image credentials remain
+registry credentials and the repository token remain on their exact stage or release execution step, private-image credentials remain
 on preparation, and catalog credentials remain on catalog validation or finalization. A release job starts
 a new action where its registry credential changes, so one action never carries two values for one input.
 Packing and uploads gain no credential environment through extraction. Recovery receives the
