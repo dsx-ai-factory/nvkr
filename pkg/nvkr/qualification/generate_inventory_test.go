@@ -50,7 +50,7 @@ func TestGenerateInventoryAdmissionBeforeCompilation(t *testing.T) {
 }
 
 func TestGenerateSelectionsRetainsRuntimeGuards(t *testing.T) {
-	environment, err := lifecycle.LoadEnvironment(t.Context(), "../../../inputs/environments/github-nvke-nightly-gpu-site.yaml")
+	environment, err := lifecycle.LoadEnvironment(t.Context(), "../../../inputs/environments/github-nvke-nightly.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}
