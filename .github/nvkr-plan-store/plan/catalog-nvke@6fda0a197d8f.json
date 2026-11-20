@@ -296,38 +296,6 @@
       ],
       "writeDir": "charts"
     },
-    "nktp-chart-nightly-site": {
-      "artifactPath": "charts/nktp-0.1.0.tgz",
-      "buildCommand": [
-        "sh",
-        "-euc",
-        {
-          "file": ".github/nvkr-plan-store/scripts/nktp-chart-nightly-site/build@7917c664e6cb.sh"
-        }
-      ],
-      "builderType": "oci-hermetic",
-      "commit": "a97548c56d101b41740e8a00e273166c84b442e7",
-      "fromSource": true,
-      "outputType": "tarball",
-      "platforms": [
-        "linux/arm64"
-      ],
-      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline.git",
-      "sourceDateEpoch": 1793913052,
-      "tag": "nktp/v0.1.0",
-      "toolchainImages": {
-        "arm64": "docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b"
-      },
-      "treeHash": "4125b283eacc8842210bf405e7dc5f04090e8b05",
-      "vendorCommand": [
-        "sh",
-        "-euc",
-        {
-          "file": ".github/nvkr-plan-store/scripts/nvke-telemetry-pipeline/vendor@30098a503c1a.sh"
-        }
-      ],
-      "writeDir": "charts"
-    },
     "nktp-chart-release": {
       "artifactPath": "charts/nktp-0.1.0.tgz",
       "buildCommand": [
@@ -684,48 +652,6 @@
         "-euc",
         {
           "file": ".github/nvkr-plan-store/scripts/nvke/vendor@d0fd77a131f3.sh"
-        }
-      ],
-      "writeDir": "charts"
-    },
-    "nvke-controller-chart-nightly-site": {
-      "artifactPath": "charts/nvke-controller-0.23.0.tgz",
-      "buildCommand": [
-        "sh",
-        "-euc",
-        {
-          "file": ".github/nvkr-plan-store/scripts/nvke-controller-chart-nightly-site/build@4f98439617fa.sh"
-        }
-      ],
-      "builderType": "oci-hermetic",
-      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
-      "fromSource": true,
-      "helm": {
-        "chart": ".",
-        "images": {
-          "controller": {
-            "values": {
-              "digest": "image.digest"
-            }
-          }
-        }
-      },
-      "outputType": "tarball",
-      "platforms": [
-        "linux/arm64"
-      ],
-      "repo": "https://github.com/dsx-ai-factory/nvke.git",
-      "sourceDateEpoch": 1793236039,
-      "tag": "v0.23.0",
-      "toolchainImages": {
-        "arm64": "docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b"
-      },
-      "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",
-      "vendorCommand": [
-        "sh",
-        "-euc",
-        {
-          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@af34f7ee2ebf.sh"
         }
       ],
       "writeDir": "charts"
@@ -1491,20 +1417,6 @@
         }
       ]
     },
-    "nvke-controller-helm-nightly-site": {
-      "constraint": "v0.23.0",
-      "repo": "https://github.com/dsx-ai-factory/nvke.git",
-      "toolchainImagesByArch": {
-        "arm64": "docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b"
-      },
-      "vendorCommand": [
-        "sh",
-        "-euc",
-        {
-          "file": ".github/nvkr-plan-store/scripts/nvke/vendor@af34f7ee2ebf.sh"
-        }
-      ]
-    },
     "nvke-controller-module-tags": {
       "constraint": "v0.23.0",
       "repo": "https://github.com/dsx-ai-factory/nvke",
@@ -1610,21 +1522,6 @@
         "-euc",
         {
           "file": ".github/nvkr-plan-store/scripts/nvke-telemetry-pipeline/vendor@afb3c5efa11c.sh"
-        }
-      ]
-    },
-    "nvke-nktp-helm-nightly-site": {
-      "constraint": "0.1.0",
-      "repo": "https://github.com/dsx-ai-factory/nvke-telemetry-pipeline.git",
-      "tagPrefix": "nktp/v",
-      "toolchainImagesByArch": {
-        "arm64": "docker.io/library/golang@sha256:957861185dbf29d93668ace41e011d091c6e779953d47f0316ef2cc58e28fe2b"
-      },
-      "vendorCommand": [
-        "sh",
-        "-euc",
-        {
-          "file": ".github/nvkr-plan-store/scripts/nvke-telemetry-pipeline/vendor@30098a503c1a.sh"
         }
       ]
     },
