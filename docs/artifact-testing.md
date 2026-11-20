@@ -60,7 +60,11 @@ Registrations are not yet executed. The `pkg/nvkr/validation` package resolves s
 admits them against the built-in `local` test environment, and binds each input role to exactly
 one named output of a completed local Run. All inputs of one suite must be built for the same
 platform. The binding records the Run's content subject and each output's digest and build
-subject. Admission does not yet check `acquisition` or its network access;
+subject. That Run is either an existing attempt built with
+`nvkr run local --capture-inputs-root` (binding replays its captured compiler inputs), or a new
+attempt built from a repository-relative Definition and Environment. Before building, the
+compiled Plan must contain every selected input as an output on a declared platform; a failed
+build binds nothing. Admission does not yet check `acquisition` or its network access;
 the executor that runs `acquisition` and `command` will enforce them, and is follow-up work. No
 command exposes this yet. `validators run --profile` below still uses the earlier indexed
 catalog under `inputs/testing/validators/` until it is migrated.
