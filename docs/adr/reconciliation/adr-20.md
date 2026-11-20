@@ -7,8 +7,12 @@ profile-specific admission, full streaming readback receipt and release-by-refer
 or externally exercised. Current tests and recorded publications below do not establish the revised path,
 zero-registry-secret adoption or release-root byte equivalence. The [ADR-18 migration gates](adr-18.md)
 separate development disks, all outputs and residual input-edge removal.
+The revised contract retains the post-sign verifier's own complete payload readback; no cross-process
+readback-receipt protocol is specified. Dedicated stage-writer references and secret homes must be fixed
+by the implementation before their profiles are admitted. Platform-token publication does not authorize
+either production or development qualification's dedicated-credential pair.
 
-The revised C profile accepts repository-linked packages and fork exposure; independent package principals
+The revised platform-token profile accepts repository-linked packages and fork exposure; independent package principals
 and binary confidentiality from public-source forks are not promised. `NVKR_REGISTRY_WRITE` remains an opt-in
 maintained-production/external-registry policy, requiring a distinct producer stage writer. Existing
 production qualification and dedicated development profiles still enforce their current credential rules

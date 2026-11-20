@@ -1,7 +1,8 @@
 # ADR-18 — Pipeline IR & CI-adapter emission (hermetic execution)
 
 - **Decision status:** Accepted (2026-11-14); GitLab extension below proposed for maintainer review.
-- **Revised:** 2026-11-20 — destination staging by digest (Design B), with platform-token access (Design C) as the adopter default.
+- **Revised:** Accepted by njhensley on 2026-11-20 on the maintainer's own behalf — destination staging
+  by digest, with platform-token access as the adopter default.
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
@@ -333,15 +334,15 @@ private output and a fixed credential-free environment. The local byte-observati
 no producer code and carries no container-isolation or qualification claim. Shared code prevents semantic
 drift; it does not alone prove byte identity across hosts.
 The pipeline-attested workflow trusts the bootstrap job and authenticated same-Run metadata delivery.
-Product payload transport through a separate CI registry is retired in favor of destination staging by digest
-(Design B). After observation and offline packaging, one fixed stage step in the producer job pushes the exact
+Product payload transport through a separate CI registry is retired in favor of destination staging by digest.
+After observation and offline packaging, one fixed stage step in the producer job pushes the exact
 payload closure, untagged, to its final output repository. It exports bounded controls, evidence documents and
 digest references; the release job reads back the staged closure, attests and signs by reference under ADR-20 §6.
 No product payload is restored from CI storage and pushed again by the release job. Stage success, a locator
 or a digest supplied by a producer is not release authority. Exact named-output, Plan, invocation, subject and
 evidence checks remain mandatory, including full served-byte readback before release acceptance.
 
-Design C is the default adopter profile: the source repository's own GHCR namespace, job-scoped
+The platform-token profile is the default adopter profile: the source repository's own GHCR namespace, job-scoped
 `GITHUB_TOKEN` with `packages: write` for staging and release writes, and OIDC only in release jobs.
 It requires zero configured registry secrets. ADR-20 owns destination admission, the accepted fork-package
 exposure and the opt-in independent-credential profile. The planned GitLab equivalent uses `CI_JOB_TOKEN`;
@@ -575,7 +576,7 @@ session and held disk survive through packaging; strict mode additionally requir
 carrier; its standard OCI wrapper carries its exact bytes. All component evidence and producer-result slots
 remain required. Only fixed source-fetch steps receive private-source credentials. ARC producer commands
 receive no source token, registry credential or OIDC signing token. After packaging, one fixed stage step
-receives the destination writer and pushes the prepared payload by digest. Under Design C the producer job
+receives the destination writer and pushes the prepared payload by digest. Under the platform-token profile the producer job
 has `packages: write`; an opted-in independent-credential profile uses a stage-only writer distinct from the
 release-environment secret. Neither profile gives ARC the release environment or OIDC minting authority.
 Step environment isolation does not enforce package-scoped grants or isolate the writer from trusted
@@ -1375,7 +1376,7 @@ the default branch and any explicitly authorized dispatch branches. The signing 
 recognize those exact workflow refs. Only a release job that signs or attests receives OIDC minting permission, at job scope.
 Its SBOM-attestation step receives no product-publication credentials. The producer's fixed stage step receives
 the admitted destination writer, while release writes use their own job token or environment-scoped writer.
-Verification performs only registry reads. The independent profile supplies its read credential; C retains
+Verification performs only registry reads. The independent profile supplies its read credential; the platform-token profile retains
 the release job token's write grant because provider permissions cannot narrow per step. Legacy private carriers keep their dedicated
 storage credentials until their edges migrate. Job timeouts are
 bounded, and workflow concurrency does not cancel an in-progress publication. Terminal observation and Run
@@ -1403,7 +1404,7 @@ Development finalization emits its Run record without a production qualification
 admission rejects development before qualification evidence collection.
 
 Development publication and signing jobs use `nvkr-dev-release`; native disk jobs use `nvkr-dev-arc`.
-They never inherit the production deployment environments. Design C uses each job's platform token; the
+They never inherit the production deployment environments. The platform-token profile uses each job's platform token; the
 opt-in dedicated development profile keeps separate read, stage-write and release-write bindings. Only the
 fixed stage step receives the stage writer. Only a release job that signs or attests receives OIDC minting
 permission, at job scope. Read-only toolchain preparation requires the Environment-declared independent reader for its private
@@ -1412,7 +1413,7 @@ release-environment writer or OIDC authority; destination staging is their bound
 remain confined to the existing fixed source-fetch and catalog-validation steps. Branch code must be
 reviewed before dispatch. In the independent-credential profile, provider ACLs must exclude production write
 access from development principals; a namespace or protected environment alone cannot enforce token scope.
-C retains distinct development namespaces and signing identities but does not promise separate package principals.
+The platform-token profile retains distinct development namespaces and signing identities but does not promise separate package principals.
 
 Development and production have separate generated layouts and concurrency groups (ADR-21). Unsigned
 development cancels superseded same-branch Runs and retains helpers/carriers for one day. Signed development,
@@ -1463,6 +1464,8 @@ qualifier code replays the original inputs and verifies the original Plan digest
 digest-checked bounded ZIPs restore only the Plan-selected public metadata controls through the existing
 metadata transport owner. Missing, expired, ambiguous or private-only controls fail closed before smoke.
 
+Development qualification requires the dedicated development credential profile; the default platform-token
+publication profile does not authorize this qualification pair.
 Both development qualification jobs use `nvkr-dev-release`. Workers receive the dedicated development
 reader and OIDC for their own reports; only the final qualifier receives the development writer and OIDC
 for qualification attachments. Repository-token package permissions remain read-only. All worker certificate,
@@ -1522,7 +1525,7 @@ No operation's timeout, command, evidence slot, signing subject or step-scoped c
 Every operation keeps its pinned execution, exact command, isolation, carrier and result slot. A job's
 token scope is exactly the union of its operations' scopes. Registry credentials and the repository token
 are bound only to the execution step of the operation that uses them; the attestation step receives none
-and verification performs only reads. C's token remains write-capable throughout a release-write job;
+and verification performs only reads. The platform-token profile's token remains write-capable throughout a release-write job;
 step binding is not a permission reduction. No producer operation shares a job with the
 release environment, an identity token or the environment-scoped release writer. The stage-writer exception
 does not grant attestation or signing authority. A job that starts with its own source
@@ -1591,8 +1594,10 @@ release identity is derived. In `per-output-v1`, that operation reads and return
 evidence. The producer stages unchanged payload manifests and blobs in their final repositories. The release
 owner authenticates their complete served bytes and combines verified references with signed evidence under
 ADR-20 §6. It exports exact-root-bound metadata for the signer; the signer
-re-derives subjects and verifies SBOMs without downloading payloads. Release verification binds the complete
-staged-byte readback receipt to the final signed root and served evidence without a second payload pass.
+re-derives subjects and verifies SBOMs without downloading payloads. The post-sign verifier independently
+reads back the complete served payload closure and authenticates its final signed root and evidence.
+It cannot consume another step's process-local readback receipt or a persisted success flag. This retains
+the verifier's own payload pass in addition to the release publisher's pre-root readback.
 Signer and verifier take their own inputs and credentials on their own steps of
 the output's release job, under the job boundaries above; they are not separate machines. Legacy
 full-layout attestation retains its existing ownership and retry contract. These handoffs are internal
@@ -1648,7 +1653,8 @@ qualification handoff it also restores each output's original publication refere
 predicate; these bounded metadata carriers do not download output payloads. Provider-result
 admission still covers every stage and bootstrap job; any failed, skipped or missing required job prevents
 completion. Assembly and finalization perform only registry reads. The independent profile supplies its reader;
-C's assembly shares the aggregate release job's write-capable token, while the finalizer has a read-only token. The finalizer
+under the platform-token profile, assembly shares the aggregate release job's write-capable token,
+while the finalizer has a read-only token. The finalizer
 job has no OIDC minting or package-write permission; assembly shares the aggregate route's release job with
 its publication, signing and verification. Signing and release-environment credentials remain outside ARC
 producer jobs; only the fixed destination stage step receives a writer there.

@@ -3,7 +3,7 @@
 This entry records the implemented private-carrier publication path. The accepted 2026-11-20
 [ADR-18](adr-18.md) / [ADR-20](adr-20.md) destination-staging revision supersedes its transport and default
 credential requirements, but is not implemented. The checks and Runs below do not establish destination
-staging, C-profile package admission or release-root equivalence. Private CI storage and the unlinked-package
+staging, package admission with platform tokens or release-root equivalence. Private CI storage and the unlinked-package
 checks remain active until the separately gated migration replaces them.
 
 The GitHub `per-output-v1` mode retains full payload/producer/evidence checks for each exact named output.
