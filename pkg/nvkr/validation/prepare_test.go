@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+//go:build linux || darwin
+
 package validation
 
 import (
@@ -20,8 +22,10 @@ import (
 func selectionFixture(t *testing.T) string {
 	t.Helper()
 	root := registrationFixture(t)
-	raw := bytes.ReplaceAll(shippedContract(t), []byte("id: nvke/nvkectl/contract"), []byte("id: nvke/e2e/bootstrap"))
-	writeCatalogFile(t, filepath.Join(root, "nvke/e2e/bootstrap.yaml"), raw)
+	for _, id := range []string{"nvke/e2e/bootstrap", "nvke/nvkectl/nvkectl"} {
+		raw := bytes.ReplaceAll(shippedContract(t), []byte("id: nvke/nvkectl/contract"), []byte("id: "+id))
+		writeCatalogFile(t, filepath.Join(root, id+".yaml"), raw)
+	}
 	return root
 }
 
@@ -42,10 +46,11 @@ func TestPrepareSelectionOrderAndDeduplication(t *testing.T) {
 	}{
 		{"exact", []string{"nvke/nvkectl/contract"}, "nvke/nvkectl/contract"},
 		{"user-order", []string{"nvke/nvkectl/contract", "nvke/nvkectl/cli"}, "nvke/nvkectl/contract,nvke/nvkectl/cli"},
-		{"suite-group", []string{"nvke/nvkectl"}, "nvke/nvkectl/cli,nvke/nvkectl/contract"},
-		{"repository", []string{"nvke"}, "nvke/e2e/bootstrap,nvke/nvkectl/cli,nvke/nvkectl/contract"},
-		{"exact-then-parent", []string{"nvke/nvkectl/contract", "nvke"}, "nvke/nvkectl/contract,nvke/e2e/bootstrap,nvke/nvkectl/cli"},
-		{"parent-then-exact", []string{"nvke", "nvke/nvkectl/cli"}, "nvke/e2e/bootstrap,nvke/nvkectl/cli,nvke/nvkectl/contract"},
+		{"suite-group", []string{"nvke/nvkectl"}, "nvke/nvkectl/cli,nvke/nvkectl/contract,nvke/nvkectl/nvkectl"},
+		{"repository", []string{"nvke"}, "nvke/e2e/bootstrap,nvke/nvkectl/cli,nvke/nvkectl/contract,nvke/nvkectl/nvkectl"},
+		{"exact-then-parent", []string{"nvke/nvkectl/contract", "nvke"}, "nvke/nvkectl/contract,nvke/e2e/bootstrap,nvke/nvkectl/cli,nvke/nvkectl/nvkectl"},
+		{"parent-then-exact", []string{"nvke", "nvke/nvkectl/cli"}, "nvke/e2e/bootstrap,nvke/nvkectl/cli,nvke/nvkectl/contract,nvke/nvkectl/nvkectl"},
+		{"repeated-segment-name", []string{"nvke/nvkectl/nvkectl"}, "nvke/nvkectl/nvkectl"},
 		{"repeated", []string{"nvke/nvkectl/cli", "nvke/nvkectl/cli"}, "nvke/nvkectl/cli"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -123,6 +128,24 @@ func TestPrepareAdmitsEnvironmentAndExecutorRequirements(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// With several unsupported roles, the refusal names the first in sorted order.
+func TestPrepareAdmissionRefusalDeterministic(t *testing.T) {
+	roles := "inputs:\n"
+	for _, role := range []string{"e", "d", "c", "b", "a"} {
+		roles += "  " + role + ":\n    output: nvkectl\n    component: kubectl\n    format: executable\n"
+	}
+	raw := bytes.Replace(shippedContract(t), []byte("inputs:\n"), []byte(roles), 1)
+	root := selectionFixture(t)
+	writeCatalogFile(t, filepath.Join(root, "nvke/nvkectl/contract.yaml"), raw)
+	for range 20 {
+		_, err := Prepare(t.Context(), root, []string{"nvke/nvkectl/contract"}, "local")
+		catalogCode(t, err, e.CodeEngineCapability)
+		if !strings.Contains(err.Error(), `role "a"`) {
+			t.Fatalf("refusal named another role: %v", err)
+		}
 	}
 }
 
