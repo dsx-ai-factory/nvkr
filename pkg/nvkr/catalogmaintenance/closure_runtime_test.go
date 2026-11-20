@@ -16,6 +16,7 @@ import (
 )
 
 const (
+	runtimeFixtureDefinition  = "definition-runtime.yaml"
 	runtimeFixtureEnvironment = "environment-runtime.yaml"
 	runtimeFixturePlan        = ".github/nvkr-run-runtime/plan.json"
 	runtimeFixtureWorkflow    = ".github/workflows/nvkr-run-runtime.yml"
@@ -30,8 +31,11 @@ func runtimeFixture(t *testing.T) Config {
 	cfg, promote := maintenanceFixture(t)
 	raw := append(readFixture(t, cfg.Environment), "githubBundle: runtime\ngithubRuntimePlan: true\n"...)
 	writeFixture(t, runtimeFixtureEnvironment, raw)
-	cfg.AdditionalRuns = []RunInput{{Definition: cfg.Definition, Environment: runtimeFixtureEnvironment}}
-	if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, runtimeFixtureEnvironment, "test (deadbeef)", "github", ".", false); err != nil {
+	// Independent selections may intentionally track different source pins;
+	// owners of the same selection must instead refresh together.
+	writeFixture(t, runtimeFixtureDefinition, bytes.ReplaceAll(readFixture(t, cfg.Definition), []byte("name: fixture"), []byte("name: runtime-fixture")))
+	cfg.AdditionalRuns = []RunInput{{Definition: runtimeFixtureDefinition, Environment: runtimeFixtureEnvironment}}
+	if _, err := lifecycle.GenerateFiles(t.Context(), runtimeFixtureDefinition, runtimeFixtureEnvironment, "test (deadbeef)", "github", ".", false); err != nil {
 		t.Fatal(err)
 	}
 	promote("1.1.0")
@@ -50,7 +54,7 @@ func runtimeFixture(t *testing.T) Config {
 // would call the valid baseline drift.
 func TestClosureChecksRuntimePlanMembersThroughTheirOwner(t *testing.T) {
 	cfg := runtimeFixture(t)
-	if _, err := lifecycle.GenerateFiles(t.Context(), cfg.Definition, runtimeFixtureEnvironment, "test (deadbeef)", "github", ".", true); err == nil {
+	if _, err := lifecycle.GenerateFiles(t.Context(), runtimeFixtureDefinition, runtimeFixtureEnvironment, "test (deadbeef)", "github", ".", true); err == nil {
 		t.Fatal("the fixture's runtime Plan does not lag the pins, so it cannot tell the two owners apart")
 	}
 	beforePlan, beforeWorkflow := readFixture(t, runtimeFixturePlan), readFixture(t, runtimeFixtureWorkflow)
@@ -82,7 +86,7 @@ func TestClosureChecksRuntimePlanMembersThroughTheirOwner(t *testing.T) {
 func TestRefreshRegeneratesRuntimePlanMembersThroughTheirOwner(t *testing.T) {
 	cfg := runtimeFixture(t)
 	beforePlan, beforeWorkflow := readFixture(t, runtimeFixturePlan), readFixture(t, runtimeFixtureWorkflow)
-	if _, err := regenerate(t.Context(), cfg, "test (deadbeef)", lifecycle.GenerateFiles); err != nil {
+	if _, err := regenerate(t.Context(), cfg, "test (deadbeef)", generateClosure); err != nil {
 		t.Fatal(err)
 	}
 	if bytes.Equal(beforePlan, readFixture(t, runtimeFixturePlan)) {
@@ -91,7 +95,7 @@ func TestRefreshRegeneratesRuntimePlanMembersThroughTheirOwner(t *testing.T) {
 	if !bytes.Equal(beforeWorkflow, readFixture(t, runtimeFixtureWorkflow)) {
 		t.Fatal("runtime regeneration changed the reviewed workflow")
 	}
-	if _, err := lifecycle.GenerateRuntimeFiles(t.Context(), cfg.Definition, runtimeFixtureEnvironment, "test (deadbeef)", "github", ".", true); err != nil {
+	if _, err := lifecycle.GenerateRuntimeFiles(t.Context(), runtimeFixtureDefinition, runtimeFixtureEnvironment, "test (deadbeef)", "github", ".", true); err != nil {
 		t.Fatalf("the regenerated runtime bundle does not recheck: %v", err)
 	}
 	if _, err := os.Stat(filepath.Dir(runtimeFixturePlan)); err != nil {
