@@ -1057,8 +1057,9 @@ distinct stage writer. These jobs request no workflow-token package permissions.
 nightly inputs retain this opt-in policy; the platform-token profile is the new-adopter default, with its explicit fork-exposure tradeoff.
 Arbitrary static credentials remain rejected. The retained maintained-production qualification profile
 requires the fixed production writer policy on both the publication and every target, matching its emitted
-credentials and permissions; the platform-token profile does not implicitly authorize that qualification pair. The signed-development
-contract below distinguishes the platform-token profile from its opt-in dedicated credentials. Legacy publication without this mode
+credentials and permissions; the platform-token profile does not implicitly authorize that qualification pair.
+Signed development uses the dedicated credential profile until the per-attempt mechanism below is specified
+and implemented. Legacy publication without this mode
 retains its full-closure assembly/finalization path. Local
 execution and dry-run signing do not admit the new mode. Interrupted production runs can leave independently
 published outputs; no production cross-run reuse, rollback, retention protocol or atomic multi-repository
