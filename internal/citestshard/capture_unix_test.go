@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
-//go:build unix
+//go:build linux || darwin
 
 package main
 
@@ -18,6 +18,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 func TestCaptureHelper(t *testing.T) {
@@ -28,6 +30,8 @@ func TestCaptureHelper(t *testing.T) {
 	switch mode {
 	case "text":
 		fmt.Print(os.Getenv("NVKR_CAPTURE_TEXT"))
+	case "flood":
+		fmt.Print(strings.Repeat("x", 1024*1024))
 	case "fail":
 		fmt.Println("failure output")
 		os.Exit(3)
@@ -177,5 +181,58 @@ func TestCaptureCancellation(t *testing.T) {
 	argv, env := helperArgs(t, "text")
 	if _, err := captured(ctx, argv, "", env, time.Second, false, 1024, io.Discard, io.Discard); !errors.Is(err, context.Canceled) {
 		t.Fatalf("%v", err)
+	}
+}
+
+func TestCaptureBlockedOutput(t *testing.T) {
+	for _, emit := range []bool{false, true} {
+		t.Run(fmt.Sprint(emit), func(t *testing.T) {
+			reader, writer, err := os.Pipe()
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer reader.Close()
+			defer writer.Close()
+			fd := writer.Fd()
+			if err := unix.SetNonblock(int(fd), true); err != nil {
+				t.Fatal(err)
+			}
+			for {
+				_, err := unix.Write(int(fd), make([]byte, 4096))
+				if errors.Is(err, unix.EAGAIN) {
+					break
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := unix.SetNonblock(int(fd), false); err != nil {
+				t.Fatal(err)
+			}
+			argv, env := helperArgs(t, "flood")
+			result := make(chan error, 1)
+			go func() {
+				_, err := captured(t.Context(), argv, "", env, time.Second, emit, 32, writer, io.Discard)
+				result <- err
+			}()
+			select {
+			case err := <-result:
+				if emit && !errors.Is(err, context.DeadlineExceeded) {
+					t.Fatalf("streaming error: %v", err)
+				}
+				if !emit && (err == nil || !strings.Contains(err.Error(), "stdout exceeded 32-byte capture limit")) {
+					t.Fatalf("overflow error: %v", err)
+				}
+			case <-time.After(5 * time.Second):
+				// Release the full pipe before joining a regressed implementation.
+				reader.Close()
+				<-result
+				t.Fatal("capture blocked beyond its deadline")
+			}
+			flags, err := unix.FcntlInt(fd, unix.F_GETFL, 0)
+			if err != nil || flags&unix.O_NONBLOCK != 0 {
+				t.Fatalf("borrowed descriptor flags changed: %d %v", flags, err)
+			}
+		})
 	}
 }

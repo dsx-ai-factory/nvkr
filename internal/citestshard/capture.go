@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os/exec"
@@ -46,19 +47,29 @@ func (w *captureWriter) Write(p []byte) (int, error) {
 // captured owns a new process group through cancellation, kill and Wait. Go's
 // copy goroutine is joined by Wait; WaitDelay also bounds inherited pipes after
 // a parent exits while a descendant remains alive.
-func captured(ctx context.Context, argv []string, dir string, env []string, timeout time.Duration, emit bool, maxBytes int, stdout, stderr io.Writer) (string, error) {
+func captured(ctx context.Context, argv []string, dir string, env []string, timeout time.Duration, emit bool, maxBytes int, stdout, stderr io.Writer) (log string, resultErr error) {
 	if maxBytes < 1 || len(argv) == 0 {
 		return "", fmt.Errorf("invalid capture arguments")
 	}
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	stdout, releaseOut, err := commandOutput(ctx, stdout)
+	if err != nil {
+		return "", err
+	}
+	defer func() { resultErr = errors.Join(resultErr, releaseOut()) }()
+	stderr, releaseErr, err := commandOutput(ctx, stderr)
+	if err != nil {
+		return "", err
+	}
+	defer func() { resultErr = errors.Join(resultErr, releaseErr()) }()
 	fmt.Fprintln(stderr, "+ "+strings.Join(argv, " "))
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...)
 	cmd.Dir, cmd.Env, cmd.Stderr = dir, env, stderr
 	writer := &captureWriter{stdout: stdout, emit: emit, limit: maxBytes, cancel: cancel}
 	cmd.Stdout = writer
-	err := ownedcmd.Run(ctx, cmd)
-	log := writer.output.String()
+	err = ownedcmd.Run(ctx, cmd)
+	log = writer.output.String()
 	if writer.err != nil {
 		return log, writer.err
 	}

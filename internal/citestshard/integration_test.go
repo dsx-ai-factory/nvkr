@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 // SPDX-License-Identifier: Apache-2.0
 
+//go:build linux || darwin
+
 package main
 
 import (
-	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -53,11 +54,13 @@ func terminalTests(t *testing.T, log string) map[[3]string]int {
 func TestRealMatrix(t *testing.T) {
 	root := t.TempDir()
 	binary := filepath.Join(t.TempDir(), "shard")
-	var diagnostics strings.Builder
-	if _, err := captured(t.Context(), []string{"go", "build", "-o", binary, "."}, "", nil, 90*time.Second, false, 32*1024*1024, &diagnostics, io.Discard); err != nil {
-		t.Fatalf("build: %s %v", diagnostics.String(), err)
+	var diagnostics, stderr strings.Builder
+	// Nested Go commands share a runner with the outer package shard.
+	buildEnv := append(os.Environ(), "GOMAXPROCS=1", "GOFLAGS=-p=1")
+	if _, err := captured(t.Context(), []string{"go", "build", "-o", binary, "."}, "", buildEnv, 90*time.Second, false, 32*1024*1024, &diagnostics, &stderr); err != nil {
+		t.Fatalf("build: %s\n%s\n%v", diagnostics.String(), stderr.String(), err)
 	}
-	env := append(os.Environ(), "GOTOOLCHAIN=local", "GOWORK=off", "GOPROXY=off", "GOSUMDB=off", "GOFLAGS=", "NVKR_SHARD_FIXTURE_FAIL=0")
+	env := append(buildEnv, "GOTOOLCHAIN=local", "GOWORK=off", "GOPROXY=off", "GOSUMDB=off", "NVKR_SHARD_FIXTURE_FAIL=0")
 	version, err := os.ReadFile("../../.go-version")
 	if err != nil {
 		t.Fatal(err)
@@ -81,7 +84,12 @@ func TestRealMatrix(t *testing.T) {
 	execute := func(argv, environment []string) (string, error) {
 		t.Helper()
 		diagnostics.Reset()
-		return captured(t.Context(), argv, root, environment, 90*time.Second, false, 32*1024*1024, &diagnostics, io.Discard)
+		stderr.Reset()
+		log, err := captured(t.Context(), argv, root, environment, 90*time.Second, false, 32*1024*1024, &diagnostics, &stderr)
+		if err != nil {
+			t.Logf("subprocess stderr: %s", stderr.String())
+		}
+		return log, err
 	}
 	baseline, err := execute([]string{"go", "test", "-json", "-count=1", "-timeout=10s", "./..."}, env)
 	if err != nil {

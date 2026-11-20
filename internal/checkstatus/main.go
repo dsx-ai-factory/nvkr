@@ -20,6 +20,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
 	nerrors "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -27,11 +29,19 @@ import (
 
 const ledger = "docs/adr/reconciliation/"
 const revisionHint = "fetch BASE and HEAD with full history, or set STATUS_BASE/STATUS_HEAD"
+
+// Python's Unicode whitespace class, retained from the original checker.
+const whitespace = `\s\v\x{1c}-\x{1f}\x{85}\p{Z}`
 const un = `un(?:recorded|proven|exercised|validated|tested)`
 const done = `(?:recorded|exercised|proven|validated|qualified|verified)`
 const record = `(?:hosted |external |acceptance |development )*(?:run|execution|evidence|result|observation)s?`
 
-var phrases = func() []*regexp.Regexp {
+type statusPhrase struct {
+	pattern     *regexp.Regexp
+	endBoundary bool
+}
+
+var phrases = func() []statusPhrase {
 	patterns := []string{
 		`\b(?:remains?|remained|is|are) (?:still )?` + un + `\b`,
 		`\b(?:execution|acceptance|qualification|cycle|deployment|build|run|publication)s? (?:remains?|is|are) (?:still )?unverified\b`,
@@ -43,18 +53,20 @@ var phrases = func() []*regexp.Regexp {
 		`\b(?:hosted|external|production) (?:publication|signing|acceptance|execution|qualification|verification) (?:was|were|has been|have been|is|are) (?:not )?(?:yet )?` + done + `\b`,
 		`\b(?:is|are|was|were|been|not) (?:yet )?(?:externally|operationally) (?:exercised|accepted|validated|proven)\b`,
 	}
-	result := make([]*regexp.Regexp, 0, len(patterns))
+	result := make([]statusPhrase, 0, len(patterns))
 	for _, p := range patterns {
-		result = append(result, regexp.MustCompile("(?i)"+strings.ReplaceAll(p, " ", `[\s\v\x{85}\p{Z}]+`)))
+		end := strings.HasSuffix(p, `\b`)
+		p = strings.TrimSuffix(strings.TrimPrefix(p, `\b`), `\b`)
+		result = append(result, statusPhrase{regexp.MustCompile("(?i)" + strings.ReplaceAll(p, " ", `[`+whitespace+`]+`)), end})
 	}
 	return result
 }()
-var escape = regexp.MustCompile(`<!--\s*status-ok\b(.*?)-->`)
-var reason = regexp.MustCompile(`^\s*:\s*\S`)
+var escape = regexp.MustCompile(`<!--[` + whitespace + `]*status-ok((?:[^\pL\pN_].*?)?)-->`)
+var reason = regexp.MustCompile(`^[` + whitespace + `]*:[` + whitespace + `]*[^` + whitespace + `]`)
 var ownerFile = regexp.MustCompile(`^adr-(\d\d)(?:-(\d\d))?\.md$`)
 var adrPath = regexp.MustCompile(`^docs/adr/(\d{4})-`)
 var adrRef = regexp.MustCompile(`\bADR-(\d{1,2})\b`)
-var listItem = regexp.MustCompile(`^\s*(?:[-*+]|\d+[.)])\s`)
+var listItem = regexp.MustCompile(`^[` + whitespace + `]*(?:[-*+]|\p{Nd}+[.)])[` + whitespace + `]`)
 var hunk = regexp.MustCompile(`^@@ -\S+ \+(\d+)`)
 
 func git(ctx context.Context, repo, hint string, args ...string) (string, error) {
@@ -171,6 +183,14 @@ type finding struct {
 	message, span string
 }
 
+func wordRune(r rune) bool { return unicode.IsLetter(r) || unicode.IsNumber(r) || r == '_' }
+
+func phraseBoundary(text string, start, end int, endBoundary bool) bool {
+	before, _ := utf8.DecodeLastRuneInString(text[:start])
+	after, _ := utf8.DecodeRuneInString(text[end:])
+	return !wordRune(before) && (!endBoundary || !wordRune(after))
+}
+
 func scan(block []line) []finding {
 	var text strings.Builder
 	starts := []int{}
@@ -200,7 +220,10 @@ func scan(block []line) []finding {
 		}
 	}
 	for _, phrase := range phrases {
-		for _, m := range phrase.FindAllStringIndex(joined, -1) {
+		for _, m := range phrase.pattern.FindAllStringIndex(joined, -1) {
+			if !phraseBoundary(joined, m[0], m[1], phrase.endBoundary) {
+				continue
+			}
 			first, last := lineOf(m[0]), lineOf(m[1]-1)
 			number := 0
 			escaped := false
@@ -232,11 +255,11 @@ func ownerFiles(ctx context.Context, repo, head string) ([]string, error) {
 			names = append(names, entry.Name())
 		}
 	} else {
-		out, err := git(ctx, repo, head+" predates the per-section ledger; merge main to name the owner file", "ls-tree", "--name-only", head+":"+ledger)
+		out, err := git(ctx, repo, head+" predates the per-section ledger; merge main to name the owner file", "ls-tree", "--name-only", "-z", head+":"+ledger)
 		if err != nil {
 			return nil, err
 		}
-		names = strings.Split(strings.TrimSpace(out), "\n")
+		names = strings.Split(out, "\x00")
 	}
 	owners := []string{}
 	for _, name := range names {
@@ -250,7 +273,13 @@ func ownerFiles(ctx context.Context, repo, head string) ([]string, error) {
 	}
 	return owners, nil
 }
-func ledgerRow(ctx context.Context, repo, head, path, text string) (string, error) {
+
+type ledgerResolver struct {
+	repo, head string
+	owners     []string
+}
+
+func (r *ledgerResolver) row(ctx context.Context, path, text string) (string, error) {
 	adr := adrPath.FindStringSubmatch(path)
 	if adr == nil {
 		adr = adrRef.FindStringSubmatch(text)
@@ -259,11 +288,14 @@ func ledgerRow(ctx context.Context, repo, head, path, text string) (string, erro
 		return "its " + ledger + " row", nil
 	}
 	number, _ := strconv.Atoi(adr[1])
-	owners, err := ownerFiles(ctx, repo, head)
-	if err != nil {
-		return "", err
+	if r.owners == nil {
+		owners, err := ownerFiles(ctx, r.repo, r.head)
+		if err != nil {
+			return "", err
+		}
+		r.owners = owners
 	}
-	for _, name := range owners {
+	for _, name := range r.owners {
 		m := ownerFile.FindStringSubmatch(name)
 		first, _ := strconv.Atoi(m[1])
 		last := first
@@ -330,6 +362,7 @@ func check(ctx context.Context, repo, base, head string) (string, []string, erro
 		finding
 	}
 	found := []located{}
+	resolver := ledgerResolver{repo: repo, head: head}
 	for path, added := range changed {
 		if strings.HasPrefix(path, ledger) || strings.HasPrefix(path, "docs/evidence/") {
 			continue
@@ -344,9 +377,12 @@ func check(ctx context.Context, repo, base, head string) (string, []string, erro
 			return "", nil, err
 		}
 		for _, block := range paragraphs(text, added) {
+			if err := ctx.Err(); err != nil {
+				return "", nil, err
+			}
 			for _, f := range scan(block) {
 				if f.span != "" {
-					row, err := ledgerRow(ctx, repo, head, path, f.span)
+					row, err := resolver.row(ctx, path, f.span)
 					if err != nil {
 						return "", nil, err
 					}
@@ -372,12 +408,41 @@ func check(ctx context.Context, repo, base, head string) (string, []string, erro
 			out = append(out, formatted)
 		}
 	}
-	return since, out, nil
+	return since, out, ctx.Err()
+}
+
+// flag stops at the first positional argument; the historical argparse CLI
+// accepts --repo before, between, or after the revisions.
+func interspersedArgs(args []string) ([]string, error) {
+	var options, revisions []string
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		if arg == "--" {
+			revisions = append(revisions, args[i+1:]...)
+			break
+		}
+		if arg == "--repo" || arg == "-repo" {
+			if i+1 == len(args) {
+				return nil, fmt.Errorf("--repo requires a value")
+			}
+			options = append(options, arg, args[i+1])
+			i++
+		} else if strings.HasPrefix(arg, "-") {
+			options = append(options, arg)
+		} else {
+			revisions = append(revisions, arg)
+		}
+	}
+	return append(append(options, "--"), revisions...), nil
 }
 func run(ctx context.Context, args []string, stdout, stderr io.Writer) (int, error) {
 	flags := flag.NewFlagSet("check-status-restated", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	repo := flags.String("repo", ".", "repository checkout")
+	args, err := interspersedArgs(args)
+	if err != nil {
+		return 2, err
+	}
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			return 0, nil
@@ -393,7 +458,15 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) (int, err
 		return 1, err
 	}
 	for _, f := range findings {
-		fmt.Fprintln(stdout, f)
+		if err := ctx.Err(); err != nil {
+			return 1, err
+		}
+		if _, err := fmt.Fprintln(stdout, f); err != nil {
+			return 1, err
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		return 1, err
 	}
 	label := head
 	if label == "" {

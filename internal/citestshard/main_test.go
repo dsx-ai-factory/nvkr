@@ -165,6 +165,33 @@ func TestResults(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildEvents(t *testing.T) {
+	valid := eventLog(map[string]string{"Action": "output", "Package": "p", "Output": "TestA\n"}, map[string]string{"Action": "pass", "Package": "p", "Test": "TestA"}, map[string]string{"Action": "pass", "Package": "p"})
+	for _, tc := range []struct {
+		name      string
+		row       map[string]string
+		wantError bool
+	}{
+		{"compiler diagnostic", map[string]string{"Action": "build-output", "ImportPath": "dependency", "Output": "TestNotRegistered\n"}, false},
+		{"failed build", map[string]string{"Action": "build-fail", "ImportPath": "dependency"}, true},
+		{"missing build package", map[string]string{"Action": "build-output", "Output": "warning"}, true},
+		{"mixed event", map[string]string{"Action": "build-output", "ImportPath": "dependency", "Package": "p"}, true},
+		{"build test", map[string]string{"Action": "build-output", "ImportPath": "dependency", "Test": "TestA"}, true},
+		{"foreign test output", map[string]string{"Action": "output", "Package": "dependency", "Output": "TestNotRegistered\n"}, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			log := eventLog(tc.row) + valid
+			names, err := listedTests(log, "p")
+			if (err != nil) != tc.wantError || (!tc.wantError && !slices.Equal(names, []string{"TestA"})) {
+				t.Fatalf("discovery %v: %v", names, err)
+			}
+			if err := validateResults(log, []string{"p"}, []string{"TestA"}); (err != nil) != tc.wantError {
+				t.Fatalf("results: %v", err)
+			}
+		})
+	}
+}
 func TestMatrix(t *testing.T) {
 	var out bytes.Buffer
 	if err := run(t.Context(), []string{"--matrix"}, &out, io.Discard); err != nil {

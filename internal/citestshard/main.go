@@ -91,8 +91,24 @@ func packagesForGroup(packages []string, module, name string, index int) ([]stri
 }
 
 type event struct {
-	Action, Package, Output string
-	Test                    *string
+	Action, Package, Output, ImportPath string
+	Test                                *string
+}
+
+// go test -json also emits build events, whose package is ImportPath rather
+// than Package. Compiler diagnostics must not enter the test inventory.
+func buildEvent(e event) (bool, error) {
+	switch e.Action {
+	case "build-output":
+		if e.ImportPath == "" || e.Package != "" || e.Test != nil {
+			return true, fmt.Errorf("malformed build output event")
+		}
+		return true, nil
+	case "build-fail":
+		return true, fmt.Errorf("build failed for %s", e.ImportPath)
+	default:
+		return false, nil
+	}
 }
 
 func events(log string) ([]event, error) {
@@ -114,6 +130,12 @@ func listedTests(log, pkg string) ([]string, error) {
 	names, terminal := []string{}, []string{}
 	seen := map[string]bool{}
 	for _, e := range rows {
+		if build, err := buildEvent(e); build {
+			if err != nil {
+				return nil, err
+			}
+			continue
+		}
 		if e.Package != pkg {
 			return nil, fmt.Errorf("test discovery returned an unexpected package")
 		}
@@ -145,6 +167,12 @@ func validateResults(log string, packages, selected []string) error {
 	completed := map[string]bool{}
 	tests := map[[2]string]bool{}
 	for _, e := range rows {
+		if build, err := buildEvent(e); build {
+			if err != nil {
+				return err
+			}
+			continue
+		}
 		if !slices.Contains(packages, e.Package) {
 			return fmt.Errorf("test run returned an unexpected package")
 		}

@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -137,6 +138,9 @@ func TestStatusDiff(t *testing.T) {
 		{"unchanged", "docs/old.md", baseFiles["docs/old.md"] + "Unrelated.\n", nil},
 		{"code", "pkg/x.go", "// remains unrecorded\n", nil},
 		{"escaped", "docs/escaped.md", "Hosted publication was exercised. <!-- status-ok: dated log -->\n", nil},
+		{"Unicode escape", "docs/unicode-escape.md", "Hosted publication was exercised. <!--\u00a0status-ok:\u2003dated log -->\n", nil},
+		{"Unicode blank reason", "docs/unicode-reason.md", "<!-- status-ok:\u00a0\u2003 -->\n", []string{"1: status-ok escape needs a reason: <!-- status-ok: why -->"}},
+		{"Unicode list boundary", "docs/unicode-items.md", "- ADR-02 identity.\n\u00a0-\u2003Hosted signing remains unproven.\n", []string{`2: status restated ("remains unproven")` + link}},
 		{"wrapped escape", "docs/wrapped.md", "It requires a recorded\nrun. <!-- status-ok: quoted policy -->\n", nil},
 		{"bare escape", "docs/bare.md", "Hosted publication was exercised. <!-- status-ok: -->\n", []string{`1: status restated ("Hosted publication was exercised")` + link, "1: status-ok escape needs a reason: <!-- status-ok: why -->"}},
 	}
@@ -186,14 +190,25 @@ func TestStatusDiff(t *testing.T) {
 		code    int
 		failure bool
 	}{{base, 1, false}, {head, 0, false}, {"no-such-revision", 1, true}} {
-		code, err := run(t.Context(), []string{"--repo", repo, tc.base, head}, io.Discard, io.Discard)
-		if code != tc.code || (err != nil) != tc.failure {
-			t.Fatalf("exit %d error %v", code, err)
-		}
-		if tc.failure && (!strings.Contains(err.Error(), "STATUS_BASE") || !strings.Contains(err.Error(), tc.base)) {
-			t.Fatal(err)
+		for _, args := range [][]string{{"--repo", repo, tc.base, head}, {tc.base, "--repo", repo, head}, {tc.base, head, "--repo", repo}, {tc.base, head, "--repo=" + repo}} {
+			code, err := run(t.Context(), args, io.Discard, io.Discard)
+			if code != tc.code || (err != nil) != tc.failure {
+				t.Fatalf("exit %d error %v", code, err)
+			}
+			if tc.failure && (!strings.Contains(err.Error(), "STATUS_BASE") || !strings.Contains(err.Error(), tc.base)) {
+				t.Fatal(err)
+			}
 		}
 	}
+	t.Run("cancel during output", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		var summary strings.Builder
+		code, err := run(ctx, []string{base, head, "--repo", repo}, cancelWriter{cancel}, &summary)
+		if code != 1 || !errors.Is(err, context.Canceled) || summary.Len() != 0 {
+			t.Fatalf("exit %d error %v summary %q", code, err, summary.String())
+		}
+	})
 	t.Run("textconv ignored", func(t *testing.T) {
 		write(t, repo, ".git/info/attributes", "*.md diff=hide\n")
 		fixtureGit(t, repo, "config", "diff.hide.textconv", "true")
@@ -222,6 +237,67 @@ func TestStatusDiff(t *testing.T) {
 			t.Fatalf("got %q want %q error %v", got, want, err)
 		}
 	})
+}
+
+type cancelWriter struct{ cancel context.CancelFunc }
+
+func (w cancelWriter) Write(p []byte) (int, error) { w.cancel(); return len(p), nil }
+
+func TestOwnerFileNamesAndCache(t *testing.T) {
+	clearLocalGitEnv(t)
+	repo := newRepo(t)
+	write(t, repo, ledger+"adr-21.md ", "not an owner\n")
+	head := commit(t, repo)
+	for _, revision := range []string{"", head} {
+		if _, err := ownerFiles(t.Context(), repo, revision); err == nil {
+			t.Fatal("accepted a trailing-space owner name")
+		}
+	}
+	resolver := ledgerResolver{repo: repo}
+	if _, err := resolver.row(t.Context(), "docs/adr/0021-generation.md", ""); err == nil {
+		t.Fatal("accepted a ledger without an owner")
+	}
+	write(t, repo, ledger+"adr-21.md", "owner\n")
+	if got, err := resolver.row(t.Context(), "docs/adr/0021-generation.md", ""); err != nil || got != ledger+"adr-21.md" {
+		t.Fatalf("first lookup %q: %v", got, err)
+	}
+	if err := os.Rename(filepath.Join(repo, ledger), filepath.Join(repo, "saved-ledger")); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := resolver.row(t.Context(), "docs/guide.md", "ADR-21"); err != nil || got != ledger+"adr-21.md" {
+		t.Fatalf("cached lookup %q: %v", got, err)
+	}
+}
+
+func TestArgumentErrors(t *testing.T) {
+	for _, args := range [][]string{{"HEAD", "--repo"}, {"--unknown"}, {"--repo", "."}} {
+		if code, err := run(t.Context(), args, io.Discard, io.Discard); code != 2 || err == nil {
+			t.Fatalf("%v: %d %v", args, code, err)
+		}
+	}
+}
+
+func TestUnicodeWordBoundaries(t *testing.T) {
+	for _, tc := range []struct {
+		text  string
+		count int
+	}{
+		{"Signing remains unprovené.", 0},
+		{"Signing éremains unproven.", 0},
+		{"Signing remains unproven².", 0},
+		{"Signing remains unproven_thing.", 0},
+		{"Signing (remains unproven).", 1},
+		{"Signing remains unproven. <!-- status-oké: not an escape -->", 1},
+		{"Signing remains unproven. <!-- status-ok: dated log -->", 0},
+		{"Signing remains unproven. <!-- status-ok-->", 2},
+	} {
+		t.Run(tc.text, func(t *testing.T) {
+			got := scan([]line{{number: 1, text: tc.text, added: true}})
+			if len(got) != tc.count {
+				t.Fatalf("findings %v, want %d", got, tc.count)
+			}
+		})
+	}
 }
 func TestMissingLedger(t *testing.T) {
 	clearLocalGitEnv(t)
