@@ -1,0 +1,63 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+---
+name: NVKR NVKE hardware E2E
+
+# Placeholder that registers this dispatch-only workflow on the default branch so a branch that
+# carries the real workflow can be dispatched. The default-branch copy takes no machine, holds no
+# credentials and always fails; the real workflow replaces it.
+
+'on':
+  workflow_dispatch:
+    inputs:
+      artifact-source:
+        description: nvkr-outputs runs NVKR-built artifacts. build-subject builds them from the subject commit in the job and says nothing is NVKR-built.
+        type: choice
+        required: true
+        options: [nvkr-outputs, build-subject]
+      stage:
+        description: provision stops at a booted node, bootstrap adds Kubernetes, deployment adds the NVKE stack, full adds a tenant and every check.
+        type: choice
+        default: full
+        options: [provision, bootstrap, deployment, full]
+      outputs-manifest:
+        description: For nvkr-outputs only. A path under inputs/qualification/ to the producer's outputs manifest.
+        type: string
+        default: ''
+      harness-commit:
+        description: The NVKE commit whose suite and harness run. Empty means the plan fixture's commit. For build-subject it must be that commit.
+        type: string
+        default: ''
+      node-user:
+        description: The account the node image bakes. Empty falls back to the QUALIFY_E2E_NODE_USER variable, then to the suite's default.
+        type: string
+        default: ''
+      allow-node-image-version-skew:
+        description: For nvkr-outputs only. Allow a node image built at another NVKE version than the plan's. The summary records the skew.
+        type: boolean
+        default: false
+      verify-plan:
+        description: Also run NVKE's qualify verify on the plan before any machine is taken. Needs the NGC credentials NVKE's own lane uses.
+        type: boolean
+        default: false
+      dry-run:
+        description: Plan, check, stage and list the specs without joining Teleport or taking a machine.
+        type: boolean
+        default: false
+      keep-site:
+        description: Keep the site node, and a failed tenant's nodes, for debugging. Delete them by hand afterwards.
+        type: boolean
+        default: false
+
+permissions: {}
+
+jobs:
+  placeholder:
+    name: Refuse the placeholder
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Refuse
+        run: |
+          echo "::error::this is the default-branch placeholder; dispatch the branch that carries the real workflow"
+          exit 1
