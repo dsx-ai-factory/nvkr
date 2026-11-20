@@ -296,47 +296,29 @@ func admitPlanStamp(ctx context.Context, plan, generatorVersion string) error {
 	return nil
 }
 
-// generateClosure writes or checks every member through its own owner. Production
-// goes through the qualification owner when a policy is named, because that owner
-// composes the producer and qualification pair; every other Run uses the Run
-// owner, or the runtime-Plan owner when its Environment opts into githubRuntimePlan. An owner's coded drift or conflict error is returned unchanged.
-func generateClosure(ctx context.Context, config Config, generatorVersion string, check bool,
-	generate func(context.Context, string, string, string, string, string, bool) (string, error),
-) (string, error) {
-	var digest string
-	var err error
-	if config.QualificationPolicy != "" {
-		digest, err = qualification.GenerateFiles(ctx, config.Definition, config.Environment, config.QualificationPolicy, generatorVersion, factory.EngineGitHub, ".", check)
-	} else {
-		digest, err = generate(ctx, config.Definition, config.Environment, generatorVersion, factory.EngineGitHub, ".", check)
+// generateClosure delegates complete-set publication to the generation owner.
+// Runtime members are admitted against their committed baseline before any write.
+func generateClosure(ctx context.Context, config Config, generatorVersion string, check bool) (string, error) {
+	inputs := []qualification.GenerationInput{{Definition: config.Definition, Environment: config.Environment,
+		QualificationPolicy: config.QualificationPolicy}}
+	for _, run := range otherRuns(config) {
+		input := qualification.GenerationInput{Definition: run.Definition, Environment: run.Environment,
+			QualificationPolicy: run.QualificationPolicy}
+		if run.Environment == config.DevelopmentEnvironment && input.QualificationPolicy == "" {
+			input.QualificationPolicy = config.DevelopmentQualificationPolicy
+		}
+		if input.QualificationPolicy == "" {
+			environment, err := lifecycle.LoadEnvironment(ctx, run.Environment)
+			if err != nil {
+				return "", err
+			}
+			input.Runtime = environment.GitHubRuntimePlan
+		}
+		inputs = append(inputs, input)
 	}
+	digests, err := qualification.GenerateSelections(ctx, inputs, generatorVersion, ".", check)
 	if err != nil {
 		return "", err
 	}
-	for _, run := range otherRuns(config) {
-		if run.QualificationPolicy != "" {
-			if _, err := qualification.GenerateFiles(ctx, run.Definition, run.Environment, run.QualificationPolicy, generatorVersion, factory.EngineGitHub, ".", check); err != nil {
-				return "", err
-			}
-			continue
-		}
-		if run.Environment == config.DevelopmentEnvironment && config.DevelopmentQualificationPolicy != "" {
-			if _, err := qualification.GenerateFiles(ctx, run.Definition, run.Environment, config.DevelopmentQualificationPolicy, generatorVersion, factory.EngineGitHub, ".", check); err != nil {
-				return "", err
-			}
-			continue
-		}
-		environment, err := lifecycle.LoadEnvironment(ctx, run.Environment)
-		if err != nil {
-			return "", err
-		}
-		owner := generate
-		if environment.GitHubRuntimePlan {
-			owner = lifecycle.GenerateRuntimeFiles
-		}
-		if _, err := owner(ctx, run.Definition, run.Environment, generatorVersion, factory.EngineGitHub, ".", check); err != nil {
-			return "", err
-		}
-	}
-	return digest, nil
+	return digests[0], nil
 }

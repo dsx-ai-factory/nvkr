@@ -25,16 +25,45 @@ The index describes producer commands; orchestration shell remains visible in wo
 
 | File | Purpose |
 |---|---|
-| `.github/<bundle>/plan.json` | Root index: scalar metadata, ordered build references and distinct catalogs keyed by catalogDigest |
+| `.github/<bundle>/plan.json` | Root index: scalar metadata, graphDigest, ordered build references and distinct catalogs keyed by catalogDigest |
 | `.github/<bundle>/manifest.json` | Owned paths, modes, full exact-byte hashes and Plan/workflow identities |
-| `.github/nvkr-plan-store/steps/<target>/<platform>@<12 hex>.json` | Build record with inline resolved configuration and execution graph, including source commits |
-| `.github/nvkr-plan-store/plan/<kind>-<name>@<12 hex>.json` | Catalog snapshots and remaining frozen Plan fields |
+| `.github/nvkr-plan-store/steps/<selection>/<target>/<platform>.json` | Build record with inline resolved configuration and execution graph, including source commits |
+| `.github/nvkr-plan-store/plan/<kind>-<selection>.json` | Shared frozen Plan fields with stable names |
+| `.github/nvkr-plan-store/plan/targets-<selection>-<bundle>.json` | Environment bindings, publication prefix, target repository suffixes and derived inventory Build Digest |
+| `.github/nvkr-plan-store/plan/catalog-<name>@<12 hex>.json` | Catalog snapshot variants |
 | `.github/nvkr-plan-store/scripts/<name>/<operation>@<12 hex>.sh` | Exact multiline operand bytes, with no added shebang or newline |
 | `.github/nvkr-plan-store/index.json` | Shared job-to-step-to-script navigation, variants and bundle users |
 
 Only `scripts/`, `steps/` and `plan/` are store directories. A step filename uses a platform label such as `linux-arm64`; its record retains the full original target name and platform. Component and source configuration stay inline, so reading a build does not require separate pointer-only records. Each distinct catalog snapshot is stored once per catalogDigest and shared across bundles.
 
-The short suffix is a locator. Full manifest hashes check file integrity; the typed Plan Digest binds the reconstructed canonical Plan. The shared index is descriptive, not authorization. `nvkr run plan --plan .github/nvkr-run-nvke/plan.json --json` verifies the manifest-listed tree and returns canonical bytes without resolving catalogs or rendering workflows. Complete adapter-file drift is checked separately by `make workflows-check`; each bundle check verifies its navigation and the shared object inventory. Checking all maintained bundles covers the entire navigation index without reading another bundle's private Plan or workflows. Edit authored inputs or generator code, then regenerate. Do not edit frozen scripts or indexes.
+The `nvkr-plan-tree-v3` format omits the artifact graph. Loading derives it from the verified stored inputs
+with the existing compiler, checks the root's typed `graphDigest`, and validates the complete reconstructed
+Plan against its manifest identity. Use `nvkr run graph` to inspect the graph; packed exports retain it in full.
+V1 and v2 trees remain readable, and regeneration retires their stored graph objects. Graph omission reduces
+the committed tree, not the packed Plan size or its 8 MiB limit.
+
+Plan and step names remain stable when their bytes change. Environment records include the bundle name.
+Static Environments can share output records when only their bindings differ. For `githubRuntimePlan`
+Environments, all stable Plan and step records additionally include the bundle name. Nightly keeps separate
+records so dispatch refresh and carrier installation can update it beside unchanged production files.
+Catalogs and scripts keep short content suffixes because multiple variants may coexist. The short suffix
+is a locator. Full manifest hashes check file integrity; the typed Plan Digest binds the reconstructed
+canonical Plan. The shared index is descriptive, not authorization.
+
+`nvkr run plan --plan .github/nvkr-run-nvke/plan.json --json` verifies the manifest-listed tree and returns
+canonical bytes without resolving catalogs or rendering workflows. Complete adapter-file drift is checked
+separately by `make workflows-check`; each bundle check verifies its navigation and the shared object
+inventory. Checking all maintained bundles covers the entire navigation index without reading another
+bundle's private Plan or workflows.
+
+Edit authored inputs or generator code, then regenerate with `make workflows-generate`. A change to a shared
+stable record requires all its owners in that coordinated generation; a single-bundle write that would leave
+another owner stale is refused. `make nvke-generate` and `make pipeline-dev-generate` also regenerate the
+complete maintained set. Static Environments that need different shared producer or output contents require
+distinct Definition names; an incompatible coordinated batch returns a capability error. The store's `plan/`
+and `steps/` directories are generator-owned: unmanifested stable JSON files there are swept, so keep authored
+files elsewhere. An interrupted update fails exact-byte checks; retry the same complete selection, or restore
+the committed store and manifests before changing the inputs. Do not edit frozen scripts or indexes.
 
 ## Consume from another CI adapter
 
