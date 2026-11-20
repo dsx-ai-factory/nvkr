@@ -51,6 +51,17 @@ A process-wide permit owns queueing, snapshot creation, scan/cleanup and close; 
 against unrelated processes. Opted-in inspection failure fails the Run and discards uncommitted delivery
 bytes; default builds remain build-only. Controlled tests exercise these boundaries, not a real joined NVKE bake.
 
+The hosted `installed-packages-v1` extension now selects that concrete held-Packer
+reader through the existing original-owner evidence transaction. It emits signed
+package inventory for plain disks and explicit producer-only FDE evidence; inspection
+failure cannot downgrade the requested mode. The package scan has one selected
+profile timeout, rather than the strict material-operation multiplier. Source/material
+integrity and evidence slots remain mandatory. Contract tests cover both architecture
+descriptions and owner/profile/subject substitution; no current hosted populated-SBOM
+Run is recorded. Maintained Environments stay on producer-only evidence until refreshed
+appliances preserve the observed vendor and measured image pins are recorded for both
+architectures. The historical 730-package diagnostic is not hosted publication proof.
+
 The separate full-content profile binds the native inspector/codec/guestfish/Syft/dpkg-deb image/tool closure,
 resource budgets, exact acquisition carriers, staged materials and exported filesystem. Class-separated
 correspondence, observed file hashes, method-scoped CycloneDX subjects and original-owner export receipts
@@ -88,8 +99,9 @@ coordinates and timeout summaries. A separate parsing ceiling rejects excessive 
 draining the child; truncation preserves the last accepted phase. Diagnostics grant no receipt and timing
 does not enter evidence identity. Hosted retention uses one atomically published, no-replace file and an
 optional, failure-tolerant, always-run upload with one-day retention and a separate five-minute allowance.
-Required evidence uploads remain mandatory. NVKE build-provenance mode emits neither inspection nor this
-upload. Rebuilt-helper deployment, full native inspection and corrected production timeout behavior remain
+Required evidence uploads remain mandatory. Per-output build-provenance mode emits neither inspection nor this
+upload. Package-only plain outputs select the existing inspection diagnostic transport.
+Rebuilt-helper deployment, full native inspection and corrected production timeout behavior remain
 unexercised.
 
 The [October 7 PR #97 contract record](https://github.com/dsx-ai-factory/nvkr/blob/e8bc47af0bc4c4017cf3dad1f13b03b1468f3643/docs/evidence/2026-10-07-pr97-review-fix-contracts.md)

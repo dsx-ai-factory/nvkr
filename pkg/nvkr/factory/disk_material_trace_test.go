@@ -48,7 +48,7 @@ func diskMaterialTraceFixtureWithCapture(t *testing.T, sibling, networked bool, 
 	return diskMaterialTraceFixtureWithPublicationMode(t, sibling, networked, platform, encryption, capture, len(buildProvenance) != 0 && buildProvenance[0], "")
 }
 
-func diskMaterialTraceFixtureWithPublicationMode(t *testing.T, sibling, networked bool, platform, encryption, capture string, buildProvenance bool, publicationMode string) (*Plan, *LocalRunResult) {
+func diskMaterialTraceFixtureWithPublicationMode(t *testing.T, sibling, networked bool, platform, encryption, capture string, buildProvenance bool, publicationMode string, edits ...func(*authored.Environment)) (*Plan, *LocalRunResult) {
 	t.Helper()
 	fixture := newVMPackerMaterialFixtureForPlatform(t, nil, map[string]string{"a-agent": "agent", "z-runtime": "runtime"}, platform)
 	base := fixture.plan.CatalogSnapshot
@@ -90,6 +90,9 @@ func diskMaterialTraceFixtureWithPublicationMode(t *testing.T, sibling, networke
 		environment.Signing = cosignSigningProfile()
 		fixture.plan.Definition.CosignTool = "cosign"
 		base.Tools = map[string]catalog.ToolPin{"cosign": {Format: ToolFormatTarGzip, URL: "https://example.test/cosign.tar.gz", Platform: environment.UtilityPlatform, ExecutablePath: "cosign", ArchiveDigest: testCosignArchiveDigest, ExecutableDigest: testCosignExecutableDigest}}
+	}
+	for _, edit := range edits {
+		edit(&environment)
 	}
 	stack, err := catalog.ApplyStack(base)
 	if err != nil {

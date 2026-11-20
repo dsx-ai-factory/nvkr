@@ -159,7 +159,7 @@ func TestCompleteHostedDiskPublicationStrictPublicRuntime(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 90*time.Second)
 	defer cancel()
 	fixture := newPublicDiskEvidenceFixture(t, ctx, "hosted publication")
-	if diskBuildProvenance(fixture.plan) || fixture.plan.Qualification != TierPipelineAttested {
+	if diskBuildProvenance(fixture.plan, fixture.plan.LifecycleOutputs[0].Name) || fixture.plan.Qualification != TierPipelineAttested {
 		t.Fatal("fixture does not select strict pipeline-attested completion")
 	}
 	owner, artifact := fixture.produce(t, ctx)
