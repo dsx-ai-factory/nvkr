@@ -12,14 +12,14 @@ import (
 
 func selectionFlags() []cli.Flag {
 	return []cli.Flag{
-		&cli.StringFlag{Name: "data", Usage: "explicit catalog directory"},
+		&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Usage: "explicit catalog directory"},
 		&cli.StringSliceFlag{Name: "component", Usage: "exact component ID to build (repeatable)"},
 		&cli.StringFlag{Name: "platform", Usage: "target platform: linux/amd64 | linux/arm64"},
 	}
 }
 
 func providerFor(c *cli.Context) catalog.DataProvider {
-	if d := c.String("data"); d != "" {
+	if d := c.String("catalog"); d != "" {
 		return catalog.Dir(d)
 	}
 	return nil
@@ -28,8 +28,8 @@ func providerFor(c *cli.Context) catalog.DataProvider {
 // resolveBuildResult retains the SDK's resolved producers, compiled graph and
 // digest together so command adapters do not compile the same inputs again.
 func resolveBuildResult(c *cli.Context) (*client.Resolution, error) {
-	if c.String("data") == "" {
-		return nil, e.New(e.CodeUsage, "build resolution requires --data <catalog-directory>")
+	if c.String("catalog") == "" {
+		return nil, e.New(e.CodeUsage, "build resolution requires --catalog <catalog-directory>")
 	}
 	return client.New(client.WithProvider(providerFor(c))).ResolveBuild(c.Context, client.ResolveRequest{
 		Components: c.StringSlice("component"), Platform: c.String("platform"),

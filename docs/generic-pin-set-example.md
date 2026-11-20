@@ -35,8 +35,8 @@ From the NVKR repository root, with its pinned Go toolchain available:
 mkdir -p .nvkr/generic-pin-set
 cp docs/examples/generic-pin-set/registry.yaml .nvkr/generic-pin-set/
 # Edit the copied registry to use your real URLs.
-go run ./cmd/nvkr catalog pin --dir .nvkr/generic-pin-set --tag v1.4.0 platform
-go run ./cmd/nvkr catalog validate --data .nvkr/generic-pin-set
+go run ./cmd/nvkr catalog pin --catalog .nvkr/generic-pin-set --tag v1.4.0 platform
+go run ./cmd/nvkr catalog validate --catalog .nvkr/generic-pin-set
 ```
 
 NVKR generates `pins.lock.yaml` with three records:
@@ -52,7 +52,7 @@ Do not edit the generated lock. No build, packaging or installation runs in this
 ## Preview the next release
 
 ```sh
-go run ./cmd/nvkr catalog bump --dir .nvkr/generic-pin-set --check platform
+go run ./cmd/nvkr catalog bump --catalog .nvkr/generic-pin-set --check platform
 ```
 
 This checks the newest tag matching `1.4.x`. Pending changes return `NVKR-E-DIFF` without writing;

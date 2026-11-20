@@ -112,7 +112,7 @@ for directory in inputs/catalogs/nvsentinel inputs/experiments/nvsentinel/catalo
     if [ "$directory" = inputs/experiments/nvsentinel/catalog ]; then
       case "$source" in nvsentinel-binaries|nvsentinel-content) continue ;; esac
     fi
-    bin/nvkr catalog pin --dir "$directory" \
+    bin/nvkr catalog pin --catalog "$directory" \
       --commit c1593477357299ab93dd5246f5b2cd236f8f07c8 --timeout 5m "$source"
   done
 done

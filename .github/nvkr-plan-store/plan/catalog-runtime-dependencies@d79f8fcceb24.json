@@ -282,7 +282,7 @@
   "Kind": "SourceBuildRegistry",
   "Metadata": {
     "description": "Acquired runtime images selected by pinned NVKE deployment values and exact acquired chart payloads; not chart default deployment topology.",
-    "name": "nvke-deployment-images"
+    "name": "runtime-dependencies"
   },
   "Sources": {
     "nvke-deployment-selection": {
