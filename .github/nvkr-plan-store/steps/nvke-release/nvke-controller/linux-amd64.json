@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:61ccf2ba324853ee4329620cd8a5fb62404f5913c7f74b12a90c0c3fdf496e3d",
-  "catalogDigest": "sha256:cfdd2ac46b19b3d786987d53709b459a8964a32fadc4230ec3a41d68d9c470b7",
+  "catalogDigest": "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87",
   "components": [
     "nvke-controller"
   ],

@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:a355e104d9e04ce11a5bbbd4054bd7e5a1f7c82e01033b6dcbb9c2cbfaacf576",
-  "catalogDigest": "sha256:981ee13a811402292ecebadf45629ce01bbca126d58d83a4e535a606a1e33417",
+  "catalogDigest": "sha256:b6ecdd63bf4f35cbe2cbee75bd573e3afba798e410a7e81cb73d7b4c8a7da8fe",
   "components": [
     "helm-operator",
     "kubectl-operator"

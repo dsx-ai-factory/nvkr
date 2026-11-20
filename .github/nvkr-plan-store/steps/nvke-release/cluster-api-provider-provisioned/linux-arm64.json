@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:59dc2953847c0461b6727d50d2b22b00e6d5662000366f7fc3947144238f1599",
-  "catalogDigest": "sha256:cfdd2ac46b19b3d786987d53709b459a8964a32fadc4230ec3a41d68d9c470b7",
+  "catalogDigest": "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87",
   "components": [
     "cluster-api-provider-provisioned"
   ],
