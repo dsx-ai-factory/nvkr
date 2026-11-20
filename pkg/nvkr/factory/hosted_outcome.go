@@ -43,6 +43,11 @@ func validateHostedRestores(ctx context.Context, workspace string, plan *Plan) e
 	if PerOutputPublication(plan) {
 		raw, err := readSmallFactoryFile(ctx, HostedRestoreOutcomePath(workspace, "all-provider-jobs"), "provider job closure")
 		if err != nil || string(raw) != "restored:success\n" {
+			if err == nil {
+				if detail := githubProviderFailureMessage(plan, strings.TrimSuffix(string(raw), "\n")); detail != "" {
+					return classifyContext(ctx, e.New(e.CodeProvenanceMissing, "%s; complete provider job closure did not succeed", detail))
+				}
+			}
 			return classifyContext(ctx, e.New(e.CodeProvenanceMissing, "complete provider job closure did not succeed"))
 		}
 	}

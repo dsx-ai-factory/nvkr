@@ -403,8 +403,11 @@ func TestCosignOCINoCredentialUsesPrivateEmptyDockerConfig(t *testing.T) {
 				env[key] = value
 			}
 		}
-		if env["HOME"] == "" || env["HOME"] == ambient || env["DOCKER_CONFIG"] == "" || filepath.Dir(env["DOCKER_CONFIG"]) != env["HOME"] || env["XDG_CONFIG_HOME"] != "" || env["XDG_RUNTIME_DIR"] != "" {
+		if env["HOME"] == "" || env["HOME"] == ambient || env["DOCKER_CONFIG"] == "" || filepath.Dir(env["DOCKER_CONFIG"]) == ambient || env["XDG_CONFIG_HOME"] != "" || env["XDG_RUNTIME_DIR"] != "" {
 			return fmt.Errorf("ambient credential search paths remained")
+		}
+		if call.args[0] != "verify-blob-attestation" && filepath.Dir(env["DOCKER_CONFIG"]) != env["HOME"] {
+			return fmt.Errorf("registry operation lost its credential workspace")
 		}
 		captured = filepath.Join(env["DOCKER_CONFIG"], "config.json")
 		raw, err := os.ReadFile(captured)
