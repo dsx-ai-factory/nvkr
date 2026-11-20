@@ -395,14 +395,17 @@ Pipeline-attested contract from [#514](https://github.com/dsx-ai-factory/nvkr/is
 [Reconciliation](reconciliation/object-store-publication.md#selective-boot-asset-publication) owns acceptance/implementation. Existing full-mirror schemas, bytes and verification stay unchanged.
 Generated execution, producer integration and rendering remain separate acceptance work; compiling the versioned Plan does not enable those routes.
 
-NVKR Go remains independent of downstream CRDs and rendering conventions. The NVKE catalog owns
-its MachineImage candidate as a small script and maintained template under
+NVKR's root Go module remains independent of downstream CRDs and rendering conventions. The NVKE catalog owns
+its MachineImage candidate as a separate Go module and maintained template under
 `inputs/catalogs/nvke/machineimage/`. It consumes generic preliminary or selected boot descriptions
 (named disk/platform raw digests, imager members/profiles and destination URLs), with separately supplied
 proposed disk metadata. It reads the CRD directly from the catalog's locked `nvke-controller` source commit;
 no CRD is vendored and no floating or dirty-working-tree schema is used. Rendering validates the complete
-set against that source's served OpenAPI schema before emitting any manifests. Local JSON Schema checks
-are not Kubernetes CEL/admission or boot evidence.
+set against that source's served OpenAPI schema with kube-openapi before emitting any manifests.
+Schema admission rejects unsupported features and references. A guarded table binds exact CEL rule text
+and schema location to Go predicates; any unknown rule in the CRD fails closed. The known immutability
+transition rule is inapplicable to new candidates. These checks are not a CEL interpreter, Kubernetes
+admission or boot evidence.
 
 This catalog experiment is not a declared producer, generated execution route or NVKR lifecycle API.
 Production rendering remains unavailable. Candidate descriptions authenticate nothing; metadata bindings,
@@ -410,7 +413,7 @@ ordinary producer/material integration, signed artifact handoff and trusted impo
 The candidate names fingerprint exact pre-name YAML bytes, not a typed Build or Release identity. Its
 annotations distinguish output/destination pairs and record the imager raw digest. No eventual aggregate,
 content or inventory identity enters the rendered bytes. Existing source Build and Plan identities are
-unchanged by this unregistered candidate. Future producer admission must bind the script, template,
+unchanged by this unregistered candidate. Future producer admission must bind the program, template,
 source CRD, exact raw dependencies and authorized metadata through the existing material/Build owners.
 
 NVKE owns CRD compatibility, iPXE/template conventions and downstream registration. Strict imager
