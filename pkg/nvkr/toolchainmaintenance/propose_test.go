@@ -19,6 +19,7 @@ func TestReviewPathAdmission(t *testing.T) {
 		want bool
 	}{
 		{"inputs/catalogs/node-images/registry.yaml", true}, {"inputs/environments/github-release.yaml", true}, {".github/nvkr-run/plan.json", true}, {".github/workflows/nvkr-run.yml", true},
+		{"inputs/environments/café.json", true}, {"inputs/environments/\xff.json", false},
 		{"inputs/catalogs/node-images/pins.lock.yaml", false}, {"inputs/policies/toolchain-maintenance/123.json", false}, {producerOverlayPolicy, true}, {"inputs/policies/other-producer-overlays.json", false}, {localToolchainBindings, true}, {"toolchains/nvkr-packer/toolchain.lock.json", false}, {".github/workflows/merge-gate.yaml", false}, {"inputs/catalogs/../../secret.json", false}, {"/tmp/registry.yaml", false}, {"inputs/catalogs/./registry.yaml", false},
 	} {
 		if got := allowedReviewPath(tc.path); got != tc.want {
@@ -27,7 +28,7 @@ func TestReviewPathAdmission(t *testing.T) {
 	}
 }
 func TestProposalRetryAndRefusal(t *testing.T) {
-	for _, scenario := range []string{"create", "retry", "closed", "conflict", "main-advanced", "unexpected-file", "whitespace-changed", "whitespace-untracked", "symlink", "ambiguous-refs", "truncated-pulls", "invalid-bot", "deleted", "executable", "no-change"} {
+	for _, scenario := range []string{"create", "retry", "closed", "conflict", "main-advanced", "unexpected-file", "whitespace-changed", "whitespace-untracked", "invalid-utf8", "symlink", "ambiguous-refs", "truncated-pulls", "invalid-bot", "deleted", "executable", "no-change"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := t.TempDir()
 			name := "inputs/environments/test.json"
@@ -73,12 +74,15 @@ func TestProposalRetryAndRefusal(t *testing.T) {
 						return []byte(source + "\n"), nil
 					case "rev-parse HEAD^{tree}":
 						return []byte("base-tree\n"), nil
-					case "diff --name-only -z HEAD":
+					case "diff --no-renames --name-only -z HEAD":
 						if scenario == "no-change" {
 							return nil, nil
 						}
 						if scenario == "whitespace-changed" {
 							return []byte(" " + name + "\x00"), nil
+						}
+						if scenario == "invalid-utf8" {
+							return []byte("inputs/environments/\xff.json\x00"), nil
 						}
 						return []byte(name + "\x00"), nil
 					case "ls-files --others --exclude-standard -z":
@@ -138,8 +142,8 @@ func TestProposalRetryAndRefusal(t *testing.T) {
 						t.Fatal(body)
 					}
 					entry := entries[0].(map[string]any)
-					if scenario == "deleted" && entry["sha"] != nil {
-						t.Fatal("deletion requires null sha")
+					if sha, present := entry["sha"]; scenario == "deleted" && (!present || sha != nil) {
+						t.Fatal("deletion requires an explicit null sha")
 					}
 					if scenario == "executable" && entry["mode"] != "100755" {
 						t.Fatal("executable mode lost")
@@ -193,7 +197,7 @@ func TestProposalRetryAndRefusal(t *testing.T) {
 				return nil, nil
 			}}
 			result, err := propose(t.Context(), client, func(k string) string { return env[k] })
-			failure := slices.Contains([]string{"conflict", "main-advanced", "unexpected-file", "whitespace-changed", "whitespace-untracked", "symlink", "ambiguous-refs", "truncated-pulls", "invalid-bot"}, scenario)
+			failure := slices.Contains([]string{"conflict", "main-advanced", "unexpected-file", "whitespace-changed", "whitespace-untracked", "invalid-utf8", "symlink", "ambiguous-refs", "truncated-pulls", "invalid-bot"}, scenario)
 			if failure {
 				requireReviewError(t, err)
 			} else if err != nil || result == "" {
@@ -207,7 +211,7 @@ func TestProposalRetryAndRefusal(t *testing.T) {
 					t.Fatalf("retry mutated branch/proposal: %+v", w)
 				}
 			}
-			if slices.Contains([]string{"main-advanced", "unexpected-file", "whitespace-changed", "whitespace-untracked", "symlink", "ambiguous-refs", "no-change"}, scenario) && len(writes) != 0 {
+			if slices.Contains([]string{"main-advanced", "unexpected-file", "whitespace-changed", "whitespace-untracked", "invalid-utf8", "symlink", "ambiguous-refs", "no-change"}, scenario) && len(writes) != 0 {
 				t.Fatalf("rejected candidate wrote: %+v", writes)
 			}
 		})
@@ -219,4 +223,36 @@ func TestProposalAdmissionBeforeWork(t *testing.T) {
 		return nil, nil
 	}}, func(string) string { return "" })
 	requireReviewError(t, err)
+}
+
+func TestCandidateFilesPreserveStagedRename(t *testing.T) {
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	root := t.TempDir()
+	git := func(args ...string) {
+		t.Helper()
+		if _, err := command(t.Context(), root, "git", args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	git("init", "--template=")
+	oldPath, newPath := "inputs/environments/old.json", "inputs/environments/new.json"
+	if err := os.MkdirAll(filepath.Dir(filepath.Join(root, oldPath)), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	const contents = `{"image":"synthetic"}`
+	if err := os.WriteFile(filepath.Join(root, oldPath), []byte(contents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	git("add", "--", oldPath)
+	git("-c", "user.name=Synthetic Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "-m", "fixture")
+	git("mv", "--", oldPath, newPath)
+	git("config", "diff.renames", "true")
+	files, err := newReviewClient(root).candidateFiles(t.Context())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 || files[0].entry.Path != newPath || files[0].deleted || string(files[0].content) != contents || files[1].entry.Path != oldPath || !files[1].deleted {
+		t.Fatalf("rename lost its deletion or addition: %+v", files)
+	}
 }

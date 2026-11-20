@@ -36,7 +36,7 @@ func TestReviewOutputBound(t *testing.T) {
 	}
 }
 func TestMalformedReviewPagesFailClosed(t *testing.T) {
-	for _, raw := range []string{"null", "{}", "[null]", "[{}]", "not-json"} {
+	for _, raw := range []string{"null", "{}", "[null]", "[{}]", "[[null]]", "[[], [null]]", "not-json"} {
 		t.Run(raw, func(t *testing.T) {
 			c := reviewClient{invoke: func(context.Context, []string, []byte) ([]byte, error) { return []byte(raw), nil }}
 			var issues []refreshIssue

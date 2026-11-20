@@ -103,11 +103,6 @@ func TestCompareRejectsUnadmittedPlan(t *testing.T) {
 	} else {
 		t.Fatal("unadmitted Plan accepted")
 	}
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	if _, err := Compare(ctx, plan, proposal, "amd64"); err == nil {
-		t.Fatal("canceled Plan read accepted")
-	}
 }
 
 func TestCompareCommittedPlanTree(t *testing.T) {
@@ -148,6 +143,11 @@ func TestCompareCommittedPlanTree(t *testing.T) {
 			changed, err := Compare(t.Context(), planPath, proposal, arch)
 			if err != nil || changed {
 				t.Fatalf("committed Plan comparison = %t: %v", changed, err)
+			}
+			ctx, cancel := context.WithCancel(t.Context())
+			cancel()
+			if _, err := Compare(ctx, planPath, proposal, arch); !errors.Is(err, context.Canceled) {
+				t.Fatalf("canceled comparison did not preserve cancellation: %v", err)
 			}
 		})
 	}
@@ -302,6 +302,18 @@ func TestRefreshReportRouting(t *testing.T) {
 		if len(f.writes) != 0 {
 			t.Fatal(f.writes)
 		}
+	})
+	t.Run("null legacy item refuses creation", func(t *testing.T) {
+		c := reviewClient{invoke: func(_ context.Context, args []string, payload []byte) ([]byte, error) {
+			if payload != nil {
+				t.Fatal("malformed lookup authorized a remote write")
+			}
+			if strings.Contains(args[len(args)-1], "labels=") {
+				return []byte(`[[]]`), nil
+			}
+			return []byte(`[[null]]`), nil
+		}}
+		requireReviewError(t, c.postReport(t.Context(), "report"))
 	})
 }
 func TestRefreshActionableOutcomes(t *testing.T) {

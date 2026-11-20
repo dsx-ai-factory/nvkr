@@ -101,6 +101,11 @@ func (c reviewClient) pages(ctx context.Context, endpoint string, result any) er
 		if page == nil {
 			return e.New(e.CodeGateUnmet, "missing review page")
 		}
+		for _, item := range page {
+			if bytes.Equal(bytes.TrimSpace(item), []byte("null")) {
+				return e.New(e.CodeGateUnmet, "missing review item")
+			}
+		}
 		flat = append(flat, page...)
 	}
 	joined, err := json.Marshal(flat)

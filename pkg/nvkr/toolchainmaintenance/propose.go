@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"unicode/utf8"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
@@ -22,7 +23,7 @@ var reviewRunPattern = regexp.MustCompile(`^[1-9][0-9]{0,18}$`)
 var appSlugPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
 
 func allowedReviewPath(path string) bool {
-	if path == "" || !filepath.IsLocal(path) || strings.Contains(path, `\`) {
+	if path == "" || !utf8.ValidString(path) || !filepath.IsLocal(path) || strings.Contains(path, `\`) {
 		return false
 	}
 	parts := strings.Split(path, "/")
@@ -69,7 +70,7 @@ func (c reviewClient) git(ctx context.Context, args ...string) (string, error) {
 	return string(raw), err
 }
 func (c reviewClient) candidateFiles(ctx context.Context) ([]reviewFile, error) {
-	changed, err := c.git(ctx, "diff", "--name-only", "-z", "HEAD")
+	changed, err := c.git(ctx, "diff", "--no-renames", "--name-only", "-z", "HEAD")
 	if err != nil {
 		return nil, err
 	}
