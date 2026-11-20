@@ -96,11 +96,11 @@ git_fixture init -q --template= --object-format=sha1 --initial-branch=main
 git_fixture add .
 git_fixture commit -q -m 'fixture 1.0.0'
 for tag in app/v1.0.0 tools/v1.0.0 platform/v1.0.0; do git_fixture tag "$tag"; done
-cli catalog pin --dir catalog --tag 1.0.0 platform
+cli catalog pin --catalog catalog --tag 1.0.0 platform
 bounded cp -- catalog/pins.lock.yaml original-pins.lock.yaml
-cli catalog pin --dir catalog --tag 1.0.0 platform
+cli catalog pin --catalog catalog --tag 1.0.0 platform
 unchanged_lock 'no-op pin'
-run_checked 13 NVKR-E-UNSUPPORTED command.stdout "$binary" catalog pin --dir catalog --tag 1.0.0 app
+run_checked 13 NVKR-E-UNSUPPORTED command.stdout "$binary" catalog pin --catalog catalog --tag 1.0.0 app
 unchanged_lock 'refused derived-member pin'
 
 cli_to definition.json definition inspect --definition definition.yaml
@@ -124,7 +124,7 @@ bounded jq -e '
 supplier_hash=$(bounded "${hash_command[@]}" <supplier-doctor.sh)
 supplier_hash=${supplier_hash%% *}
 [[ $supplier_hash =~ ^[0-9a-f]{64}$ ]] || die 'invalid supplier SHA-256 output'
-cli_to catalog-digest.txt catalog digest --data catalog
+cli_to catalog-digest.txt catalog digest --catalog catalog
 catalog_digest=$(<catalog-digest.txt)
 # These are complete authored inputs and reports, never canonical identities.
 bounded jq -nS --arg digest "$catalog_digest" --arg supplier "sha256:$supplier_hash" '{
@@ -159,9 +159,9 @@ EOF
 git_fixture add versions.yaml
 git_fixture commit -q -m 'fixture platform 1.0.1'
 git_fixture tag platform/v1.0.1
-run_checked 3 NVKR-E-DIFF pin-preview.txt "$binary" catalog bump --dir catalog --check platform
+run_checked 3 NVKR-E-DIFF pin-preview.txt "$binary" catalog bump --catalog catalog --check platform
 unchanged_lock 'pin preview'
-cli catalog bump --dir catalog platform
+cli catalog bump --catalog catalog platform
 compile_plan source-pin
 run_checked 43 NVKR-E-UNVERIFIED-REF command.stdout "$binary" run plan --definition whole-producer.json \
   --environment environment.yaml --json

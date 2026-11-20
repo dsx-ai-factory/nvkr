@@ -279,9 +279,9 @@ func TestFlagOnlyInspectionCommandsRejectUnusedArguments(t *testing.T) {
 		{"definition validate", []string{"definition", "validate", "--definition", definition, "--ui", "plain", "typo.yaml"}, "--definition"},
 		{"definition inspect", []string{"definition", "inspect", "--definition", definition, "--ui", "plain", "typo.yaml"}, "--definition"},
 		{"definition pin", []string{"definition", "pin", "--definition", definition, "--check", "typo.yaml"}, "--definition"},
-		{"catalog validate", []string{"catalog", "validate", "--data", catalog, "--ui", "plain", "nvkectl"}, "--data"},
-		{"catalog list", []string{"catalog", "list", "--data", catalog, "--ui", "plain", "nvkectl"}, "--data"},
-		{"catalog digest", []string{"catalog", "digest", "--data", catalog, "--ui", "plain", "nvkectl"}, "--data"},
+		{"catalog validate", []string{"catalog", "validate", "--data", catalog, "--ui", "plain", "nvkectl"}, "--catalog"},
+		{"catalog list", []string{"catalog", "list", "--data", catalog, "--ui", "plain", "nvkectl"}, "--catalog"},
+		{"catalog digest", []string{"catalog", "digest", "--data", catalog, "--ui", "plain", "nvkectl"}, "--catalog"},
 		{"flag-looking tokens after the argument", []string{"definition", "validate", "--definition", definition, "typo.yaml", "--ui", "plain"}, "--definition"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
