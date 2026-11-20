@@ -55,7 +55,7 @@ runs:
         set +x +v
         set -eu
         if [[ "${RUNNER_TEMP:-}" != /* ]] || [ ! -d "$RUNNER_TEMP" ] || ! command -v go >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1; then
-          printf 'NVKR-E-ENGINE-CAPABILITY: private bootstrap requires a runner temporary directory and Go (plus timeout and published-module Python when needed)\n' >&2
+          printf 'NVKR-E-ENGINE-CAPABILITY: private bootstrap requires a runner temporary directory, Go and timeout\n' >&2
           exit 29
         fi
         cache=$(mktemp -d "$RUNNER_TEMP/nvkr-ci-bootstrap-XXXXXXXX") || {

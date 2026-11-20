@@ -151,6 +151,12 @@ failure, not a signature result. A denied candidate manifest or bundle is one un
 search continues, a later valid candidate can still satisfy the type, and when none does the last
 candidate failure determines the code, so a sole denied candidate reports a fetch failure. Cosign itself verifies the fetched bundles offline with an empty private Docker configuration.
 The existing operation deadline covers transport and cryptographic verification.
+Bundle verification without an authenticated trusted-root snapshot gives each cosign subprocess a
+fresh private home and TUF cache. Parallel verifiers cannot write the same metadata files, and cleanup
+follows child completion on success, failure or cancellation. The pinned executable's normal TUF
+bootstrap and transparency checks remain in force; an ambient cache or trust override is not imported.
+This route still needs online trust metadata and does not claim reproducible offline root selection.
+The separately metered boot-verification path retains its authenticated shared root snapshot.
 Private temporary bundle files are checked for mutation and removed on success or failure. Unfetched
 historical or unrelated candidates are not claimed to be valid: this discovery requires an authenticated
 bundle for each required type, not validation of every registry referrer. Complete release payload and
