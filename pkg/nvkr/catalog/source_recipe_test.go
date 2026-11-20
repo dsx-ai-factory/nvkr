@@ -65,3 +65,36 @@ func TestSourceRecipeTagOnlyCommitDoesNotInferVersion(t *testing.T) {
 	_, err := c.RecipeVersion()
 	assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
 }
+
+func TestRenderedRecipeVersion(t *testing.T) {
+	commit := strings.Repeat("a", 40)
+	for _, tc := range []struct {
+		name, tag, template, stream, want string
+		invalid                           bool
+	}{
+		{"commit tag only", commit, "{{.Tag}}", "", "", false},
+		{"nonsemantic tag only", "next", "{{.Tag}}", "", "", false},
+		{"semantic tag only", "v1.2.3", "{{.Tag}}", "", "", false},
+		{"release", "v1.2.3", "{{.ReleaseVersion}}", "", "1.2.3", false},
+		{"commit packaging stream", commit, "{{.ReleaseVersion}}", "1.2.3", "1.2.3", false},
+		{"error after version", "v1.2.3", "{{.ReleaseVersion}}{{.Bogus}}", "", "", true},
+		{"missing commit stream", commit, "{{.ReleaseVersion}}", "", "", true},
+		{"unused conditional version", commit, "{{if false}}{{.ReleaseVersion}}{{else}}{{.Tag}}{{end}}", "", "", false},
+		{"invalid unused stream", commit, "{{.Tag}}", "invalid", "", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := Component{FromSource: true, Tag: tc.tag, Commit: commit, SourceRecipe: &SourceRecipe{BuildCommand: []string{"echo", tc.template}, ArtifactPath: "result", CommitVersion: tc.stream}}
+			got, err := c.RenderedRecipeVersion()
+			if tc.invalid {
+				if got != "" {
+					t.Fatalf("failed report returned version %q", got)
+				}
+				assertCatalogContractCode(t, err, e.CodeInvalidCatalog)
+				return
+			}
+			if err != nil || got != tc.want {
+				t.Fatalf("version=%q, error=%v; want %q", got, err, tc.want)
+			}
+		})
+	}
+}

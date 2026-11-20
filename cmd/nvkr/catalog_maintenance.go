@@ -86,8 +86,12 @@ func familyResultFields(result catalogmaintenance.FamilyResult) []progress.Field
 		}
 	}
 	for _, recipe := range result.Recipes {
-		rows = append(rows, progress.Field{Label: "Recipe normalized version " + recipe.Catalog + " / " + recipe.Component, Value: recipe.Before + " -> " + recipe.After})
-		rows = append(rows, progress.Field{Label: "  Exact Tag", Value: recipe.BeforeTag + " -> " + recipe.AfterTag})
+		tagLabel := "Recipe exact tag " + recipe.Catalog + " / " + recipe.Component
+		if recipe.Before != "" || recipe.After != "" {
+			rows = append(rows, progress.Field{Label: "Recipe normalized version " + recipe.Catalog + " / " + recipe.Component, Value: recipe.Before + " -> " + recipe.After})
+			tagLabel = "  Exact Tag"
+		}
+		rows = append(rows, progress.Field{Label: tagLabel, Value: recipe.BeforeTag + " -> " + recipe.AfterTag})
 		if recipe.CommitVersion != "" {
 			rows = append(rows, progress.Field{Label: "  Explicit commit-only packaging stream", Value: recipe.CommitVersion + "; for commit-only pins, Tag uses the exact commit"})
 		}

@@ -392,3 +392,32 @@ func TestFamilyMixedNoopAndAdvancingCatalogs(t *testing.T) {
 		t.Fatal("no-op catalog changed")
 	}
 }
+
+func TestFamilyRecipesPreserveCommitTag(t *testing.T) {
+	commit := strings.Repeat("a", 40)
+	for _, tc := range []struct {
+		name, operand, stream, want string
+		invalid                     bool
+	}{
+		{"tag only", "{{.Tag}}", "", "", false},
+		{"release requires stream", "{{.ReleaseVersion}}", "", "", true},
+		{"explicit packaging stream", "{{.ReleaseVersion}}", "1.2.3", "1.2.3", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cat := &catalog.Catalog{Components: map[string]catalog.Component{
+				"unselected-recipe": {FromSource: true, Tag: commit, Commit: commit, SourceRecipe: &catalog.SourceRecipe{BuildCommand: []string{"echo", tc.operand}, ArtifactPath: "result", CommitVersion: tc.stream}},
+			}}
+			got, err := familyRecipeVersions(cat)
+			if tc.invalid {
+				assertCode(t, err, e.CodeInvalidCatalog)
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if len(got) != 1 || got["unselected-recipe"].tag != commit || got["unselected-recipe"].version != tc.want {
+				t.Fatalf("recipe report: %+v", got)
+			}
+		})
+	}
+}

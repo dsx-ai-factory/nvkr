@@ -26,11 +26,18 @@ type SourceRecipe struct {
 var recipeTag = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/+~-]*$`)
 
 type sourceRecipeData struct {
-	Tag, Arch string
-	component Component
+	Tag, Arch      string
+	component      Component
+	releaseVersion *string
 }
 
-func (data sourceRecipeData) ReleaseVersion() (string, error) { return data.component.RecipeVersion() }
+func (data sourceRecipeData) ReleaseVersion() (string, error) {
+	version, err := data.component.RecipeVersion()
+	if err == nil && data.releaseVersion != nil {
+		*data.releaseVersion = version
+	}
+	return version, err
+}
 
 func cloneSourceRecipe(recipe *SourceRecipe) *SourceRecipe {
 	if recipe == nil {
@@ -65,7 +72,22 @@ func (c Component) RecipeVersion() (string, error) {
 	return version, nil
 }
 
+// RenderedRecipeVersion reports the packaging version actually used by a recipe.
+// Tag-only recipes return an empty version; their exact source tag remains separate.
+func (c Component) RenderedRecipeVersion() (string, error) {
+	var version string
+	_, _, err := c.renderSourceRecipe(&version)
+	if err != nil {
+		return "", err
+	}
+	return version, nil
+}
+
 func (c Component) renderedSourceRecipe() ([]string, string, error) {
+	return c.renderSourceRecipe(nil)
+}
+
+func (c Component) renderSourceRecipe(releaseVersion *string) ([]string, string, error) {
 	recipe := c.SourceRecipe
 	if recipe == nil {
 		return c.BuildCommand, c.ArtifactPath, nil
@@ -84,7 +106,7 @@ func (c Component) renderedSourceRecipe() ([]string, string, error) {
 	// Arch stays an existing runtime token. No shell expansion is introduced.
 	// Resolve a release version only when the declaration uses it: Tag alone can
 	// describe an exact commit without inventing a semantic packaging version.
-	data := sourceRecipeData{Tag: c.Tag, Arch: "{{.Arch}}", component: c}
+	data := sourceRecipeData{Tag: c.Tag, Arch: "{{.Arch}}", component: c, releaseVersion: releaseVersion}
 	render := func(raw string) (string, error) {
 		if len(raw) > 4096 {
 			return "", e.New(e.CodeInvalidCatalog, "source recipe value exceeds byte limit")

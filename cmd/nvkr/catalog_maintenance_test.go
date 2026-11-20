@@ -237,3 +237,14 @@ func TestCatalogRefreshAdmitsTheSourceRepositoryBeforeAnyWork(t *testing.T) {
 		})
 	}
 }
+
+func TestFamilyPreviewTagOnlyRecipe(t *testing.T) {
+	for _, tag := range []string{strings.Repeat("a", 40), "v1.2.3"} {
+		t.Run(tag, func(t *testing.T) {
+			fields := familyResultFields(catalogmaintenance.FamilyResult{Recipes: []catalogmaintenance.FamilyRecipeUpdate{{Catalog: "test", Component: "agent", BeforeTag: tag, AfterTag: tag}}})
+			if len(fields) != 1 || fields[0].Label != "Recipe exact tag test / agent" || fields[0].Value != tag+" -> "+tag {
+				t.Fatalf("tag-only report: %+v", fields)
+			}
+		})
+	}
+}

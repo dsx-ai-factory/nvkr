@@ -222,7 +222,7 @@ func bumpFamily(ctx context.Context, configPath, familyName, generatorVersion st
 				if component == nil || component.SourceRecipe == nil {
 					continue
 				}
-				version, err := component.RecipeVersion()
+				version, err := component.RenderedRecipeVersion()
 				if err != nil {
 					return result, err
 				}
@@ -230,7 +230,7 @@ func bumpFamily(ctx context.Context, configPath, familyName, generatorVersion st
 				oldTag := ""
 				if previous := before.Components[name].Component; previous != nil {
 					oldTag = previous.Tag
-					oldVersion, err = previous.RecipeVersion()
+					oldVersion, err = previous.RenderedRecipeVersion()
 					if err != nil {
 						return result, err
 					}
@@ -407,12 +407,16 @@ func familyRecipes(ctx context.Context, root, directory string) (map[string]fami
 	if err != nil {
 		return nil, err
 	}
+	return familyRecipeVersions(cat)
+}
+
+func familyRecipeVersions(cat *catalog.Catalog) (map[string]familyRecipeVersion, error) {
 	versions := map[string]familyRecipeVersion{}
 	for name, component := range cat.Components {
 		if component.SourceRecipe == nil {
 			continue
 		}
-		version, err := component.RecipeVersion()
+		version, err := component.RenderedRecipeVersion()
 		if err != nil {
 			return nil, err
 		}
