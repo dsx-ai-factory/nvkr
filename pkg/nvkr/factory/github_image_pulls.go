@@ -41,7 +41,7 @@ func githubStagePrivateImages(plan *Plan, stage githubStage) []string {
 			images = append(images, node.Container)
 		}
 	}
-	if stage.DiskOutput != "" && githubDiskInspectionRequired(plan) {
+	if stage.DiskOutput != "" && githubDiskInspectionRequired(plan, stage.DiskOutput) {
 		image := plan.Environment.DiskInspectionProfiles[stage.Nodes[0].Platform].Image
 		if githubPrivateToolchain(plan, image) {
 			images = append(images, image)

@@ -14,8 +14,8 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
-func diskBuildProvenance(plan *Plan) bool {
-	return plan != nil && plan.Environment.DiskEvidence == sbom.DiskBuildProvenance
+func diskBuildProvenance(plan *Plan, output string) bool {
+	return plan != nil && plan.Environment.DiskEvidenceFor(output) == sbom.DiskBuildProvenance
 }
 
 func diskBuildDocuments(build BuildPlan, hashes map[string]string) (map[string]*sbom.BOM, error) {
@@ -70,7 +70,7 @@ func validateDiskBuildDocument(plan *Plan, output, component, subject string, do
 // packageDiskBuildProvenance authenticates the original held QCOW2 and every
 // transitive material handoff. It does not manufacture an inspection receipt.
 func (owner *LocalRunResult) packageDiskBuildProvenance(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, output Artifact) (returnErr error) {
-	if !diskBuildProvenance(plan) || plan.Qualification != TierPipelineAttested || plan.Environment.GitHubARC != "native-kvm-v1" {
+	if !diskBuildProvenance(plan, expected.Name) || plan.Qualification != TierPipelineAttested || plan.Environment.GitHubARC != "native-kvm-v1" {
 		return e.New(e.CodeEngineCapability, "disk build provenance requires its explicit hosted policy")
 	}
 	platform, _, err := reconciledDiskPackageBinding(plan, expected, output)

@@ -165,8 +165,8 @@ Site-specific NICo provisioning targets and the special TestGrid publisher remai
 Unsigned runtime reports do not mint qualified conformance or promotion receipts.
 
 Consumer Verification Policy binds `minimumDiskEvidence` into its typed digest. Pipeline-attested policy
-defaults to `build-provenance-v1`; explicit `strict` requires inspected-disk evidence. Qualified policy
-defaults to strict and rejects the producer-only minimum. Every disk in the authenticated closure must
+defaults to `build-provenance-v1`; `packages` requires installed-package inventory and `strict` requires
+full content/material reconciliation. Qualified policy defaults to strict and rejects either weaker minimum. Every disk in the authenticated closure must
 meet that policy before a capability is issued. Synthetic publication contracts cover enforcement and
 failed-policy cleanup; they do not establish production disk-release acceptance.
 

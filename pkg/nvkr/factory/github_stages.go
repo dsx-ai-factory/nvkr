@@ -117,9 +117,9 @@ func githubDiskStageBudget(plan *Plan, stage githubStage) (time.Duration, int, e
 	if roots != 1 || members == 0 || plan == nil {
 		return 0, 0, e.New(e.CodeEngineCapability, "GitHub disk stage %q requires one bound VM producer", stage.ID)
 	}
-	if githubDiskInspectionRequired(plan) {
+	if githubDiskInspectionRequired(plan, stage.DiskOutput) {
 		started := time.Unix(0, 0)
-		deadline, err := diskEvidenceJoinDeadline(started, plan.Environment.DiskInspectionProfiles[platform].TimeoutSeconds, members)
+		deadline, err := diskSelectedEvidenceDeadline(plan, stage.DiskOutput, started, plan.Environment.DiskInspectionProfiles[platform].TimeoutSeconds, members)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -132,7 +132,7 @@ func githubDiskStageBudget(plan *Plan, stage githubStage) (time.Duration, int, e
 	// The helper returns before the provider boundary, leaving time for owner
 	// cleanup and failure diagnostics. Earlier caller deadlines still win.
 	uploadMinutes := githubDiskDiagnosticUploadMinutes // failed Packer diagnostics
-	if githubDiskInspectionRequired(plan) {
+	if githubDiskInspectionRequired(plan, stage.DiskOutput) {
 		uploadMinutes += githubDiskDiagnosticUploadMinutes // always-run inspection diagnostics
 	}
 	overhead := uint64((githubDiskProviderOverheadMinutes + githubDiskCleanupHeadroomMinutes + uploadMinutes) * 60)
@@ -292,7 +292,7 @@ func projectExecutionStages(plan *Plan, placement func(Node) (Node, error), byAu
 		if stage.DiskOutput != "" {
 			stage.ID = githubJobID("disk/" + stage.DiskOutput)
 			stage.Name = "Build, inspect and package " + stage.DiskOutput
-			if diskBuildProvenance(plan) {
+			if diskBuildProvenance(plan, stage.DiskOutput) {
 				stage.Name = "Build and package producer evidence for " + stage.DiskOutput
 			}
 			if GitHubDiskBuildOnly(plan) {
