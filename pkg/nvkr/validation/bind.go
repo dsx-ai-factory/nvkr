@@ -54,29 +54,35 @@ type BoundValidation struct {
 	closeErr error
 }
 
-// RunIdentity names the completed Run that was bound.
+// RunIdentity names the completed Run that was bound and the content it committed.
 type RunIdentity struct {
-	Attempt    string
-	PlanDigest string
+	Attempt        string
+	PlanDigest     string
+	ContentSubject string
 }
 
-// BoundSuite is a prepared suite resolved against the completed Run.
+// BoundSuite is a prepared suite resolved against the completed Run. Every
+// input is built for Platform, so one execution container can run the suite.
 type BoundSuite struct {
 	PreparedSuite
 	Inputs     map[string]BoundInput
+	Platform   string
 	TestOrigin TestOrigin
 	Image      string
 }
 
-// BoundInput is one input role bound to an exact named Run output.
+// BoundInput is one input role bound to an exact named Run output. Digest is
+// the declared component's build subject, the bytes under test; OutputDigest
+// identifies the output the Run committed.
 type BoundInput struct {
-	Output      string
-	Component   string
-	Format      string
-	Platform    string
-	Digest      string
-	BuildDigest string
-	Version     string
+	Output       string
+	Component    string
+	Format       string
+	Platform     string
+	Digest       string
+	OutputDigest string
+	BuildDigest  string
+	Version      string
 }
 
 // TestOrigin is the exact source the suite's tests come from.
@@ -121,7 +127,8 @@ func bindRun(p *PreparedValidation, run completedRun) (*BoundValidation, error) 
 		return nil, err
 	}
 	producers := map[string]*factory.CLIArtifactTestInputs{}
-	bound := &BoundValidation{run: run, identity: RunIdentity{Attempt: description.Attempt, PlanDigest: description.PlanDigest}}
+	bound := &BoundValidation{run: run, identity: RunIdentity{Attempt: description.Attempt, PlanDigest: description.PlanDigest,
+		ContentSubject: description.ContentSubject}}
 	for _, suite := range p.suites {
 		result := BoundSuite{PreparedSuite: suite, Inputs: map[string]BoundInput{}}
 		for _, role := range slices.Sorted(maps.Keys(suite.Inputs)) {
@@ -129,6 +136,10 @@ func bindRun(p *PreparedValidation, run completedRun) (*BoundValidation, error) 
 			if err != nil {
 				return nil, keepCode(err, "suite %q input %q", suite.ID, role)
 			}
+			if result.Platform != "" && result.Platform != input.Platform {
+				return nil, e.New(e.CodeEngineCapability, "suite %q inputs are built for different platforms %q and %q", suite.ID, result.Platform, input.Platform)
+			}
+			result.Platform = input.Platform
 			result.Inputs[role] = input
 			if role == suite.TestOrigin.FromInput {
 				result.TestOrigin = TestOrigin{Repository: producer.Repo, Commit: producer.Commit, Tree: producer.TreeHash}
@@ -181,6 +192,10 @@ func bindInput(description lifecycle.LocalDiagnosticDescription, platforms []str
 	if !ok {
 		var err error
 		if producer, err = run.Producer(input.Output); err != nil {
+			// The Run has the output, so a missing producer is a Run mismatch, not misuse.
+			if coded := (*e.Error)(nil); errors.As(err, &coded) && coded.Code == e.CodeUsage {
+				return BoundInput{}, nil, e.Wrap(e.CodeVerifyFailed, err, "output %q has no matching Plan producer", input.Output)
+			}
 			return BoundInput{}, nil, err
 		}
 		producers[input.Output] = producer
@@ -189,7 +204,8 @@ func bindInput(description lifecycle.LocalDiagnosticDescription, platforms []str
 		return BoundInput{}, nil, e.New(e.CodeVerifyFailed, "output %q differs from its Plan producer", input.Output)
 	}
 	return BoundInput{Output: input.Output, Component: input.Component, Format: input.Format, Platform: platform,
-		Digest: digest, BuildDigest: selected.BuildDigest, Version: producer.ExpectedVersion}, producer, nil
+		Digest: digest, OutputDigest: selected.Digest,
+		BuildDigest: selected.BuildDigest, Version: producer.ExpectedVersion}, producer, nil
 }
 
 // Run returns the bound Run's identity.
@@ -211,7 +227,11 @@ func (b *BoundValidation) Close() error {
 	if b == nil {
 		return nil
 	}
-	b.once.Do(func() { b.closeErr = b.run.Close() })
+	b.once.Do(func() {
+		if b.run != nil {
+			b.closeErr = b.run.Close()
+		}
+	})
 	return b.closeErr
 }
 

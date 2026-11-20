@@ -5,6 +5,7 @@ package validation
 
 import (
 	"context"
+	"maps"
 	"slices"
 	"strings"
 
@@ -93,7 +94,8 @@ func (c *Registrations) resolve(selections []string) ([]string, error) {
 	seen := map[string]bool{}
 	for _, selection := range selections {
 		parts := strings.Split(selection, "/")
-		if len(parts) > 3 || !validList(parts, false, segment.MatchString) {
+		// Segments may repeat (nvke/nvkectl/nvkectl); each must be a valid name.
+		if len(parts) > 3 || slices.ContainsFunc(parts, func(p string) bool { return !segment.MatchString(p) }) {
 			return nil, e.New(e.CodeUsage, "selection %q must be a suite ID or parent path", selection)
 		}
 		var matches []string
@@ -134,7 +136,8 @@ func admitSuite(r Registration, environment testEnvironment) error {
 			return e.New(e.CodeEngineCapability, "executor does not support platform %q", platform)
 		}
 	}
-	for role, input := range r.Inputs {
+	for _, role := range slices.Sorted(maps.Keys(r.Inputs)) {
+		input := r.Inputs[role]
 		if input.Format != lifecycle.OutputExecutable || input.Component != factory.ArtifactTestComponent {
 			return e.New(e.CodeEngineCapability, "input role %q requires an unsupported format or component", role)
 		}
