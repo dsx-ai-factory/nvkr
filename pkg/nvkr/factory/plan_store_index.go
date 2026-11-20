@@ -34,23 +34,23 @@ type planStoreVariant struct {
 	Bundles []string `json:"bundles"`
 }
 
-func planStoreIndex(ctx context.Context, root string, incoming *GeneratedBundle) ([]byte, error) {
-	except := ""
-	if incoming != nil {
-		except = incoming.ManifestPath
+func planStoreIndex(ctx context.Context, root string, incoming ...*GeneratedBundle) ([]byte, error) {
+	except := make([]string, 0, len(incoming))
+	for _, bundle := range incoming {
+		except = append(except, bundle.ManifestPath)
 	}
-	owners, err := planStoreOwners(ctx, root, except)
+	owners, err := planStoreOwners(ctx, root, except...)
 	if err != nil {
 		return nil, err
 	}
-	if incoming != nil {
-		for name, raw := range incoming.Files {
+	for _, bundle := range incoming {
+		for name, raw := range bundle.Files {
 			if !isPlanStorePath(name) {
 				continue
 			}
 			owner := owners[name]
 			owner.Member = GeneratedMember{Path: name, SHA256: pipeline.FileDigest(raw), Mode: 0o644}
-			owner.Bundles = append(owner.Bundles, path.Base(path.Dir(incoming.ManifestPath)))
+			owner.Bundles = append(owner.Bundles, path.Base(path.Dir(bundle.ManifestPath)))
 			owners[name] = owner
 		}
 	}
