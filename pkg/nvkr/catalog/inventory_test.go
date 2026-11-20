@@ -44,6 +44,9 @@ func TestInventoryMaintainedCatalogsOffline(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, entry := range entries {
+		if entry.Name != entry.Path {
+			t.Fatalf("catalog %s has metadata name %q", entry.Path, entry.Name)
+		}
 		actual = append(actual, entry.Path)
 	}
 	slices.Sort(expected)

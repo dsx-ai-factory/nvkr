@@ -29,7 +29,7 @@ func definitionInitCommand() *cli.Command {
 			&cli.StringFlag{Name: "apt-distribution", Usage: "distribution for apt-repository"},
 			&cli.StringFlag{Name: "apt-component", Usage: "component for apt-repository"},
 			&cli.StringFlag{Name: "name", Usage: "Definition and output name (required)"},
-			&cli.StringFlag{Name: "catalog", Usage: "catalog directory, relative to the current directory and inside root (required)"},
+			&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Usage: "catalog directory, relative to the current directory and inside root (required)"},
 			&cli.StringFlag{Name: "platform", Usage: "output target, for example linux/arm64 (required)"},
 			&cli.StringSliceFlag{Name: "component", Usage: "catalog component to bundle; repeat for more (required)"}),
 		Action: func(c *cli.Context) error {

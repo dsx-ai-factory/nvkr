@@ -376,8 +376,8 @@
     "sha256:48674570f31a57e249a05316817f772ecc2b2aba10ad08fa267a8ff5da08094d": {
       "file": ".github/nvkr-plan-store/plan/catalog-node-images@066d259871a2.json"
     },
-    "sha256:6a1d1024115f715923de1d47143b5da838164d35fcd0a752ea81446b01ec3b99": {
-      "file": ".github/nvkr-plan-store/plan/catalog-nvke-deployment-images@ad8da4320a73.json"
+    "sha256:846dcc17957d283482e241ed117d4d61060b1a37930c85f2a799e3de717ba092": {
+      "file": ".github/nvkr-plan-store/plan/catalog-runtime-dependencies@d79f8fcceb24.json"
     },
     "sha256:89be7d16270fba4550ba69b239af96a04351889196f3c7508cff9dd3270b3d29": {
       "file": ".github/nvkr-plan-store/plan/catalog-aicr@809249666f0f.json"
