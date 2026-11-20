@@ -337,7 +337,7 @@ PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION
 
 .PHONY: workflows-check
 workflows-check: workflow-generator producer-overlays-check catalog-refresh-check catalog-index-check ## Check every maintained producer and qualification bundle from the authored inventory.
-	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
+	bin/nvkr-exec definition pin --check --definition $(NVKE_COMPOSITE)
 	bin/nvkr-exec definition pin --check --definition $(NVKE_RELEASE)
 	bash scripts/generate-maintained.sh --check $(PROJECTION_PILOT_FLAG)
 
@@ -387,14 +387,14 @@ workflows-generate: maintained-bundles-generate ## Regenerate all maintained bun
 	$(MAKE) catalog-refresh-generate
 
 # Composite member pin admission is independent of bundle inventory admission.
-NVKE_GPU_SITE := inputs/definitions/nvke/gpu-site.composite.yaml
-NVKE_RELEASE := inputs/definitions/nvke/gpu-site-release.composite.yaml
+NVKE_COMPOSITE := inputs/definitions/nvke/nvke.composite.yaml
+NVKE_RELEASE := inputs/definitions/nvke/nvke-release.composite.yaml
 
 .PHONY: nvke-generate nvke-check
 nvke-generate: maintained-bundles-generate ## Regenerate all maintained owners for an NVKE production change.
 
 nvke-check: workflow-generator ## Check NVKE member pins and generation.
-	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
+	bin/nvkr-exec definition pin --check --definition $(NVKE_COMPOSITE)
 	bin/nvkr-exec definition pin --check --definition $(NVKE_RELEASE)
 	bash scripts/generate-maintained.sh --group main --check $(PROJECTION_PILOT_FLAG)
 

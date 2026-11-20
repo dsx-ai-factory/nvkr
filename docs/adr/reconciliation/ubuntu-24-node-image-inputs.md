@@ -26,7 +26,7 @@ or qualification is established by these tests. ADR-10/11/18/22 own the unchange
 Maintained publication selects `nvke-node-image-ubuntu24-<arch>` and `nvke-node-fde-ubuntu24-<arch>` for
 AMD64 and ARM64 through `inputs/definitions/nvke/disks-ubuntu24.yaml`, the composite's
 `nvke-disks-ubuntu24` member. Production uses the main-only `nvkr-run-nvke.yml` signer and
-`candidate/gpu-site` prefix. The standalone `github-nvke-disks-ubuntu24` Environment remains an
+`candidate/nvke` prefix. The standalone `github-nvke-disks-ubuntu24` Environment remains an
 unenrolled comparison fixture. ADR-26 admits both series as separate composite members only when the composite declares
 each component the overlay replaces as a variant of the two disk families; an opt-in extended contract compiles
 that composite. The maintained [GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite)

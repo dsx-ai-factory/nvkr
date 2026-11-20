@@ -2,9 +2,9 @@
 
 This directory owns the repository's NVKE, NVSentinel, AICR and NVIDIA Workload Identity inputs. Definitions select named outputs
 from pinned catalog producers; Environments select execution and publication policy. The maintained
-production/nightly candidate starts at [the NVKE release composite](definitions/nvke/gpu-site-release.composite.yaml),
+production/nightly candidate starts at [the NVKE release composite](definitions/nvke/nvke-release.composite.yaml),
 which adds the derived inventory to the five NVKE families and GB200 AICR member. Development uses the same
-pinned members through the [payload-only composite](definitions/nvke/gpu-site.composite.yaml). The
+pinned members through the [payload-only composite](definitions/nvke/nvke.composite.yaml). The
 [three maintained bundles](definitions/nvke/README.md#gpu-site-composite) cover those selections.
 
 ```text
@@ -30,9 +30,9 @@ the move preserves each file's existing format.
 
 | Definition | Environment | Scope |
 |---|---|---|
-| [`definitions/nvke/gpu-site-release.composite.yaml`](definitions/nvke/gpu-site-release.composite.yaml) | [`environments/github-nvke-gpu-site.yaml`](environments/github-nvke-gpu-site.yaml) | 84-output [GPU site release composite](definitions/nvke/README.md#gpu-site-composite) of the five families, GB200 AICR bundles and package-derived inventory; one Run and one Release |
-| [`definitions/nvke/gpu-site.composite.yaml`](definitions/nvke/gpu-site.composite.yaml), 83 payload outputs | [`environments/github-development.yaml`](environments/github-development.yaml) | The repository's fixed signed development bundle (`nvkr-dev.yml`) and disposable publication namespace |
-| Same release composite | [`environments/github-nvke-nightly-gpu-site.yaml`](environments/github-nvke-nightly-gpu-site.yaml) | Floating-source signed NVKE candidate (`nvkr-run-nvke-nightly.yml`), manual dispatch |
+| [`definitions/nvke/nvke-release.composite.yaml`](definitions/nvke/nvke-release.composite.yaml) | [`environments/github-nvke.yaml`](environments/github-nvke.yaml) | 84-output [GPU site release composite](definitions/nvke/README.md#gpu-site-composite) of the five families, GB200 AICR bundles and package-derived inventory; one Run and one Release |
+| [`definitions/nvke/nvke.composite.yaml`](definitions/nvke/nvke.composite.yaml), 83 payload outputs | [`environments/github-development.yaml`](environments/github-development.yaml) | The repository's fixed signed development bundle (`nvkr-dev.yml`) and disposable publication namespace |
+| Same release composite | [`environments/github-nvke-nightly.yaml`](environments/github-nvke-nightly.yaml) | Floating-source signed NVKE candidate (`nvkr-run-nvke-nightly.yml`), manual dispatch |
 | [`definitions/demo/arm64-nvidia-tcg.json`](definitions/demo/arm64-nvidia-tcg.json) | [`environments/local-arm64-tcg.json`](environments/local-arm64-tcg.json) | Local 32-output NVIDIA OVN demo |
 | [`definitions/demo/arm64-upstream-tcg.json`](definitions/demo/arm64-upstream-tcg.json) | Same local TCG Environment | Local 32-output upstream OVN diagnostic demo |
 | [`definitions/demo/amd64-nvidia-local-kvm.json`](definitions/demo/amd64-nvidia-local-kvm.json) | [`environments/local-amd64-kvm.json`](environments/local-amd64-kvm.json) | Native AMD64 local build and Go site-bootstrap smoke inputs; build and runtime acceptance require a completed Run |
@@ -106,7 +106,7 @@ explicit producer selection, without inheritance or execution-time output filter
 select production only. Family files remain pinned members; their standalone Environments and the old
 combined input are comparison fixtures, not maintained releases.
 
-The [qualification policy](policies/nvke-gpu-site-qualification.yaml) and
+The [qualification policy](policies/nvke-composite-qualification.yaml) and
 [nightly build/test workflow](../.github/workflows/nvkr-nightly.yml) have independent owners and scopes.
 [Reconciliation](../docs/adr/reconciliation/README.md) remains the evidence ledger for implementation and
 external acceptance.

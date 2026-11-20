@@ -6,27 +6,10 @@
   "cosignTool": "cosign-module-tags",
   "kind": "Definition",
   "metadata": {
-    "description": "Publish the NVKE GPU site and its package-derived inventory as one Release.",
-    "name": "nvke-gpu-site-release"
+    "description": "Build and publish NVKE as one Release from the five NVKE family Definitions and the GB200 AICR bundles.",
+    "name": "nvke"
   },
   "outputs": [
-    {
-      "derived": {
-        "encoding": "aicr-inventory-v1",
-        "outputs": [
-          "controller-chart",
-          "nktp",
-          "nvke-controller",
-          "postgresql",
-          "spire",
-          "spire-crds",
-          "temporal"
-        ]
-      },
-      "format": "bundle-oci",
-      "name": "aicr-inventory",
-      "platform": "linux/amd64"
-    },
     {
       "catalog": {
         "base": "../../catalogs/aicr"

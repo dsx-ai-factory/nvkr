@@ -411,7 +411,7 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 			// placement and credential contracts. Generic mutation tests use
 			// small fixtures; they do not need hundreds of unrelated jobs.
 			if planPath == maintainedNVKEPlanPath {
-				if plan.DefinitionPath != "inputs/definitions/nvke/gpu-site-release.composite.yaml" || plan.EnvironmentPath != "inputs/environments/github-nvke-gpu-site.yaml" || plan.Environment.GitHubBundle != "nvke" {
+				if plan.DefinitionPath != "inputs/definitions/nvke/nvke-release.composite.yaml" || plan.EnvironmentPath != "inputs/environments/github-nvke.yaml" || plan.Environment.GitHubBundle != "nvke" {
 					t.Fatal("committed NVKE workflow must select the maintained composite inputs")
 				}
 				if err := CheckGeneratedBundle(t.Context(), "../../..", bundle); err != nil {
