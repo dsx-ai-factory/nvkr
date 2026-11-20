@@ -1,6 +1,6 @@
 # ADR-24 — Imported validator catalog and artifact bindings
 
-- **Decision status:** Accepted (2026-11-14); registered container-command model below proposed for review in #567.
+- **Decision status:** Accepted (2026-11-14; revised 2026-11-19)
 - **Implementation maturity:** The earlier provisional slice is what `main` implements: an indexed catalog,
   typed `nvke-cli/v1` dispatch and `validators run --profile` local-plan binding. Registration discovery,
   selection, Run binding, the `container-command/v1` executor, TestEnvironments and ValidationResult are
@@ -91,10 +91,12 @@ host-environment lookup and no shell; an unknown role or field fails loading. Re
 environment values; the same text in `command` or `acquisition.command` fails loading.
 
 Credential and network requirements are part of the registration model, but the `v1` schema does not yet
-contain them. They are added as optional `v1` fields once the executor can enforce declared destinations and
-an owner delivers credentials (§6); existing registrations stay valid. Changing an existing field's meaning
-requires a new API version. Until those fields exist, a suite needing test-phase network access or credentials
-cannot be registered, so it cannot be admitted.
+contain them. `v1` grows only by additive optional fields: they are added once the executor can enforce
+declared destinations and an owner delivers credentials (§6), and existing registrations stay valid. A reader
+that predates a field refuses a document using it as an unknown field, so an older `nvkr` fails closed rather
+than ignoring a requirement. Changing an existing field's meaning requires a new API version. Until those
+fields exist, a suite needing test-phase network access or credentials cannot be registered, so it cannot be
+admitted.
 
 Isolation is executor-owned. The schema has no fields for mounts, devices, privileges, credential values or
 host paths, and unknown fields fail (§3), so a registration cannot weaken the executor's defaults. The parity
@@ -156,7 +158,9 @@ invocation rather than being skipped.
 | Result | `nvkr.dev/validation-result/v1` | `ValidationResult` | Build, environment and per-suite outcomes (§8) |
 
 Readers dispatch on exact version and kind and reject unknown fields, duplicate keys, nulls, invalid values
-and unresolved references. YAML and JSON decode into the same typed model; YAML aliases, anchors, merge keys
+and unresolved references. The only exception is a ValidationResult: the fields its outline (§8) marks
+nullable may be null, meaning not yet known or unavailable; null anywhere else in it, or anywhere in a
+registration or TestEnvironment, is rejected. YAML and JSON decode into the same typed model; YAML aliases, anchors, merge keys
 and multi-document streams are rejected. A registration declares at most 64 input roles, platforms and
 capabilities, and at most 256 command arguments and environment bindings. Descriptions are display text and
 cannot select behavior. Package or test counts are never presented as a count of artifact contracts.
@@ -206,7 +210,7 @@ sorted by ID; a repeated suite keeps its first position. A selection matching no
 are no globs, no fuzzy aliases and no implicit run-all: zero selections is a usage error. Suites execute
 sequentially in the resulting order.
 
-Input mode is either build-first or an existing Run (`--run <attempt>`). Build-first compiles the supplied
+Input mode is either build-first or an existing Run (`--run .nvkr/runs/<attempt>`, the attempt directory). Build-first compiles the supplied
 Definition and Environment through the existing local Run path, checks before building that every selected
 input is a planned output on a declared platform, builds a new attempt and then binds it exactly as `--run`
 binds an existing one; a failed build binds nothing. Validation continues only from a successfully completed
@@ -281,10 +285,13 @@ configuration and results. `provides.capabilities: [bare-metal]` admits suites d
 `requires.capabilities: [bare-metal]`. The forge example illustrates the schema; its provider integration is
 not defined here.
 
-One TestEnvironment is selected per invocation. `--test-env <name>` resolves a named declaration from the
-configured environment directory, and an explicit environment-file option selects a declaration directly.
-NVKR ships a built-in `local` environment providing `docker`, with no credentials and no test-phase network.
-A declaration in the directory cannot reuse a built-in name; that ambiguity fails resolution. When `--test-env`
+One TestEnvironment is selected per invocation, by `--test-env <name>`. NVKR ships a built-in `local`
+environment providing `docker`, with no credentials and no test-phase network; the first stage ships only
+`local`, and any other name is refused. Declared environments are resolved by name from an environment
+directory or selected directly by an explicit environment-file option. The directory's location, the file
+option's name, how either relates to `--validator-catalog`, and whether both may be given together are not
+decided here; the stage that adds declared environments fixes them. A declaration cannot reuse a built-in
+name; that ambiguity fails resolution. When `--test-env`
 is omitted, the documented default is `local`. This is a resolution rule, not a fallback: if `local` cannot
 satisfy a selected suite's requirements, the invocation fails before any build, and an explicitly named
 environment never falls back to another. ValidationResult records the selected environment and the digest of
@@ -299,27 +306,19 @@ Dependency acquisition is admitted separately from test execution.
 Until pipeline can enforce declared destinations, acquisition runs with the parity baseline's unrestricted
 egress, without the artifact or credentials; this is a named limitation (see Boundaries), not admitted access.
 The test phase has no network. Suites requiring test-phase network access or credentials fail admission until
-enforcement and a credential-delivery owner exist.
+enforcement and a credential-delivery owner exist. The one planned exception is connectivity to the suite's
+own NVKR-managed kind cluster (§7): it is admitted only once the executor can confine the test container to
+that cluster's network, with no other egress. Until then, suites requiring a cluster fail admission.
 
 ### 7. Execute through the existing owners
 
 `pkg/nvkr/validation` is the primary owner of the feature. It orchestrates and owns registration loading,
 selection, preparation, binding and result recording. Factory keeps Plan interpretation, `sourcegit` source
 import, pipeline container execution, process lifetime and network enforcement, and lifecycle Run opening,
-byte checks and the local build path. Proposed files are thin orchestration over those owners:
-
-| File | Responsibility |
-|---|---|
-| `catalog*.go` | Registration loading and discovery |
-| `selection.go` | Ordered selection and deduplication |
-| `request.go` | Static preparation and frozen requests |
-| `build.go` | Existing build integration |
-| `artifacts.go` | Run binding and checked-input ownership |
-| `execute.go` | Shared suite execution |
-| `kind.go` | Disposable cluster lifecycle |
-| `results.go` | Persistence, aggregation and observability |
-
-The CLI and SDK delegate; package placement preserves the dependency direction and creates no import cycle.
+byte checks and the local build path. The package is thin orchestration over those owners, covering
+registration loading and discovery, ordered selection and frozen preparation, build integration, Run binding
+and checked-input ownership, shared suite execution, the disposable cluster lifecycle, and result persistence,
+aggregation and observability. The CLI and SDK delegate; package placement preserves the dependency direction and creates no import cycle.
 
 An invocation validates configuration, selections and declared compatibility; builds or opens the Run and
 requires it to be complete; checks exact output bindings and artifact bytes; checks runtime readiness;
@@ -345,9 +344,11 @@ defines neither event triggers nor runner labels or workflow permissions.
 
 A suite reports passed, failed or execution error, retaining the observed exit status and diagnostics. Exit
 zero alone is not sufficient: the executor applies a named, versioned result interpreter recorded in the
-result. For the CLI suites this is the existing CLI result checks, which reject missing, empty, skipped or
-incomplete test results and changed staged bytes. A registration whose output has no admitted interpreter
-cannot pass. How a registration names its interpreter is fixed with the executor, as an optional `v1` field.
+result. `container-command/v1` admits only `executable` inputs of the `nvkectl` component, and its one
+interpreter is the existing CLI result checks, which reject missing, empty, skipped or incomplete test results
+and changed staged bytes. Registrations therefore name no interpreter. When a second interpreter is admitted,
+a registration names it through an additive optional field (§1); a registration without that field keeps the
+CLI checks only for the inputs they cover, and is otherwise refused at admission.
 
 Execution creates a ValidationResult before build or runtime work and updates it as execution progresses.
 Each suite records its execution state (not started, preparing, running or completed), verdict (passed,
@@ -462,8 +463,9 @@ sources, probe Docker or launch infrastructure. Once the executor lands, discove
 registration is admissible in the selected TestEnvironment using the same admission check as execution.
 
 Errors keep ADR-03's codes: invalid configuration `invalid-catalog` or `usage`; unknown selections and
-environments `unsupported`; unmet capabilities and platforms `engine-capability`; binding disagreements
-`verify-failed`; an incomplete Run `gate-unmet`; source acquisition `fetch-failed`; a failed suite keeps the
+environments `unsupported`; unmet capabilities, platforms and formats, including a bound output whose format
+differs from the registration, `engine-capability`; missing or ambiguous outputs and subjects and producer
+disagreements `verify-failed`; an incomplete Run `gate-unmet`; source acquisition `fetch-failed`; a failed suite keeps the
 current diagnostic's `build-failed`; timeout and cancellation `timeout`. No new exit codes are allocated.
 
 ## Boundaries the catalog cannot resolve
@@ -507,8 +509,9 @@ conceal materially different claims, so diagnostic and evidence contracts stay s
 | Copy AICR's schema and Kubernetes Job execution | Reject: does not express NVKR's artifact roles and Plan-derived source relationships; imposes cluster execution on CLI diagnostics |
 | Group primarily by deployment/conformance/performance | Reject: repository and suite group are the navigation keys; execution requirements remain metadata |
 | Require every suite group to name one artifact | Reject: end-to-end suites consume several artifacts |
-| Add commands or scripts for each suite | Reject: scatters discovery and repeats binding and execution logic |
-| A typed Go adapter per upstream interface, with entries naming only a suite selector | Reject: needs Go changes per repository; one executor with fixed isolation and a literal argument vector keeps the same safety properties |
+| Add command branches or scripts to NVKR code for each suite | Reject: scatters discovery and repeats binding and execution logic |
+| A typed Go adapter per upstream interface, with entries naming only a suite selector | Reject: needs Go changes per repository. Isolation stays executor-owned, so container safety is unchanged; the suite's entrypoint and arguments move from reviewed Go into catalog data reviewed by the catalog owner. A registration can therefore narrow a suite (for example with a test filter) and still pass the CLI checks, which is why §8 leaves exhaustive completeness unknown |
+| Defer a universal plugin runtime until after the CLI is cataloged | Adopted, limited to `container-command/v1`: one versioned executor with fixed isolation now runs every registration, because per-repository adapters were the larger cost; any other runtime needs its own decision |
 | Shell commands, mounts, overlays or embedded provisioning in YAML | Reject: creates an execution language and lets registrations weaken executor isolation |
 | An explicit `catalog.yaml` index of entry files | Reject: path-derived IDs give one owner per registration; strict layout, bounds and validate-all loading keep the safety properties |
 | Profiles binding a local Plan and caller-supplied artifact paths | Reject: Run binding checks bytes through lifecycle and removes caller-supplied paths |
@@ -529,9 +532,11 @@ Acceptance is staged; each stage has its own acceptance and none is implied by a
    or ambiguous output, incomplete Run, missing entrypoint, unsupported capability, timeout and SIGINT/SIGTERM,
    with parity of isolation, budgets, failure statuses and cleanup. Existing recorded CLI runs are baselines,
    not proof of the new path.
-2. **Multiple inputs and a disposable cluster:** one suite consuming at least two named inputs, with exact
+2. **Multiple inputs and a disposable cluster:** an enforced test-phase path confined to the suite's own
+   cluster (§6) is a prerequisite. One suite consuming at least two named inputs, with exact
    supplied-image/package selection, refusal of default or rebuilt substitutes, runtime subject observation, an
-   NVKR-managed kind cluster and teardown after failure, timeout and cancellation. Then adopt a second
+   NVKR-managed kind cluster, refusal of any other test-phase egress, and teardown after failure, timeout and
+   cancellation. Then adopt a second
    repository without changing generic loading rules.
 3. **CI route:** lifecycle capture of hosted Runs is a prerequisite. The same registrations then run on
    generator-owned workflows (ADR-21), with per-phase network and credential delivery either enforced or
