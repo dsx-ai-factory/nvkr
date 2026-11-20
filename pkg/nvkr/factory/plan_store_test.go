@@ -45,8 +45,8 @@ func TestPlanStoreSharesFrozenRecords(t *testing.T) {
 	if err := json.Unmarshal(bundles[1].Files[bundles[1].PlanPath], &second); err != nil {
 		t.Fatal(err)
 	}
-	for _, field := range []string{"graph", "catalogSnapshots"} {
-		if !bytes.Equal(first[field], second[field]) {
+	for _, field := range []string{"lifecycleOutputs", "catalogSnapshots"} {
+		if len(first[field]) == 0 || !bytes.Equal(first[field], second[field]) {
 			t.Fatalf("identical %s is not shared across bundles", field)
 		}
 	}

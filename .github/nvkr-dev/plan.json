@@ -390,9 +390,7 @@
   "environmentDigest": "sha256:6cfc17a822fe089862a222c5a5894abb9434cd5dbc253480b6c2947d46e0d3ed",
   "environmentPath": "inputs/environments/github-development.yaml",
   "generatorVersion": "dev (unknown)",
-  "graph": {
-    "file": ".github/nvkr-plan-store/plan/graph-nvke-gpu-site.json"
-  },
+  "graphDigest": "sha256:72fce6081c0d6b13c81c8cb181415b2deccfb7b0723b157fab9dfc1662f35149",
   "lifecycleOutputs": {
     "file": ".github/nvkr-plan-store/plan/outputs-nvke-gpu-site.json"
   },
@@ -402,7 +400,7 @@
     "file": ".github/nvkr-plan-store/plan/routes-nvke-gpu-site.json"
   },
   "schemaVersion": "nvkr.dev/run-plan/v6",
-  "storage": "nvkr-plan-tree-v2",
+  "storage": "nvkr-plan-tree-v3",
   "targets": {
     "file": ".github/nvkr-plan-store/plan/targets-nvke-gpu-site-nvkr-dev.json"
   }

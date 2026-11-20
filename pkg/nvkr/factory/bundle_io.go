@@ -186,7 +186,7 @@ func writeGeneratedBundles(ctx context.Context, root string, bundles []*Generate
 		for name, raw := range bundle.Files {
 			if previous, exists := files[name]; exists && (!isPlanStorePath(name) || !bytes.Equal(previous, raw)) {
 				if isPlanStoreRecord(name) && !strings.Contains(filepath.Base(name), "@") {
-					return e.New(e.CodeEngineCapability, "selected bundles require incompatible contents at stable Plan record %s; align shared inputs, or use distinct Definition names for different graph structures", name)
+					return e.New(e.CodeEngineCapability, "selected bundles require incompatible contents at stable Plan record %s; align shared inputs, or use distinct Definition names for different shared producer or output contents", name)
 				}
 				return e.New(e.CodePipelineDrift, "coordinated bundles disagree on member %s", name)
 			}

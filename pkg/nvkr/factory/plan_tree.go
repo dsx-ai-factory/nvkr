@@ -15,7 +15,8 @@ import (
 )
 
 // This is a storage discriminator, not a Plan schema or executable identity.
-const planTreeStorage = "nvkr-plan-tree-v2"
+const planTreeStorage = "nvkr-plan-tree-v3"
+const storedGraphPlanTreeStorage = "nvkr-plan-tree-v2"
 const legacyPlanTreeStorage = "nvkr-plan-tree-v1"
 
 // Raw fields preserve omission, null, integer precision and all existing IR
@@ -63,10 +64,11 @@ func treeTargetName(raw json.RawMessage) (string, error) {
 }
 
 func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[string][]byte, error) {
-	return renderPlanTreeFormat(ctx, plan, planPath, false)
+	return renderPlanTreeFormat(ctx, plan, planPath, planTreeStorage)
 }
 
-func renderPlanTreeFormat(ctx context.Context, plan *Plan, planPath string, legacy bool) (map[string][]byte, error) {
+func renderPlanTreeFormat(ctx context.Context, plan *Plan, planPath, storage string) (map[string][]byte, error) {
+	legacy := storage == legacyPlanTreeStorage
 	raw, err := canonical.Marshal(plan)
 	if err != nil {
 		return nil, err
@@ -77,6 +79,17 @@ func renderPlanTreeFormat(ctx context.Context, plan *Plan, planPath string, lega
 	var root planFields
 	if err := json.Unmarshal(raw, &root); err != nil {
 		return nil, e.Wrap(e.CodePipelineDrift, err, "slicing Plan")
+	}
+	if storage == planTreeStorage {
+		digest, err := plan.Graph.Digest()
+		if err != nil {
+			return nil, err
+		}
+		root["graphDigest"], err = canonical.Marshal(digest)
+		if err != nil {
+			return nil, err
+		}
+		delete(root, "graph")
 	}
 	var builds []planFields
 	if err := json.Unmarshal(root["builds"], &builds); err != nil {
@@ -178,7 +191,7 @@ func renderPlanTreeFormat(ctx context.Context, plan *Plan, planPath string, lega
 			return nil, err
 		}
 	}
-	for _, field := range sharedPlanFields {
+	for _, field := range planTreeFields(storage) {
 		if value, ok := root[field]; ok {
 			kind := map[string]string{"appliedOverlays": "overlays", "internalTools": "tools", "lifecycleOutputs": "outputs", "runtimeInputs": "runtime-inputs"}[field]
 			if kind == "" {
@@ -202,10 +215,6 @@ func renderPlanTreeFormat(ctx context.Context, plan *Plan, planPath string, lega
 				return nil, err
 			}
 		}
-	}
-	storage := planTreeStorage
-	if legacy {
-		storage = legacyPlanTreeStorage
 	}
 	root["storage"] = json.RawMessage(`"` + storage + `"`)
 	files[planPath], err = treeJSON(root)

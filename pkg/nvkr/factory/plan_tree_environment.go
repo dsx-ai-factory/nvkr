@@ -102,14 +102,25 @@ func treeTargetReferences(bindings planFields, expand bool) error {
 }
 
 func mapTreeEnvironment(root, bindings planFields, expand bool) error {
-	var graph planFields
-	if err := json.Unmarshal(root["graph"], &graph); err != nil {
-		return e.Wrap(e.CodePipelineDrift, err, "reading stored graph")
-	}
-	for _, group := range []struct {
+	groups := []struct {
 		owner               planFields
 		field, key, binding string
-	}{{graph, "nodes", "id", "nodes"}, {root, "lifecycleOutputs", "name", "outputs"}} {
+	}{{root, "lifecycleOutputs", "name", "outputs"}}
+	// Only v2 stores graph nodes and their Environment bindings. V3 derives
+	// those nodes directly from the joined Environment and producer records.
+	var graph planFields
+	if raw, stored := root["graph"]; stored {
+		if err := json.Unmarshal(raw, &graph); err != nil {
+			return e.Wrap(e.CodePipelineDrift, err, "reading stored graph")
+		}
+		groups = append(groups, struct {
+			owner               planFields
+			field, key, binding string
+		}{graph, "nodes", "id", "nodes"})
+	} else if bindings["nodes"] != nil {
+		return e.New(e.CodePipelineDrift, "derived graph cannot have stored node bindings")
+	}
+	for _, group := range groups {
 		if _, exists := group.owner[group.field]; !exists {
 			continue
 		}
@@ -205,9 +216,11 @@ func mapTreeEnvironment(root, bindings planFields, expand bool) error {
 		}
 	}
 	var err error
-	root["graph"], err = canonical.Marshal(graph)
-	if err != nil {
-		return err
+	if graph != nil {
+		root["graph"], err = canonical.Marshal(graph)
+		if err != nil {
+			return err
+		}
 	}
 	if !expand {
 		root["targets"], err = canonical.Marshal(bindings)
@@ -251,7 +264,11 @@ func stablePlanTreeNames(files map[string][]byte, planPath string) (map[string][
 		}
 		return canonical.Marshal(record)
 	}
-	for _, field := range sharedPlanFields {
+	var storage string
+	if err := json.Unmarshal(root["storage"], &storage); err != nil {
+		return nil, e.Wrap(e.CodePipelineDrift, err, "reading Plan storage format")
+	}
+	for _, field := range planTreeFields(storage) {
 		if raw, ok := root[field]; ok {
 			value, err := rewrite(raw)
 			if err != nil {

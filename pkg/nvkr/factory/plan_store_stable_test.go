@@ -6,7 +6,6 @@ package factory
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -69,10 +68,18 @@ func TestPlanTreeEnvironmentProjectionPreservesIdentity(t *testing.T) {
 				if err := json.Unmarshal(files[planPath], &root); err != nil {
 					t.Fatal(err)
 				}
+				if root["graph"] != nil || root["graphDigest"] == nil {
+					t.Fatal("tree must describe its derived graph without storing it")
+				}
+				for name := range files {
+					if strings.Contains(name, "/plan/graph-") {
+						t.Fatal("tree retained a graph record", name)
+					}
+				}
 				roots = append(roots, root)
 				trees = append(trees, files)
 			}
-			for _, field := range []string{"graph", "lifecycleOutputs"} {
+			for _, field := range []string{"lifecycleOutputs"} {
 				var ref map[string]string
 				if err := json.Unmarshal(roots[0][field], &ref); err != nil {
 					t.Fatal(err)
@@ -89,7 +96,7 @@ func TestPlanTreeEnvironmentProjectionPreservesIdentity(t *testing.T) {
 	}
 }
 
-func TestPlanStoreStructuralEnvironmentConflict(t *testing.T) {
+func TestPlanStoreEnvironmentGraphsDeriveIndependently(t *testing.T) {
 	first := signedTestPlan(t, cosignSigningProfile(), ghcrTarget())
 	second := recompileGitHubStabilityPlan(t, first, func(in *githubStabilityInputs) {
 		in.environment.GitHubBundle = "unsigned"
@@ -106,14 +113,47 @@ func TestPlanStoreStructuralEnvironmentConflict(t *testing.T) {
 		}
 		bundles = append(bundles, bundle)
 	}
-	root := filepath.Join(t.TempDir(), "untouched")
-	err := WriteGeneratedBundles(t.Context(), root, bundles)
-	assertFactoryErrorCode(t, err, e.CodeEngineCapability)
-	if !strings.Contains(err.Error(), "distinct Definition names") {
-		t.Fatal("structural conflict suggested an impossible retry", err)
+	root := t.TempDir()
+	if err := WriteGeneratedBundles(t.Context(), root, bundles); err != nil {
+		t.Fatal(err)
 	}
-	if _, err := os.Stat(root); !errors.Is(err, os.ErrNotExist) {
-		t.Fatal("incompatible selection created output", err)
+	for i, expected := range []*Plan{first, second} {
+		loaded, err := LoadPlanContext(t.Context(), filepath.Join(root, bundles[i].PlanPath))
+		if err != nil || !bytes.Equal(mustCanonical(t, loaded), mustCanonical(t, expected)) {
+			t.Fatal("Environment graph was not independently reconstructed", err)
+		}
+		if err := CheckGeneratedBundle(t.Context(), root, bundles[i]); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestPlanStoreConflictingSelectedRecords(t *testing.T) {
+	plans, bundles := sharedPlanStoreFixtures(t)
+	changed := recompileGitHubStabilityPlan(t, plans[1], func(in *githubStabilityInputs) {
+		component := in.catalog.Components["kubelet"]
+		component.BuildCommand = []string{"sh", "-c", "echo changed-build"}
+		in.catalog.Components["kubelet"] = component
+	})
+	var err error
+	bundles[1], err = RenderGitHub(t.Context(), changed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, reverse := range []bool{false, true} {
+		name := "forward"
+		selected := []*GeneratedBundle{bundles[0], bundles[1]}
+		if reverse {
+			name = "reverse"
+			selected[0], selected[1] = selected[1], selected[0]
+		}
+		t.Run(name, func(t *testing.T) {
+			root := filepath.Join(t.TempDir(), "untouched")
+			assertFactoryErrorCode(t, WriteGeneratedBundles(t.Context(), root, selected), e.CodeEngineCapability)
+			if _, err := os.Stat(root); !os.IsNotExist(err) {
+				t.Fatalf("refused batch created output: %v", err)
+			}
+		})
 	}
 }
 
@@ -123,14 +163,10 @@ func TestPlanTreeStorageVersions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, legacy := range []bool{true, false} {
-		storage := planTreeStorage
-		if legacy {
-			storage = legacyPlanTreeStorage
-		}
+	for _, storage := range []string{legacyPlanTreeStorage, storedGraphPlanTreeStorage, planTreeStorage} {
 		t.Run(storage, func(t *testing.T) {
 			planPath := githubLayoutFor(plan).planPath
-			files, err := renderPlanTreeFormat(t.Context(), plan, planPath, legacy)
+			files, err := renderPlanTreeFormat(t.Context(), plan, planPath, storage)
 			if err != nil {
 				t.Fatal(err)
 			}

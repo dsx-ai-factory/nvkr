@@ -132,16 +132,23 @@ operation; the workflow has its own exact-byte digest. The commit manifest lists
 plus plan and workflow identities. It is written last and never lists itself. No self-referential identity is permitted.
 
 GitHub stores that same Plan as a generated file tree.
-Each bundle's small `plan.json` index carries the `storage: nvkr-plan-tree-v2` discriminator, outside the executable Plan schema.
-The loader also admits v1 trees for migration; new generation emits v2 and retires the old manifest-owned objects.
+Each bundle's small `plan.json` index carries the `storage: nvkr-plan-tree-v3` discriminator, outside the executable Plan schema.
+The loader also admits v1 and v2 trees for migration; new generation emits v3 and retires the old manifest-owned objects.
+V3 does not store the artifact graph. After authenticating and joining the stored inputs, the loader derives
+the graph with the same compiler used by Plan validation. The root's `graphDigest` records the existing
+typed graph digest as a review signal and must match the derived graph. The owning manifest's Plan Digest
+still binds the entire reconstructed Plan; `graphDigest` does not grant authority independently.
+Graph inspection uses `run graph`; the packed Plan and its schemas retain the full graph unchanged.
+Legacy readers preserve admitted historical graph encodings. If the current compiler cannot reproduce
+such an encoding exactly, v3 generation fails before emission rather than rewriting its identity.
 Frozen JSON records and raw scripts live in one repository store, `.github/nvkr-plan-store/`.
 The store has three directories: `scripts/`, `steps/` and `plan/`.
-Plan records use stable logical filenames, such as `plan/graph-<selection>.json`,
+Plan records use stable logical filenames, such as `plan/definition-<selection>.json`,
 `plan/outputs-<selection>.json` and `steps/<selection>/<target>/<platform>.json`.
 Environment, targets and runtime-input records additionally include the owning bundle name.
 For `githubRuntimePlan` Environments, every stable Plan and step record includes that bundle name,
 so dispatch-time source freezing and carrier installation can refresh one bundle independently.
-Runtime bundles therefore give up graph, output and step sharing with other bundles; catalog snapshots
+Runtime bundles therefore give up output and step sharing with other bundles; catalog snapshots
 and scripts remain shared by exact content.
 Platform filename labels use `linux-arm64` form; an aggregate target includes its platform only once.
 Catalog snapshots and scripts can have multiple simultaneous variants within one Plan. They retain
@@ -153,8 +160,8 @@ A filename is a locator, never an identity or evidence of integrity.
 Changing a shared stable record requires coordinated regeneration of all owners. A single-bundle update
 that conflicts with another owner's full digest fails before payload publication. Independent selections
 have separate step records; differing source pins for the same selection cannot coexist at one stable name.
-Likewise, static Environments for one Definition must have the same graph structure after environment bindings
-are projected out. A signed and an unsigned topology, for example, need distinct Definition names.
+Likewise, static Environments for one Definition must agree on the remaining shared records after
+output bindings are projected out. Differing shared producer or output content needs distinct Definition names.
 If the selected owners themselves disagree on stable contents, coordinated generation returns
 `NVKR-E-ENGINE-CAPABILITY` and directs the author to separate the selections; rerunning the same batch
 cannot repair that structural incompatibility. This differs from an omitted-owner drift refusal.
@@ -184,15 +191,15 @@ Snapshots keep component and source configuration inline. Each step record keeps
 configuration inline beside the unchanged target name, platform, Build Digest, component selection,
 overlays and execution graph, whose source operations carry their exact source commits. There are no
 separate component, source or resolved-component pointer records. Loading never resolves them again.
-Structured top-level fields are shared records too. The graph retains topology, producer requirements,
-artifacts and identities independent of the environment. Its runner and execution-binding fields, utility
-container/platform fields, and derived inventory publication prefix live in the per-environment targets
-record. That record also retains the derived output's publication-bound Build Digest and prefix removed
-from the shared outputs record, beside the ordinary publication destinations and credentials.
-This is a storage projection only: joining restores every original field before canonical Plan and graph
-validation. The inventory Build Digest still covers the publication prefix; no Build, Plan or published
-identity is recomputed under a different contract. Static Environments share the same graph and
-outputs record when their only differences are these environment bindings. The maintained nightly
+Structured top-level fields are shared records too. Environment-specific graph fields, including runners,
+execution bindings, utility containers/platforms and derived publication prefixes, are reconstructed by
+the compiler and have no stored node-binding copy. The per-environment targets record retains the derived
+output's publication-bound Build Digest and prefix removed from the shared outputs record, beside the
+ordinary publication destinations and credentials.
+This is a storage projection only: joining and graph derivation restore every original field before canonical
+Plan validation. The inventory Build Digest still covers the publication prefix; no Build, Plan or published
+identity is recomputed under a different contract. Static Environments share the same outputs record when
+their only differences are these environment bindings. The maintained nightly
 Environment opts into runtime Plans and keeps its own stable records for independent refresh.
 Full target names remain unchanged, including aggregate targets such as `output/linux/arm64`.
 

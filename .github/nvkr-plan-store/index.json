@@ -18038,42 +18038,6 @@
         "sha256": "sha256:f89739e778fa6984df8ca1f6dff8872d42e0e23bb5ddf0793dab36f340c18b6e"
       }
     ],
-    "plan/graph-nvke-gpu-site": [
-      {
-        "bundles": [
-          "nvkr-dev"
-        ],
-        "file": "plan/graph-nvke-gpu-site.json",
-        "sha256": "sha256:9d339c431b27833f9e895af3d6dced265b9d28092734bbafa5d4c1a55df45d70"
-      }
-    ],
-    "plan/graph-nvke-gpu-site-release": [
-      {
-        "bundles": [
-          "nvkr-run-nvke"
-        ],
-        "file": "plan/graph-nvke-gpu-site-release.json",
-        "sha256": "sha256:a7b1f6c2f104d0953e93ffdbc8948713e5c5f87a970ec579d630130cbf9b5f86"
-      }
-    ],
-    "plan/graph-nvke-gpu-site-release-nvkr-run-nvke-nightly": [
-      {
-        "bundles": [
-          "nvkr-run-nvke-nightly"
-        ],
-        "file": "plan/graph-nvke-gpu-site-release-nvkr-run-nvke-nightly.json",
-        "sha256": "sha256:a7b1f6c2f104d0953e93ffdbc8948713e5c5f87a970ec579d630130cbf9b5f86"
-      }
-    ],
-    "plan/graph-wli-imds-agent": [
-      {
-        "bundles": [
-          "nvkr-run-wli-imds-agent"
-        ],
-        "file": "plan/graph-wli-imds-agent.json",
-        "sha256": "sha256:bb7a0f69453e0f66d8c19fc9682d2b06a2940b7eb57159319364547980eb0402"
-      }
-    ],
     "plan/outputs-nvke-gpu-site": [
       {
         "bundles": [
@@ -18143,7 +18107,7 @@
           "nvkr-dev"
         ],
         "file": "plan/targets-nvke-gpu-site-nvkr-dev.json",
-        "sha256": "sha256:cca68a829b13e4c1ef0e2b46c6d4e5a5aaa6bc2dc725f0653e1cf98551f2b74a"
+        "sha256": "sha256:396d5b4a32f7c8caf6e86b52fe10f19cd90f88f06182b61fc4a325ab7cd1e69b"
       }
     ],
     "plan/targets-nvke-gpu-site-release-nvkr-run-nvke": [
@@ -18152,7 +18116,7 @@
           "nvkr-run-nvke"
         ],
         "file": "plan/targets-nvke-gpu-site-release-nvkr-run-nvke.json",
-        "sha256": "sha256:c7239ca0ac8bb6853133e19e62edd3085d08ee5859704406b865da72c99fda0a"
+        "sha256": "sha256:691cce5d070e7ca02c4ac22484217fa3760b1be2c724e9472f7b2e509385fbfb"
       }
     ],
     "plan/targets-nvke-gpu-site-release-nvkr-run-nvke-nightly": [
@@ -18161,7 +18125,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "plan/targets-nvke-gpu-site-release-nvkr-run-nvke-nightly.json",
-        "sha256": "sha256:2c031f51bb0be9f81e5845d177cbef99402682b139af8ffbd1dc11339d3a22dc"
+        "sha256": "sha256:765d27ee86c1404049cdb28d00407ad18d28d47df3b982cebdb5e66060cf3cdc"
       }
     ],
     "plan/targets-wli-imds-agent-nvkr-run-wli-imds-agent": [
@@ -18170,7 +18134,7 @@
           "nvkr-run-wli-imds-agent"
         ],
         "file": "plan/targets-wli-imds-agent-nvkr-run-wli-imds-agent.json",
-        "sha256": "sha256:d919bc09df261ec22e42c504bf8acf53755174394e36d0602dbfd33ff9555a28"
+        "sha256": "sha256:ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
       }
     ],
     "scripts/aicr-gb300-generic-training-argocd-helm/build": [
