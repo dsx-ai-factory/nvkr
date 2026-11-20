@@ -52,8 +52,8 @@ func ResolveSourceRevision(ctx context.Context, repository, commit string) (*Sou
 }
 
 // ApplySourceRevision derives a complete overlay from the validated stack.
-// Only matching from-source producers change. Acquired dependencies, commands,
-// patches and toolchains retain their independently selected contracts.
+// Only matching from-source producers change. Opt-in release recipe values are
+// re-rendered; acquired dependencies, other commands, patches and toolchains stay selected.
 func ApplySourceRevision(stack *Stack, revision *SourceRevision) (*Stack, error) {
 	if stack == nil || stack.Catalog == nil || revision == nil || !revision.issued {
 		return nil, e.New(e.CodeEngineCapability, "runtime source replacement requires a validated stack and owner-issued revision")
@@ -76,6 +76,9 @@ func ApplySourceRevision(stack *Stack, revision *SourceRevision) (*Stack, error)
 		}
 		component.Tag, component.Commit, component.TreeHash, component.SourceDate = revision.pin.Tag, revision.pin.Commit, revision.pin.TreeHash, revision.pin.SourceDateEpoch
 		component.VersionStamp = stamps
+		if err := component.resolveSourceRecipe(); err != nil {
+			return nil, err
+		}
 		overlay.Components[name] = ComponentReplacement{Component: &component}
 		declarations[name] = sourceStampDeclarationFor(component, declaration.templates)
 	}
