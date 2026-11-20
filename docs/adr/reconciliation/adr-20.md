@@ -1,5 +1,40 @@
 ## Support by owner
 
+ADR-20's 2026-11-20 revision accepts separate destination staging and release-by-reference operations,
+with repository-local GHCR/job-token access as the adopter default. Implementation still combines payload
+upload with the hosted publisher and requires unlinked private/internal GHCR packages. The stage step,
+profile-specific admission, full streaming readback receipt and release-by-reference owner are not implemented
+or externally exercised. Current tests and recorded publications below do not establish the revised path,
+zero-registry-secret adoption or release-root byte equivalence. The [ADR-18 migration gates](adr-18.md)
+separate development disks, all outputs and residual input-edge removal.
+The revised contract retains the post-sign verifier's own complete payload readback; no cross-process
+readback-receipt protocol is specified. Dedicated stage-writer references and secret homes must be fixed
+by the implementation before their profiles are admitted. Platform-token publication does not authorize
+either production or development qualification's dedicated-credential pair.
+The platform-token profile additionally requires Write-only repository Actions access on every destination
+package, excluding Admin grants and leaving deletion/restoration to a human package administrator. Role
+admission and proof that producer/development job tokens cannot delete or restore versions are not
+implemented or externally exercised. New-package and disposable-attempt setup must preserve this boundary;
+neither existing privacy tests nor a workflow's `packages: write` declaration proves the required package role.
+The platform-token profile is not admitted until a verifiable provider-authenticated Actions-role check
+exists; no such mechanism is specified or implemented, and an operator's setup statement is not a substitute.
+Signed development continues to require dedicated credentials: a per-attempt package-creation and Write-role
+admission mechanism is an open prerequisite, keeping platform-token development refused. Fixed destination
+setup requires package creation outside the generated workflow and removal of inherited repository access
+before assigning the repository's Actions role. Those steps alone do not admit the profile.
+Destination visibility defaults to internal/private. The named Environment opt-in
+`publication.allowPublicPackages` is designed but not implemented; unexpected public packages must fail
+closed, and public platform-token publication cannot be admitted until the field and every boundary's
+enforcement exist. The dedicated GHCR credential profile retains its private/internal requirement.
+
+The revised platform-token profile accepts repository-linked packages and fork exposure; independent package principals
+and binary confidentiality from public-source forks are not promised. `NVKR_REGISTRY_WRITE` remains an opt-in
+maintained-production/external-registry policy, requiring a distinct producer stage writer. Existing
+production qualification and dedicated development profiles still enforce their current credential rules
+until explicitly migrated. No secrets, package grants, environments, retention policy or generated files are
+changed by this documentation revision. Cleanup of unsigned staged objects must preserve active attempts
+and retained signed release closures; the existing development cleanup evidence is not proof of that migration.
+
 Post-seed GHCR privacy confirmation retries only API absence with bounded backoff.
 `TestPrivatePublicationWaitsForSeedConfirmation` covers delayed visibility, success on the last attempt,
 exhaustion with the original trust-policy code, explicit unsafe policy, denied requests and cancellation;

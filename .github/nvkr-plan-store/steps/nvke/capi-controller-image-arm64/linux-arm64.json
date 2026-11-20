@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:3dc9e7e1617d6c154265fa47490fabf381f83da9ade42411767ea0fd48956350",
-  "catalogDigest": "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87",
+  "catalogDigest": "sha256:84b9ecc3946d2ff92d75a413f45c9fffc7fb54f198589e5da8158ec6f397bbd2",
   "components": [
     "capi-controller-image"
   ],

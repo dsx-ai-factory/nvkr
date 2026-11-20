@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:456d2d4697a8e36468e66fc7b16fb356f675b0deb617d7f86e1d6ac6f255af3b",
-  "catalogDigest": "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87",
+  "catalogDigest": "sha256:84b9ecc3946d2ff92d75a413f45c9fffc7fb54f198589e5da8158ec6f397bbd2",
   "components": [
     "nvke-controller-chart"
   ],
@@ -133,6 +133,17 @@
       ],
       "repo": "https://github.com/dsx-ai-factory/nvke",
       "sourceDateEpoch": 1793236039,
+      "sourceRecipe": {
+        "artifactPath": "charts/nvke-controller-{{.ReleaseVersion}}.tgz",
+        "buildCommand": [
+          "package",
+          "controller/deploy/charts/controller",
+          "--version={{.ReleaseVersion}}",
+          "--app-version={{.Tag}}",
+          "--destination=charts/"
+        ],
+        "commitVersion": "0.23.0"
+      },
       "tag": "v0.23.0",
       "toolchainImage": "alpine/helm@sha256:a6cf54599ccb99d90cf0712b30f03fdb3cab062e6b94e0418cc4db7e8a1464b2",
       "treeHash": "a377abf5f0d584db9c86cc9981b2fdaa8bb4ac53",

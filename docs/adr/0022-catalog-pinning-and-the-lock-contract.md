@@ -112,6 +112,23 @@ This authoring form establishes no execution or release acceptance.
 Multiple components may share one source and therefore **bump atomically** (e.g. the Kubernetes-core binaries
 move together on a single lock entry).
 
+**Source-derived command operands.** Optional `sourceRecipe` binds one bounded argv array and artifact path
+to the selected source pin. It is exclusive with ordinary `buildCommand`, `buildCommandByPlatform` and
+`artifactPath` declarations. `Tag` is the exact source tag; `ReleaseVersion` normalizes its semantic version,
+including a leading `v` and prerelease identifiers. `Arch` retains the existing runtime token. Unknown tokens,
+unsafe tag text and unsupported producer contracts fail closed. Commit-only `ReleaseVersion` use requires an explicit semantic
+`commitVersion` packaging stream; this is an authored producer choice, not an inferred upstream release.
+In commit-only mode `Tag` is the exact commit, including chart app-version bindings. The explicit
+packaging stream remains separately authored and appears in maintenance previews.
+Resolved snapshots retain the declaration and validate its rendered values. Source substitution rerenders it
+from the new pin; ordinary command contracts remain unchanged. The existing `sourceMetadata.ReleaseVersion`
+remains tag-only. This opt-in form neither introduces recipe selection nor changes source identity.
+
+An explicit maintenance `family` selects catalog/source roots across the policy's generated closure.
+`catalog bump --all FAMILY` without a catalog path uses that selection; `--all --catalog PATH` retains one-catalog
+semantics. Family members must share exact constraint and tag-prefix text and resolve one release identity,
+while retaining distinct fetch and producer contracts. ADR-21 owns candidate preparation and commitment.
+
 **Per-module tag prefixes.** A source MAY declare a **`tagPrefix`** (for example `cli/`) when the upstream is a
 monorepo whose modules tag independently. Pin and bump then consider **only** tags under that prefix, and the
 `constraint` matches the version part after it — a sibling module's newer tag can never satisfy this source. The
@@ -279,7 +296,9 @@ provenance may advance to a new umbrella with unchanged member bytes. Interactiv
 remain explicit and unchanged. No constraint is widened automatically. The maintenance workflow owner is
 defined in ADR-21.
 
-Every write follows ADR-21's same-filesystem stage, fsync, original-digest compare-and-swap, and atomic rename.
+Single-catalog writes follow ADR-21's same-filesystem stage, fsync, original-digest compare-and-swap, and atomic rename.
+Coordinated family publication uses ADR-21's retained-destination and no-replace protocol, including its
+briefly absent path and checkout-repair boundary.
 Lock snapshots and writes share the bounded context-aware file boundary. Cancellation before rename aborts and
 removes the stage; after rename, commit wins and durability work completes. Concurrent same-checkout bumps never
 use last-writer-wins; one returns the coded write conflict. `--check` runs the identical resolver/serializer and

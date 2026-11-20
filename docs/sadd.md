@@ -62,6 +62,10 @@ Explicit digest-pinned fragments share authored declarations before resolution; 
 complete lock. Snapshot capture includes those fragment bytes and replay remains confined to captured inputs.
 File-backed build/vendor argv operands expand to exact bytes during catalog loading and join that captured
 closure; their paths do not enter resolved command identities (ADR-22).
+Opt-in source-derived argv/path bindings and complete source-bound producer copies retain explicit producer
+contracts. Catalog-family maintenance prepares selected pins, overlay predecessors and consumer bundles
+before guarded commitment, preserving independently selected cohorts (ADR-21/22). It generates static
+authored bundles; runtime source freezing and release authorization remain separate owners.
 [ADR-22](adr/0022-catalog-pinning-and-the-lock-contract.md#github-action-dependencies) owns how generated
 Runs bind action commits from the catalog lock. Definitions declare named deliverable outputs once.
 An optional ordered catalog list supplies complete producer selections for outputs without an override;
@@ -792,6 +796,8 @@ Identical complete host step sequences
 can share descriptive YAML anchors for native preflight, credential-free checkout, current-job preparation
 and one or two uncontrolled node calls. Expansion restores independent nodes before substituting each
 job's parameters; an earlier new anchor owner may change presentation while preserving expanded jobs.
+The carrier and credential rules below describe the implementation pending the
+[accepted destination-staging migration](adr/0018-pipeline-ir-and-ci-adapter-emission.md).
 Private carriers use Go-owned, digest-verified chunks in an unlinked private/internal GHCR package; Actions
 retain their JSON locators plus separately admitted metadata records. The factory validates exact schemas
 and inventories before exporting metadata; control layouts exclude output payload blobs. Same-Run provider

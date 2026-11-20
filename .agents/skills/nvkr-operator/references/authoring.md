@@ -77,13 +77,19 @@ source key. Use `catalog pin-artifacts` for its supported acquired-artifact path
 rather than assuming every pin command has check mode. Derived members update through their owning source. The
 [pin-set guide](../../../../docs/generic-pin-set-example.md) and [catalog maintenance
 guide](../../../../docs/catalog-maintenance.md) cover coordinated updates and matching generator identity.
+`catalog bump --all FAMILY` without a catalog path selects only the reviewed maintenance family's explicit roots
+and consumer closure; `--all --catalog PATH` retains single-catalog behavior. Preview the declared scope before
+applying. Keep independent cohorts and the separately authored commit-only packaging stream explicit.
 
 When a pin feeds configured producer copies, follow the maintenance guide's
 [producer-copy sequence](../../../../docs/catalog-maintenance.md#maintain-producer-copies): check the old
 baseline before pin mutation, regenerate the configured overlays before dependent Run bundles, and require
 all byte-exact checks to pass. Keep excluded variants and downstream profile streams explicit. For new
-lock-derived command values, use the catalog guide's opt-in `sourceMetadata` bindings; commit-only pins
-require explicit, chart-validated stream metadata. Report changed Build Digests when migrating bindings.
+lock-derived environment values, use opt-in `sourceMetadata`; for argv and artifact paths use `sourceRecipe`
+as described in the maintenance guide. Exact-tag bindings can describe commits; semantic release-version
+bindings require an explicit packaging stream for commit-only pins. `sourceBound` maintenance declarations
+retain a complete producer contract and bind one named producer's source identity. Report changed Plan and
+Build Digests when migrating bindings.
 
 Never hand-edit `pins.lock.yaml`, generated `.github/workflows/nvkr-run-nvke.yml`, managed `.github/nvkr-run-nvke/`
 members or generated `.gitlab/nvkr-run/` members. GitLab's root `.gitlab-ci.yml` stays operator-owned but must

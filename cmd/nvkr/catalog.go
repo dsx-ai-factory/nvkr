@@ -250,17 +250,30 @@ func cmdCatalog() *cli.Command {
 				Action: func(c *cli.Context) error { return pinSources(c, false) },
 			},
 			{
-				Name:      "bump",
-				Usage:     "pin the newest constraint-matching source releases, including declared tool assets",
-				ArgsUsage: "[source...]",
+				Name:        "bump",
+				Usage:       "pin the newest constraint-matching source releases, including declared tool assets",
+				Description: "Family bump is supported only on a checkout the operator exclusively owns, with no uncoordinated writers during the run.",
+				ArgsUsage:   "[source...]",
 				Flags: []cli.Flag{
-					&cli.BoolFlag{Name: "all", Usage: "bump every source"},
+					&cli.BoolFlag{Name: "all", Usage: "with --catalog, bump every source in that catalog; with a family name and no --catalog, coordinate its declared catalogs"},
 					&cli.BoolFlag{Name: "check", Usage: "dry-run: print the lockfile diff, write nothing (ADR-22 §4)"},
-					&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Required: true, Usage: "on-disk catalog directory to update"},
+					&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Usage: "on-disk catalog directory for single-catalog bump"},
+					&cli.StringFlag{Name: "family-config", Value: "inputs/policies/nvke-catalog-maintenance.yaml", Usage: "reviewed family maintenance policy (family mode only)"},
 					&cli.StringFlag{Name: "runtime", Value: "docker", Usage: "legacy default-only option (docker); image pins use anonymous HTTPS"},
 					&cli.DurationFlag{Name: "timeout", Value: 5 * time.Minute, Usage: "maximum duration for upstream git/container resolution"},
 				},
-				Action: func(c *cli.Context) error { return pinSources(c, true) },
+				Action: func(c *cli.Context) error {
+					if !c.IsSet("catalog") && c.Bool("all") && c.Args().Len() == 1 {
+						return bumpCatalogFamily(c)
+					}
+					if c.String("catalog") == "" {
+						return e.New(e.CodeUsage, "bump requires --catalog, or --all followed by one declared family name")
+					}
+					if c.IsSet("family-config") {
+						return e.New(e.CodeUsage, "--family-config requires family mode without --catalog")
+					}
+					return pinSources(c, true)
+				},
 			},
 			{
 				Name:      "pin-artifacts",

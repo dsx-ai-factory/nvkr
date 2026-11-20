@@ -1,5 +1,26 @@
 ## Support by owner
 
+Interactive catalog-family bumping prepares the explicit multi-catalog closure before writing working files.
+Local Git fixtures cover cross-catalog release consistency, excluded cohorts, unchanged dry-run files and
+second-catalog preparation failure. Injected writer tests cover rollback, cancellation and concurrent edits,
+including retained recovery backups when another writer changed a committed member. Additional fixtures
+inject edits immediately before/after withdrawal, change unchanged inputs during publication, and
+validate edited workflow/policy bytes captured after initial admission. Publication checks the actual
+displaced bytes and uses no-replace links; paths may briefly be absent. These contracts do not
+establish cross-file crash atomicity, hosted family maintenance or producer execution. Scheduled refresh
+retains its existing source selection and separate owner transactions.
+Family commitment holds the shared Plan-store guard, publishes manifests before retiring captured
+objects removed by ordinary staged generation, and writes the derived index last. Injected tests cover
+retirement rollback, cancellation and concurrent saves. Directory additions or retirements require
+ordinary authored regeneration and are refused before commitment.
+The family path generates static authored bundles without freezing runtime source heads, then repeats
+owner checks. Runtime-source fixtures retain capture refusal and exact-commit dispatch admission; family
+generation supplies neither a frozen snapshot nor a source commit. Explicit source-bound Ubuntu24 copies
+and their predecessor chains regenerate through the overlay owner while preserving producer contracts.
+The real default-family no-op dry run checked the existing closure and resolved every selected pin; the
+no-change path does not run staged generation or commitment. Changed-candidate preparation, second-pass
+generation and rollback are covered by local fixtures, not an externally exercised family version advance.
+
 Explicit producer-overlay maintenance now checks the existing generated baseline before pin mutation,
 copies complete producers from named catalogs, and derives ordered predecessor bindings before Run
 generation. The NVIDIA/upstream TCG copies and their two dependent local KVM bindings are enrolled;
