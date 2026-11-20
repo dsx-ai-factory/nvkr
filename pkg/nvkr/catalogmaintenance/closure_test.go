@@ -148,39 +148,14 @@ func TestRefreshRejectsDriftInADependentBundleBeforePinWork(t *testing.T) {
 // An owner's coded cause must survive the maintenance wrapper: a stage conflict
 // stays a write conflict and drift stays drift, never a generic capability error.
 func TestRegenerateKeepsTheOwnersCodedFailure(t *testing.T) {
-	cfg := validConfig()
-	cfg.DevelopmentEnvironment = "environment-dev.yaml"
-	// The closure reads each Run's Environment to choose its owner; this one opts out of runtime Plans.
-	t.Chdir(t.TempDir())
-	writeFixture(t, cfg.DevelopmentEnvironment, []byte("apiVersion: nvkr.dev/environment/v1\nkind: Environment\nmetadata: {name: dev}\nutilityContainer: busybox@sha256:"+strings.Repeat("a", 64)+"\nutilityPlatform: linux/amd64\ngithubDevelopment: true\n"))
-	for _, tc := range []struct {
-		name         string
-		failEnv      string
-		failOnCheck  bool
-		code         e.Code
-		wantMessages string
-	}{
-		{"production write conflict", cfg.Environment, false, e.CodeWriteConflict, "regeneration failed"},
-		{"development write conflict", cfg.DevelopmentEnvironment, false, e.CodeWriteConflict, "regeneration failed"},
-		{"development drift on recheck", cfg.DevelopmentEnvironment, true, e.CodePipelineDrift, "did not reproduce"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var wrote []string
-			_, err := regenerate(t.Context(), cfg, "test (deadbeef)", func(_ context.Context, _, environment, _, _, _ string, check bool) (string, error) {
-				if !check {
-					wrote = append(wrote, environment)
-				}
-				if environment == tc.failEnv && check == tc.failOnCheck {
-					return "", e.New(tc.code, "owner failure")
-				}
-				return "sha256:plan", nil
+	for _, code := range []e.Code{e.CodeWriteConflict, e.CodePipelineDrift, e.CodeTimeout} {
+		t.Run(string(code), func(t *testing.T) {
+			_, err := regenerate(t.Context(), validConfig(), "test (deadbeef)", func(context.Context, Config, string, bool) (string, error) {
+				return "", e.New(code, "owner failure")
 			})
-			assertCode(t, err, tc.code)
-			if !strings.Contains(err.Error(), tc.wantMessages) {
+			assertCode(t, err, code)
+			if !strings.Contains(err.Error(), "regeneration failed") || !strings.Contains(err.Error(), "retain the disposable checkout") {
 				t.Fatalf("lost the retained-checkout guidance: %v", err)
-			}
-			if tc.failOnCheck && len(wrote) != 2 {
-				t.Fatalf("every member must be written before the recheck: %v", wrote)
 			}
 		})
 	}

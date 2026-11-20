@@ -1,0 +1,60 @@
+{
+  "buildDigest": "sha256:e4ab0b0bc322bfaf48e7833be9708810c5bc6a0023a47ffdcf55933a80a1f178",
+  "catalogDigest": "sha256:9bc477c5d41d1a66c9cb5aca4e5e5b58d0f09a65ed0939b6a32f37ae971daa9e",
+  "components": [
+    "local-path-helper-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "docker.io/library/busybox:1.37.0",
+        "component": "local-path-helper-image",
+        "digest": "sha256:d82c2ab94640ded77cf76514ce6a84870761105058a4a9e51b05a8a79be97a6c",
+        "id": "pull-local-path-helper-image",
+        "imageParentDigest": "sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/arm64",
+        "version": "0.0.37"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-local-path-helper-image"
+        ]
+      }
+    ],
+    "platform": "linux/arm64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "local-path-helper-image-arm64",
+  "platform": "linux/arm64",
+  "resolvedComponents": [
+    {
+      "Name": "local-path-helper-image",
+      "commit": "49b2be8e26d6d34c9afaa21fa33108d2e82f8955",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4",
+          "arm64": "sha256:d82c2ab94640ded77cf76514ce6a84870761105058a4a9e51b05a8a79be97a6c"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "docker.io/library/busybox:1.37.0",
+        "imageParentDigest": "sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec"
+      },
+      "repo": "https://github.com/rancher/local-path-provisioner",
+      "sourceDateEpoch": 1785898268,
+      "tag": "v0.0.37"
+    }
+  ]
+}
