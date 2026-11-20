@@ -5,11 +5,15 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
 func TestScan(t *testing.T) {
@@ -140,5 +144,31 @@ func TestExclusionGlobs(t *testing.T) {
 		if err != nil || got != tc.want {
 			t.Fatalf("%+v: %t %v", tc, got, err)
 		}
+	}
+}
+
+type cancelingWriter struct {
+	bytes.Buffer
+	cancel context.CancelFunc
+}
+
+func (w *cancelingWriter) Write(p []byte) (int, error) {
+	w.cancel()
+	return w.Buffer.Write(p)
+}
+
+func TestRunObservesCancellationDuringReporting(t *testing.T) {
+	file := writeDoc(t, t.TempDir(), "last.md", "<br>\n")
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	out := &cancelingWriter{cancel: cancel}
+	var stderr bytes.Buffer
+	code, err := run(ctx, []string{file}, out, &stderr)
+	var coded *e.Error
+	if code != 1 || !errors.Is(err, context.Canceled) || !errors.As(err, &coded) || coded.Code != e.CodeTimeout {
+		t.Fatalf("canceled reporting returned code=%d error=%v", code, err)
+	}
+	if strings.Contains(out.String(), "OK:") || stderr.Len() != 0 {
+		t.Fatalf("reported completion after cancellation: %q %q", out.String(), stderr.String())
 	}
 }

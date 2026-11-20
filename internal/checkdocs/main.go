@@ -321,6 +321,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) (int, err
 		}
 		text := strings.ReplaceAll(strings.ReplaceAll(string(raw), "\r\n", "\n"), "\r", "\n")
 		updated, findings := scan(text, fix)
+		if err := ctx.Err(); err != nil {
+			return 1, e.Wrap(e.CodeTimeout, err, "scan MDX inputs")
+		}
 		if fix {
 			if updated != text {
 				if err := os.WriteFile(file, []byte(updated), 0o600); err != nil {
@@ -333,6 +336,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) (int, err
 			fmt.Fprintf(stdout, "%s:%d: [%s] %s\n", file, f.line, f.kind, f.message)
 			total++
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return 1, e.Wrap(e.CodeTimeout, err, "scan MDX inputs")
 	}
 	if total > 0 {
 		fmt.Fprintf(stderr, "\nMDX safety: %d issue(s) found\n", total)
