@@ -1,10 +1,10 @@
 {
   "outputs": {
     "aicr-inventory": {
-      "buildDigest": "sha256:85830e79660a0bd4e1a2a1e824378ef6bb2ba163707b4ae84002b347741bb65a"
+      "buildDigest": "sha256:6db14480413c0cb3efd809943583e3821ae0fd2e4d1e663de71f501ef87f0e9b"
     }
   },
-  "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site",
+  "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke",
   "targets": {
     "output-aicr-inventory": {
       "credentialRef": "github:NVKR_REGISTRY_WRITE",

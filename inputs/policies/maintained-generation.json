@@ -2,23 +2,23 @@
   {
     "bundle": "nvkr-dev",
     "group": "development",
-    "definition": "inputs/definitions/nvke/gpu-site.composite.yaml",
+    "definition": "inputs/definitions/nvke/nvke.composite.yaml",
     "environment": "inputs/environments/github-development.yaml",
-    "qualificationPolicy": "inputs/policies/nvke-gpu-site-development-qualification.yaml"
+    "qualificationPolicy": "inputs/policies/nvke-composite-development-qualification.yaml"
   },
   {
     "bundle": "nvkr-run-nvke",
     "group": "main",
-    "definition": "inputs/definitions/nvke/gpu-site-release.composite.yaml",
-    "environment": "inputs/environments/github-nvke-gpu-site.yaml",
-    "qualificationPolicy": "inputs/policies/nvke-gpu-site-qualification.yaml"
+    "definition": "inputs/definitions/nvke/nvke-release.composite.yaml",
+    "environment": "inputs/environments/github-nvke.yaml",
+    "qualificationPolicy": "inputs/policies/nvke-composite-qualification.yaml"
   },
   {
     "bundle": "nvkr-run-nvke-nightly",
     "group": "nightly",
-    "definition": "inputs/definitions/nvke/gpu-site-release.composite.yaml",
-    "environment": "inputs/environments/github-nvke-nightly-gpu-site.yaml",
-    "qualificationPolicy": "inputs/policies/nvke-nightly-gpu-site-qualification.yaml"
+    "definition": "inputs/definitions/nvke/nvke-release.composite.yaml",
+    "environment": "inputs/environments/github-nvke-nightly.yaml",
+    "qualificationPolicy": "inputs/policies/nvke-composite-nightly-qualification.yaml"
   },
   {
     "bundle": "nvkr-run-wli-imds-agent",

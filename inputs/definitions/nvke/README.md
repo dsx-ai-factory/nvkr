@@ -1,9 +1,9 @@
 # NVKE composite release inputs
 
-The [release composite](gpu-site-release.composite.yaml) is the maintained production/nightly entry point.
+The [release composite](nvke-release.composite.yaml) is the maintained production/nightly entry point.
 It pins five NVKE family files and the [GB200 AICR member](../aicr/nvke-gb200.yaml), preserving their
 83 payload outputs and adding the composite-owned `aicr-inventory` as the 84th required output.
-Development keeps the [payload-only composite](gpu-site.composite.yaml) and its 83 outputs.
+Development keeps the [payload-only composite](nvke.composite.yaml) and its 83 outputs.
 Family files remain authored selection owners; there are no maintained standalone family workflows.
 
 The inventory is derived after packaging from `controller-chart`, `nktp`, `nvke-controller`, `postgresql`,
@@ -33,9 +33,14 @@ acceptance work in [reconciliation](../../../docs/adr/reconciliation/adr-26.md).
 
 | Purpose | Environment | Workflow | Publication prefix |
 |---|---|---|---|
-| Pinned production | [github-nvke-gpu-site.yaml](../../environments/github-nvke-gpu-site.yaml) | `nvkr-run-nvke.yml` | `ghcr.io/dsx-ai-factory/nvkr/candidate/gpu-site` |
+| Pinned production | [github-nvke.yaml](../../environments/github-nvke.yaml) | `nvkr-run-nvke.yml` | `ghcr.io/dsx-ai-factory/nvkr/candidate/nvke` |
 | Branch development | [github-development.yaml](../../environments/github-development.yaml) | `nvkr-dev.yml` | `ghcr.io/dsx-ai-factory/nvkr/development/runs/<run>/attempts/<attempt>` |
-| Floating-source candidate | [github-nvke-nightly-gpu-site.yaml](../../environments/github-nvke-nightly-gpu-site.yaml) | `nvkr-run-nvke-nightly.yml` | `ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site` |
+| Floating-source candidate | [github-nvke-nightly.yaml](../../environments/github-nvke-nightly.yaml) | `nvkr-run-nvke-nightly.yml` | `ghcr.io/dsx-ai-factory/nvkr/nightly/nvke` |
+
+Future production and nightly releases use the prefixes above. Any artifacts already published under `candidate/gpu-site`, `nightly/gpu-site` or historical
+`m2-candidate/gpu-site` stay at their original paths; this rename does not move or delete them. External consumers may still pin those repository paths and digests. Keep those exact
+references when consuming existing releases; use a new Run's published reference when adopting the renamed
+namespace. Replacing a path segment in an old digest-pinned reference does not migrate that release.
 
 All three producers are manually dispatched. The separate [AMD64 nightly E2E](../../../docs/nvke-nightly.md)
 is scheduled and builds/tests locally. Floating-source NVKE nightly freezes its declared upstream main refs
@@ -50,9 +55,9 @@ gh workflow run nvkr-run-nvke-nightly.yml --repo dsx-ai-factory/nvkr --ref main
 
 Every composite Run rebuilds every output, including eight native disk bakes. Member Release reuse and local
 composite qualification rehearsal remain unsupported. Complete-composite qualification uses independent
-[production](../../policies/nvke-gpu-site-qualification.yaml),
-[development](../../policies/nvke-gpu-site-development-qualification.yaml) and
-[nightly](../../policies/nvke-nightly-gpu-site-qualification.yaml) policies. The production/nightly qualifier
+[production](../../policies/nvke-composite-qualification.yaml),
+[development](../../policies/nvke-composite-development-qualification.yaml) and
+[nightly](../../policies/nvke-composite-nightly-qualification.yaml) policies. The production/nightly qualifier
 runs after its exact producer completes; its native smoke worker is reusable only by the qualifier.
 AICR archive checks establish artifact validity, not deployment or application compatibility.
 
@@ -61,8 +66,8 @@ AICR archive checks establish artifact validity, not deployment or application c
 After editing a member, update its digest pin and regenerate through the owner:
 
 ```sh
-bin/nvkr definition pin --definition inputs/definitions/nvke/gpu-site.composite.yaml
-bin/nvkr definition pin --definition inputs/definitions/nvke/gpu-site-release.composite.yaml
+bin/nvkr definition pin --definition inputs/definitions/nvke/nvke.composite.yaml
+bin/nvkr definition pin --definition inputs/definitions/nvke/nvke-release.composite.yaml
 make nvke-generate
 make nvke-check
 make workflows-generate
@@ -96,7 +101,7 @@ The former [combined Definition](definition.yaml) and standalone family Environm
 authoring fixtures; they are not enrolled releases. The decision supersedes the former hosted/consumer/output-
 equivalence retirement prerequisites without claiming that missing acceptance evidence now exists.
 The composite keeps the same member selections and Build identities; production/nightly rename their workflow,
-Environment, Plan and qualification-policy identities. Existing registry prefixes remain unchanged.
+Environment, Plan and qualification-policy identities. That retirement left existing registry prefixes unchanged.
 
 ## Selected artifacts and their owners
 
@@ -239,7 +244,7 @@ under `nvke.nvidia.com/os-image-materials/v1`; every selected material and disk 
 
 This composite remains a candidate; its selection does not complete product acceptance. The production target Environment reuses
 the existing registry credential, source access and workflow signing policy, but publishes only under
-the separately authored `ghcr.io/dsx-ai-factory/nvkr/candidate/gpu-site` prefix. The maintained signer identity
+the separately authored `ghcr.io/dsx-ai-factory/nvkr/candidate/nvke` prefix. The maintained signer identity
 admits only `main`; the temporary branch-test exception has been removed after the
 cancelled attempt. Candidate execution is not organizational publication acceptance. Native disk
 execution classes select the two ARC KVM pools under `githubARC: native-kvm-v1`. They describe requested
@@ -365,7 +370,7 @@ The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actio
 completed a standalone FDE bake and raw artifact retention. It did not exercise FDE publication, an ARM64
 FDE bake, or the maintained release composite. Those operational acceptance checks remain outstanding.
 
-`../../environments/github-nvke-gpu-site.yaml` admits only ADR-18's `githubARC: native-kvm-v1` route on
+`../../environments/github-nvke.yaml` admits only ADR-18's `githubARC: native-kvm-v1` route on
 `arc-amd64-kvm` and `arc-arm64-kvm`, with required native KVM. Each execution class requests 8 CPUs,
 36 GiB memory, 224 GiB workspace capacity and a six-hour disk-producer budget. Declarations are admission
 budgets, not observed allocation or general runner-capacity guarantees. Docker uses the typed runtime
@@ -384,7 +389,7 @@ Strict profiles contain actual native image/executable pins and conservative bou
 subject, 16 GiB filesystem, 28 GiB inspection memory, 224 GiB private scratch and a ten-minute deadline.
 These retained profiles do not demonstrate a successful full NVKE inspection or measured peak usage.
 
-Publication uses the separate `ghcr.io/dsx-ai-factory/nvkr/candidate/gpu-site` prefix and
+Publication uses the separate `ghcr.io/dsx-ai-factory/nvkr/candidate/nvke` prefix and
 `publication.mode: per-output-v1`. Each output is packaged, published, signed and verified independently.
 Assembly authenticates same-Plan, same-workflow metadata and evidence; it does not download payload layers.
 The release remains one signed entry point. Retry assembly may retain earlier attempt identities;
@@ -442,7 +447,7 @@ delivered-tool smoke remain required. Authenticated partial retries within the s
 run preserve successful output/worker evidence when its exact inputs and policy remain unchanged. No source
 or artifact pin changes are needed merely to satisfy the optional metadata check.
 
-The [candidate policy](../../policies/nvke-gpu-site-qualification.yaml) records concrete cosign version/executable hashes, native
+The [candidate policy](../../policies/nvke-composite-qualification.yaml) records concrete cosign version/executable hashes, native
 smoke-image manifest digests, three tool profiles and 63 exact deployment-image and bundle-archive scope decisions. These
 independently authored trust selections are reviewed with the generated workflow pair; they are not inherited
 from the producing Run. The [hosted setup guide](../../../docs/lifecycle.md#publish-qualification-evidence)

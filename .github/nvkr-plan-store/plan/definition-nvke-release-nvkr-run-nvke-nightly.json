@@ -6,8 +6,8 @@
   "cosignTool": "cosign-module-tags",
   "kind": "Definition",
   "metadata": {
-    "description": "Publish the NVKE GPU site and its package-derived inventory as one Release.",
-    "name": "nvke-gpu-site-release"
+    "description": "Publish NVKE and its package-derived inventory as one Release.",
+    "name": "nvke-release"
   },
   "outputs": [
     {
