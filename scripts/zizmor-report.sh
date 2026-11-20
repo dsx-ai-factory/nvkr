@@ -55,8 +55,9 @@ zizmor_install() {
   printf '%s\n' "$work/zizmor"
 }
 zizmor_summarize() {
-  local raw=$1 output=$2
+  local raw=$1 output=$2 rendered
   jq -jRs . "$raw" | cmp -s "$raw" - || { zizmor_error 'findings are not UTF-8'; return 1; }
+  rendered=$(mktemp "$output.XXXXXX") || return 1
   jq -er -s '
     def finding:
       type == "object" and (.ident | type == "string") and (.desc | type == "string") and
@@ -69,11 +70,11 @@ zizmor_summarize() {
     else error("invalid zizmor JSON v1 findings array") end |
     .[] | (.determinations.severity + " " + .ident + ": " + .desc + (if .ignored then " [ignored]" else "" end)),
       (.locations[] | "  \(.symbolic.key.Local.verbatim_path):\(.concrete.location.start_point.row + 1): \(.symbolic.annotation)")
-  ' "$raw" >"$output" && return 0
+  ' "$raw" >"$rendered" && { mv "$rendered" "$output"; return; }
   # An empty findings array emits no rows; jq -e distinguishes that from a
   # parse/schema error with exit status 4. Validate it explicitly.
-  jq -e -s 'length == 1 and .[0] == []' "$raw" >/dev/null 2>&1 || return 1
-  printf '\n' >"$output"
+  jq -e -s 'length == 1 and .[0] == []' "$raw" >/dev/null 2>&1 || { rm -f "$rendered"; return 1; }
+  printf '\n' >"$rendered" && mv "$rendered" "$output"
 }
 zizmor_collect_report() {
   local root=$1 work=$2 attempt=$3 binary status count input_count name

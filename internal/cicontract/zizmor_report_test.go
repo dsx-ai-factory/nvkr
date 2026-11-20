@@ -247,6 +247,11 @@ func TestZizmorReportVerdicts(t *testing.T) {
 			if got := string(readFile(t, filepath.Join(attempts[0], "findings.json"))); got != tc.raw {
 				t.Fatalf("lost tool bytes: %q", got)
 			}
+			if slices.Contains([]string{"bad JSON", "bad schema", "missing fields", "invalid UTF-8 findings"}, tc.name) {
+				if _, err := os.Stat(filepath.Join(attempts[0], "findings.txt")); !os.IsNotExist(err) {
+					t.Fatalf("malformed findings produced a text report: %v", err)
+				}
+			}
 			calls := strings.Split(strings.TrimSuffix(string(readFile(t, filepath.Join(root, "calls"))), "\x00"), "\x00")
 			want := []string{"--offline", "--strict-collection", "--no-progress", "--color", "never", "--format", "json-v1", "--no-exit-codes", ".github/workflows/test.yml"}
 			if !slices.Equal(calls, want) {

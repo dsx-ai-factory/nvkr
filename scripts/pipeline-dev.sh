@@ -40,11 +40,12 @@ command_result() {
   esac
 }
 local_branch() {
+  local LC_ALL=C
   command_result 'Cannot inspect the Git working tree.' false git status --porcelain=v1 --untracked-files=all
   [ -z "$result" ] || fail NVKR-E-USAGE 2 'Commit or set aside all tracked and untracked changes before dispatch.'
   command_result 'A named branch is required; check out a branch instead of detached HEAD.' false git symbolic-ref --quiet --short HEAD
   branch=$result
-  if [ -z "$branch" ] || LC_ALL=C printf '%s' "$branch" | LC_ALL=C grep -q '[[:cntrl:][:space:]]'; then
+  if [[ -z $branch || $branch == *[[:cntrl:][:space:]]* ]]; then
     fail NVKR-E-USAGE 2 'Git returned an invalid branch name.'
   fi
   command_result 'Cannot resolve the local commit.' false git rev-parse --verify 'HEAD^{commit}'

@@ -91,6 +91,10 @@ func TestPipelineDevCommandHelper(t *testing.T) {
 				fmt.Println("bad branch")
 				os.Exit(0)
 			}
+			if failure == "newline branch" {
+				fmt.Println("feat\nevil")
+				os.Exit(0)
+			}
 			marker := filepath.Join(os.Getenv("NVKR_ADAPTER_ROOT"), "branch-read")
 			_, err := os.Stat(marker)
 			if failure == "local moved" && err == nil {
@@ -308,6 +312,7 @@ func TestPipelineDevRejectsPreflight(t *testing.T) {
 		{"ambiguous response", "NVKR-E-FETCH-FAILED", "ambiguous response", 20}, {"multiple responses", "NVKR-E-FETCH-FAILED", "malformed JSON", 20},
 		{"missing object", "NVKR-E-USAGE", "does not match local HEAD", 2}, {"wrong ref", "NVKR-E-USAGE", "does not match local HEAD", 2},
 		{"local moved", "NVKR-E-USAGE", "changed during preflight", 2}, {"invalid branch", "NVKR-E-USAGE", "invalid branch", 2}, {"invalid commit", "NVKR-E-USAGE", "exact GitHub commit SHA", 2},
+		{"newline branch", "NVKR-E-USAGE", "invalid branch", 2},
 	} {
 		t.Run(tc.failure, func(t *testing.T) {
 			output, status, calls := pipelineDevFixture(t, tc.failure, "--repo", dispatchRepo)
