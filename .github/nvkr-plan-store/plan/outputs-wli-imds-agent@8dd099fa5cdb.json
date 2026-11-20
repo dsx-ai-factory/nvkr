@@ -1,0 +1,20 @@
+[
+  {
+    "artifactId": "package/dsx-imds-node-attestor-agent-linux-amd64",
+    "buildDigest": "sha256:5c1584d50c59d7c934c8d929ec7dd6f378ac5833fb03fad5097888b422f3d6db",
+    "components": [
+      "dsx-imds-node-attestor-agent"
+    ],
+    "kind": "executable",
+    "name": "dsx-imds-node-attestor-agent-linux-amd64"
+  },
+  {
+    "artifactId": "package/dsx-imds-node-attestor-agent-linux-arm64",
+    "buildDigest": "sha256:1969c767bff3810133e03cb65aa36487c038188857a950ef01a97980d458fafc",
+    "components": [
+      "dsx-imds-node-attestor-agent"
+    ],
+    "kind": "executable",
+    "name": "dsx-imds-node-attestor-agent-linux-arm64"
+  }
+]

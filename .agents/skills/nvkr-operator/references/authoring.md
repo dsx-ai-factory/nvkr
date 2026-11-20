@@ -91,8 +91,10 @@ bindings require an explicit packaging stream for commit-only pins. `sourceBound
 retain a complete producer contract and bind one named producer's source identity. Report changed Plan and
 Build Digests when migrating bindings.
 
-Never hand-edit `pins.lock.yaml`, generated `.github/workflows/nvkr-run-nvke.yml`, or managed `.github/nvkr-run-nvke/`
-members. Use the selected inputs and same CLI identity for generation and `--check`. Root generation is
+Never hand-edit `pins.lock.yaml`, generated `.github/workflows/nvkr-run-nvke.yml`, managed `.github/nvkr-run-nvke/`
+members or generated `.gitlab/nvkr-run/` members. GitLab's root `.gitlab-ci.yml` stays operator-owned but must
+contain only its exact generated local include; follow the [native GitLab guide](../../../../docs/generate-pipeline.md#native-gitlab-execution).
+Use the selected inputs and same CLI identity for generation and `--check`. Root generation is
 appropriate only when explicitly updating that root's owned bundle; alternate examples belong in a scratch
 root. Follow the maintained Definition's own instructions when its committed bundle uses a different generator
 stamp.

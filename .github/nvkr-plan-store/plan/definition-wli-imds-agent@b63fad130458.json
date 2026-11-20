@@ -1,0 +1,29 @@
+{
+  "apiVersion": "nvkr.dev/definition/v5",
+  "catalog": {
+    "base": "../../catalogs/nvidia-workload-identity"
+  },
+  "kind": "Definition",
+  "metadata": {
+    "description": "Source-built NVIDIA Workload Identity DSX IMDS NodeAttestor agent executable for Linux AMD64 and ARM64; build-only, unsigned, unpublished.",
+    "name": "wli-imds-agent"
+  },
+  "outputs": [
+    {
+      "components": [
+        "dsx-imds-node-attestor-agent"
+      ],
+      "format": "executable",
+      "name": "dsx-imds-node-attestor-agent-linux-amd64",
+      "platform": "linux/amd64"
+    },
+    {
+      "components": [
+        "dsx-imds-node-attestor-agent"
+      ],
+      "format": "executable",
+      "name": "dsx-imds-node-attestor-agent-linux-arm64",
+      "platform": "linux/arm64"
+    }
+  ]
+}

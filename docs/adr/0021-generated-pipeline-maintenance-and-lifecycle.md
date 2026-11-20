@@ -1,6 +1,6 @@
 # ADR-21 — Generated-pipeline maintenance & lifecycle
 
-- **Decision status:** Accepted (2026-11-14)
+- **Decision status:** Accepted (2026-11-14); GitLab extension below proposed for maintainer review.
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
@@ -39,6 +39,25 @@ workflow are removed. Cluster-composition files and nodes are also removed; rege
 owned members through the same prior-manifest checks described below. Changed graph/plan and lifecycle records use their new schema majors; old records
 cannot be relabeled into current identities.
 
+The proposed GitLab extension requires maintainer review; the existing ADR acceptance does not ratify it.
+GitLab uses the fixed `.gitlab/nvkr-run/` namespace containing `pipeline.yml`, canonical `plan.json` and
+`manifest.json`. The manifest binds the complete generated payload inventory and is written last through
+the same owned-file writer, drift and retirement rules. The repository root `.gitlab-ci.yml` remains
+operator-owned and is never generated, adopted or retired by that writer. Execution requires that root to
+contain only one local include naming `.gitlab/nvkr-run/pipeline.yml`; extra root jobs, variables, includes
+and replacement policy are not customization seams. The provider project must select its default root CI
+configuration. Generated GitLab namespace paths are not authored and cannot be replaced with GitHub layouts.
+The generated include's intrinsic Docker-helper umask switch, fresh-clone strategy and token-free Git URL
+flag apply before every job's source checkout (ADR-18). Its workflow rules mirror the authored ref/source
+selection and protected-publication requirement; they end with refusal, not a catch-all allow rule. Fresh job-owned source checkout avoids incompatible regular-file modes
+retained by fetch in reused Runner storage; the switch prevents the standard helper from widening them.
+Committed generated payloads still require their exact manifest modes, including `0644` regular files.
+No checkout chmod or mode-tolerant drift exception is admitted.
+ADR-18 owns native invocation, authenticated current-job/original-carrier admission and unsigned finalization;
+ADR-20 owns its bounded publication exception. Named GitHub bundles, GitHub runtime Plan/source refresh,
+qualification generation, catalog maintenance and the projection pilot do not extend this GitLab profile.
+The [generation ledger](reconciliation/adr-21.md#gitlab-generated-bundle) owns current checks and acceptance.
+
 In production mode, Environment's optional `githubBundle` selects an independent generated GitHub namespace.
 Empty preserves `.github/workflows/nvkr-run.yml` and `.github/nvkr-run/{plan,manifest}.json`
 byte-for-byte. A nonempty name contains at most 48 lowercase letters, digits and hyphens,
@@ -60,7 +79,7 @@ Every generated execution, recovery and utility-container command selects that e
 Plan path; validation rejects a bundle whose paths differ from the admitted Environment.
 Signing identity and issuer remain explicit Environment policy and are never rewritten
 to accommodate a selected workflow filename. Operators must select the matching policy.
-Producer generation emits independent bundles whose entrypoints support manual dispatch, with no cron or
+GitHub producer generation emits independent bundles whose entrypoints support manual dispatch, with no cron or
 callable trigger. By default every producer job remains in its bundle's entry workflow. The opt-in
 `githubExecutionPartitions` projection also owns up to 50 same-commit sibling workers named
 `<entry-stem>__w-<lowest member job id>.yml`, with a template portion of at most 64 characters.

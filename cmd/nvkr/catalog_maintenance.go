@@ -197,6 +197,9 @@ func cmdCatalogUpdateCI() *cli.Command {
 		if err := factory.ValidateGenerationEngine(c.String("engine")); err != nil {
 			return showCommandResult(c, view, display, err)
 		}
+		if !strings.EqualFold(strings.TrimSpace(c.String("engine")), factory.EngineGitHub) {
+			return showCommandResult(c, view, display, e.New(e.CodeEngineCapability, "catalog maintenance supports only the GitHub workflow provider"))
+		}
 		ctx, cancel, err := maintenanceContext(c)
 		if err != nil {
 			return showCommandResult(c, view, display, err)
