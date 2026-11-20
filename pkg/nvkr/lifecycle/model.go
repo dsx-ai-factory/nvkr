@@ -88,6 +88,18 @@ type Signing = definition.Signing
 // exact observed bytes; required output slots use a separate internal record.
 type Artifact = delivery.Output
 
+// GitLabInvocation describes the provider-authenticated finalizer invocation.
+// Serialized metadata does not restore a provider receipt or publication authority.
+type GitLabInvocation struct {
+	APIURL     string `json:"apiURL"`
+	ProjectID  uint64 `json:"projectID"`
+	PipelineID uint64 `json:"pipelineID"`
+	JobID      uint64 `json:"jobID"`
+	Commit     string `json:"commit"`
+	Ref        string `json:"ref"`
+	Source     string `json:"source"`
+}
+
 // Run joins frozen expectations to observations without deriving requirements
 // from success. Plans and node reports are inspectable internal records.
 type Run struct {
@@ -102,6 +114,9 @@ type Run struct {
 	Observed          []Artifact       `json:"observed,omitempty"`
 	Failure           *runFailure      `json:"failure,omitempty"`
 	ContentSubject    string           `json:"contentSubject,omitempty"`
+	// GitLab is descriptive finalizer metadata, not serialized provider authority.
+	GitLab *GitLabInvocation `json:"gitlab,omitempty"`
+
 	// Composition binds a composite Run's members and per-output attribution;
 	// definitionDigest then names the composite (ADR-26 §4).
 	Composition *definition.CompositionRecord `json:"composition,omitempty"`

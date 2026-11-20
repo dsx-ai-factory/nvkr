@@ -76,6 +76,11 @@ func generatedMemberInNamespace(bundle *GeneratedBundle, member string) bool {
 	if bundle.Engine == EngineTekton {
 		return member == tektonResourcePath || member == tektonPlanPath
 	}
+	if bundle.Engine == EngineGitLab {
+		layout, ok := gitlabWorkflowNamespace(bundle.WorkflowPath)
+		return ok && bundle.ManifestPath == layout.manifestPath && bundle.PlanPath == layout.planPath &&
+			strings.HasPrefix(member, path.Dir(layout.manifestPath)+"/")
+	}
 	owner, sibling := legacyGitHubChildWorkflowOwner(member)
 	return isPlanStorePath(member) || member == bundle.WorkflowPath || strings.HasPrefix(member, path.Dir(bundle.ManifestPath)+"/") ||
 		(sibling && owner == bundle.WorkflowPath && githubPartitionWorkflowSuffix.MatchString(member))
@@ -85,6 +90,9 @@ func generatedMemberInNamespace(bundle *GeneratedBundle, member string) bool {
 func priorGeneratedMemberInNamespace(bundle *GeneratedBundle, member string) bool {
 	if generatedMemberInNamespace(bundle, member) {
 		return true
+	}
+	if bundle.Engine == EngineGitLab {
+		return false
 	}
 	owner, ok := legacyGitHubChildWorkflowOwner(member)
 	return ok && owner == bundle.WorkflowPath

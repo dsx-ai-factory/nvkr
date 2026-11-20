@@ -14,8 +14,9 @@ Ordinary local source admission uses Git's bounded `ls-files --format` query to 
 an unsupported query fails with a coded diagnostic naming this Git version floor.
 The required [authoring lab regression](docs/examples/authoring-lab/README.md) uses these tools and fails
 if a prerequisite is missing. `make check` additionally requires Python 3.12 or later (`python3` on `PATH`)
-for `make test-ci-tools`, which runs the CI report parser and all local adapter contract suites using
-only the Python standard library. Go-test adapter wrappers report an explicit skip when Python is
+for `make test-ci-tools`, which runs the remaining Python CI sharding and local adapter contract suites using
+only the Python standard library, plus Go-driven shell/jq generation and summary contracts.
+Go-test adapter wrappers report an explicit skip when Python is
 absent; that is not full-gate coverage. The tooling gate fails if Python is missing or too old and
 runs every suite independently, so a Go-only test pass cannot stand in for the completion gate.
 The restated-status check in `make check` diffs against `origin/main`; set `STATUS_BASE` when your base
@@ -524,3 +525,63 @@ caller-authored descriptions into authority.
 
 [CONTRIBUTING.md](CONTRIBUTING.md) owns contribution and commit rules. [Documentation guidance](docs/README.md)
 identifies active references; historical drafts and dated evidence do not override current contracts.
+
+## Test the GitLab adapter against a real server
+
+Run the opt-in integration test locally. The manual **GitLab Docker acceptance** workflow remains
+available, but its standard `ubuntu-24.04` runner does not guarantee the disk requirement below.
+See the [GitLab acceptance ledger](docs/adr/reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile)
+for recorded execution scope. The workflow's [`nvkectl` job](.github/workflows/gitlab-docker.yml)
+has a fixed `runs-on: ubuntu-24.04`; dispatch offers no runner selector. Before dispatch, change that
+job's `runs-on` to an adequately sized GitHub-hosted runner configured for the repository, or use
+the local path below.
+The standard public runner has four CPUs and 16 GB RAM but only 14 GB guaranteed storage; the private
+repository allocation is two CPUs, 8 GB RAM and 14 GB storage. See the
+[GitHub runner specifications](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+The supported alternative is a disposable local Docker daemon with the required capacity. Install
+the Go version in `.go-version`, Git and Docker, then use a local Unix Docker context
+with native Linux AMD64 or ARM64 execution, at least four CPUs, 12 GiB Docker memory and 35 GiB free disk.
+The selected daemon must expose `/var/run/docker.sock` on its own host or VM. The test bind-mounts
+that exact daemon-side socket and verifies that its daemon ID matches the selected context before
+checking disk space. The client-side Unix socket path may differ. A rootless daemon exposing only
+its per-user socket does not meet this prerequisite; select a compatible disposable daemon.
+The test checks Docker CPU and memory first, then pulls only the pinned Docker CLI prerequisite and
+measures available bytes on an owned daemon volume before pulling the large server images. The
+35 GiB observation is a precondition, not a reservation; concurrent use can still consume capacity.
+The test neither adds storage nor deletes unrelated resources. It builds the real pinned NVKE CLI;
+allow up to two hours.
+No existing GitLab service, registration token, SSH key or organization credential is needed.
+
+```sh
+export GOTOOLCHAIN=local
+export NVKR_GITLAB_EVIDENCE="$(mktemp -d)/evidence"
+make test-gitlab-docker
+```
+
+The test starts the official GitLab CE server and GitLab Runner in Docker, uses a fresh private project,
+and selects only `nvkectl` from the maintained native NVKE tutorial Definition. NVKR builds its own CLI,
+generates and checks the committed GitLab include, and retains ownership of every product build step.
+The official `glab` executable creates the project and masked read-only API variable, asks the real server
+to lint the complete include, submits the pipeline through its API, and polls terminal pipeline and job
+statuses. The test requires the exact generated job inventory, success with no retried jobs, a complete
+unsigned Run bound to the generated Plan, and an independently inspected downloadable `nvkectl` binary bundle.
+
+Server, Runner and its native helper, external `glab`, Go bootstrap image and Docker CLI images are
+pinned in `toolchains/gitlab-docker/pins.json`. The pinned official Go image is the bootstrap image.
+A read-only owned volume supplies only the Docker client copied from its pinned official image,
+with an explicit Runner tool path. No bootstrap registry, image build, package-manager update or product build
+script is added. External `glab` keeps its dependencies outside NVKR's linked Apache-clean binary.
+
+HTTPS uses a freshly generated test CA and server certificate with verified hostnames. Each job receives
+only the public CA and its scoped GitLab credentials. The administrator token, server private key and Runner
+authentication configuration stay outside the product checkout and job mounts. The fixture's Docker socket
+grants its registered jobs control of the selected daemon, so run on a disposable development/CI daemon.
+Named build storage is mounted at its reported daemon path so NVKR's own Docker workspace mounts refer
+to the same bytes on Linux and Docker-backed macOS. Native image checks refuse emulation or an architecture mismatch.
+
+Cleanup stops scheduling and joins the owned containers before removing this test's network and volumes.
+It never prunes Docker or removes unrelated resources. Pulled upstream images remain ordinary shared caches.
+Only bounded status, Run and executable-bundle metadata enter `NVKR_GITLAB_EVIDENCE`; credentials, raw server
+logs, Runner configuration and job traces are excluded. An unavailable dependency, failed lint, failed/skipped
+job, missing artifact or cleanup failure fails the integration test. Its result covers this one unsigned
+executable output; it does not establish publication, signing, disks, private-source access or full NVKE qualification.

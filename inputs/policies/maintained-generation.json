@@ -19,5 +19,11 @@
     "definition": "inputs/definitions/nvke/nvke-release.composite.yaml",
     "environment": "inputs/environments/github-nvke-nightly.yaml",
     "qualificationPolicy": "inputs/policies/nvke-composite-nightly-qualification.yaml"
+  },
+  {
+    "bundle": "nvkr-run-wli-imds-agent",
+    "group": "main",
+    "definition": "inputs/definitions/nvidia-workload-identity/imds-agent.yaml",
+    "environment": "inputs/environments/github-wli-imds-agent.yaml"
   }
 ]

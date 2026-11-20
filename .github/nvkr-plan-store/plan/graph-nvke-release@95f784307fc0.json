@@ -1455,7 +1455,7 @@
       "component": "nvkectl-module-tags",
       "id": "artifact/nvkectl-linux-arm64/nvkectl-module-tags",
       "kind": "host-package",
-      "mediaType": "application/vnd.debian.binary-package",
+      "mediaType": "application/octet-stream",
       "name": "nvkectl-module-tags",
       "path": ".nvkr/factory/nvkectl-linux-arm64/out/nvkectl-module-tags/nvkectl",
       "producer": "nvkectl-linux-arm64/build-nvkectl-module-tags"
@@ -1465,7 +1465,7 @@
       "component": "nvkectl-module-tags",
       "id": "artifact/nvkectl/nvkectl-module-tags",
       "kind": "host-package",
-      "mediaType": "application/vnd.debian.binary-package",
+      "mediaType": "application/octet-stream",
       "name": "nvkectl-module-tags",
       "path": ".nvkr/factory/nvkectl/out/nvkectl-module-tags/nvkectl",
       "producer": "nvkectl/build-nvkectl-module-tags"
@@ -1475,7 +1475,7 @@
       "component": "helm-operator",
       "id": "artifact/operator-tools-linux-arm64/helm-operator",
       "kind": "host-package",
-      "mediaType": "application/vnd.debian.binary-package",
+      "mediaType": "application/octet-stream",
       "name": "helm-operator",
       "path": ".nvkr/factory/operator-tools-linux-arm64/fetch/helm-operator/helm-operator",
       "producer": "operator-tools-linux-arm64/pull-helm-operator"
@@ -1485,7 +1485,7 @@
       "component": "kubectl-operator",
       "id": "artifact/operator-tools-linux-arm64/kubectl-operator",
       "kind": "host-package",
-      "mediaType": "application/vnd.debian.binary-package",
+      "mediaType": "application/octet-stream",
       "name": "kubectl-operator",
       "path": ".nvkr/factory/operator-tools-linux-arm64/fetch/kubectl-operator/kubectl-operator",
       "producer": "operator-tools-linux-arm64/pull-kubectl-operator"
@@ -1495,7 +1495,7 @@
       "component": "helm-operator",
       "id": "artifact/operator-tools/helm-operator",
       "kind": "host-package",
-      "mediaType": "application/vnd.debian.binary-package",
+      "mediaType": "application/octet-stream",
       "name": "helm-operator",
       "path": ".nvkr/factory/operator-tools/fetch/helm-operator/helm-operator",
       "producer": "operator-tools/pull-helm-operator"
@@ -1505,7 +1505,7 @@
       "component": "kubectl-operator",
       "id": "artifact/operator-tools/kubectl-operator",
       "kind": "host-package",
-      "mediaType": "application/vnd.debian.binary-package",
+      "mediaType": "application/octet-stream",
       "name": "kubectl-operator",
       "path": ".nvkr/factory/operator-tools/fetch/kubectl-operator/kubectl-operator",
       "producer": "operator-tools/pull-kubectl-operator"
@@ -19850,7 +19850,7 @@
             "name": "temporal"
           }
         ],
-        "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/candidate/nvke"
+        "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/nightly/nvke"
       },
       "id": "package/aicr-inventory",
       "inputs": [

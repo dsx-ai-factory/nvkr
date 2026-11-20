@@ -391,7 +391,7 @@
   "environmentPath": "inputs/environments/github-nvke-nightly.yaml",
   "generatorVersion": "dev (unknown)",
   "graph": {
-    "file": ".github/nvkr-plan-store/plan/graph-nvke-release@60e0fff39596.json"
+    "file": ".github/nvkr-plan-store/plan/graph-nvke-release@95f784307fc0.json"
   },
   "lifecycleOutputs": {
     "file": ".github/nvkr-plan-store/plan/outputs-nvke-release@f0c06a92ec27.json"

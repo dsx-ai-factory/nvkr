@@ -1,6 +1,6 @@
 # Authored inputs
 
-This directory owns the repository's NVKE, NVSentinel and AICR build and release inputs. Definitions select named outputs
+This directory owns the repository's NVKE, NVSentinel, AICR and NVIDIA Workload Identity inputs. Definitions select named outputs
 from pinned catalog producers; Environments select execution and publication policy. The maintained
 production/nightly candidate starts at [the NVKE release composite](definitions/nvke/nvke-release.composite.yaml),
 which adds the derived inventory to the five NVKE families and GB200 AICR member. Development uses the same
@@ -71,6 +71,12 @@ keeps separate Debian producer copies with byte-identical commands, matching sou
 and the existing composer/Packer folder handoff. These development inputs do not
 change the maintained NVKE release or demonstrate current NVSentinel build/runtime acceptance.
 
+The independent [NVIDIA Workload Identity agent](definitions/nvidia-workload-identity/README.md)
+selects two Linux executable outputs and its own manual, build-only GitHub workflow.
+It is the fourth maintained bundle alongside the three NVKE composites, without
+adding WLI outputs to those composites. The shared refresh admits its complete
+generated closure and imported action pins; it does not repin the WLI source.
+
 The [AICR example](definitions/aicr/README.md) selects six deployment-bundle formats
 from one pinned catalog with a local build-only Environment. Its GB200 NVKE Kubeflow
 training Definition selects three of those formats from the same catalog.
@@ -94,8 +100,9 @@ together. Maintain pins through `catalog pin`/`catalog bump`; use
 [catalog maintenance](../docs/catalog-maintenance.md) for the complete workflow. Definition reuse is
 explicit producer selection, without inheritance or execution-time output filtering.
 
-`make workflows-generate` and `make workflows-check` own exactly three maintained composite bundles:
-`nvkr-dev`, `nvkr-run-nvke` and `nvkr-run-nvke-nightly`. `make nvke-generate` and `make nvke-check`
+`make workflows-generate` and `make workflows-check` own three maintained NVKE composite bundles
+(`nvkr-dev`, `nvkr-run-nvke` and `nvkr-run-nvke-nightly`) plus the independent build-only
+`nvkr-run-wli-imds-agent` bundle. `make nvke-generate` and `make nvke-check`
 select production only. Family files remain pinned members; their standalone Environments and the old
 combined input are comparison fixtures, not maintained releases.
 

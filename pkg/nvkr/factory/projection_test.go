@@ -5,6 +5,8 @@ package factory
 
 import (
 	"context"
+	"encoding/json"
+	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -120,8 +122,30 @@ func recordProjectionCalls(t *testing.T) *projectionCalls {
 func projectionEquivalencePlans(t *testing.T, repo string) map[string]*Plan {
 	t.Helper()
 	committed, err := filepath.Glob(filepath.Join(repo, ".github", "nvkr*", "plan.json"))
-	if err != nil || len(committed) != 3 {
-		t.Fatalf("committed maintained Plans = %v, %v; want the three .github/nvkr*/plan.json", committed, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := os.ReadFile(filepath.Join(repo, "inputs/policies/maintained-generation.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var inventory []struct {
+		Bundle string `json:"bundle"`
+	}
+	if err := json.Unmarshal(raw, &inventory); err != nil {
+		t.Fatal(err)
+	}
+	var expected, discovered []string
+	for _, entry := range inventory {
+		expected = append(expected, entry.Bundle)
+	}
+	for _, path := range committed {
+		discovered = append(discovered, filepath.Base(filepath.Dir(path)))
+	}
+	sort.Strings(expected)
+	sort.Strings(discovered)
+	if len(expected) == 0 || !reflect.DeepEqual(expected, discovered) {
+		t.Fatalf("committed maintained bundles = %v; policy requires %v", discovered, expected)
 	}
 	plans := map[string]*Plan{}
 	for _, path := range committed {
@@ -156,7 +180,7 @@ func TestProjectionTransportsMatchInBinaryGenerator(t *testing.T) {
 			}
 			// The maintained product has its own default test; the complete
 			// committed matrix remains an extended integration check.
-			if strings.HasPrefix(name, "committed/") {
+			if strings.HasPrefix(name, "committed/") && name != "committed/nvkr-run-wli-imds-agent" {
 				testutil.RequireExtended(t)
 			}
 			assertProjectionTransportEquivalence(t, repo, name, plan)
