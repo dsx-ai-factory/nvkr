@@ -66,7 +66,7 @@ type reviewFile struct {
 
 func (c reviewClient) git(ctx context.Context, args ...string) (string, error) {
 	raw, err := c.invoke(ctx, append([]string{"git"}, args...), nil)
-	return strings.TrimSpace(string(raw)), err
+	return string(raw), err
 }
 func (c reviewClient) candidateFiles(ctx context.Context) ([]reviewFile, error) {
 	changed, err := c.git(ctx, "diff", "--name-only", "-z", "HEAD")
@@ -157,7 +157,7 @@ func propose(ctx context.Context, c reviewClient, getenv func(string) string) (s
 	if err != nil {
 		return "", err
 	}
-	if head != source {
+	if strings.TrimSpace(head) != source {
 		return "", e.New(e.CodeGateUnmet, "checkout differs from triggering main revision")
 	}
 	var main gitReference
@@ -210,7 +210,7 @@ func propose(ctx context.Context, c reviewClient, getenv func(string) string) (s
 		return "", err
 	}
 	var tree gitObject
-	if err := c.repoAPI(ctx, "git/trees", map[string]any{"base_tree": baseTree, "tree": entries}, &tree); err != nil {
+	if err := c.repoAPI(ctx, "git/trees", map[string]any{"base_tree": strings.TrimSpace(baseTree), "tree": entries}, &tree); err != nil {
 		return "", err
 	}
 	if tree.SHA == "" {

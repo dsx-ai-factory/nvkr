@@ -27,7 +27,7 @@ func TestReviewPathAdmission(t *testing.T) {
 	}
 }
 func TestProposalRetryAndRefusal(t *testing.T) {
-	for _, scenario := range []string{"create", "retry", "closed", "conflict", "main-advanced", "unexpected-file", "symlink", "ambiguous-refs", "truncated-pulls", "invalid-bot", "deleted", "executable", "no-change"} {
+	for _, scenario := range []string{"create", "retry", "closed", "conflict", "main-advanced", "unexpected-file", "whitespace-changed", "whitespace-untracked", "symlink", "ambiguous-refs", "truncated-pulls", "invalid-bot", "deleted", "executable", "no-change"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := t.TempDir()
 			name := "inputs/environments/test.json"
@@ -70,17 +70,23 @@ func TestProposalRetryAndRefusal(t *testing.T) {
 				if args[0] == "git" {
 					switch strings.Join(args[1:], " ") {
 					case "rev-parse HEAD":
-						return []byte(source), nil
+						return []byte(source + "\n"), nil
 					case "rev-parse HEAD^{tree}":
-						return []byte("base-tree"), nil
+						return []byte("base-tree\n"), nil
 					case "diff --name-only -z HEAD":
 						if scenario == "no-change" {
 							return nil, nil
+						}
+						if scenario == "whitespace-changed" {
+							return []byte(" " + name + "\x00"), nil
 						}
 						return []byte(name + "\x00"), nil
 					case "ls-files --others --exclude-standard -z":
 						if scenario == "unexpected-file" {
 							return []byte("secret.json\x00"), nil
+						}
+						if scenario == "whitespace-untracked" {
+							return []byte("\t" + name + "\x00"), nil
 						}
 						return []byte(".nvkr-inputs/source/ignored\x00"), nil
 					default:
@@ -124,6 +130,9 @@ func TestProposalRetryAndRefusal(t *testing.T) {
 					}
 					return []byte(`{"sha":"blob"}`), nil
 				case endpoint == "git/trees":
+					if body["base_tree"] != "base-tree" {
+						t.Fatal("rev-parse line ending was not removed", body)
+					}
 					entries, ok := body["tree"].([]any)
 					if !ok || len(entries) != 1 {
 						t.Fatal(body)
@@ -184,7 +193,7 @@ func TestProposalRetryAndRefusal(t *testing.T) {
 				return nil, nil
 			}}
 			result, err := propose(t.Context(), client, func(k string) string { return env[k] })
-			failure := slices.Contains([]string{"conflict", "main-advanced", "unexpected-file", "symlink", "ambiguous-refs", "truncated-pulls", "invalid-bot"}, scenario)
+			failure := slices.Contains([]string{"conflict", "main-advanced", "unexpected-file", "whitespace-changed", "whitespace-untracked", "symlink", "ambiguous-refs", "truncated-pulls", "invalid-bot"}, scenario)
 			if failure {
 				requireReviewError(t, err)
 			} else if err != nil || result == "" {
@@ -198,7 +207,7 @@ func TestProposalRetryAndRefusal(t *testing.T) {
 					t.Fatalf("retry mutated branch/proposal: %+v", w)
 				}
 			}
-			if slices.Contains([]string{"main-advanced", "unexpected-file", "symlink", "ambiguous-refs", "no-change"}, scenario) && len(writes) != 0 {
+			if slices.Contains([]string{"main-advanced", "unexpected-file", "whitespace-changed", "whitespace-untracked", "symlink", "ambiguous-refs", "no-change"}, scenario) && len(writes) != 0 {
 				t.Fatalf("rejected candidate wrote: %+v", writes)
 			}
 		})
