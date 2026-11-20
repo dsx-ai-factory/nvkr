@@ -823,8 +823,13 @@ Destination staging by digest is the accepted pipeline-attested transport. The p
 
 1. **Stage:** after observation and offline packaging, the producer's final fixed push step admits the
    destination and uploads the unchanged payload closure directly to its final output repository, untagged
-   by digest. Native architecture jobs stage their own manifests; an aggregate job writes only the index
-   after authenticating its exact children and platform membership. The stage exports bounded preparation
+   by digest. Native architecture jobs stage their own manifests and complete payload closures. After
+   authenticating exact children and platform membership, the aggregate stage makes every child manifest,
+   config and layer resolvable by digest in the aggregate output repository before writing the index there.
+   It copies any missing child closure from its admitted staged references without changing bytes or digests;
+   a manifest in another repository alone does not satisfy this requirement. No cross-repository mount is
+   required. This aggregate-stage transfer is distinct from release by reference and is not a CI-storage
+   round trip. The stage exports bounded preparation
    controls, raw evidence documents and immutable references bound to the exact named output, Plan and
    originating Run/attempt. No private CI payload copy is required for this output edge.
 2. **Release:** a separate job authenticates those bindings and independently reads back the complete staged
@@ -887,7 +892,11 @@ cannot substitute for the check; the existing visibility/linkage query and workf
 the effective Actions role. The profile remains refused until that prerequisite is implemented.
 
 One-time adopter setup, for each fixed destination package: a human package administrator creates or
-initializes a missing package outside the generated workflow. In **Package settings**, disable **Inherit
+initializes a missing package outside the generated workflow, then uses **Connect repository** on the
+package landing page to select and connect the publishing repository, as documented in
+[GitHub's package-linking procedure](https://docs.github.com/en/packages/learn-github-packages/connecting-a-repository-to-a-package).
+This package association is separate from the Actions access grant and requires no payload rewrite.
+In **Package settings**, disable **Inherit
 access from repository** before configuring package-level roles. Under **Manage Actions access**, add or
 select the publishing repository and set its role to **Write**. Remove or reduce any other grant that gives
 that repository Admin access and retain package administration outside workflow credentials. Repeat this

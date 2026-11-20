@@ -352,11 +352,18 @@ for each fixed destination package, including output, evidence and release packa
 
 1. Create or initialize a missing package outside the generated workflow, using the human administrator's
    access. Do not rely on the producer workflow to create an already-admitted package.
-2. Open **Package settings** and disable **Inherit access from repository** so package-level roles apply.
-3. Under **Manage Actions access**, add or select the publishing repository and set its role to **Write**,
+2. On the package landing page, use **Connect repository**, select the publishing repository, and confirm
+   the connection. This is the [package-linking procedure](https://docs.github.com/en/packages/learn-github-packages/connecting-a-repository-to-a-package)
+   admitted by ADR-20; it establishes repository association separately from the Actions access grant.
+3. Open **Package settings** and disable **Inherit access from repository** so package-level roles apply.
+4. Under **Manage Actions access**, add or select the publishing repository and set its role to **Write**,
    not **Admin**.
-4. Remove or reduce any other grant giving that repository Admin access. Keep package administration with
+5. Remove or reduce any other grant giving that repository Admin access. Keep package administration with
    a human administrator and outside workflow credentials.
+
+Granting a public publishing repository access to a private package can expose that package to forks of
+the repository. The platform-token profile accepts this exposure; see
+[ADR-20's adopter-default policy](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/0020-artifact-publication-and-target-configuration.md#adopter-default-and-independent-credentials).
 
 The effective Write-only role is required so producer and development-branch job tokens cannot delete or
 restore released versions. The workflow's `packages: write` permission is not a substitute for this package
