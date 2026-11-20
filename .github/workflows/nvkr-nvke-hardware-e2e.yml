@@ -117,7 +117,9 @@ jobs:
           if [ "$DRY_RUN" != true ]; then
             # The Teleport join token admits refs/heads/main only, and a re-run of failed legs would
             # mix evidence from two attempts into one summary.
-            [ "$REF" = refs/heads/main ] || die "a real run starts from refs/heads/main, not $REF"
+            # TEMPORARY: remove the feature-branch allowance before merge.
+            [ "$REF" = refs/heads/main ] || [ "$REF" = refs/heads/pull-request/560 ] ||
+              die "a real run starts from refs/heads/main, not $REF"
             [ "$RUN_ATTEMPT" = 1 ] || die "re-running jobs would mix two attempts; dispatch a new run"
           fi
           if [ "$SOURCE" = nvkr-outputs ]; then
