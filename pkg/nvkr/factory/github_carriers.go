@@ -79,6 +79,18 @@ func PackGitHubOutputs(ctx context.Context, plan *Plan, nodeID string, options G
 		return e.New(e.CodeInvalidCatalog, "GitHub plan has no node %q", nodeID)
 	}
 	outputs := githubCarrierOutputs(plan, *selected, artifacts, nodeJobs)
+	ordered, _, err := githubSchedulingProjection(plan)
+	if err != nil {
+		return err
+	}
+	seeds, err := githubSourceSeeds(plan, ordered)
+	if err != nil {
+		return err
+	}
+	seedOwner := false
+	for consumer, seed := range seeds {
+		seedOwner = seedOwner || seed.ID == nodeID && nodeJobs[consumer] != nodeJobs[seed.ID]
+	}
 	details := make([]string, 0, len(outputs))
 	for _, id := range outputs {
 		details = append(details, githubArtifactDetail(plan, "Output", id))
@@ -87,7 +99,13 @@ func PackGitHubOutputs(ctx context.Context, plan *Plan, nodeID string, options G
 		for _, id := range outputs {
 			progress.phase("archive " + id)
 			progress.log("Archive: " + id)
-			if err := transportarchive.Pack(ctx, carrierPath(id), ".", []string{artifacts[id].Path}); err != nil {
+			var err error
+			if seedOwner && artifacts[id].Kind == "source-closure" {
+				err = transportarchive.PackSourceSeed(ctx, carrierPath(id), ".", artifacts[id].Path)
+			} else {
+				err = transportarchive.Pack(ctx, carrierPath(id), ".", []string{artifacts[id].Path})
+			}
+			if err != nil {
 				return err
 			}
 		}
