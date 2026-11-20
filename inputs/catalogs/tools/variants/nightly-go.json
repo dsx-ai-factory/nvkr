@@ -2,7 +2,7 @@
   "apiVersion": "nvkr.dev/catalog-overlay/v3",
   "kind": "CatalogOverlay",
   "name": "nvke-nightly-tools-go-1-27-4",
-  "requiresCatalogDigest": "sha256:981ee13a811402292ecebadf45629ce01bbca126d58d83a4e535a606a1e33417",
+  "requiresCatalogDigest": "sha256:b6ecdd63bf4f35cbe2cbee75bd573e3afba798e410a7e81cb73d7b4c8a7da8fe",
   "components": {
     "nvke-installer-sources": {
       "component": {

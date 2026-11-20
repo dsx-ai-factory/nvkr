@@ -14,7 +14,7 @@ import (
 func TestNVKEReleasePinsStayAligned(t *testing.T) {
 	// These catalogs package the NKTP chart. Each selects the NKTP release that
 	// NVKE v0.23.0's deploy/nico/nktp/values.yaml targets.
-	buildsNKTP := map[string]int{"nvke": 4}
+	buildsNKTP := map[string]int{"nvke": 3}
 	for _, directory := range []string{
 		"nvke", "node-images", "tools", "runtime-dependencies",
 	} {
