@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:d2f8a02672184e39571c1565d35fd4e8fe4cdd02435a58a2528ceaff9bea65f2",
-  "catalogDigest": "sha256:abb063dd6200cfdd7324d2dcfc5319857c3c47904efa09f2023123befcdc54ae",
+  "catalogDigest": "sha256:84b9ecc3946d2ff92d75a413f45c9fffc7fb54f198589e5da8158ec6f397bbd2",
   "components": [
     "nktp-operator-image"
   ],

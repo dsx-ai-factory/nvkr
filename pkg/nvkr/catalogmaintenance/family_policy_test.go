@@ -60,8 +60,8 @@ func TestMaintainedFamilyPolicyBoundary(t *testing.T) {
 			count++
 		}
 	}
-	if count != 21 {
-		t.Fatalf("source roles=%d, want 21", count)
+	if count != 20 {
+		t.Fatalf("source roles=%d, want 20", count)
 	}
 	for _, tc := range []struct {
 		source   string
@@ -74,6 +74,7 @@ func TestMaintainedFamilyPolicyBoundary(t *testing.T) {
 		{"inputs/catalogs/node-images:nvke-os", true},
 		{"inputs/catalogs/nvke:nvke-controller-helm", false},
 		{"inputs/catalogs/nvke:nvke-nktp-helm", false},
+		{"inputs/catalogs/nvke:nvke-controller-helm-nightly-site", false},
 	} {
 		if selected[tc.source] != tc.included {
 			t.Errorf("family membership for %s = %v, want %v", tc.source, selected[tc.source], tc.included)

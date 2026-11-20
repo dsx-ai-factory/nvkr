@@ -6,7 +6,7 @@
 
 Opt-in `sourceRecipe` renders command argv and artifact paths from the selected source pin. Local contracts
 cover leading `v`, prereleases, prefixed tags, explicit commit-only packaging streams, unknown tokens and
-stale rendered values. Three controller chart recipes and the Ubuntu24 agent use this binding; source-owned chart
+stale rendered values. Two controller chart recipes and the Ubuntu24 agent use this binding; source-owned chart
 versions and unrelated chart contracts remain unchanged. These tests do not execute Helm or prove a release.
 Complete pin-free producer templates may bind one explicitly named catalog producer's source identity.
 Binding tests preserve fetch, patch, toolchain and packaging fields; overlay tests advance the source pin

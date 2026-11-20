@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:6cabe7a8ba5adb5853f927d525935cb45e09eee7b5ed6b08e2883233c243aa94",
-  "catalogDigest": "sha256:abb063dd6200cfdd7324d2dcfc5319857c3c47904efa09f2023123befcdc54ae",
+  "catalogDigest": "sha256:84b9ecc3946d2ff92d75a413f45c9fffc7fb54f198589e5da8158ec6f397bbd2",
   "components": [
     "capnico-controller"
   ],

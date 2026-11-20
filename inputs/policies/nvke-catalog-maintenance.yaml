@@ -36,7 +36,7 @@ family:
     - catalog: inputs/catalogs/node-images
       sources: [nvke-cni-calico-source, nvke-doca-ovs-source, nvke-kubeadm-distro-source, nvke-os, nvke-spire-agent-source]
     - catalog: inputs/catalogs/nvke
-      sources: [nvke, nvke-cli, nvke-cli-local-site, nvke-content, nvke-controller, nvke-controller-helm-native-site, nvke-controller-helm-nightly-site, nvke-controller-module-tags, nvke-deploy, nvke-helm, nvke-profiles]
+      sources: [nvke, nvke-cli, nvke-cli-local-site, nvke-content, nvke-controller, nvke-controller-helm-native-site, nvke-controller-module-tags, nvke-deploy, nvke-helm, nvke-profiles]
     - catalog: inputs/catalogs/runtime-dependencies
       sources: [nvke-deployment-selection]
     - catalog: inputs/catalogs/tools

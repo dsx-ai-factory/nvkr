@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:6dc0b3191acc4a8ba4a45aff058bebd794048d314bf78ef4589dcb5cf89a6d68",
-  "catalogDigest": "sha256:abb063dd6200cfdd7324d2dcfc5319857c3c47904efa09f2023123befcdc54ae",
+  "catalogDigest": "sha256:84b9ecc3946d2ff92d75a413f45c9fffc7fb54f198589e5da8158ec6f397bbd2",
   "components": [
     "nktp-collector-image"
   ],
