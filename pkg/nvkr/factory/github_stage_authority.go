@@ -53,18 +53,26 @@ func rootToolStage(stage githubStage) bool {
 type authorityStages struct {
 	plan      *Plan
 	artifacts map[string]Artifact
+	// Shared source owners release their carrier before producer work begins.
+	sourceSeedOwners map[string]bool
 	// needs holds each stage's direct prerequisite stages by index.
 	needs map[int]map[int]bool
 }
 
-// join returns the existing stage an operation extends. A member never adds a
-// prerequisite its job did not already await, other than a root tool: every
+// join returns the existing stage an operation extends. An ordinary member adds
+// no prerequisite its job did not already await, other than a root tool: every
 // input comes from the job itself, one of its ancestors, or a root tool
 // acquisition. Contraction therefore cannot create a cycle or make one output
-// wait for another.
+// wait for another. Image publication batches additionally admit acyclic
+// cross-output dependencies through joinImagePublications.
 func (grouping *authorityStages) join(node Node, stages []githubStage, owners map[string]int) (int, bool) {
 	if rootToolAcquisition(node) {
 		return 0, false
+	}
+	if node.Kind == NodeFetch {
+		if stage, ok := grouping.joinSourceFetches(node, stages, owners); ok {
+			return stage, true
+		}
 	}
 	if len(node.Inputs) == 0 {
 		return grouping.joinRoots(node, stages)
@@ -97,7 +105,94 @@ func (grouping *authorityStages) join(node Node, stages []githubStage, owners ma
 			return candidate, true
 		}
 	}
+	if grouping.imagePublication(node) {
+		return grouping.joinImagePublications(node, stages, candidates)
+	}
 	return 0, false
+}
+
+// Image publication operations may share setup with other image publications.
+// Keep every operation's existing timeout, command, credential scope and result
+// slot. A chain can span jobs when its next operation exhausts the job budget.
+// New prerequisites are allowed only when they cannot introduce a back edge.
+func (grouping *authorityStages) joinImagePublications(node Node, stages []githubStage, producers []int) (int, bool) {
+	for candidate, stage := range stages {
+		if stage.DiskOutput != "" || !stageFits(stage, node) {
+			continue
+		}
+		compatible := true
+		targets := map[string]bool{node.Target: true}
+		for _, member := range stage.Nodes {
+			targets[member.Target] = true
+			if !grouping.imagePublication(member) || member.RunsOn != node.RunsOn || member.Platform != node.Platform ||
+				grouping.plan.Targets[member.Target].CredentialRef != grouping.plan.Targets[node.Target].CredentialRef {
+				compatible = false
+				break
+			}
+		}
+		if !compatible || len(targets) > 2 {
+			continue
+		}
+		for _, producer := range producers {
+			if producer != candidate && grouping.ancestor(producer, candidate) {
+				compatible = false
+				break
+			}
+		}
+		if compatible {
+			return candidate, true
+		}
+	}
+	return 0, false
+}
+
+// Source-only stages may acquire prerequisites from shared seeds. Keep sibling
+// fetches together when that contraction is acyclic; otherwise a multi-source
+// consumer would gain one job per seed. Credentialed fetches remain separate.
+func (grouping *authorityStages) joinSourceFetches(node Node, stages []githubStage, owners map[string]int) (int, bool) {
+	for candidate, stage := range stages {
+		if !grouping.admits(stage, node) || !stageFits(stage, node) {
+			continue
+		}
+		compatible := true
+		for _, member := range stage.Nodes {
+			if member.Kind != NodeFetch || member.BuildTarget != node.BuildTarget {
+				compatible = false
+				break
+			}
+		}
+		for _, input := range node.Inputs {
+			producer, exists := owners[grouping.artifacts[input].Producer]
+			if !exists || producer != candidate && grouping.ancestor(producer, candidate) {
+				compatible = false
+				break
+			}
+		}
+		if compatible {
+			return candidate, true
+		}
+	}
+	return 0, false
+}
+
+func (grouping *authorityStages) imagePublication(node Node) bool {
+	if !PerOutputPublication(grouping.plan) || stageAuthorityFor(grouping.plan, node) != authorityRelease {
+		return false
+	}
+	switch node.Kind {
+	case NodeAttestEvidence, NodePublish, NodeSign, NodeVerifyPublication:
+	default:
+		return false
+	}
+	if grouping.plan.Targets[node.Target].Kind != "oci" {
+		return false
+	}
+	for _, output := range grouping.plan.LifecycleOutputs {
+		if node.Target == "output-"+output.Name {
+			return lifecyclePackageKind(output.Kind) == PackageImage && output.ImageIndex == nil
+		}
+	}
+	return false
 }
 
 // joinRoots places an input-free operation with the other input-free operations
@@ -145,6 +240,10 @@ func (grouping *authorityStages) admits(stage githubStage, node Node) bool {
 		return false
 	}
 	for _, member := range stage.Nodes {
+		if grouping.sourceSeedOwners[member.ID] && node.Kind != NodeFetch ||
+			grouping.sourceSeedOwners[node.ID] && member.Kind != NodeFetch {
+			return false
+		}
 		if authority == authorityRelease && member.Target != node.Target {
 			return false
 		}
