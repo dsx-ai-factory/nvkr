@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:456d2d4697a8e36468e66fc7b16fb356f675b0deb617d7f86e1d6ac6f255af3b",
-  "catalogDigest": "sha256:cfdd2ac46b19b3d786987d53709b459a8964a32fadc4230ec3a41d68d9c470b7",
+  "catalogDigest": "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87",
   "components": [
     "nvke-controller-chart"
   ],

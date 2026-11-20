@@ -14,29 +14,6 @@ components:
         none: true
       releaseExecutable: true
     source: clusterctl
-  clusterctl-installer-hosted:
-    artifactPath: nvkr-output/clusterctl
-    buildCommand:
-    - bash
-    - -euc
-    - |
-      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
-      build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
-      go build -trimpath -mod=vendor \
-        -ldflags "-s -w -buildid= -X sigs.k8s.io/cluster-api/version.gitVersion=$BUILD_VERSION -X sigs.k8s.io/cluster-api/version.gitCommit=$GIT_VERSION -X sigs.k8s.io/cluster-api/version.gitReleaseCommit=$GIT_VERSION -X sigs.k8s.io/cluster-api/version.gitTreeState=clean -X sigs.k8s.io/cluster-api/version.gitMajor=$KUBE_GIT_MAJOR -X sigs.k8s.io/cluster-api/version.gitMinor=$KUBE_GIT_MINOR -X sigs.k8s.io/cluster-api/version.buildDate=$build_date" \
-        -o /src/nvkr-output/clusterctl ./cmd/clusterctl
-    cgo: false
-    fromSource: true
-    outputType: host-package
-    platforms:
-    - linux/arm64
-    source: clusterctl-installer-hosted
-    versionStamp:
-      BUILD_VERSION: '{{.Tag}}'
-      GIT_VERSION: '{{.Commit}}'
-      KUBE_GIT_MAJOR: '{{.Major}}'
-      KUBE_GIT_MINOR: '{{.Minor}}'
-    writeDir: nvkr-output
   clusterctl-installer-local:
     artifactPath: nvkr-output/clusterctl
     buildCommand:
@@ -114,27 +91,6 @@ components:
         none: true
       releaseExecutable: true
     source: kind
-  kind-installer-hosted:
-    artifactPath: nvkr-output/kind
-    buildCommand:
-    - bash
-    - -euc
-    - |
-      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
-      go build -trimpath -mod=vendor \
-        -ldflags "-s -w -buildid= -X sigs.k8s.io/kind/pkg/cmd/kind/version.gitCommit=$GIT_VERSION" \
-        -o /src/nvkr-output/kind .
-      test "$(/src/nvkr-output/kind version -q)" = "$BUILD_VERSION"
-    cgo: false
-    fromSource: true
-    outputType: host-package
-    platforms:
-    - linux/arm64
-    source: kind-installer-hosted
-    versionStamp:
-      BUILD_VERSION: '{{.Version}}'
-      GIT_VERSION: '{{.Commit}}'
-    writeDir: nvkr-output
   kind-installer-local:
     artifactPath: nvkr-output/kind
     buildCommand:
@@ -167,29 +123,6 @@ components:
         none: true
       releaseExecutable: true
     source: kubectl
-  kubectl-installer-hosted:
-    artifactPath: nvkr-output/kubectl
-    buildCommand:
-    - bash
-    - -euc
-    - |
-      export GOENV=off GOWORK=/src/go.work GOTOOLCHAIN=local GOPROXY=off
-      build_date="$(date -u -d "@$SOURCE_DATE_EPOCH" +%Y-%m-%dT%H:%M:%SZ)"
-      go build -trimpath -mod=vendor -tags selinux,notest,grpcnotrace \
-        -ldflags "-s -w -buildid= -X k8s.io/component-base/version.gitVersion=$BUILD_VERSION -X k8s.io/component-base/version.gitCommit=$GIT_VERSION -X k8s.io/component-base/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/component-base/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/component-base/version.gitTreeState=clean -X k8s.io/component-base/version.buildDate=$build_date -X k8s.io/client-go/pkg/version.gitVersion=$BUILD_VERSION -X k8s.io/client-go/pkg/version.gitCommit=$GIT_VERSION -X k8s.io/client-go/pkg/version.gitMajor=$KUBE_GIT_MAJOR -X k8s.io/client-go/pkg/version.gitMinor=$KUBE_GIT_MINOR -X k8s.io/client-go/pkg/version.gitTreeState=clean -X k8s.io/client-go/pkg/version.buildDate=$build_date" \
-        -o /src/nvkr-output/kubectl ./cmd/kubectl
-    cgo: false
-    fromSource: true
-    outputType: host-package
-    platforms:
-    - linux/arm64
-    source: kubectl-installer-hosted
-    versionStamp:
-      BUILD_VERSION: '{{.Tag}}'
-      GIT_VERSION: '{{.Commit}}'
-      KUBE_GIT_MAJOR: '{{.Major}}'
-      KUBE_GIT_MINOR: '{{.Minor}}'
-    writeDir: nvkr-output
   kubectl-installer-local:
     artifactPath: nvkr-output/kubectl
     buildCommand:
@@ -291,29 +224,6 @@ components:
     - linux/arm64
     source: nvke-nicosim
     writeDir: controller/nico-sim/bin
-  nico-sim-nicosim:
-    artifactPath: controller/nico-sim/bin/nico-sim
-    buildCommand:
-    - bash
-    - -euc
-    - |
-      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
-      make -C controller/nico-sim build-static \
-        BUILD_VERSION="${NICO_SIM_VERSION:?}" GIT_COMMIT="${NICO_SIM_COMMIT:?}" GIT_TREE_STATE="${NICO_SIM_TREE:?}"
-    cgo: true
-    fromSource: true
-    outputType: host-package
-    patches:
-    - name: patches/version-interface.patch
-      sha256: sha256:186d3ca32819bdb0f299732414de8982e67e0b5561b9914c16a26f11641b6cde
-    platforms:
-    - linux/arm64
-    source: nvke-nicosim-nicosim
-    versionStamp:
-      NICO_SIM_COMMIT: '{{.Commit}}'
-      NICO_SIM_TREE: patched
-      NICO_SIM_VERSION: v{{.Version}}
-    writeDir: controller/nico-sim/bin
   nico-sim-runtime-assets:
     artifactPath: controller/nico-sim/bin/nicosim-runtime-assets.tar.gz
     buildCommand:
@@ -372,31 +282,6 @@ components:
     - linux/amd64
     - linux/arm64
     source: nvke-nicosim
-    writeDir: controller/nico-sim/bin
-  nico-simctl-nicosim:
-    artifactPath: controller/nico-sim/bin/nico-simctl
-    buildCommand:
-    - bash
-    - -euc
-    - |
-      cd controller/nico-sim
-      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor
-      CGO_ENABLED=1 go build -trimpath -tags 'netgo osusergo' \
-        -ldflags "-X github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version.BuildVersion=${NICO_SIM_VERSION:?} -X github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version.GitCommit=${NICO_SIM_COMMIT:?} -X github.com/dsx-ai-factory/nvke/controller/nico-sim/internal/version.GitTreeState=${NICO_SIM_TREE:?} -linkmode external -extldflags -static" \
-        -o bin/nico-simctl ./cmd/nico-simctl
-    cgo: true
-    fromSource: true
-    outputType: host-package
-    patches:
-    - name: patches/version-interface.patch
-      sha256: sha256:186d3ca32819bdb0f299732414de8982e67e0b5561b9914c16a26f11641b6cde
-    platforms:
-    - linux/arm64
-    source: nvke-nicosim-nicosim
-    versionStamp:
-      NICO_SIM_COMMIT: '{{.Commit}}'
-      NICO_SIM_TREE: patched
-      NICO_SIM_VERSION: v{{.Version}}
     writeDir: controller/nico-sim/bin
   nvke-installer-sources:
     artifactPath: bin/nvke-installer-sources.tar.gz
@@ -491,25 +376,6 @@ components:
         none: true
       releaseExecutable: true
     source: oras
-  oras-installer-hosted:
-    artifactPath: nvkr-output/oras
-    buildCommand:
-    - bash
-    - -euc
-    - |
-      export GOENV=off GOWORK=off GOTOOLCHAIN=local GOPROXY=off
-      go build -trimpath -mod=vendor \
-        -ldflags "-s -w -buildid= -X oras.land/oras/internal/version.BuildMetadata= -X oras.land/oras/internal/version.GitCommit=$GIT_VERSION -X oras.land/oras/internal/version.GitTreeState=clean" \
-        -o /src/nvkr-output/oras ./cmd/oras
-    cgo: false
-    fromSource: true
-    outputType: host-package
-    platforms:
-    - linux/arm64
-    source: oras-installer-hosted
-    versionStamp:
-      GIT_VERSION: '{{.Commit}}'
-    writeDir: nvkr-output
   oras-installer-local:
     artifactPath: nvkr-output/oras
     buildCommand:

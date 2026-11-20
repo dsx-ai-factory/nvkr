@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:4c8e7c3b7c23d15565dcf77a73393ea1de0a7fe23c9b11a6fcbede84819aee03",
-  "catalogDigest": "sha256:cfdd2ac46b19b3d786987d53709b459a8964a32fadc4230ec3a41d68d9c470b7",
+  "catalogDigest": "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87",
   "components": [
     "cert-manager-webhook-image"
   ],

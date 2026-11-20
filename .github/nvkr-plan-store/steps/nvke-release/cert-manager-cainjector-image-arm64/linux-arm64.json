@@ -1,6 +1,6 @@
 {
   "buildDigest": "sha256:4553b5321b7a7353428de7e779e8be9543d003d92c1a26af2168163b5eb8b792",
-  "catalogDigest": "sha256:cfdd2ac46b19b3d786987d53709b459a8964a32fadc4230ec3a41d68d9c470b7",
+  "catalogDigest": "sha256:f632d51a8e58b5728e8900b24370cff90c875bac0b3d250d7cb700dc03604d87",
   "components": [
     "cert-manager-cainjector-image"
   ],
