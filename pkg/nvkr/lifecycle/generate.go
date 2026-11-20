@@ -33,6 +33,17 @@ func GenerateRuntimeSourceFiles(ctx context.Context, definitionPath, environment
 }
 
 func generateFiles(ctx context.Context, definitionPath, environmentPath, generatorVersion, engine, root string, check, runtimePlan bool, sourceCommit ...string) (string, error) {
+	// GitLab has its own native invocation and transfer admission. GitHub's
+	// runtime/source refresh and diagnostic projection cannot supply it, even
+	// when a caller requests check mode. Refuse before loading authored inputs.
+	if strings.EqualFold(strings.TrimSpace(engine), factory.EngineGitLab) {
+		if runtimePlan {
+			return "", e.New(e.CodeEngineCapability, "GitLab generation does not support runtime Plan or source refresh")
+		}
+		if factory.ProjectionAdapterSelected(ctx) {
+			return "", e.New(e.CodeEngineCapability, "GitLab generation does not support the GitHub projection pilot")
+		}
+	}
 	if err := factory.ValidateGenerationEngine(engine); err != nil {
 		return "", err
 	}

@@ -180,7 +180,8 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 	NVKR_TEST_EXTENDED=1 $(MAKE) test-race
 
 .PHONY: test-ci-tools
-test-ci-tools: ## Require Python and check CI sharding, reports and local adapters.
+test-ci-tools: ## Require Go, jq and Python; check CI sharding, reports and local adapters.
+	go test ./scripts -run 'TestMaintainedGeneration|TestCITestSummary|TestDemoShellTools' -count=1
 	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
 	python3 -B -m unittest discover -s scripts -p '*_test.py'
 
@@ -329,7 +330,7 @@ PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION
 workflows-check: workflow-generator producer-overlays-check catalog-refresh-check catalog-index-check ## Check every maintained producer and qualification bundle from the authored inventory.
 	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
 	bin/nvkr-exec definition pin --check --definition $(NVKE_RELEASE)
-	python3 scripts/generate-maintained.py --check $(PROJECTION_PILOT_FLAG)
+	bash scripts/generate-maintained.sh --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: producer-overlays-check producer-overlays-generate
 producer-overlays-check: workflow-generator ## Check configured producer copies and predecessor bindings.
@@ -371,7 +372,7 @@ catalog-refresh-generate: workflow-generator ## Regenerate the installed catalog
 
 .PHONY: workflows-generate
 workflows-generate: workflow-generator ## Regenerate all maintained bundles from the authored generation inventory.
-	python3 scripts/generate-maintained.py
+	bash scripts/generate-maintained.sh
 	$(MAKE) catalog-refresh-generate
 
 # Composite member pin admission is independent of bundle inventory admission.
@@ -380,19 +381,19 @@ NVKE_RELEASE := inputs/definitions/nvke/gpu-site-release.composite.yaml
 
 .PHONY: nvke-generate nvke-check
 nvke-generate: workflow-generator ## Regenerate the NVKE production bundle.
-	python3 scripts/generate-maintained.py --group main
+	bash scripts/generate-maintained.sh --group main
 
 nvke-check: workflow-generator ## Check NVKE member pins and generation.
 	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
 	bin/nvkr-exec definition pin --check --definition $(NVKE_RELEASE)
-	python3 scripts/generate-maintained.py --group main --check $(PROJECTION_PILOT_FLAG)
+	bash scripts/generate-maintained.sh --group main --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-generate pipeline-dev-check
 pipeline-dev-generate: workflow-generator ## Regenerate the development bundle.
-	python3 scripts/generate-maintained.py --group development
+	bash scripts/generate-maintained.sh --group development
 
 pipeline-dev-check: workflow-generator ## Check development workflow generation.
-	python3 scripts/generate-maintained.py --group development --check $(PROJECTION_PILOT_FLAG)
+	bash scripts/generate-maintained.sh --group development --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-run
 pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branch (PIPELINE_DEV_REPO=owner/repo).
@@ -429,3 +430,7 @@ e2e-quick: export GOMAXPROCS := 2
 e2e-quick: export GOFLAGS := -p=2
 e2e-quick: build ## Build, publish, recover and smoke hello; unsigned qualification (Docker or CONTAINER_RUNTIME=podman).
 	go run ./internal/quicke2e
+
+.PHONY: test-gitlab-docker
+test-gitlab-docker: go-version-check ## Run the real, owned GitLab server/Runner nvkectl integration (Docker, 12 GiB RAM).
+	bash scripts/test-gitlab-docker.sh
