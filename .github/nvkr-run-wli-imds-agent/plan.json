@@ -1,14 +1,14 @@
 {
   "actions": {
-    "file": ".github/nvkr-plan-store/plan/actions-github@a255839cbafe.json"
+    "file": ".github/nvkr-plan-store/plan/actions-github.json"
   },
   "builds": [
     {
-      "file": ".github/nvkr-plan-store/steps/dsx-imds-node-attestor-agent-linux-amd64/linux-amd64@07b098c815e4.json",
+      "file": ".github/nvkr-plan-store/steps/wli-imds-agent/dsx-imds-node-attestor-agent-linux-amd64/linux-amd64.json",
       "name": "dsx-imds-node-attestor-agent-linux-amd64"
     },
     {
-      "file": ".github/nvkr-plan-store/steps/dsx-imds-node-attestor-agent-linux-arm64/linux-arm64@cacc984b9b1f.json",
+      "file": ".github/nvkr-plan-store/steps/wli-imds-agent/dsx-imds-node-attestor-agent-linux-arm64/linux-arm64.json",
       "name": "dsx-imds-node-attestor-agent-linux-arm64"
     }
   ],
@@ -19,24 +19,25 @@
     }
   },
   "definition": {
-    "file": ".github/nvkr-plan-store/plan/definition-wli-imds-agent@b63fad130458.json"
+    "file": ".github/nvkr-plan-store/plan/definition-wli-imds-agent.json"
   },
   "definitionDigest": "sha256:459474dbacb60363429a783f7351529f92881184cf45af8a5d0993ecbb8e2597",
   "definitionPath": "inputs/definitions/nvidia-workload-identity/imds-agent.yaml",
   "environment": {
-    "file": ".github/nvkr-plan-store/plan/environment-wli-imds-agent-github@f89739e778fa.json"
+    "file": ".github/nvkr-plan-store/plan/environment-wli-imds-agent-github-nvkr-run-wli-imds-agent.json"
   },
   "environmentDigest": "sha256:3e76483ea80df8687b3a17f42aeb07876db07738a486f0c5b19aab42b284cf6b",
   "environmentPath": "inputs/environments/github-wli-imds-agent.yaml",
   "generatorVersion": "dev (unknown)",
-  "graph": {
-    "file": ".github/nvkr-plan-store/plan/graph-wli-imds-agent@50ee67450c13.json"
-  },
+  "graphDigest": "sha256:27abbd8d5d841f604ed5a7c31fbac3bc42d8c9348cb69805cdf9787998f9f43d",
   "lifecycleOutputs": {
-    "file": ".github/nvkr-plan-store/plan/outputs-wli-imds-agent@8dd099fa5cdb.json"
+    "file": ".github/nvkr-plan-store/plan/outputs-wli-imds-agent.json"
   },
   "name": "wli-imds-agent",
   "qualification": "static-unqualified",
   "schemaVersion": "nvkr.dev/run-plan/v5",
-  "storage": "nvkr-plan-tree-v1"
+  "storage": "nvkr-plan-tree-v3",
+  "targets": {
+    "file": ".github/nvkr-plan-store/plan/targets-wli-imds-agent-nvkr-run-wli-imds-agent.json"
+  }
 }
