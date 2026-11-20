@@ -228,8 +228,10 @@ Record actual provisioning-network retrieval under [#383](https://github.com/dsx
 local fixtures establish no EFI chainload, Secure Boot, imaging, reboot or first-boot acceptance.
 
 MachineImage rendering is unavailable in production. The [NVKE catalog candidate](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/catalogs/nvke/machineimage/README.md)
-is a standalone script and maintained template, with no NVKR Go renderer or vendored CRD. It reads the
-CRD from the catalog's locked NVKE controller source commit and checks rendered documents against its OpenAPI schema.
+is a standalone Go module and maintained template, with no renderer in NVKR's root module or vendored CRD.
+It reads the CRD from the catalog's locked NVKE controller source commit and checks rendered documents
+against its OpenAPI schema with kube-openapi. Guarded Go predicates implement the known creation-time
+CEL rules; unknown rule text, rule locations and unsupported schema features fail closed.
 Generic boot descriptions supply named raw digests, platforms and destination URLs; proposed disk metadata
 remains separately supplied and unauthenticated. No producer or workflow invokes the candidate. Local
 schema validation does not establish Kubernetes admission, authenticated import or boot compatibility.
