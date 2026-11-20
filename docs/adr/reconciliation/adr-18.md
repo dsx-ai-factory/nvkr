@@ -28,11 +28,19 @@ limits. Generated native disk jobs use an unprivileged preflight, a fixed scrubb
 owned watchdog. Narrow input/work projections preserve plugin and firmware paths. Packer preparation stays
 offline; the build uses the snapshot-pinned, unprivileged `slirp4netns` helper with fixed arguments, numeric
 DNS projection and paired process lifetime. Shell and namespace fixtures cover these boundaries.
+The launcher re-arms its parent-death kill after dropping credentials and checks a held original-parent
+descriptor. A local native ARM64 Linux test under Docker killed the launcher in both offline and outbound
+modes; both namespace children exited and a detached descendant stopped writing. This is process-lifetime
+evidence, not ARM64 runtime assembly or disk-build evidence. Runtime SBOM extraction uses the original
+coordinator's private scratch. After all execution owners close, selected carrier outputs and sealed diagnostics
+return to the held workspace's owner; contract tests reject symlink escapes and shared root-owned files.
 
 The four maintained amd64 disk consumers select separately named runtime requirements. Each native group
 retains its own production, observation and SBOM; equal Build Digests do not permit cross-job receipt
 restoration. Run completion requires matching manifest and complete-layout digests and sizes, with every
-requirement's own evidence. These transported descriptions grant no execution authority. The compiler removes
+requirement's own evidence. Each disk result must also match its exact named runtime's observation, SBOM,
+manifest, layout, layer, size and terminal record. Finalizers transport those consumer result records,
+and focused substitution tests reject changed bindings. These descriptions grant no execution authority. The compiler removes
 the unused container-image dependency from selected consumers and binds runtime production into their Builds.
 Composite admission checks the declaring member before catalog work. Each disk publication requires its
 contributing runtime's producer records and complete SBOM, while runtime payloads remain absent from

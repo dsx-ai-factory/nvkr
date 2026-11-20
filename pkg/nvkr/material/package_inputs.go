@@ -22,7 +22,8 @@ var (
 
 // PackageRepository pins repository metadata, independently of its package
 // manager's wire format. URI locates the exact metadata blob, not a moving suite.
-// Package acquisition must authenticate the metadata and its referenced indexes.
+// Acquisition checks the catalog's blob digest and size. This description does
+// not authenticate repository signatures or membership in referenced indexes.
 type PackageRepository struct {
 	URI    string `json:"uri"`
 	Digest string `json:"digest"`

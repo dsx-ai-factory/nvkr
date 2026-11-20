@@ -38,6 +38,17 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 		return e.Wrap(e.CodeEngineCapability, err, "hold ARC workspace")
 	}
 	defer func() { returnErr = joinFactoryCleanupError(returnErr, workspace.Close(), "close ARC workspace") }()
+	ownership, err := captureDiskOwnership(ctx, workspace)
+	if err != nil {
+		return err
+	}
+	var retainedDiagnostics string
+	var admitted bool
+	defer func() {
+		if admitted {
+			returnErr = joinFactoryCleanupError(returnErr, ownership.finish(ctx, workspace, plan, stage, retainedDiagnostics), "return ARC disk outputs to runner")
+		}
+	}()
 	var inspectionLog *diskdiagnostic.Collector
 	if githubDiskInspectionRequired(plan) {
 		inspectionLog = diskdiagnostic.NewCollector()
@@ -47,6 +58,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	if err != nil {
 		return err
 	}
+	admitted = true
 	defer func() { returnErr = joinFactoryCleanupError(returnErr, admission.Close(), "close ARC VM admission") }()
 	_, instruction, err := plan.producerInstruction(root)
 	if err != nil {
@@ -126,9 +138,11 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 		if err != nil {
 			return err
 		}
-		return coordinateGitHubDiskExecution(ctx, diagnostics, func(ctx context.Context) error {
+		err = coordinateGitHubDiskExecution(ctx, diagnostics, func(ctx context.Context) error {
 			return executeAdmittedGitHubDisk(ctx, plan, stage, root, admission, workspace, inspector, inspectionLog, diagnostics, scratch, options)
 		})
+		retainedDiagnostics = diagnostics.RetainedPath()
+		return err
 	}
 	if probeHelper != nil {
 		return probeGitHubDiskHelper(ctx, probeHelper, produce)

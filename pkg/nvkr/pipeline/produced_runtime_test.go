@@ -148,6 +148,26 @@ func TestProducedRuntimeReceiptRetainsAndRevokesExactClosure(t *testing.T) {
 	if err := tool.AuthenticateResultContext(t.Context(), result); err != nil {
 		t.Fatal(err)
 	}
+	if err := ValidateRuntimeProductionDescription(binding, node, result, binding.LayoutDigest, layerDigest); err != nil {
+		t.Fatalf("original production description rejected: %v", err)
+	}
+	for _, change := range []struct {
+		name  string
+		apply func(*ArtifactResult)
+	}{
+		{"input", func(result *ArtifactResult) { result.InputDigest = FileDigest([]byte("different input")) }},
+		{"transport", func(result *ArtifactResult) { result.TransportPath += "-substituted" }},
+		{"manifest", func(result *ArtifactResult) { result.SHA256 = FileDigest([]byte("different manifest")) }},
+		{"size", func(result *ArtifactResult) { result.Size++ }},
+	} {
+		t.Run(change.name, func(t *testing.T) {
+			changed := result
+			change.apply(&changed)
+			if err := ValidateRuntimeProductionDescription(binding, node, changed, binding.LayoutDigest, layerDigest); code(err) != e.CodeVerifyFailed {
+				t.Fatalf("substituted description accepted: %v", err)
+			}
+		})
+	}
 	copy := *tool
 	if err := tool.Close(); err != nil {
 		t.Fatal(err)

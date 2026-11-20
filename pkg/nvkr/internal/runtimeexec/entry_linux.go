@@ -52,6 +52,9 @@ func Entry() error {
 	if err := validateRecord(record); err != nil {
 		return err
 	}
+	if err := rearmParentDeath(parentDescriptor(record)); err != nil {
+		return err
+	}
 	if record.Mode == "assemble" || record.Mode == "probe-assembly" {
 		if err := admitAssemblyIDs(); err != nil {
 			return err
@@ -488,7 +491,33 @@ func dropPrivileges(record requestRecord) error {
 		return entryError(err)
 	}
 	capabilities := [2]unix.CapUserData{}
-	return entryError(unix.Capset(&unix.CapUserHeader{Version: unix.LINUX_CAPABILITY_VERSION_3}, &capabilities[0]))
+	if err := unix.Capset(&unix.CapUserHeader{Version: unix.LINUX_CAPABILITY_VERSION_3}, &capabilities[0]); err != nil {
+		return entryError(err)
+	}
+	// Effective UID/GID changes clear PDEATHSIG. PID 1 sees its outer parent
+	// as PID 0, so getppid cannot detect death in this window. The inherited
+	// pidfd names the original launcher without PID reuse or namespace lookup.
+	return rearmParentDeath(parentDescriptor(record))
+}
+
+func rearmParentDeath(parentFD int) error {
+	if err := unix.Prctl(unix.PR_SET_PDEATHSIG, uintptr(unix.SIGKILL), 0, 0, 0); err != nil {
+		return entryError(err)
+	}
+	fds := []unix.PollFd{{Fd: int32(parentFD), Events: unix.POLLIN}}
+	for {
+		_, err := unix.Poll(fds, 0)
+		if errors.Is(err, unix.EINTR) {
+			continue
+		}
+		if err != nil {
+			return entryError(err)
+		}
+		if fds[0].Revents != 0 {
+			return e.New(e.CodeEngineCapability, "runtime launcher exited before payload admission")
+		}
+		return nil
+	}
 }
 
 func entryError(err error) error {

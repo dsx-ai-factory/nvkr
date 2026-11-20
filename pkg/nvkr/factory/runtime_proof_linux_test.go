@@ -160,6 +160,9 @@ func TestNativeRuntimeConsumer(t *testing.T) {
 	if result.RuntimeUse == nil || result.RuntimeUse.SBOM == "" {
 		t.Fatal("disk did not complete original runtime and SBOM consumption")
 	}
+	if err := validateRuntimeConsistency(ctx, plan, artifacts, func(path string) (string, error) { return path, nil }); err != nil {
+		t.Fatal(err)
+	}
 	nativeRuntimeProofRecord(t, "disk-observation.json", observation)
 	nativeRuntimeProofRecord(t, "disk-result.json", result)
 	layer := result.RuntimeUse.Production.LayerDigest

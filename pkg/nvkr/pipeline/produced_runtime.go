@@ -151,13 +151,7 @@ func captureExecutedRuntime(ctx context.Context, platform, buildDigest string, p
 		return nil, err
 	}
 	retained.AbsPath = manifest
-	terminal, err := canonical.Digest(canonical.KindTerminalVerification, struct {
-		BuildDigest  string                           `json:"buildDigest"`
-		Nodes        []producedExecutableNodeView     `json:"nodes"`
-		Artifacts    []producedExecutableArtifactView `json:"artifacts"`
-		LayoutDigest string                           `json:"layoutDigest"`
-	}{buildDigest, []producedExecutableNodeView{{ID: producer.ID, Kind: producer.Kind, Status: "ok"}},
-		[]producedExecutableArtifactView{{NodeID: producer.ID, Result: retained, LiveRoot: root, LivePath: manifest}}, tree.Digest()})
+	terminal, err := runtimeTerminalDigest(buildDigest, producer, retained, tree.Digest())
 	if err != nil {
 		return nil, err
 	}
@@ -169,6 +163,43 @@ func captureExecutedRuntime(ctx context.Context, platform, buildDigest string, p
 	}
 	accepted = true
 	return &ProducedRuntime{state: state}, nil
+}
+
+func runtimeTerminalDigest(buildDigest string, producer ir.Node, result ArtifactResult, layout string) (string, error) {
+	manifest := filepath.Join(result.TransportPath, "blobs", "sha256", strings.TrimPrefix(result.SHA256, "sha256:"))
+	return canonical.Digest(canonical.KindTerminalVerification, struct {
+		BuildDigest  string                           `json:"buildDigest"`
+		Nodes        []producedExecutableNodeView     `json:"nodes"`
+		Artifacts    []producedExecutableArtifactView `json:"artifacts"`
+		LayoutDigest string                           `json:"layoutDigest"`
+	}{buildDigest, []producedExecutableNodeView{{ID: producer.ID, Kind: producer.Kind, Status: "ok"}},
+		[]producedExecutableArtifactView{{NodeID: producer.ID, Result: result, LiveRoot: result.TransportPath, LivePath: manifest}}, layout})
+}
+
+// ValidateRuntimeProductionDescription joins transported descriptions to their
+// exact selected producer. It never restores a production or execution receipt.
+func ValidateRuntimeProductionDescription(binding ProducedRuntimeBinding, producer ir.Node, result ArtifactResult, layout, layer string) error {
+	for _, digest := range []string{binding.BuildDigest, binding.Digest, binding.LayoutDigest, binding.LayerDigest, binding.TerminalDigest} {
+		if !canonical.IsDigest(digest) {
+			return e.New(e.CodeVerifyFailed, "runtime production description requires exact digests")
+		}
+	}
+	if producer.Kind != ir.KindBuild || producer.BuilderType != ir.BuilderMkosi ||
+		producer.OutputType != "oci-image" || binding.Size <= 0 || (binding.Platform != "linux/amd64" && binding.Platform != "linux/arm64") ||
+		binding.Component != producer.Component || result.Component != producer.Component ||
+		result.BuilderType != ir.BuilderMkosi || result.EngineClass != ir.BuilderMkosi || result.OutputType != "oci-image" ||
+		result.TransportPath == "" || result.Path != producer.ArtifactPath || result.Toolchain != "" || result.Ref != "" || result.Packaged || result.AICRValidation != nil ||
+		binding.Digest != result.SHA256 || binding.Size != result.Size || binding.LayoutDigest != layout || binding.LayerDigest != layer {
+		return e.New(e.CodeVerifyFailed, "runtime use changes its named production's content")
+	}
+	terminal, err := runtimeTerminalDigest(binding.BuildDigest, producer, result, layout)
+	if err != nil {
+		return err
+	}
+	if binding.TerminalDigest != terminal {
+		return e.New(e.CodeVerifyFailed, "runtime use changes its named production's terminal record")
+	}
+	return nil
 }
 
 // require runs with the state's lock held (or before its first publication).

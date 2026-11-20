@@ -153,6 +153,23 @@ func nextDescriptor(record requestRecord) int {
 	return fd
 }
 
+// The launcher appends its own pidfd after all admitted payload descriptors.
+// It is never authored, projected into the root, or retained across payload exec.
+func parentDescriptor(record requestRecord) int {
+	switch record.Mode {
+	case "probe", "probe-assembly", "probe-outbound":
+		return 5
+	case "outbound":
+		return 8
+	default:
+		fd := nextDescriptor(record)
+		if record.NetworkFD != 0 {
+			fd++
+		}
+		return fd
+	}
+}
+
 func absolutePath(value string) bool {
 	return len(value) > 0 && len(value) <= 4096 && utf8.ValidString(value) && strings.HasPrefix(value, "/") &&
 		path.Clean(value) == value && !strings.ContainsAny(value, "\x00\r\n\\")

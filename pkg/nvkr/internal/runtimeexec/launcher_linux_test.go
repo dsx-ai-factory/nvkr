@@ -26,6 +26,13 @@ import (
 )
 
 func TestMain(tests *testing.M) {
+	if len(os.Args) == 5 && os.Args[1] == "runtime-test-launcher" {
+		if err := deathTestLauncher(os.Args[2], os.Args[3], os.Args[4] == "outbound"); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
 	if len(os.Args) > 0 && os.Args[0] == "/usr/bin/slirp4netns" {
 		if err := outboundFixture(); err != nil {
 			fmt.Fprintln(os.Stderr, err)

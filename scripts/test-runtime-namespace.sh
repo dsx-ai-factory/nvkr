@@ -55,5 +55,5 @@ sudo -n systemd-run --quiet --wait --pipe --collect \
   --property=RuntimeMaxSec=60 --property=KillMode=control-group \
   /usr/bin/env -i PATH=/usr/bin:/bin LANG=C GOMAXPROCS=2 "TMPDIR=$fixture" \
     NVKR_TEST_NATIVE_RUNTIME=1 "NVKR_TEST_RUNTIME_SCRATCH=$fixture" \
-    "$binary" '-test.run=TestNative(Runtime|Assembly|OutboundRuntime)Namespace|TestManagedResolverDelegation' -test.v -test.timeout=45s \
+    "$binary" '-test.run=TestNative(Runtime|Assembly|OutboundRuntime)Namespace|TestNativeRuntimeLauncherDeath|TestParentDeathRearm|TestManagedResolverDelegation' -test.v -test.timeout=45s \
   2>&1 | tee "$evidence/namespaces.log"

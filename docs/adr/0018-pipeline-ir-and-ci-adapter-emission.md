@@ -514,8 +514,10 @@ Signing subjects, runner labels, publication policy and digest families retain t
 Assembly selects mkosi by source commit and tree, a checked-in configuration, an exact repository
 snapshot and metadata blob pins, and the complete package archive closure. Package input records use
 manager-neutral names, versions, architectures, blob digests, sizes and repository metadata bindings.
-Only the APT adapter is initially admitted. Acquisition authenticates metadata and every retained package
-before assembly, which runs without network access. The original mkosi JSON installed-package report
+Only the APT adapter is initially admitted. Acquisition checks metadata and every retained package
+against the catalog's exact blob digests and sizes before assembly, which runs without network access.
+It does not verify repository signatures or derive package membership by parsing those metadata blobs;
+the package-to-repository association is a reviewed catalog description. The original mkosi JSON installed-package report
 must match the entire retained package selection, including dependencies; surplus, missing, duplicate
 or substituted packages fail. The report is an installed-content input to SBOM generation, not a
 replacement for acquisition materials or package/license review.
@@ -577,8 +579,9 @@ admits the exact Plan, output, native platform, resources and VM capabilities wi
 starts the existing disk coordinator under noninteractive sudo with a fixed environment allowlist and
 a root-owned watchdog derived from the group's budget. The coordinator repeats admission, probes its
 namespace capabilities, and creates root-owned scratch under the fixed protected `/opt` parent only
-after checking execution/write permissions and available disk-backed capacity. Source fetch, carrier
-upload, registry credential preparation, signing and publication remain outside this owner. No token,
+after checking execution/write permissions and available disk-backed capacity. Source checkout, carrier
+upload, registry credential preparation, signing and publication remain outside this owner. The coordinator
+may anonymously pull an exact public utility image after capability admission. No token,
 credential directory, authored environment or executable override is forwarded across the boundary.
 It admits the required mount, network, device, ownership
 and privilege-dropping capabilities before producer work. The owner retains the authenticated layer in a
@@ -594,6 +597,11 @@ inputs remain read-only; private output and scratch locations are the only writa
 The launcher drops to UID/GID 65534, removes supplementary groups and all capabilities, locks root
 privilege restoration off, and applies no-new-privileges before payload execution. These process IDs
 are an execution restriction, not a signing identity or a new publication subject.
+After changing credentials, the child re-arms its parent-death kill and checks a held descriptor for
+the original launcher process. The launcher keeps the creating thread alive until the child joins.
+After execution owners close and diagnostics seal, the coordinator returns only selected transport
+outputs, sealed diagnostics and their parent directories to the held workspace's owner. Descriptor-relative
+traversal rejects symlinks and shared root-owned files; ownership is not taken from sudo environment variables.
 A private loopback interface permits Packer/QEMU communication. An explicitly network-admitted disk
 producer additionally uses the snapshot-pinned `slirp4netns` helper in the authenticated runtime. Setup
 creates and configures one TAP device inside the consumer's private network namespace and transfers

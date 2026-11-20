@@ -5,9 +5,8 @@ and shuts down through the QEMU pc machine's ACPI port. Packer builds an 8 MiB
 QCOW2. Its post-processor checks the guest write, consumer UID and capabilities,
 and an exact snapshot metadata download through the produced outbound helper.
 
-Regenerate `seed.raw` and its Packer checksum file with `python3 generate-seed.py`.
-The generator contains the complete guest instruction bytes and disk-address packet. It downloads
-nothing. The guest uses the runtime's already-pinned SeaBIOS package.
+The Go test `TestRuntimeGuestSeedBytes` checks `seed.raw` and its Packer checksum file against the
+complete guest instruction bytes and disk-address packet. It downloads nothing. The guest uses the runtime's already-pinned SeaBIOS package.
 
 The opt-in factory test owns the original runtime production, installed-package
 SBOM and completed consumer receipt until the held disk is exported. It does not

@@ -29,13 +29,21 @@ import (
 )
 
 func executeSBOM(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer) error {
-	return executeSBOMWithRuntime(ctx, plan, node, artifacts, stdout, nil)
+	return executeSBOMWithRuntime(ctx, plan, node, artifacts, stdout, nil, nil)
 }
 
-func executeSBOMWithRuntime(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer, runtime *pipeline.ProducedRuntime) error {
+func executeSBOMWithRuntime(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact, stdout io.Writer, runtime *pipeline.ProducedRuntime, scratch *runtimeScratch) error {
 	selected, internal := plan.internalToolForTarget(node.BuildTarget)
 	if internal && selected.Format == authored.OutputOCI && runtime == nil {
 		return e.New(e.CodeEngineCapability, "runtime SBOM requires its original live production")
+	}
+	var staging string
+	if runtime != nil {
+		var err error
+		staging, err = scratch.path(ctx)
+		if err != nil {
+			return err
+		}
 	}
 	var buildPlan *BuildPlan
 	for i := range plan.Builds {
@@ -88,7 +96,7 @@ func executeSBOMWithRuntime(ctx context.Context, plan *Plan, node Node, artifact
 		if !internal || selected.Format != authored.OutputOCI {
 			return e.New(e.CodeEngineCapability, "runtime SBOM has no selected internal OCI producer")
 		}
-		bom, err := sbom.WithRuntimeContents(ctx, boms[selected.Component], runtime, filepath.Dir(artifacts[selected.ArtifactID].Path))
+		bom, err := sbom.WithRuntimeContents(ctx, boms[selected.Component], runtime, staging)
 		if err != nil {
 			return err
 		}

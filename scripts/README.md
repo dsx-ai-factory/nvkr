@@ -25,8 +25,8 @@ The launcher runs in a child shell, so failure does not change the caller's SSH 
 `test-runtime-namespace.sh /absolute/evidence-directory` runs the opt-in native Linux AMD64 namespace
 fixtures on a VM kernel. It requires noninteractive sudo and systemd, creates its own executable tmpfs,
 and bounds the test service's CPU, memory, processes and lifetime. It preserves inherited mount restrictions
-and retains text diagnostics. The fork-only proof workflow invokes this script; it neither builds a VM
-runtime nor establishes disk equivalence or production-lane evidence.
+and retains text diagnostics. This opt-in script neither builds a VM runtime nor establishes disk
+equivalence or production-lane evidence.
 
 `test-mkosi-assembly.sh /absolute/evidence-directory` exercises the source-pinned mkosi assembly backend
 on a native Linux AMD64 VM. It requires noninteractive sudo and systemd, installs and records bootstrap
@@ -46,7 +46,7 @@ publication, libguestfs inspection, EFI or ARM64.
 
 The same fixture exports `runtime-tar-entries.json`: bounded per-entry metadata,
 content hashes and archive order from the original runtime layer. Compare two
-downloaded evidence directories with `python3 scripts/compare-runtime-evidence.py FIRST SECOND`.
+downloaded evidence directories with `go run ./scripts/compare-runtime-evidence FIRST SECOND`.
 The check requires equal runtime Build, OCI manifest, layer, layout and size, and
 reports differing entry fields and order. It exits nonzero on differences or
 incomplete diagnostics; these descriptions grant no execution or publication authority.

@@ -45,9 +45,18 @@ func platformAdmission() error {
 }
 
 func executeChild(ctx context.Context, self *heldfile.File, record requestRecord, descriptors []*os.File, stdout, stderr io.Writer) error {
+	// PDEATHSIG is bound to the creating thread. Keep it alive through Wait.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
 	if err := platformAdmission(); err != nil {
 		return err
 	}
+	parentFD, err := unix.PidfdOpen(os.Getpid(), 0)
+	if err != nil {
+		return e.Wrap(e.CodeEngineCapability, err, "holding runtime launcher lifetime")
+	}
+	parent := os.NewFile(uintptr(parentFD), "runtime-parent")
+	defer parent.Close()
 	raw, err := encodeRequest(record)
 	if err != nil {
 		return err
@@ -67,6 +76,10 @@ func executeChild(ctx context.Context, self *heldfile.File, record requestRecord
 		defer file.Close()
 		files = append(files, file)
 	}
+	if 3+len(files) != parentDescriptor(record) {
+		return e.New(e.CodeEngineCapability, "runtime parent descriptor differs from its fixed slot")
+	}
+	files = append(files, parent)
 	command := exec.CommandContext(ctx, "/proc/self/fd/3", EntryArgument)
 	command.ExtraFiles = files
 	command.Env = []string{"LANG=C", "LC_ALL=C"}

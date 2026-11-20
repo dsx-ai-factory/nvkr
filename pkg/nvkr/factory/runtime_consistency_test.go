@@ -4,6 +4,7 @@
 package factory
 
 import (
+	"bytes"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -47,7 +48,16 @@ func writeRuntimeConsistencyFixture(t *testing.T, plan *Plan, artifacts map[stri
 			digest = subject
 		}
 		hashes[artifact.Component] = digest
-		write(artifact.Path, pipeline.ArtifactResult{Component: artifact.Component, SHA256: digest, Size: size})
+		result := pipeline.ArtifactResult{Component: artifact.Component, SHA256: digest, Size: size}
+		if artifact.Component == tool.Component {
+			_, producer, err := plan.producerInstruction(planNode(plan, artifact.Producer))
+			if err != nil {
+				t.Fatal(err)
+			}
+			result.BuilderType, result.EngineClass, result.OutputType = producer.BuilderType, producer.BuilderType, producer.OutputType
+			result.Path, result.TransportPath = producer.ArtifactPath, "/synthetic/runtime"
+		}
+		write(artifact.Path, result)
 	}
 	boms, index, err := sbom.PerArtifact(&buildgraph.Resolved{Platform: build.Platform, Components: build.ResolvedComponents}, build.BuildDigest, hashes)
 	if err != nil {
@@ -101,7 +111,74 @@ func writeRuntimeConsistencyFixture(t *testing.T, plan *Plan, artifacts map[stri
 	write(artifacts[tool.ObservationArtifactID].Path, observation)
 }
 
+func writeRuntimeConsumerFixture(t *testing.T, plan *Plan, artifacts map[string]Artifact) {
+	t.Helper()
+	identity, err := plan.IdentityDigest()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, consumer := range plan.Graph.Nodes {
+		if consumer.Kind != NodeBuild || len(consumer.InternalTools) == 0 {
+			continue
+		}
+		_, instruction, err := plan.producerInstruction(consumer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if instruction.Runtime == nil {
+			continue
+		}
+		var tool InternalToolPlan
+		for _, candidate := range plan.InternalTools {
+			if candidate.Name == instruction.Runtime.Tool {
+				tool = candidate
+			}
+		}
+		produced, err := readProducerResult(t.Context(), artifacts[tool.ResultArtifactID].Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, producer, err := plan.producerInstruction(planNode(plan, artifacts[tool.ResultArtifactID].Producer))
+		if err != nil {
+			t.Fatal(err)
+		}
+		layout := pipeline.FileDigest([]byte("layout"))
+		terminal, err := canonical.Digest(canonical.KindTerminalVerification, map[string]any{
+			"buildDigest": tool.BuildDigest, "layoutDigest": layout,
+			"nodes": []any{map[string]any{"id": producer.ID, "kind": producer.Kind, "status": "ok", "duration": int64(0)}},
+			"artifacts": []any{map[string]any{"nodeId": producer.ID, "result": produced, "liveRoot": produced.TransportPath,
+				"livePath": filepath.Join(produced.TransportPath, "blobs", "sha256", strings.TrimPrefix(produced.SHA256, "sha256:"))}},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		observation, err := digestFactoryPath(t.Context(), artifacts[tool.ObservationArtifactID].Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		inventory, err := digestFactoryPath(t.Context(), artifacts[tool.SBOMArtifactID].Path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		binding := &pipeline.RuntimeUseBinding{PlanDigest: identity, Subject: identity + "/" + identity + "/" + consumer.ID, Purpose: "packer-build", Runtime: *instruction.Runtime,
+			Production: pipeline.ProducedRuntimeBinding{BuildDigest: tool.BuildDigest, Platform: tool.Platform, Component: tool.Component, Digest: produced.SHA256, Size: produced.Size, LayoutDigest: layout, LayerDigest: layout, TerminalDigest: terminal}, Observation: observation, SBOM: inventory}
+		for _, id := range consumer.Outputs {
+			if artifacts[id].Kind != "producer-result" {
+				continue
+			}
+			raw, err := canonical.Marshal(pipeline.ArtifactResult{RuntimeUse: binding})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := writeFactoryFile(t.Context(), artifacts[id].Path, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}
+
 func TestRuntimeConsistencyRequiresEveryIndependentProduction(t *testing.T) {
+	plan := runtimeConsumersPlanFixture(t, []string{"first", "second", "third", "fourth"})
 	for _, tc := range []struct {
 		name   string
 		change func(*testing.T, *Plan, map[string]Artifact, InternalToolPlan)
@@ -138,12 +215,12 @@ func TestRuntimeConsistencyRequiresEveryIndependentProduction(t *testing.T) {
 		}, code: e.CodeVerifyFailed},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			plan := runtimeConsumersPlanFixture(t, []string{"first", "second", "third", "fourth"})
 			t.Chdir(t.TempDir())
 			_, artifacts := planIndex(plan)
 			for _, tool := range plan.InternalTools {
 				writeRuntimeConsistencyFixture(t, plan, artifacts, tool, pipeline.FileDigest([]byte("manifest")), pipeline.FileDigest([]byte("layout")), 100)
 			}
+			writeRuntimeConsumerFixture(t, plan, artifacts)
 			if tc.change != nil {
 				tc.change(t, plan, artifacts, plan.InternalTools[3])
 			}
@@ -159,8 +236,22 @@ func TestRuntimeConsistencyRequiresEveryIndependentProduction(t *testing.T) {
 
 func TestRuntimeConsistencyTransportsEvidenceWithoutPayloadOrAuthority(t *testing.T) {
 	plan := runtimeConsumersPlanFixture(t, []string{"first", "second", "third", "fourth"})
+	plan.Actions = githubTestPlan(t).Actions
 	plan.Environment.Publication = &definition.Publication{Mode: "per-output-v1"}
+	jobs := make(map[string]string)
+	for _, node := range plan.Graph.Nodes {
+		jobs[node.ID] = githubJobID(node.ID)
+	}
+	var rendered bytes.Buffer
+	if err := writeGitHubFinalizerRestoreSteps(&rendered, plan, jobs); err != nil {
+		t.Fatal(err)
+	}
+	steps := decodeGitHubSteps(t, rendered.Bytes())
+	names := strings.Split(strings.Trim(steps[0].With["pattern"], "{}"), ",")
 	for _, tool := range plan.InternalTools {
+		if slices.Contains(names, githubArtifactName(tool.ArtifactID)) {
+			t.Fatal("finalizer downloads runtime payload")
+		}
 		for _, a := range plan.Graph.Artifacts {
 			if a.BuildTarget != tool.BuildTarget {
 				continue
@@ -170,5 +261,113 @@ func TestRuntimeConsistencyTransportsEvidenceWithoutPayloadOrAuthority(t *testin
 				t.Fatalf("transport %s = %v, want %v", a.ID, got, want)
 			}
 		}
+	}
+	_, artifacts := planIndex(plan)
+	consumers := 0
+	for _, consumer := range plan.Graph.Nodes {
+		if consumer.Kind != NodeBuild || len(consumer.InternalTools) == 0 {
+			continue
+		}
+		for _, id := range consumer.Outputs {
+			if artifacts[id].Kind == "producer-result" {
+				consumers++
+				if !finalizerArtifact(plan, artifacts[id]) || !slices.Contains(names, githubArtifactName(id)) {
+					t.Fatalf("consumer result %s omitted", id)
+				}
+			}
+		}
+	}
+	if consumers != 4 {
+		t.Fatalf("transport fixture has %d consumers, want four", consumers)
+	}
+}
+
+func TestRuntimeConsumerEvidenceRejectsSubstitution(t *testing.T) {
+	plan := runtimeConsumersPlanFixture(t, []string{"first", "second"})
+	for _, field := range []string{"observation", "sbom", "manifest", "layout", "layer", "terminal", "size", "consumer", "plan", "runtime"} {
+		t.Run(field, func(t *testing.T) {
+			t.Chdir(t.TempDir())
+			_, artifacts := planIndex(plan)
+			for _, tool := range plan.InternalTools {
+				writeRuntimeConsistencyFixture(t, plan, artifacts, tool, pipeline.FileDigest([]byte("manifest")), pipeline.FileDigest([]byte("layout")), 100)
+			}
+			writeRuntimeConsumerFixture(t, plan, artifacts)
+			var path string
+			var result pipeline.ArtifactResult
+			for _, node := range plan.Graph.Nodes {
+				if node.Kind != NodeBuild || len(node.InternalTools) == 0 {
+					continue
+				}
+				_, instruction, err := plan.producerInstruction(node)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if instruction.Runtime == nil {
+					continue
+				}
+				for _, id := range node.Outputs {
+					if artifacts[id].Kind == "producer-result" {
+						path = artifacts[id].Path
+					}
+				}
+				result, err = readProducerResult(t.Context(), path)
+				if err != nil {
+					t.Fatal(err)
+				}
+				break
+			}
+			if result.RuntimeUse == nil {
+				t.Fatal("fixture omits runtime consumer")
+			}
+			use, other := result.RuntimeUse, pipeline.FileDigest([]byte("unrelated evidence"))
+			switch field {
+			case "observation":
+				use.Observation = other
+			case "sbom":
+				use.SBOM = other
+			case "manifest":
+				use.Production.Digest = other
+			case "layout":
+				use.Production.LayoutDigest = other
+			case "layer":
+				use.Production.LayerDigest = other
+			case "terminal":
+				use.Production.TerminalDigest = other
+			case "size":
+				use.Production.Size++
+			case "consumer":
+				parts := strings.SplitN(use.Subject, "/", 3)
+				parts[2] = "unrelated/" + filepath.Base(parts[2])
+				use.Subject = strings.Join(parts, "/")
+			case "plan":
+				use.PlanDigest = other
+			case "runtime":
+				use.Runtime.Tool = "unrelated"
+			}
+			raw, err := canonical.Marshal(result)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := writeFactoryFile(t.Context(), path, raw, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			err = validateRuntimeConsistency(t.Context(), plan, artifacts, func(path string) (string, error) { return path, nil })
+			assertFactoryErrorCode(t, err, e.CodeVerifyFailed)
+		})
+	}
+}
+
+func TestRuntimeSBOMRequiresOwnedScratchBeforeIO(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		scratch *runtimeScratch
+		code    e.Code
+	}{
+		{"missing", nil, e.CodeEngineCapability}, {"closed", &runtimeScratch{}, e.CodeGateUnmet},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := executeSBOMWithRuntime(t.Context(), &Plan{}, Node{}, nil, nil, &pipeline.ProducedRuntime{}, tc.scratch)
+			assertFactoryErrorCode(t, err, tc.code)
+		})
 	}
 }

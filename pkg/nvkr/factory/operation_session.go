@@ -176,7 +176,7 @@ func (session *operationSession) dispatch(ctx context.Context, plan *Plan, node 
 			var runtime *pipeline.ProducedRuntime
 			runtime, _, err = session.placement.owner.internalRuntimeProduction(ctx, plan, selected.Name)
 			if err == nil {
-				err = executeSBOMWithRuntime(ctx, plan, node, artifacts, session.stdout, runtime)
+				err = executeSBOMWithRuntime(ctx, plan, node, artifacts, session.stdout, runtime, session.placement.owner.runtimeScratch)
 			}
 		} else {
 			if err = validateInternalToolSBOMNode(plan, node); err == nil {

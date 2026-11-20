@@ -6,10 +6,14 @@ package factory
 import (
 	"bytes"
 	"context"
+	"path/filepath"
+	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 )
 
 type runtimeContent struct {
@@ -45,6 +49,113 @@ func validateRuntimeConsistency(ctx context.Context, plan *Plan, artifacts map[s
 			return e.New(e.CodeVerifyFailed, "independent runtime production %q differs from the same selected producer's other disk groups", tool.Name)
 		}
 		seen[key] = content
+	}
+	if len(seen) == 0 {
+		return nil
+	}
+	return validateRuntimeConsumerEvidence(ctx, plan, artifacts, local)
+}
+
+func validateRuntimeConsumerEvidence(ctx context.Context, plan *Plan, artifacts map[string]Artifact, local func(string) (string, error)) error {
+	identity, err := plan.IdentityDigest()
+	if err != nil {
+		return err
+	}
+	for _, consumer := range plan.Graph.Nodes {
+		if consumer.Kind != NodeBuild || len(consumer.InternalTools) == 0 {
+			continue
+		}
+		_, instruction, err := plan.producerInstruction(consumer)
+		if err != nil {
+			return err
+		}
+		if instruction.Runtime == nil {
+			continue
+		}
+		var tool InternalToolPlan
+		for _, candidate := range plan.InternalTools {
+			if candidate.Name == instruction.Runtime.Tool {
+				tool = candidate
+			}
+		}
+		if tool.Name == "" || tool.Format != definition.OutputOCI {
+			return e.New(e.CodeProvenanceMissing, "runtime consumer has no named production")
+		}
+		var resultArtifact Artifact
+		for _, id := range consumer.Outputs {
+			if artifacts[id].Kind == "producer-result" {
+				resultArtifact = artifacts[id]
+			}
+		}
+		if resultArtifact.ID == "" {
+			return e.New(e.CodeProvenanceMissing, "runtime consumer has no result")
+		}
+		path, err := local(resultArtifact.Path)
+		if err != nil {
+			return err
+		}
+		result, err := readProducerResult(ctx, path)
+		if err != nil {
+			return err
+		}
+		if err := pipeline.ValidateArtifactRuntimeUse(instruction, result); err != nil {
+			return err
+		}
+		use := result.RuntimeUse
+		subject := strings.SplitN(use.Subject, "/", 3)
+		if use.PlanDigest != identity || len(subject) != 3 || subject[2] != consumer.ID {
+			return e.New(e.CodeVerifyFailed, "runtime use changes its exact Plan or consumer")
+		}
+		for _, evidence := range []struct{ id, digest string }{{tool.ObservationArtifactID, use.Observation}, {tool.SBOMArtifactID, use.SBOM}} {
+			path, err := local(artifacts[evidence.id].Path)
+			if err != nil {
+				return err
+			}
+			digest, err := digestFactoryPath(ctx, path)
+			if err != nil {
+				return err
+			}
+			if digest != evidence.digest {
+				return e.New(e.CodeVerifyFailed, "runtime use changes its named producer's completed evidence")
+			}
+		}
+		content, err := observedRuntimeContent(ctx, plan, tool, artifacts, local)
+		if err != nil {
+			return err
+		}
+		path, err = local(artifacts[tool.SBOMArtifactID].Path)
+		if err != nil {
+			return err
+		}
+		raw, err := readFactorySBOMFile(ctx, filepath.Join(path, tool.Component+".cdx.json"), "runtime contents binding")
+		if err != nil {
+			return err
+		}
+		var bom sbom.BOM
+		if err := canonical.UnmarshalExact(bytes.TrimSuffix(raw, []byte{'\n'}), &bom); err != nil {
+			return e.Wrap(e.CodeVerifyFailed, err, "decoding runtime contents binding")
+		}
+		layer := ""
+		for _, property := range bom.Metadata.Props {
+			if property.Name == "nvkr:runtimeLayerDigest" {
+				layer = property.Value
+			}
+		}
+		path, err = local(artifacts[tool.ResultArtifactID].Path)
+		if err != nil {
+			return err
+		}
+		produced, err := readProducerResult(ctx, path)
+		if err != nil {
+			return err
+		}
+		_, producer, err := plan.producerInstruction(planNode(plan, artifacts[tool.ResultArtifactID].Producer))
+		if err != nil {
+			return err
+		}
+		if err := pipeline.ValidateRuntimeProductionDescription(use.Production, producer, produced, content.layout, layer); err != nil {
+			return err
+		}
 	}
 	return nil
 }

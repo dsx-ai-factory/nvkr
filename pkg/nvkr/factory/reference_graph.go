@@ -104,6 +104,16 @@ func finalizerArtifact(plan *Plan, a Artifact) bool {
 			return true
 		}
 	}
+	if a.Kind == "producer-result" {
+		consumer := planNode(plan, a.Producer)
+		for _, name := range consumer.InternalTools {
+			for _, tool := range plan.InternalTools {
+				if tool.Name == name && tool.Format == definition.OutputOCI {
+					return true
+				}
+			}
+		}
+	}
 	if a.Kind == ArtifactObjectPublication {
 		return true
 	}
