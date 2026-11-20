@@ -62,10 +62,11 @@ The [development guide](../DEVELOPMENT.md#test-the-gitlab-adapter-against-a-real
 resources, token isolation, HTTPS trust, API submission and retained evidence. It is opt-in and fails
 when prerequisites are absent. This is an ordinary unsigned build, not signing or qualification.
 
-`ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's twenty-three
-test jobs. Factory, lifecycle, CLI and qualification packages split by top-level test; other packages run
-whole. It includes examples and fuzz seed tests, and requires exact completion of the discovered
-selection. New packages and tests need no allowlist update. `make test-shard` reproduces one matrix
+`ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's forty-nine
+test jobs. Factory, lifecycle, CLI and qualification packages split by top-level test into 34, 2, 4 and 4
+shards respectively; other packages run whole across five shards. Examples and fuzz seeds are included,
+and the runner requires exact completion of the discovered selection. New packages and tests need no
+allowlist update. `make test-shard` reproduces one matrix
 entry; `make test` still runs the full suite. Each child command may retain at most 32 MiB of stdout;
 exceeding that limit fails the shard and stops its process group while preserving diagnostics already
 read. `ci-test-summary.jq` summarizes the retained Go JSON events. Partition, completeness, parser and

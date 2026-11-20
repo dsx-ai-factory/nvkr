@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "scripts" / "ci-test-shard.py"
 MODULE = "example.com/shardfixture"
 
-# Thirty-one targets keep all twenty-three shards nonempty. The prefix pair
+# Fifty-eight targets keep all forty-nine shards nonempty. The prefix pair
 # deliberately lands in different factory shards, detecting unanchored -run.
 FACTORY = '''package fixture
 
@@ -56,6 +56,36 @@ func FuzzDecode0(f *testing.F) {
         if value != "seed" { t.Fatal("unexpected seed") }
     })
 }
+'''
+
+FACTORY_EXTRA = '''
+func TestFactoryMatrix0(t *testing.T) {}
+func TestFactoryMatrix2(t *testing.T) {}
+func TestFactoryMatrix3(t *testing.T) {}
+func TestFactoryMatrix6(t *testing.T) {}
+func TestFactoryMatrix8(t *testing.T) {}
+func TestFactoryMatrix9(t *testing.T) {}
+func TestFactoryMatrix10(t *testing.T) {}
+func TestFactoryMatrix12(t *testing.T) {}
+func TestFactoryMatrix14(t *testing.T) {}
+func TestFactoryMatrix16(t *testing.T) {}
+func TestFactoryMatrix18(t *testing.T) {}
+func TestFactoryMatrix19(t *testing.T) {}
+func TestFactoryMatrix22(t *testing.T) {}
+func TestFactoryMatrix24(t *testing.T) {}
+func TestFactoryMatrix25(t *testing.T) {}
+func TestFactoryMatrix33(t *testing.T) {}
+func TestFactoryMatrix37(t *testing.T) {}
+func TestFactoryMatrix38(t *testing.T) {}
+func TestFactoryMatrix42(t *testing.T) {}
+func TestFactoryMatrix43(t *testing.T) {}
+func TestFactoryMatrix44(t *testing.T) {}
+func TestFactoryMatrix49(t *testing.T) {}
+func TestFactoryMatrix51(t *testing.T) {}
+func TestFactoryMatrix57(t *testing.T) {}
+func TestFactoryMatrix83(t *testing.T) {}
+func TestFactoryMatrix92(t *testing.T) {}
+func TestFactoryMatrix93(t *testing.T) {}
 '''
 
 LIFECYCLE = '''package fixture
@@ -115,7 +145,7 @@ class RealGoShardTest(unittest.TestCase):
             root = Path(directory)
             version = (ROOT / ".go-version").read_text().strip()
             (root / "go.mod").write_text(f"module {MODULE}\n\ngo {version}\n")
-            fixtures = {"pkg/nvkr/factory": FACTORY, "pkg/nvkr/lifecycle": LIFECYCLE,
+            fixtures = {"pkg/nvkr/factory": FACTORY + FACTORY_EXTRA, "pkg/nvkr/lifecycle": LIFECYCLE,
                         "cmd/nvkr": FACTORY, "pkg/nvkr/qualification": FACTORY}
             fixtures.update({f"ordinary/package{index}": ORDINARY for index in (0, 1, 2, 3, 23)})
             for package, source in fixtures.items():
@@ -126,7 +156,7 @@ class RealGoShardTest(unittest.TestCase):
             baseline = self.run_command(directory, environment, "go", "test", "-json",
                                         "-count=1", "-timeout=10s", "./...")
             expected = terminal_tests(baseline.stdout)
-            self.assertEqual(sum(expected.values()), 31)
+            self.assertEqual(sum(expected.values()), 58)
             self.assertTrue(all(action == "pass" and count == 1
                                 for (_, _, action), count in expected.items()))
             self.assertIn('"Test":"TestExact/child"', baseline.stdout)
@@ -134,7 +164,7 @@ class RealGoShardTest(unittest.TestCase):
 
             matrix = json.loads(self.run_command(directory, environment, sys.executable,
                                                  str(RUNNER), "--matrix").stdout)["include"]
-            self.assertEqual(len(matrix), 23)
+            self.assertEqual(len(matrix), 49)
             actual, failure_command = Counter(), None
             for entry in matrix:
                 command = (sys.executable, str(RUNNER), "--group", entry["group"],

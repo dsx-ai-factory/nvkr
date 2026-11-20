@@ -60,7 +60,7 @@ class ShardTest(unittest.TestCase):
         expected = [{"group": group, "index": index}
                     for group, (_, count) in shard.GROUPS.items() for index in range(count)]
         self.assertEqual(actual, expected)
-        self.assertEqual(len(actual), 23)
+        self.assertEqual(len(actual), 49)
 
     def test_child_failure_and_timeout_preserve_output_and_stop_descendants(self):
         output = io.StringIO()
@@ -114,7 +114,7 @@ class ShardTest(unittest.TestCase):
 
     def test_complete_partition_including_future_tests(self):
         names = [f"TestCase{i}" for i in range(1000)] + ["Example_contract", "FuzzDecoder", "TestCase"]
-        for count in (1, 2, 4, 5, 8, 15):
+        for count in (1, 2, 4, 5, 8, 15, 34):
             with self.subTest(count=count):
                 assigned = [shard.partition(names, index, count) for index in range(count)]
                 self.assertEqual(Counter(name for group in assigned for name in group), Counter(names))
@@ -130,7 +130,7 @@ class ShardTest(unittest.TestCase):
         for group, (_, count) in shard.GROUPS.items():
             for index in range(count):
                 counts.update(shard.packages_for_group(packages, "m", group, index))
-        split = {"m/pkg/nvkr/factory": 8, "m/pkg/nvkr/lifecycle": 2,
+        split = {"m/pkg/nvkr/factory": 34, "m/pkg/nvkr/lifecycle": 2,
                  "m/cmd/nvkr": 4, "m/pkg/nvkr/qualification": 4}
         self.assertEqual(counts, Counter({package: split.get(package, 1) for package in packages}))
 
