@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"path"
 	"strings"
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
@@ -14,7 +15,9 @@ import (
 )
 
 // This is a storage discriminator, not a Plan schema or executable identity.
-const planTreeStorage = "nvkr-plan-tree-v1"
+const planTreeStorage = "nvkr-plan-tree-v3"
+const storedGraphPlanTreeStorage = "nvkr-plan-tree-v2"
+const legacyPlanTreeStorage = "nvkr-plan-tree-v1"
 
 // Raw fields preserve omission, null, integer precision and all existing IR
 // variants. Only the existing Plan decoder can admit the joined document.
@@ -61,6 +64,11 @@ func treeTargetName(raw json.RawMessage) (string, error) {
 }
 
 func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[string][]byte, error) {
+	return renderPlanTreeFormat(ctx, plan, planPath, planTreeStorage)
+}
+
+func renderPlanTreeFormat(ctx context.Context, plan *Plan, planPath, storage string) (map[string][]byte, error) {
+	legacy := storage == legacyPlanTreeStorage
 	raw, err := canonical.Marshal(plan)
 	if err != nil {
 		return nil, err
@@ -71,6 +79,17 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 	var root planFields
 	if err := json.Unmarshal(raw, &root); err != nil {
 		return nil, e.Wrap(e.CodePipelineDrift, err, "slicing Plan")
+	}
+	if storage == planTreeStorage {
+		digest, err := plan.Graph.Digest()
+		if err != nil {
+			return nil, err
+		}
+		root["graphDigest"], err = canonical.Marshal(digest)
+		if err != nil {
+			return nil, err
+		}
+		delete(root, "graph")
 	}
 	var builds []planFields
 	if err := json.Unmarshal(root["builds"], &builds); err != nil {
@@ -143,6 +162,13 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 		// The platform is a filename label; the exact full target remains in the
 		// record. Aggregate targets already end in that platform.
 		logical := strings.TrimSuffix(name, "/"+platform) + "/" + strings.ReplaceAll(platform, "/", "-")
+		if !legacy {
+			selection := plan.Definition.Metadata.Name
+			if plan.Environment.GitHubRuntimePlan {
+				selection += "-" + path.Base(path.Dir(planPath))
+			}
+			logical = selection + "/" + logical
+		}
 		stepPath, err := namedPlanStorePath("steps/"+logical, step, ".json")
 		if err != nil {
 			return nil, err
@@ -163,7 +189,12 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 	if err != nil {
 		return nil, err
 	}
-	for _, field := range sharedPlanFields {
+	if !legacy {
+		if err := sliceTreeEnvironment(root); err != nil {
+			return nil, err
+		}
+	}
+	for _, field := range planTreeFields(storage) {
 		if value, ok := root[field]; ok {
 			kind := map[string]string{"appliedOverlays": "overlays", "internalTools": "tools", "lifecycleOutputs": "outputs", "runtimeInputs": "runtime-inputs"}[field]
 			if kind == "" {
@@ -176,6 +207,9 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 			if field == "actions" {
 				logical = "github"
 			}
+			if !legacy && (plan.Environment.GitHubRuntimePlan || field == "environment" || field == "targets" || field == "runtimeInputs") {
+				logical += "-" + path.Base(path.Dir(planPath))
+			}
 			if logical == "" {
 				logical = "plan"
 			}
@@ -185,10 +219,16 @@ func renderPlanTree(ctx context.Context, plan *Plan, planPath string) (map[strin
 			}
 		}
 	}
-	root["storage"] = json.RawMessage(`"` + planTreeStorage + `"`)
+	root["storage"] = json.RawMessage(`"` + storage + `"`)
 	files[planPath], err = treeJSON(root)
 	if err != nil {
 		return nil, err
+	}
+	if !legacy {
+		files, err = stablePlanTreeNames(files, planPath)
+		if err != nil {
+			return nil, err
+		}
 	}
 	size := 0
 	for _, data := range files {

@@ -366,23 +366,29 @@ func containsString(values []string, wanted string) bool {
 	return false
 }
 
-// validateCompiledGraph checks the complete compiler-owned operation set after
-// authenticating the authored inputs, catalog snapshots and producer selections.
-func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
+// deriveCompiledGraph is shared by tree reconstruction and graph validation.
+// Its caller must first authenticate the inputs with validateGraphInputs.
+func (plan Plan) deriveCompiledGraph(packages []packageSpec) (ArtifactGraph, error) {
 	for _, build := range plan.Builds {
 		selection, ok := plan.selectionForBuild(build.Name)
 		if !ok {
-			return e.New(e.CodeUnverifiedRef, "build %q has no Definition selection", build.Name)
+			return ArtifactGraph{}, e.New(e.CodeUnverifiedRef, "build %q has no Definition selection", build.Name)
 		}
 		if selection.Catalog == nil && len(plan.Definition.Catalogs) == 0 && build.CatalogDigest != plan.CatalogDigest {
-			return e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", build.Name)
+			return ArtifactGraph{}, e.New(e.CodeUnverifiedRef, "output %q substitutes the Definition catalog", build.Name)
 		}
 	}
 	tools, err := selectedTools(plan.Definition, plan.Environment, plan.CatalogSnapshot, plan.Builds)
 	if err != nil {
-		return err
+		return ArtifactGraph{}, err
 	}
-	expected, err := compileArtifactGraph(plan, tools, packages)
+	return compileArtifactGraph(plan, tools, packages)
+}
+
+// validateCompiledGraph checks the complete compiler-owned operation set after
+// authenticating the authored inputs, catalog snapshots and producer selections.
+func (plan Plan) validateCompiledGraph(packages []packageSpec) error {
+	expected, err := plan.deriveCompiledGraph(packages)
 	if err != nil {
 		return err
 	}

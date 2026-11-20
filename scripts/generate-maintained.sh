@@ -49,6 +49,21 @@ inventory=$(jq -sce '
 while IFS= read -r -d '' path; do
   [ -f "$root/$path" ] || fail "invalid maintained input path: $path"
 done < <(jq -j '.[] | (.definition, .environment, .qualificationPolicy // empty) | ., "\u0000"' <<<"$inventory")
+# Writes publish the selected owners together. The runtime flag is check-only:
+# regeneration records the reviewed baseline; dispatch freezes runtime sources.
+if [ "$check" -eq 0 ]; then
+  count=$(jq --arg group "$group" '[.[] | select($group == "" or .group == $group)] | length' <<<"$inventory")
+  [ "$count" -ne 0 ] || exit 0
+  args=(run generate-set --inventory inputs/policies/maintained-generation.json --root .)
+  [ -z "$group" ] || args+=(--group "$group")
+  [ -z "$pilot" ] || args+=(--projection-pilot "$pilot")
+  if (cd "$root" && "$timer" --foreground --kill-after=10s 900 "$root/bin/nvkr-exec" "${args[@]}" </dev/null); then
+    exit 0
+  else
+    status=$?
+    fail "coordinated generator failed or timed out: selected bundles $count, exit status $status"
+  fi
+fi
 # Read NUL-delimited strings so whitespace in authored paths stays literal.
 while IFS= read -r entry; do
   IFS= read -r -d '' definition < <(jq -j '.definition, "\u0000"' <<<"$entry")

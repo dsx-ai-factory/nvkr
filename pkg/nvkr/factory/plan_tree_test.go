@@ -298,6 +298,16 @@ func TestPlanTreeMaintainedIdentity(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			withoutGraph := *plan
+			withoutGraph.Graph = ArtifactGraph{}
+			packages, err := withoutGraph.validateGraphInputs()
+			if err != nil {
+				t.Fatal(err)
+			}
+			derived, err := withoutGraph.deriveCompiledGraph(packages)
+			if err != nil || !bytes.Equal(mustCanonical(t, derived), mustCanonical(t, plan.Graph)) {
+				t.Fatal("blank-graph derivation changed the maintained graph", err)
+			}
 			planPath := githubLayoutFor(plan).planPath
 			files, err := renderPlanTree(t.Context(), plan, planPath)
 			if err != nil {

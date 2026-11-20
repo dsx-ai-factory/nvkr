@@ -17,23 +17,8 @@ import (
 // Validate admits the complete Plan in dependency order. Local checks retain
 // their coded diagnostics; rederivation finally checks every executable byte.
 func (plan Plan) Validate() error {
-	if err := plan.validateFrozenSources(); err != nil {
-		return err
-	}
-	if err := plan.validateRuntimeSourceSelection(); err != nil {
-		return err
-	}
-	packages, err := plan.validatePlanInputs()
+	packages, err := plan.validateGraphInputs()
 	if err != nil {
-		return err
-	}
-	if err := plan.validateCatalogCandidates(); err != nil {
-		return err
-	}
-	if err := plan.validatePlanBuilds(); err != nil {
-		return err
-	}
-	if err := plan.validateInternalToolPlans(); err != nil {
 		return err
 	}
 	if err := plan.validateEvidenceAttestationGraph(); err != nil {
@@ -65,6 +50,31 @@ func (plan Plan) Validate() error {
 		return err
 	}
 	return plan.validateCompiledGraph(packages)
+}
+
+// Admit derivation inputs before the compiler sees an untrusted graph-free tree.
+// This is also the first phase of full Plan validation; it never reads Graph.
+func (plan Plan) validateGraphInputs() ([]packageSpec, error) {
+	if err := plan.validateFrozenSources(); err != nil {
+		return nil, err
+	}
+	if err := plan.validateRuntimeSourceSelection(); err != nil {
+		return nil, err
+	}
+	packages, err := plan.validatePlanInputs()
+	if err != nil {
+		return nil, err
+	}
+	if err := plan.validateCatalogCandidates(); err != nil {
+		return nil, err
+	}
+	if err := plan.validatePlanBuilds(); err != nil {
+		return nil, err
+	}
+	if err := plan.validateInternalToolPlans(); err != nil {
+		return nil, err
+	}
+	return packages, nil
 }
 
 func (plan Plan) validatePlanInputs() ([]packageSpec, error) {

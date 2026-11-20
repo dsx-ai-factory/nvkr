@@ -186,12 +186,17 @@ and bounds the changed worker files to two. Split-boundary, namespace, exact bun
 contracts remain local evidence; the renamed worker topology has no recorded hosted execution.
 
 GitHub runtime-input carriers contain exactly two files: a packed canonical Plan and the manifest.
-The bootstrap stages them separately from the committed Plan tree;
-the helper invokes the installer to admit and regenerate that tree. Bootstrap installation renders
+The bootstrap stages them separately from the committed Plan tree.
+The v3 tree derives its artifact graph from authenticated stored inputs through the same compiler as
+Plan validation, checks `graphDigest`, and retains the full canonical Plan identity. Graph omission does
+not reduce the packed carrier or change Build Digests. Legacy v1/v2 trees remain readable.
+The helper invokes the installer to admit and regenerate that tree. Bootstrap installation renders
 the baseline and candidate once each. Stage installation verifies the saved baseline Plan and fixed
 checkout members, then renders only the candidate. Secondary multi-source bootstraps combine the
-runtime-input check and carrier staging in one render. Frozen JSON record addresses may change during a source-pin refresh,
-while target membership, script bytes, consumer cohorts and non-Plan members remain fixed.
+runtime-input check and carrier staging in one render. Frozen Plan and step record addresses remain stable during a source-pin refresh; catalog variants
+retain content addresses. Target membership, script bytes, consumer cohorts and non-Plan members remain fixed.
+Runtime-plan Environments have bundle-scoped stable records. `TestRuntimePlanRefreshBesideProduction`
+covers dispatch refresh and both carrier installers beside an unchanged production bundle.
 A vendor cohort split requires normal regeneration even when its script bytes and addresses are unchanged.
 Packed-carrier and cohort-split refusal fixtures exercise these boundaries locally. The retained
 `nvke-nightly` selection passes synthetic source-pin refresh with unchanged scripts and exact reconstructed

@@ -102,10 +102,16 @@ results from committed regressions.
 
 ## Definition → Run
 
-`generate-maintained.sh` drives `make workflows-generate` and `make workflows-check` from
-`inputs/policies/maintained-generation.json`. That authored list selects every maintained Plan bundle and
-the default qualifier policy. Contract tests compare the list with committed Plans and manifests, so a
-new bundle must enter the same image-access contract. Group-specific Make targets use this list too.
+`make workflows-generate` invokes `generate-maintained.sh`, which coordinates writes through
+`run generate-set` with
+`inputs/policies/maintained-generation.json`, then regenerates the catalog-refresh workflow.
+`make nvke-generate` and `make pipeline-dev-generate` regenerate that complete producer/qualifier set too:
+shared stable records require coordinated owners even when only one group motivated the edit.
+The read-only `workflows-check`, `nvke-check` and `pipeline-dev-check` targets retain their respective
+all/group scopes through `generate-maintained.sh`. Contract tests compare the authored inventory with
+committed Plans and manifests, so a new bundle must enter the same image-access contract.
+The inventory `runtime` flag selects runtime admission only for checks. Writes regenerate the reviewed
+baseline without freezing dispatch-time source heads; the Environment owns runtime policy.
 
 For repository pipeline changes, `make pipeline-dev-run PIPELINE_DEV_REPO=owner/repo` checks the generated
 development bundle and calls `pipeline-dev.py`. The helper requires a clean named branch matching the

@@ -72,7 +72,10 @@ snapshot. Each output's complete executable build graph is recompiled from its s
 Environment-authorized toolchain registry relocation and deterministic execution binding applied. Admission
 compares canonical full-graph bytes; the transport-independent Build Digest cannot authenticate repository,
 artifact or flake locators, image registry prefixes, or execution metadata.
-Compilation and validation also share one complete artifact graph derivation.
+Compilation, validation and graph-free Plan-tree loading share one complete artifact graph derivation.
+The tree loader authenticates its stored inputs before deriving the graph, checks the root's typed graph
+digest, then validates the complete canonical Plan against its manifest identity (ADR-21 §1). This storage
+layout leaves packed Plan bytes, Build Digests, graph identity and published identities unchanged.
 Validation compares every node and artifact, including exact input/output sets, transport
 URL, format, archive and executable digests, executable member and output path. Producer source and receipt
 edges, package membership and terminal-observation gates, and publication/signing routes must match the
@@ -1779,7 +1782,13 @@ reviewed regeneration. This does not resolve latest versions or silently alter p
 
 That bootstrap publishes the frozen data once as `nvkr-runtime-inputs`. Other native helper bootstraps
 depend on it and restore its two JSON files into a fresh staging directory. The carrier retains
-packed canonical Plan bytes; ADR-21's GitHub tree is reconstructed locally from that Plan.
+packed canonical Plan bytes; ADR-21's GitHub tree is reconstructed locally from that Plan. The v3 tree uses stable Plan-record filenames,
+derives the artifact graph at load, and keeps inventory output bindings in its per-bundle targets record. Full manifest
+hashes authenticate those files. Runtime-plan Environments scope all stable records by bundle, so
+nightly dispatch refresh and carrier installation preserve production records in the same checkout.
+Catalog/script variants retain their content suffixes. Graph node bindings are derived from the joined
+Environment and producer records. This storage projection restores the original
+canonical bytes and does not change the Plan, graph or Build identity.
 The generation owner admits
 the complete committed baseline, exact staged Plan/manifest and current authored inputs before
 installing freshly rendered bytes through the existing manifest-last writer. The generic private transport

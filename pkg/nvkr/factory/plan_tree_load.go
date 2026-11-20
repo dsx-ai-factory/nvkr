@@ -26,12 +26,24 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 	if err := decodeTreeJSON(files[planPath], &root); err != nil {
 		return nil, nil, err
 	}
-	if string(root["storage"]) != `"`+planTreeStorage+`"` {
+	var storage string
+	if json.Unmarshal(root["storage"], &storage) != nil ||
+		(storage != legacyPlanTreeStorage && storage != storedGraphPlanTreeStorage && storage != planTreeStorage) {
 		return nil, nil, e.New(e.CodePipelineDrift, "unknown Plan storage format")
 	}
 	delete(root, "storage")
 	if err := treePackageSnapshots(root, files, true); err != nil {
 		return nil, nil, err
+	}
+	var graphDigest string
+	if storage == planTreeStorage {
+		if _, stored := root["graph"]; stored {
+			return nil, nil, e.New(e.CodePipelineDrift, "derived Plan graph cannot also be stored")
+		}
+		if json.Unmarshal(root["graphDigest"], &graphDigest) != nil || !canonical.IsDigest(graphDigest) {
+			return nil, nil, e.New(e.CodePipelineDrift, "missing or invalid derived graph digest")
+		}
+		delete(root, "graphDigest")
 	}
 	var catalogs planFields
 	if err := json.Unmarshal(root["catalogSnapshots"], &catalogs); err != nil {
@@ -51,7 +63,7 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 		catalogs[digest] = value
 	}
 	fieldBytes := 0
-	for _, field := range sharedPlanFields {
+	for _, field := range planTreeFields(storage) {
 		if ref, ok := root[field]; ok {
 			value, err := readTreeJSON(ref, files)
 			if err != nil {
@@ -62,6 +74,11 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 				return nil, nil, e.New(e.CodePipelineDrift, "Plan fields exceed decoded size bound")
 			}
 			root[field] = value
+		}
+	}
+	if storage != legacyPlanTreeStorage {
+		if err := joinTreeEnvironment(root); err != nil {
+			return nil, nil, err
 		}
 	}
 	restoreCatalog := func(record planFields) error {
@@ -153,6 +170,14 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 	if err != nil {
 		return nil, nil, err
 	}
+	if storage == planTreeStorage {
+		// Supply only the canonical empty Graph for exact typed decoding. Unknown
+		// or omitted Plan fields still fail; no caller-supplied graph is admitted.
+		root["graph"], err = canonical.Marshal(ArtifactGraph{})
+		if err != nil {
+			return nil, nil, err
+		}
+	}
 	raw, err := canonical.Marshal(root)
 	if err != nil {
 		return nil, nil, err
@@ -164,10 +189,36 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 	if err := canonical.UnmarshalExact(raw, &plan); err != nil {
 		return nil, nil, e.Wrap(e.CodePipelineDrift, err, "decoding reconstructed Plan")
 	}
+	if storage == planTreeStorage {
+		// First admit the stored inputs before compiling an untrusted graph-free
+		// tree. Full Plan validation below is a separate boundary: it checks the
+		// completed graph and its bindings, including input checks and rederivation.
+		// Keep both boundaries unless profiling a representative large Plan justifies
+		// sharing invocation-local work without weakening either admission.
+		packages, err := plan.validateGraphInputs()
+		if err != nil {
+			return nil, nil, err
+		}
+		plan.Graph, err = plan.deriveCompiledGraph(packages)
+		if err != nil {
+			return nil, nil, err
+		}
+		digest, err := plan.Graph.Digest()
+		if err != nil || digest != graphDigest {
+			return nil, nil, e.New(e.CodePipelineDrift, "derived Plan graph differs from stored graphDigest")
+		}
+		raw, err = canonical.Marshal(plan)
+		if err != nil {
+			return nil, nil, err
+		}
+		if int64(len(raw)) > MaxPlanBytes {
+			return nil, nil, e.New(e.CodePipelineDrift, "reconstructed Plan exceeds its size bound")
+		}
+	}
 	if err := plan.Validate(); err != nil {
 		return nil, nil, err
 	}
-	want, err := renderPlanTree(ctx, &plan, planPath)
+	want, err := renderPlanTreeFormat(ctx, &plan, planPath, storage)
 	if err != nil {
 		return nil, nil, err
 	}

@@ -185,7 +185,7 @@ Readable views, linked graph exports and semantic comparisons describe the valid
 its canonical identity bytes or grant execution or evidence authority. GitHub bundle storage splits
 the Plan into a per-bundle index and shared frozen records and command files under
 [ADR-21's storage contract](docs/adr/0021-generated-pipeline-maintenance-and-lifecycle.md#1-the-emitted-pipeline-is-a-generated-artifact-not-an-owned-scaffold).
-The loader reconstructs the same canonical bytes before execution. Packed canonical bytes remain the wire and Tekton form.
+The loader reconstructs the same canonical bytes before execution. Shared Plan records use stable names; environment bindings live in per-bundle targets records, and manifests verify exact bytes. Updating a shared record coordinates all its owners. Packed canonical bytes remain the wire and Tekton form.
 Package recipes share exact package-input documents by blob digest within the Plan; restoration precedes
 complete admission and does not share runtime results, evidence or execution authority between requirements.
 An opted-in dispatch-frozen Plan records an explicit repository/main allowlist's exact
