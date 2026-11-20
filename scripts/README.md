@@ -33,7 +33,7 @@ The [development guide](../DEVELOPMENT.md#test-the-gitlab-adapter-against-a-real
 resources, token isolation, HTTPS trust, API submission and retained evidence. It is opt-in and fails
 when prerequisites are absent. This is an ordinary unsigned build, not signing or qualification.
 
-`ci-test-shard.py` discovers the ordinary Go suite and partitions it across the Merge Gate's fifteen
+`go run ./internal/citestshard` discovers the ordinary Go suite and partitions it across the Merge Gate's fifteen
 test jobs. It includes examples and fuzz seed tests, and requires exact completion of the discovered
 selection. New packages and tests need no allowlist update. `make test-shard` reproduces one matrix
 entry; `make test` still runs the full suite. Each child command may retain at most 32 MiB of stdout;
@@ -42,7 +42,7 @@ read. `ci-test-summary.jq` summarizes the retained Go JSON events. Partition, co
 small offline Go composition contracts run with `make test-ci-tools`; the Go fixture exercises every
 matrix entry without rebuilding the product suite.
 
-`check-status-restated.py BASE [HEAD]` backs the rule that validation status lives in the
+`go run ./internal/checkstatus BASE [HEAD]` backs the rule that validation status lives in the
 [reconciliation ledger](../docs/adr/reconciliation/README.md). It fails when a Markdown line added since the
 merge base, outside the ledger directory and `docs/evidence/`, matches one of a fixed list of status phrases
 taken from fixed review findings. Other phrasings pass, it cannot judge whether a sentence is true, and it

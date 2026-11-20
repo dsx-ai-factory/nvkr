@@ -166,9 +166,13 @@ test-workflow-scripts: ## Test the triage and PR-metadata workflow scripts (need
 test: ## Fast default tests for CI and agents (no extended fixtures or instrumentation).
 	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) $(PKG)
 
+.PHONY: ci-test-shard
+ci-test-shard: go-version-check ## Build the CI shard runner with direct signal handling.
+	go build -o bin/nvkr-ci-test-shard ./internal/citestshard
+
 .PHONY: test-shard
-test-shard: go-version-check ## Reproduce one CI test shard (TEST_SHARD_GROUP and TEST_SHARD_INDEX required).
-	python3 -B scripts/ci-test-shard.py --group '$(TEST_SHARD_GROUP)' --index '$(TEST_SHARD_INDEX)' --timeout '$(GO_TEST_TIMEOUT)'
+test-shard: ci-test-shard ## Reproduce one CI test shard (TEST_SHARD_GROUP and TEST_SHARD_INDEX required).
+	exec ./bin/nvkr-ci-test-shard --group '$(TEST_SHARD_GROUP)' --index '$(TEST_SHARD_INDEX)' --timeout '$(GO_TEST_TIMEOUT)'
 
 .PHONY: test-race
 test-race: ## Opt-in race detection and coverage for the default suite.
@@ -181,6 +185,7 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 
 .PHONY: test-ci-tools
 test-ci-tools: ## Check CI tooling, local adapters and the catalog renderer with Go and shell tools.
+	go test ./internal/citestshard ./internal/checkstatus ./internal/gennotices -count=1
 	go test ./internal/checkdocs -count=1
 	go test ./scripts -run 'TestMaintainedGeneration|TestCITestSummary|TestDemoShellTools' -count=1
 	go test ./internal/cicontract -run 'TestDemoHTML|TestHeartbeat|TestVulncheckTools|TestPipelineDev|TestZizmor' -count=1
@@ -195,7 +200,7 @@ STATUS_HEAD ?=
 
 .PHONY: status-restated-check
 status-restated-check: ## Fail when added docs restate validation status outside the reconciliation ledger.
-	python3 -B scripts/check-status-restated.py '$(STATUS_BASE)' '$(STATUS_HEAD)'
+	go run ./internal/checkstatus '$(STATUS_BASE)' '$(STATUS_HEAD)'
 
 .PHONY: cover
 cover: test-race ## Open the HTML coverage report in a browser.
