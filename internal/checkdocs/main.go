@@ -10,11 +10,13 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"os/signal"
 	"path"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
+	"syscall"
 	"unicode/utf8"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -340,7 +342,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) (int, err
 	return 0, nil
 }
 func main() {
-	code, err := run(context.Background(), os.Args[1:], os.Stdout, os.Stderr)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	code, err := run(ctx, os.Args[1:], os.Stdout, os.Stderr)
+	stop()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
