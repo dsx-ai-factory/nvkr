@@ -16,6 +16,7 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testresults"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/validation"
 	"github.com/urfave/cli/v2"
 )
 
@@ -68,7 +69,7 @@ func TestValidateCLIForwardsConfiguredSelectionAndPartialOutputs(t *testing.T) {
 			var output bytes.Buffer
 			app := validationCLI(func(got context.Context, name, config string, options lifecycle.QualificationRuntimeOptions) ([]testresults.Output, error) {
 				calls++
-				if got != ctx || name != selected || config != "profile.json" || options.WorkspaceRoot != workspace || options.GitHubToken != "explicit-token" || options.Credential.Registry != "registry.example.test" || options.Registry.Password != "explicit-secret" || options.Registry.Anonymous {
+				if got.Err() != nil || name != selected || config != "profile.json" || options.WorkspaceRoot != workspace || options.GitHubToken != "explicit-token" || options.Credential.Registry != "registry.example.test" || options.Registry.Password != "explicit-secret" || options.Registry.Anonymous {
 					t.Fatal("changed selection, context or explicit credentials")
 				}
 				return []testresults.Output{original}, runErr
@@ -182,5 +183,65 @@ func TestValidateCLIExplicitRegistryAuthenticationMode(t *testing.T) {
 				t.Fatalf("owner refusal changed: %v %q", err, output.String())
 			}
 		})
+	}
+}
+
+func TestValidateCLIProgressStaysOnStderrWithUnchangedJSON(t *testing.T) {
+	var output, diagnostics bytes.Buffer
+	app := validationCLI(func(ctx context.Context, _, _ string, _ lifecycle.QualificationRuntimeOptions) ([]testresults.Output, error) {
+		reporter := validation.ReporterFrom(ctx)
+		if reporter == nil {
+			t.Fatal("runner context carried no progress reporter")
+		}
+		reporter(validation.Progress{Check: "cluster-conformance", Phase: validation.PhaseRunning})
+		reporter(validation.Progress{Check: "cluster-conformance", Phase: validation.PhaseCompleted})
+		return []testresults.Output{validationOutput()}, nil
+	}, &output)
+	app.ErrWriter = &diagnostics
+	err := app.RunContext(t.Context(), []string{"nvkr", "validate", "--config", "profile.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := diagnostics.String(), "validation check cluster-conformance: running\nvalidation check cluster-conformance: completed\n"; got != want {
+		t.Fatalf("progress lines %q want %q", got, want)
+	}
+	requireCanonicalValidationOutput(t, output.Bytes())
+}
+
+func TestValidateCLIProgressNeverMasksOwnerFailureOrCarriesDiagnostics(t *testing.T) {
+	var output, diagnostics bytes.Buffer
+	original := e.New(e.CodeVerifyFailed, "producer failure with private /workspace/secret detail")
+	app := validationCLI(func(ctx context.Context, _, _ string, _ lifecycle.QualificationRuntimeOptions) ([]testresults.Output, error) {
+		reporter := validation.ReporterFrom(ctx)
+		reporter(validation.Progress{Check: "cluster-conformance", Phase: validation.PhaseRunning})
+		reporter(validation.Progress{Check: "cluster-conformance", Phase: validation.PhaseFailed})
+		return []testresults.Output{validationOutput()}, original
+	}, &output)
+	app.ErrWriter = &diagnostics
+	err := app.RunContext(t.Context(), []string{"nvkr", "validate", "--config", "profile.json"})
+	if !errors.Is(err, original) || e.ExitCode(err) != e.ExitCode(original) {
+		t.Fatalf("owner failure changed: %v", err)
+	}
+	if got, want := diagnostics.String(), "validation check cluster-conformance: running\nvalidation check cluster-conformance: failed\n"; got != want {
+		t.Fatalf("progress lines %q want %q", got, want)
+	}
+	if strings.Contains(diagnostics.String(), "private") || strings.Contains(diagnostics.String(), "/workspace/secret") {
+		t.Fatalf("raw diagnostics leaked into progress: %q", diagnostics.String())
+	}
+	requireCanonicalValidationOutput(t, output.Bytes())
+}
+
+func requireCanonicalValidationOutput(t *testing.T, output []byte) {
+	t.Helper()
+	document, err := testresults.Encode(validationOutput())
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := canonical.Marshal([]json.RawMessage{document})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(output, append(want, '\n')) {
+		t.Fatalf("canonical stdout changed: %q", output)
 	}
 }

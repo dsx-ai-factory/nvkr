@@ -7,7 +7,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	client "github.com/dsx-ai-factory/nvkr/client/v1"
@@ -15,12 +17,26 @@ import (
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/lifecycle"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/testresults"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/validation"
 	"github.com/urfave/cli/v2"
 )
 
 type validationRunner func(context.Context, string, string, lifecycle.QualificationRuntimeOptions) ([]testresults.Output, error)
 
 func cmdValidate() *cli.Command { return cmdValidateWithRunner(client.New().Validate) }
+
+// validationProgressReporter renders bounded plain check-phase lines to stderr,
+// leaving the canonical stdout descriptions byte-for-byte unchanged. Check names
+// are profile-safe text and raw diagnostics never enter progress.
+func validationProgressReporter(c *cli.Context) validation.Reporter {
+	writer := c.App.ErrWriter
+	if writer == nil {
+		writer = os.Stderr
+	}
+	return func(update validation.Progress) {
+		_, _ = fmt.Fprintf(writer, "validation check %s: %s\n", update.Check, update.Phase)
+	}
+}
 func cmdValidateWithRunner(run validationRunner) *cli.Command {
 	return &cli.Command{Name: "validate", ArgsUsage: "[check-name]", Usage: "run configured diagnostic checks against a published source or complete local Run; retain original reports without qualification signing", Flags: []cli.Flag{
 		&cli.StringFlag{Name: "config", Usage: "independently selected validation profile JSON"},
@@ -33,7 +49,8 @@ func cmdValidateWithRunner(run validationRunner) *cli.Command {
 		if options.Credential.Registry == "" && options.Registry.Username == "" && options.Registry.Password == "" {
 			options.Registry.Anonymous = true
 		}
-		outputs, runErr := run(c.Context, c.Args().First(), c.String("config"), options)
+		ctx := validation.WithReporter(c.Context, validationProgressReporter(c))
+		outputs, runErr := run(ctx, c.Args().First(), c.String("config"), options)
 		if len(outputs) == 0 {
 			return runErr
 		}

@@ -78,7 +78,17 @@ type checkRunner func(context.Context, string, string, string, lifecycle.Qualifi
 func runSelected(ctx context.Context, source Source, checks []Check, options lifecycle.QualificationRuntimeOptions, run checkRunner) ([]testresults.Output, error) {
 	outputs := make([]testresults.Output, 0, len(checks))
 	for _, check := range checks {
+		emit(ctx, check.Name, PhaseRunning)
 		output, err := run(ctx, source.Reference, source.Policy, check.Config, options)
+		if err != nil {
+			phase := PhaseFailed
+			if canceledPhase(ctx, err) {
+				phase = PhaseCanceled
+			}
+			emit(ctx, check.Name, phase)
+		} else {
+			emit(ctx, check.Name, PhaseCompleted)
+		}
 		if output.SchemaVersion != "" {
 			if err != nil {
 				output.CaptureStatus = testresults.CapturePartial
