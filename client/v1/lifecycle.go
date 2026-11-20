@@ -27,6 +27,7 @@ type DefinitionPinReport = lifecycle.DefinitionPinReport
 
 const (
 	DiskEvidenceStrict          = lifecycle.DiskEvidenceStrict
+	DiskEvidencePackages        = lifecycle.DiskEvidencePackages
 	DiskEvidenceBuildProvenance = lifecycle.DiskEvidenceBuildProvenance
 )
 

@@ -50,7 +50,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 		}
 	}()
 	var inspectionLog *diskdiagnostic.Collector
-	if githubDiskInspectionRequired(plan) {
+	if githubDiskInspectionRequired(plan, output) {
 		inspectionLog = diskdiagnostic.NewCollector()
 		defer finishGitHubInspectionDiagnostics(ctx, workspace, output, inspectionLog, options)
 	}
@@ -81,7 +81,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	if instruction.Toolchain != "" {
 		images = append(images, instruction.Toolchain)
 	}
-	if githubDiskInspectionRequired(plan) {
+	if githubDiskInspectionRequired(plan, output) {
 		images = append(images, profile.Image)
 	}
 	for _, node := range stage.Nodes {
@@ -112,7 +112,7 @@ func RunGitHubDisk(ctx context.Context, plan *Plan, output string, options GitHu
 	}
 	var inspector *sbom.DiskInspectionRuntime
 	var probeHelper func(context.Context) (func() error, error)
-	if githubDiskInspectionRequired(plan) {
+	if githubDiskInspectionRequired(plan, output) {
 		if profile.HelperTool == "" {
 			inspector, err = openDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace, inspectionLog)
 			if err != nil {
@@ -223,7 +223,7 @@ func executeAdmittedGitHubDisk(ctx context.Context, plan *Plan, stage githubStag
 			}
 			return e.New(e.CodePipelineDrift, "ARC output has no lifecycle binding")
 		}
-		if inspector == nil && githubDiskInspectionRequired(plan) {
+		if inspector == nil && githubDiskInspectionRequired(plan, stage.DiskOutput) {
 			return completeGitHubDiskWithHelper(ctx, func(ctx context.Context) (func() error, error) {
 				opened, err := owner.openDiskEvidenceRuntime(ctx, plan, plan.Environment.RuntimeBinary(), workspace, inspectionLog)
 				if err != nil {
@@ -341,8 +341,10 @@ func completeGitHubDiskPublication(ctx context.Context, plan *Plan, expected Lif
 	owner *LocalRunResult, inspector *sbom.DiskInspectionRuntime, inspectionLog *diskdiagnostic.Collector, options GitHubStepOptions,
 ) error {
 	operation := "Inspect, reconcile and package " + expected.Name
-	if diskBuildProvenance(plan) {
+	if diskBuildProvenance(plan, expected.Name) {
 		operation = "Package disk build provenance " + expected.Name
+	} else if plan.Environment.DiskEvidenceFor(expected.Name) == sbom.DiskInstalledPackages {
+		operation = "Inspect installed packages and package " + expected.Name
 	}
 	if err := reportGitHubDiskCompletion(ctx, options, operation, inspectionLog, func(ctx context.Context) error {
 		return CompleteHostedDiskPublication(ctx, plan, expected, owner, inspector)

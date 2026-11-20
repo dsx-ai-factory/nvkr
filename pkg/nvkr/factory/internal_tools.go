@@ -141,7 +141,7 @@ func bindInternalToolUses(plan Plan, nodes map[string]Node, artifacts map[string
 		if node.Kind != NodeSBOM {
 			continue
 		}
-		inspection := plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) && !diskBuildProvenance(&plan) ||
+		inspection := plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) && !diskBuildProvenance(&plan, node.BuildTarget) ||
 			plan.debianPublicationTarget(node.BuildTarget) && plan.Definition.SBOMTool != ""
 		if !inspection {
 			continue
@@ -187,11 +187,12 @@ func bindInternalToolInputs(node *Node, tool InternalToolPlan, artifacts map[str
 // acquisition may precede that group.
 func admitInternalToolExecution(plan *Plan) error {
 	for _, tool := range plan.InternalTools {
-		if tool.Format != authored.OutputOCI && (tool.Format != authored.OutputExecutable || !githubDiskInspectionRequired(plan)) {
-			return e.New(e.CodeEngineCapability, "internal tool execution requires an original native inspection owner")
-		}
-		if _, err := internalToolDiskOutput(plan, tool); err != nil {
+		output, err := internalToolDiskOutput(plan, tool)
+		if err != nil {
 			return err
+		}
+		if tool.Format != authored.OutputOCI && (tool.Format != authored.OutputExecutable || !githubDiskInspectionRequired(plan, output)) {
+			return e.New(e.CodeEngineCapability, "internal tool execution requires an original native inspection owner")
 		}
 	}
 	return nil

@@ -46,6 +46,9 @@ func compileDocumentsFor(ctx context.Context, definitionPath string, definition 
 	if err := admitInputs(definition, delivery); err != nil {
 		return nil, err
 	}
+	if err := delivery.ValidateDiskEvidenceOutputs(definition); err != nil {
+		return nil, err
+	}
 	if err := admitDefinitionForm(delivery, record); err != nil {
 		return nil, err
 	}

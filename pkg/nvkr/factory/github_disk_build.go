@@ -28,8 +28,8 @@ func GitHubDiskBuildOnly(plan *Plan) bool {
 		plan.Environment.Signing == nil && plan.Environment.DiskEvidence == "" && len(plan.Routes) == 0
 }
 
-func githubDiskInspectionRequired(plan *Plan) bool {
-	return !GitHubDiskBuildOnly(plan) && !diskBuildProvenance(plan)
+func githubDiskInspectionRequired(plan *Plan, output string) bool {
+	return !GitHubDiskBuildOnly(plan) && !diskBuildProvenance(plan, output)
 }
 
 // Keep the original live owner through exact-byte export. The graph's ordinary

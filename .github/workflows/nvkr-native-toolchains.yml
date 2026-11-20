@@ -105,9 +105,11 @@ jobs:
         id: compare
         env:
           NATIVE_ARCH: ${{ matrix.arch }}
-        run: >-
-          python3 scripts/report-native-toolchains.py compare --arch "$NATIVE_ARCH"
-          --proposal ".nvkr/native-toolchains/$NATIVE_ARCH/proposal.json"
+        run: |
+          set -euo pipefail
+          changed=$(./nvkr-exec factory toolchain-maintenance --operation compare --arch "$NATIVE_ARCH" \
+            --proposal ".nvkr/native-toolchains/$NATIVE_ARCH/proposal.json")
+          echo "changed_${NATIVE_ARCH}=$changed" >> "$GITHUB_OUTPUT"
       - name: Retain native measurements
         if: always() && steps.ci-helper.outcome == 'success'
         uses: ./.github/nvkr-run-nvke/actions/ci-upload
@@ -392,13 +394,13 @@ jobs:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           APP_SLUG: ${{ steps.app.outputs.app-slug }}
           APPROVAL_RUN: ${{ inputs.approval_run }}
-        run: python3 scripts/propose-toolchain-refresh.py
+        run: bin/nvkr-exec factory toolchain-maintenance --operation propose
 
   report:
     needs: [measure, admit, publish, verify-candidate, propose]
     if: always() && github.repository == 'dsx-ai-factory/nvkr' && github.ref == 'refs/heads/main' && !inputs.verify_published
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     permissions:
       contents: read
       issues: write
@@ -406,11 +408,16 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # 7.0.1
         with:
           persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: .go-version
+          cache: false
       - name: Notify maintenance owner of pending or failed refresh
         env:
+          GOTOOLCHAIN: local
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RESULTS: ${{ toJSON(needs) }}
           APPROVAL_RUN: ${{ inputs.approval_run }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: python3 scripts/report-native-toolchains.py report
+        run: go run ./cmd/nvkr factory toolchain-maintenance --operation report

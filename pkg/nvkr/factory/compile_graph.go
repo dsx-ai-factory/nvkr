@@ -21,6 +21,9 @@ import (
 // artifacts and their exact edges from admitted inputs and resolved producers.
 // It ignores the supplied Graph and never mutates the caller's Plan.
 func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSpecs []packageSpec) (ArtifactGraph, error) {
+	if err := plan.Environment.ValidateDiskEvidenceOutputs(plan.Definition); err != nil {
+		return ArtifactGraph{}, err
+	}
 	definition, delivery := plan.Definition, plan.Environment
 	runsOn := defaultUtilityRunner(delivery)
 	plan.Graph = ArtifactGraph{SchemaVersion: ArtifactGraphSchema}
@@ -100,7 +103,14 @@ func compileArtifactGraph(plan Plan, tools map[string]catalog.ToolPin, packageSp
 				if err := admitDiskPublicationProducer(build); err != nil {
 					return ArtifactGraph{}, err
 				}
-				if diskBuildProvenance(&plan) {
+				for _, producer := range build.Graph.Nodes {
+					if producer.Disk != nil {
+						if err := admitDiskPublicationEncryption(&plan, target.Name, producer); err != nil {
+							return ArtifactGraph{}, err
+						}
+					}
+				}
+				if diskBuildProvenance(&plan, target.Name) {
 					continue
 				}
 				host, profile, err := diskPublicationInspectionProfile(build, delivery)
