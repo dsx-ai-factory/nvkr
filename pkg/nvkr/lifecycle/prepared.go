@@ -97,11 +97,20 @@ func PrepareFiles(ctx context.Context, definitionPath, environmentPath, generato
 
 // CLIArtifactTestInputs derives one explicitly named CLI output's test inputs
 // from the compiled Plan before any build. The Plan itself stays owned here.
-func (prepared *PreparedRun) CLIArtifactTestInputs(output string) (*factory.CLIArtifactTestInputs, error) {
+func (prepared *PreparedRun) CLIArtifactTestInputs(output, component string) (*factory.CLIArtifactTestInputs, error) {
 	if prepared == nil || prepared.plan == nil {
 		return nil, e.New(e.CodeUsage, "CLI test inputs require a prepared Run")
 	}
-	return factory.SelectCLIArtifactTestInputs(prepared.plan, output)
+	return factory.SelectCLIArtifactTestInputs(prepared.plan, output, component)
+}
+
+// AdmitLocalDiagnosticCapture refuses, before any build, a Plan whose completed
+// Run CaptureLocalDiagnosticArtifacts would refuse.
+func (prepared *PreparedRun) AdmitLocalDiagnosticCapture() error {
+	if prepared == nil || prepared.plan == nil {
+		return e.New(e.CodeUsage, "diagnostic capture admission requires a prepared Run")
+	}
+	return admitLocalDiagnosticPlan(prepared.plan)
 }
 
 func (prepared *PreparedRun) Description() Run {

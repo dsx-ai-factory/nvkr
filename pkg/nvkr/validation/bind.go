@@ -18,7 +18,7 @@ import (
 // completedRun is what binding needs from one captured, completed Run.
 type completedRun interface {
 	Description() (lifecycle.LocalDiagnosticDescription, error)
-	Producer(output string) (*factory.CLIArtifactTestInputs, error)
+	Producer(output, component string) (*factory.CLIArtifactTestInputs, error)
 	Close() error
 }
 
@@ -36,12 +36,12 @@ func openLocalRun(ctx context.Context, attempt string) (completedRun, error) {
 	return localRun{owner}, nil
 }
 
-func (r localRun) Producer(output string) (*factory.CLIArtifactTestInputs, error) {
+func (r localRun) Producer(output, component string) (*factory.CLIArtifactTestInputs, error) {
 	plan, err := r.Plan()
 	if err != nil {
 		return nil, err
 	}
-	return factory.SelectCLIArtifactTestInputs(plan, output)
+	return factory.SelectCLIArtifactTestInputs(plan, output, component)
 }
 
 // BoundValidation holds the completed Run open and records each suite's exact
@@ -188,17 +188,18 @@ func bindInput(description lifecycle.LocalDiagnosticDescription, platforms []str
 	if subjects != 1 {
 		return BoundInput{}, nil, e.New(e.CodeVerifyFailed, "output %q must have exactly one %q build subject", input.Output, input.Component)
 	}
-	producer, ok := producers[input.Output]
+	key := input.Output + "\x00" + input.Component
+	producer, ok := producers[key]
 	if !ok {
 		var err error
-		if producer, err = run.Producer(input.Output); err != nil {
+		if producer, err = run.Producer(input.Output, input.Component); err != nil {
 			// The Run has the output, so a missing producer is a Run mismatch, not misuse.
 			if coded := (*e.Error)(nil); errors.As(err, &coded) && coded.Code == e.CodeUsage {
 				return BoundInput{}, nil, e.Wrap(e.CodeVerifyFailed, err, "output %q has no matching Plan producer", input.Output)
 			}
 			return BoundInput{}, nil, err
 		}
-		producers[input.Output] = producer
+		producers[key] = producer
 	}
 	if producer.Output != input.Output || producer.BuildDigest != selected.BuildDigest || producer.Platform != platform {
 		return BoundInput{}, nil, e.New(e.CodeVerifyFailed, "output %q differs from its Plan producer", input.Output)

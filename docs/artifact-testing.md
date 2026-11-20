@@ -62,11 +62,14 @@ one named output of a completed local Run. All inputs of one suite must be built
 platform. The binding records the Run's content subject and each output's digest and build
 subject. That Run is either an existing attempt built with
 `nvkr run local --capture-inputs-root` (binding replays its captured compiler inputs), or a new
-attempt built from a repository-relative Definition and Environment. Before building, the
-compiled Plan must contain every selected input as an output on a declared platform; a failed
-build binds nothing. Admission does not yet check `acquisition` or its network access;
-the executor that runs `acquisition` and `command` will enforce them, and is follow-up work. No
-command exposes this yet. `validators run --profile` below still uses the earlier indexed
+attempt built from a repository-relative Definition and Environment, run from the repository
+root. Before building, the compiled Plan must contain every selected input as an output of the
+declared component on a declared platform, and must not come from a composite Definition, whose
+Runs cannot be bound yet. A failed build binds nothing. If the build completes but binding
+refuses, the attempt is kept, the error names its directory, and it can be bound later.
+Admission does not yet check `acquisition` or its network access; the executor that runs
+`acquisition` and `command` will enforce them, and is follow-up work. No command exposes this
+yet. `validators run --profile` below still uses the earlier indexed
 catalog under `inputs/testing/validators/` until it is migrated.
 
 ```sh
