@@ -13,6 +13,7 @@ import (
 
 func TestToolchainMaintenanceCLIRejectsBeforeOutput(t *testing.T) {
 	t.Setenv("GITHUB_ACTIONS", "")
+	t.Setenv("GITHUB_REPOSITORY", "")
 	for _, tc := range []struct {
 		name string
 		args []string
@@ -23,6 +24,9 @@ func TestToolchainMaintenanceCLIRejectsBeforeOutput(t *testing.T) {
 		{"unknown architecture", []string{"--operation", "describe", "--arch", "riscv64"}, e.CodeUsage},
 		{"untrusted publication", []string{"--operation", "publish", "--run", "123"}, e.CodeEngineCapability},
 		{"untrusted repin", []string{"--operation", "repin", "--run", "123"}, e.CodeEngineCapability},
+		{"untrusted proposal", []string{"--operation", "propose"}, e.CodeEngineCapability},
+		{"untrusted report", []string{"--operation", "report"}, e.CodeGateUnmet},
+		{"unknown comparison architecture", []string{"--operation", "compare", "--arch", "riscv64"}, e.CodeUsage},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var out bytes.Buffer

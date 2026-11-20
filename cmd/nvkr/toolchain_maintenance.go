@@ -5,6 +5,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/toolchainmaintenance"
@@ -22,6 +23,8 @@ func cmdToolchainMaintenance() *cli.Command {
 			&cli.StringFlag{Name: "directory"},
 			&cli.StringFlag{Name: "arch"},
 			&cli.StringFlag{Name: "source"},
+			&cli.StringFlag{Name: "plan", Value: ".github/nvkr-run-nvke/plan.json"},
+			&cli.StringFlag{Name: "proposal"},
 		},
 		Action: func(c *cli.Context) error {
 			if c.Args().Present() {
@@ -40,6 +43,12 @@ func cmdToolchainMaintenance() *cli.Command {
 				result, err = toolchainmaintenance.Verify(c.Context, c.String("root"), c.String("run"))
 			case "repin":
 				result, err = toolchainmaintenance.Repin(c.Context, c.String("root"), c.String("run"))
+			case "compare":
+				result, err = toolchainmaintenance.Compare(c.Context, c.String("plan"), c.String("proposal"), c.String("arch"))
+			case "report":
+				result, err = toolchainmaintenance.Report(c.Context, c.String("root"))
+			case "propose":
+				result, err = toolchainmaintenance.Propose(c.Context, c.String("root"))
 			default:
 				return e.New(e.CodeUsage, "unknown toolchain maintenance operation")
 			}
@@ -47,6 +56,15 @@ func cmdToolchainMaintenance() *cli.Command {
 				return err
 			}
 			if result == nil {
+				return nil
+			}
+			if text, ok := result.(string); ok {
+				if text == "" {
+					return nil
+				}
+				if _, err := fmt.Fprintln(c.App.Writer, text); err != nil {
+					return e.Wrap(e.CodeInternal, err, "write maintenance result")
+				}
 				return nil
 			}
 			if err := json.NewEncoder(c.App.Writer).Encode(result); err != nil {
