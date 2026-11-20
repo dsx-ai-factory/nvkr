@@ -60,7 +60,7 @@ class ShardTest(unittest.TestCase):
         expected = [{"group": group, "index": index}
                     for group, (_, count) in shard.GROUPS.items() for index in range(count)]
         self.assertEqual(actual, expected)
-        self.assertEqual(len(actual), 15)
+        self.assertEqual(len(actual), 23)
 
     def test_child_failure_and_timeout_preserve_output_and_stop_descendants(self):
         output = io.StringIO()
@@ -124,14 +124,15 @@ class ShardTest(unittest.TestCase):
                     self.assertEqual(set(selection), set(expanded) - {"TestFutureContract"})
 
     def test_every_package_assigned_exactly_once_or_split(self):
-        packages = ["m/pkg/nvkr/factory", "m/pkg/nvkr/lifecycle", "m/cmd/nvkr"]
+        packages = ["m/pkg/nvkr/factory", "m/pkg/nvkr/lifecycle", "m/cmd/nvkr", "m/pkg/nvkr/qualification"]
         packages += [f"m/new/package{i}" for i in range(100)]
         counts = Counter()
         for group, (_, count) in shard.GROUPS.items():
             for index in range(count):
                 counts.update(shard.packages_for_group(packages, "m", group, index))
-        self.assertEqual(counts, Counter({package: 8 if package.endswith("/factory") else
-                                         2 if package.endswith("/lifecycle") else 1 for package in packages}))
+        split = {"m/pkg/nvkr/factory": 8, "m/pkg/nvkr/lifecycle": 2,
+                 "m/cmd/nvkr": 4, "m/pkg/nvkr/qualification": 4}
+        self.assertEqual(counts, Counter({package: split.get(package, 1) for package in packages}))
 
     def test_invalid_selection_fails_closed(self):
         for names, index, count in [(["x"], -1, 2), (["x"], 2, 2), (["x"], 0, 0), (["x", "x"], 0, 2)]:

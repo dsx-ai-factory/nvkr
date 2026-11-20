@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parent.parent
 RUNNER = ROOT / "scripts" / "ci-test-shard.py"
 MODULE = "example.com/shardfixture"
 
-# Fifteen targets keep all fifteen shards nonempty. The prefix pair
+# Thirty-one targets keep all twenty-three shards nonempty. The prefix pair
 # deliberately lands in different factory shards, detecting unanchored -run.
 FACTORY = '''package fixture
 
@@ -115,7 +115,8 @@ class RealGoShardTest(unittest.TestCase):
             root = Path(directory)
             version = (ROOT / ".go-version").read_text().strip()
             (root / "go.mod").write_text(f"module {MODULE}\n\ngo {version}\n")
-            fixtures = {"pkg/nvkr/factory": FACTORY, "pkg/nvkr/lifecycle": LIFECYCLE}
+            fixtures = {"pkg/nvkr/factory": FACTORY, "pkg/nvkr/lifecycle": LIFECYCLE,
+                        "cmd/nvkr": FACTORY, "pkg/nvkr/qualification": FACTORY}
             fixtures.update({f"ordinary/package{index}": ORDINARY for index in (0, 1, 2, 3, 23)})
             for package, source in fixtures.items():
                 path = root / package / "contract_test.go"
@@ -125,7 +126,7 @@ class RealGoShardTest(unittest.TestCase):
             baseline = self.run_command(directory, environment, "go", "test", "-json",
                                         "-count=1", "-timeout=10s", "./...")
             expected = terminal_tests(baseline.stdout)
-            self.assertEqual(sum(expected.values()), 15)
+            self.assertEqual(sum(expected.values()), 31)
             self.assertTrue(all(action == "pass" and count == 1
                                 for (_, _, action), count in expected.items()))
             self.assertIn('"Test":"TestExact/child"', baseline.stdout)
@@ -133,7 +134,7 @@ class RealGoShardTest(unittest.TestCase):
 
             matrix = json.loads(self.run_command(directory, environment, sys.executable,
                                                  str(RUNNER), "--matrix").stdout)["include"]
-            self.assertEqual(len(matrix), 15)
+            self.assertEqual(len(matrix), 23)
             actual, failure_command = Counter(), None
             for entry in matrix:
                 command = (sys.executable, str(RUNNER), "--group", entry["group"],

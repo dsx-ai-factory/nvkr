@@ -412,6 +412,8 @@ func TestNativeOutboundRuntimeNamespace(t *testing.T) {
 		t.Fatalf("consumer did not finish: %q", stdout.String())
 	}
 	checkNamespaceCancellation(t, ctx, launcher, request, output)
+	// Exercise blocked output before enabling the independent helper-exit case.
+	checkBlockedNamespaceOutput(t, ctx, launcher, request, output, e.CodeTimeout)
 	if err := os.WriteFile(filepath.Join(root, "exit-helper"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -422,7 +424,6 @@ func TestNativeOutboundRuntimeNamespace(t *testing.T) {
 	if ctx.Err() != nil {
 		t.Fatal("helper exit did not stop its consumer promptly")
 	}
-	checkBlockedNamespaceOutput(t, ctx, launcher, request, output, e.CodeTimeout)
 }
 
 func TestNativeRuntimeNamespace(t *testing.T) {

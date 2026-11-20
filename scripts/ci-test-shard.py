@@ -19,6 +19,7 @@ import time
 
 # Heavy packages split by top-level test; all other packages run whole.
 GROUPS = {"factory": ("pkg/nvkr/factory", 8), "lifecycle": ("pkg/nvkr/lifecycle", 2),
+          "command": ("cmd/nvkr", 4), "qualification": ("pkg/nvkr/qualification", 4),
           "packages": (None, 5)}
 TEST_NAME = re.compile(r"(?:Test|Example|Fuzz)\w*\Z")
 # Retain at most 32 MiB of stdout per child, including discovery commands.

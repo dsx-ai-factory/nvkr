@@ -50,7 +50,8 @@ func TestGitHubFactoryCommandsKeepOperationDiagnosticsInLogs(t *testing.T) {
 }
 
 func TestGitHubFactoryCommandsRejectUnboundWorkBeforeOutputs(t *testing.T) {
-	plan, err := factory.LoadPlanContext(t.Context(), filepath.Join("..", "..", ".github/nvkr-run-nvke/plan.json"))
+	// These refusals require ordinary nodes, without internal runtime producers.
+	plan, err := factory.LoadPlanContext(t.Context(), filepath.Join("..", "..", ".github/nvkr-run-wli-imds-agent/plan.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
