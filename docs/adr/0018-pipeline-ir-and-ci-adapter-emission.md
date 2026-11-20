@@ -334,7 +334,8 @@ private output and a fixed credential-free environment. The local byte-observati
 no producer code and carries no container-isolation or qualification claim. Shared code prevents semantic
 drift; it does not alone prove byte identity across hosts.
 The pipeline-attested workflow trusts the bootstrap job and authenticated same-Run metadata delivery.
-Product payload transport through a separate CI registry is retired in favor of destination staging by digest.
+The accepted target design retires product payload transport through a separate CI registry in favor of
+destination staging by digest; reconciliation records the current private-carrier implementation pending migration.
 After observation and offline packaging, one fixed stage step in the producer job pushes the exact
 payload closure, untagged, to its final output repository. It exports bounded controls, evidence documents and
 digest references; the release job reads back the staged closure, attests and signs by reference under ADR-20 §6.
@@ -1411,7 +1412,8 @@ profile keeps separate read, stage-write and release-write bindings. Only the
 fixed stage step receives the stage writer. Only a release job that signs or attests receives OIDC minting
 permission, at job scope. Read-only toolchain preparation requires the Environment-declared independent reader for its private
 roots; credentials are removed before producer execution. ARC jobs never receive source credentials, the
-release-environment writer or OIDC authority; destination staging is their bounded write exception. Source-read credentials
+release-environment writer or OIDC authority. The accepted target design adds destination staging as their
+bounded write exception; this stage-writer path remains implementation follow-up. Source-read credentials
 remain confined to the existing fixed source-fetch and catalog-validation steps. Branch code must be
 reviewed before dispatch. In the independent-credential profile, provider ACLs must exclude production write
 access from development principals; a namespace or protected environment alone cannot enforce token scope.

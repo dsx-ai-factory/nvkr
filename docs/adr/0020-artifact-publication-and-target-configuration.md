@@ -937,8 +937,9 @@ Repeated metadata checks may use ADR-18's bounded operation-local authenticated 
 admission check is skipped, and errors cannot reuse an earlier successful policy response.
 Unknown or inaccessible policy fails closed. Public packages fail the independent GHCR profile and fail the
 platform-token profile unless its explicit Environment visibility opt-in is admitted.
-A missing package can receive only a metadata-only
-seed before admission. After that seed, API absence alone permits up to six confirmation attempts with
+For the independent-credential GHCR profile only, a missing package can receive a metadata-only
+seed before admission. Fixed platform-token packages instead require the human initialization and verified
+Actions Write access described above before dispatch. After an independent-credential seed, API absence alone permits up to six confirmation attempts with
 2-, 4-, 8-, 16- and 32-second cancellation-aware waits. Each API check retains its existing bounded
 availability/rate-limit retries under the caller's operation deadline. A 404 can also hide a package
 that the credential cannot access; retrying it never grants access or bypasses the privacy check.
