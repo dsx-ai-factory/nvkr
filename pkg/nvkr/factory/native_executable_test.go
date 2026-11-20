@@ -10,6 +10,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -28,6 +29,14 @@ func TestNativeExecutableFactoryKeepsLinuxUtilityExecution(t *testing.T) {
 	}
 	if err := plan.Validate(); err != nil {
 		t.Fatal(err)
+	}
+	nodes, artifacts := planIndex(plan)
+	payload := artifacts["artifact/native-tools/tool"]
+	if payload.Kind != "host-package" || payload.MediaType != delivery.MediaOctetStream || nodes[payload.Producer].Kind != NodeAcquire {
+		t.Fatalf("raw executable producer metadata: %+v", payload)
+	}
+	if nodes["package/native-tools"].PackageKind != PackageBinaryBundle {
+		t.Fatal("executable lost its native binary-bundle packaging")
 	}
 	for _, node := range plan.Graph.Nodes {
 		operation, err := plan.ExecutionFor(node)
@@ -74,6 +83,14 @@ func TestNativeSourceFactorySeparatesPayloadAndContainer(t *testing.T) {
 	}
 	if err := plan.Validate(); err != nil {
 		t.Fatal(err)
+	}
+	nodes, artifacts := planIndex(plan)
+	payload := artifacts["artifact/native-tools/tool"]
+	if payload.Kind != "host-package" || payload.MediaType != delivery.MediaOctetStream || nodes[payload.Producer].Kind != NodeBuild {
+		t.Fatalf("raw executable producer metadata: %+v", payload)
+	}
+	if nodes["package/native-tools"].PackageKind != PackageBinaryBundle {
+		t.Fatal("executable lost its native binary-bundle packaging")
 	}
 	if len(plan.Builds) != 1 || plan.Builds[0].Platform != "darwin/arm64" {
 		t.Fatal("payload target lost")

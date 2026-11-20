@@ -27,6 +27,8 @@ func projectionCoreForEngine(engine string) (projectionCore, error) {
 	switch strings.ToLower(strings.TrimSpace(engine)) {
 	case EngineTekton:
 		return projectionCore{EngineTekton, tektonLayoutFor, renderTekton, ValidateTektonBundle}, nil
+	case EngineGitLab:
+		return projectionCore{EngineGitLab, gitlabLayoutFor, RenderGitLab, ValidateGitLabBundle}, nil
 	case EngineGitHub:
 		return projectionCore{EngineGitHub, githubLayoutFor, RenderGitHub, ValidateGitHubBundle}, nil
 	default:

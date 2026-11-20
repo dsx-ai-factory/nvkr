@@ -173,3 +173,107 @@ Packed-carrier and cohort-split refusal fixtures exercise these boundaries local
 `nvke-nightly` selection passes synthetic source-pin refresh with unchanged scripts and exact reconstructed
 Plan bytes. The local source fixture restores and replays the frozen commit through the packed carrier. No hosted carrier
 transfer with the tree layout has been recorded.
+
+## GitLab ordinary unsigned profile
+
+This GitLab extension remains proposed for maintainer review. The provider runs below cover only their
+exact recorded source snapshots; they do not establish acceptance for the integration with upstream
+`12e0badb` (shared Plan storage and catalog consolidation) or later source changes.
+
+The current implementation admits the authenticated project default branch plus exact authored
+`additionalRefs`, with `push`/`web` defaults or explicit `pipelineSources`. It denies tags, requires
+authenticated branch protection for every publication, and binds ref/source into operation outcomes and
+recorded complete or failed Runs. Refreshes retain the original invocation and default branch. API, carriers
+and isolated GitLab registry access share direct TLS trust: authored bounded PEM CA replaces system
+roots; omitted CA refuses ambient certificate overrides, and proxies are not taken from the environment.
+The token-free checkout flag is required; a bounded raw/effective local Git-config check refuses the actual
+job/reader credential bytes before provider/build work. These later changes are outside the historical
+real-server snapshots below and require fresh affected acceptance.
+
+The bounded adapter implements native runner/bootstrap policy, complete-Plan projection,
+provider-authenticated current jobs, original-job outcomes/carriers and shared lifecycle finalization.
+Producer placement and budgets use the executable producer view. Generated jobs select the native
+Docker-helper umask switch and fresh-clone strategy before checkout; shared exact `0644` checks remain.
+Pinned Runner source and local Git reproductions establish why both settings are needed: default helper
+`umask 0000` creates `0666` files, and fetch/forced checkout retain those non-executable permissions.
+A fresh normal-umask clone passes with identical bytes. Nonstandard helper/repository policies still fail closed.
+
+On November 18, 2026, `make test-gitlab-docker` passed against real GitLab CE 19.4.8 and Runner 19.4.0
+on native Linux ARM64. All eight generated jobs succeeded without retry: source-built bootstrap, real
+NVKE source fetch and `nvkectl` build, Syft acquisition, observation, SBOM, packaging and finalization.
+The test downloaded and inspected the executable bundle and exact complete `static-unqualified` Run,
+matched its original invocation and Plan, captured generator/bootstrap blob identities, exited zero and
+joined cleanup with no test-owned resources remaining. NVKE was `v0.23.0` at
+`2cfd00081b468d85a4894ec17e9deac13c9d8169`. The complete 3,055-entry tested source snapshot had SHA-256
+`88cc238746c2ff7abf75d3ed2ec895c97b212692ff2b5497156a3927d22d51c8`; all source bytes and modes
+were independently rechecked unchanged. This local acceptance has no public hosted-Run URL. Test code,
+pinned infrastructure and the manual hosted workflow are committed; private receipts retain the original
+failed attempts and successful Run. The hosted workflow has not been exercised.
+
+A separate Go 1.27.4 Linux ARM64 run passed both controlled lifecycle targets, all 26 subcases with no
+failures or skips. It covers production-client publication/refusal and finalization against controlled HTTPS
+fixtures, separately from the real server/Runner acceptance above. It does not establish a live project-registry push.
+
+The real exercise used a scoped project `read_api` private-token reader, separate from native current-job
+authentication and registry-write authority. This describes the fixture's provisioning, not scope enforcement:
+NVKR checks the credential kind and endpoint access but does not introspect token grants. Least-privilege
+reader provisioning remains the operator's responsibility. The optional job-token API-reader route remains unverified,
+especially project metadata, job-list permissions and the branch-read permission needed by the later
+protected-publication check. No job-token access proof is inferred for that added endpoint. See GitLab's
+[job-token access table](https://docs.gitlab.com/ci/jobs/ci_job_token/#job-token-access) and
+[fine-grained permissions](https://docs.gitlab.com/ci/jobs/fine_grained_permissions/).
+Native AMD64 execution, module-installed bootstrap, live registry publication and actual retry/cancellation
+recovery remain outside this acceptance. Signing, qualification, disk and private-source execution remain
+refused. Full repository checks and maintainer review are separate gates; this exercise grants no production acceptance.
+
+Native metadata GETs retry HTTP 429 at most twice inside the existing lookup and caller deadlines.
+They honor a valid `Retry-After` of at most 30 seconds, use one- and two-second delays when absent,
+and refuse ambiguous, invalid or excessive delays without exposing provider text. Failed bodies close
+before waiting; cancellation and client Close stop the wait. Contract tests cover these bounds, credential
+destinations, exhaustion and joined cancellation. Other statuses, identity changes and failed validation
+are not retried. This is controlled-client coverage, not live provider-throttling acceptance.
+
+Each consumer authenticates every ancestor outcome against one provider snapshot and retains the original
+attempt bindings; only selected payload carriers are downloaded. Publication revalidates that acquired
+closure after inspection and before the first write, then again on completion. The finalizer uses the last
+stage as its completion barrier and downloads only its utility bootstrap. Raw checkout input bytes are
+compared without Git worktree conversion against the runner clone's blobs for the provider-authenticated
+commit identifier. This establishes consistency with that clone, whose object database is trusted; it does
+not independently rehash the commit/tree/blob closure or protect against a compromised runner.
+
+A fresh native Linux ARM64 server/Runner exercise passed on the complete 3,067-entry source archive
+`ce0a8f34a90e99b659d0871bf528f56a1385cab796bf899f295faa740ced0f2c`, based on `1f156647` plus these
+review fixes. All eight generated jobs succeeded with zero retries; the test verified the executable and
+complete exact Run, exited zero in 295.101 seconds, and joined cleanup with no owned resources remaining.
+Source bytes and modes remained unchanged. The finalizer remained unstarted while the build was active;
+this success case does not establish mixed-platform skipped-branch failure scheduling. The retained Run
+contains only the unsigned executable output, with no registry publication. Later publication-error
+presentation distinguishes observed write attempts from pre-write failures and reports a completed push
+whose readback remains unverified; controlled delivery and HTTPS-fixture regressions cover those cases.
+Separate cancellation-test regressions require retry-wait entry and prove that Close joins the held lookup.
+These later source and test changes do not inherit live publication or error-path acceptance from this Run.
+The current manual GitHub workflow still selects a standard runner whose guaranteed disk is below the
+35 GiB test prerequisite. An adequately sized hosted route and hosted execution remain unverified.
+
+## GitLab SDK reuse assessment
+
+The current follow-up assessment identifies the official `gitlab.com/gitlab-org/api/client-go/v3` SDK
+`v3.52.0` at `c65d798cad511d8a1ee8d3e274eea4b0fa188fe2` as a reuse candidate for the required API
+methods and generated `testing.TestClient`. Its [pinned module](https://gitlab.com/gitlab-org/api/client-go/-/blob/c65d798cad511d8a1ee8d3e274eea4b0fa188fe2/go.mod)
+requires `go-cleanhttp v0.5.2` and `go-retryablehttp v0.7.8`; both carry MPL-2.0
+([cleanhttp license](https://github.com/hashicorp/go-cleanhttp/blob/v0.5.2/LICENSE),
+[retryablehttp license](https://github.com/hashicorp/go-retryablehttp/blob/v0.7.8/LICENSE)). The
+[SDK runtime client](https://gitlab.com/gitlab-org/api/client-go/-/blob/c65d798cad511d8a1ee8d3e274eea4b0fa188fe2/gitlab.go#L462-L466)
+constructs and uses these dependencies even when a caller supplies an HTTP client. Its Apache-2.0 top-level
+license therefore does not satisfy the repository's [Apache-clean linked-dependency policy](../../../CONTRIBUTING.md#the-invariants-your-change-must-respect).
+The [Merge Gate note](../../../.github/workflows/merge-gate.yaml) records automated license enforcement as
+planned; a green gate supplies no policy exception. This SDK closure must not enter NVKR's production import
+graph under the current policy. Its [generated test client](https://gitlab.com/gitlab-org/api/client-go/-/blob/c65d798cad511d8a1ee8d3e274eea4b0fa188fe2/testing/client.go)
+also imports the SDK; it is not a dependency-free alternative.
+
+SDK adoption remains recommended for evaluation after an upstream policy-compatible closure or explicit
+license-policy decision, followed by pinned dependency, notices, security and provider-boundary review.
+No dependency or policy exception is admitted here. External official `glab` provisioning is available at the
+permitted subprocess boundary without linking its dependency graph into NVKR; it grants no runtime provider
+or publication authority. SDK test doubles remain controlled fixtures and cannot replace real GitLab plus
+Runner acceptance.

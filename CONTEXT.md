@@ -198,6 +198,10 @@ _Avoid_: Authored definition, execution observation
 The exact generated files and commit manifest that carry an execution plan to a selected execution engine.
 GitHub uses hosted workflow identity; Tekton uses ADR-18's explicit cluster-authenticated execution and
 independent signer keys. No separate qualified renderer or authored transport-plan model is retained.
+The proposed GitLab ordinary unsigned profile uses explicit native runner policy and authenticates current jobs and
+original artifact carriers through its selected provider API. Its complete Plan, required outputs and shared
+lifecycle owners remain unchanged; provider authentication grants no signing or stronger evidence lane.
+Its generated include has a fixed ownership namespace, separate from the operator-owned root pipeline.
 The GitHub entry workflow, Plan and shared composite templates share one ownership manifest and
 byte-exact drift gate. Actions expose fixed semantic interfaces for Plan operations; grouped work repeats those
 interfaces without generating group-size or output-count variants. Named invocation parameters are recomputed

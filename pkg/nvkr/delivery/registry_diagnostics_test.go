@@ -395,7 +395,7 @@ func TestRegistryObservationKeepsLocalFailuresSeparate(t *testing.T) {
 		{"local integrity", e.CodeVerifyFailed, "Check exact manifest/blob digests"},
 		{"local tag validation", e.CodeInvalidCatalog, "Check the named tag"},
 		{"local capability", e.CodeEngineCapability, "choose an admitted alternative"},
-		{"local timeout", e.CodeTimeout, "reconcile partial uploads before retrying"},
+		{"local timeout", e.CodeTimeout, "check its outcome before retrying"},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			ctx, observer := observeRegistry(t.Context())
@@ -414,6 +414,9 @@ func TestRegistryObservationKeepsLocalFailuresSeparate(t *testing.T) {
 			}
 			if test.action == "" && err != local {
 				t.Fatalf("local error without registry guidance was changed: %v", err)
+			}
+			if test.code == e.CodeTimeout && strings.Contains(err.Error(), "partial uploads") {
+				t.Fatalf("local timeout inferred an upload from stale request diagnostics: %v", err)
 			}
 		})
 	}
