@@ -796,6 +796,8 @@ Identical complete host step sequences
 can share descriptive YAML anchors for native preflight, credential-free checkout, current-job preparation
 and one or two uncontrolled node calls. Expansion restores independent nodes before substituting each
 job's parameters; an earlier new anchor owner may change presentation while preserving expanded jobs.
+The carrier and credential rules below describe the implementation pending the
+[accepted destination-staging migration](adr/0018-pipeline-ir-and-ci-adapter-emission.md).
 Private carriers use Go-owned, digest-verified chunks in an unlinked private/internal GHCR package; Actions
 retain their JSON locators plus separately admitted metadata records. The factory validates exact schemas
 and inventories before exporting metadata; control layouts exclude output payload blobs. Same-Run provider
