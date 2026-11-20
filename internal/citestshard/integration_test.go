@@ -49,7 +49,7 @@ func terminalTests(t *testing.T, log string) map[[3]string]int {
 	return counts
 }
 
-// All fifteen real shards must produce exactly the same top-level results as
+// All nineteen real shards must produce exactly the same top-level results as
 // ordinary go test, including examples, fuzz seeds, parallel tests and subtests.
 func TestRealMatrix(t *testing.T) {
 	root := t.TempDir()
@@ -68,7 +68,12 @@ func TestRealMatrix(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module example.com/shardfixture\n\ngo "+strings.TrimSpace(string(version))+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	fixtures := map[string]string{"pkg/nvkr/factory": factoryFixture, "pkg/nvkr/lifecycle": lifecycleFixture}
+	fixtures := map[string]string{
+		"pkg/nvkr/factory":       factoryFixture,
+		"pkg/nvkr/lifecycle":     lifecycleFixture,
+		"pkg/nvkr/qualification": lifecycleFixture,
+		"cmd/nvkr":               lifecycleFixture,
+	}
 	for _, index := range []int{0, 1, 2, 3, 23} {
 		fixtures["ordinary/package"+strconv.Itoa(index)] = "package fixture\nimport \"testing\"\nfunc TestExact(t *testing.T){}\n"
 	}
@@ -96,8 +101,8 @@ func TestRealMatrix(t *testing.T) {
 		t.Fatalf("baseline %s %v", diagnostics.String(), err)
 	}
 	expected := terminalTests(t, baseline)
-	if len(expected) != 15 {
-		t.Fatalf("expected 15 targets: %v", expected)
+	if len(expected) != 19 {
+		t.Fatalf("expected 19 targets: %v", expected)
 	}
 	for key, n := range expected {
 		if key[2] != "pass" || n != 1 {

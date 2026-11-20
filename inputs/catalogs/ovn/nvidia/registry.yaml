@@ -114,7 +114,7 @@ kind: SourceBuildRegistry
 metadata:
   description: Shared ovn/nvidia domain catalog; explicit producer variants preserve
     existing build and acquisition contracts.
-  name: ovn-nvidia
+  name: ovn/nvidia
 sources:
   ovn-kubernetes:
     repo: https://github.com/dsx-ai-factory/ovn-kubernetes

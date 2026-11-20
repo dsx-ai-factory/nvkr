@@ -18,7 +18,7 @@ import (
 
 func cmdCatalogInventory(name string) *cli.Command {
 	command := &cli.Command{Name: name, Flags: []cli.Flag{
-		&cli.StringFlag{Name: "data", Required: true, Usage: "catalog directory or root to scan offline"},
+		&cli.StringFlag{Name: "catalog", Aliases: []string{"data", "dir"}, Required: true, Usage: "catalog directory or root to scan offline"},
 	}}
 	if name == "find" {
 		command.Usage = "find every exact component match with its catalog path and recorded pins"
@@ -34,7 +34,7 @@ func cmdCatalogInventory(name string) *cli.Command {
 				return e.New(e.CodeUsage, "catalog find requires exactly one component name")
 			}
 			component = c.Args().First()
-		} else if err := rejectUnusedArguments(c, "data"); err != nil {
+		} else if err := rejectUnusedArguments(c, "catalog"); err != nil {
 			return err
 		}
 		return presentCatalogInventory(c, component, "", "")
@@ -57,7 +57,7 @@ func presentCatalogInventory(c *cli.Context, name, platform, outputType string) 
 	}
 	display := catalogCommandDisplay("Catalog inventory")
 	display.Note = "Recorded declarations and pins only; no producer selection or upstream pin-set verification."
-	entries, err := catalog.InventoryContext(c.Context, c.String("data"))
+	entries, err := catalog.InventoryContext(c.Context, c.String("catalog"))
 	if err != nil {
 		return showCommandResult(c, view, display, err)
 	}
@@ -81,7 +81,7 @@ func presentCatalogInventory(c *cli.Context, name, platform, outputType string) 
 		return nil
 	}
 	if view.tui {
-		display.Fields = []progress.Field{{Label: "Scanned root", Value: c.String("data")}, {Label: "Catalogs", Value: strconv.Itoa(len(entries))}}
+		display.Fields = []progress.Field{{Label: "Scanned root", Value: c.String("catalog")}, {Label: "Catalogs", Value: strconv.Itoa(len(entries))}}
 		for _, entry := range entries {
 			for _, component := range entry.Components {
 				item := progress.Item{ID: entry.Path + "/" + component.Name, Name: component.Name, Kind: component.OutputType, State: "recorded", Fields: []progress.Field{{Label: "Catalog path", Value: entry.Path}}}
@@ -94,7 +94,7 @@ func presentCatalogInventory(c *cli.Context, name, platform, outputType string) 
 		return showCommandResult(c, view, display, nil)
 	}
 	var out bytes.Buffer
-	fmt.Fprintf(&out, "catalog root: %q\n%s\n", c.String("data"), display.Note)
+	fmt.Fprintf(&out, "catalog root: %q\n%s\n", c.String("catalog"), display.Note)
 	for _, entry := range entries {
 		fmt.Fprintf(&out, "\ncatalog: %q (%q)\n", entry.Path, entry.Name)
 		for _, component := range entry.Components {

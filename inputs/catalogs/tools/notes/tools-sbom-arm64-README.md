@@ -8,7 +8,7 @@ Update the existing scanner version through the CLI, keeping it aligned with the
 release catalog:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/tools --tag v1.51.1 syft
+bin/nvkr catalog pin --catalog inputs/catalogs/tools --tag v1.51.1 syft
 ```
 
 The lock binds the source revision, release archive and executable bytes. Acquisition does not

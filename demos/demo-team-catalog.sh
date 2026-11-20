@@ -91,9 +91,9 @@ printf 'Exports and full commands: %s\n' "$OUT"
 
 heading '1 / 4  Meet the components'
 printf 'The catalog describes how to produce each component; the lock fixes its inputs.\n'
-show_command catalog list --data "$CATALOG"
-export_command "$OUT/catalog-validation.txt" "$NVKR" catalog validate --data "$CATALOG"
-export_command "$OUT/catalog-list.txt" "$NVKR" catalog list --data "$CATALOG"
+show_command catalog list --catalog "$CATALOG"
+export_command "$OUT/catalog-validation.txt" "$NVKR" catalog validate --catalog "$CATALOG"
+export_command "$OUT/catalog-list.txt" "$NVKR" catalog list --catalog "$CATALOG"
 cat "$OUT/catalog-list.txt"
 printf 'Read the declarations: %s/registry.yaml\n' "$CATALOG"
 printf 'Read the exact pins:   %s/pins.lock.yaml\n' "$CATALOG"

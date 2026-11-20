@@ -102,7 +102,7 @@ kind: SourceBuildRegistry
 metadata:
   description: Shared ovn/upstream domain catalog; explicit producer variants preserve
     existing build and acquisition contracts.
-  name: ovn-upstream
+  name: ovn/upstream
 sources:
   ovn-kubernetes:
     repo: https://github.com/ovn-kubernetes/ovn-kubernetes
