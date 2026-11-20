@@ -12,6 +12,8 @@ payloads plus their producer records. The implementation is selected by artifact
 | Bound Helm package | NVKR re-inspects the final archive after image binding | Packaging stage: chart declarations/references in the exact delivered bytes |
 | Generic OCI bundle | NVKR's bounded archive reader inventories every regular file | `bundle-files/v1`: delivered paths, exact hashes, sizes and modes; referenced images/charts/providers are not inspected |
 | Original Debian package output | Pinned package reader exports the held payload and the offline scanner inspects it under the selected native profile | Exact raw package subject, platform and tool-bound payload inventory; no installation or runtime claim |
+| Plain QCOW2 disk | Pinned offline libguestfs inspector reads the installed Debian package database | `installed-packages-v1`: names, versions, architectures and deb purls bound to the final disk digest; no file integrity or material correspondence claim |
+| LUKS2 disk | Original held producer and material observations | Explicit `build-provenance-v1` override; no installed inventory or pre-encryption handoff |
 | Separate Debian archive metadata diagnostic | `InspectDebianArchiveMetadata` uses Syft v1.51.1 with the fixed private name `subject.deb`, independent of the caller's filename | Package identity only; `syft-debian-archive-metadata/v1` is rejected by dependency SBOM attachment and serialized BOM validation; no maintained factory output invokes this diagnostic |
 
 Ordinary `InspectDependencies` and held-only `InspectHeldDependencies` retain hint-free host-file scanning;
@@ -54,8 +56,16 @@ See [the registry graph](publication-architecture.md) for every remaining manife
 Current contract coverage and hosted publication evidence are recorded in
 [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/README.md). Signed producer evidence in the producer-only disk mode explicitly records
 deferred inspection; it is not the dependency inventory described for binaries, images and charts above.
-The current qualification workflow preserves producer-only disk evidence. Strict disk inventory/reconciliation is separate deferred
-hardening; qualification of source metadata does not prove installed disk contents.
+Maintained NVKE Environments retain `build-provenance-v1` pending refreshed AMD64/ARM64
+inspector appliances and their measured pins. The current pinned helpers discard distro;
+the new package mode requires observed vendor and rejects those reports. Activation
+selects `installed-packages-v1` with explicit producer-only FDE `diskEvidenceOverrides`. Unknown
+output names and requested package inspection of LUKS2 fail admission. A failed
+plain-disk inspection fails the Run rather than falling back to an empty SBOM.
+`release verify --minimum-disk-evidence packages` accepts package-only or strict
+evidence and rejects producer-only members. Strict disk inventory/reconciliation
+remains separate hardening. The [ADR-13 reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/adr-13.md)
+owns package-mode acceptance status and the limits of historical producer-only Runs.
 
 ## Verification on real outputs
 

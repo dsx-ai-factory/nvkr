@@ -18,6 +18,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/signkey"
@@ -38,19 +39,20 @@ const (
 )
 
 const (
-	OutputExecutable         = definition.OutputExecutable
-	OutputOCI                = definition.OutputOCI
-	OutputAPT                = definition.OutputAPT
-	OutputHelm               = definition.OutputHelm
-	OutputBundle             = definition.OutputBundle
-	OutputDiskImage          = definition.OutputDiskImage
-	OutputDebianPackage      = definition.OutputDebianPackage
-	LaneQualified            = "qualified"
-	LanePipeline             = "pipeline-attested"
-	LaneUnqualified          = "static-unqualified"
-	ScopeAuthenticity        = "authenticity"
-	ScopeArtifactPublication = "artifact-publication"
-	ScopeRelease             = "release"
+	OutputExecutable           = definition.OutputExecutable
+	OutputOCI                  = definition.OutputOCI
+	OutputAPT                  = definition.OutputAPT
+	OutputHelm                 = definition.OutputHelm
+	OutputBundle               = definition.OutputBundle
+	OutputDiskImage            = definition.OutputDiskImage
+	OutputDebianPackage        = definition.OutputDebianPackage
+	LaneQualified              = "qualified"
+	LanePipeline               = "pipeline-attested"
+	LaneUnqualified            = "static-unqualified"
+	ScopeAuthenticity          = "authenticity"
+	ScopeArtifactPublication   = "artifact-publication"
+	ScopeSelectedBootArtifacts = "selected-boot-artifacts"
+	ScopeRelease               = "release"
 )
 
 // DiskEvidenceRequirement is the minimum disk evidence a consumer accepts.
@@ -60,6 +62,7 @@ type DiskEvidenceRequirement string
 
 const (
 	DiskEvidenceStrict          DiskEvidenceRequirement = "strict"
+	DiskEvidencePackages        DiskEvidenceRequirement = "packages"
 	DiskEvidenceBuildProvenance DiskEvidenceRequirement = sbom.DiskBuildProvenance
 )
 
@@ -86,6 +89,18 @@ type Signing = definition.Signing
 // exact observed bytes; required output slots use a separate internal record.
 type Artifact = delivery.Output
 
+// GitLabInvocation describes the provider-authenticated finalizer invocation.
+// Serialized metadata does not restore a provider receipt or publication authority.
+type GitLabInvocation struct {
+	APIURL     string `json:"apiURL"`
+	ProjectID  uint64 `json:"projectID"`
+	PipelineID uint64 `json:"pipelineID"`
+	JobID      uint64 `json:"jobID"`
+	Commit     string `json:"commit"`
+	Ref        string `json:"ref"`
+	Source     string `json:"source"`
+}
+
 // Run joins frozen expectations to observations without deriving requirements
 // from success. Plans and node reports are inspectable internal records.
 type Run struct {
@@ -100,6 +115,9 @@ type Run struct {
 	Observed          []Artifact       `json:"observed,omitempty"`
 	Failure           *runFailure      `json:"failure,omitempty"`
 	ContentSubject    string           `json:"contentSubject,omitempty"`
+	// GitLab is descriptive finalizer metadata, not serialized provider authority.
+	GitLab *GitLabInvocation `json:"gitlab,omitempty"`
+
 	// Composition binds a composite Run's members and per-output attribution;
 	// definitionDigest then names the composite (ADR-26 §4).
 	Composition *definition.CompositionRecord `json:"composition,omitempty"`
@@ -109,6 +127,7 @@ type Run struct {
 }
 
 type requiredOutput struct {
+	Derived          *derivedoutput.Binding  `json:"derived,omitempty"`
 	ImageIndex       *factory.ImageIndexPlan `json:"imageIndex,omitempty"`
 	Name             string                  `json:"name"`
 	Kind             string                  `json:"kind"`
@@ -161,7 +180,7 @@ func (policy VerificationPolicy) Validate() error {
 		}
 	}
 	switch policy.MinimumDiskEvidence {
-	case "", DiskEvidenceStrict, DiskEvidenceBuildProvenance:
+	case "", DiskEvidenceStrict, DiskEvidencePackages, DiskEvidenceBuildProvenance:
 	default:
 		return e.New(e.CodeTrustPolicyMissing, "minimum disk evidence %q is unsupported", policy.MinimumDiskEvidence)
 	}
@@ -170,13 +189,13 @@ func (policy VerificationPolicy) Validate() error {
 		if policy.Scope != ScopeRelease {
 			return e.New(e.CodeTrustPolicyMissing, "qualified verification requires full release scope")
 		}
-		if policy.MinimumDiskEvidence == DiskEvidenceBuildProvenance {
-			return e.New(e.CodeTrustPolicyMissing, "qualified verification cannot accept producer-only disk evidence")
+		if policy.MinimumDiskEvidence != "" && policy.MinimumDiskEvidence != DiskEvidenceStrict {
+			return e.New(e.CodeTrustPolicyMissing, "qualified verification requires strict disk evidence")
 		}
 		return nil
 	case LanePipeline:
-		if policy.Scope != ScopeAuthenticity && policy.Scope != ScopeArtifactPublication && policy.Scope != ScopeRelease {
-			return e.New(e.CodeTrustPolicyMissing, "pipeline-attested verification requires an explicit authenticity, artifact-publication or release scope")
+		if policy.Scope != ScopeAuthenticity && policy.Scope != ScopeArtifactPublication && policy.Scope != ScopeSelectedBootArtifacts && policy.Scope != ScopeRelease {
+			return e.New(e.CodeTrustPolicyMissing, "pipeline-attested verification requires an explicit supported scope")
 		}
 		if strings.TrimSpace(policy.IdentityRegexp) == "" || strings.TrimSpace(policy.Issuer) == "" {
 			return e.New(e.CodeTrustPolicyMissing, "pipeline-attested verification requires identity and issuer")

@@ -43,7 +43,7 @@ func TestContainerImagePublicationPreservesRunnableManifest(t *testing.T) {
 	}
 	root := filepath.Join(t.TempDir(), "publication")
 	_, err = BuildPublicationRoot(ctx, root, PublicationRequest{Objects: []ObjectInput{{
-		Name: "cwe", Kind: "oci-image", Path: image, Layout: true, ArtifactType: MediaOCIManifest,
+		Name: "nvke-controller", Kind: "oci-image", Path: image, Layout: true, ArtifactType: MediaOCIManifest,
 		SemanticDigest: inspected.ManifestDigest, BlobDigest: inspected.RootDigest, OS: "linux", Arch: "amd64",
 	}}})
 	if err != nil {

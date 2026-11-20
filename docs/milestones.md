@@ -9,11 +9,11 @@ not complete a milestone.
 | Milestone | Outcome | Acceptance owner |
 |---|---|---|
 | M1 — Vertical slice | One pinned NVKE CLI built, published, signed and independently verified through a generated default-branch workflow | [M1 criteria](epics-v1-spec.md#epic-m1--vertical-slice) |
-| M2 — Breadth | The complete required artifact set, including the NVKE OS image, with exact output membership and source-bound production evidence | [M2 criteria](epics-v1-spec.md#epic-m2--breadth) |
+| Artifact breadth | The complete required artifact set, including the NVKE OS image, with exact output membership and source-bound production evidence | [NVKE criteria](epics-v1-spec.md#artifact-breadth) |
 | M3 — Qualification | Complete-set build/evidence checks, delivered-tool smoke and signed pass/fail evidence under an independent identity | [M3 criteria](epics-v1-spec.md#epic-m3--qualification) |
 | M4 — Automated releases | Reviewed pin updates, signed immutable release manifests, safe channel/tag behavior and revocation | [M4 criteria](epics-v1-spec.md#epic-m4--automated-releases) |
 
-M2 disk delivery binds the exact produced disk and traced materials. The
+NVKE disk delivery binds the exact produced disk and traced materials. The
 initial scope decision
 retains producer-only disk evidence and defers deep inventory, material reconciliation, waivers, offline
 pull-request qualification, a dedicated verify-only dispatch and cross-run qualification reuse. Authenticated
@@ -29,7 +29,7 @@ remain outside it. M4 does not grant the separate qualified-lane clearance.
 
 Generated execution defaults to generic GitHub-hosted runners. ADR-18 admits only the explicit native
 KVM ARC disk route; it does not permit arbitrary self-hosted labels or qualified claims. The
-[34-output M2 candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) succeeded under that route and an
+[34-output NVKE candidate](https://github.com/dsx-ai-factory/nvkr/blob/a187d6b702cbc1a70452760c606c2c4de1ed6618/docs/evidence/2026-10-06-team-demo-pipeline.md) succeeded under that route and an
 explicit validation-branch signing exception. It does not establish main-only execution, independent
 full-payload disk consumption, full inventory, organizational approval or complete milestone acceptance.
 
@@ -46,6 +46,6 @@ provisioning and teardown; the parent harness owns outer host/network restoratio
 [Reconciliation](adr/reconciliation/README.md) records exact source revisions, completed
 runs and their limits; the former ARM64 published-artifact cycle is retired.
 
-M2’s product floor remains AMD64 producer provenance. The approved initial scope defers strict
+NVKE’s product floor remains AMD64 producer provenance. The approved initial scope defers strict
 inspection and material reconciliation without organizational ADR ratification. ARM64 is an implementation extension; every additional
 output explicitly selected by a Definition remains mandatory for that Run and Release.

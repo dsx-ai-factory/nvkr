@@ -1,0 +1,60 @@
+{
+  "buildDigest": "sha256:94da162202d2e5f3f266a37f6f8f62db0ec168aefc8bc47af20cbc1f05175f29",
+  "catalogDigest": "sha256:846dcc17957d283482e241ed117d4d61060b1a37930c85f2a799e3de717ba092",
+  "components": [
+    "spire-oidc-image"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "ghcr.io/spiffe/oidc-discovery-provider:1.15.3",
+        "component": "spire-oidc-image",
+        "digest": "sha256:32f5e7d7b6329ed9dff97ad374e11d9156c43611ecfcb0693b7ca085b5328cdf",
+        "id": "pull-spire-oidc-image",
+        "imageParentDigest": "sha256:bb95f13c2b4e8392d6631ff1a45a03554ba050534cd3c1045505cc80d3fb77e2",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "oci-image",
+        "platform": "linux/amd64",
+        "version": "0.23.0"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-spire-oidc-image"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "spire-oidc-image",
+  "platform": "linux/amd64",
+  "resolvedComponents": [
+    {
+      "Name": "spire-oidc-image",
+      "commit": "2cfd00081b468d85a4894ec17e9deac13c9d8169",
+      "fromSource": false,
+      "outputType": "oci-image",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:32f5e7d7b6329ed9dff97ad374e11d9156c43611ecfcb0693b7ca085b5328cdf",
+          "arm64": "sha256:6adc68d480f285e586edb67f4053bfb8923816a02486bf22d117e29bdee54a78"
+        },
+        "evidence": {
+          "none": true
+        },
+        "image": "ghcr.io/spiffe/oidc-discovery-provider:1.15.3",
+        "imageParentDigest": "sha256:bb95f13c2b4e8392d6631ff1a45a03554ba050534cd3c1045505cc80d3fb77e2"
+      },
+      "repo": "https://github.com/dsx-ai-factory/nvke",
+      "sourceDateEpoch": 1793236039,
+      "tag": "v0.23.0"
+    }
+  ]
+}

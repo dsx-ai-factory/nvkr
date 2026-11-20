@@ -144,6 +144,11 @@ func sbomRekorEntryConflict(stderr string) bool {
 }
 
 func (s *CosignOCISigner) VerifySBOM(ctx context.Context, digest string, bundle []byte) error {
+	finish, err := beginBoundedVerification(ctx)
+	if err != nil {
+		return err
+	}
+	defer finish()
 	if err := s.admitSBOM(ctx, digest); err != nil {
 		return err
 	}

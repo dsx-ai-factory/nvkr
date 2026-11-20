@@ -1,6 +1,6 @@
 # ADR-18 — Pipeline IR & CI-adapter emission (hermetic execution)
 
-- **Decision status:** Accepted (2026-11-14)
+- **Decision status:** Accepted (2026-11-14); GitLab extension below proposed for maintainer review.
 - **Implementation maturity:** Tracked separately in `reconciliation/README.md`; implementation and test evidence do not
   constitute governance ratification.
 - **Acceptance-test maturity:** Tracked separately in `reconciliation/README.md`; green unit tests alone do not
@@ -14,7 +14,8 @@
 
 - **Scope:** Sections 1–7 define shared execution requirements and the deferred qualified provider protocol.
   Qualified CI renderers and their TransportPlan implementation are removed; shared local authority primitives
-  remain. Section 8 defines the implemented GitHub Run emitter and event policy.
+  remain. Section 1 also proposes the bounded ordinary unsigned GitLab profile, outside the existing
+  acceptance. Section 8 defines the GitHub Run emitter and event policy.
 
 ## Context
 
@@ -29,12 +30,12 @@ implementation of rendered strings that must be kept in sync.
 
 ### 1. One IR, many adapters — topology/transport only
 
-The maintained GitHub adapter and local runner use the same producer IR. GitLab and Argo generation
-are unavailable; their unused adapters are removed, as are the separate qualified GitHub/GitLab renderers.
+The GitHub adapter, local runner and proposed bounded ordinary unsigned GitLab adapter use the same producer IR.
+Argo generation is unavailable. Separate qualified GitHub/GitLab renderers remain retired.
 Tekton's cluster execution and independent key policy are specified below. Generation admits only that
 explicit contract; reconciliation records implementation checks and external acceptance separately.
-The former GitLab-only `runtime.builderImage` schema field has no retained adapter and any nonempty value
-fails capability admission. GitHub uses its pinned setup-go action for source bootstrap. The generator's
+The former GitLab-only `runtime.builderImage` schema field remains rejected; native GitLab bootstrap images
+belong to its explicit runner policy below. GitHub uses its pinned setup-go action for source bootstrap. The generator's
 own build selects how bootstraps obtain the runner. Any build of a local checkout emits bootstraps that install
 `./cmd/nvkr` from the checkout with its `.go-version`; they require NVKR source. A module-mode install of an
 exact module version, either a release (`go install …/cmd/nvkr@vX.Y.Z`) or a commit
@@ -58,7 +59,11 @@ retains its own producer results and evidence obligations; the aggregate binds t
 No authored reusable producer group, recipe selection, criteria matcher, mixin or recipe layer participates. The BuildDigest
 identifies the selected executable producer closure and excludes the output name, packaging and transport.
 Two named outputs with equal BuildDigest retain independent executions, results and evidence obligations.
-Existing Helm image-output dependencies remain explicit packaging edges. Run-plan and artifact-graph v5 contain no cluster-composition nodes or records. Compiler handoff documents
+Existing Helm image-output dependencies remain explicit packaging edges. ADR-20 inventory derivation adds
+a package node downstream of every selected sibling package. Its transferred inputs include the exact
+sibling packages and producer records needed to authenticate them independently. It runs in process without
+network access or a new runner class. Derived outputs use ADR-20 publication-bound identity; ordinary
+producer Build Digests retain the exclusions above. Run-plan and artifact-graph v5 contain no cluster-composition nodes or records. Compiler handoff documents
 are removed; the complete Plan retains the exact authored Definition and Environment.
 
 The Plan retains its base catalog snapshot and each output's selected catalog snapshot, checked against their
@@ -67,13 +72,125 @@ snapshot. Each output's complete executable build graph is recompiled from its s
 Environment-authorized toolchain registry relocation and deterministic execution binding applied. Admission
 compares canonical full-graph bytes; the transport-independent Build Digest cannot authenticate repository,
 artifact or flake locators, image registry prefixes, or execution metadata.
-Compilation and validation also share one complete artifact graph derivation.
+Compilation, validation and graph-free Plan-tree loading share one complete artifact graph derivation.
+The tree loader authenticates its stored inputs before deriving the graph, checks the root's typed graph
+digest, then validates the complete canonical Plan against its manifest identity (ADR-21 §1). This storage
+layout leaves packed Plan bytes, Build Digests, graph identity and published identities unchanged.
 Validation compares every node and artifact, including exact input/output sets, transport
 URL, format, archive and executable digests, executable member and output path. Producer source and receipt
 edges, package membership and terminal-observation gates, and publication/signing routes must match the
 admitted inputs. Missing, extra or substituted operations, artifacts or edges fail before execution or emission.
 Only the local runner may relocate admitted artifact paths into its selected workspace; a serialized path does
 not grant relocation authority.
+
+#### GitLab ordinary unsigned execution contract
+
+This proposed extension requires maintainer review; the existing ADR acceptance does not ratify it.
+The profile admits only `static-unqualified` execution against the complete Plan. Fetch, build, acquisition,
+verification, SBOM and packaging operations retain their existing owners. Optional publication is the bounded
+unsigned HTTPS OCI route in ADR-20. Signing configuration, `pipeline-attested` and `qualified` claims, disk
+outputs, private-source access, private execution images, native-toolchain/runtime-source profiles, runtime
+storage extensions and unsupported producer execution requirements fail capability admission before output.
+Arbitrary setup hooks, job variables, services and legacy runtime/helper image overrides are not admitted.
+Neither authenticated provider metadata nor successful publication upgrades this evidence lane.
+
+The project's provider-authenticated default branch is always admitted. Optional `additionalRefs` adds
+a sorted, unique list of at most 32 exact branch names from the existing bounded dispatch-branch subset,
+not patterns. Optional `pipelineSources` selects a sorted, unique list of at most 16 supported native
+sources; omission admits only `push` and `web`. Other sources, including API, merge-request and parent
+pipelines, require explicit selection. Generated rules deny debug modes and tags, apply the exact ref/source
+selection and end with refusal. When merge-request events are selected, an open merge request suppresses
+the duplicate push pipeline. Any publication selection additionally requires a protected ref, both in the
+generated rule and through an authenticated exact-branch lookup; a job variable is not protected-branch proof.
+
+Environment's `gitlab` policy selects an exact HTTPS `/api/v4` endpoint, positive native project ID, API-reader
+credential reference and kind, and one or two native `linux/amd64` / `linux/arm64` runner routes. Each route
+declares sorted unique literal tags and a digest-pinned bootstrap image. There are no inferred organization
+tags or GitHub runner-label substitutions and no hosted-runner default. The operator provisions runners
+matching these authored tags. Selected execution images require declared anonymous access.
+The operator supplies the native host, matching Go installation and container runtime. Placement and time
+budgets resolve through the Plan's executable producer view; an empty scheduler reference cannot substitute
+the utility platform or hide source-owned requirements. Actual host mismatch fails before execution.
+The source-built runner follows the generator's checkout or exact module-version bootstrap contract above;
+bootstrap checks the selected Go release and native host before compiling with automatic toolchain download disabled.
+The generated include selects native `FF_DISABLE_UMASK_FOR_DOCKER_EXECUTOR=true`,
+`GIT_STRATEGY=clone` and `FF_GIT_URLS_WITHOUT_TOKENS=true` before checkout for bootstrap, operation
+and finalizer jobs. Runtime admission requires the token-free URL flag to remain enabled. The first removes the
+Docker helper's default `umask 0000` override; the second creates a fresh source checkout in the job-owned
+CI workspace, including when Runner storage was previously used. Git fetch and forced checkout do not
+normalize unchanged files' non-executable permission bits. Native Runner owns this workspace lifecycle;
+NVKR does not change file permissions after checkout or relax the exact generated-file mode contract.
+Before provider or build work, the existing Git owner checks the raw root `.git/config` and effective
+local configuration, including includes, for the actual current-job and selected reader credential bytes.
+A match is refused without exposing those bytes. This bounded check is not a general repository secret
+scan or protection against a compromised runner. These intrinsic provider settings do not admit authored
+job variables or arbitrary Git configuration.
+Non-root build images must supply working `id -u` / `id -g` for Runner's native ownership handling.
+The switch does not itself force a particular umask: a nonstandard helper or repository policy still fails
+the exact mode check. Source acquisition and artifacts continue through their existing owning boundaries.
+
+ADR-21 owns the fixed generated include and operator-owned root pipeline. Native GitLab pipeline invocation
+does not become a GitHub dispatch event, and no generated cron, trigger API or callable producer interface is
+added. Debug trace/service modes are refused by workflow rules. At most 256 operations and 50 native needs
+per job are admitted; an oversized graph fails rather than changing its output selection. Dependencies retain
+their full prerequisite closure: ordinary operations require success, while verification runs after completion.
+The finalizer is scheduled with `when: always`; cancellation or provider loss can still prevent a Run record.
+
+Caller-supplied project, pipeline, job and commit values describe a selection. Before operation work, the
+provider owner authenticates the current running generated job using its own `CI_JOB_TOKEN`, checks project
+configuration and exact pipeline identity, and enumerates the complete current non-retried generated job map.
+The separately configured API reader must cover project metadata (including `default_branch`), pipeline
+metadata, job enumeration and original-job artifact downloads. Any publication selection also requires
+read access to the exact `repository/branches/<ref>` endpoint for the protected-branch check. Its `private-token` and `job-token` kinds describe authentication mechanisms,
+not a grant of API permissions; the operator must establish the selected instance's endpoint access.
+NVKR does not introspect token grants or enforce least-privilege scopes. For a `private-token` reader,
+the operator must provision project-limited read access (such as `read_api`), without write or broader
+account grants; a more privileged token is not rejected solely for its scopes.
+The current-job token is not interchangeable with that API reader. Provider clients have bounded I/O and a
+caller-derived lifetime; closing an owner cancels and joins its work.
+
+Optional `certificateAuthority` contains at most 64 KiB of explicit PEM CA material bound into the Plan;
+it replaces system roots. Omission admits system roots only when `SSL_CERT_FILE` and `SSL_CERT_DIR`
+are absent. API metadata, artifact carriers and isolated GitLab registry transport share the direct TLS
+owner and do not select proxies from the job environment. This does not change the default, non-isolated
+registry transport. Provider redirects remain refused; carrier storage follows its separately bounded
+credential-free delegation contract.
+
+The provider authenticates the commit identifier, but checkout comparison establishes consistency only
+with the runner's clone. The runner's object database is trusted; NVKR does not independently rehash the
+commit/tree/blob closure. Comparing raw committed blobs with worktree bytes excludes worktree conversion
+from that comparison, not a malicious object database or a compromised runner.
+
+Provider-client reuse is subject to the repository's linked-dependency license and security admission.
+The official GitLab Go SDK remains a candidate for API plumbing and generated test facilities when its pinned
+runtime dependency closure can be admitted under that policy. Reuse must preserve the provider owner's
+bounded I/O, exact endpoint/token scope, redirect refusal, caller lifetime and opaque receipt issuance.
+No SDK exception is implied by its top-level license. The official `glab` CLI may instead provision the
+external acceptance fixture through an owned, bounded subprocess with explicit credentials; it does not
+replace runtime provider authentication or create a linked SDK dependency. The
+[SDK assessment ledger](reconciliation/adr-18.md#gitlab-sdk-reuse-assessment) records the current constraint and open recommendation.
+
+Runtime compares the caller's ref and source with authenticated provider metadata, then checks that
+invocation against the authored selection. Every refresh retains the original default branch and invocation;
+a changed default branch, ref or source is refused. Each outcome binds its exact Plan operation, project,
+pipeline, commit, authenticated ref and source, original job ID, inputs and carrier
+digests/sizes. Consumers authenticate the original provider job and bounded carrier bytes before restoration;
+workspace files and digest strings confer no authority. A retried producer replacing an acquired original job,
+foreign or ambiguous membership, missing outcomes and failed/skipped jobs fail closed. Original bindings are
+revalidated before acceptance. The finalizer authenticates its role before recompilation, compares the exact
+authored-input Plan, validates the complete job/outcome closure and delegates observation, named-output
+binding and immutable Run writing to the shared lifecycle. Both complete and failed Runs recorded after
+admission carry optional descriptive GitLab invocation metadata (API, project, pipeline, finalizer job,
+commit, ref and source); loading this metadata cannot restore a provider receipt. Finalization compares
+the complete captured authored-input closure with the runner clone before accepting its recompilation.
+No alternative public lifecycle object is added.
+Provider acceptance requires a real GitLab server and GitLab Runner in Docker executing the generated
+multi-job pipeline, with native job authentication, artifact transfer and finalization. Record exact server,
+runner and source identities and the resulting job/Run outcomes, including failure and transport refusals.
+Handwritten HTTP response fixtures and SDK-generated test doubles establish controlled contracts; they
+cannot satisfy this real-server acceptance requirement.
+Implementation checks, credential-access limits and external acceptance belong to
+[reconciliation](reconciliation/adr-18.md#gitlab-ordinary-unsigned-profile).
 
 #### Tekton execution, signing and qualification contract
 
@@ -195,7 +312,7 @@ execute a producer reference from the complete Plan through `factory execute-nod
 
 ### 3. Helper-owned isolation and narrowly admitted native ARC disks
 
-Jobs use generic hosted runners except the explicit native ARC disk policy below. With `runsOn`
+GitHub jobs use generic hosted runners except the explicit native ARC disk policy below. With `runsOn`
 unset and no ARC policy selected, ordinary native ARM64 producer fetch/acquisition/build operations select `ubuntu-24.04-arm`;
 AMD64 producers and legacy single-platform utility operations retain `ubuntu-latest`.
 An Environment may enable native output utilities with `utilityContainers`, a platform-to-digest-pinned-image
@@ -276,17 +393,27 @@ fail closed during restoration and completeness checking. A helper is
 built from the exact checkout with the pinned Go toolchain before private downloads, or, for a bundle
 generated by a released NVKR, from a private copy of that exact published module after its version and
 checksum match the pin, so bootstrap needs no public binary delivery. The source bootstrap owns fresh Go build and module caches beneath the runner's
-temporary directory. A fixed Python 3 supervisor gives dependency acquisition and compilation one
-900-second deadline. Public module acquisition may retry at most three times, with one- and two-second
-cancellable waits, only when every reported failure is the admitted `proxy.golang.org` module ZIP's
-HTTP/2 `INTERNAL_ERROR` received from its peer. Unknown, malformed, checksum, certificate and other
-download failures stop. The two small dependency manifests are copied into the disposable directory so
-Go cannot normalize the checkout or published module copy; their exact bytes must remain unchanged. Compilation runs once with
-read-only module metadata and proxy/checksum-database networking disabled. No producer, signing,
-verification or publication operation is retried by this bootstrap policy. The supervisor stops and joins
-each child before retry or cache cleanup, and completes cleanup before private downloads.
-The installed Go toolchain and produced helper remain available; ambient runner caches are not cleanup
-targets. Missing supervisor/toolchain capabilities or failed cleanup fail closed. This remains separate
+temporary directory. A shell step under coreutils `timeout --kill-after` gives dependency acquisition and
+compilation one 900-second deadline with five seconds of kill escalation. Public module acquisition
+retries any failed invocation at most three times without backoff; exhaustion fails closed. Go's download
+diagnostics reach the runner log without the former captured-output size bound or JSON error filtering.
+The two dependency manifests must be regular, non-symlink files no larger than 4 MiB. They are copied
+into private Go inputs and separate pristine snapshots before dependency acquisition; both the source and
+Go inputs must still match those snapshots after acquisition and compilation. These are pathname checks,
+not atomic no-follow descriptor opens or protection against a hostile same-user writer. Compilation runs once with read-only module metadata and
+proxy/checksum-database networking disabled. Only PATH, HOME and optional TMPDIR/GOROOT pass from the
+runner environment; Go's toolchain, environment-file and workspace settings are fixed. No producer,
+signing, verification or publication operation is retried by this bootstrap policy. Coreutils bounds the
+process group. The step shell forwards INT/TERM to timeout and re-waits before cleanup, returning the
+coded timeout error for cancellation, including cancellation during cache cleanup. The joined child PID
+is cleared and cleanup completes before the final status is selected; failed cleanup is retried once.
+Dependency acquisition and helper compilation receive closed input via `/dev/null`; a compiler's nonzero exit is a build failure even when its status resembles a timeout. This does not add supervision
+of arbitrary detached descendants after a successful Go exit. Cleanup removes only the invocation's disposable caches before private downloads. The installed Go
+toolchain and produced helper remain available; ambient runner caches are not cleanup targets. Missing
+toolchain/timeout capabilities or failed cleanup fail closed. Published-module acquisition additionally
+uses a standard-library-only Go program, compiled offline in the same isolated environment, to check the exact
+module path, version and checksum before the shell copies the source.
+This remains separate
 from qualified exact-helper-byte verification.
 
 Artifact movement must serve a required stage boundary or an explicit byte-verification operation.
@@ -313,7 +440,9 @@ archive rather than trusting a partially received prefix, and repeats neither pu
 
 CI transfer admission requires an API-confirmed private/internal package with no linked repository,
 including while the source remains private. A missing package may receive an empty metadata-only seed;
-payload upload requires a subsequent successful privacy check. Transfers require separate dedicated read
+payload upload requires a subsequent successful privacy check. Post-seed API absence uses the same
+bounded confirmation backoff as publication (ADR-20); no payload is admitted on retry exhaustion.
+Transfers require separate dedicated read
 and write credentials with their configured account usernames, scoped only to their consuming steps, without repository-token fallback or extra
 repository package permissions. The repository token authenticates repository metadata separately from the
 package credential. These principals must have no production publication grants. No Actions-payload fallback
@@ -539,7 +668,7 @@ inside the producer deadline, uses the same guarded Docker device projection, an
 Published native Packer pins remain required. The strict disk-evidence mode additionally requires the full
 inspector image and measured executable pins. Explicit candidate `diskEvidence: build-provenance-v1` omits inspector
 preparation and execution; it authenticates live producer/material evidence under ADR-13/20 instead.
-This is the M2 and M3 MVP producer-provenance scope; full inspection and material reconciliation remain
+This is the NVKE and M3 MVP producer-provenance scope; full inspection and material reconciliation remain
 deferred hardening (ADR-13 §6).
 The ARC group sums only executed material-producer budgets, applying the selected VM class ceiling to its
 root producer. Synthetic SBOM/package nodes do not each add an adapter-default hour. One shared adapter-default
@@ -569,7 +698,7 @@ remain unqualified descriptions; the complete hosted finalizer, signing and cons
 
 Native preparation is a separate read-only-permission workflow that builds both images and records exact local
 image/tool measurements on matching native hosts. Measurements do not supply publication approval or registry
-pins. Toolchain publication gates and full generated M2 operational acceptance remain unresolved until separately
+pins. Toolchain publication gates and full generated NVKE operational acceptance remain unresolved until separately
 recorded; the generation contract must not fill those inputs with placeholders.
 
 Held Linux Podman execution uses a package-owned, initially empty `XDG_CONFIG_HOME`, removed by the same
@@ -1030,6 +1159,34 @@ path mapping. A receipt carrier must not include the shared receipt directory: i
 otherwise claim the same immutable destination during finalization. The path is a transport description;
 receipt authentication and no-replace restoration remain mandatory.
 
+GitHub may share source acquisition within one Run. The projection selects one network-fetch owner for
+each exact repository URL, commit and tree, and one prepared-closure owner for each additional vendor
+specification and native platform. These are transport dependencies between the existing fetch operations; the Plan, producer
+IR and Build identities remain unchanged. Every consumer still admits its own source environment and
+native vendor runtime before writing its private checkout. A source owner needed by another consumer
+finishes in a source-only job before producer work starts. Same-target source fetches may share that
+job when their combined seed prerequisites remain acyclic; credentialed fetches retain separate jobs.
+Consumers depend on the selected owner completing its vendor operation and transport its whole closure,
+even when they only reuse Git metadata. This deliberate same-Run scheduling/failure coupling does not
+replace each consumer's own admission. Owner selection is deterministic from the current Plan; adding a
+consumer can change the selected owner. Prepared closure sharing additionally requires the same native platform; cross-platform consumers
+reconstruct the pristine Git tree and run their own vendor operation.
+
+Ordinary source carriers omit the checkout's immediate Git administrative directory. A shared owner's
+carrier explicitly includes only its Git object store and optional shallow boundary beside the closure;
+the archive refuses missing object stores and symlinked Git metadata. It does not carry config, hooks,
+refs, attributes or index state. These additional transport bytes do not enter logical Build identity.
+The source module authenticates the restored owner's receipt and complete closure. It copies only the
+Git object store and shallow boundary into a fresh repository, refuses alternate object sources, and
+uses Git's full object-integrity check before binding the pinned commit/tree. Seed config, attributes,
+refs, grafts, hooks and index state are not imported.
+An equal vendor specification and native platform permit copying the closure and issuing the same byte-bound receipt in
+the consumer's own slot after verification. A different specification or native platform reconstructs the pristine pinned tree from those verified
+objects; the consumer then runs its own vendor operation
+and issues its own receipt. The normal fetch and downstream build rehash their exact inputs in both
+cases. Missing, corrupt, mismatched or unsafe seed inputs fail closed without a network fallback.
+This is same-Run source preparation, not reuse of producer results or output evidence under ADR-30.
+
 ### 7. Terminal verify + granularity
 
 Every admitted Run retains component operations and an **unconditional terminal verify** (GitHub
@@ -1165,8 +1322,9 @@ requires separate runtime evidence. An opt-in native smoke test requires an expl
 and already-local exact native image ID; absence of those inputs skips it, not proves the backend works.
 No generated disk executor or stronger evidence lane is implied.
 
-Maintained lifecycle targets are local, GitHub and the explicit native Tekton cluster contract above.
-GitLab and Argo selection returns `CodeEngineCapability` before reading authored inputs or producing output.
+Maintained lifecycle targets are local, GitHub and the explicit native Tekton cluster contract. The bounded
+ordinary unsigned GitLab implementation follows the proposed contract above; it is outside the ADR's existing
+acceptance. Argo selection returns `CodeEngineCapability` before reading authored inputs or producing output.
 No fallback renderer exists.
 
 | Event | Admitted work and credentials |
@@ -1178,7 +1336,7 @@ No fallback renderer exists.
 | Development Environment branch manual dispatch | Unsigned hosted builds, or full signed publication using development environments/credentials, the admitted native ARC route, and disposable attempt namespaces |
 | Git tag | No signing trigger |
 
-Generated Run workflows are manual-only. Production execution admits the default branch plus exact branch
+Generated GitHub Run workflows are manual-only. Production execution admits the default branch plus exact branch
 names explicitly listed in `Environment.githubDispatchBranches`. The optional list is sorted and unique;
 wildcards, tag/PR refs and expression syntax are rejected. It is bound into Environment and Plan identity,
 cloned with its owner, and enforced in every helper bootstrap, source access, execution and finalization guard.
@@ -1263,7 +1421,7 @@ Definition, Environment and Plan bindings are authenticated separately from the 
 Earlier successful output publications may be retained within the same producer run under ADR-20; earlier
 successful native workers may be retained within the same qualifier run under ADR-16. Each keeps its original
 authenticated invocation and unchanged inputs. A manually dispatched qualification workflow
-does not itself prove that its source build succeeded or came from the approved branch. The M2 validation-branch
+does not itself prove that its source build succeeded or came from the approved branch. The NVKE validation-branch
 exception cannot authorize qualification. Any later workflow adapter must reject unrelated or unsuccessful
 Runs before downloading executable subjects or requesting qualification signing credentials.
 
@@ -1316,8 +1474,19 @@ one runner start in one job. A root tool acquisition never gains members; a job 
 for it and restores it first, and a failed acquisition prevents that job. Contraction therefore cannot
 create a cycle or make one output wait for another, and the projected provider graph must remain acyclic.
 A job holds at most sixteen operations, and the sum of each operation's declared or default 60-minute budget
-must fit the provider ceiling; an operation that does not fit starts a new job. Membership never depends on
-adjacency in the global topological order or on a fixed-size chunk of unrelated nodes.
+must fit the provider ceiling; an operation that does not fit starts a new job. Ordinary producer membership
+does not depend on adjacency in the global topological order.
+
+Single-platform OCI image publication operations may additionally share a release job across output
+routes when their runner, platform and publication credential reference match. A batch contains at most
+two output routes, and scheduling drains each output's ready chain before starting the next, limiting
+payload fan-in without shortening any operation budget. A deterministic first-fit
+projection retains the same operation and duration ceilings and refuses any added dependency that would
+create a cycle. At the default per-operation budget a job holds at most six operations; an output's chain
+continues in another job when the current job is full. This introduces bounded cross-output waiting and
+failure coupling and may change image-batch membership when an output is added. Disk publications,
+image indexes, other output formats and aggregate release assembly retain their existing boundaries.
+No operation's timeout, command, evidence slot, signing subject or step-scoped credential changes.
 
 Every operation keeps its pinned execution, exact command, isolation, carrier and result slot. A job's
 token scope is exactly the union of its operations' scopes. Registry credentials and the repository token
@@ -1329,8 +1498,9 @@ schedule of §7. Failure of any operation marks the whole provider job unsuccess
 complete finalization still requires every required provider job to succeed. Scheduling does not change the
 logical graph, Plan identity or Build identity.
 
-One output's attestation, publication, signing and verification share a job and a machine. The job that can
-mint the workflow identity therefore also restores that output's payload carrier. The carrier transport's
+An output's attestation, publication, signing and verification can share a job and a machine. Image batches
+may restore several outputs' carriers. The job that can mint the workflow identity therefore also restores
+the selected payload carriers. The carrier transport's
 extraction guard is the boundary, as it already was for the controls the attestation job restored.
 Step-scoped credentials limit what each operation is given; they are not a machine boundary between
 operations in one job. [Reconciliation](reconciliation/adr-18.md) owns this layout's validation status.
@@ -1374,7 +1544,7 @@ Temporary siblings are not upload targets; publication happens only after comple
 An existing destination is rejected, not overwritten or authenticated as this attempt's log; operators must
 retain the ephemeral, single-job workspace policy. Failure snapshots are folded in job logs with the same
 truncation marker as retained files, and logs show the last accepted inspection phase. Successful operations
-do not dump the snapshot. Graceful-timeout retention does not promise recovery after runner loss or `SIGKILL`. The explicit M2
+do not dump the snapshot. Graceful-timeout retention does not promise recovery after runner loss or `SIGKILL`. The explicit NVKE
 build-provenance mode emits neither inspection work nor its diagnostic upload. Changing the helper requires
 rebuilding and repinning its complete inspection image before claiming hosted operation.
 Retention uses a separate ten-second cleanup context with cancellation checks between filesystem operations;
@@ -1511,13 +1681,22 @@ may refresh. Changed scheduling, action templates or Environment policy fails be
 reviewed regeneration. This does not resolve latest versions or silently alter pins.
 
 That bootstrap publishes the frozen data once as `nvkr-runtime-inputs`. Other native helper bootstraps
-depend on it and restore its two JSON files into a fresh staging directory. The generation owner admits
+depend on it and restore its two JSON files into a fresh staging directory. The carrier retains
+packed canonical Plan bytes; ADR-21's GitHub tree is reconstructed locally from that Plan. The v3 tree uses stable Plan-record filenames,
+derives the artifact graph at load, and keeps inventory output bindings in its per-bundle targets record. Full manifest
+hashes authenticate those files. Runtime-plan Environments scope all stable records by bundle, so
+nightly dispatch refresh and carrier installation preserve production records in the same checkout.
+Catalog/script variants retain their content suffixes. Graph node bindings are derived from the joined
+Environment and producer records. This storage projection restores the original
+canonical bytes and does not change the Plan, graph or Build identity.
+The generation owner admits
 the complete committed baseline, exact staged Plan/manifest and current authored inputs before
 installing freshly rendered bytes through the existing manifest-last writer. The generic private transport
 continues to reject existing destinations. The bootstrap then runs the ordinary complete generation check
 against the same repository inputs. Every helper artifact carries the same Plan and manifest alongside the native
-helper; ordinary jobs, ARC jobs, recovery and finalization therefore restore the dispatch's exact inputs
-before execution. This retains the existing trusted bootstrap and same-Run artifact boundary and issues
+helper; ordinary jobs, ARC jobs, recovery and finalization stage those inputs and invoke the same
+installer before execution. They do not copy packed wire bytes over the tree root. This retains the
+existing trusted bootstrap and same-Run artifact boundary and issues
 no new execution receipt. CI uses `run generate --runtime --check` to admit unchanged scheduling and
 policy without requiring current source pins in the committed baseline. Ordinary `--check` remains
 byte-exact, including after bootstrap restoration. Default and development generation remain unchanged.
@@ -1571,7 +1750,7 @@ Environment identity remain fixed under the runtime-generation check.
 
 The maintained GPU-site floating candidate selects NVKE, OVN Kubernetes, CAPNICO and
 NVIDIA AICR main in this lane, publishes only below
-`ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site`, and has an independent qualifier/smoke
+`ghcr.io/dsx-ai-factory/nvkr/nightly/nvke`, and has an independent qualifier/smoke
 policy. Its production GPU-site sibling retains its existing pins and namespace.
 The generated producer is manual-only; this decision adds no scheduled dispatch.
 Complete artifact qualification remains `pipeline-attested`, not GPU deployment acceptance
@@ -1796,6 +1975,15 @@ still prevent finalization.
 Finalizers are scheduled unconditionally and fail on failed/missing producers, failed restore, omitted required
 artifacts, malformed or substituted observations/SBOMs, and wrong production predicates. The platform may prevent
 the finalizer itself from starting; inspect provider status when no Run record exists (ADR-17).
+For GitHub per-output publication, recovery retains one original unsuccessful provider job in the failed
+closure description. Actual failure takes precedence over cancellation and skipped dependents. Within
+each outcome, ancestors with that outcome precede their dependents, including through successful
+intermediate jobs; independent roots use job-ID order because the provider result schema carries no
+timestamps. Recovery logs and the finalizer's existing `provenance-missing` failure name that admitted job
+and, for execution stages, its Plan-derived display label, directing
+operators to its log for the original error. These descriptions cannot select an upstream error code or
+authorize completion. Missing, legacy, malformed or foreign diagnostics retain the generic completeness
+error; successful closure still requires every original job and exact restored evidence.
 
 ADR-20's [object-store publication contract](0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract)
 adds one ordinary required publish operation per configured destination after the original aggregate

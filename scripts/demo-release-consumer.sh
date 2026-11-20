@@ -128,14 +128,13 @@ if [ "$EXECUTION_RUNTIME" = docker ]; then
     case "$REGISTRY_CONFIG" in /*) ;; *) REGISTRY_CONFIG="$CALLER_DIR/$REGISTRY_CONFIG" ;; esac
     [ -f "$REGISTRY_CONFIG/config.json" ] && [ ! -L "$REGISTRY_CONFIG/config.json" ] ||
       demo_die "--registry-config requires a regular config.json file"
-    demo_need_command python3
-    python3 - "$REGISTRY_CONFIG/config.json" <<'PY'
-import json, sys
-with open(sys.argv[1], encoding="utf-8") as f:
-    config = json.load(f)
-if config.get("credsStore") or config.get("credHelpers"):
-    sys.exit("demo: container registry config requires inline auth, not host credential helpers")
-PY
+    demo_need_command jq
+    jq -se 'def populated: . != null and . != false and . != "" and . != {} and . != [] and . != 0;
+      if length == 1 and (.[0] | type == "object") then .[0]
+      else error("demo: container registry config requires one JSON object") end |
+      if (.credsStore | populated) or (.credHelpers | populated)
+      then error("demo: container registry config requires inline auth, not host credential helpers")
+      else true end' "$REGISTRY_CONFIG/config.json" >/dev/null
   fi
 else
   [ -z "$REGISTRY_CONFIG" ] || demo_die "--registry-config requires Docker mode; native verification uses DOCKER_CONFIG"
@@ -168,7 +167,10 @@ if [ "$EXECUTION_RUNTIME" = docker ]; then
     for input_path in "$DEFINITION" "$ENVIRONMENT" "$PLAN"; do
       [ -f "$input_path" ] && [ ! -L "$input_path" ] || demo_die "exact inputs must be regular files"
     done
-    docker_args+=(-v "$DEFINITION:/inputs/definition.yaml:ro" -v "$ENVIRONMENT:/inputs/environment.yaml:ro" -v "$PLAN:/inputs/plan.json:ro")
+    # Admit the Plan tree on the host, then transport canonical wire bytes.
+    demo_prepare_nvkr
+    "$NVKR" run plan --plan "$PLAN" --json > "$WORK/plan.json"
+    docker_args+=(-v "$DEFINITION:/inputs/definition.yaml:ro" -v "$ENVIRONMENT:/inputs/environment.yaml:ro" -v "$PWD/$WORK/plan.json:/inputs/plan.json:ro")
     args+=(--definition /inputs/definition.yaml --environment /inputs/environment.yaml --plan /inputs/plan.json)
   fi
   docker "${docker_args[@]}" "$LINUX_IMAGE" /nvkr "${args[@]}"

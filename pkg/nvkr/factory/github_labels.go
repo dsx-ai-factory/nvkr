@@ -121,6 +121,13 @@ func githubAuthorityStageLabel(plan *Plan, nodes []Node) string {
 		return githubNodeLabel(plan, nodes[0])
 	}
 	if nodes[0].Kind == NodePublish || signFamilyNode(nodes[0].Kind) {
+		var targets []string
+		for _, node := range nodes {
+			targets = append(targets, node.Target)
+		}
+		if targets = uniqueSorted(targets); len(targets) > 1 {
+			return "Publish and verify images: " + strings.Join(targets, ", ")
+		}
 		verbs := map[string]string{NodeAssembleRelease: "assemble", NodeAttestEvidence: "attest", NodePublish: "publish",
 			NodeSign: "sign", NodeVerifyPublication: "verify"}
 		var steps []string

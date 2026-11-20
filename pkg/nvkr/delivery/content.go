@@ -10,6 +10,7 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/versionpolicy"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/canonical"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 )
 
@@ -18,17 +19,18 @@ import (
 // immutable release-content identity. Image indexes describe platforms through
 // their exact child membership instead of a single OS/Arch pair.
 type Output struct {
-	Name         string             `json:"name"`
-	Kind         string             `json:"kind"`
-	Digest       string             `json:"digest"`
-	Reference    string             `json:"reference,omitempty"`
-	OS           string             `json:"os,omitempty"`
-	Arch         string             `json:"arch,omitempty"`
-	ChartVersion string             `json:"chartVersion,omitempty"`
-	BuildDigest  string             `json:"buildDigest"`
-	Components   []string           `json:"components,omitempty"`
-	Disk         *DiskOutput        `json:"disk,omitempty"`
-	ImageIndex   *ImageIndexBinding `json:"imageIndex,omitempty"`
+	Derived      *derivedoutput.Binding `json:"derived,omitempty"`
+	Name         string                 `json:"name"`
+	Kind         string                 `json:"kind"`
+	Digest       string                 `json:"digest"`
+	Reference    string                 `json:"reference,omitempty"`
+	OS           string                 `json:"os,omitempty"`
+	Arch         string                 `json:"arch,omitempty"`
+	ChartVersion string                 `json:"chartVersion,omitempty"`
+	BuildDigest  string                 `json:"buildDigest"`
+	Components   []string               `json:"components,omitempty"`
+	Disk         *DiskOutput            `json:"disk,omitempty"`
+	ImageIndex   *ImageIndexBinding     `json:"imageIndex,omitempty"`
 }
 
 // DiskOutput is the descriptive copy of a binding established by factory's held
@@ -68,6 +70,11 @@ func (disk *DiskOutput) validatePublicationEncryption() error {
 var outputNamePattern = regexp.MustCompile(`^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$`)
 
 func (output Output) Validate() error {
+	if output.Derived != nil {
+		if err := output.Derived.ValidateOutput(output.Name, output.Kind, output.BuildDigest, output.Components); err != nil {
+			return err
+		}
+	}
 	if !outputNamePattern.MatchString(output.Name) || output.Kind == "" || !canonical.IsDigest(output.Digest) ||
 		(output.BuildDigest != "" && !canonical.IsDigest(output.BuildDigest)) {
 		return e.New(e.CodeVerifyFailed, "artifact %q must identify exact immutable bytes", output.Name)
@@ -110,7 +117,7 @@ func (output Output) Validate() error {
 		(output.Disk.Encryption != "none" && output.Disk.Encryption != "luks2") ||
 		output.Disk.Size <= 0 || !canonical.IsDigest(output.Disk.PlanDigest) ||
 		!canonical.IsDigest(output.Disk.PayloadDigest) ||
-		(output.Disk.EvidenceMode != "" && output.Disk.EvidenceMode != "build-provenance-v1") ||
+		(output.Disk.EvidenceMode != "" && output.Disk.EvidenceMode != "build-provenance-v1" && output.Disk.EvidenceMode != "installed-packages-v1") ||
 		output.Disk.Outcome != "succeeded" || !slices.Contains(output.Components, output.Disk.Component) {
 		return e.New(e.CodeVerifyFailed, "disk artifact %q lacks an exact successful QCOW2 producer binding", output.Name)
 	}
@@ -168,6 +175,7 @@ func projectReleaseContentOutput(output Output) releaseContentOutput {
 func cloneOutputs(source []Output) []Output {
 	result := append([]Output(nil), source...)
 	for i := range result {
+		result[i].Derived = source[i].Derived.Clone()
 		result[i].Components = append([]string(nil), source[i].Components...)
 		result[i].Disk = cloneDiskOutput(source[i].Disk)
 		result[i].ImageIndex = source[i].ImageIndex.Clone()

@@ -1,6 +1,6 @@
 # Native Linux demo inputs
 
-These Definitions select Linux host tools from the [shared native tool catalog](../../../catalogs/tools/native/README.md). They do not copy its registry or source pins. Host release assets retain their original Linux digests and versions under distinct producer IDs; the verified private tool view uses conventional command names. Linux outputs do not select vmnet tools.
+These Definitions select Linux host tools from the [shared native tool catalog](../../../catalogs/tools/notes/tools-native-README.md). They do not copy its registry or source pins. Host release assets retain their original Linux digests and versions under distinct producer IDs; the verified private tool view uses conventional command names. Linux outputs do not select vmnet tools.
 
 The [ARM64](../tools/linux-arm64.json) and [AMD64](../tools/linux-amd64.json) tool Definitions select the host bundle, including the CLI used for bootstrap and deployment, and the Linux site runtime companion. `definition-components.json` selects the same native NVKE controller/provider/profile owners as the Mac build. The separate `definition-components-upstream-ovn.json` retains its historical upstream OVN diagnostic selection. A tools Run does not imply a compatible site disk.
 

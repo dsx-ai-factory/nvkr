@@ -3,7 +3,7 @@
 These images show the current NVKR renderer in an 80x24 simulation terminal with
 the shared NVKR/NVKE demo color palette and framed panes. The monochrome example
 uses terminal-default colors; the wide Details example uses 120x40 cells.
-All use the checked-in `.github/nvkr-run/plan.json`, whose validated Plan digest is
+All use the checked-in `.github/nvkr-run-nvke/plan.json`, whose validated Plan digest is
 `sha256:2a59420b680dc5d5411b570fd72d7ae763cfa7657b02370712e54f092ec9181e`.
 The Plan is loaded
 and validated by `planview.Load`; `graphDisplay` supplies the same typed

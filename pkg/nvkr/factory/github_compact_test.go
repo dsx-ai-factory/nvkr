@@ -390,10 +390,9 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 		planPath             string
 		privateDiskProducers int // -1 explicitly exempts the separate development credential policy.
 	}{
-		{FactoryPlanPath, 4},
+		{maintainedNVKEPlanPath, 8},
 		{GitHubDevelopmentPlanPath, -1},
-		{".github/nvkr-run-nvke-nightly-arm64/plan.json", 1},
-		{".github/nvkr-run-nvke-nightly-upstream-ovn-arm64/plan.json", 1},
+		{".github/nvkr-run-nvke-nightly/plan.json", 8},
 	} {
 		planPath := selected.planPath
 		t.Run(planPath, func(t *testing.T) {
@@ -411,9 +410,9 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 			// One render per maintained bundle covers the real product's size,
 			// placement and credential contracts. Generic mutation tests use
 			// small fixtures; they do not need hundreds of unrelated jobs.
-			if planPath == FactoryPlanPath {
-				if plan.DefinitionPath != "inputs/definitions/nvke/definition.yaml" || plan.EnvironmentPath != "inputs/environments/github-release.yaml" || plan.Environment.GitHubBundle != "" {
-					t.Fatal("committed default workflow must select the maintained combined M2 inputs")
+			if planPath == maintainedNVKEPlanPath {
+				if plan.DefinitionPath != "inputs/definitions/nvke/nvke-release.composite.yaml" || plan.EnvironmentPath != "inputs/environments/github-nvke.yaml" || plan.Environment.GitHubBundle != "nvke" {
+					t.Fatal("committed NVKE workflow must select the maintained composite inputs")
 				}
 				if err := CheckGeneratedBundle(t.Context(), "../../..", bundle); err != nil {
 					t.Fatalf("default namespace changed committed Plan/workflow/manifest bytes: %v", err)
@@ -443,7 +442,7 @@ func TestMaintainedGitHubBundles(t *testing.T) {
 				t.Fatal("producer entry must expose only its manual dispatch trigger")
 			}
 			emitted := githubEmittedWorkflows(t, plan, bundle)
-			if planPath == FactoryPlanPath {
+			if planPath == maintainedNVKEPlanPath {
 				// The default suite checks the combined bundle's emitted pin and
 				// source credential scope; the extended suite covers the others.
 				assertMaintainedPinSetCredentialScope(t, plan, emitted, false)

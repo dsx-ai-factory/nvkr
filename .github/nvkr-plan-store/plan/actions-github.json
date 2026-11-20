@@ -1,0 +1,22 @@
+{
+  "checkout": {
+    "repo": "actions/checkout",
+    "sha": "3d3c42e5aac5ba805825da76410c181273ba90b1",
+    "version": "v7.0.1"
+  },
+  "download-artifact": {
+    "repo": "actions/download-artifact",
+    "sha": "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c",
+    "version": "v8.0.1"
+  },
+  "setup-go": {
+    "repo": "actions/setup-go",
+    "sha": "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e",
+    "version": "v7.0.0"
+  },
+  "upload-artifact": {
+    "repo": "actions/upload-artifact",
+    "sha": "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+    "version": "v7.0.1"
+  }
+}

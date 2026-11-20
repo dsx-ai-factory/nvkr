@@ -75,6 +75,9 @@ func GenerateFiles(ctx context.Context, definitionPath, environmentPath, policyP
 	if err := generationContext(ctx); err != nil {
 		return "", err
 	}
+	if strings.EqualFold(strings.TrimSpace(engine), factory.EngineGitLab) {
+		return "", e.New(e.CodeEngineCapability, "GitLab qualification generation is unavailable")
+	}
 	if err := factory.ValidateGenerationEngine(engine); err != nil {
 		return "", err
 	}
@@ -114,10 +117,8 @@ func GenerateFiles(ctx context.Context, definitionPath, environmentPath, policyP
 	if err != nil {
 		return "", err
 	}
-	for _, name := range qualificationNames(bundle.files) {
-		if _, overlap := producer.Files[name]; overlap {
-			return "", e.New(e.CodeEngineCapability, "qualification workflow %q overlaps the producer bundle", name)
-		}
+	if err := checkProducerQualificationOverlap(producer, bundle); err != nil {
+		return "", err
 	}
 	if check {
 		if err := factory.CheckGeneratedBundle(ctx, root, producer); err != nil {
@@ -139,6 +140,15 @@ func GenerateFiles(ctx context.Context, definitionPath, environmentPath, policyP
 		}
 	}
 	return producer.PlanDigest, nil
+}
+
+func checkProducerQualificationOverlap(producer *factory.GeneratedBundle, qualifier *GeneratedWorkflows) error {
+	for _, name := range qualificationNames(qualifier.files) {
+		if _, overlap := producer.Files[name]; overlap {
+			return e.New(e.CodeEngineCapability, "qualification workflow %q overlaps the producer bundle", name)
+		}
+	}
+	return nil
 }
 
 func generationContext(ctx context.Context) error {

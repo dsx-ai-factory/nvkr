@@ -39,7 +39,7 @@ func capturedRegistryIndexFixture(t *testing.T) (*ImageIndex, PublishedObject) {
 	if _, err := Push(t.Context(), publication, strings.TrimPrefix(server.URL, "http://")+"/product/releases", options); err != nil {
 		t.Fatal(err)
 	}
-	reference, err := name.NewDigest(strings.TrimPrefix(server.URL, "http://")+"/product/cwe@"+description.Digest, name.StrictValidation, name.Insecure)
+	reference, err := name.NewDigest(strings.TrimPrefix(server.URL, "http://")+"/product/nvke-controller@"+description.Digest, name.StrictValidation, name.Insecure)
 	if err != nil {
 		t.Fatal(err)
 	}

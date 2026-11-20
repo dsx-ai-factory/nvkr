@@ -30,15 +30,15 @@ const maxDocumentArtifactBytes = 128 << 20
 // On upload failure the returned attempted reference may contain partial uploads.
 func PushDocumentArtifact(ctx context.Context, repository, mediaType string, raw []byte, options RegistryOptions) (reference string, resultErr error) {
 	ctx, observer := observeRegistry(ctx)
+	if ctx != nil {
+		ctx = context.WithValue(ctx, registryPublicationProgressKey{}, &registryPublicationProgress{})
+	}
 	defer func(observedCtx context.Context) { resultErr = observer.explain(observedCtx, resultErr) }(ctx)
 	if err := admitDocumentTransport(ctx, mediaType, int64(len(raw)), options); err != nil {
 		return "", err
 	}
-	if _, bounded := ctx.Deadline(); !bounded {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(ctx, 5*time.Minute)
-		defer cancel()
-	}
+	ctx, cancel := registryPublicationContext(ctx, 5*time.Minute)
+	defer cancel()
 	parse := []name.Option{name.StrictValidation}
 	if options.PlainHTTP {
 		parse = append(parse, name.Insecure)

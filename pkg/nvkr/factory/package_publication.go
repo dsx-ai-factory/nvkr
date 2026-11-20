@@ -281,7 +281,15 @@ func bindPublicationOutputObjects(ctx context.Context, plan *Plan, node Node, ar
 			}
 		}
 		objects[i].Output = &delivery.OutputBinding{Repository: output.Name, Format: output.Kind,
+			Derived:     output.Derived.Clone(),
 			BuildDigest: output.BuildDigest, Components: output.Components, BuildSubjects: subjects, Disk: output.Disk, ImageIndex: output.ImageIndex.Clone()}
+		if output.Derived != nil {
+			materials, err := observeDerivedMaterials(ctx, plan, output.Derived, artifacts)
+			if err != nil {
+				return err
+			}
+			objects[i].Output.DerivedMaterials = materials
+		}
 		if output.Kind == PackageBundle {
 			for _, component := range output.Components {
 				input := artifacts["artifact/"+output.Name+"/"+component]

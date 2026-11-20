@@ -16,8 +16,8 @@ The Build Digest identifies that generated graph's logical content. Output label
 execution settings remain in their owning records. Two outputs can share a Build Digest while requiring
 separate producer jobs, observations and evidence; one successful output cannot satisfy a missing sibling.
 
-The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-module-tags/definition.yaml) directly selects `nvkectl`, `cwe`, and `nvke-helm`
-for three outputs. The Helm output explicitly depends on the NVKE management-plane image output (`cwe`). No reusable membership group,
+The [NVKE Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/examples/nvke-module-tags/definition.yaml) directly selects `nvkectl`, `nvke-controller`, and `nvke-helm`
+for three outputs. The Helm output explicitly depends on the NVKE management-plane image output (`nvke-controller`). No reusable membership group,
 criteria query, inheritance chain, or mixin sits between an output and its producers.
 
 Deployment topology and placement are owned by the system that consumes the artifacts;
@@ -48,27 +48,67 @@ preserving build identity. A dry-run signing mode records intended operations an
 
 ## Start a small executable Definition
 
-`definition init` prints a plain Definition with one executable output named after `--name`, bundling
-catalog components you select explicitly. It adds no Environment, pins, signer, CI files or composite, and
-it never adds a dependency you did not name:
+`definition init` prints one output named after `--name`, selecting only the components you name.
+Give its intended `--destination` inside the checkout root. Catalog references are relative to that file,
+so the saved Definition has the same bytes when the checkout moves:
 
 ```sh
-bin/nvkr definition init --name my-tools \
-  --catalog inputs/catalogs/tools/operator-arm64 \
-  --platform linux/arm64 --component helm --component kubectl > definition.yaml
+bin/nvkr definition init --name my-tools --destination definition.yaml \
+  --catalog inputs/catalogs/tools \
+  --platform linux/arm64 --component helm-operator --component kubectl-operator > definition.yaml
 bin/nvkr definition validate --definition definition.yaml
+bin/nvkr run local --definition definition.yaml --attempt my-tools-1
 ```
 
-The selection is admitted through the same catalog, platform-route and material-set checks a later run uses,
-and init adds no rule of its own. A missing flag, a missing, duplicate or unknown component, an unsupported
-platform or an incomplete material selection fails with a coded error and prints nothing. Components are sorted, so the same request on the same checkout always prints the same
-bytes.
+Run the last command from the checkout root with a supported local runtime available. It uses the
+built-in build-only Environment below. The example selects ARM64 tools explicitly; use a matching local
+execution host. `--destination` does not write a file: save stdout at that exact location. Shell redirection opens the file
+before validation, so choose a new filename to avoid truncating an existing Definition. The parent must
+already exist. `--root` defaults to the working directory; when authoring from another directory, pass
+an absolute checkout root and catalog path. Relative destinations are resolved under `--root`.
+Outside-root destinations and catalogs are refused before YAML is emitted. Later Run preparation still
+confines captured inputs to its root; moving the Definition alone requires updating its relative references.
 
-`--catalog` is written as an absolute path, so the printed file works where it was made. That path is part of the
-Definition digest and the Plan, so the same request prints different bytes and identities on another checkout.
-Captured local runs, hosted runs and composite Definitions refuse an absolute catalog locator. Before you commit
-the file or use it in one of those runs, change `catalog.base` to a path relative to the Definition file's own
-directory, not the directory you ran `definition init` from. This first version covers one executable output and a single platform.
+The default format is `executable`. Use `--format` for another supported single-platform output:
+
+| Format | Explicit selection and example |
+|---|---|
+| `executable` | One or more executable producers; the command above selects acquired tools. |
+| `oci` | One OCI image producer, for example `pause` in `testdata/examples/layered-catalog`. |
+| `apt-repository` | Host-package producers plus `--apt-distribution stable --apt-component main`; for example `kubectl` in the layered catalog exercises packaging, not Debian package installation. |
+| `helm-oci` | One source chart archive or acquired chart with no required image bindings; `gpu-runtime-chart` in the layered catalog is a source-archive example. |
+| `bundle-oci` | One source archive or one pinned-tool layout with its complete material closure; `gpu-runtime-chart` also demonstrates archive packaging. |
+| `debian-package` | One source host-package producer; the maintained [NVSENTINEL Debian Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvsentinel/debian-ubuntu-24.04-arm64.yaml) selects an actual Debian-producing component. |
+| `disk-image` | One disk root and every explicit material; the maintained [disk Definition](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/definitions/nvke/disks-ubuntu24.yaml) shows complete selections. Supply `--environment` with the necessary explicit execution classes. |
+
+These are authoring and compilation examples, not evidence that a producer ran or that its payload is
+installable. Init validates the complete selection through the compiler. It adds no dependency, image binding,
+overlay, signer or execution class. Use an existing multi-output Definition when a chart requires images.
+Unsupported formats, platform routes, incomplete materials and incompatible packaging return coded errors
+without printing YAML. `--environment FILE` validates a starter against that policy instead of the built-in
+local policy; it does not embed the Environment in the Definition or select it for subsequent commands.
+
+### Built-in local Environment
+
+Only `run local` may omit `--environment`. It resolves a versioned `builtin-local-v1-amd64` or
+`builtin-local-v1-arm64` policy on Linux or macOS, using the host architecture for utility execution while
+preserving each output's explicit target. Host architecture therefore changes Environment and Plan identity;
+logical producer Build Digests stay unchanged. The policy selects Docker, offline build networking and a pinned
+Go utility image. Anonymous toolchain pulls are limited to `docker.io/library/alpine`,
+`docker.io/library/golang`, and `docker.io/moby/buildkit`. Fetching declared sources remains a separate step.
+Other image roots, image-location bindings, native toolchains and producer network access require an explicit
+Environment. The default supplies no signing, publication, VM execution classes, KVM access or qualification
+claim. `--publish` requires an explicit Environment.
+
+The Plan contains the resolved Environment and its digest; the Run binds that digest and the Plan digest.
+Local execution retains the exact policy bytes in `compile-inputs.json` under the logical path
+`.nvkr/builtin/local-environment-v1.json`, alongside all other captured compiler inputs. That entry is never
+read from or written to the checkout when the Environment is omitted. A file at that path cannot override
+that default. Explicit `--environment` selection always uses the selected file, including at that location;
+the path alone is not proof of the built-in policy. Inspect its bytes and digest. Replay uses the
+captured bytes, so a later CLI default cannot change an existing Run's identity. Dry runs and rejected
+capabilities create no attempt storage. An explicit `--environment` keeps its existing meaning; planning
+and hosted generation continue to require it.
 
 ## Inspect and generate
 
@@ -225,8 +265,8 @@ presentation flags.
 
 ```sh
 bin/nvkr definition inspect --definition docs/examples/nvke-module-tags/definition.yaml --ui=tui
-bin/nvkr run graph --plan .github/nvkr-run/plan.json --ui=tui
-bin/nvkr catalog list --data inputs/catalogs/nvke/module-tags --ui=tui
+bin/nvkr run graph --plan .github/nvkr-run-nvke/plan.json --ui=tui
+bin/nvkr catalog list --catalog inputs/catalogs/nvke --ui=tui
 ```
 
 Graph and release browsers start with an output overview when their supplied
@@ -352,9 +392,10 @@ an unavailable stronger scope never falls back to weaker verification.
 
 For disk outputs, `VerificationPolicy.minimumDiskEvidence` is included in the policy digest. Pipeline-attested
 verification defaults to `build-provenance-v1`, accepting signed producer/material evidence without an inspected
-disk inventory. Use `--minimum-disk-evidence strict` to require inspected evidence. The
-SDK exposes `DiskEvidenceStrict` and `DiskEvidenceBuildProvenance`. Qualified verification defaults to strict
-and cannot opt into the producer-only mode. Authenticity enforces the same minimum against signed evidence
+disk inventory. Use `--minimum-disk-evidence packages` to require installed-package inventory,
+or `strict` to require full content/material reconciliation. The SDK exposes `DiskEvidenceStrict`,
+`DiskEvidencePackages` and `DiskEvidenceBuildProvenance`. Qualified verification defaults to strict
+and cannot opt into either weaker mode. Authenticity enforces the same minimum against signed evidence
 and metadata; it does not inspect or re-hash the disk.
 
 The CLI expresses build-evidence acceptance as `--scope artifact-publication`. On Linux, with a pinned cosign
@@ -569,8 +610,9 @@ then includes a separate failed `source-lifetime` diagnostic and an overall fail
 pin and other artifact checks keep their actual results. This extra diagnostic appears only on final
 source-admission failure. Successful reports retain the six artifact checks above. Always inspect the
 returned error or command exit status; diagnostic data alone never proves receipt issuance.
-Payload digests remain distinct from OCI delivery-container subjects, and disk results explicitly retain
-producer-only scope without content inspection.
+Payload digests remain distinct from OCI delivery-container subjects. Disk results derive their scope
+from the authenticated evidence mode: producer-only, installed packages without file-integrity/material
+reconciliation, or strict content/material reconciliation. The report does not perform new disk inspection.
 
 An incomplete evidence traversal is labeled as a failure of the complete publication in every output's
 signed-evidence diagnostic. Output-specific signature failures remain visible alongside that global failure;
@@ -676,8 +718,8 @@ publishes outcomes to the results index of ADR-31, but no generated job runs it 
 Add `--qualification-policy qualification.yaml` to the normal `run generate` invocation to generate the
 qualifier and its native smoke worker alongside the producer. The worker is a generated reusable GitHub
 Actions workflow; the operator does not write or maintain a separate worker implementation. The maintained
-candidate supplies `inputs/policies/nvke-qualification.yaml` and emits `.github/workflows/nvkr-qualify.yml`
-and `.github/workflows/nvkr-smoke.yml`. The same invocation with `--check` compares
+candidate supplies `inputs/policies/nvke-composite-qualification.yaml` and emits `.github/workflows/nvkr-qualify-nvke.yml`
+and `.github/workflows/nvkr-smoke-nvke.yml`. The same invocation with `--check` compares
 all owned bytes without writing. The separately owned qualification manifest records both workflow files;
 hand edits and unowned files are not silently overwritten. The worker is a fixed same-repository reusable
 workflow at the caller's exact commit. It is generated plumbing, not another operator command to configure
@@ -697,7 +739,7 @@ The independent policy extends the artifact-check policy with these decisions:
 | `smoke.nonToolMembers` | Exact output/member pairs for non-executable runtime-assets archives in mixed executable bundles |
 | `outsideMVPSuites` / `requiredSuites` | Unevaluated external suites, or a requirement that currently blocks qualification |
 
-The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-qualification.yaml)
+The [maintained-candidate policy](https://github.com/dsx-ai-factory/nvkr/blob/main/inputs/policies/nvke-composite-qualification.yaml)
 contains concrete verifier/native-image pins and exact output scope. Review those independent trust selections
 with the generated workflows before merge. Other Definitions need their own matching scope and native pins;
 the candidate policy is not a wildcard approval. The trust policy belongs to the operator, not the producing

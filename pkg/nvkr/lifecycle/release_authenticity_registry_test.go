@@ -435,7 +435,7 @@ func authenticityRegistryIndexLayout(t *testing.T) (string, string) {
 	return indexPublicationLayout(t, "amd64", "arm64")
 }
 
-// indexPublicationLayout publishes one aggregate image output "cwe" whose index
+// indexPublicationLayout publishes one aggregate image output "nvke-controller" whose index
 // holds a synthetic child for each Linux architecture given.
 func indexPublicationLayout(t *testing.T, arches ...string) (string, string) {
 	t.Helper()
@@ -483,9 +483,9 @@ func indexPublicationLayout(t *testing.T, arches ...string) (string, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	objects := []delivery.ObjectInput{{Name: "cwe", Kind: "container-image", ArtifactType: delivery.MediaOCIIndex, Path: layout, Layout: true,
+	objects := []delivery.ObjectInput{{Name: "nvke-controller", Kind: "container-image", ArtifactType: delivery.MediaOCIIndex, Path: layout, Layout: true,
 		SemanticDigest: description.Digest, BlobDigest: description.Digest,
-		Output: &delivery.OutputBinding{Repository: "cwe", Format: "oci", BuildDigest: build, Components: []string{"controller"}, ImageIndex: binding}}}
+		Output: &delivery.OutputBinding{Repository: "nvke-controller", Format: "oci", BuildDigest: build, Components: []string{"controller"}, ImageIndex: binding}}}
 	for _, child := range binding.Children {
 		bom, err := sbom.NewSubject(child.BuildDigest, child.Component, child.ManifestDigest)
 		if err != nil {
@@ -505,11 +505,11 @@ func indexPublicationLayout(t *testing.T, arches ...string) (string, string) {
 		}
 		objects = append(objects, delivery.ObjectInput{Name: "sbom-" + strings.TrimPrefix(semantic, "sha256:"), Kind: "sbom",
 			ArtifactType: "application/vnd.cyclonedx+json", LayerMediaType: "application/vnd.cyclonedx+json", SemanticDigest: semantic, Bytes: raw,
-			Evidence: &delivery.EvidenceBinding{Outputs: []string{"cwe"}, Platform: child.Platform, Component: child.Component,
+			Evidence: &delivery.EvidenceBinding{Outputs: []string{"nvke-controller"}, Platform: child.Platform, Component: child.Component,
 				Stage: "build-output", SubjectKind: "oci-manifest", SubjectDigest: child.ManifestDigest, InspectionInputDigest: child.BuildSubject}})
 	}
 	sort.Slice(objects, func(i, j int) bool { return objects[i].Name < objects[j].Name })
-	content, err := delivery.ContentDigest([]delivery.Output{{Name: "cwe", Kind: "oci", Digest: description.Digest, BuildDigest: build,
+	content, err := delivery.ContentDigest([]delivery.Output{{Name: "nvke-controller", Kind: "oci", Digest: description.Digest, BuildDigest: build,
 		Components: []string{"controller"}, ImageIndex: binding}})
 	if err != nil {
 		t.Fatal(err)

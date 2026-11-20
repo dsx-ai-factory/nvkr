@@ -1,6 +1,6 @@
 ## Ubuntu 24 node-image inputs
 
-The opt-in `inputs/definitions/diagnostics/ubuntu24` selections reuse M2's NVKE source, now
+The opt-in `inputs/definitions/diagnostics/ubuntu24` selections reuse NVKE's NVKE source, now
 `v0.23.0` at `2cfd00081b468d85a4894ec17e9deac13c9d8169`, including upstream Ubuntu 24 support from
 `96ccc50cb7f8ed8bb08f7cf8655906982774f809`. A predecessor-bound whole-producer overlay
 selects Ubuntu 24.04.5 installer bytes for each native architecture, the 24.04 DOCA OVS packages and a
@@ -9,7 +9,7 @@ OS; no new Packer variable or NVKR platform axis is introduced. Preparation chec
 nFPM archive and executable pins; the agent stays dynamically linked and must pass the
 pinned upstream ELF checker for the Ubuntu loader and GLIBC <= 2.39. Its updater must
 remain a static ELF without a program interpreter, matching the pinned upstream check.
-Other M2 materials and the Packer host runtime retain their existing scope and exceptions.
+Other NVKE materials and the Packer host runtime retain their existing scope and exceptions.
 
 Single-output hosted Definitions cover plain and public-bootstrap FDE on AMD64 and ARM64;
 the existing native local wrapper also selects the two plain variants. Hosted build-only
@@ -23,19 +23,19 @@ and build recipe used in the package exercise below. This is contract evidence: 
 guest boot, full acquired-payload ABI inspection, agent-start smoke, release publication
 or qualification is established by these tests. ADR-10/11/18/22 own the unchanged contracts.
 
-Maintained publication uses the sibling `inputs/definitions/nvke/disks-ubuntu24.yaml` family. It selects
-`nvke-node-image-ubuntu24-<arch>` and `nvke-node-fde-ubuntu24-<arch>` for AMD64 and ARM64 through the same
-overlay stack, with its own `github-nvke-disks-ubuntu24` Environment, main-only
-`nvkr-run-nvke-disks-ubuntu24.yml` signer and `m2-candidate/disks-ubuntu24` prefix. Private toolchain
-preparation admits that exact prefix. The combined M2 candidate, its Ubuntu 26.04 disks and the `disks`
-family are unchanged. ADR-26 admits both series as separate composite members only when the composite declares
+Maintained publication selects `nvke-node-image-ubuntu24-<arch>` and `nvke-node-fde-ubuntu24-<arch>` for
+AMD64 and ARM64 through `inputs/definitions/nvke/disks-ubuntu24.yaml`, the composite's
+`nvke-disks-ubuntu24` member. Production uses the main-only `nvkr-run-nvke.yml` signer and
+`candidate/nvke` prefix. The standalone `github-nvke-disks-ubuntu24` Environment remains an
+unenrolled comparison fixture. ADR-26 admits both series as separate composite members only when the composite declares
 each component the overlay replaces as a variant of the two disk families; an opt-in extended contract compiles
 that composite. The maintained [GPU site composite](../../../inputs/definitions/nvke/README.md#gpu-site-composite)
-selects both series that way, declaring the eight replaced components, in its generated production and
-development bundles. Split, composite, closure
+selects both series that way, declaring the eight replaced components, in its generated production,
+development and nightly bundles. Split, composite, closure
 and credential-boundary contracts pin each output's exact overlay stack and closure, signer isolation and
-credential projection; generation is deterministic. No Ubuntu 24.04 hosted bake, publication, release
-verification or guest boot is recorded.
+credential projection; generation is deterministic. The [historical composite publication](adr-26.md#hosted-gpu-site-publication)
+covers its exact Ubuntu 24.04 outputs; current-candidate execution, independent consumer verification and
+guest boots remain unrecorded.
 
 On 2026-10-19 (UTC), a local native ARM64 container exercise ran the then-current overlay preparation
 and offline build commands against the earlier `ff21ba8c07cafff74b68e238a8876af11e5beded` source with the declared Bookworm image

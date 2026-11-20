@@ -1,11 +1,13 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# Retained comparison/authoring fixture; not enrolled in maintained generation.
+
 apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
-  description: M2 candidate publication namespace; native disk execution with build provenance; deep inspection and material reconciliation deferred beyond the M3 MVP.
-  name: nvke-m2-github
+  description: NVKE candidate publication namespace; native disk execution with build provenance; deep inspection and material reconciliation deferred beyond the M3 MVP.
+  name: nvke-github
 githubExecutionPartitions: true
 githubARC: native-kvm-v1
 toolchainAccess:
@@ -43,7 +45,7 @@ executionClasses:
     maxTimeoutSeconds: 21600
     capabilities: [kvm]
 # Executable pins are native measurements. Budgets cover the existing 8 GiB
-# subject / 16 GiB filesystem limits, not a measured full M2 execution.
+# subject / 16 GiB filesystem limits, not a measured full NVKE execution.
 # Private-volume admission requires 12*filesystem + 2*subject + 2 GiB scratch;
 # memory covers 2*subject + appliance + scanner/report headroom. Host capacity
 # includes the additional held subject snapshot.
@@ -79,7 +81,7 @@ diskInspectionProfiles:
 publication:
   mode: per-output-v1
   credentialRef: github:NVKR_REGISTRY_WRITE
-  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/m2-candidate
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/candidate
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared

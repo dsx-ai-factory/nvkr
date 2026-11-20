@@ -15,14 +15,37 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/catalog"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/delivery"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/derivedoutput"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 )
 
 const ArtifactCheckGateVersion = "nvkr.dev/artifact-checks/v1"
+
+// Disk evidence descriptions retain the authenticated publication's scope. They
+// are report vocabulary, not receipts or independent inspection authority.
+const (
+	DiskEvidenceDescriptionBuildProvenance = "producer-only; content inspection not performed"
+	DiskEvidenceDescriptionPackages        = "installed packages inventoried; file integrity and material reconciliation not checked"
+	DiskEvidenceDescriptionStrict          = "content and material reconciliation performed"
+)
+
+func qualificationDiskEvidence(mode string) (string, error) {
+	switch mode {
+	case sbom.DiskBuildProvenance:
+		return DiskEvidenceDescriptionBuildProvenance, nil
+	case sbom.DiskInstalledPackages:
+		return DiskEvidenceDescriptionPackages, nil
+	case "":
+		return DiskEvidenceDescriptionStrict, nil
+	default:
+		return "", e.New(e.CodeVerifyFailed, "unknown qualification disk evidence mode")
+	}
+}
 
 // QualificationPredicate is untrusted input until its exact bytes pass both
 // Plan semantics and cryptographic verification for the independently selected
@@ -51,6 +74,7 @@ type ArtifactCheckResult struct {
 }
 
 type ArtifactCheckOutput struct {
+	Derived       *derivedoutput.Binding      `json:"derived,omitempty"`
 	Name          string                      `json:"name"`
 	Kind          string                      `json:"kind"`
 	Reference     string                      `json:"reference"`
@@ -325,6 +349,9 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 	if err := factory.ValidateQualificationRootInvocation(predicates[request.Reference], &plan, publication.Metadata.InvocationID, origin.InvocationID); err != nil {
 		return nil, nil, err
 	}
+	if err := factory.ValidateQualificationRootMaterials(predicates[request.Reference], &plan, publication); err != nil {
+		return nil, nil, err
+	}
 	if len(predicates) != len(publication.Outputs)+1 {
 		return nil, nil, e.New(e.CodeReleaseIncomplete, "qualification predicates do not cover the exact root and output set")
 	}
@@ -363,6 +390,10 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 		checks = append(checks, qualificationCheck("build-signature-and-provenance", signatureErr))
 		pinErr := checkAcquiredQualificationSubjects(&plan, output)
 		checks = append(checks, qualificationCheck("payload-pins", pinErr))
+		derivedErr := checkQualificationDerived(ctx, &plan, publication, output, verified.publication)
+		if output.Derived != nil {
+			checks = append(checks, qualificationCheck("derived-inventory", derivedErr))
+		}
 		embeddedStatus, embeddedErr := checkQualificationEmbedded(ctx, &plan, output.Name)
 		embeddedCheck := qualificationCheck("embedded-declarations", embeddedErr)
 		if embeddedErr == nil {
@@ -371,20 +402,27 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 		checks = append(checks, embeddedCheck)
 		sort.Slice(checks, func(i, j int) bool { return checks[i].Name < checks[j].Name })
 		verdict := ArtifactCheckOutput{Name: output.Name, Kind: output.Kind, Reference: output.Reference,
+			Derived: output.Derived.Clone(),
 			Subject: output.Digest, BuildDigest: output.BuildDigest, BuildSubjects: output.BuildSubjects,
 			Checks: checks, Overall: "pass", ImageIndex: output.ImageIndex.Clone()}
 		if output.OS != "" && output.Arch != "" {
 			verdict.Platform = output.OS + "/" + output.Arch
 		}
 		if output.Kind == OutputDiskImage {
-			verdict.DiskEvidence = "producer-only; content inspection not performed"
+			if output.Disk == nil {
+				return nil, nil, e.New(e.CodeVerifyFailed, "qualification disk output lacks its signed evidence mode")
+			}
+			verdict.DiskEvidence, err = qualificationDiskEvidence(output.Disk.EvidenceMode)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 		for _, check := range checks {
 			if check.Status == "fail" {
 				verdict.Overall = "fail"
 			}
 		}
-		failures = append(failures, signatureErr, pinErr, embeddedErr)
+		failures = append(failures, signatureErr, pinErr, embeddedErr, derivedErr)
 		failures = append(failures, memberEvidenceErrs...)
 		if i == 0 {
 			// Keep shared failures at their first original position so coded-error
@@ -490,6 +528,14 @@ func qualificationCheck(name string, err error) ArtifactCheckResult {
 }
 
 func checkAcquiredQualificationSubjects(plan *factory.Plan, output delivery.PublicationOutput) error {
+	if output.Derived != nil {
+		for _, required := range plan.LifecycleOutputs {
+			if required.Name == output.Name && required.Derived != nil && required.BuildDigest == output.BuildDigest {
+				return output.Derived.ValidateOutput(output.Name, output.Kind, output.BuildDigest, output.Components)
+			}
+		}
+		return e.New(e.CodeReleaseIncomplete, "derived output has no matching planned derivation")
+	}
 	// BuildSubjects identify producer/acquisition payloads; output.Digest is the
 	// separate delivery manifest. An acquired file pin must never be compared
 	// with that wrapper digest. Native image children retain their own subjects.

@@ -31,6 +31,10 @@ func inspectMetadata(ctx context.Context, root string, allowPayloads bool) (Insp
 }
 
 func inspectMetadataProgress(ctx context.Context, root string, allowPayloads bool, expectedRoot string, progress func(MetadataProgress)) (Inspection, error) {
+	return inspectSelectedMetadata(ctx, root, allowPayloads, expectedRoot, progress, nil)
+}
+
+func inspectSelectedMetadata(ctx context.Context, root string, allowPayloads bool, expectedRoot string, progress func(MetadataProgress), selection metadataSelection) (Inspection, error) {
 	ctx = withMetadataReads(ctx)
 	if err := deliveryContext(ctx); err != nil {
 		return Inspection{}, err
@@ -71,6 +75,9 @@ func inspectMetadataProgress(ctx context.Context, root string, allowPayloads boo
 	if publication.Release == nil || publication.Qualification != QualificationDiagnostic {
 		return Inspection{}, e.New(e.CodeEngineCapability, "metadata transport requires pipeline release metadata")
 	}
+	if err := selection.requireOutputs(publication); err != nil {
+		return Inspection{}, err
+	}
 	semantic, err := publication.Digest()
 	if err != nil {
 		return Inspection{}, err
@@ -92,6 +99,9 @@ func inspectMetadataProgress(ctx context.Context, root string, allowPayloads boo
 	}
 	report(nil)
 	for _, object := range publication.Objects {
+		if !selection.includes(object) {
+			continue
+		}
 		if object.Output != nil && object.Output.ImageIndex != nil {
 			controls, payloads, err := imageIndexMetadata(ctx, root, object)
 			if err != nil {
@@ -168,7 +178,7 @@ func inspectMetadataProgress(ctx context.Context, root string, allowPayloads boo
 		}
 	}
 	sources := map[string]PublicationSource{}
-	if err := verifyReleaseEvidenceSources(ctx, root, publication, sources); err != nil {
+	if err := verifySelectedReleaseEvidenceSources(ctx, root, publication, sources, selection); err != nil {
 		return Inspection{}, err
 	}
 	outputs, err := MetadataOutputs(publication)
@@ -194,6 +204,7 @@ func MetadataOutputs(root PublicationRoot) ([]Output, error) {
 		}
 		b := object.Output
 		o := Output{Name: object.Name, Kind: b.Format, Digest: object.DescriptorDigest, BuildDigest: b.BuildDigest, Components: append([]string(nil), b.Components...), Disk: cloneDiskOutput(b.Disk), ImageIndex: b.ImageIndex.Clone()}
+		o.Derived = b.Derived.Clone()
 		o.OS, o.Arch = object.OS, object.Arch
 		if b.Format == "apt-repository" || b.Format == outputFormatDebian {
 			o.Digest = object.SemanticDigest
@@ -276,6 +287,10 @@ func BuildMetadataRootWithRepresentation(ctx context.Context, out string, root P
 }
 
 func buildMetadataRoot(ctx context.Context, out string, root PublicationRoot, sources map[string]string, expectedRoot, bootstrapSource string) (Result, error) {
+	return buildSelectedMetadataRoot(ctx, out, root, sources, expectedRoot, bootstrapSource, nil)
+}
+
+func buildSelectedMetadataRoot(ctx context.Context, out string, root PublicationRoot, sources map[string]string, expectedRoot, bootstrapSource string, selection metadataSelection) (Result, error) {
 	if err := deliveryContext(ctx); err != nil {
 		return Result{}, err
 	}
@@ -285,6 +300,12 @@ func buildMetadataRoot(ctx context.Context, out string, root PublicationRoot, so
 	if root.Release == nil || root.Qualification != QualificationDiagnostic {
 		return Result{}, e.New(e.CodeEngineCapability, "metadata transport requires pipeline release metadata")
 	}
+	if err := selection.requireOutputs(root); err != nil {
+		return Result{}, err
+	}
+	if selection != nil && (bootstrapSource == "" || !isDigest(expectedRoot)) {
+		return Result{}, e.New(e.CodeUsage, "selected metadata must preserve an exact original bootstrap")
+	}
 	stage, commit, cleanup, err := stageLayout(out)
 	if err != nil {
 		return Result{}, err
@@ -292,6 +313,9 @@ func buildMetadataRoot(ctx context.Context, out string, root PublicationRoot, so
 	defer cleanup()
 	writer := layoutWriter{root: stage, plain: true}
 	for _, o := range root.Objects {
+		if !selection.includes(o) {
+			continue
+		}
 		source := sources[o.Name]
 		if o.Output != nil && o.Output.ImageIndex != nil {
 			controls, _, err := imageIndexMetadata(ctx, source, o)
@@ -353,7 +377,7 @@ func buildMetadataRoot(ctx context.Context, out string, root PublicationRoot, so
 	if expectedRoot != "" && digest != expectedRoot {
 		return Result{}, e.New(e.CodeVerifyFailed, "exported publication metadata differs from expected root")
 	}
-	if _, err := InspectMetadata(ctx, stage); err != nil {
+	if _, err := inspectSelectedMetadata(ctx, stage, false, expectedRoot, nil, selection); err != nil {
 		return Result{}, err
 	}
 	if err := commit(); err != nil {

@@ -12,7 +12,7 @@ PKG         := ./...
 # Optional diagnostic flags, e.g. GO_TEST_FLAGS=-json for CI timing capture.
 GO_TEST_FLAGS ?=
 # Bound each package explicitly; the local unsharded suite can exceed Go's
-# implicit 10-minute default. Hosted shards have a separate five-minute job budget.
+# implicit 10-minute default. Hosted shards have a separate ten-minute job budget.
 GO_TEST_TIMEOUT ?= 20m
 # CI splits the ordinary suite; reproduce any matrix entry with make test-shard.
 TEST_SHARD_GROUP ?=
@@ -21,7 +21,7 @@ TEST_SHARD_INDEX ?=
 PIPELINE_DEV_REPO ?=
 export PIPELINE_DEV_REPO
 # Module source dirs only (never the vendored trees checked out under .nvkr/).
-GOSRC       := client cmd internal pkg
+GOSRC       := client cmd internal pkg inputs/catalogs/nvke/machineimage
 GO_VERSION  := $(shell cat .go-version 2>/dev/null)
 VERSION     ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 COMMIT      := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
@@ -56,11 +56,15 @@ build: go-version-check ## Compile the nvkr binary.
 
 .PHONY: demo demo-test-bin
 demo: go-version-check ## Build the downstream Go local NVKE demo CLI (calls nvkr).
-	go build -o $(DEMO_BIN) ./cmd/nvke-demo
+	go -C demos/nvke build -o $(abspath $(DEMO_BIN)) ./cmd/nvke-demo
 	chmod 0755 $(DEMO_BIN)
 
 demo-test-bin: go-version-check ## Compile opt-in native NVKE E2E tests; does not run them.
-	go test -c -o $(DEMO_TEST_BIN) ./internal/nvkedemo
+	go -C demos/nvke test -c -o $(abspath $(DEMO_TEST_BIN)) ./internal/nvkedemo
+
+.PHONY: demo-check
+demo-check: go-version-check ## Check the separate NVKE demo module (format, vet, build, test, lint, vulnerabilities).
+	$(MAKE) -C demos/nvke check
 
 .PHONY: install
 install: ## Install nvkr into $$(go env GOBIN).
@@ -102,11 +106,11 @@ shellcheck: ## Check executable shell surfaces for warning-or-higher defects.
 	@# same context without adding headers or changing identity-bearing file bytes.
 	@set -e; for spec in \
 	 bash:inputs/catalogs/aicr/scripts/build-nvke-bundle.sh.tmpl \
-	 bash:inputs/catalogs/node-images/release/scripts/build-nvke-cni-ovn.sh.tmpl \
-	 bash:inputs/catalogs/ovn-nvidia/scripts/build-nvke-cni-ovn.sh.tmpl \
-	 bash:inputs/catalogs/ovn-upstream/scripts/build-nvke-cni-ovn.sh.tmpl \
+	 bash:inputs/catalogs/node-images/scripts/build-nvke-cni-ovn.sh.tmpl \
+	 bash:inputs/catalogs/ovn/nvidia/scripts/build-nvke-cni-ovn.sh.tmpl \
+	 bash:inputs/catalogs/ovn/upstream/scripts/build-nvke-cni-ovn.sh.tmpl \
 	 sh:inputs/catalogs/nvsentinel/scripts/build-go-image.sh.tmpl \
-	 sh:inputs/catalogs/nvke/native-site/scripts/vendor-nktp-helm.sh.tmpl; do \
+	 sh:inputs/catalogs/nvke/scripts/vendor-nktp-helm.sh.tmpl; do \
 	 script=$${spec#*:}; dialect=$${spec%%:*}; \
 	 for arch in amd64 arm64; do \
 	   body=$$(sed 's/{{\.Arch}}/'"$$arch"'/g' "$$script"); \
@@ -149,8 +153,8 @@ ZIZMOR_REPORT_DIR ?= $(CURDIR)/.nvkr/zizmor-report
 export ZIZMOR_REPORT_DIR
 
 .PHONY: zizmor-report
-zizmor-report: ## Report offline workflow security findings with checksum-pinned zizmor (Python 3.12+, curl).
-	python3 -B scripts/zizmor-report.py
+zizmor-report: ## Report offline workflow security findings with checksum-pinned zizmor (shell, jq, curl, tar).
+	bash scripts/zizmor-report.sh
 
 .PHONY: test-workflow-scripts
 test-workflow-scripts: ## Test the triage and PR-metadata workflow scripts (needs node and npm).
@@ -162,9 +166,13 @@ test-workflow-scripts: ## Test the triage and PR-metadata workflow scripts (need
 test: ## Fast default tests for CI and agents (no extended fixtures or instrumentation).
 	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) $(PKG)
 
+.PHONY: ci-test-shard
+ci-test-shard: go-version-check ## Build the CI shard runner with direct signal handling.
+	go build -o bin/nvkr-ci-test-shard ./internal/citestshard
+
 .PHONY: test-shard
-test-shard: go-version-check ## Reproduce one CI test shard (TEST_SHARD_GROUP and TEST_SHARD_INDEX required).
-	python3 -B scripts/ci-test-shard.py --group '$(TEST_SHARD_GROUP)' --index '$(TEST_SHARD_INDEX)' --timeout '$(GO_TEST_TIMEOUT)'
+test-shard: ci-test-shard ## Reproduce one CI test shard (TEST_SHARD_GROUP and TEST_SHARD_INDEX required).
+	exec ./bin/nvkr-ci-test-shard --group '$(TEST_SHARD_GROUP)' --index '$(TEST_SHARD_INDEX)' --timeout '$(GO_TEST_TIMEOUT)'
 
 .PHONY: test-race
 test-race: ## Opt-in race detection and coverage for the default suite.
@@ -176,9 +184,13 @@ test-full: ## Include extended capacity/integration fixtures with race + coverag
 	NVKR_TEST_EXTENDED=1 $(MAKE) test-race
 
 .PHONY: test-ci-tools
-test-ci-tools: ## Require Python and check CI sharding, reports and local adapters.
-	python3 -B -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else "Python 3.12+ is required for CI report tests")'
-	python3 -B -m unittest discover -s scripts -p '*_test.py'
+test-ci-tools: ## Check CI tooling, local adapters and the catalog renderer with Go and shell tools.
+	go test ./internal/citestshard ./internal/checkstatus ./internal/gennotices -count=1
+	go test ./internal/checkdocs -count=1
+	go test ./scripts -run 'TestMaintainedGeneration|TestCITestSummary|TestDemoShellTools' -count=1
+	go test ./internal/cicontract -run 'TestDemoHTML|TestHeartbeat|TestVulncheckTools|TestPipelineDev|TestZizmor' -count=1
+	go -C inputs/catalogs/nvke/machineimage vet ./...
+	go -C inputs/catalogs/nvke/machineimage test ./... -count=1
 
 # Diff-scoped: only Markdown lines added since the merge base with STATUS_BASE are checked.
 # An empty STATUS_HEAD checks the working tree, including uncommitted and untracked files;
@@ -188,16 +200,18 @@ STATUS_HEAD ?=
 
 .PHONY: status-restated-check
 status-restated-check: ## Fail when added docs restate validation status outside the reconciliation ledger.
-	python3 -B scripts/check-status-restated.py '$(STATUS_BASE)' '$(STATUS_HEAD)'
+	go run ./internal/checkstatus '$(STATUS_BASE)' '$(STATUS_HEAD)'
 
 .PHONY: cover
 cover: test-race ## Open the HTML coverage report in a browser.
 	go tool cover -html=coverage.out
 
 .PHONY: tidy
-tidy: ## Format + go mod tidy.
+tidy: ## Format + tidy application and catalog renderer modules.
 	gofmt -s -w $(GOSRC)
 	go mod tidy
+	go -C inputs/catalogs/nvke/machineimage mod tidy
+	$(MAKE) -C demos/nvke tidy
 
 .PHONY: notices
 notices: ## Regenerate THIRD_PARTY_NOTICES.md from the linked module set.
@@ -231,10 +245,10 @@ fern-install: ## Install the locked Fern CLI into tools/fern (needs node and npm
 	npm ci --prefix tools/fern --omit=optional --ignore-scripts --no-audit --no-fund
 
 .PHONY: docs-check
-docs-check: ## Validate the published Fern docs (needs node and `make fern-install`).
+docs-check: ## Validate the published Fern docs (needs Go, node and `make fern-install`).
 	@[ -x "$(FERN)" ] || { echo "locked Fern CLI not installed — run make fern-install" >&2; exit 1; }
 	@[ -n "$(DOCS_PAGES)" ] || { echo "no pages listed in docs/index.yml" >&2; exit 1; }
-	python3 tools/check-docs-mdx $(DOCS_PAGES)
+	go run ./internal/checkdocs $(DOCS_PAGES)
 	@set -e; \
 	 work="$$(mktemp -d)"; trap 'rm -rf "$$work"' EXIT; \
 	 tar -cf - docs/index.yml $(DOCS_PAGES) | tar -xf - -C "$$work"; \
@@ -257,6 +271,7 @@ LICENSE_HOLDER     := NVIDIA CORPORATION & AFFILIATES
 # development bundles generate nvkr-dev-<name>.yml beside the authored files in
 # LICENSE_AUTHORED, which the second check still requires to carry a header.
 LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
+	-ignore '.github/nvkr-plan-store/**/*.sh' \
 	-ignore '.github/workflows/nvkr-run.yml' -ignore '.github/workflows/nvkr-qualify.yml' \
 	-ignore '.github/workflows/nvkr-run-*.yml' \
 	-ignore '.github/workflows/nvkr-qualify-*.yml' -ignore '.github/workflows/nvkr-smoke-*.yml' \
@@ -266,7 +281,7 @@ LICENSE_IGNORES := -ignore '**/testdata/**' -ignore '**/pins.lock.yaml' \
 	-ignore '.github/workflows/nvkr-smoke.yml' -ignore '.github/workflows/nvkr-dev.yml' -ignore '**/*.tmpl' \
 	-ignore 'docs/evidence/**' -ignore 'docs/**/*.yaml' -ignore 'docs/**/*.yml' \
 	-ignore '.nvkr/**' -ignore '.nvkr-inputs/**' -ignore '.claude/**' -ignore 'bin/**'
-LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify(-[a-z0-9-]+)?|smoke(-[a-z0-9-]+)?|dev(-[a-z0-9-]+)?)(__partition-[0-9]{2}|__w-[a-z0-9-]+)?\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
+LICENSE_UNCHECKED := (^|/)testdata/|pins\.lock\.yaml$$|^\.github/nvkr-plan-store/(scripts/.+@[0-9a-f]{12}|[0-9a-f]{64})\.sh$$|^\.github/workflows/nvkr-(run(-[a-z0-9-]+)?|qualify(-[a-z0-9-]+)?|smoke(-[a-z0-9-]+)?|dev(-[a-z0-9-]+)?)(__partition-[0-9]{2}|__w-[a-z0-9-]+)?\.yml$$|\.tmpl$$|^docs/evidence/|^docs/.*\.ya?ml$$|^\.nvkr(-inputs)?/|^\.claude/|^bin/
 LICENSE_AUTHORED := ^\.github/workflows/nvkr-dev-cleanup\.yml$$
 LICENSE_SOURCES := git ls-files '*.go' '*.py' '*.sh' '*.yaml' '*.yml' '*.jq' '*Dockerfile*' '*Makefile'
 ADDLICENSE := go run github.com/google/addlicense@$(ADDLICENSE_VERSION)
@@ -305,7 +320,7 @@ license-header-check: ## Fail when a source file has no license header.
 .PHONY: workflow-generator
 workflow-generator: go-version-check
 	@# The generator version is an input to regeneration (ADR-21 §1) and is recorded
-	@# in .github/nvkr-run/plan.json as `generatorVersion`. Building via `make build`,
+	@# in .github/nvkr-run-nvke/plan.json as `generatorVersion`. Building via `make build`,
 	@# whose version comes from `git describe`, therefore always reports drift. Build
 	@# the generator with the same canonical version string the generated Run
 	@# workflow uses, so this target is reproducible locally and in CI.
@@ -314,15 +329,16 @@ workflow-generator: go-version-check
 		-o bin/nvkr-exec ./cmd/nvkr
 
 # Diagnostic: `make workflows-check PROJECTION_PILOT=in-process` checks the
-# production, development and NVKE family producer bundles through the reference projection
+# production and development producer bundles through the reference projection
 # plugin over that transport. Qualification workflows and runtime bundles stay core-only.
 PROJECTION_PILOT ?=
 PROJECTION_PILOT_FLAG = $(if $(PROJECTION_PILOT),--projection-pilot=$(PROJECTION_PILOT))
 
 .PHONY: workflows-check
-workflows-check: workflow-generator producer-overlays-check catalog-refresh-check ## Check every maintained producer and qualification bundle from the authored inventory.
-	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
-	python3 scripts/generate-maintained.py --check $(PROJECTION_PILOT_FLAG)
+workflows-check: workflow-generator producer-overlays-check catalog-refresh-check catalog-index-check ## Check every maintained producer and qualification bundle from the authored inventory.
+	bin/nvkr-exec definition pin --check --definition $(NVKE_COMPOSITE)
+	bin/nvkr-exec definition pin --check --definition $(NVKE_RELEASE)
+	bash scripts/generate-maintained.sh --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: producer-overlays-check producer-overlays-generate
 producer-overlays-check: workflow-generator ## Check configured producer copies and predecessor bindings.
@@ -332,6 +348,17 @@ producer-overlays-generate: workflow-generator ## Regenerate configured producer
 	bin/nvkr-exec catalog regenerate-overlays --config inputs/policies/ovn-producer-overlays.json
 
 # Maintained catalog sources are public and fetched anonymously.
+
+.PHONY: catalog-index-check catalog-index-generate
+catalog-index-check: workflow-generator ## Check the offline catalog inventory for drift.
+	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
+	 bin/nvkr-exec catalog index --catalog inputs/catalogs --ui plain > "$$rendered" && \
+	 { diff -u inputs/catalogs/INDEX.md "$$rendered" || { echo "run 'make catalog-index-generate'" >&2; exit 1; }; }
+
+catalog-index-generate: workflow-generator ## Regenerate the offline catalog inventory.
+	@rendered="$$(mktemp)" && trap 'rm -f "$$rendered"' EXIT && \
+	 bin/nvkr-exec catalog index --catalog inputs/catalogs --ui plain > "$$rendered" && \
+	 chmod 0644 "$$rendered" && mv "$$rendered" inputs/catalogs/INDEX.md
 
 .PHONY: catalog-refresh-check
 catalog-refresh-check: workflow-generator ## Check the installed catalog refresh workflow against `catalog update-ci`.
@@ -351,39 +378,34 @@ catalog-refresh-generate: workflow-generator ## Regenerate the installed catalog
 	 bin/nvkr-exec catalog update-ci > "$$rendered" && \
 	 chmod 0644 "$$rendered" && mv "$$rendered" .github/workflows/catalog-refresh.yaml
 
-.PHONY: workflows-generate
-workflows-generate: workflow-generator ## Regenerate all maintained bundles from the authored generation inventory.
-	python3 scripts/generate-maintained.py
+.PHONY: maintained-bundles-generate workflows-generate
+maintained-bundles-generate: workflow-generator ## Regenerate all maintained producer and qualifier owners together.
+	bash scripts/generate-maintained.sh
+
+workflows-generate: maintained-bundles-generate ## Regenerate all maintained bundles and the catalog-refresh workflow.
 	$(MAKE) catalog-refresh-generate
 
-.PHONY: nvke-split-generate nvke-split-check
-nvke-split-generate: workflow-generator ## Regenerate the independent NVKE family bundles.
-	python3 scripts/generate-maintained.py --group split
-
-nvke-split-check: workflow-generator ## Check the independent NVKE family bundles.
-	python3 scripts/generate-maintained.py --group split --check $(PROJECTION_PILOT_FLAG)
-
 # Composite member pin admission is independent of bundle inventory admission.
-NVKE_GPU_SITE := inputs/definitions/nvke/gpu-site.composite.yaml
+NVKE_COMPOSITE := inputs/definitions/nvke/nvke.composite.yaml
+NVKE_RELEASE := inputs/definitions/nvke/nvke-release.composite.yaml
 
-.PHONY: nvke-gpu-site-generate nvke-gpu-site-check
-nvke-gpu-site-generate: workflow-generator ## Regenerate the GPU site production bundle.
-	python3 scripts/generate-maintained.py --group gpu-site
+.PHONY: nvke-generate nvke-check
+nvke-generate: maintained-bundles-generate ## Regenerate all maintained owners for an NVKE production change.
 
-nvke-gpu-site-check: workflow-generator ## Check GPU site member pins and generation.
-	bin/nvkr-exec definition pin --check --definition $(NVKE_GPU_SITE)
-	python3 scripts/generate-maintained.py --group gpu-site --check $(PROJECTION_PILOT_FLAG)
+nvke-check: workflow-generator ## Check NVKE member pins and generation.
+	bin/nvkr-exec definition pin --check --definition $(NVKE_COMPOSITE)
+	bin/nvkr-exec definition pin --check --definition $(NVKE_RELEASE)
+	bash scripts/generate-maintained.sh --group main --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-generate pipeline-dev-check
-pipeline-dev-generate: workflow-generator ## Regenerate the development bundle.
-	python3 scripts/generate-maintained.py --group development
+pipeline-dev-generate: maintained-bundles-generate ## Regenerate all maintained owners for a development change.
 
 pipeline-dev-check: workflow-generator ## Check development workflow generation.
-	python3 scripts/generate-maintained.py --group development --check $(PROJECTION_PILOT_FLAG)
+	bash scripts/generate-maintained.sh --group development --check $(PROJECTION_PILOT_FLAG)
 
 .PHONY: pipeline-dev-run
 pipeline-dev-run: pipeline-dev-check ## Dispatch the clean, pushed current branch (PIPELINE_DEV_REPO=owner/repo).
-	python3 scripts/pipeline-dev.py --repo "$$PIPELINE_DEV_REPO"
+	bash scripts/pipeline-dev.sh --repo "$$PIPELINE_DEV_REPO"
 
 .PHONY: check
 check: go-version-check fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check vet lint shellcheck test-ci-tools test vulncheck ## Code gate: format, Definition and ledger location, license, restated status, vet, lint, shell, tool tests, Go tests, vulnerabilities.
@@ -393,7 +415,7 @@ check: go-version-check fmt-check definitions-location-check reconciliation-loca
 # merge gate runs. CodeQL and the DCO App run only on GitHub.
 # Checks needing extra tools or network access run before the long test suite.
 CI_CHECKS := fmt-check definitions-location-check reconciliation-location-check license-header-check status-restated-check shellcheck actionlint test-workflow-scripts \
-	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test demo-hello
+	notices-check workflows-check docs-check vet test-ci-tools build lint vulncheck test demo-hello demo-check
 
 .PHONY: ci-check
 ci-check: go-version-check $(CI_CHECKS) ## Complete local merge gate (needs public NVKE access, Node and Fern; see CONTRIBUTING.md).
@@ -405,8 +427,18 @@ clean: ## Remove build output, coverage, and the local engine workspace.
 
 .PHONY: run-resolve
 run-resolve: build ## Resolve the pinned kubectl producer and print its build graph.
-	$(BIN) resolve --data testdata/catalogs/kubernetes-layered --component kubectl --platform linux/amd64
+	$(BIN) resolve --catalog testdata/catalogs/kubernetes-layered --component kubectl --platform linux/amd64
 
 .PHONY: demo-hello
 demo-hello: ## Build and verify the hello demo (requires running Docker).
 	bash demos/demo-local.sh --out "$$(mktemp -d)/hello"
+
+.PHONY: e2e-quick
+e2e-quick: export GOMAXPROCS := 2
+e2e-quick: export GOFLAGS := -p=2
+e2e-quick: build ## Build, publish, recover and smoke hello; unsigned qualification (Docker or CONTAINER_RUNTIME=podman).
+	go run ./internal/quicke2e
+
+.PHONY: test-gitlab-docker
+test-gitlab-docker: go-version-check ## Run the real, owned GitLab server/Runner nvkectl integration (Docker, 12 GiB RAM).
+	bash scripts/test-gitlab-docker.sh

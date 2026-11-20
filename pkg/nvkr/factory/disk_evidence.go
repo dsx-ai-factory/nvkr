@@ -106,7 +106,7 @@ func openDiskEvidenceRuntimeWithTool(ctx context.Context, plan *Plan, runtimeExe
 	if err := requireProductionDiskScratch(profile); err != nil {
 		return nil, err
 	}
-	if err := validateDiskScannerSelection(plan, platform, profile.ScannerDigest); err != nil {
+	if err := validateSelectedDiskScanner(plan, platform, profile.ScannerDigest); err != nil {
 		return nil, err
 	}
 	return sbom.OpenDiskInspectionRuntime(ctx, diskEvidenceRuntimeSelection(plan, profile, platform, runtimeExecutable, workspace, diagnostics, tool))
@@ -141,7 +141,7 @@ func diskEvidenceProfile(ctx context.Context, plan *Plan, inspection *sbom.DiskI
 	if err := requireProductionDiskScratch(profile); err != nil {
 		return definition.DiskInspectionProfile{}, err
 	}
-	if err := validateDiskScannerSelection(plan, selection.Platform, profile.ScannerDigest); err != nil {
+	if err := validateSelectedDiskScanner(plan, selection.Platform, profile.ScannerDigest); err != nil {
 		return definition.DiskInspectionProfile{}, err
 	}
 	_, runtimeErr := containerruntime.Select(plan.Environment.Runtime.Runtime, selection.RuntimeExecutable)
@@ -160,6 +160,35 @@ func diskProfileFromSelection(selection pipeline.DiskInspectionSelection) defini
 		Resources: selection.Resources, TimeoutSeconds: selection.TimeoutSeconds, MaxFilesystemBytes: selection.MaxFilesystemBytes, ScratchStorage: selection.ScratchStorage}
 }
 
+// The shared runtime retains every frozen tooling pin. Only strict outputs use
+// its full-content scanner, so only those outputs must also match a separately
+// selected Definition scanner for their execution host.
+func validateSelectedDiskScanner(plan *Plan, platform, pin string) error {
+	for _, output := range plan.LifecycleOutputs {
+		if output.Kind != PackageDiskImage || plan.Environment.DiskEvidenceFor(output.Name) != "" {
+			continue
+		}
+		found := false
+		for _, build := range plan.Builds {
+			if build.Name != output.Name {
+				continue
+			}
+			found = true
+			host, _, err := diskPublicationInspectionProfile(build, plan.Environment)
+			if err != nil {
+				return err
+			}
+			if host == platform {
+				return validateDiskScannerSelection(plan, platform, pin)
+			}
+		}
+		if !found {
+			return e.New(e.CodePipelineDrift, "strict disk output %q lacks its frozen build", output.Name)
+		}
+	}
+	return nil
+}
+
 // A frozen inspection profile owns its complete scanner pin. Reuse a separately
 // selected Definition scanner when it targets this native host. A profile for
 // the other supported host is explicit observation infrastructure, not an
@@ -172,10 +201,17 @@ func validateDiskScannerSelection(plan *Plan, platform, pin string) error {
 		return nil
 	}
 	selected, ok := plan.CatalogSnapshot.Tools[plan.Definition.SBOMTool]
-	if _, multi := plan.CatalogSnapshot.ToolPlatforms[plan.Definition.SBOMTool]; multi {
+	if pins, multi := plan.CatalogSnapshot.ToolPlatforms[plan.Definition.SBOMTool]; multi {
 		var err error
 		selected, err = plan.CatalogSnapshot.SelectTool(plan.Definition.SBOMTool, platform)
 		if err != nil {
+			var coded *e.Error
+			if len(pins) > 0 && (platform == "linux/amd64" || platform == "linux/arm64") &&
+				errors.As(err, &coded) && coded.Code == e.CodeEngineCapability {
+				// No catalog scanner targets this supported host. Its frozen
+				// inspection profile owns the independent scanner pin.
+				return nil
+			}
 			return err
 		}
 		ok = true
@@ -193,12 +229,30 @@ func validateDiskScannerSelection(plan *Plan, platform, pin string) error {
 // acquisitions, and the complete live staged producer graph. No caller path,
 // input description or completeness boolean is admitted.
 func (owner *LocalRunResult) ReconcileDiskEvidence(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, inspection *sbom.DiskInspectionRuntime) (*DiskEvidenceReceipt, error) {
+	if plan == nil || plan.Environment.DiskEvidenceFor(expected.Name) != "" {
+		return nil, e.New(e.CodeEngineCapability, "strict reconciliation requires the strict evidence selection")
+	}
+	return owner.collectDiskEvidence(ctx, plan, expected, inspection, owner.scanDiskEvidence)
+}
+
+// InspectDiskPackageEvidence joins only the installed package database to the
+// original held disk and live producer trace. It grants no strict reconciliation.
+func (owner *LocalRunResult) InspectDiskPackageEvidence(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, inspection *sbom.DiskInspectionRuntime) (*DiskEvidenceReceipt, error) {
+	if plan == nil || plan.Environment.DiskEvidenceFor(expected.Name) != sbom.DiskInstalledPackages {
+		return nil, e.New(e.CodeEngineCapability, "package inspection requires its explicit evidence selection")
+	}
+	return owner.collectDiskEvidence(ctx, plan, expected, inspection, owner.scanDiskPackages)
+}
+
+func (owner *LocalRunResult) collectDiskEvidence(ctx context.Context, plan *Plan, expected LifecycleOutputPlan, inspection *sbom.DiskInspectionRuntime,
+	scan func(context.Context, *Plan, BuildPlan, *diskMaterialTrace, *diskPayload, *sbom.DiskInspectionRuntime, definition.DiskInspectionProfile) (diskEvidenceScan, error),
+) (*DiskEvidenceReceipt, error) {
 	receipt, err := owner.reconcileDiskEvidence(ctx, plan, expected, inspection,
 		func(ctx context.Context) (definition.DiskInspectionProfile, error) {
 			return owner.diskEvidenceProfile(ctx, plan, expected, inspection)
 		},
 		func(ctx context.Context, build BuildPlan, trace *diskMaterialTrace, payload *diskPayload, profile definition.DiskInspectionProfile) (diskEvidenceScan, error) {
-			return owner.scanDiskEvidence(ctx, plan, build, trace, payload, inspection, profile)
+			return scan(ctx, plan, build, trace, payload, inspection, profile)
 		})
 	if err != nil {
 		return nil, err
@@ -259,7 +313,7 @@ func (owner *LocalRunResult) reconcileDiskEvidenceStarted(ctx context.Context, p
 	if err != nil {
 		return nil, err
 	}
-	deadline, err := diskEvidenceJoinDeadline(started, profile.TimeoutSeconds, len(trace.description.Members))
+	deadline, err := diskSelectedEvidenceDeadline(plan, expected.Name, started, profile.TimeoutSeconds, len(trace.description.Members))
 	if err != nil {
 		return nil, err
 	}
@@ -337,6 +391,14 @@ func diskEvidenceJoinDeadline(started time.Time, timeoutSeconds uint64, members 
 	return started.Add(time.Duration(operations*timeoutSeconds) * time.Second), nil
 }
 
+func diskSelectedEvidenceDeadline(plan *Plan, output string, started time.Time, timeoutSeconds uint64, members int) (time.Time, error) {
+	deadline, err := diskEvidenceJoinDeadline(started, timeoutSeconds, members)
+	if err == nil && plan.Environment.DiskEvidenceFor(output) == sbom.DiskInstalledPackages {
+		return started.Add(time.Duration(timeoutSeconds) * time.Second), nil
+	}
+	return deadline, err
+}
+
 func (owner *LocalRunResult) scanDiskEvidence(ctx context.Context, plan *Plan, build BuildPlan, trace *diskMaterialTrace, payload *diskPayload,
 	inspection *sbom.DiskInspectionRuntime, profile definition.DiskInspectionProfile,
 ) (diskEvidenceScan, error) {
@@ -397,15 +459,42 @@ func requireProductionDiskScratch(profile definition.DiskInspectionProfile) erro
 // Whether raw material bytes are a supported ISO is still checked by guestfish;
 // output kind alone grants no filesystem or installed-content proof.
 func admitDiskEvidenceBuild(plan *Plan, expected LifecycleOutputPlan) (BuildPlan, error) {
-	if plan == nil {
-		return BuildPlan{}, e.New(e.CodeUsage, "disk evidence requires its frozen Plan")
-	}
-	if err := plan.Validate(); err != nil {
+	builds, err := admitDiskEvidenceBuilds(plan, []LifecycleOutputPlan{expected})
+	if err != nil {
 		return BuildPlan{}, err
 	}
+	return builds[0], nil
+}
+
+// Admit a group against one complete Plan validation. Rendering checks all disk
+// outputs together; repeating whole-Plan validation per output makes that work
+// grow with both the output count and the size of the Plan. No admission survives
+// this call, and an invalid member returns no partially admitted group.
+func admitDiskEvidenceBuilds(plan *Plan, expected []LifecycleOutputPlan) ([]BuildPlan, error) {
+	if plan == nil {
+		return nil, e.New(e.CodeUsage, "disk evidence requires its frozen Plan")
+	}
+	if err := plan.Validate(); err != nil {
+		return nil, err
+	}
+	builds := make([]BuildPlan, 0, len(expected))
+	for _, output := range expected {
+		build, err := diskEvidenceBuildForValidatedPlan(plan, output)
+		if err != nil {
+			return nil, err
+		}
+		builds = append(builds, build)
+	}
+	return builds, nil
+}
+
+func diskEvidenceBuildForValidatedPlan(plan *Plan, expected LifecycleOutputPlan) (BuildPlan, error) {
 	for _, build := range plan.Builds {
 		if build.Name != expected.Name || build.BuildDigest != expected.BuildDigest {
 			continue
+		}
+		if plan.Environment.DiskEvidenceFor(expected.Name) == sbom.DiskInstalledPackages {
+			return build, nil // Package inventory does not scan material contents.
 		}
 		// Complete Plan validation admits the IR target domain and binds this
 		// copied BuildPlan's platform to that graph before any Run permit/work.

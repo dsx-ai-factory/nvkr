@@ -1,11 +1,22 @@
 ## Support by owner
 
+Post-seed GHCR privacy confirmation retries only API absence with bounded backoff.
+`TestPrivatePublicationWaitsForSeedConfirmation` covers delayed visibility, success on the last attempt,
+exhaustion with the original trust-policy code, explicit unsafe policy, denied requests and cancellation;
+the whole-set check and no-repeat-seed boundary remain mandatory. `TestSeedConfirmationPreservesRateLimitBudget`
+uses virtual time to cover a 120-second Retry-After and consecutive 60/120-second rate-limit waits
+after an absent response. These are local API/registry fixtures.
+The triggering [operator publication failure](https://github.com/dsx-ai-factory/nvkr/actions/runs/44577627888/job/135756330227)
+establishes a successful metadata seed followed by API absence; eventual consistency is an inference
+from that sequence. Retry outcomes and a corrected hosted publication remain unverified.
+
 The Tekton route selects the existing per-output OCI publication owner with anonymous transport and explicit
 cluster signing keys. Its complete in-cluster registry exercise remains pending; see [ADR-18](adr-18.md).
 
 | Owner | Implemented and contract-tested | Remaining capability or acceptance |
 |---|---|---|
-| 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects with consistent named-output aliases and independent evidence, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation, selected output payload-closure retrieval and per-output assembly/finalization; consumer held-closure export bound to exact-input receipts; candidate M2 hosted signing/publication completed; public-bootstrap FDE build-provenance publication supported; development attempt namespaces and scoped GHCR cleanup; hosted GHCR package privacy admission using metadata-derived destination references and an exact-root-bound push; required Environment transport selection with preserved omitted-OCI behavior, explicit OCI identity and early APT/both rejection; required S3 copies of original signed publications through a generic byte-provider interface | Package admission has local contracts, not a hosted private-publication or public-source access proof; independent grants, historical provider payloads and future visibility changes remain operational obligations. Hosted GHCR legacy layouts without the metadata contract fail closed. `release pull` shares the bounded HTTP/2 peer-reset reacquisition used by `delivery.Pull`, with local `httptest` contracts only, as recorded in [output-local publication](output-local-publication-and-metadata-assembly.md#output-local-publication-and-metadata-assembly); no external large-disk `release pull` has been re-run since the recorded peer-reset failures. Main-only Plan execution, independent M2 full-payload disk consumption, strict full-content publication and live S3/CDN operational acceptance remain unproved; registration is deferred. Direct APT service adapter, repository signing and authenticated read-back remain unimplemented. |
+| 20 Publication | Digest-selected sibling repositories, signed evidence membership, native OCI/Docker subjects with consistent named-output aliases and independent evidence, aggregate runnable OCI indexes with exact native-child evidence, bounded metadata navigation, selected output payload-closure retrieval and per-output assembly/finalization; consumer held-closure export bound to exact-input receipts; candidate NVKE hosted signing/publication completed; public-bootstrap FDE build-provenance publication supported; development attempt namespaces and scoped GHCR cleanup; hosted GHCR package privacy admission using metadata-derived destination references and an exact-root-bound push; required Environment transport selection with preserved omitted-OCI behavior, explicit OCI identity and early APT/both rejection; required S3 copies of original signed publications through a generic byte-provider interface | Package admission has local contracts, not a hosted private-publication or public-source access proof; independent grants, historical provider payloads and future visibility changes remain operational obligations. Hosted GHCR legacy layouts without the metadata contract fail closed. `release pull` shares the bounded HTTP/2 peer-reset reacquisition used by `delivery.Pull`, with local `httptest` contracts only, as recorded in [output-local publication](output-local-publication-and-metadata-assembly.md#output-local-publication-and-metadata-assembly); no external large-disk `release pull` has been re-run since the recorded peer-reset failures. Main-only Plan execution, independent NVKE full-payload disk consumption, strict full-content publication and live S3/CDN operational acceptance remain unproved; registration is deferred. Direct APT service adapter, repository signing and authenticated read-back remain unimplemented. [Selective boot publication](object-store-publication.md#selective-boot-asset-publication) has core lifecycle APIs; generated execution, production rendering and external acceptance remain unavailable. |
+| 20 Publication-bound inventory | `aicr-inventory-v1` compiles the exact destination prefix and named sibling Build identities into a distinct tagged Build identity. `TestInventoryBuildIdentity` and `TestDerivedInventoryPlan` cover destination changes without changing native producer identities; provenance contracts bind observed sibling subjects and detect missing or substituted materials, including prefix-related output names. The checked publication owner retains only bounded, explicitly marked inventory layers and compares their exact document/tar envelope through a revocable API; different gzip encodings are accepted. | Local contract coverage only; no new registry-service, signing-service or hosted qualification acceptance. Re-derivation is required after relocation. The current member does not render a catalog or installer bundle. |
 
 For [issue #425](https://github.com/dsx-ai-factory/nvkr/issues/425), `publication.ociRepresentation` explicitly
 selects construction before identity freezing. Omission preserves the existing `artifact-v1` format;
@@ -81,3 +92,42 @@ in the observation transport. Metadata-member cancellation preserves the member 
 guidance before any write, and nested alias readback classification does not duplicate its message.
 Write probes remain absent; the library's mutating, asynchronously cleaned-up push-permission helper is not
 used. Live registry/version coverage and hosted validation of these changes remain unverified.
+
+The development [Run 44255595374](https://github.com/dsx-ai-factory/nvkr/actions/runs/44255595374)
+completed source sharing but failed publication of the second output in a two-image batch: a successful
+metadata-only seed was followed by a package API 404. Publication remained closed and the release job
+was skipped. The exact error is reproduced by the package-admission fixture. Bounded authenticated
+post-seed confirmation now covers delayed visibility, exhaustion, cancellation and immediate explicit
+policy refusal; whole-set admission still rechecks every package before payload upload. The later package
+API read showed the metadata root as internal and unlinked, which is consistent with delayed visibility
+but does not establish the original credential's provider response sequence. The subsequent [Run 44270895414](https://github.com/dsx-ai-factory/nvkr/actions/runs/44270895414), at
+`8fdf3737`, completed on attempt 2: all 83 named artifacts/evidence and the aggregate release were verified,
+and finalization recorded 83 observed outputs. Its separate disk blob-readback HTTP 403 recovered through
+an authorized failed-job-only retry without changing credentials, target construction or code. No automatic
+authentication-error retry or privacy-policy relaxation is introduced. The published release is
+`ghcr.io/dsx-ai-factory/nvkr/development/runs/44270895414/attempts/2/releases@sha256:3b73371f34c31ca91ce8387d85f3826a5728ed2a5c1615c1bccefe0ab76c661b`.
+This supplies hosted evidence for that exact selection and revision, including successful post-seed admission;
+it does not prove every bounded retry branch occurred remotely. [ADR-18](adr-18.md) records timing and
+cross-Run byte-comparison limits. The earlier failed attempts supply no release-completeness evidence.
+
+## GitLab ordinary unsigned publication
+
+The GitLab publication path is implemented as anonymous HTTPS OCI transport or current-job
+`gitlab:CI_JOB_TOKEN` authentication confined to provider-reported same-project registry metadata.
+It checks every output/evidence repository, isolates registry/token endpoint traffic and independently
+reads back the complete closure before recording success. The anonymous route enforces HTTPS while
+retaining the HTTP client's ordinary redirect policy, without the authenticated route's one-hop or
+same-project authority bounds. A local TLS test of authenticated publication also checks one-hop blob
+redirects to credential-free HTTPS storage, refusal of manifest/token/foreign-repository delegation, and
+zero requests to an insecure redirect destination. This is transport contract coverage, not live object-store
+acceptance. Both isolated GitLab routes now share ADR-18's direct TLS trust owner and require
+provider-authenticated branch protection when publication is selected. The default non-isolated transport
+and signed publication lanes are unchanged. These current trust/admission changes are not exercised by
+the historical real-server snapshots below.
+The [GitLab validation record](adr-18.md#gitlab-ordinary-unsigned-profile) separates the real server/Runner
+CLI-build acceptance from the 26 controlled Linux HTTPS lifecycle subcases. The latter exercise publication
+and refusal with the production clients; the real recipe selected no registry destination. Neither establishes
+publication to a live GitLab registry, signing or qualification. API-reader access remains separate from
+registry-write authority. Protected publication also requires API-reader access to the exact branch
+endpoint; the optional job-token reader's access to it remains unverified. Full repository checks and
+maintainer review remain separate gates.

@@ -1,0 +1,124 @@
+{
+  "buildDigest": "sha256:a355e104d9e04ce11a5bbbd4054bd7e5a1f7c82e01033b6dcbb9c2cbfaacf576",
+  "catalogDigest": "sha256:b6ecdd63bf4f35cbe2cbee75bd573e3afba798e410a7e81cb73d7b4c8a7da8fe",
+  "components": [
+    "helm-operator",
+    "kubectl-operator"
+  ],
+  "executionGraph": {
+    "nodes": [
+      {
+        "artifact": "https://get.helm.sh/helm-v4.1.4-linux-amd64.tar.gz",
+        "artifactPath": "helm-operator",
+        "component": "helm-operator",
+        "digest": "sha256:210d576a6dc04b7864af4b5d9a5af58860bbc03d19174ffeddbd29d01d1b59a9",
+        "env": [
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1775710686"
+          }
+        ],
+        "executableArchive": {
+          "digest": "sha256:70b2c30a19da4db264dfd68c8a3664e05093a361cefd89572ffb36f8abfa3d09",
+          "member": "linux-amd64/helm"
+        },
+        "id": "pull-helm-operator",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "host-package",
+        "platform": "linux/amd64",
+        "version": "4.1.4"
+      },
+      {
+        "artifact": "https://dl.k8s.io/release/v1.36.3/bin/linux/amd64/kubectl",
+        "artifactPath": "kubectl-operator",
+        "component": "kubectl-operator",
+        "digest": "sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336",
+        "env": [
+          {
+            "name": "SOURCE_DATE_EPOCH",
+            "value": "1784743658"
+          }
+        ],
+        "id": "pull-kubectl-operator",
+        "kind": "pull",
+        "network": "default",
+        "outputType": "host-package",
+        "platform": "linux/amd64",
+        "version": "1.36.3"
+      },
+      {
+        "id": "verify",
+        "kind": "verify",
+        "needs": [
+          "pull-helm-operator",
+          "pull-kubectl-operator"
+        ]
+      }
+    ],
+    "platform": "linux/amd64",
+    "schemaVersion": "nvkr.dev/ir/v4"
+  },
+  "name": "operator-tools",
+  "platform": "linux/amd64",
+  "resolvedComponents": [
+    {
+      "Name": "helm-operator",
+      "commit": "05fa37973dc9e42b76e1d2883494c87174b6074f",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/amd64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:210d576a6dc04b7864af4b5d9a5af58860bbc03d19174ffeddbd29d01d1b59a9"
+        },
+        "evidence": {
+          "none": true
+        },
+        "executable": {
+          "archiveDigest": "sha256:70b2c30a19da4db264dfd68c8a3664e05093a361cefd89572ffb36f8abfa3d09",
+          "executableDigest": "sha256:210d576a6dc04b7864af4b5d9a5af58860bbc03d19174ffeddbd29d01d1b59a9",
+          "executablePath": "linux-amd64/helm",
+          "format": "tar-gzip",
+          "platform": "linux/amd64",
+          "url": "https://get.helm.sh/helm-v4.1.4-linux-amd64.tar.gz"
+        },
+        "url": "https://get.helm.sh/helm-v4.1.4-linux-amd64.tar.gz"
+      },
+      "repo": "https://github.com/helm/helm",
+      "sourceDateEpoch": 1775710686,
+      "tag": "v4.1.4"
+    },
+    {
+      "Name": "kubectl-operator",
+      "commit": "0f29094e5b73085e3802ecc1298ecae13866bfe6",
+      "fromSource": false,
+      "outputType": "host-package",
+      "platforms": [
+        "linux/amd64"
+      ],
+      "prebuilt": {
+        "digests": {
+          "amd64": "sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336"
+        },
+        "evidence": {
+          "none": true
+        },
+        "executable": {
+          "archiveDigest": "sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336",
+          "executableDigest": "sha256:ebbd080e7c2e275093b55915722043257eb24004363e20acb3c4d71919f88336",
+          "executablePath": "kubectl",
+          "format": "raw",
+          "platform": "linux/amd64",
+          "url": "https://dl.k8s.io/release/v1.36.3/bin/linux/amd64/kubectl"
+        },
+        "url": "https://dl.k8s.io/release/v1.36.3/bin/linux/amd64/kubectl"
+      },
+      "repo": "https://github.com/kubernetes/kubernetes",
+      "sourceDateEpoch": 1784743658,
+      "tag": "v1.36.3"
+    }
+  ]
+}

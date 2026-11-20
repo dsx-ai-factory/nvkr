@@ -9,7 +9,7 @@ import (
 )
 
 // CheckedPublication owns complete publication integrity checks and retained
-// control, evidence and executable bytes. Other payloads are verified and released
+// control, evidence, executable and bounded derived-inventory bytes. Other payloads are verified and released
 // before issuance, so this owner cannot export a full layout or a disk payload.
 // It grants no signature, execution or release authority. Shallow copies share
 // revocation and Close joins active streams before releasing retained bytes.
@@ -24,7 +24,7 @@ func (publication *CheckedPublication) retainedState() *publicationState {
 	return publication.state
 }
 
-// Close releases the retained controls, evidence and executable layers.
+// Close releases retained controls, evidence, executable and derived-inventory layers.
 func (publication *CheckedPublication) Close() error {
 	return publication.retainedState().close()
 }

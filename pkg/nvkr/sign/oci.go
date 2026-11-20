@@ -32,6 +32,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -658,6 +659,11 @@ func (s *CosignOCISigner) verifyAndCapture(ctx context.Context, subject Subject,
 	if err := s.admit(); err != nil {
 		return VerificationRecord{}, err
 	}
+	finish, err := beginBoundedVerification(ctx)
+	if err != nil {
+		return VerificationRecord{}, err
+	}
+	defer finish()
 	if err := subject.Validate(); err != nil {
 		return VerificationRecord{}, err
 	}
@@ -753,12 +759,25 @@ func (s *CosignOCISigner) verifyAndCapture(ctx context.Context, subject Subject,
 // exit to the crypto-gate error code.
 func (s *CosignOCISigner) capture(ctx context.Context, args, environment []string) ([]byte, error) {
 	var stdout, stderr cosignOutputBuffer
-	if err := s.run(ctx, args, environment, &stdout, &stderr); err != nil {
-		if ctxErr := contextError(ctx); ctxErr != nil {
-			return nil, ctxErr
+	err := withBoundedBundleVerification(ctx, args, func(args []string) error {
+		if len(args) > 0 && args[0] == "verify-blob-attestation" && !slices.Contains(args, "--trusted-root") {
+			workspace, cleanup, err := newPrivateWorkspace("nvkr-cosign-tuf-*")
+			if err != nil {
+				return err
+			}
+			defer cleanup()
+			environment = cosignVerificationEnvironment(environment, workspace)
 		}
-		return nil, e.Wrap(e.CodeSignatureInvalid, err,
-			"cosign %s failed: %s", args[0], strings.TrimSpace(stderr.String()))
+		if err := s.run(ctx, args, environment, &stdout, &stderr); err != nil {
+			if failure := boundedVerificationFailure(ctx); failure != nil {
+				return failure
+			}
+			return e.Wrap(e.CodeSignatureInvalid, err, "cosign %s failed: %s", args[0], strings.TrimSpace(stderr.String()))
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 	if stdout.exceeded || stderr.exceeded {
 		return nil, e.New(e.CodeSignatureInvalid, "cosign %s produced an oversized report", args[0])
@@ -892,8 +911,8 @@ func (s *CosignOCISigner) writeDockerConfig(ctx context.Context, workspace strin
 // ociCosignEnvironment is the qualified cosign environment plus exclusive
 // control of Docker registry configuration. When a private workspace is supplied,
 // HOME is replaced because the upstream Docker keychain checks HOME before
-// DOCKER_CONFIG. Blob adapters without a registry workspace keep their ambient
-// home and cache locations. It keeps the ambient scrub of the
+// DOCKER_CONFIG. Blob verification additionally isolates its TUF cache at the
+// subprocess boundary. It keeps the ambient scrub of the
 // sign-blob/verify-blob adapters (loader injection, COSIGN_*, SIGSTORE_*, TUF_*,
 // SOURCE_DATE_EPOCH) and additionally removes ambient Docker/Podman registry
 // configuration controls.
@@ -921,6 +940,23 @@ func ociCosignEnvironment(base []string, dockerConfigDir string) []string {
 		out = append(out, "HOME="+filepath.Dir(dockerConfigDir), "DOCKER_CONFIG="+dockerConfigDir)
 	}
 	return out
+}
+
+// The pinned Sigstore client stores TUF metadata under HOME/.sigstore/root.
+// Each verifier needs its own cache: concurrent refreshes can replace a role's
+// file between go-tuf's atomic rename and read-back comparison. Preserve the
+// admitted argv and trust bootstrap; never copy an ambient cache or trust root.
+func cosignVerificationEnvironment(base []string, workspace string) []string {
+	out := make([]string, 0, len(base)+2)
+	for _, entry := range qualifiedCosignEnvironment(base) {
+		name, _, _ := strings.Cut(entry, "=")
+		switch strings.ToUpper(name) {
+		case "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR":
+			continue
+		}
+		out = append(out, entry)
+	}
+	return append(out, "HOME="+workspace, "USERPROFILE="+workspace)
 }
 
 type inTotoStatement struct {

@@ -158,9 +158,9 @@ func TestReleaseVerifyForwardsCompleteExactInputsToLifecycleUseCase(t *testing.T
 		"--reference", reference,
 		"--lane", "pipeline-attested", "--scope", "artifact-publication",
 		"--identity", "^builder$", "--issuer", "issuer", "--anonymous",
-		"--definition", "inputs/definitions/nvke/definition.yaml",
-		"--environment", "inputs/environments/github-release.yaml",
-		"--plan", ".github/nvkr-run/plan.json",
+		"--definition", "inputs/definitions/nvke/nvke-release.composite.yaml",
+		"--environment", "inputs/environments/github-nvke.yaml",
+		"--plan", ".github/nvkr-run-nvke/plan.json",
 	}
 	app := &cli.App{Commands: []*cli.Command{cmdReleaseWithVerify(verify)}}
 	raw, err := runCLIWithCapturedStdout(t, app, args...)
@@ -181,7 +181,7 @@ func TestReleaseVerifyForwardsCompleteExactInputsToLifecycleUseCase(t *testing.T
 
 func TestReleaseVerifyForwardsDiskEvidencePolicyWithExactInputs(t *testing.T) {
 	lifecycleCommandRepo(t)
-	for _, minimum := range []lifecycle.DiskEvidenceRequirement{"", lifecycle.DiskEvidenceBuildProvenance, lifecycle.DiskEvidenceStrict} {
+	for _, minimum := range []lifecycle.DiskEvidenceRequirement{"", lifecycle.DiskEvidenceBuildProvenance, lifecycle.DiskEvidencePackages, lifecycle.DiskEvidenceStrict} {
 		t.Run(string(minimum), func(t *testing.T) {
 			called := false
 			verify := func(_ context.Context, _ string, policy lifecycle.VerificationPolicy,
@@ -198,9 +198,9 @@ func TestReleaseVerifyForwardsDiskEvidencePolicyWithExactInputs(t *testing.T) {
 				"--reference", "registry.example.test/releases@sha256:" + strings.Repeat("a", 64),
 				"--lane", "pipeline-attested", "--scope", "artifact-publication",
 				"--identity", "^builder$", "--issuer", "issuer",
-				"--definition", "inputs/definitions/nvke/definition.yaml",
-				"--environment", "inputs/environments/github-release.yaml",
-				"--plan", ".github/nvkr-run/plan.json",
+				"--definition", "inputs/definitions/nvke/nvke-release.composite.yaml",
+				"--environment", "inputs/environments/github-nvke.yaml",
+				"--plan", ".github/nvkr-run-nvke/plan.json",
 			}
 			if minimum != "" {
 				args = append(args, "--minimum-disk-evidence", string(minimum))

@@ -90,14 +90,14 @@ func TestSDKRejectsUnsupportedGenerationBeforeInputsAndUnconfiguredConsumer(t *t
 }
 
 func TestSDKExposesTypedDiskEvidencePolicy(t *testing.T) {
-	runtimeValue := string(client.DiskEvidenceBuildProvenance)
+	runtimeValue := string(client.DiskEvidencePackages)
 	policy := client.VerificationPolicy{Lane: "pipeline-attested", Scope: "artifact-publication",
 		IdentityRegexp: "^builder$", Issuer: "issuer", MinimumDiskEvidence: client.DiskEvidenceRequirement(runtimeValue)}
 	if err := policy.Validate(); err != nil {
 		t.Fatal(err)
 	}
-	if client.DiskEvidenceStrict != "strict" || client.DiskEvidenceBuildProvenance != "build-provenance-v1" {
-		t.Fatalf("disk evidence policy constants = %q, %q", client.DiskEvidenceStrict, client.DiskEvidenceBuildProvenance)
+	if client.DiskEvidenceStrict != "strict" || client.DiskEvidencePackages != "packages" || client.DiskEvidenceBuildProvenance != "build-provenance-v1" {
+		t.Fatalf("disk evidence policy constants = %q, %q, %q", client.DiskEvidenceStrict, client.DiskEvidencePackages, client.DiskEvidenceBuildProvenance)
 	}
 }
 
@@ -120,7 +120,7 @@ func TestSDKLocalRuntimeInheritsEnvironmentAndRejectsConflicts(t *testing.T) {
 		t.Fatal(err)
 	}
 	root := t.TempDir()
-	for _, path := range []string{"docs/examples/nvke-module-tags", "inputs/catalogs/nvke/module-tags", "inputs/catalogs/shared"} {
+	for _, path := range []string{"docs/examples/nvke-module-tags", "inputs/catalogs/nvke", "inputs/catalogs/shared"} {
 		if err := os.CopyFS(filepath.Join(root, path), os.DirFS(filepath.Join(repo, path))); err != nil {
 			t.Fatal(err)
 		}

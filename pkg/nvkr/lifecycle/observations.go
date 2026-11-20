@@ -101,6 +101,7 @@ func observeOutput(ctx context.Context, slot requiredOutput, artifacts map[strin
 	}
 
 	expected := factory.LifecycleOutputPlan{Name: slot.Name, Kind: slot.Kind, ArtifactID: slot.MemberArtifactID,
+		Derived:     slot.Derived.Clone(),
 		BuildDigest: slot.BuildDigest, Components: append([]string(nil), slot.Components...), ImageIndex: slot.ImageIndex.Clone()}
 	observation, err := factory.ObserveWorkspaceLifecyclePayload(ctx, plan, expected, workspace, artifacts)
 	if err != nil {
@@ -114,6 +115,7 @@ func observeOutput(ctx context.Context, slot requiredOutput, artifacts map[strin
 		return Artifact{}, err
 	}
 	return Artifact{Name: slot.Name, Kind: slot.Kind, Digest: digest, BuildDigest: slot.BuildDigest,
+		Derived:    slot.Derived.Clone(),
 		Components: components, ImageIndex: observation.ImageIndex.Clone()}, nil
 }
 

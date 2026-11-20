@@ -56,7 +56,7 @@ func TestAuthoredBinaryHandoffsUsePrivateStorage(t *testing.T) {
 					continue
 				}
 				found = true
-				if step.Uses != "./.github/nvkr-run/actions/ci-upload" ||
+				if step.Uses != "./.github/nvkr-run-nvke/actions/ci-upload" ||
 					step.With["nvkr-ci-storage-write-token"] != "${{ secrets.NVKR_CI_STORAGE_WRITE_TOKEN }}" ||
 					step.With["include-hidden-files"] != true {
 					t.Fatal("binary handoff escaped the generated private transport")
@@ -92,7 +92,7 @@ func TestAuthoredPrivateConsumersUseReadCredential(t *testing.T) {
 				t.Fatal("private download disappeared")
 			}
 			step := job.Steps[index]
-			if step.Uses != "./.github/nvkr-run/actions/ci-download" ||
+			if step.Uses != "./.github/nvkr-run-nvke/actions/ci-download" ||
 				step.With["nvkr-ci-storage-read-token"] != "${{ secrets.NVKR_CI_STORAGE_READ_TOKEN }}" ||
 				step.With["name"] != test.artifact || step.With["path"] != test.path {
 				t.Fatal("private download changed its credential or locator handoff")
@@ -113,7 +113,7 @@ func TestNightlyDoesNotUploadProductsOrMetadata(t *testing.T) {
 			if strings.HasPrefix(step.Uses, "actions/upload-artifact@") {
 				t.Fatalf("nightly job %s uploads files from the local build", name)
 			}
-			for _, action := range []string{"actions/cache@", "docker/build-push-action@", "./.github/nvkr-run/actions/ci-upload"} {
+			for _, action := range []string{"actions/cache@", "docker/build-push-action@", "./.github/nvkr-run-nvke/actions/ci-upload"} {
 				if strings.HasPrefix(step.Uses, action) {
 					t.Fatalf("nightly coordinator %s exports product artifacts through %s", name, step.Uses)
 				}
@@ -140,7 +140,7 @@ func TestOSCandidateCannotObtainPrivateWriterOrUploadFiles(t *testing.T) {
 			if strings.HasPrefix(step.Uses, "actions/upload-artifact@") {
 				t.Fatal("candidate-controlled files may not enter public artifact storage")
 			}
-			if step.Uses == "./.github/nvkr-run/actions/ci-upload" {
+			if step.Uses == "./.github/nvkr-run-nvke/actions/ci-upload" {
 				if !strings.Contains(step.If, trusted) || strings.Contains(step.If, "||") || step.ContinueOnError != nil {
 					t.Fatal("postcandidate private storage requires exact workflow source admission")
 				}
@@ -152,7 +152,7 @@ func TestOSCandidateCannotObtainPrivateWriterOrUploadFiles(t *testing.T) {
 			}
 			for input, value := range step.With {
 				if text, ok := value.(string); ok && strings.Contains(text, "NVKR_CI_STORAGE_WRITE_TOKEN") &&
-					(step.Uses != "./.github/nvkr-run/actions/ci-upload" || input != "nvkr-ci-storage-write-token") {
+					(step.Uses != "./.github/nvkr-run-nvke/actions/ci-upload" || input != "nvkr-ci-storage-write-token") {
 					t.Fatal("private writer credential escaped its admitted transfer action")
 				}
 			}

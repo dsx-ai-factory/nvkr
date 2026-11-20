@@ -42,7 +42,7 @@ done
 demo_prepare_nvkr
 demo_need_command cmp
 demo_need_command dd
-demo_need_command python3
+demo_need_command jq
 WORK=$(demo_absolute_path "$WORK")
 demo_prepare_work "$WORK" "tamper-detection" "$(demo_absolute_path .nvkr/demo-tamper-detection)"
 demo_section "1/4  Inspect and extract an intact diagnostic publication"
@@ -58,17 +58,8 @@ LAYOUT="$WORK/publication"
 cmp "$ARTIFACT" "$WORK/intact/demo-artifact"
 
 demo_section "2/4  Reject changed artifact bytes before extraction"
-PAYLOAD_DIGEST=$(python3 - "$BUNDLE" <<'PYTHON'
-import json
-import pathlib
-import sys
-root = pathlib.Path(sys.argv[1])
-index = json.loads((root / "index.json").read_text())
-manifest_digest = index["manifests"][0]["digest"].split(":", 1)[1]
-manifest = json.loads((root / "blobs" / "sha256" / manifest_digest).read_text())
-print(manifest["layers"][0]["digest"].split(":", 1)[1])
-PYTHON
-)
+MANIFEST_DIGEST=$(jq -er '.manifests[0].digest | capture("^sha256:(?<hex>[0-9a-f]{64})$").hex' "$BUNDLE/index.json")
+PAYLOAD_DIGEST=$(jq -er '.layers[0].digest | capture("^sha256:(?<hex>[0-9a-f]{64})$").hex' "$BUNDLE/blobs/sha256/$MANIFEST_DIGEST")
 printf 'tampered artifact bytes\n' >> "$LAYOUT/blobs/sha256/$PAYLOAD_DIGEST"
 if "$NVKR" publish extract --layout "$LAYOUT" --bundle demo --out "$WORK/forbidden" > "$WORK/artifact-tamper.out" 2>&1; then
   demo_die "changed artifact bytes unexpectedly extracted"

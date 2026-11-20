@@ -148,39 +148,14 @@ func TestRefreshRejectsDriftInADependentBundleBeforePinWork(t *testing.T) {
 // An owner's coded cause must survive the maintenance wrapper: a stage conflict
 // stays a write conflict and drift stays drift, never a generic capability error.
 func TestRegenerateKeepsTheOwnersCodedFailure(t *testing.T) {
-	cfg := validConfig()
-	cfg.DevelopmentEnvironment = "environment-dev.yaml"
-	// The closure reads each Run's Environment to choose its owner; this one opts out of runtime Plans.
-	t.Chdir(t.TempDir())
-	writeFixture(t, cfg.DevelopmentEnvironment, []byte("apiVersion: nvkr.dev/environment/v1\nkind: Environment\nmetadata: {name: dev}\nutilityContainer: busybox@sha256:"+strings.Repeat("a", 64)+"\nutilityPlatform: linux/amd64\ngithubDevelopment: true\n"))
-	for _, tc := range []struct {
-		name         string
-		failEnv      string
-		failOnCheck  bool
-		code         e.Code
-		wantMessages string
-	}{
-		{"production write conflict", cfg.Environment, false, e.CodeWriteConflict, "regeneration failed"},
-		{"development write conflict", cfg.DevelopmentEnvironment, false, e.CodeWriteConflict, "regeneration failed"},
-		{"development drift on recheck", cfg.DevelopmentEnvironment, true, e.CodePipelineDrift, "did not reproduce"},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var wrote []string
-			_, err := regenerate(t.Context(), cfg, "test (deadbeef)", func(_ context.Context, _, environment, _, _, _ string, check bool) (string, error) {
-				if !check {
-					wrote = append(wrote, environment)
-				}
-				if environment == tc.failEnv && check == tc.failOnCheck {
-					return "", e.New(tc.code, "owner failure")
-				}
-				return "sha256:plan", nil
+	for _, code := range []e.Code{e.CodeWriteConflict, e.CodePipelineDrift, e.CodeTimeout} {
+		t.Run(string(code), func(t *testing.T) {
+			_, err := regenerate(t.Context(), validConfig(), "test (deadbeef)", func(context.Context, Config, string, bool) (string, error) {
+				return "", e.New(code, "owner failure")
 			})
-			assertCode(t, err, tc.code)
-			if !strings.Contains(err.Error(), tc.wantMessages) {
+			assertCode(t, err, code)
+			if !strings.Contains(err.Error(), "regeneration failed") || !strings.Contains(err.Error(), "retain the disposable checkout") {
 				t.Fatalf("lost the retained-checkout guidance: %v", err)
-			}
-			if tc.failOnCheck && len(wrote) != 2 {
-				t.Fatalf("every member must be written before the recheck: %v", wrote)
 			}
 		})
 	}
@@ -193,8 +168,8 @@ func TestClosureAllowlistIsExactInBothPlaces(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const stage = `git add -- "$POLICY_CATALOG/pins.lock.yaml" '.github/nvkr-dev' '.github/nvkr-run' '.github/workflows/nvkr-dev.yml' '.github/workflows/nvkr-run.yml'`
-	const admit = `"$catalog/pins.lock.yaml" | '.github/nvkr-dev'/* | '.github/nvkr-run'/* | '.github/workflows/nvkr-dev.yml' | '.github/workflows/nvkr-run.yml') ;;`
+	const stage = `git add -- "$POLICY_CATALOG/pins.lock.yaml" '.github/nvkr-dev' '.github/nvkr-plan-store' '.github/nvkr-run' '.github/workflows/nvkr-dev.yml' '.github/workflows/nvkr-run.yml'`
+	const admit = `"$catalog/pins.lock.yaml" | '.github/nvkr-dev'/* | '.github/nvkr-plan-store'/* | '.github/nvkr-run'/* | '.github/workflows/nvkr-dev.yml' | '.github/workflows/nvkr-run.yml') ;;`
 	for _, want := range []string{stage, admit} {
 		if !bytes.Contains(raw, []byte(want)) {
 			t.Fatalf("rendered workflow lacks the exact closure allowlist %q", want)
@@ -226,16 +201,9 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 		t.Fatal("the maintained policy does not name its dependent bundles as expected")
 	}
 	wantAdditional := []RunInput{
-		{Definition: "inputs/definitions/nvke/core.yaml", Environment: "inputs/environments/github-nvke-core.yaml"},
-		{Definition: "inputs/definitions/nvke/services.yaml", Environment: "inputs/environments/github-nvke-services.yaml"},
-		{Definition: "inputs/definitions/nvke/telemetry.yaml", Environment: "inputs/environments/github-nvke-telemetry.yaml"},
-		{Definition: "inputs/definitions/nvke/disks.yaml", Environment: "inputs/environments/github-nvke-disks.yaml"},
-		{Definition: "inputs/definitions/nvke/disks-ubuntu24.yaml", Environment: "inputs/environments/github-nvke-disks-ubuntu24.yaml"},
-		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-nvke-gpu-site.yaml", QualificationPolicy: "inputs/policies/nvke-gpu-site-qualification.yaml"},
-		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-development.yaml", QualificationPolicy: "inputs/policies/nvke-gpu-site-development-qualification.yaml"},
-		{Definition: "inputs/definitions/demo/arm64-nvidia-kvm.json", Environment: "inputs/environments/github-nightly-nvidia.json"},
-		{Definition: "inputs/definitions/demo/arm64-upstream-kvm.json", Environment: "inputs/environments/github-nightly-upstream.json"},
-		{Definition: "inputs/definitions/nvke/gpu-site.composite.yaml", Environment: "inputs/environments/github-nvke-nightly-gpu-site.yaml", QualificationPolicy: "inputs/policies/nvke-nightly-gpu-site-qualification.yaml"},
+		{Definition: "inputs/definitions/nvke/nvke.composite.yaml", Environment: "inputs/environments/github-development.yaml", QualificationPolicy: "inputs/policies/nvke-composite-development-qualification.yaml"},
+		{Definition: "inputs/definitions/nvke/nvke-release.composite.yaml", Environment: "inputs/environments/github-nvke-nightly.yaml", QualificationPolicy: "inputs/policies/nvke-composite-nightly-qualification.yaml"},
+		{Definition: "inputs/definitions/nvidia-workload-identity/imds-agent.yaml", Environment: "inputs/environments/github-wli-imds-agent.yaml"},
 	}
 	if len(cfg.AdditionalRuns) != len(wantAdditional) {
 		t.Fatalf("maintained policy selects %d additional Runs, want %d", len(cfg.AdditionalRuns), len(wantAdditional))
@@ -319,44 +287,29 @@ func TestClosureListsTheMaintainedBundles(t *testing.T) {
 	wantDirectories := []string{
 		".github/nvkr-dev",
 		".github/nvkr-dev-qualification",
-		".github/nvkr-qualification",
-		".github/nvkr-qualification-nvke-gpu-site",
-		".github/nvkr-qualification-nvke-nightly-gpu-site",
-		".github/nvkr-run",
-		".github/nvkr-run-nvke-core",
-		".github/nvkr-run-nvke-disks",
-		".github/nvkr-run-nvke-disks-ubuntu24",
-		".github/nvkr-run-nvke-gpu-site",
-		".github/nvkr-run-nvke-nightly-arm64",
-		".github/nvkr-run-nvke-nightly-gpu-site",
-		".github/nvkr-run-nvke-nightly-upstream-ovn-arm64",
-		".github/nvkr-run-nvke-services",
-		".github/nvkr-run-nvke-telemetry",
+		".github/nvkr-plan-store",
+		".github/nvkr-qualification-nvke",
+		".github/nvkr-qualification-nvke-nightly",
+		".github/nvkr-run-nvke",
+		".github/nvkr-run-nvke-nightly",
+		".github/nvkr-run-wli-imds-agent",
 	}
 	if !slices.Equal(directories, wantDirectories) {
 		t.Fatalf("closure directories = %v, want %v", directories, wantDirectories)
 	}
 	wantFiles := []string{
+		".github/workflows/nvkr-dev.yml",
 		".github/workflows/nvkr-dev-qualify.yml",
 		".github/workflows/nvkr-dev-smoke.yml",
-		".github/workflows/nvkr-dev.yml",
-		".github/workflows/nvkr-qualify-nvke-gpu-site.yml",
-		".github/workflows/nvkr-qualify-nvke-nightly-gpu-site.yml",
-		".github/workflows/nvkr-qualify.yml",
-		".github/workflows/nvkr-run-nvke-core.yml",
-		".github/workflows/nvkr-run-nvke-disks-ubuntu24.yml",
-		".github/workflows/nvkr-run-nvke-disks.yml",
-		".github/workflows/nvkr-run-nvke-gpu-site.yml",
-		".github/workflows/nvkr-run-nvke-nightly-arm64.yml",
-		".github/workflows/nvkr-run-nvke-nightly-gpu-site.yml",
-		".github/workflows/nvkr-run-nvke-nightly-upstream-ovn-arm64.yml",
-		".github/workflows/nvkr-run-nvke-services.yml",
-		".github/workflows/nvkr-run-nvke-telemetry.yml",
-		".github/workflows/nvkr-run.yml",
-		".github/workflows/nvkr-smoke-nvke-gpu-site.yml",
-		".github/workflows/nvkr-smoke-nvke-nightly-gpu-site.yml",
-		".github/workflows/nvkr-smoke.yml",
+		".github/workflows/nvkr-qualify-nvke.yml",
+		".github/workflows/nvkr-qualify-nvke-nightly.yml",
+		".github/workflows/nvkr-run-nvke.yml",
+		".github/workflows/nvkr-run-nvke-nightly.yml",
+		".github/workflows/nvkr-run-wli-imds-agent.yml",
+		".github/workflows/nvkr-smoke-nvke.yml",
+		".github/workflows/nvkr-smoke-nvke-nightly.yml",
 	}
+	slices.Sort(wantFiles)
 	if !slices.Equal(files, wantFiles) {
 		t.Fatalf("closure workflow files = %v, want %v", files, wantFiles)
 	}
