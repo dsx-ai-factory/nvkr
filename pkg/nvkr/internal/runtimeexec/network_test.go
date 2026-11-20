@@ -13,7 +13,9 @@ import (
 
 func TestResolverConfiguration(t *testing.T) {
 	for _, tc := range []struct{ name, input, want string }{
-		{"numeric addresses", "search private.example\nnameserver 127.0.0.53\nnameserver 2001:db8::1 # note\noptions ndots:5\n", "nameserver 127.0.0.53\nnameserver 2001:db8::1\n"},
+		{"numeric addresses", "search private.example\nnameserver 127.0.0.53\nnameserver 2001:db8::1 # note\noptions ndots:5\n", "nameserver 127.0.0.53\n"},
+		{"IPv6 only", "nameserver 2001:db8::1\n", ""},
+		{"IPv4 after IPv6", "nameserver 2001:db8::1\nnameserver 2001:db8::2\nnameserver 2001:db8::3\nnameserver 192.0.2.1\n", "nameserver 192.0.2.1\n"},
 		{"bounded servers", "nameserver 192.0.2.1\nnameserver 192.0.2.2\nnameserver 192.0.2.3\nnameserver 192.0.2.4\n", "nameserver 192.0.2.1\nnameserver 192.0.2.2\nnameserver 192.0.2.3\n"},
 		{"name", "nameserver dns.example\n", ""},
 		{"zone", "nameserver fe80::1%host0\n", ""},

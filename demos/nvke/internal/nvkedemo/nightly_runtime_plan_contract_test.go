@@ -267,10 +267,8 @@ func testNightlyRuntimePlanHandoff(t *testing.T, sourcePolicy bool) {
 				code = e.CodeUnpinnedInput
 			}
 			switch scenario {
-			case "malformed Plan", "substituted Plan path":
+			case "malformed Plan", "substituted Plan path", "invalid Plan":
 				code = e.CodePipelineDrift
-			case "invalid Plan":
-				code = e.CodeInvalidCatalog
 			case "substituted Environment", "substituted Definition":
 				code = e.CodeUnverifiedRef
 			case "wrong runtime origin", "replaced runtime artifact", "wrong cycle source", "missing cycle source":

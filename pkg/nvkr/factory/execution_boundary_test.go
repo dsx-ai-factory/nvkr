@@ -206,7 +206,7 @@ func TestObservedProducerCannotBorrowSiblingResult(t *testing.T) {
 func TestFactoryPlanLoaderRejectsMalformedFiles(t *testing.T) {
 	for _, tc := range []struct{ name, raw string }{
 		{"invalid json", "{"},
-		{"unknown field", `{"unknown":true}`},
+		{"unknown field", `{"schemaVersion":"` + PlanSchemaVersion + `","unknown":true}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			path := filepath.Join(t.TempDir(), "plan.json")

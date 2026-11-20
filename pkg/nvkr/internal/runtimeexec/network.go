@@ -34,6 +34,11 @@ func resolverConfiguration(raw []byte) string {
 		if err != nil || address.Zone() != "" || address.IsUnspecified() || address.IsMulticast() {
 			return ""
 		}
+		// This TAP admits IPv4 only. libslirp 4.9.1's IPv4 DNS forwarding
+		// resolves upstreams with AF_INET and cannot use an IPv6-only set.
+		if !address.Is4() {
+			continue
+		}
 		servers = append(servers, "nameserver "+address.String()+"\n")
 		if len(servers) == 3 {
 			break

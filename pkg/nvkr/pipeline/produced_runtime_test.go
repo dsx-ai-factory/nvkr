@@ -148,7 +148,14 @@ func TestProducedRuntimeReceiptRetainsAndRevokesExactClosure(t *testing.T) {
 	if err := tool.AuthenticateResultContext(t.Context(), result); err != nil {
 		t.Fatal(err)
 	}
-	if err := ValidateRuntimeProductionDescription(binding, node, result, binding.LayoutDigest, layerDigest); err != nil {
+	tree, err := ociclosure.Snapshot(t.Context(), artifactHostPath(options, node))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if binding.LayoutDigest != tree.Digest() {
+		t.Fatal("receipt differs from independently observed layout")
+	}
+	if err := ValidateRuntimeProductionDescription(binding, node, result, tree.Digest(), layerDigest); err != nil {
 		t.Fatalf("original production description rejected: %v", err)
 	}
 	for _, change := range []struct {

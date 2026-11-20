@@ -26,6 +26,10 @@ import (
 )
 
 func TestMain(tests *testing.M) {
+	if len(os.Args) == 2 && os.Args[1] == "runtime-test-print" {
+		_, _ = os.Stderr.Write([]byte("helper diagnostic\n"))
+		os.Exit(0)
+	}
 	if len(os.Args) == 5 && os.Args[1] == "runtime-test-launcher" {
 		if err := deathTestLauncher(os.Args[2], os.Args[3], os.Args[4] == "outbound"); err != nil {
 			fmt.Fprintln(os.Stderr, err)
@@ -55,13 +59,20 @@ func TestMain(tests *testing.M) {
 			time.Sleep(10 * time.Millisecond)
 		}
 	}
-	if len(os.Args) == 2 && os.Args[1] == "runtime-test-block" {
+	if len(os.Args) == 2 && (os.Args[1] == "runtime-test-block" || os.Args[1] == "runtime-test-flood") {
 		child := exec.Command("/bin/payload", "runtime-test-heartbeat")
 		child.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 		child.Stdout, child.Stderr = os.Stdout, os.Stderr
 		if err := child.Start(); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
+		}
+		if os.Args[1] == "runtime-test-flood" {
+			for {
+				if _, err := os.Stderr.Write(make([]byte, 64<<10)); err != nil {
+					os.Exit(1)
+				}
+			}
 		}
 		// This deliberately detached descendant must die with its PID namespace,
 		// even though group-directed cancellation cannot reach its new session.
@@ -405,12 +416,13 @@ func TestNativeOutboundRuntimeNamespace(t *testing.T) {
 		t.Fatal(err)
 	}
 	request.Command = []string{"/bin/payload", "runtime-test-block"}
-	if err := launcher.Execute(ctx, request); err == nil {
-		t.Fatal("consumer succeeded after helper exit")
+	if err := launcher.Execute(ctx, request); errorCodeForTest(err) != e.CodeEngineCapability {
+		t.Fatalf("consumer did not report helper exit: %v", err)
 	}
 	if ctx.Err() != nil {
 		t.Fatal("helper exit did not stop its consumer promptly")
 	}
+	checkBlockedNamespaceOutput(t, ctx, launcher, request, output, e.CodeTimeout)
 }
 
 func TestNativeRuntimeNamespace(t *testing.T) {
@@ -481,6 +493,8 @@ func TestNativeRuntimeNamespace(t *testing.T) {
 		t.Fatalf("output projection: %q %v", raw, err)
 	}
 	checkNamespaceCancellation(t, ctx, launcher, request, output)
+	checkBlockedNamespaceOutput(t, ctx, launcher, request, output, e.CodeTimeout)
+	checkProcessExitBeforeCapture(t, ctx, launcher, rootFD)
 	if err := launcher.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -488,6 +502,70 @@ func TestNativeRuntimeNamespace(t *testing.T) {
 	var coded *e.Error
 	if !errors.As(err, &coded) || coded.Code != e.CodeEngineCapability {
 		t.Fatalf("closed launcher accepted work: %v", err)
+	}
+}
+
+func checkProcessExitBeforeCapture(t *testing.T, ctx context.Context, launcher *Launcher, root *os.File) {
+	t.Helper()
+	callCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	capture := NewCapture(1024)
+	capture.mu.Lock() // Delay capture drainage independently of process exit.
+	exited, done := make(chan struct{}), make(chan error, 1)
+	go func() {
+		done <- executeChildObserved(callCtx, launcher.state.executable,
+			requestRecord{Mode: "execute", UID: 65534, GID: 65534, RootFD: 5,
+				Command: []string{"/bin/payload", "runtime-test-print"}, Workdir: "/"},
+			[]*os.File{root}, nil, capture, func() { close(exited) })
+	}()
+	select {
+	case <-exited:
+	case <-callCtx.Done():
+		t.Error("process exit notification waited for diagnostic capture")
+	}
+	capture.mu.Unlock()
+	if err := <-done; err != nil {
+		t.Fatal(err)
+	}
+	raw, overflow := capture.Snapshot()
+	if raw != "helper diagnostic\n" || overflow {
+		t.Fatalf("capture lost diagnostics: %q", raw)
+	}
+}
+
+func errorCodeForTest(err error) e.Code {
+	var coded *e.Error
+	if errors.As(err, &coded) {
+		return coded.Code
+	}
+	return ""
+}
+
+func checkBlockedNamespaceOutput(t *testing.T, ctx context.Context, launcher *Launcher, request Request, output string, want e.Code) {
+	t.Helper()
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reader.Close()
+	defer writer.Close()
+	request.Stdout, request.Stderr = writer, writer
+	request.Command = []string{"/bin/payload", "runtime-test-flood"}
+	callCtx, cancel := context.WithTimeout(ctx, time.Second)
+	defer cancel()
+	started := time.Now()
+	err = launcher.Execute(callCtx, request)
+	if errorCodeForTest(err) != want || time.Since(started) > 5*time.Second {
+		t.Fatalf("blocked file output did not join namespace: %v (%s)", err, time.Since(started))
+	}
+	before, err := os.ReadFile(filepath.Join(output, "heartbeat"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	time.Sleep(50 * time.Millisecond)
+	after, err := os.ReadFile(filepath.Join(output, "heartbeat"))
+	if err != nil || !bytes.Equal(before, after) {
+		t.Fatalf("blocked-output descendant survived: %q -> %q (%v)", before, after, err)
 	}
 }
 

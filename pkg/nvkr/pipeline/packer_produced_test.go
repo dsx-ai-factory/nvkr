@@ -16,7 +16,33 @@ import (
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/runtimeexec"
 )
+
+func TestProducedPackerValidationCapture(t *testing.T) {
+	for _, tc := range []struct {
+		name, raw, want string
+		limit           int
+		accepted        bool
+	}{
+		{"version", "Packer v1.16.2\n", "Packer v1.16.2", 100, true},
+		{"clean validation", "The configuration is valid.\n", "The configuration is valid.", 100, true},
+		{"silent diagnostics", "", "", 100, true},
+		{"whitespace is diagnostic", "\n", "", 100, false},
+		{"additional diagnostic", "Packer v1.16.2\nwarning", "Packer v1.16.2", 100, false},
+		{"truncated matching prefix", "Packer v1.16.2\nwarning", "Packer v1.16.2", 13, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			capture := runtimeexec.NewCapture(tc.limit)
+			if _, err := io.WriteString(capture, tc.raw); err != nil {
+				t.Fatal(err)
+			}
+			if got := runtimeOutputExact(capture, tc.want); got != tc.accepted {
+				t.Fatalf("validation accepted=%v, want %v", got, tc.accepted)
+			}
+		})
+	}
+}
 
 func TestProducedPackerArtifactCollection(t *testing.T) {
 	for _, scenario := range []string{"exact", "wrong format", "file link", "directory link", "escaping path", "zero capacity", "canceled"} {

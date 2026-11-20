@@ -140,7 +140,7 @@ func validateInternalToolEvidence(ctx context.Context, plan *Plan, selected Inte
 		if input.ArtifactID != planned.ID || input.Kind != planned.Kind {
 			return e.New(e.CodeVerifyFailed, "internal tool terminal input is unbound")
 		}
-		digest, err := digestFactoryPath(ctx, planned.Path)
+		digest, err := digestObservationInput(ctx, plan, planned, planned.Path)
 		if err != nil {
 			return err
 		}

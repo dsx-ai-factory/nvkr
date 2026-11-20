@@ -85,6 +85,11 @@ func newMkosiWorkspace(ctx context.Context, scratch string) (_ *mkosiWorkspace, 
 	if err := prepareMkosiBootstrap(ctx, rootPath); err != nil {
 		return nil, err
 	}
+	for _, directory := range []string{rootPath, workspace.source, workspace.inputs, workspace.work} {
+		if err := readableMkosiDirectories(ctx, directory); err != nil {
+			return nil, err
+		}
+	}
 	// Only the namespace root and writable state belong to mapped IDs. Source,
 	// recipe, packages and reports stay host-root-owned and world-readable, so
 	// namespace root cannot modify them even if it remounts its own bind.
@@ -164,6 +169,11 @@ func prepareMkosiBootstrap(ctx context.Context, root string) error {
 }
 
 func (workspace *mkosiWorkspace) execute(ctx context.Context, operation mkosi.Invocation, stdout, stderr io.Writer) error {
+	// Reports and measured package copies can add projection directories between
+	// operations. They remain host-owned and read-only inside the namespace.
+	if err := readableMkosiDirectories(ctx, workspace.inputs); err != nil {
+		return err
+	}
 	return workspace.launcher.Execute(ctx, runtimeexec.Request{Root: workspace.root,
 		Projections: []runtimeexec.Projection{
 			{Directory: workspace.inputsFD, Target: "/inputs"},

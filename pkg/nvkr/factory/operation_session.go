@@ -166,7 +166,9 @@ func (session *operationSession) dispatch(ctx context.Context, plan *Plan, node 
 			return err
 		}
 		var err error
-		if node.Kind == NodeVerify {
+		if node.Kind == NodeVerify && selected.Format == authored.OutputOCI {
+			err = session.placement.owner.executeRuntimeObservation(ctx, plan, node, artifacts, selected.Name)
+		} else if node.Kind == NodeVerify {
 			err = executeObservation(ctx, plan, node, artifacts)
 		} else if selected.Format == authored.OutputOCI {
 			if node.Container != "" || node.Platform != selected.Platform || node.Network != ir.NetworkNone ||

@@ -140,7 +140,7 @@ func TestQualificationHandoffRejectsAlteredClosure(t *testing.T) {
 		{"noncanonical Plan", func(h *QualificationHandoff) { h.Plan = append(h.Plan, '\n') }, e.CodeProvenanceMissing},
 		{"Plan schema", func(h *QualificationHandoff) {
 			editQualificationHandoffPlan(t, h, func(p *factory.Plan) { p.SchemaVersion += "-future" })
-		}, e.CodeInvalidCatalog},
+		}, e.CodeProvenanceMissing}, // Unsupported schemas fail at the strict Plan decoding boundary.
 		{"Plan identity", func(h *QualificationHandoff) {
 			editQualificationHandoffPlan(t, h, func(p *factory.Plan) { p.DefinitionDigest = "sha256:" + strings.Repeat("b", 64) })
 		}, e.CodeUnverifiedRef},

@@ -25,27 +25,15 @@ type networkChild struct {
 	err  error
 }
 
-type networkLog struct {
-	mu     sync.Mutex
-	writer io.Writer
-}
-
-func (log *networkLog) Write(p []byte) (int, error) {
-	log.mu.Lock()
-	defer log.mu.Unlock()
-	return log.writer.Write(p)
-}
-
 func startNetworkChild(ctx context.Context, cancel context.CancelFunc, exits chan<- *networkChild, self *heldfile.File,
 	record requestRecord, files []*os.File, stdout, stderr io.Writer,
 ) *networkChild {
 	child := &networkChild{done: make(chan struct{})}
 	go func() {
-		child.err = executeChild(ctx, self, record, files, stdout, stderr)
-		// Publish the first exit before cancellation can cause the peer to exit.
-		// A helper failure must never be mistaken for consumer success or timeout.
-		exits <- child
-		cancel()
+		var once sync.Once
+		notify := func() { once.Do(func() { exits <- child; cancel() }) }
+		child.err = executeChildObserved(ctx, self, record, files, stdout, stderr, notify)
+		notify() // Admission/start failures have no process-exit callback.
 		close(child.done)
 	}()
 	return child
@@ -57,8 +45,9 @@ func startNetworkChild(ctx context.Context, cancel context.CancelFunc, exits cha
 func executeOutbound(ctx context.Context, self *heldfile.File, record requestRecord,
 	files []*os.File, stdout, stderr io.Writer,
 ) error {
-	if stderr != nil {
-		stderr = &networkLog{writer: stderr}
+	stdout, stderr, err := Outputs(stdout, stderr)
+	if err != nil {
+		return err
 	}
 	dns, err := readHostResolver(ctx)
 	if err != nil {
@@ -119,6 +108,7 @@ func executeOutbound(ctx context.Context, self *heldfile.File, record requestRec
 	}
 	select {
 	case first := <-exits:
+		<-first.done
 		if first == consumer {
 			return consumer.err
 		}

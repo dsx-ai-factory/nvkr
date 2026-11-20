@@ -131,6 +131,9 @@ func prepareMkosiWork(ctx context.Context, node ir.Node, source, inputs, work st
 			return nil, "", err
 		}
 	}
+	if err := readableMkosiDirectories(ctx, inputs); err != nil {
+		return nil, "", err
+	}
 	return operations, manifestDigest, nil
 }
 
@@ -199,9 +202,53 @@ func writeMkosiFile(ctx context.Context, work, relative string, raw []byte) erro
 		return e.Wrap(e.CodeBuildFailed, err, "reserving private mkosi file")
 	}
 	file := os.NewFile(uintptr(fd), name)
+	if err := file.Chmod(0o444); err != nil {
+		return e.Wrap(e.CodeBuildFailed, errors.Join(err, file.Close()), "setting private mkosi file mode")
+	}
 	_, writeErr := file.Write(raw)
 	if err := errors.Join(writeErr, file.Close()); err != nil {
 		return e.Wrap(e.CodeBuildFailed, err, "writing private mkosi file")
+	}
+	return nil
+}
+
+// Only private projection trees enter here. Set search/read access through held
+// directory descriptors without changing ownership, file modes or global umask.
+func readableMkosiDirectories(ctx context.Context, path string) error {
+	root, _, err := securepath.OpenDirectory(path)
+	if err != nil {
+		return e.Wrap(e.CodeBuildFailed, err, "holding private mkosi projection")
+	}
+	err = readableMkosiDirectory(ctx, root)
+	if err := errors.Join(err, root.Close()); err != nil {
+		return mapCancellation(ctx, e.Wrap(e.CodeBuildFailed, err, "setting private mkosi directory modes"), "mkosi directory modes")
+	}
+	return nil
+}
+
+func readableMkosiDirectory(ctx context.Context, directory *os.File) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := directory.Chmod(0o755); err != nil {
+		return err
+	}
+	entries, err := directory.ReadDir(-1)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		child, _, err := securepath.OpenChild(directory, entry.Name(), true)
+		if err != nil {
+			return err
+		}
+		err = readableMkosiDirectory(ctx, child)
+		if err := errors.Join(err, child.Close()); err != nil {
+			return err
+		}
 	}
 	return nil
 }

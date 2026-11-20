@@ -47,6 +47,7 @@ const (
 // contextRootExceptions is the exact inventory of allowed root contexts. Entries
 // must match the tree exactly: a new site, a changed count, or a stale entry fails.
 var contextRootExceptions = map[contextRoot]contextRootException{
+	{"scripts/compare-runtime-evidence/main.go", "main", "Background"}:                                                {1, processRoot},
 	{"cmd/nvkr-disk-inspect/main.go", "main", "Background"}:                                                           {1, processRoot},
 	{"cmd/nvkr-results-publish/main.go", "main", "Background"}:                                                        {1, processRoot},
 	{"cmd/nvkr/main.go", "main", "Background"}:                                                                        {1, processRoot},

@@ -43,10 +43,12 @@ type Request struct {
 	KVM         *os.File
 	// Outbound selects the fixed TAP-only helper. It is descriptive; the
 	// original Run receipt and producer network admission remain the authority.
-	Outbound       bool
-	Command        []string
-	Environment    []string
-	Workdir        string
+	Outbound    bool
+	Command     []string
+	Environment []string
+	Workdir     string
+	// Outputs accepts inherited files, standard memory buffers and Capture.
+	// Use Capture for validation instead of a writer that forwards to another sink.
 	Stdout, Stderr io.Writer
 }
 

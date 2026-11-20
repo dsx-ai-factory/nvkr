@@ -27,6 +27,9 @@ closure before issuing a runtime production receipt. Epoch zero fixes generated 
 GNU tar adapter fixes traversal, numeric ownership and PAX header names; both the outer Python search path
 and mkosi's nested search path select it. Focused tests include a real Python/GNU tar regression that reproduces
 the adapter bypass when only the nested path is set.
+Private input files and projection directories receive explicit modes through held descriptors. A staging
+subprocess under umask `077` checks exact file and nested-directory permissions without changing production
+process umask or projection ownership.
 
 Runtime production, evidence and use remain with the original Run owner. The use receipt binds the original
 and relocated Plan, exact consumer instruction, produced runtime and completed terminal/SBOM evidence.
@@ -38,6 +41,11 @@ limits. Generated native disk jobs use an unprivileged preflight, a fixed scrubb
 owned watchdog. Narrow input/work projections preserve plugin and firmware paths. Packer preparation stays
 offline; the build uses the snapshot-pinned, unprivileged `slirp4netns` helper with fixed arguments, numeric
 DNS projection and paired process lifetime. Shell and namespace fixtures cover these boundaries.
+The fixed IPv4 route filters IPv6 resolver entries before applying the three-server limit and refuses an
+IPv6-only resolver. Native Linux fixtures exercise blocked output descriptors, cancellation and detached
+descendant cleanup, normal consumer-first completion, helper-first failure, and process-exit notification
+before delayed memory capture drainage. File sinks remain inherited; standard memory buffers and bounded
+captures are admitted, while arbitrary output callbacks fail before launch.
 The launcher re-arms its parent-death kill after dropping credentials and checks a held original-parent
 descriptor. A local native ARM64 Linux test under Docker killed the launcher in both offline and outbound
 modes; both namespace children exited and a detached descendant stopped writing. This is process-lifetime
@@ -56,6 +64,12 @@ Composite admission checks the declaring member before catalog work. Each disk p
 contributing runtime's producer records and complete SBOM, while runtime payloads remain absent from
 Release membership. Aggregate and per-output tests reject missing runtime evidence and check that a
 per-output publication excludes its sibling's runtime evidence.
+The runtime observation records the terminal-tree layout digest from its original live production owner.
+A small real OCI fixture joins the actual observation renderer to descriptive consumer evidence in a custom
+workspace, rejects digest-family substitution, and checks unchanged Plan and OCI bytes. Separate owner tests
+reject absent or closed production receipts before writes. This fixes unpublished observation and downstream
+evidence identities without changing production layout identities or the ordinary directory/disk codecs;
+the fixture does not establish a completed native Run or maintained-disk equivalence.
 Maintained ARM64 disk consumers retain the existing image route.
 
 The amd64 Packer producers use a separate source declaration without agent vendoring, pinned to the same

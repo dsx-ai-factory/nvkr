@@ -31,6 +31,8 @@ func imageIndexTestPlan(t *testing.T) *Plan {
 	plan.Environment.GitHubARC, plan.Environment.DiskEvidence = "", ""
 	plan.Environment.ExecutionClasses, plan.Environment.DiskInspectionProfiles = nil, nil
 	plan.Environment.SourceAccess = nil // This offline subset does not select the OS-only fetch routes.
+	plan.Definition.InternalTools = nil
+	plan.Environment.Runtime.ProducedRuntimes = nil
 	return compileImageIndexFixture(t, plan, plan.Environment)
 }
 

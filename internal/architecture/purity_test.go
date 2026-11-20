@@ -49,6 +49,7 @@ var identityPackages = []string{
 	modulePath + "/pkg/nvkr/canonical",
 	modulePath + "/pkg/nvkr/internal/sourceenv",
 	modulePath + "/pkg/nvkr/ir",
+	modulePath + "/pkg/nvkr/mkosi",
 	modulePath + "/pkg/nvkr/target",
 }
 
@@ -58,6 +59,7 @@ var identityPackages = []string{
 var allowedIdentityImports = map[string]bool{
 	"bytes":            true,
 	"crypto/sha256":    true,
+	"embed":            true, // Fixed source bytes; mkosi's archive adapter is part of recipe identity.
 	"encoding/hex":     true,
 	"encoding/json":    true,
 	"fmt":              true,
@@ -88,6 +90,7 @@ var allowedIdentityImports = map[string]bool{
 	modulePath + "/pkg/nvkr/internal/sourceenv":       true,
 	modulePath + "/pkg/nvkr/ir":                       true,
 	modulePath + "/pkg/nvkr/material":                 true,
+	modulePath + "/pkg/nvkr/mkosi":                    true,
 	modulePath + "/pkg/nvkr/target":                   true,
 }
 

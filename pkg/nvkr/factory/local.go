@@ -26,6 +26,7 @@ import (
 	authored "github.com/dsx-ai-factory/nvkr/pkg/nvkr/definition"
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/runtimeexec"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/runtimeuse"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/pipeline"
@@ -334,9 +335,26 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	if deps.prepareRunner == nil || deps.executeNode == nil {
 		return nil, e.New(e.CodeInternal, "factory local executor is incomplete")
 	}
-	var outputMu sync.Mutex
-	options.Stdout = lockedLocalWriter{mu: &outputMu, Writer: options.Stdout}
-	options.Stderr = lockedLocalWriter{mu: &outputMu, Writer: options.Stderr}
+	runtimeOutput := false
+	for _, tool := range plan.InternalTools {
+		runtimeOutput = runtimeOutput || tool.Format == authored.OutputOCI
+	}
+	if runtimeOutput {
+		options.Stdout, options.Stderr, err = runtimeexec.Outputs(options.Stdout, options.Stderr)
+		if err != nil {
+			return nil, err
+		}
+		if options.Stdout == nil {
+			options.Stdout = io.Discard
+		}
+		if options.Stderr == nil {
+			options.Stderr = io.Discard
+		}
+	} else {
+		var outputMu sync.Mutex
+		options.Stdout = lockedLocalWriter{mu: &outputMu, Writer: options.Stdout}
+		options.Stderr = lockedLocalWriter{mu: &outputMu, Writer: options.Stderr}
+	}
 	options.producers, err = pipeline.NewNodeSession(ctx)
 	if err != nil {
 		return nil, err
@@ -475,7 +493,9 @@ func runLocal(ctx context.Context, plan *Plan, options LocalRunOptions, deps loc
 	}
 
 	_, completedArtifacts := planIndex(plan)
-	if err := validateRuntimeConsistency(ctx, plan, completedArtifacts, func(path string) (string, error) { return path, nil }); err != nil {
+	if err := validateRuntimeConsistency(ctx, plan, completedArtifacts, func(path string) (string, error) {
+		return relocatedFactoryPath(path, options.Workspace)
+	}); err != nil {
 		return nil, err
 	}
 	sort.Slice(result.Nodes, func(i, j int) bool { return result.Nodes[i].ID < result.Nodes[j].ID })

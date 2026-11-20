@@ -112,6 +112,10 @@ func writeRuntimeConsistencyFixture(t *testing.T, plan *Plan, artifacts map[stri
 }
 
 func writeRuntimeConsumerFixture(t *testing.T, plan *Plan, artifacts map[string]Artifact) {
+	writeRuntimeConsumerDigests(t, plan, artifacts, pipeline.FileDigest([]byte("layout")), pipeline.FileDigest([]byte("layout")))
+}
+
+func writeRuntimeConsumerDigests(t *testing.T, plan *Plan, artifacts map[string]Artifact, layout, layer string) {
 	t.Helper()
 	identity, err := plan.IdentityDigest()
 	if err != nil {
@@ -142,7 +146,6 @@ func writeRuntimeConsumerFixture(t *testing.T, plan *Plan, artifacts map[string]
 		if err != nil {
 			t.Fatal(err)
 		}
-		layout := pipeline.FileDigest([]byte("layout"))
 		terminal, err := canonical.Digest(canonical.KindTerminalVerification, map[string]any{
 			"buildDigest": tool.BuildDigest, "layoutDigest": layout,
 			"nodes": []any{map[string]any{"id": producer.ID, "kind": producer.Kind, "status": "ok", "duration": int64(0)}},
@@ -161,7 +164,7 @@ func writeRuntimeConsumerFixture(t *testing.T, plan *Plan, artifacts map[string]
 			t.Fatal(err)
 		}
 		binding := &pipeline.RuntimeUseBinding{PlanDigest: identity, Subject: identity + "/" + identity + "/" + consumer.ID, Purpose: "packer-build", Runtime: *instruction.Runtime,
-			Production: pipeline.ProducedRuntimeBinding{BuildDigest: tool.BuildDigest, Platform: tool.Platform, Component: tool.Component, Digest: produced.SHA256, Size: produced.Size, LayoutDigest: layout, LayerDigest: layout, TerminalDigest: terminal}, Observation: observation, SBOM: inventory}
+			Production: pipeline.ProducedRuntimeBinding{BuildDigest: tool.BuildDigest, Platform: tool.Platform, Component: tool.Component, Digest: produced.SHA256, Size: produced.Size, LayoutDigest: layout, LayerDigest: layer, TerminalDigest: terminal}, Observation: observation, SBOM: inventory}
 		for _, id := range consumer.Outputs {
 			if artifacts[id].Kind != "producer-result" {
 				continue

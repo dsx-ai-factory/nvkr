@@ -261,6 +261,18 @@ func TestNVKEDefinitionSplitEnvironmentIsolation(t *testing.T) {
 			want.Signing.Identity = "^" + regexp.QuoteMeta(identity) + "@refs/heads/main$"
 			// Each family's workflow fits flat; only the combined producer partitions.
 			want.GitHubExecutionPartitions = false
+			switch family.name {
+			case "disks":
+				want.Runtime.ProducedRuntimes = map[string]string{
+					"nvke-node-fde-amd64":   "nvke-node-fde-amd64-runtime",
+					"nvke-node-image-amd64": "nvke-node-image-amd64-runtime",
+				}
+			case "disks-ubuntu24":
+				want.Runtime.ProducedRuntimes = map[string]string{
+					"nvke-node-fde-ubuntu24-amd64":   "nvke-node-fde-ubuntu24-amd64-runtime",
+					"nvke-node-image-ubuntu24-amd64": "nvke-node-image-ubuntu24-amd64-runtime",
+				}
+			}
 			if !nvkeDiskFamily(family.name) {
 				want.GitHubARC, want.DiskEvidence = "", ""
 				want.ExecutionClasses, want.DiskInspectionProfiles = nil, nil

@@ -88,8 +88,13 @@ func TestMaintainedNVKEOSFetchIsAnonymous(t *testing.T) {
 					publicFetches[source.Repo]++
 				}
 			}
-			if publicFetches[repository] != 5 || publicFetches[ovnRepository] != 3 || len(publicFetches) != 2 {
-				t.Fatalf("public source fetches = %v, want five NVKE and three OVN fork source closures only", publicFetches)
+			wantNVKE := 5
+			if output.Platform == "linux/amd64" {
+				// The native Packer project has its own pinned source closure.
+				wantNVKE++
+			}
+			if publicFetches[repository] != wantNVKE || publicFetches[ovnRepository] != 3 || len(publicFetches) != 2 {
+				t.Fatalf("public source fetches = %v, want %d NVKE and three OVN fork source closures only", publicFetches, wantNVKE)
 			}
 		})
 	}

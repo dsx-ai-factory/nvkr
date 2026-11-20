@@ -194,6 +194,9 @@ type factoryObservedInput struct {
 }
 
 func executeObservation(ctx context.Context, plan *Plan, node Node, artifacts map[string]Artifact) error {
+	if selected, internal := plan.internalToolForTarget(node.BuildTarget); internal && selected.Format == authored.OutputOCI {
+		return e.New(e.CodeEngineCapability, "runtime terminal observation requires its live production owner")
+	}
 	if plan.hasCompiledDiskTarget(node.BuildTarget, artifacts) {
 		return e.New(e.CodeEngineCapability,
 			"disk terminal observation %q requires the local Run's held producer result", node.ID)
@@ -213,6 +216,12 @@ func executeHeldDiskObservation(ctx context.Context, plan *Plan, node Node,
 
 func executeObservationWithHeldDisk(ctx context.Context, plan *Plan, node Node,
 	artifacts map[string]Artifact, execution *LocalRunResult,
+) error {
+	return executeObservationInputs(ctx, plan, node, artifacts, execution, nil)
+}
+
+func executeObservationInputs(ctx context.Context, plan *Plan, node Node,
+	artifacts map[string]Artifact, execution *LocalRunResult, runtime *runtimeObservation,
 ) error {
 	observation := factoryObservation{SchemaVersion: "nvkr.dev/factory-observation/v2", Qualification: TierStaticUnqualified, BuildTarget: node.BuildTarget}
 	var diskObservation DiskPayloadObservation
@@ -271,7 +280,9 @@ func executeObservationWithHeldDisk(ctx context.Context, plan *Plan, node Node,
 	for _, input := range node.Inputs {
 		artifact := artifacts[input]
 		digest := ""
-		if execution != nil && artifact.Component == diskObservation.Component {
+		if runtime != nil && artifact.ID == runtime.artifact {
+			digest = runtime.layout
+		} else if execution != nil && artifact.Component == diskObservation.Component {
 			switch artifact.Kind {
 			case authored.OutputDiskImage:
 				digest = diskObservation.Digest

@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/securepath"
@@ -35,6 +37,11 @@ func runProducedPackerNode(ctx context.Context, launcher *runtimeexec.Launcher, 
 	if err := requireRunContext(ctx, "produced-runtime Packer execution"); err != nil {
 		return nil, err
 	}
+	stdout, stderr, err := runtimeexec.Outputs(request.stdout, request.stderr)
+	if err != nil {
+		return nil, err
+	}
+	request.stdout, request.stderr = stdout, stderr
 	if _, ok := ctx.Deadline(); !ok || launcher == nil || root == nil || request.node.Runtime == nil || request.node.Network != ir.NetworkDefault {
 		return nil, e.New(e.CodeEngineCapability, "produced Packer requires its admitted runtime, network and deadline")
 	}
@@ -108,12 +115,12 @@ func runProducedPackerNode(ctx context.Context, launcher *runtimeexec.Launcher, 
 		{Directory: input, Target: packerContainerInputRoot},
 		{Directory: output, Target: packerContainerWorkRoot, Writable: true},
 	}, Environment: producedPackerEnvironment(), Workdir: path.Join(packerContainerInputRoot, "source", request.node.Packer.ProjectPath)}
-	version, versionErr := newPackerValidationOutput(io.Discard), newPackerValidationOutput(io.Discard)
+	version, versionErr := runtimeexec.NewCapture(maxPackerValidationOutputBytes), runtimeexec.NewCapture(maxPackerValidationOutputBytes)
 	invocation.Command, invocation.Stdout, invocation.Stderr = []string{"/usr/local/bin/packer", "version"}, version, versionErr
 	if err := launcher.Execute(ctx, invocation); err != nil {
 		return nil, err
 	}
-	if !version.exact("Packer v"+request.bindings.packerVersion) || !versionErr.empty() {
+	if !runtimeOutputExact(version, "Packer v"+request.bindings.packerVersion) || !runtimeOutputExact(versionErr, "") {
 		return nil, e.New(e.CodeUnverifiedRef, "produced runtime Packer version differs from its declared version")
 	}
 	if request.bindings.sshPrivateKeyVariable != "" {
@@ -122,14 +129,20 @@ func runProducedPackerNode(ctx context.Context, launcher *runtimeexec.Launcher, 
 		}
 	}
 	base := packerContainerBaseArgs(request.node, request.bindings, kvm)
-	validated, validationErr := newPackerValidationOutput(request.stdout), newPackerValidationOutput(request.stderr)
+	// Validation output is bounded memory owned by the launcher. Forwarding from
+	// a capture into an arbitrary writer could strand cancellation and cleanup.
+	validated, validationErr := runtimeexec.NewCapture(maxPackerValidationOutputBytes), runtimeexec.NewCapture(maxPackerValidationOutputBytes)
 	invocation.Command = append([]string{"/usr/local/bin/packer", "validate"}, base...)
 	invocation.Stdout, invocation.Stderr = validated, validationErr
 	if err := launcher.Execute(ctx, invocation); err != nil {
-		return nil, err
+		out, _ := validated.Snapshot()
+		diagnostic, _ := validationErr.Snapshot()
+		return nil, fmt.Errorf("%w; Packer validation output: %s %s", err, out, diagnostic)
 	}
-	if !validated.exact("The configuration is valid.") || !validationErr.empty() {
-		return nil, e.New(e.CodeBuildFailed, "Packer validation emitted diagnostics or did not confirm one clean configuration")
+	if !runtimeOutputExact(validated, "The configuration is valid.") || !runtimeOutputExact(validationErr, "") {
+		out, _ := validated.Snapshot()
+		diagnostic, _ := validationErr.Snapshot()
+		return nil, e.New(e.CodeBuildFailed, "Packer validation did not confirm one clean configuration: %s %s", out, diagnostic)
 	}
 	invocation.Command = append([]string{"/usr/local/bin/packer", "build", "-on-error=cleanup"}, base...)
 	invocation.Stdout, invocation.Stderr, invocation.KVM, invocation.Outbound = request.stdout, request.stderr, request.kvm, true
@@ -235,16 +248,17 @@ func prepareProducedPackerSSH(ctx context.Context, launcher *runtimeexec.Launche
 		if info.Size() <= 0 || info.Size() > 16<<10 || (index == 0 && info.Mode().Perm() != 0o600) {
 			return e.New(e.CodeVerifyFailed, "produced Packer SSH key has invalid size or permissions")
 		}
-		capture, diagnostic := newPackerValidationOutput(io.Discard), newPackerValidationOutput(io.Discard)
+		capture, diagnostic := runtimeexec.NewCapture(maxPackerValidationOutputBytes), runtimeexec.NewCapture(maxPackerValidationOutputBytes)
 		invocation.Command = []string{"/usr/bin/ssh-keygen", "-l", "-E", "sha256", "-f", path.Join(packerContainerWorkRoot, "ssh", name)}
 		invocation.Stdout, invocation.Stderr = capture, diagnostic
 		if err := launcher.Execute(ctx, invocation); err != nil {
 			return err
 		}
-		if capture.overflow || !diagnostic.empty() {
+		raw, overflow := capture.Snapshot()
+		if overflow || !runtimeOutputExact(diagnostic, "") {
 			return e.New(e.CodeVerifyFailed, "produced Packer SSH fingerprint emitted diagnostics")
 		}
-		fingerprints[index], err = packerSSHKeyFingerprint(capture.buffer.Bytes())
+		fingerprints[index], err = packerSSHKeyFingerprint([]byte(raw))
 		if err != nil {
 			return err
 		}
@@ -253,6 +267,14 @@ func prepareProducedPackerSSH(ctx context.Context, launcher *runtimeexec.Launche
 		return e.New(e.CodeVerifyFailed, "produced Packer SSH keys do not match")
 	}
 	return nil
+}
+
+func runtimeOutputExact(output *runtimeexec.Capture, want string) bool {
+	raw, overflow := output.Snapshot()
+	if want == "" {
+		return !overflow && raw == ""
+	}
+	return !overflow && strings.TrimSpace(raw) == want
 }
 
 func collectProducedPackerArtifact(ctx context.Context, directory, name string, storage uint64) (_ *PackerArtifact, returnedErr error) {

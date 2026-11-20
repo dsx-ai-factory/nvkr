@@ -182,7 +182,7 @@ func validateHostedOutcomes(ctx context.Context, workspace string, plan *Plan) e
 					}
 					actual = observed.Disk.PayloadDigest
 				} else {
-					actual, err = digestFactoryPath(ctx, inputPath)
+					actual, err = digestObservationInput(ctx, plan, planned, inputPath)
 				}
 				if err != nil || actual != input.Digest {
 					return e.New(e.CodeVerifyFailed, "hosted terminal observation input %q differs from restored bytes", input.ArtifactID)

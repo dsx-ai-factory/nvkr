@@ -8,15 +8,39 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	e "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/material"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/mkosi"
+	"golang.org/x/sys/unix"
 )
+
+func TestMkosiStagingIgnoresRestrictiveUmask(t *testing.T) {
+	if os.Getenv("NVKR_TEST_MKOSI_UMASK") == "1" {
+		previous := unix.Umask(0o077)
+		defer unix.Umask(previous)
+		TestMkosiStagingUsesExactPrivateInputs(t)
+		TestMkosiPackageCopiesPreserveMeasuredBytes(t)
+		return
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, executable, "-test.run=^TestMkosiStagingIgnoresRestrictiveUmask$", "-test.timeout=20s")
+	command.Env = append(os.Environ(), "NVKR_TEST_MKOSI_UMASK=1")
+	if raw, err := command.CombinedOutput(); err != nil {
+		t.Fatalf("restrictive umask: %v\n%s", err, raw)
+	}
+}
 
 func mkosiStageFixture(t *testing.T) (ir.Node, string, string, string) {
 	t.Helper()
@@ -41,6 +65,23 @@ func TestMkosiStagingUsesExactPrivateInputs(t *testing.T) {
 	}
 	if digest != "" || len(operations) != 2 {
 		t.Fatalf("unexpected material binding or operations: %q, %d", digest, len(operations))
+	}
+	if err := filepath.WalkDir(inputs, func(name string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			info, err := entry.Info()
+			if err != nil {
+				return err
+			}
+			if info.Mode().Perm() != 0o755 {
+				t.Errorf("projection directory %s has mode %o", name, info.Mode().Perm())
+			}
+		}
+		return nil
+	}); err != nil {
+		t.Fatal(err)
 	}
 	wrapper := filepath.Join(inputs, strings.TrimPrefix(mkosi.ArchiveToolsDirectory, "/inputs/"), "tar")
 	adapter, err := os.ReadFile(wrapper)

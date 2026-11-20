@@ -681,7 +681,10 @@ its own separately named runtime requirement and retains the original owner thro
 Cross-job restoration of runtime execution authority is not admitted. Independent productions with the
 same Build, component and platform must yield equal manifest and complete-layout digests and sizes.
 Run completion compares each group's own authenticated transport records, terminal observation and SBOM;
-equal digests never substitute for a missing named requirement. Runtime
+the runtime layout observation uses the original live production owner's terminal-tree digest. Ordinary
+directory and disk-stream observations retain their existing digest families. Workspace relocation changes
+where completion reads artifacts, not the Plan identity used to validate their bindings.
+Equal digests never substitute for a missing named requirement. Runtime
 and evidence substitution, absent evidence and revoked owners fail closed. The receipt grants no
 Release membership, qualification, publication or reuse authority.
 
@@ -721,15 +724,20 @@ creates and configures one TAP device inside the consumer's private network name
 only that descriptor to the helper. The helper runs with its own private root/mount/PID/IPC/UTS boundary,
 UID/GID 65534, no capabilities and no-new-privileges; only this fixed helper retains the outer network.
 Its fixed invocation enables seccomp, disables host-loopback mapping, and exposes no API socket or
-inbound forwarding. DNS projection carries at most three numeric resolver addresses, not host resolver
+inbound forwarding. DNS projection carries at most three numeric IPv4 resolver addresses, not host resolver
 search domains or other configuration. The payload sees only the private DNS proxy. Both roots remain
 read-only. Host resolver configuration is a protected regular file owned by root, or one of the two
 standard systemd-resolved files explicitly selected by the root-owned `/etc/resolv.conf` symlink.
 For service-owned files, descriptor checks require protected root-owned ancestors, a final parent owned
 by root or that service, and the exact held target inode. Only bounded numeric addresses cross the
-namespace boundary. A bounded readiness handshake precedes authored payload execution; either process exiting
+namespace boundary. IPv6 entries do not consume this bound; a resolver without a usable IPv4 address fails
+admission. A bounded readiness handshake precedes authored payload execution; either process exiting
 cancels and joins the other. This is outbound connectivity, not a destination firewall: the existing
 operator obligation to isolate metadata and credential services remains in force.
+Process exit is reported before diagnostic capture drains. File output sinks remain inherited descriptors;
+standard memory buffers and package-owned bounded captures use parent-owned pipes that are closed and joined.
+Arbitrary output callbacks fail admission because their writes cannot be canceled safely. Packer validation
+uses bounded captures and rejects truncated output.
 KVM access requires the existing held-device admission and selected execution class; it is never
 inferred from the runtime's contents. The existing VM resource admission, deadlines, cancellation,
 stop/join and cleanup obligations apply to the entire namespace lifetime, including descendants that
