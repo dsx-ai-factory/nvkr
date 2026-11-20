@@ -403,12 +403,13 @@ runner environment; Go's toolchain, environment-file and workspace settings are 
 signing, verification or publication operation is retried by this bootstrap policy. Coreutils bounds the
 process group. The step shell forwards INT/TERM to timeout and re-waits before cleanup, returning the
 coded timeout error for cancellation, including cancellation during cache cleanup. The joined child PID
-is cleared and cleanup completes before the final status is selected; failed cleanup is retried once. Both Go commands receive closed input via `/dev/null`; a compiler's
-nonzero exit is a build failure even when its status resembles a timeout. This does not add supervision
+is cleared and cleanup completes before the final status is selected; failed cleanup is retried once.
+Dependency acquisition and helper compilation receive closed input via `/dev/null`; a compiler's nonzero exit is a build failure even when its status resembles a timeout. This does not add supervision
 of arbitrary detached descendants after a successful Go exit. Cleanup removes only the invocation's disposable caches before private downloads. The installed Go
 toolchain and produced helper remain available; ambient runner caches are not cleanup targets. Missing
 toolchain/timeout capabilities or failed cleanup fail closed. Published-module acquisition additionally
-uses isolated Python to check the exact module path, version and checksum and copy the source.
+uses a standard-library-only Go program, compiled offline in the same isolated environment, to check the exact
+module path, version and checksum before the shell copies the source.
 This remains separate
 from qualified exact-helper-byte verification.
 
@@ -436,13 +437,11 @@ archive rather than trusting a partially received prefix, and repeats neither pu
 
 CI transfer admission requires an API-confirmed private/internal package with no linked repository,
 including while the source remains private. A missing package may receive an empty metadata-only seed;
-payload upload requires a subsequent successful privacy check. After a successful seed write, an API
-404 may receive at most five confirmation reads with cancellable waits of 2, 4, 8 and 16 seconds, under
-the original operation deadline and existing bounded API reads (including classified rate-limit waits).
-Each read authenticates the same package with the same credential; explicit policy refusals remain
-immediate failures, and exhaustion grants no payload access. Transfers require separate dedicated read
-and write credentials with their configured account usernames, scoped only to their consuming steps,
-without repository-token fallback or extra repository package permissions. The repository token authenticates repository metadata separately from the
+payload upload requires a subsequent successful privacy check. Post-seed API absence uses the same
+bounded confirmation backoff as publication (ADR-20); no payload is admitted on retry exhaustion.
+Transfers require separate dedicated read
+and write credentials with their configured account usernames, scoped only to their consuming steps, without repository-token fallback or extra
+repository package permissions. The repository token authenticates repository metadata separately from the
 package credential. These principals must have no production publication grants. No Actions-payload fallback
 exists. GHCR supports the automatic workflow token, but its Actions grants are repository-scoped;
 GitHub [warns that granting a public repository private-package access can also expose packages to forks](https://docs.github.com/en/packages/learn-github-packages/configuring-a-packages-access-control-and-visibility#ensuring-workflow-access-to-your-package).
@@ -1967,6 +1966,15 @@ still prevent finalization.
 Finalizers are scheduled unconditionally and fail on failed/missing producers, failed restore, omitted required
 artifacts, malformed or substituted observations/SBOMs, and wrong production predicates. The platform may prevent
 the finalizer itself from starting; inspect provider status when no Run record exists (ADR-17).
+For GitHub per-output publication, recovery retains one original unsuccessful provider job in the failed
+closure description. Actual failure takes precedence over cancellation and skipped dependents. Within
+each outcome, ancestors with that outcome precede their dependents, including through successful
+intermediate jobs; independent roots use job-ID order because the provider result schema carries no
+timestamps. Recovery logs and the finalizer's existing `provenance-missing` failure name that admitted job
+and, for execution stages, its Plan-derived display label, directing
+operators to its log for the original error. These descriptions cannot select an upstream error code or
+authorize completion. Missing, legacy, malformed or foreign diagnostics retain the generic completeness
+error; successful closure still requires every original job and exact restored evidence.
 
 ADR-20's [object-store publication contract](0020-artifact-publication-and-target-configuration.md#s3-file-delivery-contract)
 adds one ordinary required publish operation per configured destination after the original aggregate

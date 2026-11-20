@@ -24,8 +24,8 @@ func TestPrivatePublicationWaitsForSeedVisibility(t *testing.T) {
 	}{
 		{"immediate", 0, "", 0, ""},
 		{"delayed", 1, "", 1, ""},
-		{"last attempt", 4, "", 4, ""},
-		{"never visible", 5, "", 4, e.CodeTrustPolicyMissing},
+		{"last attempt", 5, "", 5, ""},
+		{"never visible", 6, "", 5, e.CodeTrustPolicyMissing},
 		{"public", 1, "public", 1, e.CodeTrustPolicyMissing},
 		{"linked", 1, "linked", 1, e.CodeTrustPolicyMissing},
 		{"wrong package", 1, "wrong package", 1, e.CodeTrustPolicyMissing},
@@ -115,7 +115,7 @@ func TestPrivatePublicationWaitsForSeedVisibility(t *testing.T) {
 				wantReads = 3
 			}
 			if tc.name == "never visible" {
-				wantReads = 7
+				wantReads = 8
 			}
 			if reads != wantReads {
 				t.Errorf("package reads=%d, want %d", reads, wantReads)
