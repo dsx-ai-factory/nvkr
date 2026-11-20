@@ -437,7 +437,9 @@ archive rather than trusting a partially received prefix, and repeats neither pu
 
 CI transfer admission requires an API-confirmed private/internal package with no linked repository,
 including while the source remains private. A missing package may receive an empty metadata-only seed;
-payload upload requires a subsequent successful privacy check. Transfers require separate dedicated read
+payload upload requires a subsequent successful privacy check. Post-seed API absence uses the same
+bounded confirmation backoff as publication (ADR-20); no payload is admitted on retry exhaustion.
+Transfers require separate dedicated read
 and write credentials with their configured account usernames, scoped only to their consuming steps, without repository-token fallback or extra
 repository package permissions. The repository token authenticates repository metadata separately from the
 package credential. These principals must have no production publication grants. No Actions-payload fallback
