@@ -8,9 +8,11 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"slices"
 	"strings"
+	"syscall"
 	"unicode/utf8"
 
 	nerrors "github.com/dsx-ai-factory/nvkr/pkg/nvkr/errors"
@@ -130,11 +132,16 @@ func main() {
 		fmt.Fprintln(os.Stderr, nerrors.New(nerrors.CodeUsage, "gen-notices requires a linked-module TSV"))
 		os.Exit(2)
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	raw, err := os.ReadFile(os.Args[1])
 	var output string
 	if err == nil {
-		output, err = generate(context.Background(), string(raw))
+		output, err = generate(ctx, string(raw))
 	}
+	if err == nil {
+		err = ctx.Err()
+	}
+	stop()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, nerrors.Wrap(nerrors.CodeGateUnmet, err, "gen-notices"))
 		os.Exit(1)

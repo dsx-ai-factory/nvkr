@@ -367,26 +367,34 @@ func TestMergeGateTestMatrix(t *testing.T) {
 	step := mergeGateStepByID(t, producer, "test-matrix")
 	const matrix = `{"include":[{"group":"factory","index":2}]}`
 	for _, tc := range []struct {
-		name string
-		exit string
-		code int
+		name      string
+		exit      string
+		buildExit string
+		code      int
 	}{
-		{"success", "0", 0},
-		{"producer failure", "23", 23},
+		{"success", "0", "0", 0},
+		{"producer failure", "23", "0", 23},
+		{"build failure", "0", "29", 29},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()
 			fake := `#!/bin/sh
-[ "$*" = 'run ./internal/citestshard --matrix' ] || exit 99
+[ "$*" = "build -o $RUNNER_TEMP/ci-test-shard ./internal/citestshard" ] || exit 99
+[ "$FAKE_BUILD_EXIT" = 0 ] || exit "$FAKE_BUILD_EXIT"
+cat > "$RUNNER_TEMP/ci-test-shard" <<'SCRIPT'
+#!/bin/sh
+[ "$*" = '--matrix' ] || exit 99
 printf '%s\n' "$FAKE_MATRIX"
 exit "$FAKE_EXIT"
+SCRIPT
+chmod +x "$RUNNER_TEMP/ci-test-shard"
 `
 			if err := os.WriteFile(filepath.Join(root, "go"), []byte(fake), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			outputPath := filepath.Join(root, "outputs")
 			output, code := runMergeGateStep(t, step, root, []string{
-				"GITHUB_OUTPUT=" + outputPath, "FAKE_MATRIX=" + matrix, "FAKE_EXIT=" + tc.exit,
+				"GITHUB_OUTPUT=" + outputPath, "RUNNER_TEMP=" + root, "FAKE_MATRIX=" + matrix, "FAKE_EXIT=" + tc.exit, "FAKE_BUILD_EXIT=" + tc.buildExit,
 			})
 			if code != tc.code {
 				t.Fatalf("matrix step exited %d, want %d: %s", code, tc.code, output)

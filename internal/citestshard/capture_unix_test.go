@@ -135,8 +135,19 @@ func TestCaptureStopsDescendants(t *testing.T) {
 					timeout = 10 * time.Second
 				}
 				_, err = captured(t.Context(), argv, "", env, timeout, emit, 65536, &out, io.Discard)
-				if err == nil {
-					t.Fatal("expected timeout, overflow or inherited-pipe error")
+				switch mode {
+				case "parent":
+					if !errors.Is(err, context.DeadlineExceeded) || !strings.Contains(out.String(), "running") {
+						t.Fatalf("timeout lost its cause or diagnostics: %v %q", err, out.String())
+					}
+				case "overflow":
+					if err == nil || err.Error() != "stdout exceeded 65536-byte capture limit" {
+						t.Fatalf("expected capture overflow, got %v", err)
+					}
+				case "exit":
+					if !errors.Is(err, exec.ErrWaitDelay) {
+						t.Fatalf("expected inherited-pipe failure, got %v", err)
+					}
 				}
 				if _, err := os.Stat(ready); err != nil {
 					t.Fatal("descendant never started", err)

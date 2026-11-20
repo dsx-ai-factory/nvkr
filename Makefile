@@ -166,9 +166,13 @@ test-workflow-scripts: ## Test the triage and PR-metadata workflow scripts (need
 test: ## Fast default tests for CI and agents (no extended fixtures or instrumentation).
 	go test -timeout $(GO_TEST_TIMEOUT) $(GO_TEST_FLAGS) $(PKG)
 
+.PHONY: ci-test-shard
+ci-test-shard: go-version-check ## Build the CI shard runner with direct signal handling.
+	go build -o bin/nvkr-ci-test-shard ./internal/citestshard
+
 .PHONY: test-shard
-test-shard: go-version-check ## Reproduce one CI test shard (TEST_SHARD_GROUP and TEST_SHARD_INDEX required).
-	go run ./internal/citestshard --group '$(TEST_SHARD_GROUP)' --index '$(TEST_SHARD_INDEX)' --timeout '$(GO_TEST_TIMEOUT)'
+test-shard: ci-test-shard ## Reproduce one CI test shard (TEST_SHARD_GROUP and TEST_SHARD_INDEX required).
+	exec ./bin/nvkr-ci-test-shard --group '$(TEST_SHARD_GROUP)' --index '$(TEST_SHARD_INDEX)' --timeout '$(GO_TEST_TIMEOUT)'
 
 .PHONY: test-race
 test-race: ## Opt-in race detection and coverage for the default suite.

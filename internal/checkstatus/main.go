@@ -12,11 +12,13 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/dsx-ai-factory/nvkr/internal/ownedcmd"
@@ -43,7 +45,7 @@ var phrases = func() []*regexp.Regexp {
 	}
 	result := make([]*regexp.Regexp, 0, len(patterns))
 	for _, p := range patterns {
-		result = append(result, regexp.MustCompile("(?i)"+strings.ReplaceAll(p, " ", `\s+`)))
+		result = append(result, regexp.MustCompile("(?i)"+strings.ReplaceAll(p, " ", `[\s\v\x{85}\p{Z}]+`)))
 	}
 	return result
 }()
@@ -59,7 +61,6 @@ func git(ctx context.Context, repo, hint string, args ...string) (string, error)
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, "git", append([]string{"-C", repo}, args...)...)
-	cmd.WaitDelay = 5 * time.Second
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	var stdout strings.Builder
@@ -67,7 +68,10 @@ func git(ctx context.Context, repo, hint string, args ...string) (string, error)
 	err := ownedcmd.Run(ctx, cmd)
 	out := stdout.String()
 	if err != nil {
-		return "", fmt.Errorf("git %s: %s (%s): %w", strings.Join(args, " "), strings.TrimSpace(stderr.String()), hint, err)
+		if hint != "" {
+			hint = " (" + hint + ")"
+		}
+		return "", fmt.Errorf("git %s: %s%s: %w", strings.Join(args, " "), strings.TrimSpace(stderr.String()), hint, err)
 	}
 	return strings.ToValidUTF8(out, "�"), nil
 }
@@ -403,7 +407,9 @@ func run(ctx context.Context, args []string, stdout, stderr io.Writer) (int, err
 	return 0, nil
 }
 func main() {
-	code, err := run(context.Background(), os.Args[1:], os.Stdout, os.Stderr)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	code, err := run(ctx, os.Args[1:], os.Stdout, os.Stderr)
+	stop()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, nerrors.Wrap(nerrors.CodeGateUnmet, err, "check-status-restated"))
 	}

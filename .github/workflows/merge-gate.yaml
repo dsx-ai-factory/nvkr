@@ -118,7 +118,8 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: |
-          matrix=$(go run ./internal/citestshard --matrix)
+          go build -o "$RUNNER_TEMP/ci-test-shard" ./internal/citestshard
+          matrix=$("$RUNNER_TEMP/ci-test-shard" --matrix)
           echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
 
       # Pull requests only: the outputs above already force every category

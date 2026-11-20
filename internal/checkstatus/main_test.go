@@ -68,13 +68,17 @@ func newRepo(t *testing.T) string {
 	fixtureGit(t, repo, "init", "-q", "-b", "main")
 	return repo
 }
-func TestStatusDiff(t *testing.T) {
+func clearLocalGitEnv(t *testing.T) {
+	t.Helper()
 	for _, name := range localGitEnv(t) {
 		if value, ok := os.LookupEnv(name); ok {
 			t.Cleanup(func() { os.Setenv(name, value) })
 			os.Unsetenv(name)
 		}
 	}
+}
+func TestStatusDiff(t *testing.T) {
+	clearLocalGitEnv(t)
 	repo := newRepo(t)
 	baseFiles := map[string]string{
 		ledger + "README.md":                                 "# Architecture implementation and evidence\n",
@@ -106,6 +110,7 @@ func TestStatusDiff(t *testing.T) {
 	}
 	cases := []testCase{
 		{"added", "docs/guide.md", baseFiles["docs/guide.md"] + "Hosted acceptance remains unrecorded.\n", []string{`2: status restated ("remains unrecorded")` + link}},
+		{"Unicode whitespace", "docs/unicode.md", "Hosted signing remains\u00a0unproven.\nHosted signing remains\u2003unproven.\nHosted signing remains\u0085unproven.\n", []string{`1: status restated ("remains unproven")` + link, `2: status restated ("remains unproven")` + link, `3: status restated ("remains unproven")` + link}},
 		{"wrapped", "README.md", "Intro.\nCompletion requires a recorded\nrun of the workflow.\n", []string{`2: status restated ("requires a recorded run")` + link}},
 		{"ADR path", "docs/adr/0021-generation.md", "Its hosted acceptance is unrecorded.\n", []string{`1: status restated ("is unrecorded"); link docs/adr/reconciliation/adr-21.md instead`}},
 		{"ADR range", "docs/identity.md", "Identity has not been exercised\nfor ADR-02.\n", []string{`1: status restated ("has not been exercised"); link docs/adr/reconciliation/adr-01-03.md instead`}},
@@ -219,6 +224,7 @@ func TestStatusDiff(t *testing.T) {
 	})
 }
 func TestMissingLedger(t *testing.T) {
+	clearLocalGitEnv(t)
 	for _, tc := range []struct {
 		name  string
 		files []string
@@ -234,8 +240,12 @@ func TestMissingLedger(t *testing.T) {
 					write(t, repo, ledger+name, "# topic\n")
 				}
 			}
-			if _, err := ownerFiles(t.Context(), repo, ""); err == nil || !strings.Contains(err.Error(), tc.want) {
+			_, err := ownerFiles(t.Context(), repo, "")
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatal(err)
+			}
+			if tc.name == "absent" && !strings.Contains(err.Error(), "contains the per-section ledger") {
+				t.Fatal("missing recovery hint", err)
 			}
 		})
 	}
@@ -248,6 +258,7 @@ func TestMissingLedger(t *testing.T) {
 }
 
 func TestFixtureLeavesCallerIndexAlone(t *testing.T) {
+	clearLocalGitEnv(t)
 	outside := newRepo(t)
 	write(t, outside, "sentinel", "keep\n")
 	fixtureGit(t, outside, "add", "sentinel")
