@@ -145,9 +145,42 @@ func TestPlanTreeGraphMigrationSweepsStoredGraphs(t *testing.T) {
 			if err != nil || !bytes.Equal(mustCanonical(t, loaded), mustCanonical(t, plan)) {
 				t.Fatal("legacy load changed Plan", err)
 			}
-			writeGeneratedFixture(t, filepath.Join(root, graphPath), append(bytes.Clone(old[graphPath]), '\n'))
-			_, err = LoadPlanContext(t.Context(), filepath.Join(root, bundle.PlanPath))
-			assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+			var graph planFields
+			if err := json.Unmarshal(old[graphPath], &graph); err != nil {
+				t.Fatal(err)
+			}
+			var nodes []planFields
+			if err := json.Unmarshal(graph["nodes"], &nodes); err != nil {
+				t.Fatal(err)
+			}
+			changed := false
+			for _, node := range nodes {
+				if node["irNode"] != nil {
+					node["irNode"] = mustCanonical(t, "changed-producer-node")
+					changed = true
+					break
+				}
+			}
+			if !changed {
+				t.Fatal("legacy graph fixture has no producer node reference to mutate")
+			}
+			graph["nodes"] = mustCanonical(t, nodes)
+			semanticMutation, err := treeJSON(graph)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for name, mutation := range map[string][]byte{
+				"extra newline":         append(bytes.Clone(old[graphPath]), '\n'),
+				"changed producer node": semanticMutation,
+			} {
+				t.Run(name, func(t *testing.T) {
+					// Keep the original manifest: well-formed JSON with changed meaning
+					// must fail the same own-object byte check as malformed storage.
+					writeGeneratedFixture(t, filepath.Join(root, graphPath), mutation)
+					_, err := LoadPlanContext(t.Context(), filepath.Join(root, bundle.PlanPath))
+					assertFactoryErrorCode(t, err, e.CodePipelineDrift)
+				})
+			}
 			writeGeneratedFixture(t, filepath.Join(root, graphPath), old[graphPath])
 			if err := WriteGeneratedBundle(t.Context(), root, &current); err != nil {
 				t.Fatal(err)

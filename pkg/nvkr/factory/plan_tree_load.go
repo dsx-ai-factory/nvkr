@@ -187,6 +187,11 @@ func joinPlanTree(ctx context.Context, planPath string, files map[string][]byte)
 		return nil, nil, e.Wrap(e.CodePipelineDrift, err, "decoding reconstructed Plan")
 	}
 	if storage == planTreeStorage {
+		// First admit the stored inputs before compiling an untrusted graph-free
+		// tree. Full Plan validation below is a separate boundary: it checks the
+		// completed graph and its bindings, including input checks and rederivation.
+		// Keep both boundaries unless profiling a representative large Plan justifies
+		// sharing invocation-local work without weakening either admission.
 		packages, err := plan.validateGraphInputs()
 		if err != nil {
 			return nil, nil, err
