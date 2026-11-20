@@ -151,7 +151,7 @@ func cmdReleaseWithOperations(verify releaseVerifyOperation, authenticate releas
 					&cli.StringFlag{Name: "scope", Required: true, Usage: "authenticity (signatures and evidence; payload integrity not checked), artifact-publication (includes payload integrity), or release (capability-gated)"},
 					&cli.DurationFlag{Name: "timeout", Value: time.Hour, Usage: "overall release verification timeout"},
 					&cli.BoolFlag{Name: "no-cache", Usage: "disable the authenticity metadata cache"},
-					&cli.StringFlag{Name: "minimum-disk-evidence", Usage: "minimum accepted disk evidence: strict or build-provenance-v1 (default: build-provenance-v1)"},
+					&cli.StringFlag{Name: "minimum-disk-evidence", Usage: "minimum accepted disk evidence: strict, packages or build-provenance-v1 (default: build-provenance-v1)"},
 					&cli.StringFlag{Name: "identity"}, &cli.StringFlag{Name: "issuer"}, &cli.StringFlag{Name: "cosign"}, &cli.StringFlag{Name: "cosign-digest"},
 					&cli.StringFlag{Name: "definition", Usage: "exact authored Definition to require with --environment and --plan"},
 					&cli.StringFlag{Name: "environment", Usage: "exact selected Environment to require with --definition and --plan"},
