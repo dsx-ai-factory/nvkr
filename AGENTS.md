@@ -107,7 +107,7 @@ make ci-check       # every merge-gate check that runs locally; CodeQL runs only
 make test           # fast default tests; matches PR checks
 make test-race      # opt-in race + coverage for the default suite
 make test-full      # opt-in extended fixtures, race + coverage
-make test-ci-tools  # CI tooling contracts (requires Go, jq, shell tools and python3)
+make test-ci-tools  # CI tooling contracts (requires Go, jq and shell tools)
 make lint           # golangci-lint v2 (.golangci.yml)
 make build          # build bin/nvkr
 make nvkr-exec-helper

@@ -170,7 +170,7 @@ docker buildx version
 ```
 
 The Linux native runtime also requires Bash, Git, jq, GNU coreutils/timeout,
-Python 3.12+, OpenSSH, curl, OpenSSL, QEMU/firmware, session libvirt, cloud image
+Python 3 for the pinned NVKE deployment scripts, OpenSSH, curl, OpenSSL, QEMU/firmware, session libvirt, cloud image
 utilities, software TPM tools, dnsmasq, iptables/iproute2 and capability tools.
 On an Ubuntu installation with the appropriate package repositories, the runtime
 prerequisite package selection is:
