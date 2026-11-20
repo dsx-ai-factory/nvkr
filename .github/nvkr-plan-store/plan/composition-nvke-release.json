@@ -17,7 +17,7 @@
       "platform": "linux/amd64"
     }
   ],
-  "effectiveDefinitionDigest": "sha256:de1a4b8bb2230a4e0d5348f8b1cdc292d7e99e51f4571bf8f6b785af1b49af3c",
+  "effectiveDefinitionDigest": "sha256:9c2390ab22b5a52d9041724edd41167a35178c5edec3c99df42b6cfbd2ed002a",
   "kind": "CompositeDefinition",
   "members": [
     {
@@ -46,8 +46,8 @@
     }
   ],
   "metadata": {
-    "description": "Publish the NVKE GPU site and its package-derived inventory as one Release.",
-    "name": "nvke-gpu-site-release"
+    "description": "Publish NVKE and its package-derived inventory as one Release.",
+    "name": "nvke-release"
   },
   "outputs": [
     {

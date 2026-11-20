@@ -341,8 +341,8 @@ and owning operation carry that detail.
 ## Worked example: the four NVKE families
 
 This historical four-family example is illustrative and is **not** a maintained input. Production/nightly use
-`inputs/definitions/nvke/gpu-site-release.composite.yaml`; development uses
-`inputs/definitions/nvke/gpu-site.composite.yaml`. Both select the same larger member union; the release
+`inputs/definitions/nvke/nvke-release.composite.yaml`; development uses
+`inputs/definitions/nvke/nvke.composite.yaml`. Both select the same larger member union; the release
 composite also owns the derived inventory. The digests
 below are the actual `nvkr.definition` digests of the family Definitions at commit `75f154fe`, computed with the existing `Definition.Digest` and the Go toolchain in
 `.go-version`. Until `definition pin` exists, a short program against the existing API reproduces them:
@@ -462,9 +462,9 @@ floating-source composite bundle `nvkr-run-nvke-nightly`. The fixed development 
 and family Environments are retained only as comparison/authoring fixtures, not maintained releases.
 
 On 2026-11-19, njhensley (captain) approved the release-inventory decision as an explicit exception to the
-same-composite selection rule: production and floating-source nightly select `gpu-site-release.composite.yaml`, which retains the six
+same-composite selection rule: production and floating-source nightly select `nvke-release.composite.yaml`, which retains the six
 member pins and their 83 payload outputs and declares `aicr-inventory` as the 84th, composite-owned output.
-Development continues to select `gpu-site.composite.yaml` with its existing 83 outputs and bytes.
+Development continues to select `nvke.composite.yaml` with its existing 83 outputs and bytes.
 The inventory is derived separately for each production/nightly publication namespace. Development
 attempt relocation remains unsupported for derived outputs; this exception does not change any
 Environment, signer identity, credential or publication prefix.
