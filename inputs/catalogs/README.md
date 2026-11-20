@@ -5,6 +5,11 @@ Architecture, Kubernetes version and site flavor are explicit producer selection
 Definitions select the required producers and concrete platforms. Shared declaration owners remain in
 [`shared/`](shared/README.md), with digest-pinned imports and independent consuming locks.
 
+Catalog metadata names match slash-separated paths relative to this directory, for example `ovn/nvidia`.
+Legacy names remain readable in old catalog releases and captured Plans. A metadata rename changes catalog
+snapshot and dependent Plan identities, so overlays, name-keyed local toolchain bindings and generated
+consumers move together. Producer keys and pins keep their existing contracts.
+
 | Catalog | Pin cohort and ownership |
 |---|---|
 | [`aicr`](aicr/registry.yaml) | NVIDIA AICR source products and acquired CLI release; independent AICR releases |

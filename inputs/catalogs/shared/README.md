@@ -2,7 +2,7 @@
 
 Edit a shared source or producer here, then update the exact `sha256` on every importing registry.
 These files own instructions, not release selections. Each consumer retains its own machine-managed
-`pins.lock.yaml`, so updating one cohort does not silently update another. Run `nvkr catalog validate --data`
+`pins.lock.yaml`, so updating one cohort does not silently update another. Run `nvkr catalog validate --catalog`
 for each consumer and `make workflows-check` after changing a shared declaration.
 
 | Owner | Declarations | Consumers |

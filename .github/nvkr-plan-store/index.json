@@ -17729,15 +17729,15 @@
         "sha256": "sha256:77821e502cec7169ee28cc0ed45ed56631ae572415acf927b07fa33eb4325b3e"
       }
     ],
-    "plan/catalog-nvke-deployment-images": [
+    "plan/catalog-runtime-dependencies": [
       {
         "bundles": [
           "nvkr-dev",
           "nvkr-run-nvke",
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/catalog-nvke-deployment-images@ad8da4320a73.json",
-        "sha256": "sha256:ad8da4320a7333ac4a0d1cb6b9002f19fd919ca1526aaf210ee3daf97da6f217"
+        "file": "plan/catalog-runtime-dependencies@d79f8fcceb24.json",
+        "sha256": "sha256:d79f8fcceb24f94cde463e38af6229e49a75089217ee8d2cbc1cd60765306f91"
       }
     ],
     "plan/catalog-tools": [
@@ -19297,7 +19297,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/csi-node-driver-registrar-image-arm64/linux-arm64.json",
-        "sha256": "sha256:88d3c087ee723f31f73c1888d0ec5ef3bf8649786acc5ff5479cda9b0607854c"
+        "sha256": "sha256:c95cc09c3d4058355b00748e35af549c7ff1c6bf8862d4c7922fc36c407f249c"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/csi-node-driver-registrar-image/linux-amd64": [
@@ -19306,7 +19306,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/csi-node-driver-registrar-image/linux-amd64.json",
-        "sha256": "sha256:52b0768091167b9b4765bfc9771d4483f2aa411bedb2f1e63bafa0ebbec64b31"
+        "sha256": "sha256:06190b265a03182604bd3e33374018c598872819c374371038043a700d5b2687"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/local-path-helper-image-arm64/linux-arm64": [
@@ -19648,7 +19648,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/postgresql-image-arm64/linux-arm64.json",
-        "sha256": "sha256:25bacb628e6bce5d454a3ffd46e30d8b63acd9e6172d4fa1e663b7bb28550c54"
+        "sha256": "sha256:d2d41f86404ee65a8ff3cf9a5f485fa2b4bd3dcd2f829cde51aed331745111ec"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/postgresql-image/linux-amd64": [
@@ -19657,7 +19657,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/postgresql-image/linux-amd64.json",
-        "sha256": "sha256:1d35a7be702f1515c3111a4c4a0cd5f315b6f42d33ac28788094e4100b10f0ce"
+        "sha256": "sha256:b73b79c411481498252a6fbe070da3fc807aa5327daba1f51fb533dc6da408b0"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/postgresql/linux-amd64": [
@@ -19675,7 +19675,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spiffe-csi-image-arm64/linux-arm64.json",
-        "sha256": "sha256:0a341b69a27bb3cf2320e5fe4c6025959300966105c3cb7e67e566097d558ad4"
+        "sha256": "sha256:081822f258e4fdc8cc9d382610ce54b2c0befc1da0dd56e7a8c3a9e06a3ac3d3"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spiffe-csi-image/linux-amd64": [
@@ -19684,7 +19684,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spiffe-csi-image/linux-amd64.json",
-        "sha256": "sha256:220a31d5a505870645d76b72d6b4fe16b1a259b667cd5866e9ed7b2a805484a8"
+        "sha256": "sha256:3923ab7e0628047d2e09ebcd3e58db7f3149c94a6575e27ec0254bd14b8dc205"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-agent-image-arm64/linux-arm64": [
@@ -19693,7 +19693,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-agent-image-arm64/linux-arm64.json",
-        "sha256": "sha256:73237821917af3707d3248993d49b5af5f0704e097522b24067120c76bb6b796"
+        "sha256": "sha256:48b39ebad007abd13c59587519c11a8cc130e00bcaca7e4cc89ef6a153498502"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-agent-image/linux-amd64": [
@@ -19702,7 +19702,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-agent-image/linux-amd64.json",
-        "sha256": "sha256:caf8496907f8c642022f5968d5d250d5d5572b281bb73e3465d18c18cab0b312"
+        "sha256": "sha256:408eb2ff9b8def58df0ac94ef902b9c353d5a6b9c8f1d1a4193f20994bb9a877"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-bash-image-arm64/linux-arm64": [
@@ -19711,7 +19711,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-bash-image-arm64/linux-arm64.json",
-        "sha256": "sha256:03133a3850d2a83892ba5abe721980fdfd5bbe0a69f6ad61fd07592c830f37e0"
+        "sha256": "sha256:e75f3a7be8c006491b3e617ef44db81aef91b6d5682cfcaef77583bfece6e9b7"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-bash-image/linux-amd64": [
@@ -19720,7 +19720,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-bash-image/linux-amd64.json",
-        "sha256": "sha256:4f2fb4a728735d513b18aaea643bf4e2c9e0d2ba150eaca5202df390c87c4481"
+        "sha256": "sha256:9487cd6d2b6eaf497b178085e4f67b82db739ba6412039f9c5866bc55fa5bd58"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-controller-manager-image-arm64/linux-arm64": [
@@ -19729,7 +19729,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-controller-manager-image-arm64/linux-arm64.json",
-        "sha256": "sha256:33bfc6ff0b5e9d97dcca4647946185b76d27b95a6cad98c01b1ac90b13ff6d06"
+        "sha256": "sha256:c32bbe775e6936c6cb644a6aa8049dbe331d50245c6510f486012080e8d05f75"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-controller-manager-image/linux-amd64": [
@@ -19738,7 +19738,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-controller-manager-image/linux-amd64.json",
-        "sha256": "sha256:ce0b2973fc3c58b22f590a57366ada8d6abf85e18dd362c6ba05887cd714ca00"
+        "sha256": "sha256:bcb15f0ebdb00eddf5c46ed0f53302fe814b4517fe4956d1a395ca568aad8607"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-crds/linux-amd64": [
@@ -19756,7 +19756,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-oidc-image-arm64/linux-arm64.json",
-        "sha256": "sha256:2b19930cd2c6d3d3e24a5a42408c9bbec360b85b8fa430cad228fc9522d65e93"
+        "sha256": "sha256:eac41e3c0a04daa18a8c5904b8f085824e2a8b7784d6bf7a0f4322458a5e15c0"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-oidc-image/linux-amd64": [
@@ -19765,7 +19765,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-oidc-image/linux-amd64.json",
-        "sha256": "sha256:d76f1669d73396aff47bdda9f0b2a5bed19a8eb2fb81f613a6d27c9e3dd228e9"
+        "sha256": "sha256:57c330808090d059e70b871ee6275a00c1a01fb16971aad00ce32a659f4945b3"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-server-image-arm64/linux-arm64": [
@@ -19774,7 +19774,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-server-image-arm64/linux-arm64.json",
-        "sha256": "sha256:e611aab31304a2a1373ce20d49581af046f8b73c496d724b5703b298647bae30"
+        "sha256": "sha256:b463bff53e47db6a90b8218119c92a2cc61b5098a775caff7384f518ad864c90"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-server-image/linux-amd64": [
@@ -19783,7 +19783,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-server-image/linux-amd64.json",
-        "sha256": "sha256:25af06aeb7cfdd000150f9fc6b2493a0795e1bcab0a22429c2f4b1c5bb4f593c"
+        "sha256": "sha256:83c5d4cf8ba1bab9919758778cec8a09f507d5b538d59388deb75102f2e27e72"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-tpm-server-image-arm64/linux-arm64": [
@@ -19792,7 +19792,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-tpm-server-image-arm64/linux-arm64.json",
-        "sha256": "sha256:72d835055ded6833f0db1e56ce5e6b95c0a450d086c2a22a0f554e3102ef5e37"
+        "sha256": "sha256:d8b1279c391f5eb5f0f27176f5b026ec9e23bf9845ce2ee7feefe6980e7daaa1"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-tpm-server-image/linux-amd64": [
@@ -19801,7 +19801,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire-tpm-server-image/linux-amd64.json",
-        "sha256": "sha256:eeb04b5c21c18d7fa6b26e895631d353491a772a3c0d1e6017dd76a3f7a3859b"
+        "sha256": "sha256:33e12a18c58060a0d928690b6fdaefd7c95519aba97b7051dd4adb15fc86b590"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/spire/linux-amd64": [
@@ -19819,7 +19819,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/temporal-admin-tools-image-arm64/linux-arm64.json",
-        "sha256": "sha256:e8265936779cf06d8074ba13800780c94ce69951993d2d12502606ee25cefa6a"
+        "sha256": "sha256:c7bf2ead023c37750bbf41eb6bd16a6eb47af6244ff997a4c7c3593cd9f24877"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/temporal-admin-tools-image/linux-amd64": [
@@ -19828,7 +19828,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/temporal-admin-tools-image/linux-amd64.json",
-        "sha256": "sha256:8182a582ca6fa48eacf3f77c127dc8ad01765cd74de0d34d2d11057eb0f9eec9"
+        "sha256": "sha256:7959f5202484537355edcc3e996e1f8b050a5b0afbf0086fd00f0077739b11f5"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/temporal-server-image-arm64/linux-arm64": [
@@ -19837,7 +19837,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/temporal-server-image-arm64/linux-arm64.json",
-        "sha256": "sha256:b1b15993fc190af47febd817864eeadc021f70f92e352a2b188ba7d98227ce7a"
+        "sha256": "sha256:fc081c9308cf6dfb3dfb6f9e068ed6ce3ade85daa18f06bf4daee0298faa55f4"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/temporal-server-image/linux-amd64": [
@@ -19846,7 +19846,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/temporal-server-image/linux-amd64.json",
-        "sha256": "sha256:2a175daaef8e07965600f418911209034bc0a9ce86456e77daf223d8ed43b0ff"
+        "sha256": "sha256:bf0577b96919e52e5d78620eebfe618ec04d088d1e62a1c9b77ac65993675b1f"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/temporal-ui-image-arm64/linux-arm64": [
@@ -19855,7 +19855,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/temporal-ui-image-arm64/linux-arm64.json",
-        "sha256": "sha256:1b39ba7092a18b216cab0772d9a2d4a6744fee3047ea5a8bec185c242b2155ed"
+        "sha256": "sha256:c163218c60f3352093d0fba7bcc1f96e7f1ef206559195ba604f58886e3e3931"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/temporal-ui-image/linux-amd64": [
@@ -19864,7 +19864,7 @@
           "nvkr-run-nvke-nightly"
         ],
         "file": "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/temporal-ui-image/linux-amd64.json",
-        "sha256": "sha256:93c2010bfe451995d8bfc9d2702f442aad4633fc2d866429dad0e195f136186b"
+        "sha256": "sha256:f0bf4c5ee7a362b8cf6fea23026e0f007050e7a6dc87f02b02f4cce27115867c"
       }
     ],
     "steps/nvke-gpu-site-release-nvkr-run-nvke-nightly/temporal/linux-amd64": [
@@ -20080,7 +20080,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/csi-node-driver-registrar-image-arm64/linux-arm64.json",
-        "sha256": "sha256:88d3c087ee723f31f73c1888d0ec5ef3bf8649786acc5ff5479cda9b0607854c"
+        "sha256": "sha256:c95cc09c3d4058355b00748e35af549c7ff1c6bf8862d4c7922fc36c407f249c"
       }
     ],
     "steps/nvke-gpu-site-release/csi-node-driver-registrar-image/linux-amd64": [
@@ -20089,7 +20089,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/csi-node-driver-registrar-image/linux-amd64.json",
-        "sha256": "sha256:52b0768091167b9b4765bfc9771d4483f2aa411bedb2f1e63bafa0ebbec64b31"
+        "sha256": "sha256:06190b265a03182604bd3e33374018c598872819c374371038043a700d5b2687"
       }
     ],
     "steps/nvke-gpu-site-release/local-path-helper-image-arm64/linux-arm64": [
@@ -20431,7 +20431,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/postgresql-image-arm64/linux-arm64.json",
-        "sha256": "sha256:25bacb628e6bce5d454a3ffd46e30d8b63acd9e6172d4fa1e663b7bb28550c54"
+        "sha256": "sha256:d2d41f86404ee65a8ff3cf9a5f485fa2b4bd3dcd2f829cde51aed331745111ec"
       }
     ],
     "steps/nvke-gpu-site-release/postgresql-image/linux-amd64": [
@@ -20440,7 +20440,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/postgresql-image/linux-amd64.json",
-        "sha256": "sha256:1d35a7be702f1515c3111a4c4a0cd5f315b6f42d33ac28788094e4100b10f0ce"
+        "sha256": "sha256:b73b79c411481498252a6fbe070da3fc807aa5327daba1f51fb533dc6da408b0"
       }
     ],
     "steps/nvke-gpu-site-release/postgresql/linux-amd64": [
@@ -20458,7 +20458,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spiffe-csi-image-arm64/linux-arm64.json",
-        "sha256": "sha256:0a341b69a27bb3cf2320e5fe4c6025959300966105c3cb7e67e566097d558ad4"
+        "sha256": "sha256:081822f258e4fdc8cc9d382610ce54b2c0befc1da0dd56e7a8c3a9e06a3ac3d3"
       }
     ],
     "steps/nvke-gpu-site-release/spiffe-csi-image/linux-amd64": [
@@ -20467,7 +20467,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spiffe-csi-image/linux-amd64.json",
-        "sha256": "sha256:220a31d5a505870645d76b72d6b4fe16b1a259b667cd5866e9ed7b2a805484a8"
+        "sha256": "sha256:3923ab7e0628047d2e09ebcd3e58db7f3149c94a6575e27ec0254bd14b8dc205"
       }
     ],
     "steps/nvke-gpu-site-release/spire-agent-image-arm64/linux-arm64": [
@@ -20476,7 +20476,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spire-agent-image-arm64/linux-arm64.json",
-        "sha256": "sha256:73237821917af3707d3248993d49b5af5f0704e097522b24067120c76bb6b796"
+        "sha256": "sha256:48b39ebad007abd13c59587519c11a8cc130e00bcaca7e4cc89ef6a153498502"
       }
     ],
     "steps/nvke-gpu-site-release/spire-agent-image/linux-amd64": [
@@ -20485,7 +20485,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spire-agent-image/linux-amd64.json",
-        "sha256": "sha256:caf8496907f8c642022f5968d5d250d5d5572b281bb73e3465d18c18cab0b312"
+        "sha256": "sha256:408eb2ff9b8def58df0ac94ef902b9c353d5a6b9c8f1d1a4193f20994bb9a877"
       }
     ],
     "steps/nvke-gpu-site-release/spire-bash-image-arm64/linux-arm64": [
@@ -20494,7 +20494,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spire-bash-image-arm64/linux-arm64.json",
-        "sha256": "sha256:03133a3850d2a83892ba5abe721980fdfd5bbe0a69f6ad61fd07592c830f37e0"
+        "sha256": "sha256:e75f3a7be8c006491b3e617ef44db81aef91b6d5682cfcaef77583bfece6e9b7"
       }
     ],
     "steps/nvke-gpu-site-release/spire-bash-image/linux-amd64": [
@@ -20503,7 +20503,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spire-bash-image/linux-amd64.json",
-        "sha256": "sha256:4f2fb4a728735d513b18aaea643bf4e2c9e0d2ba150eaca5202df390c87c4481"
+        "sha256": "sha256:9487cd6d2b6eaf497b178085e4f67b82db739ba6412039f9c5866bc55fa5bd58"
       }
     ],
     "steps/nvke-gpu-site-release/spire-controller-manager-image-arm64/linux-arm64": [
@@ -20512,7 +20512,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spire-controller-manager-image-arm64/linux-arm64.json",
-        "sha256": "sha256:33bfc6ff0b5e9d97dcca4647946185b76d27b95a6cad98c01b1ac90b13ff6d06"
+        "sha256": "sha256:c32bbe775e6936c6cb644a6aa8049dbe331d50245c6510f486012080e8d05f75"
       }
     ],
     "steps/nvke-gpu-site-release/spire-controller-manager-image/linux-amd64": [
@@ -20521,7 +20521,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spire-controller-manager-image/linux-amd64.json",
-        "sha256": "sha256:ce0b2973fc3c58b22f590a57366ada8d6abf85e18dd362c6ba05887cd714ca00"
+        "sha256": "sha256:bcb15f0ebdb00eddf5c46ed0f53302fe814b4517fe4956d1a395ca568aad8607"
       }
     ],
     "steps/nvke-gpu-site-release/spire-crds/linux-amd64": [
@@ -20539,7 +20539,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spire-oidc-image-arm64/linux-arm64.json",
-        "sha256": "sha256:2b19930cd2c6d3d3e24a5a42408c9bbec360b85b8fa430cad228fc9522d65e93"
+        "sha256": "sha256:eac41e3c0a04daa18a8c5904b8f085824e2a8b7784d6bf7a0f4322458a5e15c0"
       }
     ],
     "steps/nvke-gpu-site-release/spire-oidc-image/linux-amd64": [
@@ -20548,7 +20548,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spire-oidc-image/linux-amd64.json",
-        "sha256": "sha256:d76f1669d73396aff47bdda9f0b2a5bed19a8eb2fb81f613a6d27c9e3dd228e9"
+        "sha256": "sha256:57c330808090d059e70b871ee6275a00c1a01fb16971aad00ce32a659f4945b3"
       }
     ],
     "steps/nvke-gpu-site-release/spire-server-image-arm64/linux-arm64": [
@@ -20557,7 +20557,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spire-server-image-arm64/linux-arm64.json",
-        "sha256": "sha256:e611aab31304a2a1373ce20d49581af046f8b73c496d724b5703b298647bae30"
+        "sha256": "sha256:b463bff53e47db6a90b8218119c92a2cc61b5098a775caff7384f518ad864c90"
       }
     ],
     "steps/nvke-gpu-site-release/spire-server-image/linux-amd64": [
@@ -20566,7 +20566,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spire-server-image/linux-amd64.json",
-        "sha256": "sha256:25af06aeb7cfdd000150f9fc6b2493a0795e1bcab0a22429c2f4b1c5bb4f593c"
+        "sha256": "sha256:83c5d4cf8ba1bab9919758778cec8a09f507d5b538d59388deb75102f2e27e72"
       }
     ],
     "steps/nvke-gpu-site-release/spire-tpm-server-image-arm64/linux-arm64": [
@@ -20575,7 +20575,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spire-tpm-server-image-arm64/linux-arm64.json",
-        "sha256": "sha256:72d835055ded6833f0db1e56ce5e6b95c0a450d086c2a22a0f554e3102ef5e37"
+        "sha256": "sha256:d8b1279c391f5eb5f0f27176f5b026ec9e23bf9845ce2ee7feefe6980e7daaa1"
       }
     ],
     "steps/nvke-gpu-site-release/spire-tpm-server-image/linux-amd64": [
@@ -20584,7 +20584,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/spire-tpm-server-image/linux-amd64.json",
-        "sha256": "sha256:eeb04b5c21c18d7fa6b26e895631d353491a772a3c0d1e6017dd76a3f7a3859b"
+        "sha256": "sha256:33e12a18c58060a0d928690b6fdaefd7c95519aba97b7051dd4adb15fc86b590"
       }
     ],
     "steps/nvke-gpu-site-release/spire/linux-amd64": [
@@ -20602,7 +20602,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/temporal-admin-tools-image-arm64/linux-arm64.json",
-        "sha256": "sha256:e8265936779cf06d8074ba13800780c94ce69951993d2d12502606ee25cefa6a"
+        "sha256": "sha256:c7bf2ead023c37750bbf41eb6bd16a6eb47af6244ff997a4c7c3593cd9f24877"
       }
     ],
     "steps/nvke-gpu-site-release/temporal-admin-tools-image/linux-amd64": [
@@ -20611,7 +20611,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/temporal-admin-tools-image/linux-amd64.json",
-        "sha256": "sha256:8182a582ca6fa48eacf3f77c127dc8ad01765cd74de0d34d2d11057eb0f9eec9"
+        "sha256": "sha256:7959f5202484537355edcc3e996e1f8b050a5b0afbf0086fd00f0077739b11f5"
       }
     ],
     "steps/nvke-gpu-site-release/temporal-server-image-arm64/linux-arm64": [
@@ -20620,7 +20620,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/temporal-server-image-arm64/linux-arm64.json",
-        "sha256": "sha256:b1b15993fc190af47febd817864eeadc021f70f92e352a2b188ba7d98227ce7a"
+        "sha256": "sha256:fc081c9308cf6dfb3dfb6f9e068ed6ce3ade85daa18f06bf4daee0298faa55f4"
       }
     ],
     "steps/nvke-gpu-site-release/temporal-server-image/linux-amd64": [
@@ -20629,7 +20629,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/temporal-server-image/linux-amd64.json",
-        "sha256": "sha256:2a175daaef8e07965600f418911209034bc0a9ce86456e77daf223d8ed43b0ff"
+        "sha256": "sha256:bf0577b96919e52e5d78620eebfe618ec04d088d1e62a1c9b77ac65993675b1f"
       }
     ],
     "steps/nvke-gpu-site-release/temporal-ui-image-arm64/linux-arm64": [
@@ -20638,7 +20638,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/temporal-ui-image-arm64/linux-arm64.json",
-        "sha256": "sha256:1b39ba7092a18b216cab0772d9a2d4a6744fee3047ea5a8bec185c242b2155ed"
+        "sha256": "sha256:c163218c60f3352093d0fba7bcc1f96e7f1ef206559195ba604f58886e3e3931"
       }
     ],
     "steps/nvke-gpu-site-release/temporal-ui-image/linux-amd64": [
@@ -20647,7 +20647,7 @@
           "nvkr-run-nvke"
         ],
         "file": "steps/nvke-gpu-site-release/temporal-ui-image/linux-amd64.json",
-        "sha256": "sha256:93c2010bfe451995d8bfc9d2702f442aad4633fc2d866429dad0e195f136186b"
+        "sha256": "sha256:f0bf4c5ee7a362b8cf6fea23026e0f007050e7a6dc87f02b02f4cce27115867c"
       }
     ],
     "steps/nvke-gpu-site-release/temporal/linux-amd64": [
@@ -20863,7 +20863,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/csi-node-driver-registrar-image-arm64/linux-arm64.json",
-        "sha256": "sha256:88d3c087ee723f31f73c1888d0ec5ef3bf8649786acc5ff5479cda9b0607854c"
+        "sha256": "sha256:c95cc09c3d4058355b00748e35af549c7ff1c6bf8862d4c7922fc36c407f249c"
       }
     ],
     "steps/nvke-gpu-site/csi-node-driver-registrar-image/linux-amd64": [
@@ -20872,7 +20872,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/csi-node-driver-registrar-image/linux-amd64.json",
-        "sha256": "sha256:52b0768091167b9b4765bfc9771d4483f2aa411bedb2f1e63bafa0ebbec64b31"
+        "sha256": "sha256:06190b265a03182604bd3e33374018c598872819c374371038043a700d5b2687"
       }
     ],
     "steps/nvke-gpu-site/local-path-helper-image-arm64/linux-arm64": [
@@ -21214,7 +21214,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/postgresql-image-arm64/linux-arm64.json",
-        "sha256": "sha256:25bacb628e6bce5d454a3ffd46e30d8b63acd9e6172d4fa1e663b7bb28550c54"
+        "sha256": "sha256:d2d41f86404ee65a8ff3cf9a5f485fa2b4bd3dcd2f829cde51aed331745111ec"
       }
     ],
     "steps/nvke-gpu-site/postgresql-image/linux-amd64": [
@@ -21223,7 +21223,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/postgresql-image/linux-amd64.json",
-        "sha256": "sha256:1d35a7be702f1515c3111a4c4a0cd5f315b6f42d33ac28788094e4100b10f0ce"
+        "sha256": "sha256:b73b79c411481498252a6fbe070da3fc807aa5327daba1f51fb533dc6da408b0"
       }
     ],
     "steps/nvke-gpu-site/postgresql/linux-amd64": [
@@ -21241,7 +21241,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spiffe-csi-image-arm64/linux-arm64.json",
-        "sha256": "sha256:0a341b69a27bb3cf2320e5fe4c6025959300966105c3cb7e67e566097d558ad4"
+        "sha256": "sha256:081822f258e4fdc8cc9d382610ce54b2c0befc1da0dd56e7a8c3a9e06a3ac3d3"
       }
     ],
     "steps/nvke-gpu-site/spiffe-csi-image/linux-amd64": [
@@ -21250,7 +21250,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spiffe-csi-image/linux-amd64.json",
-        "sha256": "sha256:220a31d5a505870645d76b72d6b4fe16b1a259b667cd5866e9ed7b2a805484a8"
+        "sha256": "sha256:3923ab7e0628047d2e09ebcd3e58db7f3149c94a6575e27ec0254bd14b8dc205"
       }
     ],
     "steps/nvke-gpu-site/spire-agent-image-arm64/linux-arm64": [
@@ -21259,7 +21259,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spire-agent-image-arm64/linux-arm64.json",
-        "sha256": "sha256:73237821917af3707d3248993d49b5af5f0704e097522b24067120c76bb6b796"
+        "sha256": "sha256:48b39ebad007abd13c59587519c11a8cc130e00bcaca7e4cc89ef6a153498502"
       }
     ],
     "steps/nvke-gpu-site/spire-agent-image/linux-amd64": [
@@ -21268,7 +21268,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spire-agent-image/linux-amd64.json",
-        "sha256": "sha256:caf8496907f8c642022f5968d5d250d5d5572b281bb73e3465d18c18cab0b312"
+        "sha256": "sha256:408eb2ff9b8def58df0ac94ef902b9c353d5a6b9c8f1d1a4193f20994bb9a877"
       }
     ],
     "steps/nvke-gpu-site/spire-bash-image-arm64/linux-arm64": [
@@ -21277,7 +21277,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spire-bash-image-arm64/linux-arm64.json",
-        "sha256": "sha256:03133a3850d2a83892ba5abe721980fdfd5bbe0a69f6ad61fd07592c830f37e0"
+        "sha256": "sha256:e75f3a7be8c006491b3e617ef44db81aef91b6d5682cfcaef77583bfece6e9b7"
       }
     ],
     "steps/nvke-gpu-site/spire-bash-image/linux-amd64": [
@@ -21286,7 +21286,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spire-bash-image/linux-amd64.json",
-        "sha256": "sha256:4f2fb4a728735d513b18aaea643bf4e2c9e0d2ba150eaca5202df390c87c4481"
+        "sha256": "sha256:9487cd6d2b6eaf497b178085e4f67b82db739ba6412039f9c5866bc55fa5bd58"
       }
     ],
     "steps/nvke-gpu-site/spire-controller-manager-image-arm64/linux-arm64": [
@@ -21295,7 +21295,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spire-controller-manager-image-arm64/linux-arm64.json",
-        "sha256": "sha256:33bfc6ff0b5e9d97dcca4647946185b76d27b95a6cad98c01b1ac90b13ff6d06"
+        "sha256": "sha256:c32bbe775e6936c6cb644a6aa8049dbe331d50245c6510f486012080e8d05f75"
       }
     ],
     "steps/nvke-gpu-site/spire-controller-manager-image/linux-amd64": [
@@ -21304,7 +21304,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spire-controller-manager-image/linux-amd64.json",
-        "sha256": "sha256:ce0b2973fc3c58b22f590a57366ada8d6abf85e18dd362c6ba05887cd714ca00"
+        "sha256": "sha256:bcb15f0ebdb00eddf5c46ed0f53302fe814b4517fe4956d1a395ca568aad8607"
       }
     ],
     "steps/nvke-gpu-site/spire-crds/linux-amd64": [
@@ -21322,7 +21322,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spire-oidc-image-arm64/linux-arm64.json",
-        "sha256": "sha256:2b19930cd2c6d3d3e24a5a42408c9bbec360b85b8fa430cad228fc9522d65e93"
+        "sha256": "sha256:eac41e3c0a04daa18a8c5904b8f085824e2a8b7784d6bf7a0f4322458a5e15c0"
       }
     ],
     "steps/nvke-gpu-site/spire-oidc-image/linux-amd64": [
@@ -21331,7 +21331,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spire-oidc-image/linux-amd64.json",
-        "sha256": "sha256:d76f1669d73396aff47bdda9f0b2a5bed19a8eb2fb81f613a6d27c9e3dd228e9"
+        "sha256": "sha256:57c330808090d059e70b871ee6275a00c1a01fb16971aad00ce32a659f4945b3"
       }
     ],
     "steps/nvke-gpu-site/spire-server-image-arm64/linux-arm64": [
@@ -21340,7 +21340,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spire-server-image-arm64/linux-arm64.json",
-        "sha256": "sha256:e611aab31304a2a1373ce20d49581af046f8b73c496d724b5703b298647bae30"
+        "sha256": "sha256:b463bff53e47db6a90b8218119c92a2cc61b5098a775caff7384f518ad864c90"
       }
     ],
     "steps/nvke-gpu-site/spire-server-image/linux-amd64": [
@@ -21349,7 +21349,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spire-server-image/linux-amd64.json",
-        "sha256": "sha256:25af06aeb7cfdd000150f9fc6b2493a0795e1bcab0a22429c2f4b1c5bb4f593c"
+        "sha256": "sha256:83c5d4cf8ba1bab9919758778cec8a09f507d5b538d59388deb75102f2e27e72"
       }
     ],
     "steps/nvke-gpu-site/spire-tpm-server-image-arm64/linux-arm64": [
@@ -21358,7 +21358,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spire-tpm-server-image-arm64/linux-arm64.json",
-        "sha256": "sha256:72d835055ded6833f0db1e56ce5e6b95c0a450d086c2a22a0f554e3102ef5e37"
+        "sha256": "sha256:d8b1279c391f5eb5f0f27176f5b026ec9e23bf9845ce2ee7feefe6980e7daaa1"
       }
     ],
     "steps/nvke-gpu-site/spire-tpm-server-image/linux-amd64": [
@@ -21367,7 +21367,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/spire-tpm-server-image/linux-amd64.json",
-        "sha256": "sha256:eeb04b5c21c18d7fa6b26e895631d353491a772a3c0d1e6017dd76a3f7a3859b"
+        "sha256": "sha256:33e12a18c58060a0d928690b6fdaefd7c95519aba97b7051dd4adb15fc86b590"
       }
     ],
     "steps/nvke-gpu-site/spire/linux-amd64": [
@@ -21385,7 +21385,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/temporal-admin-tools-image-arm64/linux-arm64.json",
-        "sha256": "sha256:e8265936779cf06d8074ba13800780c94ce69951993d2d12502606ee25cefa6a"
+        "sha256": "sha256:c7bf2ead023c37750bbf41eb6bd16a6eb47af6244ff997a4c7c3593cd9f24877"
       }
     ],
     "steps/nvke-gpu-site/temporal-admin-tools-image/linux-amd64": [
@@ -21394,7 +21394,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/temporal-admin-tools-image/linux-amd64.json",
-        "sha256": "sha256:8182a582ca6fa48eacf3f77c127dc8ad01765cd74de0d34d2d11057eb0f9eec9"
+        "sha256": "sha256:7959f5202484537355edcc3e996e1f8b050a5b0afbf0086fd00f0077739b11f5"
       }
     ],
     "steps/nvke-gpu-site/temporal-server-image-arm64/linux-arm64": [
@@ -21403,7 +21403,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/temporal-server-image-arm64/linux-arm64.json",
-        "sha256": "sha256:b1b15993fc190af47febd817864eeadc021f70f92e352a2b188ba7d98227ce7a"
+        "sha256": "sha256:fc081c9308cf6dfb3dfb6f9e068ed6ce3ade85daa18f06bf4daee0298faa55f4"
       }
     ],
     "steps/nvke-gpu-site/temporal-server-image/linux-amd64": [
@@ -21412,7 +21412,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/temporal-server-image/linux-amd64.json",
-        "sha256": "sha256:2a175daaef8e07965600f418911209034bc0a9ce86456e77daf223d8ed43b0ff"
+        "sha256": "sha256:bf0577b96919e52e5d78620eebfe618ec04d088d1e62a1c9b77ac65993675b1f"
       }
     ],
     "steps/nvke-gpu-site/temporal-ui-image-arm64/linux-arm64": [
@@ -21421,7 +21421,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/temporal-ui-image-arm64/linux-arm64.json",
-        "sha256": "sha256:1b39ba7092a18b216cab0772d9a2d4a6744fee3047ea5a8bec185c242b2155ed"
+        "sha256": "sha256:c163218c60f3352093d0fba7bcc1f96e7f1ef206559195ba604f58886e3e3931"
       }
     ],
     "steps/nvke-gpu-site/temporal-ui-image/linux-amd64": [
@@ -21430,7 +21430,7 @@
           "nvkr-dev"
         ],
         "file": "steps/nvke-gpu-site/temporal-ui-image/linux-amd64.json",
-        "sha256": "sha256:93c2010bfe451995d8bfc9d2702f442aad4633fc2d866429dad0e195f136186b"
+        "sha256": "sha256:f0bf4c5ee7a362b8cf6fea23026e0f007050e7a6dc87f02b02f4cce27115867c"
       }
     ],
     "steps/nvke-gpu-site/temporal/linux-amd64": [

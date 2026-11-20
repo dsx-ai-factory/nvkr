@@ -42,7 +42,7 @@ qualified. Reports of particular interest:
   identity policy.
 
 Out of scope: vulnerabilities in the **upstream components** nvkr builds (report those upstream) and in
-an **operator-authored catalog** (`--data`) that ships outside this repository.
+an **operator-authored catalog** (`--catalog`) that ships outside this repository.
 
 ## Trust boundaries and deployment assumptions
 

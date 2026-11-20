@@ -57,9 +57,9 @@ been cut over; full disk execution and hosted acceptance are separate evidence.
 Update source and scanner pins through the CLI:
 
 ```sh
-bin/nvkr catalog pin --dir inputs/catalogs/tools/disk-inspector --commit <full-source-commit> nvkr-inspector
-bin/nvkr catalog pin --dir inputs/catalogs/tools/disk-inspector --tag v1.51.1 syft-amd64
-bin/nvkr catalog pin --dir inputs/catalogs/tools/disk-inspector --tag v1.51.1 syft-arm64
+bin/nvkr catalog pin --catalog inputs/catalogs/tools/disk-inspector --commit <full-source-commit> nvkr-inspector
+bin/nvkr catalog pin --catalog inputs/catalogs/tools/disk-inspector --tag v1.51.1 syft-amd64
+bin/nvkr catalog pin --catalog inputs/catalogs/tools/disk-inspector --tag v1.51.1 syft-arm64
 ```
 
 The existing appliance-image directories remain until both architectures pass the
