@@ -117,7 +117,7 @@ func (output Output) Validate() error {
 		(output.Disk.Encryption != "none" && output.Disk.Encryption != "luks2") ||
 		output.Disk.Size <= 0 || !canonical.IsDigest(output.Disk.PlanDigest) ||
 		!canonical.IsDigest(output.Disk.PayloadDigest) ||
-		(output.Disk.EvidenceMode != "" && output.Disk.EvidenceMode != "build-provenance-v1") ||
+		(output.Disk.EvidenceMode != "" && output.Disk.EvidenceMode != "build-provenance-v1" && output.Disk.EvidenceMode != "installed-packages-v1") ||
 		output.Disk.Outcome != "succeeded" || !slices.Contains(output.Components, output.Disk.Component) {
 		return e.New(e.CodeVerifyFailed, "disk artifact %q lacks an exact successful QCOW2 producer binding", output.Name)
 	}

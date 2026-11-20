@@ -153,6 +153,9 @@ CycloneDX generation or publication. The [inspection reconciliation](adr/reconci
 owns the strict full-content receipt/packaging path and its external validation limits.
 NVKE's explicit `build-provenance-v1` mode authenticates live disk/material subjects while
 signing the deferred-inspection scope. [The NVKE README](../inputs/definitions/nvke/README.md) describes its
-candidate delivery and consumer limits. The M3 MVP retains this producer-only scope; deep inspection and
+candidate delivery and consumer limits. The `installed-packages-v1` publication path is implemented,
+but maintained activation requires refreshed AMD64/ARM64 appliances that preserve observed vendor,
+their measured pins, and explicit producer-only FDE overrides. Current maintained inputs retain
+producer-only scope while those prerequisites remain pending. Deep inspection and
 reconciliation remain deferred hardening. Neither diagnostic
 metadata nor NVKE delivery proves full-disk inventory, FDE support or qualified reproduction.
