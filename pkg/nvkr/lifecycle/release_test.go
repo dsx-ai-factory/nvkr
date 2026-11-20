@@ -1133,8 +1133,8 @@ func testDiskPublication(t *testing.T, arch, evidenceMode, inspection string, se
 		component := sbom.Component{Type: "library", Name: "fixture-package", Version: "1"}
 		if evidenceMode == sbom.DiskInstalledPackages {
 			method = sbom.DiskInstalledPackagesMethod
-			component.PURL = "pkg:deb/fixture-package@1?arch=" + arch
-			component.Properties = []sbom.Property{{Name: "nvkr:packageArchitecture", Value: arch}, {Name: "nvkr:packageFormat", Value: "deb"}}
+			component.PURL = "pkg:deb/ubuntu/fixture-package@1?arch=" + arch
+			component.Properties = []sbom.Property{{Name: "nvkr:packageArchitecture", Value: arch}, {Name: "nvkr:packageFormat", Value: "deb"}, {Name: "nvkr:packageVendor", Value: "ubuntu"}}
 		}
 		bom, err = sbom.WithDependencies(bom, []sbom.Component{component}, method, buildDigest)
 		if err != nil {

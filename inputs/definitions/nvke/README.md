@@ -264,12 +264,24 @@ it declares no storage-driver field or ambient runtime-variable workaround. Stor
 is admitted and observed by the existing runtime owner. The historical explicit-VFS probe
 is diagnostic evidence, not this Environment's configuration or production approval.
 Runner labels do not supply runtime-capacity or full-inspector profile authority.
-The maintained development, production and nightly Environments select
-`diskEvidence: installed-packages-v1` with explicit `diskEvidenceOverrides` retaining
-`build-provenance-v1` for all four FDE outputs. Plain disks use the pinned offline
-inspection profiles to emit installed Debian package names, versions, architectures
-and purls bound to the final QCOW2 digest. Every held disk and its material producers
-remain authenticated. FDE evidence reports inspection as `not-performed`: no
+The maintained development, production and nightly Environments retain
+`diskEvidence: build-provenance-v1`. Package mode is implemented, but their currently
+pinned appliances embed helpers that discard the observed distro/vendor. Activation
+requires authorized publication of refreshed AMD64/ARM64 appliances and measured
+pins in all three Environments. Only then select the policy below and regenerate:
+
+```yaml
+diskEvidence: installed-packages-v1
+diskEvidenceOverrides:
+  nvke-node-fde-amd64: build-provenance-v1
+  nvke-node-fde-arm64: build-provenance-v1
+  nvke-node-fde-ubuntu24-amd64: build-provenance-v1
+  nvke-node-fde-ubuntu24-arm64: build-provenance-v1
+```
+
+Package evidence carries observed Debian names, versions, architectures, vendor and
+purls bound to the final QCOW2 digest; missing vendor fails closed. Every held disk
+and its material producers remain authenticated. FDE evidence reports inspection as `not-performed`: no
 authenticated pre-encryption inventory handoff exists. Full disk inspection and
 material reconciliation remain separate hardening
 ([ADR-13](../../../docs/adr/0013-supply-chain-evidence.md#6-pipeline-sbom-and-acquisition-scope)).
@@ -319,8 +331,8 @@ The direct-Packer contract opts into APT capture and declares the matching plain
 source-owned material projection. Capture byte correspondence alone does not authenticate repository
 origin or establish a complete installed-software inventory.
 
-The maintained Environment selects package inventory for plain disks and explicitly
-overrides FDE outputs to producer-only evidence. The composite authenticates each held
+The maintained Environment retains producer-only evidence pending the appliance
+refresh and activation described above. The composite authenticates each held
 disk and its live producer/material subjects, signing the actual per-output scope.
 Deep content inspection and reconciliation remain separate from package inventory.
 A successful composite pipeline still
@@ -344,8 +356,8 @@ installers, the agent, DOCA OVS and the four disk producers with their 24.04 dec
 passphrase, evidence mode and every other material producer are unchanged. The
 [Ubuntu 24 inputs](../diagnostics/ubuntu24/README.md) record the agent's libc contract and installer pins.
 The composite Environment keeps the native ARC route, execution classes and inspection
-profiles; plain Ubuntu 24 disks select package inventory and FDE overrides remain
-`build-provenance-v1`. The [Ubuntu 24 reconciliation record](../../../docs/adr/reconciliation/ubuntu-24-node-image-inputs.md)
+profiles; all Ubuntu 24 disks retain `build-provenance-v1` pending the same appliance
+refresh. The [Ubuntu 24 reconciliation record](../../../docs/adr/reconciliation/ubuntu-24-node-image-inputs.md)
 owns historical publication scope and current-candidate guest acceptance.
 
 The [recorded AMD64 diagnostic Run](https://github.com/dsx-ai-factory/nvkr/actions/runs/38443178035)

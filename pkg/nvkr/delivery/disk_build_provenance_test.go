@@ -104,6 +104,7 @@ func TestQualifiedPublicationRejectsDiskBuildProvenance(t *testing.T) {
 	for _, test := range []struct{ name, mode string }{
 		{"strict", ""},
 		{"producer provenance", sbom.DiskBuildProvenance},
+		{"installed packages", sbom.DiskInstalledPackages},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			inspection, err := Inspect(t.Context(), path)
@@ -139,7 +140,7 @@ func TestQualifiedPublicationRejectsDiskBuildProvenance(t *testing.T) {
 				return
 			}
 			assertRegistryCode(t, err, e.CodeGateUnmet)
-			if !strings.Contains(err.Error(), "producer-provenance-only disk output") {
+			if !strings.Contains(err.Error(), "requires strict disk evidence") {
 				t.Fatalf("qualified rejection missed disk evidence gate: %v", err)
 			}
 			_, err = root.Digest()

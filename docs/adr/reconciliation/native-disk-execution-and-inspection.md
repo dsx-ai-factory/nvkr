@@ -58,7 +58,9 @@ failure cannot downgrade the requested mode. The package scan has one selected
 profile timeout, rather than the strict material-operation multiplier. Source/material
 integrity and evidence slots remain mandatory. Contract tests cover both architecture
 descriptions and owner/profile/subject substitution; no current hosted populated-SBOM
-Run is recorded. The historical 730-package diagnostic is not hosted publication proof.
+Run is recorded. Maintained Environments stay on producer-only evidence until refreshed
+appliances preserve the observed vendor and measured image pins are recorded for both
+architectures. The historical 730-package diagnostic is not hosted publication proof.
 
 The separate full-content profile binds the native inspector/codec/guestfish/Syft/dpkg-deb image/tool closure,
 resource budgets, exact acquisition carriers, staged materials and exported filesystem. Class-separated

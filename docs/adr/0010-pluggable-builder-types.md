@@ -468,8 +468,9 @@ contents. A new upstream component manifest is not an MVP prerequisite. Exact so
 material identities remain part of the build/evidence contract, alongside signatures, provenance and complete
 output membership. ADR-13 separately requires traced materials and read-only final-disk inspection for the
 strict evidence route. Its explicit `build-provenance-v1` mode binds live producer/material
-evidence and records inspection as not performed. Maintained NVKE plain disks select the intermediate
-`installed-packages-v1` package inventory; FDE retains build provenance. Strict inspection is deferred hardening. Current implementation
+evidence and records inspection as not performed. The intermediate `installed-packages-v1` package
+inventory is implemented; maintained activation awaits refreshed appliances with observed vendor and
+measured pins. FDE retains build provenance. Strict inspection is deferred hardening. Current implementation
 and evidence remain in [reconciliation](reconciliation/README.md). Embedded-software correctness and runtime validation
 remain the upstream build owner's duty. ADR-22's future curated-set derivation remains deferred.
 

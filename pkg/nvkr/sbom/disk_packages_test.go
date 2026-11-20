@@ -16,8 +16,8 @@ func packageInventoryFixture(arch string) *DiskInstalledInventory {
 	return &DiskInstalledInventory{subjectDigest: "sha256:" + strings.Repeat("a", 64), subjectSize: 1024,
 		runtimeDigest: "sha256:" + strings.Repeat("b", 64), inspectorDigest: "sha256:" + strings.Repeat("c", 64),
 		codecDigest: "sha256:" + strings.Repeat("d", 64), packages: []InstalledDiskPackage{
-			{Name: "zlib1g", Version: "1.2.13", Release: "0ubuntu1-2", Epoch: "1", Architecture: arch, Format: "deb"},
-			{Name: "base-files", Version: "12ubuntu4", Epoch: "0", Architecture: "all", Format: "deb"},
+			{Name: "zlib1g", Version: "1.2.13", Release: "0ubuntu1-2+b1", Epoch: "1", Architecture: arch, Format: "deb", Vendor: "ubuntu"},
+			{Name: "base-files", Version: "12ubuntu4", Epoch: "0", Architecture: "all", Format: "deb", Vendor: "ubuntu"},
 		}}
 }
 
@@ -36,7 +36,7 @@ func TestDiskPackageDocument(t *testing.T) {
 			if len(bom.Components) != 2 || bom.Metadata.Component.Hashes[0].Content != strings.Repeat("a", 64) {
 				t.Fatal("inventory lost its subject or components")
 			}
-			if got := bom.Components[1]; got.Name != "zlib1g" || got.Version != "1:1.2.13-0ubuntu1-2" || got.PURL != "pkg:deb/zlib1g@1%3A1.2.13-0ubuntu1-2?arch="+arch {
+			if got := bom.Components[1]; got.Name != "zlib1g" || got.Version != "1:1.2.13-0ubuntu1-2+b1" || got.PURL != "pkg:deb/ubuntu/zlib1g@1:1.2.13-0ubuntu1-2%2Bb1?arch="+arch {
 				t.Fatalf("package identity lost: %+v", got)
 			}
 			first, err := bom.Marshal()
@@ -80,6 +80,9 @@ func TestDiskPackageDocumentRejectsIncompleteObservation(t *testing.T) {
 		{"empty packages", func(i *DiskInstalledInventory) { i.packages = nil }, e.CodeProvenanceMissing},
 		{"missing version", func(i *DiskInstalledInventory) { i.packages[0].Version = "" }, e.CodeProvenanceMissing},
 		{"missing architecture", func(i *DiskInstalledInventory) { i.packages[0].Architecture = "" }, e.CodeProvenanceMissing},
+		{"missing vendor", func(i *DiskInstalledInventory) { i.packages[0].Vendor = "" }, e.CodeProvenanceMissing},
+		{"unknown vendor", func(i *DiskInstalledInventory) { i.packages[0].Vendor = "unknown" }, e.CodeProvenanceMissing},
+		{"invalid vendor", func(i *DiskInstalledInventory) { i.packages[0].Vendor = "../ubuntu" }, e.CodeProvenanceMissing},
 		{"invalid epoch", func(i *DiskInstalledInventory) { i.packages[0].Epoch = "-1" }, e.CodeVerifyFailed},
 		{"conflicting package", func(i *DiskInstalledInventory) {
 			p := i.packages[0]
@@ -98,6 +101,19 @@ func TestDiskPackageDocumentRejectsIncompleteObservation(t *testing.T) {
 	}
 }
 
+func TestInstalledDebPURLCanonicalExamples(t *testing.T) {
+	for _, test := range []struct{ vendor, name, version, arch, want string }{
+		{"debian", "attr", "1:2.4.47-2+b1", "amd64", "pkg:deb/debian/attr@1:2.4.47-2%2Bb1?arch=amd64"},
+		{"ubuntu", "dpkg", "1.19.0.4", "amd64", "pkg:deb/ubuntu/dpkg@1.19.0.4?arch=amd64"},
+	} {
+		t.Run(test.vendor, func(t *testing.T) {
+			if got := installedDebPURL(test.vendor, test.name, test.version, test.arch); got != test.want {
+				t.Fatalf("purl %q, want %q", got, test.want)
+			}
+		})
+	}
+}
+
 func TestDiskPackageDocumentRejectsSignedClaimSubstitution(t *testing.T) {
 	for _, test := range []struct {
 		name string
@@ -105,6 +121,10 @@ func TestDiskPackageDocumentRejectsSignedClaimSubstitution(t *testing.T) {
 		code e.Code
 	}{
 		{"wrong purl", func(b *BOM) { b.Components[0].PURL = "pkg:deb/other@1?arch=all" }, e.CodeVerifyFailed},
+		{"missing vendor", func(b *BOM) {
+			b.Components[0].Properties = slices.DeleteFunc(b.Components[0].Properties, func(p Property) bool { return p.Name == "nvkr:packageVendor" })
+		}, e.CodeVerifyFailed},
+		{"encoded epoch", func(b *BOM) { b.Components[1].PURL = strings.Replace(b.Components[1].PURL, "@1:", "@1%3A", 1) }, e.CodeVerifyFailed},
 		{"missing architecture", func(b *BOM) { b.Components[0].Properties = b.Components[0].Properties[1:] }, e.CodeVerifyFailed},
 		{"file claim", func(b *BOM) { b.Components[0].Type = "file" }, e.CodeVerifyFailed},
 		{"strict claim", func(b *BOM) {

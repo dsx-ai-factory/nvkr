@@ -224,8 +224,10 @@ content/material reconciliation. Qualified policy defaults to strict and rejects
 restored pathname or decoded description as live producer authority. The compiler describes the wrapper's output-repository and evidence edges.
 Receipt-gated packaging and consumer APIs are implemented. The explicit native ARC grouped executor consumes
 the live inspection-and-packaging operation in strict or package-only mode; producer-provenance mode skips inspection and consumes
-the original producer/material owners instead. Maintained NVKE plain disks select package-only evidence;
-FDE retains producer provenance. Full content/material reconciliation remains deferred hardening (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
+the original producer/material owners instead. Maintained NVKE inputs retain producer provenance
+until refreshed appliances preserve observed vendor and their measured pins are recorded; activation
+will select package-only evidence for plain disks with producer-only FDE overrides.
+Full content/material reconciliation remains deferred hardening (ADR-13 §6). Run outcomes and remaining operational evidence are tracked
 in [reconciliation: Native ARC disk route](reconciliation/native-arc-disk-route.md#native-arc-disk-route). The ordinary local scheduler
 still rejects disk publication.
 Local admission rejects that unsupported publication graph before runtime, source or workspace work;

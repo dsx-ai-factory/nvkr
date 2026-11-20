@@ -1,12 +1,6 @@
 {
   "apiVersion": "nvkr.dev/environment/v1",
-  "diskEvidence": "installed-packages-v1",
-  "diskEvidenceOverrides": {
-    "nvke-node-fde-amd64": "build-provenance-v1",
-    "nvke-node-fde-arm64": "build-provenance-v1",
-    "nvke-node-fde-ubuntu24-amd64": "build-provenance-v1",
-    "nvke-node-fde-ubuntu24-arm64": "build-provenance-v1"
-  },
+  "diskEvidence": "build-provenance-v1",
   "diskInspectionProfiles": {
     "linux/amd64": {
       "codecDigest": "sha256:634320b91165669917123e8e79cce1c4d00cee0a4aa4d662d7c0a8186479b3fb",
@@ -99,7 +93,7 @@
   ],
   "kind": "Environment",
   "metadata": {
-    "description": "Dispatch-frozen NVKE GPU site composite candidate publication in its own partitioned workflow and registry namespace. Plain disks include installed-package inventories; FDE disks retain build provenance and strict material reconciliation remains deferred.",
+    "description": "Dispatch-frozen NVKE GPU site composite candidate publication in its own partitioned workflow and registry namespace. Native disks retain build provenance; deep inspection and material reconciliation remain deferred.",
     "name": "nvke-nightly-github"
   },
   "publication": {

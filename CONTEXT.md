@@ -371,9 +371,11 @@ _Avoid_: Transitive reproduction, majority evidence, semantic reproduction
 **Disk inspection scope**:
 The signed statement of whether the exact disk's installed contents were inspected. Producer-provenance
 documents report `nvkr:diskInspection: not-performed`; this supplies no installed inventory.
-Maintained NVKE plain disks select `installed-packages-v1`, binding observed Debian
-names, versions, architectures and purls to the exact final disk. Explicit per-output
-FDE overrides retain producer-only evidence. The consumer `packages` floor admits
+The implemented `installed-packages-v1` mode binds observed Debian names, versions,
+architectures, vendor and purls to the exact final disk. Maintained NVKE Environments
+retain producer-only evidence until refreshed AMD64/ARM64 appliances preserve vendor
+and their measured pins are recorded. Activation selects package mode for plain disks
+with explicit producer-only FDE overrides. The consumer `packages` floor admits
 package or strict evidence and rejects producer-only members; a mixed FDE Release
 does not meet it. Strict inspection and material reconciliation remain separate
 hardening; package evidence asserts neither file integrity nor material correspondence.

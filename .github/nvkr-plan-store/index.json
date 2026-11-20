@@ -9349,8 +9349,8 @@
         "bundles": [
           "nvkr-run-nvke"
         ],
-        "file": "plan/environment-nvke-github@401dc00ea151.json",
-        "sha256": "sha256:401dc00ea1511d621d025035b3a0cea252b0cd7d6eaea8320eabac0b103ffd5c"
+        "file": "plan/environment-nvke-github@05bbd75616a5.json",
+        "sha256": "sha256:05bbd75616a5bebc9d293b7c97001b6cee0e466daa7388a4afffb4ddd254cfc3"
       }
     ],
     "plan/environment-nvke-github-dev": [
@@ -9358,8 +9358,8 @@
         "bundles": [
           "nvkr-dev"
         ],
-        "file": "plan/environment-nvke-github-dev@2f6690ad0d79.json",
-        "sha256": "sha256:2f6690ad0d794f7581ed3bc297c28ca5e73fd200b10e79a3862b12705ac74b54"
+        "file": "plan/environment-nvke-github-dev@ba7cef0162c0.json",
+        "sha256": "sha256:ba7cef0162c0130e91cd733a2d2cca3bc9acd1e73eeca09a1463ac0c31843c04"
       }
     ],
     "plan/environment-nvke-nightly-github": [
@@ -9367,8 +9367,8 @@
         "bundles": [
           "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/environment-nvke-nightly-github@e1e1245448be.json",
-        "sha256": "sha256:e1e1245448be49ff1d704659add9380b605ef815fb5f89daaf842f15a433e196"
+        "file": "plan/environment-nvke-nightly-github@9f17df7ab4af.json",
+        "sha256": "sha256:9f17df7ab4afd780500c779d624f9ab30d2f538c1a7bc8db12544c61d831cf37"
       }
     ],
     "plan/environment-wli-imds-agent-github": [
@@ -9385,24 +9385,24 @@
         "bundles": [
           "nvkr-dev"
         ],
-        "file": "plan/graph-nvke-gpu-site@3fb10e507b64.json",
-        "sha256": "sha256:3fb10e507b64a5fb310a26de6be1407a1ebd6dd75c08e2021f09a088b356eb4b"
+        "file": "plan/graph-nvke-gpu-site@afeb583e836f.json",
+        "sha256": "sha256:afeb583e836fc1801887351f7230d2c24102ccdb79410bfbbfc595002da4845a"
       }
     ],
     "plan/graph-nvke-gpu-site-release": [
       {
         "bundles": [
-          "nvkr-run-nvke"
+          "nvkr-run-nvke-nightly"
         ],
-        "file": "plan/graph-nvke-gpu-site-release@2ec8192f979b.json",
-        "sha256": "sha256:2ec8192f979bc9c6bb2c5b648544fe36aad72fc14d035832edc35309b8f77a15"
+        "file": "plan/graph-nvke-gpu-site-release@02fa03ca78b0.json",
+        "sha256": "sha256:02fa03ca78b044e0f2fa0aaf37f7effdf7a4504b4905e1136590abf73736786b"
       },
       {
         "bundles": [
-          "nvkr-run-nvke-nightly"
+          "nvkr-run-nvke"
         ],
-        "file": "plan/graph-nvke-gpu-site-release@72f18ea33dfb.json",
-        "sha256": "sha256:72f18ea33dfb1ac36f06654e22a05b012af4a0973bbaeb4508430cdf76b1c86c"
+        "file": "plan/graph-nvke-gpu-site-release@4e9c61551eb0.json",
+        "sha256": "sha256:4e9c61551eb07d8a9269eff85a2d61e98c506fb17b2c540d1faf6f8ab9b3d592"
       }
     ],
     "plan/graph-wli-imds-agent": [

@@ -18453,7 +18453,7 @@
     },
     {
       "buildTarget": "nvke-node-image-amd64",
-      "container": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:a429a3a8fabc76086897f1c0f75202a2c37eafa38823113aed31267403245d92",
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
       "id": "nvke-node-image-amd64/sbom",
       "inputs": [
         "artifact/nvke-node-image-amd64/nvke-agent",
@@ -18796,7 +18796,7 @@
     },
     {
       "buildTarget": "nvke-node-image-arm64",
-      "container": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:e2379e4f2ff70755e0e2e407a998547ae8d0a9c530640b64bafefe2f75cde5cd",
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
       "id": "nvke-node-image-arm64/sbom",
       "inputs": [
         "artifact/nvke-node-image-arm64/nvke-agent",
@@ -19149,7 +19149,7 @@
     },
     {
       "buildTarget": "nvke-node-image-ubuntu24-amd64",
-      "container": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:a429a3a8fabc76086897f1c0f75202a2c37eafa38823113aed31267403245d92",
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
       "id": "nvke-node-image-ubuntu24-amd64/sbom",
       "inputs": [
         "artifact/nvke-node-image-ubuntu24-amd64/nvke-agent",
@@ -19502,7 +19502,7 @@
     },
     {
       "buildTarget": "nvke-node-image-ubuntu24-arm64",
-      "container": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:e2379e4f2ff70755e0e2e407a998547ae8d0a9c530640b64bafefe2f75cde5cd",
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
       "id": "nvke-node-image-ubuntu24-arm64/sbom",
       "inputs": [
         "artifact/nvke-node-image-ubuntu24-arm64/nvke-agent",
@@ -19850,7 +19850,7 @@
             "name": "temporal"
           }
         ],
-        "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site"
+        "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/candidate/gpu-site"
       },
       "id": "package/aicr-inventory",
       "inputs": [

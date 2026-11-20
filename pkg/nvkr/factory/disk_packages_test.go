@@ -111,7 +111,7 @@ func TestDiskPackageReceiptBindsOwnerAndProfile(t *testing.T) {
 							return diskEvidenceScan{}, err
 						}
 						bom.Metadata.Component.Type = "operating-system"
-						bom, err = sbom.WithDependencies(bom, []sbom.Component{{Type: "library", Name: "fixture-package", Version: "1", PURL: "pkg:deb/fixture-package@1?arch=all", Properties: []sbom.Property{{Name: "nvkr:packageArchitecture", Value: "all"}, {Name: "nvkr:packageFormat", Value: "deb"}}}}, sbom.DiskInstalledPackagesMethod, p.InspectorDigest)
+						bom, err = sbom.WithDependencies(bom, []sbom.Component{{Type: "library", Name: "fixture-package", Version: "1", PURL: "pkg:deb/ubuntu/fixture-package@1?arch=all", Properties: []sbom.Property{{Name: "nvkr:packageArchitecture", Value: "all"}, {Name: "nvkr:packageFormat", Value: "deb"}, {Name: "nvkr:packageVendor", Value: "ubuntu"}}}}, sbom.DiskInstalledPackagesMethod, p.InspectorDigest)
 						if err != nil {
 							return diskEvidenceScan{}, err
 						}

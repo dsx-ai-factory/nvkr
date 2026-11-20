@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
-  description: Dispatch-frozen NVKE GPU site composite candidate publication in its own partitioned workflow and registry namespace. Plain disks include installed-package inventories; FDE disks retain build provenance and strict material reconciliation remains deferred.
+  description: Dispatch-frozen NVKE GPU site composite candidate publication in its own partitioned workflow and registry namespace. Native disks retain build provenance; deep inspection and material reconciliation remain deferred.
   name: nvke-nightly-github
 githubBundle: nvke-nightly
 githubRuntimePlan: true
@@ -33,12 +33,7 @@ toolchainAccess:
 githubRunners:
   linux/amd64: ubuntu-24.04
   linux/arm64: ubuntu-24.04-arm
-diskEvidence: installed-packages-v1
-diskEvidenceOverrides:
-  nvke-node-fde-amd64: build-provenance-v1
-  nvke-node-fde-arm64: build-provenance-v1
-  nvke-node-fde-ubuntu24-amd64: build-provenance-v1
-  nvke-node-fde-ubuntu24-arm64: build-provenance-v1
+diskEvidence: build-provenance-v1
 executionClasses:
   - name: arc-amd64-kvm
     runsOn: arc-amd64-kvm

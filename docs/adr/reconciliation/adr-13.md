@@ -1,9 +1,12 @@
 ## Support by owner
 
 The `installed-packages-v1` plain-disk extension joins the existing held Packer
-package reader to per-output signed SBOM production. Maintained development,
-production and nightly NVKE Environments select it and explicitly retain
-`build-provenance-v1` for each FDE output. Consumer policy admits the intermediate
+package reader to per-output signed SBOM production. The helper now preserves the
+observed distro for the required deb purl vendor namespace. Maintained development,
+production and nightly NVKE Environments retain `build-provenance-v1` pending refreshed
+AMD64/ARM64 appliance publication and measured pins in all three Environments.
+Only then may plain outputs select package mode with explicit producer-only FDE overrides.
+Old helper reports lack vendor and fail package publication closed. Consumer policy admits the intermediate
 `packages` floor; strict remains stronger. Contract coverage checks deterministic
 Debian version/architecture/purl projection, exact subject/tool bindings, FDE
 admission, live receipt ownership and signed publication policy ordering.

@@ -610,8 +610,9 @@ then includes a separate failed `source-lifetime` diagnostic and an overall fail
 pin and other artifact checks keep their actual results. This extra diagnostic appears only on final
 source-admission failure. Successful reports retain the six artifact checks above. Always inspect the
 returned error or command exit status; diagnostic data alone never proves receipt issuance.
-Payload digests remain distinct from OCI delivery-container subjects, and disk results explicitly retain
-producer-only scope without content inspection.
+Payload digests remain distinct from OCI delivery-container subjects. Disk results derive their scope
+from the authenticated evidence mode: producer-only, installed packages without file-integrity/material
+reconciliation, or strict content/material reconciliation. The report does not perform new disk inspection.
 
 An incomplete evidence traversal is labeled as a failure of the complete publication in every output's
 signed-evidence diagnostic. Output-specific signature failures remain visible alongside that global failure;

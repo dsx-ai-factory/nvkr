@@ -385,13 +385,13 @@
   "definitionDigest": "sha256:02235074d77d1d73fb275a8a8fefa53917bf08c1344f764ad2eab20d3c10f8e9",
   "definitionPath": "inputs/definitions/nvke/gpu-site-release.composite.yaml",
   "environment": {
-    "file": ".github/nvkr-plan-store/plan/environment-nvke-nightly-github@e1e1245448be.json"
+    "file": ".github/nvkr-plan-store/plan/environment-nvke-nightly-github@9f17df7ab4af.json"
   },
-  "environmentDigest": "sha256:25bf03d7286be0d8d746f8cb98a0366880112713b8eb268214765a3df2d38650",
+  "environmentDigest": "sha256:9d3d4c5cfa34b1a41c425b507712ee7edd5d05aae8b1bccec5f5eefb8dc8b844",
   "environmentPath": "inputs/environments/github-nvke-nightly-gpu-site.yaml",
   "generatorVersion": "dev (unknown)",
   "graph": {
-    "file": ".github/nvkr-plan-store/plan/graph-nvke-gpu-site-release@72f18ea33dfb.json"
+    "file": ".github/nvkr-plan-store/plan/graph-nvke-gpu-site-release@02fa03ca78b0.json"
   },
   "lifecycleOutputs": {
     "file": ".github/nvkr-plan-store/plan/outputs-nvke-gpu-site-release@9affba4a4e4b.json"

@@ -1771,6 +1771,14 @@
       "producer": "temporal/pull-temporal-chart"
     },
     {
+      "id": "attested-controls/output-aicr-inventory",
+      "kind": "attested-evidence-metadata",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/attested-controls/output-aicr-inventory",
+      "producer": "attest-sboms/output-aicr-inventory",
+      "target": "output-aicr-inventory"
+    },
+    {
       "id": "attested-controls/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "kind": "attested-evidence-metadata",
       "name": "output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -2433,6 +2441,14 @@
       "path": ".nvkr/factory/attested-controls/output-temporal-ui-image-arm64",
       "producer": "attest-sboms/output-temporal-ui-image-arm64",
       "target": "output-temporal-ui-image-arm64"
+    },
+    {
+      "id": "metadata/output-aicr-inventory",
+      "kind": "publication-metadata",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/metadata/output-aicr-inventory",
+      "producer": "verify-publication/output-aicr-inventory",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "metadata/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -3803,6 +3819,14 @@
       "producer": "temporal-ui-image-arm64/terminal-observe"
     },
     {
+      "id": "package/aicr-inventory",
+      "kind": "bundle-oci",
+      "mediaType": "application/vnd.nvkr.bundle.v1",
+      "name": "aicr-inventory",
+      "path": ".nvkr/factory/packages/aicr-inventory",
+      "producer": "package/aicr-inventory"
+    },
+    {
       "id": "package/aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "kind": "bundle-oci",
       "mediaType": "application/vnd.nvkr.bundle.v1",
@@ -4281,6 +4305,14 @@
       "name": "postgresql-image-arm64",
       "path": ".nvkr/factory/packages/postgresql-image-arm64",
       "producer": "package/postgresql-image-arm64"
+    },
+    {
+      "id": "package/publication-aicr-inventory",
+      "kind": "oci-root",
+      "mediaType": "application/vnd.nvkr.publication-root.v4",
+      "name": "publication-aicr-inventory",
+      "path": ".nvkr/factory/prepared/output-aicr-inventory",
+      "producer": "package/publication-aicr-inventory"
     },
     {
       "id": "package/publication-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -5139,6 +5171,15 @@
       "producer": "package/temporal-ui-image-arm64"
     },
     {
+      "id": "predicate/output-aicr-inventory",
+      "kind": "provenance-predicate",
+      "mediaType": "application/vnd.in-toto.provenance.v1+json",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/predicates/output-aicr-inventory.json",
+      "producer": "sign/output-aicr-inventory",
+      "target": "output-aicr-inventory"
+    },
+    {
       "id": "predicate/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "kind": "provenance-predicate",
       "mediaType": "application/vnd.in-toto.provenance.v1+json",
@@ -5895,6 +5936,14 @@
       "target": "release"
     },
     {
+      "id": "prepared-controls/output-aicr-inventory",
+      "kind": "prepared-evidence-metadata",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/prepared-controls/output-aicr-inventory",
+      "producer": "package/publication-aicr-inventory",
+      "target": "output-aicr-inventory"
+    },
+    {
       "id": "prepared-controls/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "kind": "prepared-evidence-metadata",
       "name": "output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -6557,6 +6606,14 @@
       "path": ".nvkr/factory/prepared-controls/output-temporal-ui-image-arm64",
       "producer": "package/publication-temporal-ui-image-arm64",
       "target": "output-temporal-ui-image-arm64"
+    },
+    {
+      "id": "publication/output-aicr-inventory",
+      "kind": "published-reference",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/publications/output-aicr-inventory.txt",
+      "producer": "publish/output-aicr-inventory",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -9607,6 +9664,15 @@
       "producer": "temporal-ui-image-arm64/sbom"
     },
     {
+      "id": "signature/output-aicr-inventory",
+      "kind": "signing-record",
+      "mediaType": "application/vnd.nvkr.signing-record.v1+json",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/signatures/output-aicr-inventory.json",
+      "producer": "sign/output-aicr-inventory",
+      "target": "output-aicr-inventory"
+    },
+    {
       "id": "signature/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "kind": "signing-record",
       "mediaType": "application/vnd.nvkr.signing-record.v1+json",
@@ -10361,6 +10427,14 @@
       "path": ".nvkr/factory/signatures/release.json",
       "producer": "sign/release",
       "target": "release"
+    },
+    {
+      "id": "signing-metadata/output-aicr-inventory",
+      "kind": "publication-signing-metadata",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/signing-metadata/output-aicr-inventory",
+      "producer": "publish/output-aicr-inventory",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "signing-metadata/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -12411,6 +12485,15 @@
       "producer": "tool/syft-module-tags/linux/arm64"
     },
     {
+      "id": "verification/output-aicr-inventory",
+      "kind": "verification-record",
+      "mediaType": "application/vnd.nvkr.verification-record.v1+json",
+      "name": "output-aicr-inventory",
+      "path": ".nvkr/factory/verifications/output-aicr-inventory.json",
+      "producer": "verify-publication/output-aicr-inventory",
+      "target": "output-aicr-inventory"
+    },
+    {
       "id": "verification/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
       "kind": "verification-record",
       "mediaType": "application/vnd.nvkr.verification-record.v1+json",
@@ -13341,6 +13424,20 @@
       ],
       "platform": "linux/arm64",
       "runsOn": "ubuntu-latest"
+    },
+    {
+      "id": "attest-sboms/output-aicr-inventory",
+      "inputs": [
+        "prepared-controls/output-aicr-inventory",
+        "tool/cosign-module-tags"
+      ],
+      "kind": "attest-sboms",
+      "network": "default",
+      "outputs": [
+        "attested-controls/output-aicr-inventory"
+      ],
+      "runsOn": "ubuntu-latest",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "attest-sboms/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -18356,7 +18453,7 @@
     },
     {
       "buildTarget": "nvke-node-image-amd64",
-      "container": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:a429a3a8fabc76086897f1c0f75202a2c37eafa38823113aed31267403245d92",
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
       "id": "nvke-node-image-amd64/sbom",
       "inputs": [
         "artifact/nvke-node-image-amd64/nvke-agent",
@@ -18699,7 +18796,7 @@
     },
     {
       "buildTarget": "nvke-node-image-arm64",
-      "container": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:e2379e4f2ff70755e0e2e407a998547ae8d0a9c530640b64bafefe2f75cde5cd",
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
       "id": "nvke-node-image-arm64/sbom",
       "inputs": [
         "artifact/nvke-node-image-arm64/nvke-agent",
@@ -19052,7 +19149,7 @@
     },
     {
       "buildTarget": "nvke-node-image-ubuntu24-amd64",
-      "container": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:a429a3a8fabc76086897f1c0f75202a2c37eafa38823113aed31267403245d92",
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
       "id": "nvke-node-image-ubuntu24-amd64/sbom",
       "inputs": [
         "artifact/nvke-node-image-ubuntu24-amd64/nvke-agent",
@@ -19405,7 +19502,7 @@
     },
     {
       "buildTarget": "nvke-node-image-ubuntu24-arm64",
-      "container": "ghcr.io/dsx-ai-factory/nvkr/m2-candidate/toolchains/inspector-native@sha256:e2379e4f2ff70755e0e2e407a998547ae8d0a9c530640b64bafefe2f75cde5cd",
+      "container": "busybox@sha256:a4b7bbbb14a7e50bec3f6cbc4e2560c9b6792a7ae7062637bdfc25793817d4ff",
       "id": "nvke-node-image-ubuntu24-arm64/sbom",
       "inputs": [
         "artifact/nvke-node-image-ubuntu24-arm64/nvke-agent",
@@ -19709,6 +19806,86 @@
       "outputs": [
         "observation/operator-tools"
       ],
+      "platform": "linux/amd64",
+      "runsOn": "ubuntu-latest"
+    },
+    {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "derived": {
+        "encoding": "aicr-inventory-v1",
+        "inputs": [
+          {
+            "buildDigest": "sha256:456d2d4697a8e36468e66fc7b16fb356f675b0deb617d7f86e1d6ac6f255af3b",
+            "kind": "helm-oci",
+            "name": "controller-chart"
+          },
+          {
+            "buildDigest": "sha256:13f79b9767087322fbc44ac5cb60892e68eeb622ecbd978d41fe34e00aa57fad",
+            "kind": "helm-oci",
+            "name": "nktp"
+          },
+          {
+            "buildDigest": "sha256:6ff4ce3e7c4e361e60a2c3d31ddea52b1c8168f8b5e18d568e7c9dbd0b58efe9",
+            "kind": "oci",
+            "name": "nvke-controller"
+          },
+          {
+            "buildDigest": "sha256:52f24a801a287763679c9cec540af6751c4fea63781922b45409af5a98dee20d",
+            "kind": "helm-oci",
+            "name": "postgresql"
+          },
+          {
+            "buildDigest": "sha256:fd6fb5db96727b10307394ff1d158dfcf60fdfa0f7ea32d9a7a5bb9bf5b4dc12",
+            "kind": "helm-oci",
+            "name": "spire"
+          },
+          {
+            "buildDigest": "sha256:d73672244fa7ed51044ae2c8654eae25e0921f567ba480e3f92626361bd9948a",
+            "kind": "helm-oci",
+            "name": "spire-crds"
+          },
+          {
+            "buildDigest": "sha256:e09c78f63d4bcdbf48bb19ccbd75395aba819a3d8dbd48f88bca8364ea11f6fe",
+            "kind": "helm-oci",
+            "name": "temporal"
+          }
+        ],
+        "repositoryPrefix": "ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site"
+      },
+      "id": "package/aicr-inventory",
+      "inputs": [
+        "artifact/controller-chart/nvke-controller-chart",
+        "artifact/nktp/nktp-chart-release",
+        "artifact/nvke-controller/linux/amd64/nvke-controller",
+        "artifact/nvke-controller/linux/arm64/nvke-controller",
+        "artifact/postgresql/postgresql-chart",
+        "artifact/spire-crds/spire-crds-chart",
+        "artifact/spire/spire-chart",
+        "artifact/temporal/temporal-chart",
+        "package/controller-chart",
+        "package/nktp",
+        "package/nvke-controller",
+        "package/postgresql",
+        "package/spire",
+        "package/spire-crds",
+        "package/temporal",
+        "result/controller-chart/nvke-controller-chart",
+        "result/nktp/nktp-chart-release",
+        "result/nvke-controller/linux/amd64/nvke-controller",
+        "result/nvke-controller/linux/arm64/nvke-controller",
+        "result/postgresql/postgresql-chart",
+        "result/spire-crds/spire-crds-chart",
+        "result/spire/spire-chart",
+        "result/temporal/temporal-chart",
+        "sbom/nvke-controller/linux/amd64",
+        "sbom/nvke-controller/linux/arm64"
+      ],
+      "kind": "package",
+      "network": "none",
+      "outputs": [
+        "package/aicr-inventory"
+      ],
+      "packageKind": "bundle-oci",
       "platform": "linux/amd64",
       "runsOn": "ubuntu-latest"
     },
@@ -21082,6 +21259,53 @@
       ],
       "packageKind": "container-image",
       "platform": "linux/arm64",
+      "runsOn": "ubuntu-latest"
+    },
+    {
+      "container": "busybox@sha256:29989570aeecad61a019f684218ea74d4b8c1c74f9e0abeb34ca926b81174ee1",
+      "id": "package/publication-aicr-inventory",
+      "inputs": [
+        "artifact/controller-chart/nvke-controller-chart",
+        "artifact/nktp/nktp-chart-release",
+        "artifact/nvke-controller/linux/amd64/nvke-controller",
+        "artifact/nvke-controller/linux/arm64/nvke-controller",
+        "artifact/postgresql/postgresql-chart",
+        "artifact/spire-crds/spire-crds-chart",
+        "artifact/spire/spire-chart",
+        "artifact/temporal/temporal-chart",
+        "package/aicr-inventory",
+        "package/controller-chart",
+        "package/nktp",
+        "package/nvke-controller",
+        "package/postgresql",
+        "package/spire",
+        "package/spire-crds",
+        "package/temporal",
+        "result/controller-chart/nvke-controller-chart",
+        "result/nktp/nktp-chart-release",
+        "result/nvke-controller/linux/amd64/nvke-controller",
+        "result/nvke-controller/linux/arm64/nvke-controller",
+        "result/postgresql/postgresql-chart",
+        "result/spire-crds/spire-crds-chart",
+        "result/spire/spire-chart",
+        "result/temporal/temporal-chart",
+        "sbom/controller-chart",
+        "sbom/nktp",
+        "sbom/nvke-controller/linux/amd64",
+        "sbom/nvke-controller/linux/arm64",
+        "sbom/postgresql",
+        "sbom/spire",
+        "sbom/spire-crds",
+        "sbom/temporal"
+      ],
+      "kind": "package",
+      "network": "none",
+      "outputs": [
+        "package/publication-aicr-inventory",
+        "prepared-controls/output-aicr-inventory"
+      ],
+      "packageKind": "oci-root",
+      "platform": "linux/amd64",
       "runsOn": "ubuntu-latest"
     },
     {
@@ -22879,6 +23103,7 @@
     {
       "id": "package/release",
       "inputs": [
+        "metadata/output-aicr-inventory",
         "metadata/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
         "metadata/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
         "metadata/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
@@ -22962,6 +23187,7 @@
         "metadata/output-temporal-server-image-arm64",
         "metadata/output-temporal-ui-image",
         "metadata/output-temporal-ui-image-arm64",
+        "predicate/output-aicr-inventory",
         "predicate/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
         "predicate/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
         "predicate/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
@@ -23045,6 +23271,7 @@
         "predicate/output-temporal-server-image-arm64",
         "predicate/output-temporal-ui-image",
         "predicate/output-temporal-ui-image-arm64",
+        "publication/output-aicr-inventory",
         "publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
         "publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
         "publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
@@ -23128,6 +23355,7 @@
         "publication/output-temporal-server-image-arm64",
         "publication/output-temporal-ui-image",
         "publication/output-temporal-ui-image-arm64",
+        "signature/output-aicr-inventory",
         "signature/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
         "signature/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
         "signature/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
@@ -23212,6 +23440,7 @@
         "signature/output-temporal-ui-image",
         "signature/output-temporal-ui-image-arm64",
         "tool/cosign-module-tags",
+        "verification/output-aicr-inventory",
         "verification/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
         "verification/output-aicr-nvke-gb200-ubuntu-training-kubeflow-flux",
         "verification/output-aicr-nvke-gb200-ubuntu-training-kubeflow-helm",
@@ -23827,6 +24056,22 @@
       ],
       "platform": "linux/amd64",
       "runsOn": "ubuntu-latest"
+    },
+    {
+      "id": "publish/output-aicr-inventory",
+      "inputs": [
+        "attested-controls/output-aicr-inventory",
+        "package/publication-aicr-inventory",
+        "tool/cosign-module-tags"
+      ],
+      "kind": "publish",
+      "network": "default",
+      "outputs": [
+        "publication/output-aicr-inventory",
+        "signing-metadata/output-aicr-inventory"
+      ],
+      "runsOn": "ubuntu-latest",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "publish/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -25168,6 +25413,22 @@
       ],
       "runsOn": "ubuntu-latest",
       "target": "release"
+    },
+    {
+      "id": "sign/output-aicr-inventory",
+      "inputs": [
+        "publication/output-aicr-inventory",
+        "signing-metadata/output-aicr-inventory",
+        "tool/cosign-module-tags"
+      ],
+      "kind": "sign",
+      "network": "default",
+      "outputs": [
+        "predicate/output-aicr-inventory",
+        "signature/output-aicr-inventory"
+      ],
+      "runsOn": "ubuntu-latest",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "sign/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",
@@ -27569,6 +27830,23 @@
       "runsOn": "ubuntu-latest",
       "toolFormat": "tar-gzip",
       "url": "https://github.com/anchore/syft/releases/download/v1.51.1/syft_1.51.1_linux_arm64.tar.gz"
+    },
+    {
+      "id": "verify-publication/output-aicr-inventory",
+      "inputs": [
+        "predicate/output-aicr-inventory",
+        "publication/output-aicr-inventory",
+        "signature/output-aicr-inventory",
+        "tool/cosign-module-tags"
+      ],
+      "kind": "verify-publication",
+      "network": "default",
+      "outputs": [
+        "metadata/output-aicr-inventory",
+        "verification/output-aicr-inventory"
+      ],
+      "runsOn": "ubuntu-latest",
+      "target": "output-aicr-inventory"
     },
     {
       "id": "verify-publication/output-aicr-nvke-gb200-ubuntu-training-kubeflow-argocd-helm",

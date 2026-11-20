@@ -23,7 +23,7 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/internal/heldfile"
 )
 
-const diskPackageXML = `<operatingsystems><operatingsystem><name>linux</name><package_format>deb</package_format><applications><application><name>pkg</name><version>2.0</version><release>1ubuntu1</release><arch>arm64</arch></application></applications></operatingsystem></operatingsystems>`
+const diskPackageXML = `<operatingsystems><operatingsystem><name>linux</name><distro>ubuntu</distro><package_format>deb</package_format><applications><application><name>pkg</name><version>2.0</version><release>1ubuntu1</release><arch>arm64</arch></application></applications></operatingsystem></operatingsystems>`
 
 func TestDiskInstalledPackageProjection(t *testing.T) {
 	for _, tc := range []struct {
@@ -31,6 +31,8 @@ func TestDiskInstalledPackageProjection(t *testing.T) {
 		code      e.Code
 	}{
 		{"valid", diskPackageXML, ""},
+		{"duplicate distro", strings.Replace(diskPackageXML, "<distro>ubuntu</distro>", "<distro>ubuntu</distro><distro>debian</distro>", 1), e.CodeEnvelopeDecode},
+		{"missing distro stays unknown", strings.Replace(diskPackageXML, "<distro>ubuntu</distro>", "", 1), ""},
 		{"invalid XML", "not XML", e.CodeEnvelopeDecode},
 		{"wrong root", "<other/>", e.CodeEnvelopeDecode},
 		{"namespaced root", strings.Replace(diskPackageXML, "<operatingsystems>", `<operatingsystems xmlns="other">`, 1), e.CodeEnvelopeDecode},
@@ -69,6 +71,12 @@ func TestDiskInstalledPackageProjection(t *testing.T) {
 			}
 			if tc.name == "unknown version stays unknown" && packages[0].Version != "" {
 				t.Fatal("projection invented a version")
+			}
+			if tc.name == "valid" && packages[0].Vendor != "ubuntu" {
+				t.Fatal("projection lost observed distro")
+			}
+			if tc.name == "missing distro stays unknown" && packages[0].Vendor != "" {
+				t.Fatal("projection invented distro")
 			}
 		})
 	}

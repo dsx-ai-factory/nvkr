@@ -56,8 +56,10 @@ See [the registry graph](publication-architecture.md) for every remaining manife
 Current contract coverage and hosted publication evidence are recorded in
 [reconciliation](https://github.com/dsx-ai-factory/nvkr/blob/main/docs/adr/reconciliation/README.md). Signed producer evidence in the producer-only disk mode explicitly records
 deferred inspection; it is not the dependency inventory described for binaries, images and charts above.
-Maintained NVKE Environments default to `installed-packages-v1` and explicitly select
-producer-only evidence for each FDE output through `diskEvidenceOverrides`. Unknown
+Maintained NVKE Environments retain `build-provenance-v1` pending refreshed AMD64/ARM64
+inspector appliances and their measured pins. The current pinned helpers discard distro;
+the new package mode requires observed vendor and rejects those reports. Activation
+selects `installed-packages-v1` with explicit producer-only FDE `diskEvidenceOverrides`. Unknown
 output names and requested package inspection of LUKS2 fail admission. A failed
 plain-disk inspection fails the Run rather than falling back to an empty SBOM.
 `release verify --minimum-disk-evidence packages` accepts package-only or strict

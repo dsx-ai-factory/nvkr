@@ -19,6 +19,7 @@ const DiskInstalledPackagesMethod = "disk-installed-packages/v1"
 
 var installedDebName = regexp.MustCompile(`^[a-z0-9][a-z0-9+.-]+$`)
 var installedDebArch = regexp.MustCompile(`^[a-z0-9][a-z0-9-]*$`)
+var installedDebVendor = regexp.MustCompile(`^[a-z0-9][a-z0-9.-]*$`)
 
 // DiskPackageDocument projects an issued final-disk inventory, without claiming
 // material correspondence or file coverage. Factory authenticates the original
@@ -34,8 +35,8 @@ func DiskPackageDocument(build, name string, inventory *DiskInstalledInventory) 
 	}
 	components := make([]Component, 0, len(packages))
 	for _, pkg := range packages {
-		if !installedDebName.MatchString(pkg.Name) || pkg.Version == "" || !installedDebArch.MatchString(pkg.Architecture) || strings.Contains(pkg.Version, ":") {
-			return nil, e.New(e.CodeProvenanceMissing, "installed Debian package lacks exact name, version or architecture")
+		if !installedDebName.MatchString(pkg.Name) || pkg.Version == "" || !installedDebArch.MatchString(pkg.Architecture) || strings.Contains(pkg.Version, ":") || !installedDebVendor.MatchString(pkg.Vendor) || pkg.Vendor == "unknown" {
+			return nil, e.New(e.CodeProvenanceMissing, "installed Debian package lacks exact name, version, architecture or observed vendor")
 		}
 		// libguestfs splits Debian Version at the colon and first hyphen. Joining
 		// these fields preserves revisions (including further hyphens). Epoch zero
@@ -52,9 +53,10 @@ func DiskPackageDocument(build, name string, inventory *DiskInstalledInventory) 
 			version = pkg.Epoch + ":" + version
 		}
 		components = append(components, Component{Type: "library", Name: pkg.Name, Version: version,
-			PURL: installedDebPURL(pkg.Name, version, pkg.Architecture), Properties: []Property{
+			PURL: installedDebPURL(pkg.Vendor, pkg.Name, version, pkg.Architecture), Properties: []Property{
 				{Name: diskPackageArchitectureProperty, Value: pkg.Architecture},
 				{Name: diskPackageFormatProperty, Value: "deb"},
+				{Name: "nvkr:packageVendor", Value: pkg.Vendor},
 			}})
 	}
 	bom, err := NewSubject(build, name, inventory.subjectDigest)
@@ -89,9 +91,10 @@ func DiskPackageDocument(build, name string, inventory *DiskInstalledInventory) 
 	return bom, nil
 }
 
-func installedDebPURL(name, version, arch string) string {
+func installedDebPURL(vendor, name, version, arch string) string {
 	escape := func(value string) string { return strings.ReplaceAll(url.QueryEscape(value), "+", "%20") }
-	return "pkg:deb/" + escape(name) + "@" + escape(version) + "?arch=" + escape(arch)
+	// Purl versions retain the Debian epoch colon and encode literal plus signs.
+	return "pkg:deb/" + escape(vendor) + "/" + escape(name) + "@" + strings.ReplaceAll(escape(version), "%3A", ":") + "?arch=" + escape(arch)
 }
 
 // ValidateDiskInstalledPackages checks the signed vocabulary; it does not issue
@@ -117,21 +120,23 @@ func ValidateDiskInstalledPackages(bom *BOM) error {
 	}
 	seen := map[string]bool{}
 	for _, component := range bom.Components {
-		arch, format := "", ""
+		arch, format, vendor := "", "", ""
 		for _, prop := range component.Properties {
 			switch prop.Name {
 			case diskPackageArchitectureProperty:
 				arch = prop.Value
 			case diskPackageFormatProperty:
 				format = prop.Value
+			case "nvkr:packageVendor":
+				vendor = prop.Value
 			default:
 				return e.New(e.CodeVerifyFailed, "disk package inventory contains an unsupported package claim")
 			}
 		}
 		key := component.Name + "\x00" + arch
 		if component.Type != "library" || !installedDebName.MatchString(component.Name) || component.Version == "" ||
-			!installedDebArch.MatchString(arch) || format != "deb" || len(component.Hashes) != 0 ||
-			component.PURL != installedDebPURL(component.Name, component.Version, arch) || seen[key] {
+			!installedDebArch.MatchString(arch) || !installedDebVendor.MatchString(vendor) || vendor == "unknown" || format != "deb" || len(component.Hashes) != 0 ||
+			component.PURL != installedDebPURL(vendor, component.Name, component.Version, arch) || seen[key] {
 			return e.New(e.CodeVerifyFailed, "disk package inventory contains an invalid or conflicting Debian identity")
 		}
 		seen[key] = true

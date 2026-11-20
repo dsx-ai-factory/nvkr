@@ -122,7 +122,8 @@ authorize payload export or exact-input matching. Both scopes enforce the select
 `--minimum-disk-evidence packages` requires a signed installed-package inventory or
 strict reconciliation for every disk member; `strict` requires reconciled evidence.
 The default `build-provenance-v1` also accepts producer-only evidence. Maintained
-LUKS2 outputs remain producer-only, so a mixed Release containing them fails a
+disks currently remain producer-only pending refreshed inspector appliances and
+measured pins; LUKS2 will retain that scope after activation. A Release containing them fails a
 packages or strict minimum. Authenticity does not inspect the disk itself. Neither
 scope provides qualification or the capability-gated full `release` scope.
 

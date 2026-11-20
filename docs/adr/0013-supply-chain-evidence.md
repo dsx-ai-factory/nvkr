@@ -250,7 +250,7 @@ closure. These documents have no inspected dependency inventory and explicitly b
 to `build-provenance-v1` and `nvkr:diskInspection` to `not-performed`. The signed release disk binding carries
 the same evidence mode. Producer integrity, provenance, every component slot and release completeness remain
 mandatory. This is pipeline-attested producer evidence, not an inspected inventory or qualified evidence.
-This remains the FDE evidence contract. The maintained plain-disk extension below
+This remains the maintained evidence contract until the appliance refresh below. The plain-disk extension
 adds installed-package inventory; deep content/material reconciliation remains separate.
 
 The pipeline-attested `installed-packages-v1` mode inventories the package database of
@@ -263,8 +263,12 @@ require material content scans or acquisition-to-package correspondence.
 
 Its deterministic CycloneDX root is an `operating-system` bound to the QCOW2 digest,
 Build and source subject. Components carry the observed Debian name, version and
-architecture, with a deb purl and `nvkr:packageArchitecture`/`nvkr:packageFormat`
-properties. The reader's separate epoch/version/release fields are rejoined without
+architecture, with a deb purl and `nvkr:packageArchitecture`/`nvkr:packageFormat`/`nvkr:packageVendor`
+properties. The vendor comes from the inspected OS's distro field, never a catalog or package-version guess.
+Purls use `pkg:deb/<vendor>/<name>@<version>?arch=<arch>`, retaining the epoch colon
+and percent-encoding literal plus signs. Missing vendor fails publication. No distro-release
+qualifier is emitted because this projection does not observe a canonical release identifier.
+The reader's separate epoch/version/release fields are rejoined without
 discarding revision suffixes; epoch zero is implicit. Metadata binds
 `nvkr:diskEvidence=installed-packages-v1`, `nvkr:diskInspection=installed-packages`,
 `nvkr:dependencyInspection=disk-installed-packages/v1`, inspector/codec executable
@@ -279,8 +283,13 @@ qualified reproduction.
 `Environment.diskEvidence` selects the default; `diskEvidenceOverrides` maps exact
 resolved disk output names to explicit modes. Unknown/non-disk override names fail
 admission. An empty mode retains strict inspection. Maintained NVKE Environments
-default to `installed-packages-v1` and explicitly override each LUKS2 output with
-`build-provenance-v1`. Requesting package or strict inspection for LUKS2 fails before
+retain `build-provenance-v1`: their currently pinned appliances embed a helper that
+does not report the observed distro. Activation requires publishing refreshed AMD64
+and ARM64 appliances through an authorized toolchain route, recording their measured
+pins in development, production and nightly Environments, selecting `installed-packages-v1`,
+and explicitly overriding each LUKS2 output with `build-provenance-v1`. Until then,
+requesting package evidence from an old helper fails closed rather than publishing
+vendor-less purls. Requesting package or strict inspection for LUKS2 fails before
 producer work; inspection failure never downgrades evidence. The current producer
 has no authenticated plaintext-to-final-ciphertext inventory handoff, and a sibling
 plain image cannot establish the FDE image's contents. Pre-encryption inventory

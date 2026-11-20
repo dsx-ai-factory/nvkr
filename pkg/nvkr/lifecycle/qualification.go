@@ -20,10 +20,32 @@ import (
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/factory"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/ir"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/qualificationorigin"
+	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sbom"
 	"github.com/dsx-ai-factory/nvkr/pkg/nvkr/sign"
 )
 
 const ArtifactCheckGateVersion = "nvkr.dev/artifact-checks/v1"
+
+// Disk evidence descriptions retain the authenticated publication's scope. They
+// are report vocabulary, not receipts or independent inspection authority.
+const (
+	DiskEvidenceDescriptionBuildProvenance = "producer-only; content inspection not performed"
+	DiskEvidenceDescriptionPackages        = "installed packages inventoried; file integrity and material reconciliation not checked"
+	DiskEvidenceDescriptionStrict          = "content and material reconciliation performed"
+)
+
+func qualificationDiskEvidence(mode string) (string, error) {
+	switch mode {
+	case sbom.DiskBuildProvenance:
+		return DiskEvidenceDescriptionBuildProvenance, nil
+	case sbom.DiskInstalledPackages:
+		return DiskEvidenceDescriptionPackages, nil
+	case "":
+		return DiskEvidenceDescriptionStrict, nil
+	default:
+		return "", e.New(e.CodeVerifyFailed, "unknown qualification disk evidence mode")
+	}
+}
 
 // QualificationPredicate is untrusted input until its exact bytes pass both
 // Plan semantics and cryptographic verification for the independently selected
@@ -387,7 +409,13 @@ func (consumer *Consumer) checkQualification(ctx context.Context, request Qualif
 			verdict.Platform = output.OS + "/" + output.Arch
 		}
 		if output.Kind == OutputDiskImage {
-			verdict.DiskEvidence = "producer-only; content inspection not performed"
+			if output.Disk == nil {
+				return nil, nil, e.New(e.CodeVerifyFailed, "qualification disk output lacks its signed evidence mode")
+			}
+			verdict.DiskEvidence, err = qualificationDiskEvidence(output.Disk.EvidenceMode)
+			if err != nil {
+				return nil, nil, err
+			}
 		}
 		for _, check := range checks {
 			if check.Status == "fail" {
