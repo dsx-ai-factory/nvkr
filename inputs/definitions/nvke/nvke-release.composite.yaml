@@ -5,8 +5,8 @@
 apiVersion: nvkr.dev/composite-definition/v1
 kind: CompositeDefinition
 metadata:
-  name: nvke-gpu-site
-  description: Build and publish an NVKE GPU site as one Release from the five NVKE family Definitions and the GB200 AICR bundles.
+  name: nvke-release
+  description: Publish NVKE and its package-derived inventory as one Release.
 members:
   - name: aicr-nvke-gb200
     definition: ../aicr/nvke-gb200.yaml
@@ -44,3 +44,11 @@ variants:
     members: [nvke-disks, nvke-disks-ubuntu24]
   - component: ubuntu-installer-iso-amd64
     members: [nvke-disks, nvke-disks-ubuntu24]
+
+# Derived only after the named member packages complete in this publication namespace.
+derivedOutputs:
+  - name: aicr-inventory
+    platform: linux/amd64
+    derived:
+      encoding: aicr-inventory-v1
+      outputs: [controller-chart, nktp, nvke-controller, postgresql, spire, spire-crds, temporal]

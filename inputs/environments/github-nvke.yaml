@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
-  description: Signed NVKE GPU site composite candidate publication in its own partitioned workflow and registry namespace. Native disks retain build provenance; deep inspection and material reconciliation remain deferred.
+  description: Signed NVKE composite candidate publication in its own partitioned workflow and registry namespace. Native disks retain build provenance; deep inspection and material reconciliation remain deferred.
   name: nvke-github
 githubBundle: nvke
 githubExecutionPartitions: true
@@ -80,7 +80,7 @@ diskInspectionProfiles:
 publication:
   mode: per-output-v1
   credentialRef: github:NVKR_REGISTRY_WRITE
-  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/candidate/gpu-site
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/candidate/nvke
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared

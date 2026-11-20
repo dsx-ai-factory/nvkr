@@ -123,11 +123,11 @@ Regenerate with the intended selection after changing its inputs or generator co
 
 ```sh
 go run ./cmd/nvkr run generate \
-  --definition inputs/definitions/nvke/gpu-site-release.composite.yaml \
-  --environment inputs/environments/github-nvke-gpu-site.yaml --engine github --root .
+  --definition inputs/definitions/nvke/nvke-release.composite.yaml \
+  --environment inputs/environments/github-nvke.yaml --engine github --root .
 go run ./cmd/nvkr run generate \
-  --definition inputs/definitions/nvke/gpu-site-release.composite.yaml \
-  --environment inputs/environments/github-nvke-gpu-site.yaml --engine github --root . --check
+  --definition inputs/definitions/nvke/nvke-release.composite.yaml \
+  --environment inputs/environments/github-nvke.yaml --engine github --root . --check
 ```
 
 Use the same generator version and input selection for generation and checking. Generated files are owned by

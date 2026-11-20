@@ -64,8 +64,8 @@
   ],
   "kind": "Definition",
   "metadata": {
-    "description": "Build and publish an NVKE GPU site as one Release from the five NVKE family Definitions and the GB200 AICR bundles.",
-    "name": "nvke-gpu-site"
+    "description": "Build and publish NVKE as one Release from the five NVKE family Definitions and the GB200 AICR bundles.",
+    "name": "nvke"
   },
   "outputs": [
     {

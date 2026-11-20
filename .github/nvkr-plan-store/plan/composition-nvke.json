@@ -1,5 +1,5 @@
 {
-  "effectiveDefinitionDigest": "sha256:ab581be309ef217d0f3a94e5a54009495f74510c98a7d5b7e0c9d2efe3d60d38",
+  "effectiveDefinitionDigest": "sha256:43496c95466cd2213386f5db6eeac102a0bc41cb0d2104d884aae9a3b848fdd7",
   "kind": "CompositeDefinition",
   "members": [
     {
@@ -28,8 +28,8 @@
     }
   ],
   "metadata": {
-    "description": "Build and publish an NVKE GPU site as one Release from the five NVKE family Definitions and the GB200 AICR bundles.",
-    "name": "nvke-gpu-site"
+    "description": "Build and publish NVKE as one Release from the five NVKE family Definitions and the GB200 AICR bundles.",
+    "name": "nvke"
   },
   "outputs": [
     {

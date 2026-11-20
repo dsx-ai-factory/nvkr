@@ -4,7 +4,7 @@
 apiVersion: nvkr.dev/environment/v1
 kind: Environment
 metadata:
-  description: Dispatch-frozen NVKE GPU site composite candidate publication in its own partitioned workflow and registry namespace. Native disks retain build provenance; deep inspection and material reconciliation remain deferred.
+  description: Dispatch-frozen NVKE composite candidate publication in its own partitioned workflow and registry namespace. Native disks retain build provenance; deep inspection and material reconciliation remain deferred.
   name: nvke-nightly-github
 githubBundle: nvke-nightly
 githubRuntimePlan: true
@@ -90,7 +90,7 @@ diskInspectionProfiles:
 publication:
   mode: per-output-v1
   credentialRef: github:NVKR_REGISTRY_WRITE
-  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/nightly/gpu-site
+  repositoryPrefix: ghcr.io/dsx-ai-factory/nvkr/nightly/nvke
 runtime:
   runtime: docker
   buildNetworkPolicy: producer-declared
